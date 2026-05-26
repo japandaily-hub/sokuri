@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ソクウリ｜写真1枚で最高値査定（デザインプレビュー）</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>html{scroll-behavior:smooth}</style>
+</head>
+<body class="bg-gray-50 text-gray-900 antialiased">
+
+<!-- ===== 注記バー（プレビュー専用・実サイトには無し） ===== -->
+<div class="bg-amber-100 px-4 py-2 text-center text-xs text-amber-800">
+  これは web/ トップページのデザインプレビューです。実際の査定機能はバックエンド起動時に動作します。
+</div>
+
+<!-- ===== HEADER ===== -->
+<header class="sticky top-0 z-50 border-b border-gray-200 bg-white shadow-sm">
+  <div class="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
+    <a href="#top" class="flex items-center gap-2">
+      <span class="text-xl font-black tracking-tight text-blue-700">ソクウリ</span>
+      <span class="rounded bg-blue-100 px-1.5 py-0.5 text-xs font-semibold text-blue-700">AI査定</span>
+    </a>
+    <nav class="hidden items-center gap-6 text-sm font-medium text-gray-600 sm:flex">
+      <a href="#features" class="hover:text-blue-700">特徴</a>
+      <a href="#categories" class="hover:text-blue-700">カテゴリ</a>
+      <a href="#how-it-works" class="hover:text-blue-700">使い方</a>
+      <a href="#channels" class="hover:text-blue-700">売却チャネル</a>
+      <a href="#faq" class="hover:text-blue-700">よくある質問</a>
+    </nav>
+    <a href="#top" class="rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800">今すぐ査定</a>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- ===== HERO ===== -->
+<section class="bg-gradient-to-br from-blue-800 via-blue-700 to-blue-500 pb-16 pt-12">
+  <div class="mx-auto max-w-7xl px-4">
+    <div class="grid grid-cols-1 items-center gap-10 lg:grid-cols-2">
+      <div class="text-white">
+        <p class="mb-2 text-sm font-semibold uppercase tracking-widest text-blue-200">AI × リユース査定</p>
+        <h1 class="text-4xl font-black leading-tight sm:text-5xl">
+          写真1枚で<br /><span class="text-yellow-300">最高値</span>で売ろう
+        </h1>
+        <p class="mt-5 text-lg leading-relaxed text-blue-100">
+          AIが商品を自動識別して、メルカリ・ヤフオク・買取店など最適な売却チャネルと査定額を<strong>即時に提案</strong>します。
+        </p>
+        <div class="mt-6 flex flex-wrap gap-4 text-sm font-medium text-blue-200">
+          <span class="flex items-center gap-1.5"><span class="text-green-300">✓</span> 完全無料</span>
+          <span class="flex items-center gap-1.5"><span class="text-green-300">✓</span> 登録不要</span>
+          <span class="flex items-center gap-1.5"><span class="text-green-300">✓</span> 30秒で査定完了</span>
+          <span class="flex items-center gap-1.5"><span class="text-green-300">✓</span> 全カテゴリ対応</span>
+        </div>
+      </div>
+      <div class="rounded-2xl bg-white p-6 shadow-2xl">
+        <h2 class="mb-5 text-center text-lg font-bold text-gray-900">かんたん査定をスタート</h2>
+        <div class="mb-4 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 px-6 py-10 text-center">
+          <svg class="mb-3 h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          <p class="text-sm font-semibold text-gray-700">写真を撮影 / ファイルを選択</p>
+          <p class="mt-1 text-xs text-gray-400">JPEG, PNG, WebP など</p>
+        </div>
+        <button class="inline-flex w-full items-center justify-center rounded-xl bg-blue-700 px-6 py-3.5 text-base font-bold text-white shadow-md hover:bg-blue-800">査定する</button>
+        <p class="mt-3 text-center text-xs text-gray-400">明るい場所で商品全体が写った写真を使うと精度が上がります。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SERVICE INTRO（追加） ===== -->
+<section id="about" class="bg-gray-50 py-14">
+  <div class="mx-auto max-w-7xl px-4">
+    <div class="mb-10 text-center">
+      <p class="text-xs font-semibold uppercase tracking-widest text-blue-600">About</p>
+      <h2 class="mt-1 text-2xl font-black text-gray-900">「売りたい」と「めんどくさい」を、AI が解決</h2>
+      <p class="mt-2 text-sm text-gray-500">不要品の売却にはいつも手間がついて回ります。ソクウリはその手間そのものをなくします。</p>
+    </div>
+    <div class="grid grid-cols-1 gap-5 md:grid-cols-3">
+      <div class="rounded-2xl border border-gray-200 bg-white p-6">
+        <p class="text-xs font-bold text-gray-400">これまでの選択肢 ①</p>
+        <h3 class="mt-2 text-base font-bold text-gray-900">フリマは、とにかく手間</h3>
+        <p class="mt-2 text-sm leading-relaxed text-gray-500">写真撮影・説明文・価格設定・梱包・発送・購入者対応。1 点売るだけでも作業が山積みです。</p>
+      </div>
+      <div class="rounded-2xl border border-gray-200 bg-white p-6">
+        <p class="text-xs font-bold text-gray-400">これまでの選択肢 ②</p>
+        <h3 class="mt-2 text-base font-bold text-gray-900">一括査定は、電話が殺到</h3>
+        <p class="mt-2 text-sm leading-relaxed text-gray-500">フォーム入力の手間に加え、申し込んだ途端に多数の業者から営業電話がかかってきます。</p>
+      </div>
+      <div class="rounded-2xl border-2 border-blue-600 bg-white p-6 shadow-sm">
+        <span class="inline-flex rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-bold text-blue-700">ソクウリの答え</span>
+        <h3 class="mt-2 text-base font-bold text-gray-900">撮るだけ。あとは AI に任せる</h3>
+        <p class="mt-2 text-sm leading-relaxed text-gray-500">AI が商品・状態・相場を判定し、最適な売却チャネルを提案。あなたは案内に沿って売るだけです。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FEATURES（追加） ===== -->
+<section id="features" class="bg-white py-14">
+  <div class="mx-auto max-w-7xl px-4">
+    <div class="mb-10 text-center">
+      <p class="text-xs font-semibold uppercase tracking-widest text-blue-600">Features</p>
+      <h2 class="mt-1 text-2xl font-black text-gray-900">ソクウリが選ばれる 3 つの理由</h2>
+    </div>
+    <div class="grid grid-cols-1 gap-6 sm:grid-cols-3">
+      <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div class="mb-4 flex items-center gap-3"><span class="text-2xl font-black text-blue-700">01</span><span class="text-3xl">📸</span></div>
+        <h3 class="mb-2 text-base font-bold text-gray-900">写真 1 枚で AI 査定</h3>
+        <p class="text-sm leading-relaxed text-gray-500">商品名も型番も相場も、自分で調べる必要はありません。撮るだけで AI が識別し、査定します。</p>
+      </div>
+      <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div class="mb-4 flex items-center gap-3"><span class="text-2xl font-black text-blue-700">02</span><span class="text-3xl">⚖️</span></div>
+        <h3 class="mb-2 text-base font-bold text-gray-900">複数チャネルを一括比較</h3>
+        <p class="text-sm leading-relaxed text-gray-500">メルカリ・ヤフオク・買取店など多数の売り先から、AI が最も高く売れるチャネルを提案します。</p>
+      </div>
+      <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div class="mb-4 flex items-center gap-3"><span class="text-2xl font-black text-blue-700">03</span><span class="text-3xl">📦</span></div>
+        <h3 class="mb-2 text-base font-bold text-gray-900">ほぼ全カテゴリに対応</h3>
+        <p class="text-sm leading-relaxed text-gray-500">家電・ファッション・ブランド品・ホビーから家具まで、幅広い商品を 1 つの入口で査定できます。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== COMPARISON（追加） ===== -->
+<section class="bg-gray-50 py-14">
+  <div class="mx-auto max-w-7xl px-4">
+    <div class="mb-10 text-center">
+      <p class="text-xs font-semibold uppercase tracking-widest text-blue-600">Comparison</p>
+      <h2 class="mt-1 text-2xl font-black text-gray-900">他の売り方と、どう違う？</h2>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="mx-auto w-full min-w-[640px] max-w-3xl border-collapse text-sm">
+        <thead>
+          <tr>
+            <th class="w-1/4 px-4 py-3 text-left font-bold text-gray-500">項目</th>
+            <th class="px-4 py-3 text-center font-bold text-gray-600">フリマで自力出品</th>
+            <th class="px-4 py-3 text-center font-bold text-gray-600">何でも一括査定</th>
+            <th class="rounded-t-xl bg-blue-700 px-4 py-3 text-center font-black text-white">ソクウリ</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="border-t border-gray-200">
+            <td class="px-4 py-4 text-left font-bold text-gray-800">出品・入力の手間</td>
+            <td class="px-4 py-4 text-center"><span class="text-lg font-black text-gray-300">×</span></td>
+            <td class="px-4 py-4 text-center"><span class="text-lg font-black text-gray-400">△</span></td>
+            <td class="bg-blue-50 px-4 py-4 text-center"><span class="text-lg font-black text-blue-700">◎</span><span class="mt-0.5 block text-xs text-gray-500">写真を撮るだけ</span></td>
+          </tr>
+          <tr class="border-t border-gray-200">
+            <td class="px-4 py-4 text-left font-bold text-gray-800">価格・相場の調査</td>
+            <td class="px-4 py-4 text-center"><span class="text-lg font-black text-gray-300">×</span></td>
+            <td class="px-4 py-4 text-center"><span class="text-lg font-black text-gray-400">△</span></td>
+            <td class="bg-blue-50 px-4 py-4 text-center"><span class="text-lg font-black text-blue-700">◎</span><span class="mt-0.5 block text-xs text-gray-500">AI が自動算出</span></td>
+          </tr>
+          <tr class="border-t border-gray-200">
+            <td class="px-4 py-4 text-left font-bold text-gray-800">連絡・営業電話</td>
+            <td class="px-4 py-4 text-center"><span class="text-lg font-black text-gray-400">△</span></td>
+            <td class="px-4 py-4 text-center"><span class="text-lg font-black text-gray-300">×</span></td>
+            <td class="bg-blue-50 px-4 py-4 text-center"><span class="text-lg font-black text-blue-700">◎</span><span class="mt-0.5 block text-xs text-gray-500">一斉架電なし</span></td>
+          </tr>
+          <tr class="border-t border-gray-200">
+            <td class="px-4 py-4 text-left font-bold text-gray-800">対応カテゴリ</td>
+            <td class="px-4 py-4 text-center"><span class="text-lg font-black text-gray-400">△</span></td>
+            <td class="px-4 py-4 text-center"><span class="text-lg font-black text-gray-400">△</span></td>
+            <td class="rounded-b-xl bg-blue-50 px-4 py-4 text-center"><span class="text-lg font-black text-blue-700">◎</span><span class="mt-0.5 block text-xs text-gray-500">ほぼ全カテゴリ</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ===== CATEGORIES ===== -->
+<section id="categories" class="bg-white py-14">
+  <div class="mx-auto max-w-7xl px-4">
+    <div class="mb-8">
+      <p class="text-xs font-semibold uppercase tracking-widest text-blue-600">Categories</p>
+      <h2 class="mt-1 text-2xl font-black text-gray-900">カテゴリから査定</h2>
+    </div>
+    <div id="cat-grid" class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6"></div>
+  </div>
+</section>
+
+<!-- ===== HOW IT WORKS ===== -->
+<section id="how-it-works" class="bg-gray-50 py-14">
+  <div class="mx-auto max-w-7xl px-4">
+    <div class="mb-10 text-center">
+      <p class="text-xs font-semibold uppercase tracking-widest text-blue-600">How it works</p>
+      <h2 class="mt-1 text-2xl font-black text-gray-900">かんたん3ステップで査定完了</h2>
+      <p class="mt-2 text-sm text-gray-500">登録不要・完全無料。スマホで撮ってすぐ査定。</p>
+    </div>
+    <div class="grid grid-cols-1 gap-6 sm:grid-cols-3">
+      <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div class="mb-4 flex items-center gap-3"><span class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-700 text-sm font-black text-white">01</span><span class="text-3xl">📷</span></div>
+        <h3 class="mb-2 text-base font-bold text-gray-900">写真を撮る</h3>
+        <p class="text-sm leading-relaxed text-gray-500">商品の写真を1枚撮影するか、既存の画像をアップロードするだけ。</p>
+      </div>
+      <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div class="mb-4 flex items-center gap-3"><span class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-700 text-sm font-black text-white">02</span><span class="text-3xl">🔍</span></div>
+        <h3 class="mb-2 text-base font-bold text-gray-900">AIが商品を識別</h3>
+        <p class="text-sm leading-relaxed text-gray-500">AIが商品名・カテゴリ・コンディションを自動で判定します。</p>
+      </div>
+      <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div class="mb-4 flex items-center gap-3"><span class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-700 text-sm font-black text-white">03</span><span class="text-3xl">💰</span></div>
+        <h3 class="mb-2 text-base font-bold text-gray-900">最高値チャネルを確認</h3>
+        <p class="text-sm leading-relaxed text-gray-500">メルカリ・ヤフオク・買取店など複数チャネルの査定額を比較。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== CHANNELS ===== -->
+<section id="channels" class="bg-white py-14">
+  <div class="mx-auto max-w-7xl px-4">
+    <div class="mb-8 text-center">
+      <p class="text-xs font-semibold uppercase tracking-widest text-blue-600">Channels</p>
+      <h2 class="mt-1 text-2xl font-black text-gray-900">対応売却チャネル一覧</h2>
+      <p class="mt-2 text-sm text-gray-500">複数チャネルの査定額を一括比較して、最も高く売れる場所を選べます。</p>
+    </div>
+    <div id="ch-grid" class="grid grid-cols-2 gap-4 sm:grid-cols-4"></div>
+  </div>
+</section>
+
+<!-- ===== FAQ（追加） ===== -->
+<section id="faq" class="bg-gray-50 py-14">
+  <div class="mx-auto max-w-7xl px-4">
+    <div class="mb-10 text-center">
+      <p class="text-xs font-semibold uppercase tracking-widest text-blue-600">FAQ</p>
+      <h2 class="mt-1 text-2xl font-black text-gray-900">よくあるご質問</h2>
+    </div>
+    <div id="faq-list" class="mx-auto max-w-2xl divide-y divide-gray-200 overflow-hidden rounded-2xl border border-gray-200 bg-white"></div>
+  </div>
+</section>
+
+<!-- ===== CTA ===== -->
+<section class="bg-gradient-to-r from-blue-800 to-blue-600 py-14">
+  <div class="mx-auto max-w-7xl px-4 text-center text-white">
+    <h2 class="text-2xl font-black sm:text-3xl">まずは1枚、写真を撮ってみよう</h2>
+    <p class="mt-3 text-blue-200">登録不要・完全無料。30秒で査定結果が出ます。</p>
+    <a href="#top" class="mt-6 inline-flex items-center gap-2 rounded-xl bg-yellow-400 px-8 py-4 text-base font-black text-gray-900 shadow-lg hover:bg-yellow-300"><span>📷</span>今すぐ無料で査定する</a>
+  </div>
+</section>
+
+</main>
+
+<!-- ===== FOOTER ===== -->
+<footer class="border-t border-gray-200 bg-white">
+  <div class="mx-auto max-w-7xl px-4 py-10">
+    <div class="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+      <div>
+        <span class="text-lg font-black text-blue-700">ソクウリ</span>
+        <p class="mt-1 max-w-xs text-xs leading-relaxed text-gray-400">写真1枚でAIが商品を識別。メルカリ・ヤフオク・買取店など、あなたの商品が最も高く売れるチャネルを即時提案します。</p>
+      </div>
+      <div class="flex gap-12 text-sm">
+        <div>
+          <p class="mb-3 font-semibold text-gray-700">サービス</p>
+          <ul class="space-y-2 text-gray-400">
+            <li><a href="#categories" class="hover:text-gray-600">カテゴリ一覧</a></li>
+            <li><a href="#how-it-works" class="hover:text-gray-600">使い方</a></li>
+            <li><a href="#channels" class="hover:text-gray-600">対応チャネル</a></li>
+          </ul>
+        </div>
+        <div>
+          <p class="mb-3 font-semibold text-gray-700">その他</p>
+          <ul class="space-y-2 text-gray-400">
+            <li><a href="#" class="hover:text-gray-600">利用規約</a></li>
+            <li><a href="#" class="hover:text-gray-600">プライバシーポリシー</a></li>
+            <li><a href="#" class="hover:text-gray-600">お問い合わせ</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="mt-8 border-t border-gray-100 pt-6 text-center text-xs text-gray-300">© 2026 ソクウリ. All rights reserved.</div>
+  </div>
+</footer>
+
+<script>
+const CATEGORIES = [
+  ["📱","家電・デジタル","スマホ・PC・カメラ"],["👗","ファッション","衣類・シューズ・帽子"],
+  ["👜","ブランド品","バッグ・財布・アクセサリー"],["⌚","時計・貴金属","腕時計・指輪・ネックレス"],
+  ["🎮","ゲーム・おもちゃ","ゲーム機・フィギュア"],["🎸","楽器","ギター・鍵盤・管楽器"],
+  ["📚","本・コミック","書籍・漫画・雑誌"],["🏋️","スポーツ・アウトドア","用具・ウェア・自転車"],
+  ["🏠","家具・インテリア","テーブル・チェア・照明"],["💄","美容・コスメ","スキンケア・メイク"],
+  ["🎨","アート・コレクション","絵画・切手・コイン"],["🚗","カー用品","パーツ・カーナビ・タイヤ"],
+];
+document.getElementById("cat-grid").innerHTML = CATEGORIES.map(([icon,label,sub]) =>
+  `<div class="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-white p-4 text-center hover:border-blue-400 hover:bg-blue-50">
+     <span class="text-3xl">${icon}</span>
+     <span class="text-xs font-bold text-gray-800">${label}</span>
+     <span class="text-xs text-gray-400">${sub}</span></div>`).join("");
+
+const CHANNELS = [
+  ["メルカリ","bg-red-50 border-red-200 text-red-700","個人間売買 No.1"],
+  ["ヤフオク","bg-red-50 border-red-200 text-red-600","オークション最大手"],
+  ["PayPayフリマ","bg-orange-50 border-orange-200 text-orange-700","即時買取対応"],
+  ["ラクマ","bg-green-50 border-green-200 text-green-700","手数料最安水準"],
+  ["ブックオフ","bg-yellow-50 border-yellow-200 text-yellow-700","本・CD・ゲーム専門"],
+  ["セカンドストリート","bg-blue-50 border-blue-200 text-blue-700","ブランド・古着強い"],
+  ["ハードオフ","bg-purple-50 border-purple-200 text-purple-700","家電・楽器専門"],
+  ["トレジャーファクトリー","bg-pink-50 border-pink-200 text-pink-700","総合リサイクル"],
+];
+document.getElementById("ch-grid").innerHTML = CHANNELS.map(([name,color,desc]) =>
+  `<div class="rounded-xl border px-4 py-4 text-center ${color}">
+     <p class="font-bold">${name}</p><p class="mt-1 text-xs opacity-70">${desc}</p></div>`).join("");
+
+const FAQ = [
+  ["査定にお金はかかりますか？","完全無料です。会員登録も不要で、何度でもご利用いただけます。"],
+  ["どんな商品に対応していますか？","家電・デジタル機器、ファッション、ブランド品、時計・貴金属、ホビー、家具・インテリアなど幅広いカテゴリに対応しています。"],
+  ["写真はどのように撮ればいいですか？","商品全体が明るく写るように 1 枚撮影してください。型番やブランドのロゴが分かると、より正確に判定できます。"],
+  ["表示された査定額で必ず売れますか？","査定額は AI が算出する参考値です。実際の価格は、各フリマサービスや買取店での確認をもって確定します。"],
+  ["しつこい営業電話は来ますか？","ソクウリは最適な売却チャネルを提案するサービスです。一括査定のように多数の業者から一斉に電話が来ることはありません。"],
+  ["個人情報の登録は必要ですか？","査定の利用に会員登録や個人情報の入力は不要です。写真をアップロードするだけで査定できます。"],
+];
+document.getElementById("faq-list").innerHTML = FAQ.map(([q,a],i) =>
+  `<div>
+     <button class="faq-q flex w-full items-center justify-between gap-4 px-5 py-4 text-left hover:bg-gray-50" data-i="${i}">
+       <span class="text-sm font-bold text-gray-900">${q}</span>
+       <span class="faq-mark shrink-0 text-xl font-black text-blue-700">${i===0?"−":"+"}</span>
+     </button>
+     <div class="faq-a px-5 pb-5 text-sm leading-relaxed text-gray-600" ${i===0?"":"hidden"}>${a}</div>
+   </div>`).join("");
+document.querySelectorAll(".faq-q").forEach(btn => btn.addEventListener("click", () => {
+  const panel = btn.nextElementSibling;
+  const open = !panel.hasAttribute("hidden");
+  if (open) { panel.setAttribute("hidden",""); btn.querySelector(".faq-mark").textContent = "+"; }
+  else { panel.removeAttribute("hidden"); btn.querySelector(".faq-mark").textContent = "−"; }
+}));
+</script>
+
+</body>
+</html>

@@ -1,0 +1,97 @@
+erDiagram
+    channels {
+        UUID id PK
+        VARCHAR(64) code UK
+        VARCHAR(128) display_name
+        VARCHAR(32) channel_type
+        VARCHAR(32) primary_category_tier
+        VARCHAR(2048) base_url
+        BOOLEAN is_active
+        INTEGER priority
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    affiliate_meta {
+        UUID id PK
+        UUID channel_id FK
+        VARCHAR(32) asp_network
+        VARCHAR(128) program_id
+        VARCHAR(2048) tracking_url_template
+        VARCHAR(32) reward_type
+        BIGINT reward_amount_min
+        BIGINT reward_amount_max
+        VARCHAR(3) reward_currency
+        BOOLEAN requires_pr_label
+        VARCHAR(32) pr_label_text
+        BOOLEAN is_active
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    routing_rules {
+        UUID id PK
+        VARCHAR(128) name
+        BOOLEAN is_active
+        INTEGER priority
+        VARCHAR(32) match_category_tier
+        VARCHAR(32) match_min_condition
+        VARCHAR(32) match_max_condition
+        BIGINT match_price_min
+        BIGINT match_price_max
+        JSONB match_attributes
+        UUID channel_id FK
+        INTEGER recommendation_rank
+        TEXT reason_template
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    items {
+        UUID id PK
+        VARCHAR(32) category_tier
+        VARCHAR(255) detected_name
+        VARCHAR(128) detected_category_label
+        VARCHAR(32) condition
+        FLOAT condition_confidence
+        VARCHAR(512) image_object_key
+        JSONB attributes
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    assessments {
+        UUID id PK
+        UUID item_id FK
+        VARCHAR(32) status
+        BIGINT estimated_price_min
+        BIGINT estimated_price_max
+        VARCHAR(3) price_currency
+        JSONB price_basis
+        VARCHAR(32) routing_method
+        VARCHAR(64) llm_model
+        JSONB raw_vision_payload
+        TEXT failure_reason
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    recommendations {
+        UUID id PK
+        UUID assessment_id FK
+        UUID channel_id FK
+        UUID source_routing_rule_id FK
+        INTEGER rank
+        TEXT reason
+        BOOLEAN is_sponsored
+        VARCHAR(2048) outbound_url
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    channels ||--o| affiliate_meta : "1:0..1 (収益化メタ)"
+    channels ||--o{ routing_rules : "1:N (ルール出力先)"
+    channels ||--o{ recommendations : "1:N (推奨先)"
+    items ||--o{ assessments : "1:N (再査定対応)"
+    assessments ||--o{ recommendations : "1:N (推奨一覧)"
+    routing_rules ||--o{ recommendations : "0..1:N (判定元ルール)"

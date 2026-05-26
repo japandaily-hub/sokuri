@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   ベーススタイル — タイポグラフィの土台と可読性の最適化
+   ============================================================ */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    /* 日本語の約物を詰めて見出しの締まりを出す（フィンテック調の精緻さ） */
+    font-feature-settings: "palt" 1;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* 数字は等幅寄りに揃え、価格表示のブレを防ぐ */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::selection {
+    background-color: #1f54de;
+    color: #ffffff;
+  }
+
+  /* キーボード操作時のフォーカスを必ず可視化（アクセシビリティ） */
+  :focus-visible {
+    outline: 2px solid #1f54de;
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}
+
+/* ============================================================
+   コンポーネントユーティリティ — 画面間で再利用する構造
+   ============================================================ */
+@layer components {
+  /* 全画面共通の中央コンテナ。横幅と左右余白をここで一元管理する */
+  .container-aw {
+    @apply mx-auto w-full max-w-container px-5 sm:px-6 lg:px-8;
+  }
+
+  /* ヒーロー背景: 上部に淡いブランド光彩を置いたクリーンな下地 */
+  .hero-surface {
+    background-image:
+      radial-gradient(
+        58% 46% at 50% -4%,
+        rgba(31, 84, 222, 0.13) 0%,
+        rgba(31, 84, 222, 0) 72%
+      ),
+      linear-gradient(180deg, #f1f5fd 0%, #ffffff 64%);
+  }
+
+  /* 微細なグリッド。情報密度のある面に「設計された」印象を与える */
+  .bg-grid-faint {
+    background-image:
+      linear-gradient(to right, rgba(20, 31, 72, 0.045) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(20, 31, 72, 0.045) 1px, transparent 1px);
+    background-size: 38px 38px;
+  }
+}
+
+/* ============================================================
+   スクロールバー — スリムで主張しない見た目に統一
+   ============================================================ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8;
+}
+
+/* アニメーションを抑制したいユーザーの設定を尊重する */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

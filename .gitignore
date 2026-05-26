@@ -1,0 +1,209 @@
+# =============================================================================
+# AssetWise — .gitignore
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Secrets / Environment
+# -----------------------------------------------------------------------------
+.env
+.env.local
+.env.*.local
+backend/.env
+!backend/.env.example
+
+# -----------------------------------------------------------------------------
+# Python
+# -----------------------------------------------------------------------------
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.Python
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+*.egg
+.eggs/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.env/
+backend/.venv/
+
+# pytest
+.pytest_cache/
+**/pytest-cache-files-*/
+.cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+*.py,cover
+nosetests.xml
+test-results/
+
+# mypy / ruff / pyright
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
+pyrightconfig.json
+
+# Type stubs
+*.pyi.bak
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# uv
+.uv/
+
+# -----------------------------------------------------------------------------
+# Node / JavaScript / TypeScript
+# -----------------------------------------------------------------------------
+node_modules/
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Build output
+dist/
+build/
+out/
+.next/
+.nuxt/
+.output/
+.cache/
+
+# TypeScript
+*.tsbuildinfo
+
+# Lock files (keep package-lock.json / yarn.lock / pnpm-lock.yaml — remove only if monorepo policy differs)
+# Uncomment the line below only if you intentionally ignore lock files:
+# package-lock.json
+
+# -----------------------------------------------------------------------------
+# Expo / React Native
+# -----------------------------------------------------------------------------
+.expo/
+.expo-shared/
+
+# Expo web
+web-build/
+
+# React Native Metro bundler
+*.hbc
+metro-cache/
+.metro-health-check*
+
+# Expo EAS
+eas-build-local-nodejs/
+
+# Android
+android/
+*.keystore
+!debug.keystore
+
+# iOS
+ios/
+*.xcworkspace/
+*.xcuserstate
+*.xcbkptlist
+Pods/
+Podfile.lock
+*.mobileprovision
+*.p8
+*.p12
+*.cer
+
+# -----------------------------------------------------------------------------
+# Docker
+# -----------------------------------------------------------------------------
+# Keep docker-compose.yml and Dockerfiles in VCS; ignore override files
+docker-compose.override.yml
+docker-compose.local.yml
+.dockerignore.local
+
+# -----------------------------------------------------------------------------
+# Logs
+# -----------------------------------------------------------------------------
+*.log
+logs/
+*.log.*
+npm-debug.log
+yarn-debug.log
+pnpm-debug.log
+
+# -----------------------------------------------------------------------------
+# OS / IDE
+# -----------------------------------------------------------------------------
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# VS Code
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json.example
+
+# JetBrains
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Vim / Emacs
+*.swp
+*.swo
+*~
+\#*\#
+.\#*
+
+# Cursor
+.cursor/
+
+# -----------------------------------------------------------------------------
+# Alembic
+# -----------------------------------------------------------------------------
+# Keep migrations; ignore generated SQL dumps
+*.sql.dump
+
+# -----------------------------------------------------------------------------
+# Misc
+# -----------------------------------------------------------------------------
+*.bak
+*.tmp
+*.orig
+tmp/
+temp/
+
+# Claude / Cowork
+.claude/
