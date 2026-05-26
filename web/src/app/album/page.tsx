@@ -44,6 +44,8 @@ interface AlbumItem {
   status: ItemStatus;
   /** バックエンド item_id（analyze 成功後） */
   itemId?: string;
+  /** バックエンド assessment_id（estimate 成功後、POST /albums で使用） */
+  assessmentId?: string;
   /** AI 識別商品名 */
   detectedName?: string;
   /** AI 推定コンディション */
@@ -113,6 +115,7 @@ export default function AlbumPage() {
 
       patch({
         status: "ready",
+        assessmentId: estimated.assessment_id,
         estimatedPrice: estimated.estimated_price,
       });
     } catch (err) {
@@ -186,8 +189,9 @@ export default function AlbumPage() {
     if (!canSubmit) return;
     setSubmitting(true);
     const payload = items
-      .filter((it) => it.status === "ready")
+      .filter((it) => it.status === "ready" && it.assessmentId)
       .map((it) => ({
+        assessment_id: it.assessmentId!,
         item_id: it.itemId,
         detected_name: it.detectedName,
         condition: it.condition,

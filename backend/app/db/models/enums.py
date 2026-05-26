@@ -88,3 +88,18 @@ class RewardType(str, enum.Enum):
     CPA = "cpa"            # 成果報酬（査定申込・成約）
     CPL = "cpl"            # リード報酬
     REVSHARE = "revshare"  # 売上シェア
+
+
+class AlbumStatus(str, enum.Enum):
+    """アルバム（一括査定束）の状態（ADR-002 Phase 2+）。
+
+    Phase 2 では BIDDING / MATCHED は Wizard of Oz 運用（管理者が手動更新）。
+    Phase 3 で自動入札ロジック実装後に活性化する。
+    """
+
+    DRAFT = "draft"          # 作成中（フロント側で sessionStorage 段階）
+    SUBMITTED = "submitted"  # ユーザーが業者依頼ボタンを押下、管理者通知前
+    BIDDING = "bidding"      # 業者へ送信済み、入札期間中
+    MATCHED = "matched"      # ユーザーが業者を選択（成約）
+    CLOSED = "closed"        # 入札期間終了（マッチング不成立含む）
+    CANCELLED = "cancelled"  # ユーザーが取り消し

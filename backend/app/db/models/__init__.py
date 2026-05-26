@@ -7,11 +7,13 @@ import 時に全モデルモジュールを読み込む。
 from __future__ import annotations
 
 from app.db.base import Base
+from app.db.models.album import Album, AlbumItem
 from app.db.models.assessment import Assessment, AssessmentRecommendation
 from app.db.models.channel import AffiliateMeta, Channel
 from app.db.models.defect import DefectEvidence
 from app.db.models.enums import (
     AffiliateNetwork,
+    AlbumStatus,
     AssessmentStatus,
     CategoryTier,
     ChannelType,
@@ -27,6 +29,8 @@ __all__ = [
     "Item",
     "Assessment",
     "AssessmentRecommendation",
+    "Album",
+    "AlbumItem",
     "Channel",
     "AffiliateMeta",
     "DefectEvidence",
@@ -35,6 +39,7 @@ __all__ = [
     "ItemCondition",
     "ChannelType",
     "AssessmentStatus",
+    "AlbumStatus",
     "RoutingMethod",
     "AffiliateNetwork",
     "RewardType",

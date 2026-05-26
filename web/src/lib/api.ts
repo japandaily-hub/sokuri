@@ -88,6 +88,22 @@ export interface DefectsResponse {
   message: string;
 }
 
+/** POST /albums リクエスト */
+export interface AlbumCreateRequest {
+  assessment_ids: string[];
+  total_estimated_jpy?: number;
+  /** 業者非開示。運営からの通知用 */
+  lead_email?: string | null;
+}
+
+/** POST /albums レスポンス */
+export interface AlbumCreateResponse {
+  album_id: string;
+  status: "draft" | "submitted" | "bidding" | "matched" | "closed" | "cancelled";
+  item_count: number;
+  total_estimated_jpy: number;
+}
+
 // ---------------------------------------------------------------------------
 // API エラー
 // ---------------------------------------------------------------------------
@@ -196,6 +212,19 @@ export async function getAssessment(
   assessmentId: string,
 ): Promise<AssessmentResponse> {
   return request<AssessmentResponse>(`/assessments/${assessmentId}`);
+}
+
+/**
+ * アルバム（一括査定束）を作成する。
+ * 「まとめてソクウリ」フローのバックエンド永続化エントリポイント。
+ */
+export async function createAlbum(
+  payload: AlbumCreateRequest,
+): Promise<AlbumCreateResponse> {
+  return request<AlbumCreateResponse>("/albums", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 /**
