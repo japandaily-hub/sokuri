@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -26,6 +27,28 @@ class Settings(BaseSettings):
     google_api_key: str = ""
     # SQLAlchemy のクエリエコー
     sql_echo: bool = False
+
+    @field_validator("database_url", mode="after")
+    @classmethod
+    def _normalize_postgres_url(cls, v: str) -> str:
+        """Railway / Heroku 等のマネージド PaaS は ``DATABASE_URL`` を
+        ``postgres://`` または ``postgresql://`` 形式（ドライバ指定なし）で
+        払い出す。SQLAlchemy 非同期エンジン (``create_async_engine``) は
+        ``postgresql+asyncpg://`` プレフィックスが必須のため、ここで自動補正する。
+
+        影響範囲: ``Settings.database_url`` の最終値のみ。下流コード（session.py）は
+        変更不要。
+
+        変換規則:
+            ``postgres://...``        → ``postgresql+asyncpg://...``
+            ``postgresql://...``       → ``postgresql+asyncpg://...``  (ドライバ未指定時のみ)
+            ``postgresql+asyncpg://`` → そのまま（ローカル / 既に正しい）
+        """
+        if v.startswith("postgres://"):
+            return "postgresql+asyncpg://" + v[len("postgres://") :]
+        if v.startswith("postgresql://") and "+" not in v.split("://", 1)[0]:
+            return "postgresql+asyncpg://" + v[len("postgresql://") :]
+        return v
 
 
 @lru_cache
