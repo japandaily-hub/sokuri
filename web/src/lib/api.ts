@@ -106,13 +106,20 @@ export class ApiError extends Error {
 // 内部ユーティリティ
 // ---------------------------------------------------------------------------
 
+/**
+ * 本番フォールバック API URL。
+ *
+ * Vercel の Environment Variables を Sensitive 扱いにすると ``NEXT_PUBLIC_*`` が
+ * クライアントバンドルに inline されない既知制約があり、env var だけに頼ると
+ * 本番でフロントが backend に到達できなくなる。確実性のため本番 Railway URL を
+ * フォールバックとして埋め込む。
+ *
+ * ローカル開発時は ``.env.local`` の ``NEXT_PUBLIC_API_URL`` が優先される。
+ */
+const FALLBACK_PROD_API_URL = "https://backend-production-e4f0d.up.railway.app/api/v1";
+
 function getBaseUrl(): string {
-  const url = process.env.NEXT_PUBLIC_API_URL;
-  if (!url) {
-    throw new Error(
-      "NEXT_PUBLIC_API_URL が設定されていません。.env.local を確認してください。",
-    );
-  }
+  const url = process.env.NEXT_PUBLIC_API_URL || FALLBACK_PROD_API_URL;
   return url.replace(/\/$/, "");
 }
 
