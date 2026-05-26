@@ -9,6 +9,7 @@ import { ServiceIntro } from "@/components/landing/ServiceIntro";
 import { Features } from "@/components/landing/Features";
 import { Comparison } from "@/components/landing/Comparison";
 import { Faq } from "@/components/landing/Faq";
+import { TrustStrip } from "@/components/landing/TrustStrip";
 
 type PageState = "idle" | "loading" | "error";
 
@@ -255,6 +256,9 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* ===== 信頼バー（Hero 直下） ===== */}
+      <TrustStrip />
 
       {/* ===== サービス紹介・特徴・比較 ===== */}
       <ServiceIntro />

@@ -125,7 +125,7 @@ export default function OgImage() {
               background: "rgba(255,255,255,0.08)",
             }}
           >
-            ✓ 完全無料
+            ●完全無料
           </div>
           <div
             style={{
@@ -135,7 +135,7 @@ export default function OgImage() {
               background: "rgba(255,255,255,0.08)",
             }}
           >
-            ✓ 登録不要
+            ●登録不要
           </div>
           <div
             style={{
@@ -145,7 +145,7 @@ export default function OgImage() {
               background: "rgba(255,255,255,0.08)",
             }}
           >
-            ✓ 30秒で完了
+            ●30秒で完了
           </div>
           <div
             style={{
@@ -155,7 +155,7 @@ export default function OgImage() {
               background: "rgba(255,255,255,0.08)",
             }}
           >
-            ✓ 営業電話ゼロ
+            ●営業電話ゼロ
           </div>
         </div>
       </div>
