@@ -65,7 +65,8 @@ const STEPS: { step: string; icon: IconName; title: string; desc: string }[] = [
 ];
 
 // ===== ヒーローの信頼シグナル =====
-const TRUST_CHIPS = ["完全無料", "登録不要", "30秒で査定完了", "全カテゴリ対応"];
+// 「営業電話ゼロ」は一括査定経験者の最大の離脱要因に対する先回り訴求
+const TRUST_CHIPS = ["完全無料", "登録不要", "30秒で完了", "営業電話ゼロ"];
 
 export default function HomePage() {
   const router = useRouter();
@@ -138,12 +139,12 @@ export default function HomePage() {
             <h1 className="mt-5 text-[2rem] font-bold leading-[1.18] tracking-tight text-slate-900 sm:text-[2.75rem]">
               写真1枚で、
               <br />
-              <span className="text-brand-600">最高値</span>で売ろう。
+              <span className="text-brand-600">いちばん高く売れる</span>場所がわかる。
             </h1>
 
             <p className="mt-5 max-w-md text-base leading-relaxed text-slate-600">
-              AIが商品を自動で識別し、メルカリ・ヤフオク・買取店など、
-              最適な売却チャネルと査定額を<strong className="font-semibold text-slate-900">即時に提案</strong>します。
+              写真をアップするだけ。AIがメルカリ・ヤフオク・買取店を横断比較し、
+              <strong className="font-semibold text-slate-900">最も高く売れる場所</strong>を30秒で提示します。
             </p>
 
             <ul className="mt-6 flex flex-wrap gap-2">
@@ -198,9 +199,11 @@ export default function HomePage() {
                     <Icon name="image" className="h-6 w-6" />
                   </span>
                   <span className="mt-3 text-sm font-semibold text-slate-800">
-                    写真を撮影 / ファイルを選択
+                    タップして写真を撮る・選ぶ
                   </span>
-                  <span className="mt-1 text-xs text-slate-400">JPEG / PNG / WebP に対応</span>
+                  <span className="mt-1 text-xs text-slate-500">
+                    JPEG / PNG / WebP・最大10MB ・画像は査定後に自動削除
+                  </span>
                   <input
                     ref={inputRef}
                     type="file"
@@ -213,9 +216,13 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* エラー */}
+            {/* エラー (WCAG 4.1.3: 動的な状態変化を SR に伝達) */}
             {pageState === "error" && (
-              <div className="mt-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3">
+              <div
+                role="alert"
+                aria-live="assertive"
+                className="mt-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3"
+              >
                 <Icon name="alert" className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
                 <p className="text-sm text-red-700">{errorMessage}</p>
               </div>
@@ -235,13 +242,13 @@ export default function HomePage() {
                 </>
               ) : (
                 <>
-                  査定する
+                  無料でAI査定する（30秒）
                   <Icon name="arrow-right" className="h-4 w-4" strokeWidth={2.25} />
                 </>
               )}
             </button>
 
-            <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-xs text-slate-400">
+            <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-xs text-slate-500">
               <Icon name="lock" className="h-3.5 w-3.5" />
               登録不要・無料。明るい場所で商品全体を撮ると精度が上がります。
             </p>
@@ -286,7 +293,7 @@ export default function HomePage() {
                   <span className="block truncate text-sm font-semibold text-slate-900">
                     {label}
                   </span>
-                  <span className="block truncate text-xs text-slate-400">{sub}</span>
+                  <span className="block truncate text-xs text-slate-500">{sub}</span>
                 </span>
               </button>
             ))}
@@ -366,13 +373,13 @@ export default function HomePage() {
                 </span>
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-semibold text-slate-900">{name}</span>
-                  <span className="block truncate text-xs text-slate-400">{desc}</span>
+                  <span className="block truncate text-xs text-slate-500">{desc}</span>
                 </span>
               </div>
             ))}
           </div>
 
-          <p className="mt-6 text-center text-xs text-slate-400">
+          <p className="mt-6 text-center text-xs text-slate-500">
             ※ チャネルの提案には広告（PR）を含む場合があります。査定額はAIによる参考値です。
           </p>
         </div>

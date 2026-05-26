@@ -3,9 +3,11 @@
 /**
  * よくあるご質問セクション（アコーディオン）。
  * 開閉状態を持つため client コンポーネント。
+ * FAQPage 構造化データ (JSON-LD) を埋め込み、検索リッチリザルトに対応。
  */
 
 import { useState } from "react";
+import Script from "next/script";
 import { Icon } from "@/components/Icon";
 
 const FAQ_ITEMS: { q: string; a: string }[] = [
@@ -34,6 +36,20 @@ const FAQ_ITEMS: { q: string; a: string }[] = [
     a: "査定の利用に会員登録や個人情報の入力は不要です。写真をアップロードするだけで査定できます。",
   },
 ];
+
+/** Google 検索の FAQPage リッチリザルト用 JSON-LD */
+const FAQ_LD = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: FAQ_ITEMS.map((item) => ({
+    "@type": "Question",
+    name: item.q,
+    acceptedAnswer: {
+      "@type": "Answer",
+      text: item.a,
+    },
+  })),
+};
 
 export function Faq() {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
@@ -82,19 +98,30 @@ export function Faq() {
                     </span>
                   </button>
                 </h3>
-                {isOpen && (
-                  <div
-                    id={panelId}
-                    className="px-5 pb-5 text-sm leading-relaxed text-slate-600"
-                  >
-                    {item.a}
-                  </div>
-                )}
+                {/*
+                  WCAG 4.1.2: aria-controls の対象は常に DOM に存在させ、
+                  hidden 属性で表示制御する。
+                */}
+                <div
+                  id={panelId}
+                  role="region"
+                  hidden={!isOpen}
+                  className="px-5 pb-5 text-sm leading-relaxed text-slate-600"
+                >
+                  {item.a}
+                </div>
               </div>
             );
           })}
         </div>
       </div>
+      {/* JSON-LD: FAQPage（リッチリザルト用） */}
+      <Script
+        id="ld-faq"
+        type="application/ld+json"
+        strategy="afterInteractive"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(FAQ_LD) }}
+      />
     </section>
   );
 }
