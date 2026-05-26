@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { analyzeImage, ApiError, type AnalyzeResponse } from "@/lib/api";
 import { fileToBase64 } from "@/lib/format";
@@ -259,6 +260,42 @@ export default function HomePage() {
 
       {/* ===== 信頼バー（Hero 直下） ===== */}
       <TrustStrip />
+
+      {/* ============================================================
+          MODE SWITCH — 単品/まとめて
+          MOTA 型一括査定への入口を Hero 直下に常時露出
+      ============================================================ */}
+      <section className="bg-white py-10 sm:py-14">
+        <div className="container-aw">
+          <div className="mx-auto max-w-3xl rounded-2xl border-2 border-brand-200 bg-gradient-to-br from-brand-50 to-white p-6 shadow-card sm:p-8">
+            <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-6">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-cta">
+                <Icon name="sparkle" className="h-6 w-6" />
+              </span>
+              <div className="flex-1">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-brand-600">
+                  まとめてソクウリ
+                </p>
+                <h2 className="mt-1 text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
+                  家中の不用品を<span className="text-brand-700">まとめて</span>査定したい方へ
+                </h2>
+                <p className="mt-1.5 text-sm leading-relaxed text-slate-600">
+                  複数の不用品を 1 つのアルバムに束ねて、提携業者が
+                  <strong className="font-semibold text-slate-900">匿名で一括入札</strong>
+                  。回収費込みで最高額を比較できます（営業電話ゼロ）。
+                </p>
+              </div>
+              <Link
+                href="/album"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 px-5 py-3 text-sm font-semibold text-white shadow-cta transition-colors hover:bg-brand-700 focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
+              >
+                まとめて査定する
+                <Icon name="arrow-right" className="h-4 w-4" strokeWidth={2.25} />
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* ===== サービス紹介・特徴・比較 ===== */}
       <ServiceIntro />
