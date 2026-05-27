@@ -1,0 +1,43 @@
+# Render Blueprint — ソクウリ AssetWise バックエンド
+#
+# Render Web Service (FastAPI on Docker) + Managed PostgreSQL の一発プロビジョニング。
+# Railway デプロイ問題からの移行用。
+#
+# 使い方:
+#   1. Render dashboard → New → Blueprint
+#   2. このリポジトリを選択（japandaily-hub/sokuri）
+#   3. Render が本ファイルを読み取り、サービスと DB を一括作成
+#   4. GOOGLE_API_KEY は dashboard で手動入力（sync: false のため）
+
+databases:
+  - name: sokuri-db
+    databaseName: sokuri
+    user: sokuri
+    plan: free          # 90 日無期限の Free PostgreSQL（再起動なし、永続）
+    region: oregon
+    ipAllowList: []     # 内部接続のみ（Render Web Service からの接続を許可）
+
+services:
+  - type: web
+    name: sokuri-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free          # 750 時間/月 (1 instance ≒ 24/7 動作可能)
+    region: oregon      # databases と同一 region 必須（内部接続のため）
+    branch: main
+    autoDeploy: true
+    healthCheckPath: /health
+    # alembic マイグレーション → uvicorn 起動の合成コマンド
+    dockerCommand: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sokuri-db
+          property: connectionString   # postgres:// 形式（backend で asyncpg 化）
+      - key: GOOGLE_API_KEY
+        sync: false                    # dashboard で手動入力（git 漏洩防止）
+      - key: PORT
+        value: 8000
+      - key: SQL_ECHO
+        value: "false"
