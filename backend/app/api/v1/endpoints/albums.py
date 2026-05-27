@@ -16,9 +16,13 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+# email-validator パッケージ依存を避けるため EmailStr を使わず、
+# 軽量な正規表現で簡易検証する（送信前にフロントでも検証済み）。
+_EMAIL_PATTERN = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
 
 from app.db.models.album import Album, AlbumItem
 from app.db.models.assessment import Assessment
@@ -46,8 +50,10 @@ class AlbumCreateRequest(BaseModel):
         ge=0,
         description="AI 試算の合計（円）。業者入札の最低価格目安。0 で未指定",
     )
-    lead_email: EmailStr | None = Field(
+    lead_email: str | None = Field(
         default=None,
+        max_length=320,
+        pattern=_EMAIL_PATTERN,
         description=(
             "ユーザー連絡先メールアドレス。**業者には絶対開示しない**。"
             "成約確定後にのみ運営から業者へ手動連絡する。"
@@ -106,7 +112,7 @@ async def create_album(
     # ---- 3. Album 作成 ----
     initial_status = AlbumStatus.SUBMITTED if payload.lead_email else AlbumStatus.DRAFT
     album = Album(
-        lead_email=str(payload.lead_email) if payload.lead_email else None,
+        lead_email=payload.lead_email,
         status=initial_status,
         total_estimated_jpy=payload.total_estimated_jpy,
     )
