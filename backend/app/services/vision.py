@@ -292,8 +292,10 @@ identity_confidence < 0.7 または condition_confidence < 0.7 の場合、
 - ハルシネーションは買取業者への送信時にユーザーの信頼を破壊する
 """.strip()
 
-# Gemini 2.0 Flash: 速度・コスト・精度のバランス（中古品識別ユースケースに最適）
-_MODEL = "gemini-2.0-flash"
+# Gemini 2.5 Flash: 2026 年現在の現役モデル。
+# 2.0 Flash は新規ユーザー向け提供終了のため使用不可。
+# 2.5 Flash は速度・コスト・精度のバランスが中古品識別ユースケースに最適。
+_MODEL = "gemini-2.5-flash"
 # 推論温度は構造化抽出向けに低く固定（決定性重視）
 _TEMPERATURE = 0.2
 
