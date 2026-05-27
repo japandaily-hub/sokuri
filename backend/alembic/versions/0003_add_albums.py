@@ -36,14 +36,17 @@ def _timestamps() -> tuple[sa.Column, sa.Column]:
 
 
 def upgrade() -> None:
-    # ENUM 型 albumstatus を idempotent に作成。
-    # 過去の失敗デプロイで ENUM だけ残るケースがあるため、
-    # SQLAlchemy の checkfirst ではなく PL/pgSQL の例外捕捉で確実に冪等化する。
+    # 過去の失敗デプロイで albums / album_items / ENUM が部分残存しているケースを
+    # 完全に掃除してから新規作成（idempotent な再構築）。
+    # Phase 1 ではユーザーデータが投入されていないため CASCADE 削除は安全。
+    op.execute("DROP TABLE IF EXISTS album_items CASCADE")
+    op.execute("DROP TABLE IF EXISTS albums CASCADE")
+    op.execute("DROP TYPE IF EXISTS albumstatus")
+
+    # ENUM 型 albumstatus を作成（上の DROP 後なので確実に新規）
     op.execute(
-        "DO $$ BEGIN "
         "CREATE TYPE albumstatus AS ENUM "
-        "('draft', 'submitted', 'bidding', 'matched', 'closed', 'cancelled'); "
-        "EXCEPTION WHEN duplicate_object THEN null; END $$;"
+        "('draft', 'submitted', 'bidding', 'matched', 'closed', 'cancelled')"
     )
 
     # albums
