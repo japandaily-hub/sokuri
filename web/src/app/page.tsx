@@ -11,6 +11,7 @@ import { Features } from "@/components/landing/Features";
 import { Comparison } from "@/components/landing/Comparison";
 import { Faq } from "@/components/landing/Faq";
 import { TrustStrip } from "@/components/landing/TrustStrip";
+import { PhotoGuide } from "@/components/PhotoGuide";
 
 type PageState = "idle" | "loading" | "error";
 
@@ -223,12 +224,50 @@ export default function HomePage() {
               <div
                 role="alert"
                 aria-live="assertive"
-                className="mt-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3"
+                className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3"
               >
-                <Icon name="alert" className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
-                <p className="text-sm text-red-700">{errorMessage}</p>
+                <div className="flex items-start gap-2">
+                  <Icon name="alert" className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
+                  <p className="text-sm font-semibold text-red-700">{errorMessage}</p>
+                </div>
+                <div className="mt-2.5 space-y-1.5 pl-6 text-xs leading-relaxed text-red-600">
+                  <p className="font-semibold">よくある原因と対処:</p>
+                  <ul className="list-disc space-y-0.5 pl-4">
+                    <li>画像が大きすぎる (10MB 超) → 別の写真を選び直す</li>
+                    <li>暗所・ピンボケ → 明るい場所で撮り直す</li>
+                    <li>通信状況 → Wi-Fi 接続を確認して再試行</li>
+                    <li>サーバー側エラー (5xx) → 数分待って再度お試しください</li>
+                  </ul>
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPageState("idle");
+                      setErrorMessage("");
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 transition-colors hover:bg-red-100"
+                  >
+                    閉じてもう一度試す
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearSelectedFile}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 transition-colors hover:bg-red-100"
+                  >
+                    別の写真を選ぶ
+                  </button>
+                </div>
               </div>
             )}
+
+            {/* 撮影ガイド — アップロード後に常時表示（写真未選択時は折りたたみ） */}
+            <div className="mt-4">
+              <PhotoGuide
+                compact={!selectedFile}
+                shotsCompleted={selectedFile ? ["front"] : []}
+              />
+            </div>
 
             {/* 査定ボタン */}
             <button

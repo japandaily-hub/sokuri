@@ -26,8 +26,13 @@ function ConditionContent() {
     : "good";
 
   const [selected, setSelected] = useState<Condition>(initialCondition);
+  const [defectNote, setDefectNote] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
+
+  // ユーザー入力の傷メモは現状サーバー送信せず、sessionStorage に控えて
+  // 後段の /result や業者連絡時の補足情報として活用する（Phase 3 で API 化）。
+  const SESSION_KEY_DEFECT_NOTE = "aw_defect_note";
 
   async function handleSubmit() {
     if (!itemId) {
@@ -44,6 +49,12 @@ function ConditionContent() {
         condition: selected,
       });
 
+      // 傷メモは現状サーバー未送信、sessionStorage に控える（Phase 3 で API 拡張時に同送）
+      if (defectNote.trim()) {
+        sessionStorage.setItem(SESSION_KEY_DEFECT_NOTE, defectNote.trim());
+      } else {
+        sessionStorage.removeItem(SESSION_KEY_DEFECT_NOTE);
+      }
       // 査定結果を sessionStorage に保存してから /result へ遷移
       sessionStorage.setItem(SESSION_KEY_ESTIMATE, JSON.stringify(result));
       router.push(
@@ -94,6 +105,32 @@ function ConditionContent() {
             onSelect={setSelected}
           />
         ))}
+      </div>
+
+      {/* 傷の場所・程度メモ（任意） */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-card">
+        <label
+          htmlFor="defect-note"
+          className="flex items-center gap-1.5 text-sm font-semibold text-slate-900"
+        >
+          <Icon name="alert" className="h-4 w-4 text-brand-600" />
+          傷・汚れの場所と程度（任意）
+        </label>
+        <p className="mt-1 text-xs leading-relaxed text-slate-500">
+          画像で見えない傷や、業者に伝えたい状態の補足を書くと査定精度が上がります。
+        </p>
+        <textarea
+          id="defect-note"
+          rows={3}
+          maxLength={400}
+          value={defectNote}
+          onChange={(e) => setDefectNote(e.target.value)}
+          placeholder="例: 画面右下に長さ 2cm の擦り傷あり / 背面ロゴ部に塗装剥がれ / 動作正常、付属品は箱と充電器あり"
+          className="mt-2.5 w-full resize-none rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-sm shadow-xs focus-visible:border-brand-500 focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-brand-200"
+        />
+        <p className="mt-1.5 text-right text-[11px] text-slate-500">
+          {defectNote.length} / 400
+        </p>
       </div>
 
       {/* エラーメッセージ */}
