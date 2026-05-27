@@ -36,14 +36,15 @@ def _timestamps() -> tuple[sa.Column, sa.Column]:
 
 
 def upgrade() -> None:
-    # ENUM 型 albumstatus を作成
-    album_status_enum = sa.Enum(
-        *ALBUM_STATUS_VALUES,
-        name="albumstatus",
-        native_enum=True,
-        create_type=True,
+    # ENUM 型 albumstatus を idempotent に作成。
+    # 過去の失敗デプロイで ENUM だけ残るケースがあるため、
+    # SQLAlchemy の checkfirst ではなく PL/pgSQL の例外捕捉で確実に冪等化する。
+    op.execute(
+        "DO $$ BEGIN "
+        "CREATE TYPE albumstatus AS ENUM "
+        "('draft', 'submitted', 'bidding', 'matched', 'closed', 'cancelled'); "
+        "EXCEPTION WHEN duplicate_object THEN null; END $$;"
     )
-    album_status_enum.create(op.get_bind(), checkfirst=True)
 
     # albums
     op.create_table(
