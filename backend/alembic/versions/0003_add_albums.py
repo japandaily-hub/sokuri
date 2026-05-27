@@ -8,14 +8,19 @@ Create Date: 2026-05-26
 albums: 複数 assessment の束、ユーザー連絡先（業者非開示）を保持。
 album_items: album → assessment の中間テーブル（順序保持）。
 
-Phase 2 では業者入札（bids / businesses）は未実装。Wizard of Oz 運用。
+実装メモ:
+- 過去デプロイ失敗で部分残存している場合に備え、DROP IF EXISTS で前掃除。
+- ENUM 型 albumstatus と各テーブル / インデックスは **全て raw SQL** で
+  作成する。`sa.Enum(...) + create_type=False` を `op.create_table` 内で
+  使うと alembic 内部で再度 CREATE TYPE が発行されエラーになる挙動が
+  asyncpg + alembic 1.x の組み合わせで再現したため、迂回している。
+- Phase 1 ではユーザーデータが投入されていないため CASCADE 削除は安全。
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 
-import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0003_add_albums"
@@ -23,94 +28,64 @@ down_revision: str | None = "0002_add_defect_evidence"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-_now = sa.text("now()")
-
-ALBUM_STATUS_VALUES = ("draft", "submitted", "bidding", "matched", "closed", "cancelled")
-
-
-def _timestamps() -> tuple[sa.Column, sa.Column]:
-    return (
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=_now, nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=_now, nullable=False),
-    )
-
 
 def upgrade() -> None:
-    # 過去の失敗デプロイで albums / album_items / ENUM が部分残存しているケースを
-    # 完全に掃除してから新規作成（idempotent な再構築）。
-    # Phase 1 ではユーザーデータが投入されていないため CASCADE 削除は安全。
+    # ---- 1. 残存物の完全掃除 ----
     op.execute("DROP TABLE IF EXISTS album_items CASCADE")
     op.execute("DROP TABLE IF EXISTS albums CASCADE")
     op.execute("DROP TYPE IF EXISTS albumstatus")
 
-    # ENUM 型 albumstatus を作成（上の DROP 後なので確実に新規）
+    # ---- 2. ENUM 型 ----
     op.execute(
         "CREATE TYPE albumstatus AS ENUM "
         "('draft', 'submitted', 'bidding', 'matched', 'closed', 'cancelled')"
     )
 
-    # albums
-    op.create_table(
-        "albums",
-        sa.Column("id", sa.Uuid(), nullable=False),
-        sa.Column("lead_email", sa.String(length=320), nullable=True),
-        sa.Column(
-            "status",
-            sa.Enum(
-                *ALBUM_STATUS_VALUES,
-                name="albumstatus",
-                native_enum=True,
-                create_type=False,
-            ),
-            nullable=False,
-            server_default="draft",
-        ),
-        sa.Column(
-            "total_estimated_jpy",
-            sa.BigInteger(),
-            nullable=False,
-            server_default=sa.text("0"),
-        ),
-        *_timestamps(),
-        sa.PrimaryKeyConstraint("id", name="pk_albums"),
-        sa.CheckConstraint(
-            "total_estimated_jpy >= 0",
-            name="total_estimated_jpy_non_negative",
-        ),
+    # ---- 3. albums テーブル（raw SQL で alembic enum バグを回避） ----
+    op.execute(
+        """
+        CREATE TABLE albums (
+            id UUID PRIMARY KEY,
+            lead_email VARCHAR(320),
+            status albumstatus NOT NULL DEFAULT 'draft',
+            total_estimated_jpy BIGINT NOT NULL DEFAULT 0,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            CONSTRAINT total_estimated_jpy_non_negative
+                CHECK (total_estimated_jpy >= 0)
+        )
+        """
     )
-    op.create_index("ix_albums_status", "albums", ["status"])
+    op.execute("CREATE INDEX ix_albums_status ON albums (status)")
 
-    # album_items
-    op.create_table(
-        "album_items",
-        sa.Column("id", sa.Uuid(), nullable=False),
-        sa.Column("album_id", sa.Uuid(), nullable=False),
-        sa.Column("assessment_id", sa.Uuid(), nullable=False),
-        sa.Column("position", sa.Integer(), nullable=False, server_default=sa.text("0")),
-        *_timestamps(),
-        sa.PrimaryKeyConstraint("id", name="pk_album_items"),
-        sa.ForeignKeyConstraint(
-            ["album_id"],
-            ["albums.id"],
-            ondelete="CASCADE",
-            name="fk_album_items_album_id_albums",
-        ),
-        sa.ForeignKeyConstraint(
-            ["assessment_id"],
-            ["assessments.id"],
-            ondelete="RESTRICT",
-            name="fk_album_items_assessment_id_assessments",
-        ),
-        sa.CheckConstraint("position >= 0", name="position_non_negative"),
+    # ---- 4. album_items テーブル ----
+    op.execute(
+        """
+        CREATE TABLE album_items (
+            id UUID PRIMARY KEY,
+            album_id UUID NOT NULL,
+            assessment_id UUID NOT NULL,
+            position INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            CONSTRAINT fk_album_items_album_id_albums
+                FOREIGN KEY (album_id) REFERENCES albums(id) ON DELETE CASCADE,
+            CONSTRAINT fk_album_items_assessment_id_assessments
+                FOREIGN KEY (assessment_id) REFERENCES assessments(id) ON DELETE RESTRICT,
+            CONSTRAINT position_non_negative CHECK (position >= 0)
+        )
+        """
     )
-    op.create_index("ix_album_items_album_id", "album_items", ["album_id"])
-    op.create_index("ix_album_items_assessment_id", "album_items", ["assessment_id"])
+    op.execute("CREATE INDEX ix_album_items_album_id ON album_items (album_id)")
+    op.execute(
+        "CREATE INDEX ix_album_items_assessment_id ON album_items (assessment_id)"
+    )
 
 
 def downgrade() -> None:
-    op.drop_index("ix_album_items_assessment_id", table_name="album_items")
-    op.drop_index("ix_album_items_album_id", table_name="album_items")
-    op.drop_table("album_items")
-    op.drop_index("ix_albums_status", table_name="albums")
-    op.drop_table("albums")
-    sa.Enum(name="albumstatus").drop(op.get_bind(), checkfirst=True)
+    op.execute("DROP INDEX IF EXISTS ix_album_items_assessment_id")
+    op.execute("DROP INDEX IF EXISTS ix_album_items_album_id")
+    op.execute("DROP TABLE IF EXISTS album_items")
+    op.execute("DROP INDEX IF EXISTS ix_albums_status")
+    op.execute("DROP TABLE IF EXISTS albums")
+    op.execute("DROP TYPE IF EXISTS albumstatus")
