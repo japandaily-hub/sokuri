@@ -207,3 +207,14 @@ temp/
 
 # Claude / Cowork
 .claude/
+
+# 一時ログ（.tools/ helper の出力）— git に含めない
+/push_log.txt
+/probe_log.txt
+/probe_appdata_log.txt
+/probe2_log.txt
+/probe3_log.txt
+/appdata_backup_log.txt
+/cleanup_log.txt
+/restore_appdata_log.txt
+/e2e_log.txt
