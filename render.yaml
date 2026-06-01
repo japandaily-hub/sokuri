@@ -28,8 +28,9 @@ services:
     branch: main
     autoDeploy: true
     healthCheckPath: /health
-    # alembic マイグレーション → uvicorn 起動の合成コマンド
-    dockerCommand: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    # 起動コマンドは Dockerfile の CMD = /app/start.sh を採用する。
+    # （Render の dockerCommand に sh -c "..." を渡すと argv 解釈が壊れ
+    #   exit 127: "alembic upgrade head && uvicorn ...: not found" になるため）
     envVars:
       - key: DATABASE_URL
         fromDatabase:

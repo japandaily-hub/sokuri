@@ -18,7 +18,12 @@ RUN pip install --no-cache-dir .
 COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini ./
+COPY start.sh ./
+RUN chmod +x /app/start.sh
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# 起動エントリポイント: alembic マイグレーション → uvicorn を 1 スクリプトで実行。
+# Render の dockerCommand は exec 解釈の都合で && / クォートが壊れるため、
+# シェルスクリプトに切り出して呼ぶ（render.yaml の dockerCommand は使わない）。
+CMD ["/app/start.sh"]
