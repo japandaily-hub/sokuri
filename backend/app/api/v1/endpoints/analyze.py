@@ -11,8 +11,12 @@
 
 from __future__ import annotations
 
-from openai import OpenAIError
+# NOTE: 元実装で openai SDK 由来の OpenAIError を catch していたが、
+# 本プロジェクトの vision 層は google-genai のみを使用しており、
+# openai パッケージは依存に含まれない（ModuleNotFoundError 防止のため import 削除）。
+# Gemini API 通信エラーは google.genai.errors.APIError に切り替える。
 from fastapi import APIRouter, Depends, HTTPException, status
+from google.genai.errors import APIError as GenAIAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.item import Item
@@ -36,7 +40,7 @@ router = APIRouter()
     ),
     responses={
         422: {"description": "バリデーションエラー（画像形式不正など）"},
-        503: {"description": "AI サービス（OpenAI）が利用不可"},
+        503: {"description": "AI サービス（Gemini）が利用不可"},
     },
 )
 async def analyze(
@@ -55,7 +59,8 @@ async def analyze(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(exc),
         ) from exc
-    except OpenAIError as exc:
+    except GenAIAPIError as exc:
+        # Gemini 側のレート制限・タイムアウト・5xx は 503 にマップ。
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"AI サービスとの通信に失敗しました: {exc}",
@@ -80,17 +85,4 @@ async def analyze(
     await session.refresh(item)
 
     # 3. AnalyzeResponse を構築して返す。
-    #    attributes から base_market_price_jpy を除いて返す（内部フィールド）。
-    public_attributes = {
-        k: v for k, v in item.attributes.items() if k != "base_market_price_jpy"
-    }
-
-    return AnalyzeResponse(
-        item_id=item.id,
-        detected_name=item.detected_name,
-        detected_category_label=item.detected_category_label,
-        category_tier=item.category_tier,
-        initial_condition=item.condition,
-        condition_confidence=item.condition_confidence,
-        attributes=public_attributes,
-    )
+    #    attributes から base_market_price_jpy を除いて返す（内
