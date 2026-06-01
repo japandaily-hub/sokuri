@@ -85,4 +85,17 @@ async def analyze(
     await session.refresh(item)
 
     # 3. AnalyzeResponse を構築して返す。
-    #    attributes から base_market_price_jpy を除いて返す（内
+    #    attributes から base_market_price_jpy を除いて返す（内部フィールド）。
+    public_attributes = {
+        k: v for k, v in item.attributes.items() if k != "base_market_price_jpy"
+    }
+
+    return AnalyzeResponse(
+        item_id=item.id,
+        detected_name=item.detected_name,
+        detected_category_label=item.detected_category_label,
+        category_tier=item.category_tier,
+        initial_condition=item.condition,
+        condition_confidence=item.condition_confidence,
+        attributes=public_attributes,
+    )

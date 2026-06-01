@@ -247,4 +247,10 @@ export async function uploadDefects(
   const res = await fetch(`${base}/assessments/${assessmentId}/defects`, {
     method: "POST",
     body: form,
-    // Content-Type は fetch が自動設定する (boundary 
+    // Content-Type は fetch が自動設定する (boundary 付き multipart)
+  });
+  if (!res.ok) {
+    throw new ApiError(res.status, `defects upload failed: ${res.status}`);
+  }
+  return res.json() as Promise<DefectsResponse>;
+}

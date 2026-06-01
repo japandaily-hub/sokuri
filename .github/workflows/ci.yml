@@ -7,10 +7,14 @@ on:
     branches: ["main", "develop"]
 
 jobs:
-  backend-test:
-    name: Backend (ruff + pytest)
+  syntax-guard:
+    # 依存ゼロ・30 秒以内で完了する高速ガード。
+    # 2026-06-01: estimate.py / seed.py で orphan fragment + 重複関数定義の
+    # SyntaxError を Render が runtime で検出 → デプロイ失敗を 2 連続経験。
+    # ruff/pytest が動かない（環境構築失敗）状況でも、構文と null bytes は
+    # この job で先に止める。
+    name: Syntax guard (parse + null-byte scan)
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
@@ -18,39 +22,17 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "pip"
 
-      - name: Install dependencies
-        working-directory: backend
+      - name: Parse all backend .py with ast + null-byte scan
+        shell: bash
         run: |
-          pip install -e ".[dev]" aiosqlite httpx
-
-      - name: Lint with ruff
-        working-directory: backend
-        run: ruff check .
-
-      - name: Run pytest
-        working-directory: backend
-        run: pytest tests/ -x -q
-
-  web-typecheck:
-    name: Web (tsc --noEmit)
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: web/package-lock.json
-
-      - name: Install dependencies
-        working-directory: web
-        run: npm ci
-
-      - name: Type check
-        working-directory: web
-        run: npx tsc --noEmit
+          set -e
+          fail=0
+          while IFS= read -r -d '' f; do
+            python3 - "$f" <<'PY' || fail=1
+          import ast, sys
+          path = sys.argv[1]
+          with open(path, "rb") as fh:
+              data = fh.read()
+          if b"\x00" in data:
+              print(f"::error file={path}::NULL bytes foun
