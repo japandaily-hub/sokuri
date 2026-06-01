@@ -127,12 +127,16 @@ export class ApiError extends Error {
  *
  * Vercel の Environment Variables を Sensitive 扱いにすると ``NEXT_PUBLIC_*`` が
  * クライアントバンドルに inline されない既知制約があり、env var だけに頼ると
- * 本番でフロントが backend に到達できなくなる。確実性のため本番 Railway URL を
+ * 本番でフロントが backend に到達できなくなる。確実性のため本番 Render URL を
  * フォールバックとして埋め込む。
+ *
+ * Railway → Render 移行履歴:
+ *   旧: https://backend-production-e4f0d.up.railway.app/api/v1 (deploy 不安定で廃止)
+ *   現: https://sokuri-backend.onrender.com/api/v1
  *
  * ローカル開発時は ``.env.local`` の ``NEXT_PUBLIC_API_URL`` が優先される。
  */
-const FALLBACK_PROD_API_URL = "https://backend-production-e4f0d.up.railway.app/api/v1";
+const FALLBACK_PROD_API_URL = "https://sokuri-backend.onrender.com/api/v1";
 
 function getBaseUrl(): string {
   const url = process.env.NEXT_PUBLIC_API_URL || FALLBACK_PROD_API_URL;
@@ -243,10 +247,4 @@ export async function uploadDefects(
   const res = await fetch(`${base}/assessments/${assessmentId}/defects`, {
     method: "POST",
     body: form,
-    // Content-Type は fetch が自動設定する (boundary 付き multipart)
-  });
-  if (!res.ok) {
-    throw new ApiError(res.status, `defects upload failed: ${res.status}`);
-  }
-  return res.json() as Promise<DefectsResponse>;
-}
+    // Content-Type は fetch が自動設定する (boundary 
