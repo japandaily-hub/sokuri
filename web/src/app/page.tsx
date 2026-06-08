@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { analyzeImage, ApiError, type AnalyzeResponse } from "@/lib/api";
 import { fileToBase64 } from "@/lib/format";
@@ -136,11 +136,18 @@ const STEPS: { step: string; icon: IconName; title: string; desc: string }[] = [
 ];
 
 // ===== 上位3社の査定オークション図解（イメージ値） =====
-const AUCTION_BIDS: { name: string; amount: string; selected: boolean }[] = [
-  { name: "A社", amount: "¥48,000", selected: true },
-  { name: "B社", amount: "¥45,500", selected: true },
-  { name: "C社", amount: "¥44,000", selected: true },
-  { name: "D社", amount: "お断り連絡", selected: false },
+// ランキングバー描画用。クラス名は完全文字列（動的連結禁止）で保持する。
+const AUCTION_BIDS: {
+  name: string;
+  amount: string;
+  selected: boolean;
+  barWidth: string;
+  barDelay: string;
+}[] = [
+  { name: "A社", amount: "¥48,000", selected: true, barWidth: "w-full", barDelay: "[animation-delay:140ms]" },
+  { name: "B社", amount: "¥45,500", selected: true, barWidth: "w-[86%]", barDelay: "[animation-delay:280ms]" },
+  { name: "C社", amount: "¥44,000", selected: true, barWidth: "w-[76%]", barDelay: "[animation-delay:420ms]" },
+  { name: "D社", amount: "自動でお断り", selected: false, barWidth: "w-[42%]", barDelay: "[animation-delay:560ms]" },
 ];
 
 // ===== 対応エリア =====
@@ -176,6 +183,24 @@ const TRUST_CHIPS = ["撮るだけ・待つだけ", "業者登録は当面無料
 export default function HomePage() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
+  const negoRef = useRef<HTMLDivElement>(null);
+
+  // 査定オークション図解: スクロール到達でランキングバーの成長を起動する
+  useEffect(() => {
+    const el = negoRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          el.classList.add("nego-inview");
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.35 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>("");
@@ -228,12 +253,17 @@ export default function HomePage() {
   const isLoading = pageState === "loading";
 
   return (
-    <div>
+    <div className="pb-20 lg:pb-0">
       {/* ============================================================
           HERO — アップロードエリア
       ============================================================ */}
-      <section className="hero-surface">
-        <div className="container-aw grid items-center gap-10 py-14 lg:grid-cols-2 lg:gap-14 lg:py-20">
+      <section className="hero-surface relative overflow-hidden">
+        {/* 微細グリッド: 上部のみ見せて下方向へフェードアウト */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 bg-grid-faint [mask-image:linear-gradient(to_bottom,black,transparent_70%)]"
+        />
+        <div className="container-aw relative grid items-center gap-10 py-14 lg:grid-cols-2 lg:gap-14 lg:py-20">
           {/* 左: キャッチコピー */}
           <div className="animate-fade-up">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
@@ -241,10 +271,14 @@ export default function HomePage() {
               不用品の買取マッチング
             </span>
 
-            <h1 className="mt-5 text-[2.1rem] font-bold leading-[1.14] tracking-tight text-slate-900 sm:text-[2.9rem]">
+            <h1 className="mt-5 text-[2.35rem] font-bold leading-[1.1] tracking-tight text-slate-900 sm:text-[3.2rem] lg:text-[3.5rem]">
               片付けたい。
               <br />
-              でも、<span className="text-brand-600">動けない</span>あなたへ。
+              でも、
+              <span className="rounded-sm bg-gradient-to-t from-brand-100 to-transparent to-45% px-1 text-brand-700">
+                動けない
+              </span>
+              あなたへ。
             </h1>
 
             <p className="mt-5 max-w-md text-base leading-relaxed text-slate-600">
@@ -265,19 +299,25 @@ export default function HomePage() {
               ))}
             </ul>
 
-            <a
-              href="#line"
-              className="mt-6 inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-xs transition-colors hover:border-brand-300 hover:bg-brand-50/50 focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
-            >
-              <Icon name="external" className="h-4 w-4" />
-              LINEで受付（準備中）
-            </a>
+            <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3">
+              <a
+                href="#estimate"
+                className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-6 py-3.5 text-base font-semibold text-white shadow-cta transition-all hover:-translate-y-0.5 hover:bg-brand-700 focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
+              >
+                <Icon name="camera" className="h-5 w-5" />
+                品物を撮ってAI仮査定
+              </a>
+              <span className="inline-flex cursor-default items-center gap-1.5 text-sm text-slate-500">
+                <Icon name="external" className="h-4 w-4" />
+                LINEで受付（準備中）
+              </span>
+            </div>
           </div>
 
-          {/* 右: 主役写真 + アップロードカード */}
-          <div className="animate-fade-up [animation-delay:120ms]">
+          {/* 右: 主役写真 + アップロードカード（モバイルはカードを先に） */}
+          <div className="flex flex-col animate-fade-up [animation-delay:120ms]">
             {/* 主役写真: スマホで品物を1点ずつ撮影する女性 */}
-            <div className="relative mb-5 aspect-[16/9] overflow-hidden rounded-2xl border border-slate-200/70 bg-gradient-to-br from-brand-100 via-brand-200 to-brand-400 shadow-elevated">
+            <div className="relative order-2 aspect-[16/9] overflow-hidden rounded-2xl border border-slate-200/70 bg-gradient-to-br from-brand-100 via-brand-200 to-brand-400 shadow-elevated lg:order-1 lg:mb-5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/img/hero.png"
@@ -297,10 +337,27 @@ export default function HomePage() {
               <span className="absolute bottom-3 left-4 right-4 text-sm font-semibold leading-snug text-white drop-shadow">
                 品物を1点ずつ撮るだけ。きれいに並べなくて大丈夫。
               </span>
+              {/* フローティングチップ: AI仮査定のイメージ */}
+              <span className="absolute right-3 top-3 flex items-center gap-2.5 rounded-xl bg-white/95 px-3.5 py-2.5 shadow-card backdrop-blur-sm animate-fade-up [animation-delay:500ms]">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-100 text-accent-600">
+                  <Icon name="yen" className="h-4 w-4" />
+                </span>
+                <span className="text-left">
+                  <span className="block text-[10px] font-medium leading-tight text-slate-400">
+                    AI仮査定・参考値のイメージ
+                  </span>
+                  <span className="block text-sm font-bold tabular-nums text-slate-900">
+                    ¥48,000
+                  </span>
+                </span>
+              </span>
             </div>
 
           {/* アップロードカード */}
-          <div className="rounded-2xl border border-slate-200/70 bg-white p-5 shadow-elevated sm:p-6">
+          <div
+            id="estimate"
+            className="order-1 mb-5 rounded-2xl border border-slate-200/70 bg-white p-5 shadow-elevated sm:p-6 lg:order-2 lg:mb-0"
+          >
             <div className="flex items-center gap-2.5">
               <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
                 <Icon name="camera" className="h-5 w-5" />
@@ -315,6 +372,16 @@ export default function HomePage() {
 
             {/* アップロードエリア */}
             <div className="mt-4">
+              {/* file input は常時マウント（プレビュー中も全CTAから inputRef.click() を有効に保つ） */}
+              <input
+                ref={inputRef}
+                id="file-input"
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="sr-only"
+                onChange={handleFileChange}
+              />
               {previewUrl ? (
                 <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-900">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -333,7 +400,10 @@ export default function HomePage() {
                   </button>
                 </div>
               ) : (
-                <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-6 py-9 text-center transition-colors hover:border-brand-400 hover:bg-brand-50/50">
+                <label
+                  htmlFor="file-input"
+                  className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-6 py-9 text-center transition-colors hover:border-brand-400 hover:bg-brand-50/50"
+                >
                   <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-white text-brand-500 shadow-xs ring-1 ring-slate-200">
                     <Icon name="image" className="h-6 w-6" />
                   </span>
@@ -343,14 +413,6 @@ export default function HomePage() {
                   <span className="mt-1 text-xs text-slate-400">
                     家電・家具・ブランド品など、品物を1点ずつアップロード
                   </span>
-                  <input
-                    ref={inputRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="sr-only"
-                    onChange={handleFileChange}
-                  />
                 </label>
               )}
             </div>
@@ -368,8 +430,14 @@ export default function HomePage() {
               type="button"
               disabled={!selectedFile || isLoading}
               onClick={handleSubmit}
-              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-6 py-3.5 text-base font-semibold text-white shadow-cta transition-colors hover:bg-brand-700 active:bg-brand-800 focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+              className="relative mt-4 inline-flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-brand-600 px-6 py-3.5 text-base font-semibold text-white shadow-cta transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-700 hover:shadow-[0_14px_32px_-8px_rgb(31_84_222/0.55)] active:translate-y-0 active:scale-[0.99] active:bg-brand-800 focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none disabled:hover:translate-y-0 disabled:hover:bg-slate-300 disabled:hover:shadow-none"
             >
+              {!isLoading && selectedFile && (
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent animate-[shimmer_2.6s_ease_infinite]"
+                />
+              )}
               {isLoading ? (
                 <>
                   <Spinner className="h-5 w-5" />
@@ -383,14 +451,34 @@ export default function HomePage() {
               )}
             </button>
 
-            <p className="mt-3 flex items-start gap-1.5 text-xs leading-relaxed text-slate-400">
-              <Icon name="lock" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              査定段階で業者へ共有するのは「写真と品目」のみ。連絡先・住所は交渉成立後に開示します。AI仮査定はお試しいただけます。
+            <ul className="mt-3 space-y-1.5">
+              <li className="flex items-start gap-1.5 text-xs leading-relaxed text-slate-500">
+                <Icon
+                  name="check"
+                  className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent-600"
+                  strokeWidth={2.5}
+                />
+                この時点で連絡先の入力は不要です
+              </li>
+              <li className="flex items-start gap-1.5 text-xs leading-relaxed text-slate-500">
+                <Icon
+                  name="check"
+                  className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent-600"
+                  strokeWidth={2.5}
+                />
+                業者に渡るのは写真と品目のみ。連絡先は交渉成立後、あなたの同意のうえで開示
+              </li>
+            </ul>
+            <p className="mt-2 text-xs text-slate-400">
+              AI仮査定は無料でお試しいただけます。査定額は参考値です。
             </p>
           </div>
           </div>
         </div>
       </section>
+
+      {/* ===== 課題提起（ヒーロー直後で「なぜ動けないか」を先に示す） ===== */}
+      <ServiceIntro />
 
       {/* ============================================================
           STORY — 利用イメージの物語化（8場面ジャーニー）
@@ -430,10 +518,14 @@ export default function HomePage() {
             </span>
           </div>
 
-          {/* ジャーニー: 横スクロール */}
-          <div className="mt-8 flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 sm:gap-5">
+          {/* ジャーニー: 横スクロール（右端フェードで続きを示唆） */}
+          <div className="relative mt-8">
+          <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 sm:gap-5">
             {STORY.map((scene) => {
               const ring = ["ring-slate-200", "ring-brand-200", "ring-accent-300"][scene.phase];
+              const topBar = ["border-t-slate-300", "border-t-brand-400", "border-t-accent-400"][
+                scene.phase
+              ];
               const gradient = [
                 "from-slate-100 via-slate-200 to-brand-100",
                 "from-brand-100 via-brand-200 to-brand-300",
@@ -452,7 +544,7 @@ export default function HomePage() {
               return (
                 <article
                   key={scene.no}
-                  className={`flex w-[78vw] max-w-[19rem] shrink-0 snap-start flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-card ring-1 ring-inset ${ring} transition-shadow hover:shadow-card-hover sm:w-72`}
+                  className={`flex w-[78vw] max-w-[19rem] shrink-0 snap-start flex-col rounded-2xl border border-slate-200 border-t-4 ${topBar} bg-white p-6 shadow-card ring-1 ring-inset ${ring} transition-shadow hover:shadow-card-hover sm:w-72`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-bold tabular-nums text-slate-300">
@@ -488,9 +580,36 @@ export default function HomePage() {
                 </article>
               );
             })}
+
+            {/* 9枚目: 物語の入口へ誘うCTAカード */}
+            <article className="flex w-[78vw] max-w-[19rem] shrink-0 snap-start flex-col justify-center rounded-2xl bg-gradient-to-br from-brand-700 to-brand-900 p-6 text-white shadow-card sm:w-72">
+              <h3 className="text-lg font-bold leading-snug">
+                この物語は、写真1枚から始まります
+              </h3>
+              <button
+                type="button"
+                onClick={() => inputRef.current?.click()}
+                className="mt-5 inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-brand-700 shadow-lg transition-transform hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand-900"
+              >
+                <Icon name="camera" className="h-4 w-4" />
+                まず1枚、撮ってみる
+              </button>
+              <p className="mt-3 text-xs leading-relaxed text-brand-200">
+                査定額は参考値。合わなければ断れます。
+              </p>
+            </article>
           </div>
-          <p className="mt-4 text-center text-xs text-slate-400">
-            横にスクロールして続きをご覧ください
+          {/* 右端フェード: スクロールの続きを示唆 */}
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 right-0 w-14 bg-gradient-to-l from-white to-transparent"
+          />
+          </div>
+          <p className="mt-4 flex justify-center">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-500">
+              横にスクロール
+              <Icon name="arrow-right" className="h-3.5 w-3.5" strokeWidth={2.25} />
+            </span>
           </p>
 
           <p className="mx-auto mt-8 max-w-3xl text-center text-xs leading-relaxed text-slate-400">
@@ -499,8 +618,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ===== 課題提起・特徴・比較 ===== */}
-      <ServiceIntro />
+      {/* ===== 特徴・比較 ===== */}
       <Features />
       <Comparison />
 
@@ -529,7 +647,7 @@ export default function HomePage() {
                 onClick={() => inputRef.current?.click()}
                 className="group flex items-center gap-3.5 rounded-2xl border border-slate-200 bg-white p-4 text-left transition-all hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-card focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
               >
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 transition-colors group-hover:bg-brand-100">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 transition-all group-hover:scale-110 group-hover:bg-brand-100">
                   <Icon name={icon} className="h-6 w-6" />
                 </span>
                 <span className="min-w-0">
@@ -567,18 +685,20 @@ export default function HomePage() {
                 key={step}
                 className="relative rounded-2xl border border-slate-200 bg-white p-6 shadow-card"
               >
-                {/* ステップ間のコネクタ（PC表示のみ） */}
+                {/* ステップ間のコネクタ: 矢印玉（PC表示のみ） */}
                 {index < STEPS.length - 1 && (
                   <span
                     aria-hidden="true"
-                    className="absolute right-0 top-12 hidden h-px w-5 translate-x-full bg-slate-200 sm:block"
-                  />
+                    className="absolute -right-[23px] top-12 z-10 hidden h-7 w-7 items-center justify-center rounded-full bg-white text-brand-400 ring-1 ring-slate-200 lg:flex"
+                  >
+                    <Icon name="chevron-right" className="h-4 w-4" strokeWidth={2.5} />
+                  </span>
                 )}
                 <div className="flex items-center gap-3">
                   <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-600 text-white">
                     <Icon name={icon} className="h-6 w-6" />
                   </span>
-                  <span className="text-3xl font-bold tracking-tight text-slate-200">{step}</span>
+                  <span className="text-4xl font-bold tracking-tight text-brand-100">{step}</span>
                 </div>
                 <h3 className="mt-4 text-base font-bold text-slate-900">{title}</h3>
                 <p className="mt-1.5 text-sm leading-relaxed text-slate-500">{desc}</p>
@@ -591,21 +711,29 @@ export default function HomePage() {
       {/* ============================================================
           NEGOTIATION — 上位3社の査定オークション図解
       ============================================================ */}
-      <section id="nego" className="bg-slate-50 py-16 sm:py-20 lg:py-24">
-        <div className="container-aw">
+      <section id="nego" className="relative overflow-hidden bg-brand-950 py-16 sm:py-20 lg:py-24">
+        {/* ダーク面の微細グリッド: 中央上部のみ見せる */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 bg-grid-faint-light [mask-image:radial-gradient(70%_60%_at_50%_30%,black,transparent)]"
+        />
+        <div className="container-aw relative">
           <div className="mx-auto max-w-2xl text-center">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-600">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-300">
               上位3社と交渉
             </p>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+            <h2 className="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">
               査定額の上位3社が、交渉権を得る
             </h2>
-            <p className="mt-3 text-sm leading-relaxed text-slate-500">
+            <p className="mt-3 text-sm leading-relaxed text-brand-100/90">
               登録業者が査定額を提示し、条件のよい上位3社だけがあなたへ連絡。残りの業者には自動でお断りの連絡が入ります。一斉架電は起こりません。
             </p>
           </div>
 
-          <div className="mx-auto mt-10 max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-card sm:p-8">
+          <div
+            ref={negoRef}
+            className="nego-stage mx-auto mt-10 max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-elevated sm:p-8"
+          >
             {/* あなた */}
             <div className="flex items-center justify-center">
               <div className="flex items-center gap-3 rounded-xl border border-brand-200 bg-white px-5 py-3 shadow-xs">
@@ -619,42 +747,79 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div aria-hidden="true" className="flex justify-center py-3 text-slate-300">
-              <Icon name="chevron-down" className="h-6 w-6" />
+            {/* コネクタ 1: 共有の流れ */}
+            <div className="flex flex-col items-center gap-2 py-3">
+              <span
+                aria-hidden="true"
+                className="h-7 w-px bg-gradient-to-b from-brand-300 to-slate-200"
+              />
+              <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
+                写真と品目のみを一斉共有
+              </span>
             </div>
 
-            {/* 登録業者群 */}
+            {/* 登録業者群: 査定額のランキングバー */}
             <div className="rounded-xl border border-slate-200 bg-white p-4">
               <p className="mb-3 text-center text-xs font-semibold uppercase tracking-wider text-slate-400">
-                登録業者へ「写真と品目のみ」を一斉共有
+                登録業者が査定額を提示
               </p>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {AUCTION_BIDS.map((bid) =>
+              <div className="space-y-2.5">
+                {AUCTION_BIDS.map((bid, index) =>
                   bid.selected ? (
-                    <div
-                      key={bid.name}
-                      className="rounded-lg border-2 border-accent-500 bg-accent-50 px-3 py-2.5 text-center"
-                    >
-                      <p className="text-xs font-semibold text-accent-700">{bid.name}</p>
-                      <p className="mt-0.5 text-sm font-bold tabular-nums text-slate-900">
-                        {bid.amount}
-                      </p>
+                    <div key={bid.name} className="flex items-center gap-3">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white">
+                        {index + 1}
+                      </span>
+                      <span className="w-8 shrink-0 text-xs font-semibold text-slate-700">
+                        {bid.name}
+                      </span>
+                      <div className="relative h-9 flex-1 rounded-lg bg-slate-100">
+                        <span
+                          aria-hidden="true"
+                          className={`absolute inset-y-0 left-0 ${bid.barWidth} origin-left rounded-lg bg-gradient-to-r from-brand-500 to-brand-600 animate-[bar-grow_0.9s_cubic-bezier(0.16,1,0.3,1)_both] ${bid.barDelay}`}
+                        />
+                        <span
+                          className={`nego-amount absolute inset-y-0 left-0 flex ${bid.barWidth} items-center justify-end pr-3 text-sm font-bold tabular-nums text-white`}
+                        >
+                          {bid.amount}
+                        </span>
+                      </div>
+                      {index === 0 && (
+                        <span className="ml-2 rounded-full bg-accent-100 px-2 py-0.5 text-[10px] font-semibold text-accent-700">
+                          最有力
+                        </span>
+                      )}
                     </div>
                   ) : (
-                    <div
-                      key={bid.name}
-                      className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-center opacity-60"
-                    >
-                      <p className="text-xs font-medium text-slate-400">{bid.name}</p>
-                      <p className="mt-0.5 text-xs text-slate-400">{bid.amount}</p>
+                    <div key={bid.name} className="flex items-center gap-3">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-400">
+                        <Icon name="close" className="h-3.5 w-3.5" strokeWidth={2.5} />
+                      </span>
+                      <span className="w-8 shrink-0 text-xs font-semibold text-slate-400">
+                        {bid.name}
+                      </span>
+                      <div className="relative h-9 flex-1 rounded-lg bg-slate-100">
+                        <span
+                          aria-hidden="true"
+                          className={`absolute inset-y-0 left-0 ${bid.barWidth} origin-left rounded-lg bg-slate-200 animate-[bar-grow_0.9s_cubic-bezier(0.16,1,0.3,1)_both] ${bid.barDelay}`}
+                        />
+                      </div>
+                      <span className="shrink-0 text-xs text-slate-400">{bid.amount}</span>
                     </div>
                   )
                 )}
               </div>
             </div>
 
-            <div aria-hidden="true" className="flex justify-center py-3 text-slate-300">
-              <Icon name="chevron-down" className="h-6 w-6" />
+            {/* コネクタ 2: 連絡の流れ */}
+            <div className="flex flex-col items-center gap-2 py-3">
+              <span
+                aria-hidden="true"
+                className="h-7 w-px bg-gradient-to-b from-brand-300 to-slate-200"
+              />
+              <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
+                上位3社だけがあなたへ連絡
+              </span>
             </div>
 
             {/* 上位3社が交渉権を獲得 */}
@@ -882,7 +1047,7 @@ export default function HomePage() {
       ============================================================ */}
       <section className="bg-white py-16 sm:py-20 lg:py-24">
         <div className="container-aw">
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-800 to-brand-950 px-6 py-14 text-center sm:px-12">
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-800 to-brand-950 px-6 py-14 text-center ring-1 ring-white/10 sm:px-12">
             {/* 装飾光彩 */}
             <span
               aria-hidden="true"
@@ -892,6 +1057,10 @@ export default function HomePage() {
               aria-hidden="true"
               className="pointer-events-none absolute -bottom-24 -left-16 h-56 w-56 rounded-full bg-brand-400/20 blur-3xl"
             />
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 bg-grid-faint-light"
+            />
             <div className="relative">
               <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
                 今日、その「片付けたい」を動かす
@@ -899,30 +1068,38 @@ export default function HomePage() {
               <p className="mt-3 text-sm text-brand-100 sm:text-base">
                 品物を1点ずつ撮るだけ。あとは待つだけで、競った査定が届きます。
               </p>
-              <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <div className="mt-7 flex justify-center">
                 <button
                   type="button"
-                  onClick={() => {
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                    setTimeout(() => inputRef.current?.click(), 500);
-                  }}
-                  className="inline-flex items-center gap-2 rounded-xl bg-white px-7 py-3.5 text-base font-semibold text-brand-700 shadow-lg transition-transform hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand-900"
+                  onClick={() => inputRef.current?.click()}
+                  className="inline-flex items-center gap-2 rounded-xl bg-white px-7 py-3.5 text-base font-semibold text-brand-700 shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-elevated focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand-900"
                 >
                   <Icon name="camera" className="h-5 w-5" />
                   AI仮査定を依頼する
+                  <Icon name="arrow-right" className="h-4 w-4" strokeWidth={2.25} />
                 </button>
-                <a
-                  href="#line"
-                  className="inline-flex items-center gap-2 rounded-xl border border-white/30 bg-white/5 px-7 py-3.5 text-base font-semibold text-white transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand-900"
-                >
-                  <Icon name="external" className="h-5 w-5" />
-                  LINEで受付（準備中）
-                </a>
               </div>
+              <p className="mt-3 text-xs text-brand-200">
+                写真1枚から、AI仮査定を無料でお試しいただけます。査定額は参考値です。
+              </p>
             </div>
           </div>
         </div>
       </section>
+
+      {/* ============================================================
+          モバイル固定CTAバー
+      ============================================================ */}
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur lg:hidden">
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-6 py-3 text-sm font-semibold text-white shadow-cta transition-colors hover:bg-brand-700 active:bg-brand-800 focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
+        >
+          <Icon name="camera" className="h-5 w-5" />
+          品物を撮ってAI仮査定（参考値）
+        </button>
+      </div>
     </div>
   );
 }

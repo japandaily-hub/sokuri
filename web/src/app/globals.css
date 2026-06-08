@@ -46,24 +46,76 @@
     @apply mx-auto w-full max-w-container px-5 sm:px-6 lg:px-8;
   }
 
-  /* ヒーロー背景: 上部に淡いブランド光彩を置いたクリーンな下地 */
+  /* ヒーロー背景: 左上のブランド光彩＋右上の微かなエメラルドで深度を出す */
   .hero-surface {
     background-image:
       radial-gradient(
-        58% 46% at 50% -4%,
-        rgba(31, 84, 222, 0.13) 0%,
-        rgba(31, 84, 222, 0) 72%
+        52% 46% at 16% -2%,
+        rgba(31, 84, 222, 0.18) 0%,
+        rgba(31, 84, 222, 0) 70%
       ),
-      linear-gradient(180deg, #f1f5fd 0%, #ffffff 64%);
+      radial-gradient(
+        38% 34% at 90% 10%,
+        rgba(16, 185, 129, 0.07) 0%,
+        rgba(16, 185, 129, 0) 70%
+      ),
+      linear-gradient(180deg, #e9f0fd 0%, #ffffff 72%);
   }
 
   /* 微細なグリッド。情報密度のある面に「設計された」印象を与える */
   .bg-grid-faint {
     background-image:
-      linear-gradient(to right, rgba(20, 31, 72, 0.045) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(20, 31, 72, 0.045) 1px, transparent 1px);
+      linear-gradient(to right, rgba(31, 84, 222, 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(31, 84, 222, 0.05) 1px, transparent 1px);
     background-size: 38px 38px;
   }
+
+  /* ダーク面用の微細グリッド（オークションステージ・CTAバナー） */
+  .bg-grid-faint-light {
+    background-image:
+      linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 38px 38px;
+  }
+}
+
+/* ============================================================
+   キーフレーム — 視覚演出用
+   ============================================================ */
+/* 査定オークション図解: ランキングバーの成長 */
+@keyframes bar-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* CTAボタンの光沢スイープ */
+@keyframes shimmer {
+  100% {
+    transform: translateX(200%);
+  }
+}
+
+/* スクロール到達（IntersectionObserver）までバー成長を待機させる */
+.nego-stage [class*="bar-grow"] {
+  animation-play-state: paused;
+}
+
+.nego-stage.nego-inview [class*="bar-grow"] {
+  animation-play-state: running;
+}
+
+/* 査定額はバー成長後にフェードイン（成長前の白文字×薄地の不可視状態を回避） */
+.nego-stage .nego-amount {
+  opacity: 0;
+  transition: opacity 0.4s ease 0.7s;
+}
+
+.nego-stage.nego-inview .nego-amount {
+  opacity: 1;
 }
 
 /* ============================================================

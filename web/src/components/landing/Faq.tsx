@@ -8,10 +8,23 @@
 import { useState } from "react";
 import { Icon } from "@/components/Icon";
 
+// 不安解消を優先する並び: 営業電話 → 個人情報 → 費用 → 査定の性質 → 対応品目 → 撮り方 → 訪問買取
 const FAQ_ITEMS: { q: string; a: string }[] = [
+  {
+    q: "しつこい営業電話は来ますか？",
+    a: "ソクウリは、あなたが同意した上位3社のみが連絡する設計です。一括査定のような一斉架電は起こりません。辞退後の再勧誘も行われません。",
+  },
+  {
+    q: "個人情報はどう扱われますか？",
+    a: "査定段階で業者へ共有するのは「写真と品目」のみです。連絡先・住所は、交渉が成立した業者にのみ、あなたの同意のうえで開示します。",
+  },
   {
     q: "利用にお金はかかりますか？",
     a: "査定の依頼にあたり、利用者から手数料はいただきません。AI仮査定は無料でお試しいただけます。業者登録は当面無料で運用しています。",
+  },
+  {
+    q: "査定額はそのまま確定しますか？",
+    a: "査定額はAIと業者による参考値です。実際の買取額は、業者の現物査定により決まります。複数の登録業者が査定額で競うため、査定が伸びやすい仕組みです。",
   },
   {
     q: "どんな物に対応していますか？",
@@ -22,20 +35,8 @@ const FAQ_ITEMS: { q: string; a: string }[] = [
     a: "品物全体が明るく写るように撮影してください。表札・顔・住所が分かる部分は写さないようご配慮ください。映り込みがある場合はマスキング等の措置に努めます。",
   },
   {
-    q: "しつこい営業電話は来ますか？",
-    a: "ソクウリは、あなたが同意した上位3社のみが連絡する設計です。一括査定のような一斉架電は起こりません。辞退後の再勧誘も行われません。",
-  },
-  {
-    q: "査定額はそのまま確定しますか？",
-    a: "査定額はAIと業者による参考値です。実際の買取額は、業者の現物査定により決まります。複数の登録業者が査定額で競うため、査定が伸びやすい仕組みです。",
-  },
-  {
     q: "訪問買取に不安があります。",
     a: "訪問による買取には特定商取引法が適用され、法定書面の交付、8日間のクーリングオフ、その期間中の物品引き渡し拒絶権など、消費者としての保護を受けられます。訪問日時はあなたが選べます。",
-  },
-  {
-    q: "個人情報はどう扱われますか？",
-    a: "査定段階で業者へ共有するのは「写真と品目」のみです。連絡先・住所は、交渉が成立した業者にのみ、あなたの同意のうえで開示します。",
   },
 ];
 
@@ -43,7 +44,7 @@ export function Faq() {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
-    <section id="faq" className="bg-white py-16 sm:py-20 lg:py-24">
+    <section id="faq" className="bg-slate-50 py-16 sm:py-20 lg:py-24">
       <div className="container-aw">
         <div className="mx-auto max-w-2xl text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">FAQ</p>
@@ -89,7 +90,7 @@ export function Faq() {
                 {isOpen && (
                   <div
                     id={panelId}
-                    className="px-5 pb-5 text-sm leading-relaxed text-slate-600"
+                    className="animate-fade-in px-5 pb-5 text-sm leading-relaxed text-slate-600"
                   >
                     {item.a}
                   </div>

@@ -81,7 +81,7 @@ export default function RootLayout({
         <main className="w-full">{children}</main>
 
         {/* ===== FOOTER ===== */}
-        <footer className="bg-brand-950 text-slate-300">
+        <footer className="bg-brand-950 pb-20 text-slate-300 lg:pb-0">
           <div className="container-aw py-14">
             <div className="flex flex-col gap-10 md:flex-row md:items-start md:justify-between">
               <div className="max-w-sm">

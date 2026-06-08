@@ -49,7 +49,8 @@ export function Comparison() {
           </h2>
         </div>
 
-        <div className="mt-10 overflow-x-auto">
+        <div className="relative mt-10">
+        <div className="overflow-x-auto">
           <table className="mx-auto w-full min-w-[620px] max-w-3xl border-separate border-spacing-0 text-sm">
             <thead>
               <tr>
@@ -62,7 +63,7 @@ export function Comparison() {
                 <th className="px-4 pb-3 text-center text-sm font-semibold text-slate-500">
                   一括査定
                 </th>
-                <th className="rounded-t-2xl bg-brand-600 px-4 py-3 text-center text-sm font-bold text-white">
+                <th className="rounded-t-2xl bg-brand-600 px-4 py-3 text-center text-sm font-bold text-white shadow-[0_-8px_24px_-8px_rgb(31_84_222/0.35)]">
                   ソクウリ
                 </th>
               </tr>
@@ -97,6 +98,12 @@ export function Comparison() {
               })}
             </tbody>
           </table>
+        </div>
+        {/* 右端フェード: 横スクロールの続きを示唆（モバイルのみ） */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-white to-transparent sm:hidden"
+        />
         </div>
       </div>
     </section>

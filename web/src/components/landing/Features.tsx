@@ -27,7 +27,7 @@ const FEATURES: { no: string; icon: IconName; title: string; desc: string }[] = 
 
 export function Features() {
   return (
-    <section id="features" className="bg-slate-50 py-16 sm:py-20 lg:py-24">
+    <section id="features" className="bg-white py-16 sm:py-20 lg:py-24">
       <div className="container-aw">
         <div className="mx-auto max-w-2xl text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">
@@ -45,7 +45,7 @@ export function Features() {
           {FEATURES.map((feature) => (
             <div
               key={feature.no}
-              className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-card-hover"
+              className="group rounded-2xl border border-slate-200 bg-slate-50/60 p-6 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-card-hover"
             >
               <div className="flex items-center justify-between">
                 <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-50 text-brand-600 transition-colors group-hover:bg-brand-100">
