@@ -8,20 +8,20 @@ const FEATURES: { no: string; icon: IconName; title: string; desc: string }[] = 
   {
     no: "01",
     icon: "camera",
-    title: "写真1枚でAI査定",
-    desc: "商品名も型番も相場も、自分で調べる必要はありません。撮るだけでAIが識別し、査定します。",
+    title: "撮るだけ・待つだけ",
+    desc: "品物を1点ずつ撮るだけ。AIが1点ずつ仮査定し、たまった品物をまとめて依頼。相場調べも出品作業も不要で、査定はあなたのもとへ届きます。",
   },
   {
     no: "02",
     icon: "scale",
-    title: "複数チャネルを一括比較",
-    desc: "メルカリ・ヤフオク・買取店など多数の売り先から、AIが最も高く売れるチャネルを提案します。",
+    title: "業者が競うから伸びやすい",
+    desc: "複数の登録業者がオンラインで査定額を入札。競争原理がはたらくため、査定が伸びやすい仕組みです。",
   },
   {
     no: "03",
-    icon: "package",
-    title: "ほぼ全カテゴリに対応",
-    desc: "家電・ファッション・ブランド品・ホビーから家具まで、幅広い商品を1つの入口で査定できます。",
+    icon: "shield",
+    title: "連絡は上位3社だけ",
+    desc: "連絡が来るのは査定額の上位3社のみ。それ以外には自動でお断りが入り、営業電話の一斉架電はありません。",
   },
 ];
 
@@ -36,6 +36,9 @@ export function Features() {
           <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
             ソクウリが選ばれる3つの理由
           </h2>
+          <p className="mt-3 text-sm leading-relaxed text-slate-500">
+            あなたがするのは、品物を1点ずつ撮ること。あとは業者が競い、査定が届くのを待つだけです。
+          </p>
         </div>
 
         <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-3">

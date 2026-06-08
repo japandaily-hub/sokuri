@@ -3,53 +3,41 @@
 /**
  * よくあるご質問セクション（アコーディオン）。
  * 開閉状態を持つため client コンポーネント。
- * FAQPage 構造化データ (JSON-LD) を埋め込み、検索リッチリザルトに対応。
  */
 
 import { useState } from "react";
-import Script from "next/script";
 import { Icon } from "@/components/Icon";
 
 const FAQ_ITEMS: { q: string; a: string }[] = [
   {
-    q: "査定にお金はかかりますか？",
-    a: "完全無料です。会員登録も不要で、何度でもご利用いただけます。",
+    q: "利用にお金はかかりますか？",
+    a: "査定の依頼にあたり、利用者から手数料はいただきません。AI仮査定は無料でお試しいただけます。業者登録は当面無料で運用しています。",
   },
   {
-    q: "どんな商品に対応していますか？",
-    a: "家電・デジタル機器、ファッション、ブランド品、時計・貴金属、ホビー、家具・インテリアなど幅広いカテゴリに対応しています。",
+    q: "どんな物に対応していますか？",
+    a: "家電・家具・ブランド品・ホビーなど、幅広い品目をまとめて依頼できます。値段がつかない物については、手放す導線を情報としてご案内します。",
   },
   {
-    q: "写真はどのように撮ればいいですか？",
-    a: "商品全体が明るく写るように1枚撮影してください。型番やブランドのロゴが分かると、より正確に判定できます。",
-  },
-  {
-    q: "表示された査定額で必ず売れますか？",
-    a: "査定額はAIが算出する参考値です。実際の価格は、各フリマサービスや買取店での確認をもって確定します。",
+    q: "写真はどう撮ればいいですか？",
+    a: "品物全体が明るく写るように撮影してください。表札・顔・住所が分かる部分は写さないようご配慮ください。映り込みがある場合はマスキング等の措置に努めます。",
   },
   {
     q: "しつこい営業電話は来ますか？",
-    a: "ソクウリは最適な売却チャネルを提案するサービスです。一括査定のように多数の業者から一斉に電話が来ることはありません。",
+    a: "ソクウリは、あなたが同意した上位3社のみが連絡する設計です。一括査定のような一斉架電は起こりません。辞退後の再勧誘も行われません。",
   },
   {
-    q: "個人情報の登録は必要ですか？",
-    a: "査定の利用に会員登録や個人情報の入力は不要です。写真をアップロードするだけで査定できます。",
+    q: "査定額はそのまま確定しますか？",
+    a: "査定額はAIと業者による参考値です。実際の買取額は、業者の現物査定により決まります。複数の登録業者が査定額で競うため、査定が伸びやすい仕組みです。",
+  },
+  {
+    q: "訪問買取に不安があります。",
+    a: "訪問による買取には特定商取引法が適用され、法定書面の交付、8日間のクーリングオフ、その期間中の物品引き渡し拒絶権など、消費者としての保護を受けられます。訪問日時はあなたが選べます。",
+  },
+  {
+    q: "個人情報はどう扱われますか？",
+    a: "査定段階で業者へ共有するのは「写真と品目」のみです。連絡先・住所は、交渉が成立した業者にのみ、あなたの同意のうえで開示します。",
   },
 ];
-
-/** Google 検索の FAQPage リッチリザルト用 JSON-LD */
-const FAQ_LD = {
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  mainEntity: FAQ_ITEMS.map((item) => ({
-    "@type": "Question",
-    name: item.q,
-    acceptedAnswer: {
-      "@type": "Answer",
-      text: item.a,
-    },
-  })),
-};
 
 export function Faq() {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
@@ -98,30 +86,19 @@ export function Faq() {
                     </span>
                   </button>
                 </h3>
-                {/*
-                  WCAG 4.1.2: aria-controls の対象は常に DOM に存在させ、
-                  hidden 属性で表示制御する。
-                */}
-                <div
-                  id={panelId}
-                  role="region"
-                  hidden={!isOpen}
-                  className="px-5 pb-5 text-sm leading-relaxed text-slate-600"
-                >
-                  {item.a}
-                </div>
+                {isOpen && (
+                  <div
+                    id={panelId}
+                    className="px-5 pb-5 text-sm leading-relaxed text-slate-600"
+                  >
+                    {item.a}
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
       </div>
-      {/* JSON-LD: FAQPage（リッチリザルト用） */}
-      <Script
-        id="ld-faq"
-        type="application/ld+json"
-        strategy="afterInteractive"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(FAQ_LD) }}
-      />
     </section>
   );
 }

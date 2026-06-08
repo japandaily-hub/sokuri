@@ -1,35 +1,37 @@
 /**
- * サービス説明セクション。
- * 「従来の選択肢の課題」→「ソクウリの答え」という対比構成。
+ * 課題提起セクション。
+ * 「これまでの手放し方」の課題 →「ソクウリの答え」という対比構成。
  */
 
 import { Icon } from "@/components/Icon";
 
-/** 従来の選択肢が抱える課題 */
+/** 従来の手放し方が抱える課題 */
 const PROBLEMS: { label: string; title: string; desc: string }[] = [
   {
-    label: "これまでの選択肢 ①",
-    title: "フリマは、とにかく手間",
-    desc: "写真撮影・説明文・価格設定・梱包・発送・購入者対応。1点売るだけでも作業が山積みです。",
+    label: "フリマ",
+    title: "売る準備が、とにかく多い",
+    desc: "撮影・説明文・価格設定・梱包・発送・購入者対応。1点売るだけでも作業が山積みです。",
   },
   {
-    label: "これまでの選択肢 ②",
-    title: "一括査定は、電話が殺到",
-    desc: "フォーム入力の手間に加え、申し込んだ途端に多数の業者から営業電話がかかってきます。",
+    label: "一括査定",
+    title: "申込んだ途端、電話が殺到",
+    desc: "フォーム入力の手間に加え、多数の業者から営業電話が一斉にかかってくることがあります。",
   },
 ];
 
 export function ServiceIntro() {
   return (
-    <section id="about" className="bg-white py-16 sm:py-20 lg:py-24">
+    <section id="about" className="bg-slate-50 py-16 sm:py-20 lg:py-24">
       <div className="container-aw">
         <div className="mx-auto max-w-2xl text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">About</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-600">
+            これまでの手放し方
+          </p>
           <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-            「売りたい」と「めんどくさい」を、AIが解決
+            売りたいのに、なぜか動けない
           </h2>
           <p className="mt-3 text-sm leading-relaxed text-slate-500">
-            不要品の売却にはいつも手間がついて回ります。ソクウリはその手間そのものをなくします。
+            出品の手間、相場調べ、そして鳴り止まない営業電話。手放したい気持ちを止めていたのは、その面倒さでした。ソクウリは、その手間そのものをなくします。
           </p>
         </div>
 
@@ -38,9 +40,9 @@ export function ServiceIntro() {
           {PROBLEMS.map((problem) => (
             <div
               key={problem.title}
-              className="rounded-2xl border border-slate-200 bg-white p-6"
+              className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card"
             >
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
                 <Icon name="close" className="h-5 w-5" strokeWidth={2.25} />
               </span>
               <p className="mt-4 text-xs font-semibold text-slate-400">{problem.label}</p>
@@ -50,18 +52,18 @@ export function ServiceIntro() {
           ))}
 
           {/* 解決カード（強調） */}
-          <div className="rounded-2xl border border-brand-200 bg-brand-50/50 p-6 shadow-card ring-1 ring-brand-100">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-100 text-accent-600">
-              <Icon name="check" className="h-5 w-5" strokeWidth={2.5} />
+          <div className="rounded-2xl border-2 border-brand-600 bg-white p-6 shadow-card-hover">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-600 text-white">
+              <Icon name="camera" className="h-6 w-6" />
             </span>
-            <p className="mt-4 inline-flex rounded-full bg-brand-600 px-2.5 py-0.5 text-xs font-bold text-white">
-              ソクウリの答え
+            <p className="mt-4 inline-flex rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700">
+              ソクウリ
             </p>
             <h3 className="mt-1.5 text-base font-bold text-slate-900">
-              撮るだけ。あとはAIに任せる
+              撮って待つだけ。業者から来る
             </h3>
             <p className="mt-2 text-sm leading-relaxed text-slate-600">
-              AIが商品・状態・相場を判定し、最適な売却チャネルを提案。あなたは案内に沿って売るだけです。
+              品物を1点ずつ撮るだけ。AIが1点ずつ仮査定し、たまった品物をまとめて業者へ。査定はあなたのもとへ届き、連絡は同意した上位3社のみです。
             </p>
           </div>
         </div>

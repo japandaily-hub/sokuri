@@ -7,10 +7,10 @@ import { Icon } from "@/components/Icon";
 type Mark = "good" | "mid" | "bad";
 
 const ROWS: { label: string; flea: Mark; bulk: Mark; sokuri: Mark; note: string }[] = [
-  { label: "出品・入力の手間", flea: "bad", bulk: "mid", sokuri: "good", note: "写真を撮るだけ" },
-  { label: "価格・相場の調査", flea: "bad", bulk: "mid", sokuri: "good", note: "AIが自動で算出" },
-  { label: "連絡・営業電話", flea: "mid", bulk: "bad", sokuri: "good", note: "一斉架電なし" },
-  { label: "対応カテゴリ", flea: "mid", bulk: "mid", sokuri: "good", note: "ほぼ全カテゴリ" },
+  { label: "出品・入力の手間", flea: "bad", bulk: "mid", sokuri: "good", note: "1点ずつ撮るだけ" },
+  { label: "価格・相場の調査", flea: "bad", bulk: "mid", sokuri: "good", note: "業者が査定を提示" },
+  { label: "連絡・営業電話", flea: "mid", bulk: "bad", sokuri: "good", note: "連絡は上位3社のみ" },
+  { label: "査定額の伸びやすさ", flea: "mid", bulk: "mid", sokuri: "good", note: "業者が競うから伸びやすい" },
 ];
 
 /** 評価マーク 1 セル分。良 / 中 / 不可 を視覚的に区別する。 */
@@ -60,7 +60,7 @@ export function Comparison() {
                   フリマで自力出品
                 </th>
                 <th className="px-4 pb-3 text-center text-sm font-semibold text-slate-500">
-                  何でも一括査定
+                  一括査定
                 </th>
                 <th className="rounded-t-2xl bg-brand-600 px-4 py-3 text-center text-sm font-bold text-white">
                   ソクウリ
