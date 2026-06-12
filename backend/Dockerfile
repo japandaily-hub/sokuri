@@ -8,14 +8,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy project metadata first for layer caching
+# Copy project metadata + source（pyproject の packages=["app"] 解決に app/ が必要）
 COPY pyproject.toml ./
+COPY app ./app
 
 # Install production deps only (no [dev])
 RUN pip install --no-cache-dir .
 
-# Copy application source
-COPY app ./app
+# Copy remaining application files
 COPY alembic ./alembic
 COPY alembic.ini ./
 COPY start.sh ./
