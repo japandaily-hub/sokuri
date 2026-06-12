@@ -4,6 +4,7 @@ import Script from "next/script";
 import "./globals.css";
 import { BrandMark, Icon } from "@/components/Icon";
 import { Providers } from "./providers";
+import { HeaderNav } from "@/components/kdz/HeaderNav";
 
 /**
  * 本番公開 URL。
@@ -126,6 +127,7 @@ const NAV_ITEMS: { href: string; label: string }[] = [
  * `href` が null のものは未実装のため、リンクとして扱わずプレーンテキスト化（a11y: 偽リンク禁止）。
  */
 const FOOTER_LEGAL: { href: string | null; label: string }[] = [
+  { href: "/operator/login", label: "買取業者の方はこちら" },
   { href: null, label: "利用規約（準備中）" },
   { href: null, label: "プライバシーポリシー（準備中）" },
   { href: null, label: "お問い合わせ（準備中）" },
@@ -172,13 +174,7 @@ export default function RootLayout({
               ))}
             </nav>
 
-            <Link
-              href="/"
-              className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-cta transition-colors hover:bg-brand-700 focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
-            >
-              <Icon name="camera" className="h-4 w-4" />
-              無料で査定
-            </Link>
+            <HeaderNav />
           </div>
         </header>
 
@@ -241,7 +237,16 @@ export default function RootLayout({
                   <ul className="mt-4 space-y-3 text-sm">
                     {FOOTER_LEGAL.map((item) => (
                       <li key={item.label} className="text-slate-400">
-                        {item.label}
+                        {item.href ? (
+                          <Link
+                            href={item.href}
+                            className="text-slate-300 transition-colors hover:text-white"
+                          >
+                            {item.label}
+                          </Link>
+                        ) : (
+                          item.label
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -277,3 +282,4 @@ export default function RootLayout({
     </html>
   );
 }
+ 

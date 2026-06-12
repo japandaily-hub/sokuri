@@ -130,6 +130,7 @@ async def create_case(
             housing_type=case.housing_type,
             floor_plan=case.floor_plan,
             photo_urls=ai_refs,
+            photo_count=len(case.photos),
         )
     except Exception as exc:
         logger.error("cases: AI サマリー生成に失敗（フォールバック） - %s", exc)

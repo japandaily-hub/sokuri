@@ -263,7 +263,20 @@ export function signupOperator(payload: {
 // 写真アップロード
 // ---------------------------------------------------------------------------
 
+/** Render free の再起動と重なった場合に備えた 1 回リトライ付きアップロード。 */
 export async function uploadCasePhoto(
+  file: File,
+  token: string,
+): Promise<PresignResponse> {
+  try {
+    return await uploadCasePhotoOnce(file, token);
+  } catch {
+    await new Promise((r) => setTimeout(r, 2000));
+    return uploadCasePhotoOnce(file, token);
+  }
+}
+
+async function uploadCasePhotoOnce(
   file: File,
   token: string,
 ): Promise<PresignResponse> {

@@ -1,9 +1,4 @@
-"""案件 AI サマリー生成 — 既存 vision.analyze_image（Gemini Vision）を流用する。
-
-案件写真（最大 4 枚）をそれぞれ解析し、検出された品目を集約して
-業者向けの日本語サマリーを組み立てる。AI 失敗時は住居情報ベースの
-フォールバック文を返す（案件作成自体は失敗させない）。
-"""
+"""案件 AI サマリー生成 — 既存 vision.analyze_image（Gemini Vision）を流用する。"""
 
 from __future__ import annotations
 
@@ -39,15 +34,9 @@ async def generate_case_summary(
     housing_type: str | None,
     floor_plan: str | None,
     photo_urls: list[str],
+    photo_count: int | None = None,
 ) -> str:
-    """写真群から案件サマリーを生成する。
-
-    Args:
-        photo_urls: 解析対象の画像（HTTPS URL または base64 データ URL）。
-
-    Returns:
-        業者の入札判断に使う日本語サマリー。AI 不可時もフォールバック文を返す。
-    """
+    """写真群から案件サマリーを生成する。AI 不可時もフォールバック文を返す。"""
     detected: list[str] = []
     for url in photo_urls[:_MAX_PHOTOS_FOR_AI]:
         try:
@@ -55,14 +44,17 @@ async def generate_case_summary(
             label = result.detected_name or result.detected_category_label
             if label:
                 detected.append(label)
-        except Exception as exc:  # AI 失敗は案件作成を止めない
+        except Exception as exc:
             logger.warning("summary: 写真解析に失敗（continue）- %s", exc)
             continue
 
-    base = _fallback_summary(purpose, housing_type, floor_plan, len(photo_urls))
+    base = _fallback_summary(
+        purpose, housing_type, floor_plan,
+        photo_count if photo_count is not None else len(photo_urls),
+    )
     if not detected:
         return base
-    items = "、".join(dict.fromkeys(detected))  # 重複除去・順序保持
+    items = "、".join(dict.fromkeys(detected))
     return f"{base} AI 検出品目: {items}。"
 
 
