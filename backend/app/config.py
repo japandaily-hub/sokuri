@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,6 +19,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        populate_by_name=True,
     )
 
     # PostgreSQL 接続 URL（asyncpg ドライバ）
@@ -27,6 +28,27 @@ class Settings(BaseSettings):
     google_api_key: str = ""
     # SQLAlchemy のクエリエコー
     sql_echo: bool = False
+
+    # ── カタヅケ: 認証 / ストレージ / メール ──────────────────────────
+    # JWT 署名鍵（本番では必ず環境変数 JWT_SECRET で上書きする）
+    jwt_secret: str = "dev-secret-change-me"
+    # JWT 有効期限（分）。デフォルト 7 日。
+    jwt_expire_minutes: int = 60 * 24 * 7
+    # 管理者ロールで登録される email（カンマ区切り）。signup 時に role='admin' を付与。
+    admin_emails_raw: str = Field(default="", alias="ADMIN_EMAILS")
+    # 写真ファイルの保存ディレクトリ（Render Free はエフェメラル。βでは許容）
+    storage_dir: str = "./uploads_storage"
+    # Brevo（メール通知）。未設定時は送信をスキップする。
+    brevo_api_key: str = ""
+    mail_from: str = "noreply@katadzuke.jp"
+    mail_from_name: str = "カタヅケ"
+    # フロントエンドの基点 URL（メール内リンク用）
+    frontend_base_url: str = "http://localhost:3000"
+
+    @property
+    def admin_emails(self) -> list[str]:
+        """ADMIN_EMAILS をカンマ区切りで正規化して返す（小文字化）。"""
+        return [e.strip().lower() for e in self.admin_emails_raw.split(",") if e.strip()]
 
     @field_validator("database_url", mode="after")
     @classmethod

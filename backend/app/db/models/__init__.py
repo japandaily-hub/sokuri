@@ -28,6 +28,14 @@ from app.db.models.enums import (
 from app.db.models.item import Item
 from app.db.models.routing import RoutingRule
 
+# ── カタヅケ（クローズドβ） ──────────────────────────────────────
+from app.db.models.case import Case, CasePhoto
+from app.db.models.operator import Operator
+from app.db.models.bid import Bid
+from app.db.models.transaction import Cancellation, ReductionRequest, Review, Transaction
+from app.db.models.user import User
+from app.db.models.invite import Invite
+
 __all__ = [
     "Base",
     "Item",
@@ -44,4 +52,15 @@ __all__ = [
     "RoutingMethod",
     "AffiliateNetwork",
     "RewardType",
+    # カタヅケ
+    "Case",
+    "CasePhoto",
+    "Operator",
+    "Bid",
+    "Transaction",
+    "ReductionRequest",
+    "Review",
+    "Cancellation",
+    "User",
+    "Invite",
 ]

@@ -18,6 +18,13 @@ import app.db.models.item
 import app.db.models.routing
 import app.db.models.assessment
 import app.db.models.defect
+# カタヅケ
+import app.db.models.case
+import app.db.models.operator
+import app.db.models.bid
+import app.db.models.transaction
+import app.db.models.user
+import app.db.models.invite
 configure_mappers()
 
 @pytest.fixture

@@ -42,3 +42,16 @@ services:
         value: 8000
       - key: SQL_ECHO
         value: "false"
+      # ── カタヅケ クローズドβ ──────────────────────────────────
+      - key: JWT_SECRET
+        generateValue: true            # Render が安全なランダム値を自動生成
+      - key: ADMIN_EMAILS
+        value: "ko.13.hei@gmail.com"   # この email の signup が admin になる
+      - key: STORAGE_DIR
+        value: /tmp/uploads            # Free plan はエフェメラル（β許容）
+      - key: BREVO_API_KEY
+        sync: false                    # dashboard で手動入力（未設定なら送信スキップ）
+      - key: MAIL_FROM
+        value: "noreply@katadzuke.jp"
+      - key: FRONTEND_BASE_URL
+        value: "https://sokuri.vercel.app"
