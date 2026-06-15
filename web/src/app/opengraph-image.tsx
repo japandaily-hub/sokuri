@@ -9,7 +9,7 @@ import { ImageResponse } from "next/og";
 export const runtime = "edge";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
-export const alt = "ソクウリ — 写真1枚で最高値査定";
+export const alt = "カタヅケ — 部屋ごと撮るだけ、片付けと買取の見積もりが届く";
 
 export default function OgImage() {
   return new ImageResponse(
@@ -50,7 +50,7 @@ export default function OgImage() {
               fontWeight: 800,
             }}
           >
-            S
+            カ
           </div>
           <div
             style={{
@@ -59,7 +59,7 @@ export default function OgImage() {
               letterSpacing: "-0.02em",
             }}
           >
-            ソクウリ
+            カタヅケ
           </div>
           <div
             style={{
@@ -92,7 +92,7 @@ export default function OgImage() {
               color: "#ffffff",
             }}
           >
-            写真1枚で、
+            部屋ごと撮るだけ。
           </div>
           <div
             style={{
@@ -103,7 +103,7 @@ export default function OgImage() {
               color: "#a7f3d0",
             }}
           >
-            いちばん高く売れる場所がわかる。
+            片付けと買取が、まとめて片づく。
           </div>
         </div>
 
@@ -135,7 +135,7 @@ export default function OgImage() {
               background: "rgba(255,255,255,0.08)",
             }}
           >
-            ●登録不要
+            ●撮るだけ
           </div>
           <div
             style={{
@@ -145,7 +145,7 @@ export default function OgImage() {
               background: "rgba(255,255,255,0.08)",
             }}
           >
-            ●30秒で完了
+            ●AI査定
           </div>
           <div
             style={{

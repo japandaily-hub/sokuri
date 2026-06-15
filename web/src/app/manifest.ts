@@ -13,10 +13,10 @@ import type { MetadataRoute } from "next";
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "ソクウリ — 写真1枚でAI査定",
-    short_name: "ソクウリ",
+    name: "カタヅケ — 部屋ごと撮るだけAI片付け査定",
+    short_name: "カタヅケ",
     description:
-      "写真を撮るだけでAIが商品を識別。メルカリ・ヤフオク・買取店を横断比較し、最高値で売却。",
+      "部屋ごと撮るだけ。AIが片付け・不用品を案件化し、リユース業者の見積もりが届くマッチングサービス。",
     start_url: "/",
     display: "standalone",
     background_color: "#f8fafc",
@@ -46,9 +46,9 @@ export default function manifest(): MetadataRoute.Manifest {
       },
       {
         name: "まとめて査定",
-        short_name: "アルバム",
-        description: "家中の不用品をアルバム化して一括査定",
-        url: "/album",
+        short_name: "まとめて",
+        description: "部屋ごと撮影して片付け・不用品をまとめて依頼",
+        url: "/create",
       },
     ],
   };

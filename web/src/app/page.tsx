@@ -933,7 +933,7 @@ export default function HomePage() {
               </div>
               <p className="mt-4 flex items-start gap-1.5 text-xs leading-relaxed text-slate-400">
                 <Icon name="info" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                ソクウリは取引の「場」を提供します。買取・回収・運搬は各業者または各導線が行います。
+                カタヅケは取引の「場」を提供します。買取・回収・運搬は各業者または各導線が行います。
               </p>
               </div>
             </div>
