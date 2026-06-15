@@ -130,6 +130,8 @@ const FOOTER_LEGAL: { href: string | null; label: string }[] = [
   { href: "/operator/login", label: "買取業者の方はこちら" },
   { href: "/terms", label: "利用規約" },
   { href: "/privacy", label: "プライバシーポリシー" },
+  { href: "/legal", label: "特定商取引法に基づく表記" },
+  { href: "/unsubscribe", label: "配信停止" },
   { href: null, label: "お問い合わせ（準備中）" },
 ];
 
