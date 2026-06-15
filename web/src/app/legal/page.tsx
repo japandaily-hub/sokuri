@@ -1,6 +1,8 @@
 /**
  * 特定商取引法に基づく表記（特商法ページ）
- * 必ず実際の運営者情報に書き換えること（[運営者名] / [住所] / [メールアドレス] 等）。
+ * 運営者情報を反映済み（2026-06-16）。
+ * 所在地（番地）・電話番号・代表者名は、特商法第11条および同法施行規則第10条に基づき
+ * 「請求があった場合に遅滞なく開示する」省略運用としている（メールでの開示請求に対応すること）。
  */
 
 export const metadata = {
@@ -14,20 +16,20 @@ export default function LegalPage() {
       <h1 className="text-2xl font-bold text-slate-900">特定商取引法に基づく表記</h1>
 
       <dl className="mt-8 divide-y divide-slate-100 text-sm">
-        <Row label="販売事業者">
-          [運営者名]（実際の個人名または法人名に変更必須）
+        <Row label="販売事業者">カタヅケ運営事務局</Row>
+        <Row label="代表者名">ご請求に応じて遅滞なく開示いたします</Row>
+        <Row label="所在地">
+          神奈川県横浜市（番地を含む正確な所在地は、ご請求に応じて遅滞なく開示いたします）
         </Row>
-        <Row label="代表者名">[代表者氏名]</Row>
-        <Row label="所在地">[住所]（〒XXX-XXXX 都道府県市区町村番地）</Row>
         <Row label="電話番号">
-          [電話番号]（お問い合わせはメールにて受け付けております）
+          ご請求に応じて遅滞なく開示いたします（お問い合わせはメールにて承ります）
         </Row>
         <Row label="メールアドレス">
           <a
-            href="mailto:katazuke.support@gmail.com"
+            href="mailto:katazuke-support@gmail.com"
             className="text-brand-700 underline hover:text-brand-900"
           >
-            katazuke.support@gmail.com
+            katazuke-support@gmail.com
           </a>
         </Row>
         <Row label="サービス名">カタヅケ（片付け案件マッチングプラットフォーム）</Row>
@@ -76,8 +78,13 @@ export default function LegalPage() {
         </Row>
       </dl>
 
-      <p className="mt-10 text-xs text-slate-400">
-        最終更新: 2026年6月15日
+      <p className="mt-8 text-xs text-slate-500 leading-relaxed">
+        ※ 所在地（番地）・電話番号・代表者名は、特定商取引法第11条および同法施行規則第10条に基づき、
+        消費者の皆様からのご請求があった場合に、上記メールアドレス宛のご連絡により遅滞なく開示いたします。
+      </p>
+
+      <p className="mt-6 text-xs text-slate-400">
+        最終更新: 2026年6月16日
       </p>
     </div>
   );

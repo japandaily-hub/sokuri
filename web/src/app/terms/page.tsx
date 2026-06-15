@@ -90,8 +90,8 @@ export default function TermsPage() {
           <h2 className="text-lg font-bold text-slate-900">第9条（お問い合わせ）</h2>
           <p className="mt-3 text-sm leading-relaxed text-slate-600">
             本規約に関するお問い合わせは{" "}
-            <a href="mailto:katazuke.support@gmail.com" className="text-brand-600 underline">
-              katazuke.support@gmail.com
+            <a href="mailto:katazuke-support@gmail.com" className="text-brand-600 underline">
+              katazuke-support@gmail.com
             </a>{" "}
             までご連絡ください。
           </p>
@@ -102,7 +102,7 @@ export default function TermsPage() {
         <dl className="space-y-1">
           <div className="flex gap-2"><dt className="font-semibold">運営者</dt><dd>カタヅケ運営事務局（個人運営）</dd></div>
           <div className="flex gap-2"><dt className="font-semibold">所在地</dt><dd>神奈川県横浜市</dd></div>
-          <div className="flex gap-2"><dt className="font-semibold">連絡先</dt><dd><a href="mailto:katazuke.support@gmail.com" className="underline">katazuke.support@gmail.com</a></dd></div>
+          <div className="flex gap-2"><dt className="font-semibold">連絡先</dt><dd><a href="mailto:katazuke-support@gmail.com" className="underline">katazuke-support@gmail.com</a></dd></div>
         </dl>
       </div>
     </div>

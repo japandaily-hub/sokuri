@@ -59,8 +59,8 @@ export default function PrivacyPage() {
           <p className="mt-3 text-sm leading-relaxed text-slate-600">
             投稿された画像・データは、査定およびマッチングの目的に必要な範囲で保管します。
             ご自身の投稿データの削除をご希望の場合は、{" "}
-            <a href="mailto:katazuke.support@gmail.com" className="text-brand-600 underline">
-              katazuke.support@gmail.com
+            <a href="mailto:katazuke-support@gmail.com" className="text-brand-600 underline">
+              katazuke-support@gmail.com
             </a>{" "}
             までご連絡ください。ご本人からのご依頼であることを確認のうえ、合理的な範囲で速やかに対応します。
           </p>
@@ -85,8 +85,8 @@ export default function PrivacyPage() {
           <h2 className="text-lg font-bold text-slate-900">第8条（お問い合わせ・開示請求）</h2>
           <p className="mt-3 text-sm leading-relaxed text-slate-600">
             本ポリシーおよび個人情報の取り扱いに関するお問い合わせ・ご請求は、{" "}
-            <a href="mailto:katazuke.support@gmail.com" className="text-brand-600 underline">
-              katazuke.support@gmail.com
+            <a href="mailto:katazuke-support@gmail.com" className="text-brand-600 underline">
+              katazuke-support@gmail.com
             </a>{" "}
             までご連絡ください。
           </p>
@@ -97,7 +97,7 @@ export default function PrivacyPage() {
         <dl className="space-y-1">
           <div className="flex gap-2"><dt className="font-semibold">運営者</dt><dd>カタヅケ運営事務局（個人運営）</dd></div>
           <div className="flex gap-2"><dt className="font-semibold">所在地</dt><dd>神奈川県横浜市</dd></div>
-          <div className="flex gap-2"><dt className="font-semibold">連絡先</dt><dd><a href="mailto:katazuke.support@gmail.com" className="underline">katazuke.support@gmail.com</a></dd></div>
+          <div className="flex gap-2"><dt className="font-semibold">連絡先</dt><dd><a href="mailto:katazuke-support@gmail.com" className="underline">katazuke-support@gmail.com</a></dd></div>
         </dl>
       </div>
     </div>

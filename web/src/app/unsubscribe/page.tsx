@@ -61,10 +61,10 @@ function UnsubscribeContent() {
       <p className="mt-6 text-xs text-slate-400">
         ご不明な点は{" "}
         <a
-          href="mailto:katazuke.support@gmail.com"
+          href="mailto:katazuke-support@gmail.com"
           className="underline hover:text-slate-600"
         >
-          katazuke.support@gmail.com
+          katazuke-support@gmail.com
         </a>{" "}
         までお問い合わせください。
       </p>
