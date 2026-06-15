@@ -1,6 +1,6 @@
 /**
  * 課題提起セクション。
- * 「これまでの手放し方」の課題 →「ソクウリの答え」という対比構成。
+ * 「これまでの手放し方」の課題 →「カタヅケの答え」という対比構成。
  */
 
 import { Icon } from "@/components/Icon";
@@ -31,7 +31,7 @@ export function ServiceIntro() {
             売りたいのに、なぜか動けない
           </h2>
           <p className="mt-3 text-sm leading-relaxed text-slate-500">
-            出品の手間、相場調べ、そして鳴り止まない営業電話。手放したい気持ちを止めていたのは、その面倒さでした。ソクウリは、その手間そのものをなくします。下の8つの場面で、変わっていく様子をご覧ください。
+            出品の手間、相場調べ、そして鳴り止まない営業電話。手放したい気持ちを止めていたのは、その面倒さでした。カタヅケは、その手間そのものをなくします。下の8つの場面で、変わっていく様子をご覧ください。
           </p>
         </div>
 
@@ -57,7 +57,7 @@ export function ServiceIntro() {
               <Icon name="camera" className="h-6 w-6" />
             </span>
             <p className="mt-4 inline-flex rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700">
-              ソクウリ
+              カタヅケ
             </p>
             <h3 className="mt-1.5 text-base font-bold text-slate-900">
               撮って待つだけ。業者から来る

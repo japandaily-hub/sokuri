@@ -1,5 +1,5 @@
 /**
- * 特徴セクション — ソクウリが選ばれる 3 つの理由。
+ * 特徴セクション — カタヅケが選ばれる 3 つの理由。
  */
 
 import { Icon, type IconName } from "@/components/Icon";
@@ -34,7 +34,7 @@ export function Features() {
             Features
           </p>
           <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-            ソクウリが選ばれる3つの理由
+            カタヅケが選ばれる3つの理由
           </h2>
           <p className="mt-3 text-sm leading-relaxed text-slate-500">
             あなたがするのは、品物を1点ずつ撮ること。あとは業者が競い、査定が届くのを待つだけです。

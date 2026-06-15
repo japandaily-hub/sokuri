@@ -22,23 +22,23 @@ const SITE_URL = "https://sokuri.vercel.app";
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "ソクウリ — 写真1枚でAI査定、メルカリ・ヤフオク含む最高値で売却",
-    template: "%s | ソクウリ",
+    default: "カタヅケ — 部屋ごと撮るだけ、片付けと買取の見積もりが届く",
+    template: "%s | カタヅケ",
   },
   description:
-    "写真を撮るだけでAIが商品を識別。メルカリ・ヤフオク・買取店など主要販売チャネルを横断比較し、最も高く売れる場所と査定額を30秒で提示します。完全無料・登録不要・営業電話ゼロ。",
+    "家の中をスマホで撮るだけ。AIが案件化し、登録リユース業者が見積もりで競います。比べて選ぶだけで、片付け・買取がまとめて終わる片付けプラットフォーム。",
   keywords: [
-    "不用品 査定",
+    "片付け 見積もり",
     "AI 査定",
-    "メルカリ 比較",
-    "ヤフオク 査定",
+    "リユース 業者",
+    "不用品 買取",
     "買取 比較",
     "リユース",
-    "写真 査定",
+    "片付け 業者",
   ],
-  authors: [{ name: "ソクウリ" }],
-  creator: "ソクウリ",
-  publisher: "ソクウリ",
+  authors: [{ name: "カタヅケ" }],
+  creator: "カタヅケ",
+  publisher: "カタヅケ",
   alternates: {
     canonical: "/",
   },
@@ -46,24 +46,24 @@ export const metadata: Metadata = {
     type: "website",
     locale: "ja_JP",
     url: SITE_URL,
-    siteName: "ソクウリ",
-    title: "ソクウリ — 写真1枚でAI査定、最高値で売却",
+    siteName: "カタヅケ",
+    title: "カタヅケ — 部屋ごと撮るだけ、片付けと買取の見積もりが届く",
     description:
-      "写真を撮るだけでAIが商品を識別。メルカリ・ヤフオク・買取店を横断比較し、最も高く売れる場所と査定額を30秒で提示。完全無料・登録不要。",
+      "家の中をスマホで撮るだけ。AIが案件化し、登録業者が見積もりで競います。片付け・買取がまとめて終わる。",
     images: [
       {
         url: "/opengraph-image",
         width: 1200,
         height: 630,
-        alt: "ソクウリ — 写真1枚で最高値査定",
+        alt: "カタヅケ — 部屋ごと撮るだけ",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "ソクウリ — 写真1枚でAI査定、最高値で売却",
+    title: "カタヅケ — 部屋ごと撮るだけ、片付けと買取の見積もりが届く",
     description:
-      "写真を撮るだけでAIが商品を識別。最も高く売れる場所と査定額を30秒で提示。",
+      "家の中をスマホで撮るだけ。AIが案件化し、業者が見積もりで競います。",
     images: ["/opengraph-image"],
   },
   robots: {
@@ -97,7 +97,7 @@ export const viewport: Viewport = {
 const ORG_LD = {
   "@context": "https://schema.org",
   "@type": "Organization",
-  name: "ソクウリ",
+  name: "カタヅケ",
   url: SITE_URL,
   logo: `${SITE_URL}/icon.svg`,
   sameAs: [],
@@ -106,11 +106,11 @@ const ORG_LD = {
 const WEBSITE_LD = {
   "@context": "https://schema.org",
   "@type": "WebSite",
-  name: "ソクウリ",
+  name: "カタヅケ",
   url: SITE_URL,
   inLanguage: "ja-JP",
   description:
-    "写真1枚でAIが商品を識別し、メルカリ・ヤフオク・買取店を横断比較して最も高く売れる場所を提示する無料の査定サービス。",
+    "家の中をスマホで撮るだけでAIが案件化し、登録リユース業者が見積もりで競う片付けプラットフォーム。",
 };
 
 /** ヘッダーのナビゲーション項目 */
@@ -128,8 +128,8 @@ const NAV_ITEMS: { href: string; label: string }[] = [
  */
 const FOOTER_LEGAL: { href: string | null; label: string }[] = [
   { href: "/operator/login", label: "買取業者の方はこちら" },
-  { href: null, label: "利用規約（準備中）" },
-  { href: null, label: "プライバシーポリシー（準備中）" },
+  { href: "/terms", label: "利用規約" },
+  { href: "/privacy", label: "プライバシーポリシー" },
   { href: null, label: "お問い合わせ（準備中）" },
 ];
 
@@ -152,10 +152,10 @@ export default function RootLayout({
         {/* ===== HEADER ===== */}
         <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-md">
           <div className="container-aw flex h-16 items-center justify-between">
-            <Link href="/" className="flex items-center gap-2.5" aria-label="ソクウリ トップへ">
+            <Link href="/" className="flex items-center gap-2.5" aria-label="カタヅケ トップへ">
               <BrandMark className="h-9 w-9" />
               <span className="flex items-baseline gap-1.5">
-                <span className="text-lg font-bold tracking-tight text-slate-900">ソクウリ</span>
+                <span className="text-lg font-bold tracking-tight text-slate-900">カタヅケ</span>
                 <span className="hidden text-[11px] font-semibold text-slate-500 sm:inline">
                   AI査定
                 </span>
@@ -190,7 +190,7 @@ export default function RootLayout({
               <div className="max-w-sm">
                 <div className="flex items-center gap-2.5">
                   <BrandMark className="h-8 w-8" />
-                  <span className="text-lg font-bold tracking-tight text-white">ソクウリ</span>
+                  <span className="text-lg font-bold tracking-tight text-white">カタヅケ</span>
                 </div>
                 <p className="mt-3 text-sm leading-relaxed text-slate-300">
                   写真1枚でAIが商品を識別。メルカリ・ヤフオク・買取店など、あなたの商品が
@@ -259,7 +259,7 @@ export default function RootLayout({
                 査定額はAIによる参考値であり、実際の売却価格を保証するものではありません。
                 売却チャネルの提案には広告（PR）を含む場合があります。
               </p>
-              <p className="mt-3 text-xs text-slate-400">© 2026 ソクウリ. All rights reserved.</p>
+              <p className="mt-3 text-xs text-slate-400">© 2026 カタヅケ. All rights reserved.</p>
             </div>
           </div>
         </footer>

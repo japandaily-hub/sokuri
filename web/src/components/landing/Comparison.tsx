@@ -64,7 +64,7 @@ export function Comparison() {
                   一括査定
                 </th>
                 <th className="rounded-t-2xl bg-brand-600 px-4 py-3 text-center text-sm font-bold text-white shadow-[0_-8px_24px_-8px_rgb(31_84_222/0.35)]">
-                  ソクウリ
+                  カタヅケ
                 </th>
               </tr>
             </thead>
