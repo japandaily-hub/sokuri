@@ -1,11 +1,4 @@
-"""FastAPI 依存性 — JWT 認証（user / operator / admin）。
-
-全カタヅケ API はこのモジュールの依存性で保護する。
-- get_current_user     : typ=user の JWT 必須
-- get_current_admin    : typ=user かつ role=admin
-- get_current_operator : typ=operator（停止中業者は 403）
-- get_current_actor    : user / operator どちらでも可（成約・レビュー用）
-"""
+"""FastAPI deps -- JWT auth."""
 
 from __future__ import annotations
 
@@ -26,7 +19,7 @@ _bearer = HTTPBearer(auto_error=False)
 
 _CRED_EXC = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
-    detail="認証情報が無効です。再度ログインしてください。",
+    detail="Invalid credentials. Please log in again.",
     headers={"WWW-Authenticate": "Bearer"},
 )
 
@@ -59,7 +52,7 @@ async def get_current_admin(
     if user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="管理者権限が必要です。",
+            detail="Admin access required.",
         )
     return user
 
@@ -77,7 +70,7 @@ async def get_current_operator(
     if operator.is_suspended:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="アカウントが停止されています。運営にお問い合わせください。",
+            detail="Account is suspended.",
         )
     return operator
 
@@ -85,20 +78,27 @@ async def get_current_operator(
 async def get_verified_operator(
     operator: Operator = Depends(get_current_operator),
 ) -> Operator:
-    """承認済み（verified_at あり）の業者のみ許可する。"""
-    if operator.verified_at is None:
+    """Allow vendor_status limited/active (or legacy verified_at for migration)."""
+    status_ok = operator.vendor_status in ("limited", "active")
+    legacy_ok = operator.verified_at is not None
+    if not (status_ok or legacy_ok):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="アカウントは承認待ちです。承認後に利用できます。",
+            detail="Account not yet approved.",
+        )
+    if operator.is_suspended:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is suspended.",
         )
     return operator
 
 
 @dataclass
 class Actor:
-    """user / operator いずれかの認証主体。"""
+    """Either user or operator principal."""
 
-    typ: str  # 'user' | 'operator'
+    typ: str
     user: User | None = None
     operator: Operator | None = None
 
@@ -128,7 +128,7 @@ async def get_current_actor(
         if operator.is_suspended:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="アカウントが停止されています。",
+                detail="Account is suspended.",
             )
         return Actor(typ="operator", operator=operator)
     raise _CRED_EXC

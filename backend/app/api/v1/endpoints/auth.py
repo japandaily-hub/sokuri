@@ -94,18 +94,21 @@ async def user_login(
     "/auth/operator/signup",
     response_model=AuthTokenResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="業者登録（招待コード必須）",
+    summary="業者登録（招待コード任意: あればactive、なければlimited登録）",
 )
 async def operator_signup(
     body: OperatorSignupRequest,
     session: AsyncSession = Depends(get_session),
 ) -> AuthTokenResponse:
-    invite = await session.scalar(select(Invite).where(Invite.code == body.invite_code))
-    if invite is None or invite.used_at is not None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="招待コードが無効、または既に使用されています。",
-        )
+    invite = None
+    # 招待コードがある場合のみ検証・消込
+    if body.invite_code:
+        invite = await session.scalar(select(Invite).where(Invite.code == body.invite_code))
+        if invite is None or invite.used_at is not None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="招待コードが無効、または既に使用されています。",
+            )
     email = body.email.lower()
     existing = await session.scalar(select(Operator).where(Operator.contact_email == email))
     if existing is not None:
@@ -113,18 +116,22 @@ async def operator_signup(
             status_code=status.HTTP_409_CONFLICT,
             detail="このメールアドレスは既に登録されています。",
         )
+    # 招待=active（即フル稼働）、オープン=limited（即暫定稼働）
+    vendor_status = "active" if invite else "limited"
     operator = Operator(
         company_name=body.company_name,
         contact_email=email,
         license_number=body.license_number,
-        invite_code=body.invite_code,
+        invite_code=body.invite_code or None,
         password_hash=hash_password(body.password),
-        verified_at=None,  # 管理者承認待ち
+        vendor_status=vendor_status,
+        verified_at=None,  # admin approveで更新
     )
     session.add(operator)
     await session.flush()
-    invite.used_at = datetime.now(timezone.utc)
-    invite.operator_id = operator.id
+    if invite is not None:
+        invite.used_at = datetime.now(timezone.utc)
+        invite.operator_id = operator.id
     await session.commit()
     await session.refresh(operator)
     token = create_access_token(operator.id, "operator", "operator")
@@ -170,6 +177,7 @@ async def operator_login(
 @router.get("/auth/me", response_model=AuthTokenResponse, summary="ログイン中アカウント情報")
 async def me(actor: Actor = Depends(get_current_actor)) -> AuthTokenResponse:
     """トークン検証を兼ねたプロフィール取得（access_token は返却しない）。"""
+   
     if actor.typ == "user":
         assert actor.user is not None
         return AuthTokenResponse(

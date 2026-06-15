@@ -54,7 +54,6 @@ def _auth(token: str) -> dict[str, str]:
 
 
 async def _make_admin(client: AsyncClient, db_session: AsyncSession) -> str:
-    """role=admin のユーザーを直接 DB に作成しログインしてトークンを返す。"""
     admin = User(
         email="admin@katadzuke.jp",
         password_hash=hash_password("adminpass123"),
@@ -91,7 +90,6 @@ async def _invite_code(client: AsyncClient, admin_token: str) -> str:
 async def _signup_operator(
     client: AsyncClient, code: str, email: str, company: str = "テスト片付け株式会社"
 ) -> tuple[str, str]:
-    """(token, operator_id) を返す。"""
     r = await client.post(
         "/api/v1/auth/operator/signup",
         json={
@@ -201,11 +199,11 @@ async def test_invite_single_use(client: AsyncClient, db_session: AsyncSession):
             "password": "operatorpass1",
         },
     )
-    assert r.status_code == 403  # 使用済みコード
+    assert r.status_code == 403
 
 
 async def test_admin_endpoints_require_admin_role(client: AsyncClient):
-    token = await _signup_user(client)  # 一般ユーザー
+    token = await _signup_user(client)
     r = await client.post("/api/v1/admin/invites", json={}, headers=_auth(token))
     assert r.status_code == 403
 
@@ -223,7 +221,7 @@ async def test_create_case_has_ai_summary_and_photos(client: AsyncClient):
     token = await _signup_user(client)
     case = await _create_case(client, token)
     assert case["status"] == "open"
-    assert case["ai_summary"]  # フォールバックでも必ず文字列が入る
+    assert case["ai_summary"]
     assert len(case["photos"]) == 2
     assert case["address_detail"] == "桜丘1-2-3 メゾン桜 101号室"
 
@@ -231,11 +229,27 @@ async def test_create_case_has_ai_summary_and_photos(client: AsyncClient):
 async def test_unverified_operator_cannot_list_cases(
     client: AsyncClient, db_session: AsyncSession
 ):
-    admin_token = await _make_admin(client, db_session)
-    code = await _invite_code(client, admin_token)
-    op_token, _ = await _signup_operator(client, code, "op1@example.com")
+    """vendor_status=pending の業者は案件一覧にアクセス不可（403）。
+    TASK-2: open 登録は limited（閲覧可）、pending は DB 直接挿入でのみ発生するエッジケース。
+    """
+    from app.core.security import create_access_token
+    from app.db.models.operator import Operator
+    import uuid as _uuid
+
+    pending_op = Operator(
+        id=_uuid.uuid4(),
+        company_name="ペンディング業者",
+        contact_email="pending_op@example.com",
+        password_hash=hash_password("password123"),
+        vendor_status="pending",
+    )
+    db_session.add(pending_op)
+    await db_session.commit()
+    await db_session.refresh(pending_op)
+
+    op_token = create_access_token(pending_op.id, "operator", "operator")
     r = await client.get("/api/v1/cases", headers=_auth(op_token))
-    assert r.status_code == 403  # 承認待ち
+    assert r.status_code == 403
 
 
 async def test_operator_case_view_masks_address(
@@ -251,7 +265,7 @@ async def test_operator_case_view_masks_address(
     r = await client.get(f"/api/v1/cases/{case['id']}", headers=_auth(op_token))
     assert r.status_code == 200
     body = r.json()
-    assert "address_detail" not in body  # ★ 品質基準: 住所詳細マスク
+    assert "address_detail" not in body
     assert body["prefecture"] == "東京都"
     assert body["city"] == "世田谷区"
 
@@ -285,7 +299,6 @@ async def test_full_flow_bid_select_reduction_complete_review(
     case = await _create_case(client, user_token)
     case_id = case["id"]
 
-    # 入札（2 社）
     r = await client.post(
         f"/api/v1/cases/{case_id}/bids",
         json={"amount": 50000, "message": "丁寧に対応します"},
@@ -300,7 +313,6 @@ async def test_full_flow_bid_select_reduction_complete_review(
     )
     assert r.status_code == 201
 
-    # 重複入札 409
     r = await client.post(
         f"/api/v1/cases/{case_id}/bids",
         json={"amount": 70000},
@@ -308,24 +320,20 @@ async def test_full_flow_bid_select_reduction_complete_review(
     )
     assert r.status_code == 409
 
-    # ユーザーは入札一覧（業者情報付き）を見られる
     r = await client.get(f"/api/v1/cases/{case_id}/bids", headers=_auth(user_token))
     assert r.status_code == 200
     bids = r.json()
     assert len(bids) == 2
     assert all(b["operator"]["company_name"] for b in bids)
 
-    # 業者は自社入札のみ見える
     r = await client.get(f"/api/v1/cases/{case_id}/bids", headers=_auth(op1_token))
     assert len(r.json()) == 1
 
-    # 他人は select 不可（業者トークンでは 401/403 相当 → user 依存のため 401）
     r = await client.post(
         f"/api/v1/cases/{case_id}/bids/{bid1['id']}/select", headers=_auth(op1_token)
     )
     assert r.status_code in (401, 403)
 
-    # ユーザーが 1 社選択（op1 を落札）
     r = await client.post(
         f"/api/v1/cases/{case_id}/bids/{bid1['id']}/select", headers=_auth(user_token)
     )
@@ -334,7 +342,6 @@ async def test_full_flow_bid_select_reduction_complete_review(
     assert txn["initial_amount"] == 50000
     txn_id = txn["id"]
 
-    # 案件 closed / 他入札 rejected
     r = await client.get(f"/api/v1/cases/{case_id}", headers=_auth(user_token))
     assert r.json()["status"] == "closed"
     r = await client.get(f"/api/v1/cases/{case_id}/bids", headers=_auth(user_token))
@@ -342,18 +349,15 @@ async def test_full_flow_bid_select_reduction_complete_review(
     assert statuses[op1_id] == "selected"
     assert statuses[op2_id] == "rejected"
 
-    # ★ 落札業者には住所詳細が開示される
     r = await client.get(f"/api/v1/transactions/{txn_id}", headers=_auth(op1_token))
     assert r.status_code == 200
     detail = r.json()
     assert detail["address"]["address_detail"] == "桜丘1-2-3 メゾン桜 101号室"
     assert detail["contact_email"] == "user1@example.com"
 
-    # ★ 落札していない業者は成約情報にアクセス不可
     r = await client.get(f"/api/v1/transactions/{txn_id}", headers=_auth(op2_token))
     assert r.status_code == 403
 
-    # 減額申請: 理由が短い → 422（サーバーサイド必須強制）
     r = await client.post(
         f"/api/v1/transactions/{txn_id}/reduction",
         json={"requested_amount": 40000, "reason": "短い"},
@@ -361,7 +365,6 @@ async def test_full_flow_bid_select_reduction_complete_review(
     )
     assert r.status_code == 422
 
-    # 減額申請: 増額は 422
     r = await client.post(
         f"/api/v1/transactions/{txn_id}/reduction",
         json={"requested_amount": 60000, "reason": "実際の物量が想定より多かったため"},
@@ -369,7 +372,6 @@ async def test_full_flow_bid_select_reduction_complete_review(
     )
     assert r.status_code == 422
 
-    # 減額申請: 正常
     r = await client.post(
         f"/api/v1/transactions/{txn_id}/reduction",
         json={
@@ -382,7 +384,6 @@ async def test_full_flow_bid_select_reduction_complete_review(
     reduction = r.json()
     assert reduction["status"] == "pending"
 
-    # 未回答中の追加申請は 409
     r = await client.post(
         f"/api/v1/transactions/{txn_id}/reduction",
         json={"requested_amount": 41000, "reason": "さらに追加の破損が見つかったため"},
@@ -390,7 +391,6 @@ async def test_full_flow_bid_select_reduction_complete_review(
     )
     assert r.status_code == 409
 
-    # ユーザーが承認 → final_amount 更新
     r = await client.patch(
         f"/api/v1/transactions/{txn_id}/reduction/{reduction['id']}",
         json={"action": "approve"},
@@ -401,7 +401,6 @@ async def test_full_flow_bid_select_reduction_complete_review(
     r = await client.get(f"/api/v1/transactions/{txn_id}", headers=_auth(user_token))
     assert r.json()["final_amount"] == 42000
 
-    # 完了確定は業者不可・ユーザーのみ
     r = await client.post(
         f"/api/v1/transactions/{txn_id}/complete", headers=_auth(op1_token)
     )
@@ -413,7 +412,6 @@ async def test_full_flow_bid_select_reduction_complete_review(
     assert r.json()["status"] == "completed"
     assert r.json()["final_amount"] == 42000
 
-    # レビュー（ユーザー → 業者。rating 平均が operator に反映）
     r = await client.post(
         "/api/v1/reviews",
         json={"transaction_id": txn_id, "rating": 5, "comment": "迅速で丁寧でした"},
@@ -425,9 +423,8 @@ async def test_full_flow_bid_select_reduction_complete_review(
         json={"transaction_id": txn_id, "rating": 4},
         headers=_auth(user_token),
     )
-    assert r.status_code == 409  # 二重投稿不可
+    assert r.status_code == 409
 
-    # 業者側レビュー
     r = await client.post(
         "/api/v1/reviews",
         json={"transaction_id": txn_id, "rating": 4, "comment": "スムーズでした"},
@@ -435,7 +432,6 @@ async def test_full_flow_bid_select_reduction_complete_review(
     )
     assert r.status_code == 201
 
-    # 業者 rating が更新されている
     r = await client.get("/api/v1/admin/operators", headers=_auth(admin_token))
     op1 = next(o for o in r.json() if o["id"] == op1_id)
     assert op1["rating"] == 5.0
@@ -460,7 +456,6 @@ async def test_cancel_flow_by_operator(client: AsyncClient, db_session: AsyncSes
     )
     txn_id = r.json()["id"]
 
-    # 業者キャンセル → cancelled / cancel_count 増加 / 住所非開示
     r = await client.post(
         f"/api/v1/transactions/{txn_id}/cancel",
         json={"reason": "繁忙期のため対応不可になりました"},
@@ -473,9 +468,8 @@ async def test_cancel_flow_by_operator(client: AsyncClient, db_session: AsyncSes
     assert r.json()["status"] == "cancelled"
 
     r = await client.get(f"/api/v1/transactions/{txn_id}", headers=_auth(op_token))
-    assert r.json()["address"] is None  # キャンセル後は非開示
+    assert r.json()["address"] is None
 
-    # 完了・再キャンセルは 409
     r = await client.post(
         f"/api/v1/transactions/{txn_id}/complete", headers=_auth(user_token)
     )
@@ -504,7 +498,7 @@ async def test_reviews_only_after_completed(
         json={"transaction_id": txn_id, "rating": 5},
         headers=_auth(user_token),
     )
-    assert r.status_code == 409  # 完了前は不可
+    assert r.status_code == 409
 
 
 # ──────────────────────────── 写真アップロード ────────────────────────────
@@ -547,3 +541,156 @@ async def test_case_create_rejects_invalid_storage_key(client: AsyncClient):
     payload["photos"] = [{"storage_key": "../../etc/passwd", "sort_order": 0}]
     r = await client.post("/api/v1/cases", json=payload, headers=_auth(token))
     assert r.status_code == 422
+
+
+# ──────────────────────────── TASK-2: オープン登録 / vendor_status ────────────────────────────
+
+
+async def test_open_operator_registration(client: AsyncClient, db_session: AsyncSession):
+    """招待コードなしでオープン登録 → vendor_status=limited → 案件閲覧・入札可能。"""
+    r = await client.post(
+        "/api/v1/auth/operator/signup",
+        json={
+            "company_name": "オープン登録業者テスト",
+            "email": "open_op@example.com",
+            "password": "password123",
+        },
+    )
+    assert r.status_code == 201
+    data = r.json()
+    assert data["operator"]["vendor_status"] == "limited"
+    op_token = data["access_token"]
+
+    user_token = await _signup_user(client, "open_user@example.com")
+    case = await _create_case(client, user_token)
+
+    r = await client.get("/api/v1/cases", headers=_auth(op_token))
+    assert r.status_code == 200
+
+    r = await client.post(
+        f"/api/v1/cases/{case['id']}/bids",
+        json={"amount": 25000},
+        headers=_auth(op_token),
+    )
+    assert r.status_code == 201
+
+
+async def test_invited_operator_gets_active(client: AsyncClient, db_session: AsyncSession):
+    """招待コードありで登録 → vendor_status=active。"""
+    admin_token = await _make_admin(client, db_session)
+    code = await _invite_code(client, admin_token)
+
+    r = await client.post(
+        "/api/v1/auth/operator/signup",
+        json={
+            "invite_code": code,
+            "company_name": "招待登録業者テスト",
+            "email": "invited_op@example.com",
+            "password": "password123",
+        },
+    )
+    assert r.status_code == 201
+    data = r.json()
+    assert data["operator"]["vendor_status"] == "active"
+
+
+async def test_limited_operator_address_hidden(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """limited業者が落札した場合、住所情報は非開示でawaiting_approval=True。"""
+    admin_token = await _make_admin(client, db_session)
+
+    r = await client.post(
+        "/api/v1/auth/operator/signup",
+        json={
+            "company_name": "住所非開示テスト業者",
+            "email": "limited_op@example.com",
+            "password": "password123",
+        },
+    )
+    assert r.status_code == 201
+    limited_op_token = r.json()["access_token"]
+    assert r.json()["operator"]["vendor_status"] == "limited"
+
+    user_token = await _signup_user(client, "user_for_limited@example.com")
+    case = await _create_case(client, user_token)
+
+    r = await client.post(
+        f"/api/v1/cases/{case['id']}/bids",
+        json={"amount": 30000},
+        headers=_auth(limited_op_token),
+    )
+    assert r.status_code == 201
+    bid_id = r.json()["id"]
+
+    r = await client.post(
+        f"/api/v1/cases/{case['id']}/bids/{bid_id}/select",
+        headers=_auth(user_token),
+    )
+    assert r.status_code == 201
+    txn_id = r.json()["id"]
+
+    r = await client.get(
+        f"/api/v1/transactions/{txn_id}",
+        headers=_auth(limited_op_token),
+    )
+    assert r.status_code == 200
+    txn_data = r.json()
+    assert txn_data["address"] is None
+    assert txn_data.get("awaiting_approval") is True
+
+
+async def test_admin_approve_sets_active(client: AsyncClient, db_session: AsyncSession):
+    """admin approveでvendor_status=active + verified_atが設定されること。"""
+    admin_token = await _make_admin(client, db_session)
+
+    r = await client.post(
+        "/api/v1/auth/operator/signup",
+        json={
+            "company_name": "承認テスト業者",
+            "email": "approve_test@example.com",
+            "password": "password123",
+        },
+    )
+    assert r.status_code == 201
+    op_id = r.json()["operator"]["id"]
+    assert r.json()["operator"]["vendor_status"] == "limited"
+
+    r = await client.patch(
+        f"/api/v1/admin/operators/{op_id}/verify",
+        json={"verified": True},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["vendor_status"] == "active"
+    assert data["verified_at"] is not None
+
+    r = await client.patch(
+        f"/api/v1/admin/operators/{op_id}/verify",
+        json={"verified": False},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["vendor_status"] == "limited"
+    assert data["verified_at"] is None
+
+
+async def test_bulk_invite_creation(client: AsyncClient, db_session: AsyncSession):
+    """バルク発行: 10件のコードが発行され、lot_nameが設定されること。"""
+    admin_token = await _make_admin(client, db_session)
+
+    r = await client.post(
+        "/api/v1/admin/invites/bulk",
+        json={"count": 10, "lot_name": "テストロット"},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 201
+    data = r.json()
+    assert data["count"] == 10
+    assert len(data["codes"]) == 10
+    assert data["lot_name"] == "テストロット"
+    assert len(set(data["codes"])) == 10
+    for code in data["codes"]:
+        assert code.startswith("KDZ-")

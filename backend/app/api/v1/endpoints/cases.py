@@ -1,4 +1,10 @@
-"""案件エンドポイント — 作成 / 一覧 / 詳細。"""
+"""案件エンドポイント — 作成 / 一覧 / 詳細。
+
+住所詳細（address_detail）の開示制御（品質基準）:
+- 所有ユーザー: CaseOut（住所詳細あり）
+- 業者:        CaseMaskedOut（prefecture / city のみ。詳細は落札後に
+               GET /transactions/{id} で開示する）
+"""
 
 from __future__ import annotations
 
@@ -130,7 +136,6 @@ async def create_case(
             housing_type=case.housing_type,
             floor_plan=case.floor_plan,
             photo_urls=ai_refs,
-            photo_count=len(case.photos),
         )
     except Exception as exc:
         logger.error("cases: AI サマリー生成に失敗（フォールバック） - %s", exc)
@@ -165,10 +170,11 @@ async def list_cases(
         return [_to_case_out(c) for c in cases]
 
     assert actor.operator is not None
-    if actor.operator.verified_at is None:
+    _op = actor.operator
+    if not (_op.vendor_status in ("limited", "active") or _op.verified_at is not None):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="アカウントは承認待ちです。承認後に案件を閲覧できます。",
+            detail="アカウントの登録承認が完了していません。承認後に案件を閲覧できます。",
         )
     cases = (
         await session.scalars(
@@ -201,9 +207,10 @@ async def get_case(
         return _to_case_out(case)
 
     assert actor.operator is not None
-    if actor.operator.verified_at is None:
+    _op = actor.operator
+    if not (_op.vendor_status in ("limited", "active") or _op.verified_at is not None):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="アカウントは承認待ちです。",
+            detail="アカウントの登録承認が完了していません。",
         )
     return _to_masked_out(case, actor.operator.id)

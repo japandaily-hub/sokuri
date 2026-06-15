@@ -1,4 +1,4 @@
-"""カタヅケ API の Pydantic スキーマ。"""
+"""カタヅケ API の Pydantic スキーマ（既存 schemas.py には手を入れず分離）。"""
 
 from __future__ import annotations
 
@@ -7,6 +7,8 @@ from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+# ──────────────────────────── 認証 ────────────────────────────
 
 
 class UserSignupRequest(BaseModel):
@@ -21,7 +23,7 @@ class UserLoginRequest(BaseModel):
 
 
 class OperatorSignupRequest(BaseModel):
-    invite_code: str = Field(min_length=4, max_length=64)
+    invite_code: str | None = Field(default=None, max_length=64, description="招待コード（任意。あればactive、なければlimited登録）")
     company_name: str = Field(min_length=1, max_length=255)
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
@@ -50,12 +52,15 @@ class OperatorOut(BaseModel):
     contact_email: str
     license_number: str | None
     verified_at: datetime | None
+    vendor_status: str
     rating: float | None
     is_suspended: bool
     created_at: datetime
 
 
 class OperatorPublicOut(BaseModel):
+    """ユーザーに見せる業者公開情報。"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
@@ -72,6 +77,9 @@ class AuthTokenResponse(BaseModel):
     operator: OperatorOut | None = None
 
 
+# ──────────────────────────── 写真アップロード ────────────────────────────
+
+
 class PresignRequest(BaseModel):
     filename: str = Field(max_length=255)
     content_type: Literal["image/jpeg", "image/png", "image/webp"]
@@ -81,6 +89,9 @@ class PresignResponse(BaseModel):
     storage_key: str
     upload_url: str
     public_url: str
+
+
+# ──────────────────────────── 案件 ────────────────────────────
 
 
 class CasePhotoIn(BaseModel):
@@ -109,6 +120,8 @@ class CaseCreateRequest(BaseModel):
 
 
 class CaseOut(BaseModel):
+    """案件（所有ユーザー向け・住所詳細を含む）。"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
@@ -128,6 +141,8 @@ class CaseOut(BaseModel):
 
 
 class CaseMaskedOut(BaseModel):
+    """案件（業者向け・住所詳細はマスク。落札後は /transactions で開示）。"""
+
     id: uuid.UUID
     status: str
     purpose: str
@@ -142,6 +157,9 @@ class CaseMaskedOut(BaseModel):
     photos: list[CasePhotoOut] = []
     bid_count: int = 0
     my_bid: BidOut | None = None
+
+
+# ──────────────────────────── 入札 ────────────────────────────
 
 
 class BidCreateRequest(BaseModel):
@@ -162,7 +180,12 @@ class BidOut(BaseModel):
     transaction_id: uuid.UUID | None = None
 
 
+# ──────────────────────────── 成約 ────────────────────────────
+
+
 class TransactionAddressOut(BaseModel):
+    """落札業者にのみ開示する住所詳細。"""
+
     prefecture: str
     city: str
     address_detail: str | None
@@ -183,10 +206,13 @@ class TransactionOut(BaseModel):
 
 
 class TransactionDetailOut(TransactionOut):
+    """当事者向け詳細。address は落札業者・所有ユーザーにのみ含める。"""
+
     case: CaseMaskedOut | None = None
     operator: OperatorPublicOut | None = None
     address: TransactionAddressOut | None = None
     contact_email: str | None = None
+    awaiting_approval: bool = False
     reduction_requests: list[ReductionOut] = []
     reviews: list[ReviewOut] = []
 
@@ -196,6 +222,8 @@ class TransactionCancelRequest(BaseModel):
 
 
 class TransactionListItem(BaseModel):
+    """成約一覧（当事者向け・住所詳細なし）。"""
+
     id: uuid.UUID
     case_id: uuid.UUID
     status: str
@@ -208,6 +236,9 @@ class TransactionListItem(BaseModel):
     city: str
     company_name: str | None = None
     has_pending_reduction: bool = False
+
+
+# ──────────────────────────── 減額申請 ────────────────────────────
 
 
 class ReductionCreateRequest(BaseModel):
@@ -231,6 +262,9 @@ class ReductionOut(BaseModel):
     created_at: datetime
 
 
+# ──────────────────────────── レビュー ────────────────────────────
+
+
 class ReviewCreateRequest(BaseModel):
     transaction_id: uuid.UUID
     rating: int = Field(ge=1, le=5)
@@ -248,6 +282,9 @@ class ReviewOut(BaseModel):
     created_at: datetime
 
 
+# ──────────────────────────── 管理 ────────────────────────────
+
+
 class InviteCreateRequest(BaseModel):
     email: EmailStr | None = None
 
@@ -260,12 +297,25 @@ class InviteOut(BaseModel):
     email: str | None
     used_at: datetime | None
     operator_id: uuid.UUID | None
+    lot_name: str | None
     created_at: datetime
+
+
+class InviteBulkCreateRequest(BaseModel):
+    count: int = Field(ge=1, le=500, description="発行件数")
+    lot_name: str | None = Field(default=None, max_length=128, description="ロット名（管理用）")
+
+
+class InviteBulkCreateResponse(BaseModel):
+    codes: list[str]
+    lot_name: str | None
+    count: int
 
 
 class OperatorVerifyRequest(BaseModel):
     verified: bool = True
 
 
+# 前方参照の解決
 CaseMaskedOut.model_rebuild()
 TransactionDetailOut.model_rebuild()

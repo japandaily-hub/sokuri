@@ -1,6 +1,6 @@
 /**
  * カタヅケ API クライアント — backend schemas_katadzuke.py と 1:1 対応。
- * 既存の api.ts（ソクウリ流用分）には手を入れず分離する。
+ * 既存の api.ts（旧版流用分）には手を入れず分離する。
  *
  * 認証が必要な関数は token（backend JWT / session.accessToken）を受け取る。
  */
@@ -27,6 +27,7 @@ export interface OperatorOut {
   contact_email: string;
   license_number: string | null;
   verified_at: string | null;
+  vendor_status: string;
   rating: number | null;
   is_suspended: boolean;
   created_at: string;
@@ -171,6 +172,8 @@ export interface TransactionDetail extends TransactionOut {
   /** 落札確定済みの当事者にのみ含まれる（バックエンド制御） */
   address: { prefecture: string; city: string; address_detail: string | null } | null;
   contact_email: string | null;
+  /** limited業者が落札した場合、admin承認待ちで住所非開示中 */
+  awaiting_approval: boolean;
   reduction_requests: ReductionOut[];
   reviews: ReviewOut[];
 }
@@ -181,7 +184,14 @@ export interface InviteOut {
   email: string | null;
   used_at: string | null;
   operator_id: string | null;
+  lot_name: string | null;
   created_at: string;
+}
+
+export interface InviteBulkCreateResponse {
+  codes: string[];
+  lot_name: string | null;
+  count: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -198,12 +208,9 @@ export class KdzApiError extends Error {
   }
 }
 
-// Vercel で NEXT_PUBLIC_API_URL が Sensitive 化されておりクライアントに inline されない
-// 既知制約（api.ts と同じ対処）→ 本番 URL をフォールバックに持つ。
-const FALLBACK_PROD_API_URL = "https://sokuri-backend.onrender.com/api/v1";
-
 export function apiBase(): string {
-  const url = process.env.NEXT_PUBLIC_API_URL || FALLBACK_PROD_API_URL;
+  const url = process.env.NEXT_PUBLIC_API_URL;
+  if (!url) throw new Error("NEXT_PUBLIC_API_URL が設定されていません。");
   return url.replace(/\/$/, "");
 }
 
@@ -247,7 +254,7 @@ export function signupUser(payload: {
 }
 
 export function signupOperator(payload: {
-  invite_code: string;
+  invite_code?: string | null;
   company_name: string;
   email: string;
   password: string;
@@ -263,20 +270,7 @@ export function signupOperator(payload: {
 // 写真アップロード
 // ---------------------------------------------------------------------------
 
-/** Render free の再起動と重なった場合に備えた 1 回リトライ付きアップロード。 */
 export async function uploadCasePhoto(
-  file: File,
-  token: string,
-): Promise<PresignResponse> {
-  try {
-    return await uploadCasePhotoOnce(file, token);
-  } catch {
-    await new Promise((r) => setTimeout(r, 2000));
-    return uploadCasePhotoOnce(file, token);
-  }
-}
-
-async function uploadCasePhotoOnce(
   file: File,
   token: string,
 ): Promise<PresignResponse> {
@@ -452,6 +446,18 @@ export function adminCreateInvite(
   });
 }
 
+export function adminBulkCreateInvites(
+  count: number,
+  lotName: string | undefined,
+  token: string,
+): Promise<InviteBulkCreateResponse> {
+  return request("/admin/invites/bulk", {
+    method: "POST",
+    body: JSON.stringify({ count, lot_name: lotName ?? null }),
+    token,
+  });
+}
+
 export function adminListInvites(token: string): Promise<InviteOut[]> {
   return request("/admin/invites", { token });
 }
@@ -470,6 +476,19 @@ export function adminVerifyOperator(
     body: JSON.stringify({ verified }),
     token,
   });
+}
+
+export interface CellDensityRow {
+  prefecture: string;
+  purpose: string;
+  open_cases: number;
+  active_suppliers: number;
+  demand_per_supplier: number;
+  status: "dense" | "normal";
+}
+
+export function adminGetCellDensity(token: string): Promise<CellDensityRow[]> {
+  return request("/admin/cell-density", { token });
 }
 
 // ---------------------------------------------------------------------------

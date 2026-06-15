@@ -1,4 +1,8 @@
-"""成約エンドポイント — 一覧 / 詳細 / 完了 / キャンセル。"""
+"""成約エンドポイント — 詳細 / 完了 / キャンセル。
+
+住所詳細・連絡先は本エンドポイントでのみ開示する（品質基準）:
+- 開示先は「所有ユーザー」と「落札業者」のみ。サーバーサイドで判定する。
+"""
 
 from __future__ import annotations
 
@@ -79,7 +83,6 @@ async def list_transactions(
         for t in txns
     ]
 
-
 _TXN_LOAD = (
     selectinload(Transaction.case).selectinload(Case.photos),
     selectinload(Transaction.bid).selectinload(Bid.operator),
@@ -100,6 +103,7 @@ async def _get_txn(session: AsyncSession, txn_id: uuid.UUID) -> Transaction:
 
 
 def _assert_party(txn: Transaction, actor: Actor) -> str:
+    """当事者チェック。'user'（所有者/管理者）か 'operator'（落札業者）を返す。"""
     if actor.typ == "user":
         assert actor.user is not None
         if txn.case.user_id == actor.user.id or actor.user.role == "admin":
@@ -155,15 +159,24 @@ async def get_transaction(
     out.reviews = [ReviewOut.model_validate(r) for r in txn.reviews]
 
     if txn.status != "cancelled":
-        out.address = TransactionAddressOut(
-            prefecture=case.prefecture,
-            city=case.city,
-            address_detail=case.address_detail,
+        winning_operator = txn.bid.operator
+        operator_is_limited = (
+            party == "operator"
+            and hasattr(winning_operator, "vendor_status")
+            and winning_operator.vendor_status == "limited"
         )
-        if party == "operator":
-            out.contact_email = await _owner_email(session, txn)
+        if operator_is_limited:
+            out.awaiting_approval = True
         else:
-            out.contact_email = txn.bid.operator.contact_email
+            out.address = TransactionAddressOut(
+                prefecture=case.prefecture,
+                city=case.city,
+                address_detail=case.address_detail,
+            )
+            if party == "operator":
+                out.contact_email = await _owner_email(session, txn)
+            else:
+                out.contact_email = txn.bid.operator.contact_email
     return out
 
 

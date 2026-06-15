@@ -1,6 +1,9 @@
 "use client";
 
-/** 業者新規登録（招待コード必須）→ 自動ログイン → 案件一覧へ。 */
+/** 業者新規登録（招待コード任意）→ 自動ログイン → 案件一覧へ。
+ * 招待コードあり → vendor_status=active（即フル稼働）
+ * 招待コードなし → vendor_status=limited（即暫定稼働、住所開示は admin 承認後）
+ */
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -10,6 +13,7 @@ import { AuthCard, ErrorNote, Field, inputClass, primaryButtonClass } from "@/co
 
 export default function OperatorSignupPage() {
   const router = useRouter();
+  const [showInviteField, setShowInviteField] = useState(false);
   const [inviteCode, setInviteCode] = useState("");
   const [company, setCompany] = useState("");
   const [license, setLicense] = useState("");
@@ -24,7 +28,7 @@ export default function OperatorSignupPage() {
     setError(null);
     try {
       await signupOperator({
-        invite_code: inviteCode.trim(),
+        invite_code: inviteCode.trim() || null,
         company_name: company,
         email,
         password,
@@ -52,20 +56,42 @@ export default function OperatorSignupPage() {
   return (
     <AuthCard
       title="業者登録"
-      subtitle="運営から発行された招待コードが必要です。登録後、運営の承認を経て案件を閲覧できます。"
+      subtitle="今すぐ無料で登録し、案件の閲覧・入札ができます。招待コードをお持ちの方はフル機能で即日稼働できます。"
     >
       <form onSubmit={onSubmit} className="space-y-4">
         <ErrorNote message={error} />
-        <Field label="招待コード">
-          <input
-            type="text"
-            required
-            value={inviteCode}
-            onChange={(e) => setInviteCode(e.target.value)}
-            className={inputClass}
-            placeholder="KDZ-XXXXXXXX"
-          />
-        </Field>
+
+        {/* 招待コード（任意・アコーディオン表示） */}
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowInviteField((v) => !v)}
+            className="flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline"
+          >
+            {showInviteField ? "▼" : "▶"} 招待コードをお持ちの方はこちら（任意）
+          </button>
+          {showInviteField ? (
+            <div className="mt-2">
+              <input
+                type="text"
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value)}
+                className={inputClass}
+                placeholder="KDZ-XXXXXXXX"
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                招待コードがあると登録直後からフル機能で入札できます。
+              </p>
+            </div>
+          ) : null}
+        </div>
+
+        {!showInviteField ? (
+          <div className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">
+            招待コードなしでも登録できます。案件の閲覧・入札が可能です（住所開示は運営承認後）。
+          </div>
+        ) : null}
+
         <Field label="会社名">
           <input
             type="text"
@@ -107,7 +133,7 @@ export default function OperatorSignupPage() {
           />
         </Field>
         <button type="submit" disabled={busy} className={primaryButtonClass}>
-          {busy ? "登録中…" : "登録する"}
+          {busy ? "登録中…" : "無料で登録する"}
         </button>
       </form>
       <p className="mt-6 text-center text-sm text-slate-500">
