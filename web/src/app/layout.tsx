@@ -115,7 +115,7 @@ const WEBSITE_LD = {
 
 /** ヘッダーのナビゲーション項目 */
 const NAV_ITEMS: { href: string; label: string }[] = [
-  { href: "/album", label: "まとめて査定" },
+  { href: "/create", label: "まとめて査定" },
   { href: "/#features", label: "特徴" },
   { href: "/#categories", label: "カテゴリ" },
   { href: "/#how-it-works", label: "使い方" },

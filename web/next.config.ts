@@ -16,6 +16,21 @@ const nextConfig: NextConfig = {
   },
 
   /**
+   * 旧「アルバム一括査定」導線（/album, /album/submitted）の恒久リダイレクト。
+   * 現行プロダクトは「カタヅケ（部屋ごと撮影 → /create）」へ移行済みで、
+   * album フローは廃止。直URL・ブックマーク・検索/キャッシュ流入での迷い込みを塞ぐ。
+   * - `permanent: true`（308）: 検索エンジンへ旧URL消滅を通知し評価を `/` へ集約する
+   * - `/album/:path*`: submitted 等の配下も含めて一括で `/` へ寄せる
+   * 注意: バックエンド（/api/v1/albums・albums テーブル）は本番適用済みのため不変更。
+   */
+  async redirects() {
+    return [
+      { source: "/album", destination: "/", permanent: true },
+      { source: "/album/:path*", destination: "/", permanent: true },
+    ];
+  },
+
+  /**
    * 全レスポンスへ付与するセキュリティヘッダ。
    * - HSTS: HTTPS 強制（subdomain 含む、preload 候補）
    * - nosniff: MIME スニッフィング抑止
