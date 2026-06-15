@@ -132,7 +132,7 @@ const FOOTER_LEGAL: { href: string | null; label: string }[] = [
   { href: "/privacy", label: "プライバシーポリシー" },
   { href: "/legal", label: "特定商取引法に基づく表記" },
   { href: "/unsubscribe", label: "配信停止" },
-  { href: null, label: "お問い合わせ（準備中）" },
+  { href: "mailto:katazuke-support@gmail.com", label: "お問い合わせ" },
 ];
 
 export default function RootLayout({
@@ -195,8 +195,8 @@ export default function RootLayout({
                   <span className="text-lg font-bold tracking-tight text-white">カタヅケ</span>
                 </div>
                 <p className="mt-3 text-sm leading-relaxed text-slate-300">
-                  写真1枚でAIが商品を識別。メルカリ・ヤフオク・買取店など、あなたの商品が
-                  最も高く売れるチャネルを即時に提案します。
+                  部屋ごと撮るだけ。AIが片付け・不用品を案件化し、
+                  複数のリユース業者から見積もりが届くマッチングサービスです。
                 </p>
               </div>
 
