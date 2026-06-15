@@ -21,7 +21,7 @@ from app.api.v1.endpoints.reviews import router as reviews_router
 from app.api.v1.endpoints.transactions import router as transactions_router
 
 api_router = APIRouter()
-# ── ソクウリ既存 ──────────────────────────────────────────────────
+# ── カタヅケ既存 ──────────────────────────────────────────────────
 api_router.include_router(analyze_router, tags=["Analyze"])
 api_router.include_router(estimate_router, tags=["Estimate"])
 # api_router.include_router(albums_router, tags=["Albums"])

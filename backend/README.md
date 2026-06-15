@@ -1,4 +1,4 @@
-# AssetWise Backend — Phase 1: ドメイン/データモデル設計
+# カタヅケ Backend — Phase 1: ドメイン/データモデル設計
 
 ## 概要
 

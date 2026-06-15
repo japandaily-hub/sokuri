@@ -56,7 +56,7 @@ def create_app() -> FastAPI:
     settings = get_settings()
 
     app = FastAPI(
-        title="AssetWise API",
+        title="カタヅケ API",
         description=(
             "全カテゴリ横断リユース・アグリゲーター — 写真から売却チャネルを AI で自動推奨する。\n\n"
             "## フロー\n"

@@ -1,7 +1,7 @@
 [project]
 name = "assetwise-backend"
 version = "0.1.0"
-description = "AssetWise — 全カテゴリ横断リユース・アグリゲーター バックエンド"
+description = "カタヅケ — 全カテゴリ横断リユース・アグリゲーター バックエンド"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",
