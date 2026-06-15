@@ -1,7 +1,7 @@
 import type { Config } from "tailwindcss";
 
 /**
- * ソクウリ / AssetWise デザインシステム — Tailwind トークン定義
+ * カタヅケ デザインシステム — Tailwind トークン定義
  *
  * 方向性: 「信頼感・クリーン系」（フィンテック寄り）。
  * - 配色は真の青（trust blue）を基幹に、彩度を抑えた restraint な構成。

@@ -1,6 +1,6 @@
 @echo off
 cd /d "%~dp0"
-echo Starting AssetWise Web...
+echo Starting Katadzuke Web...
 
 where node >nul 2>&1
 if %errorlevel% neq 0 (

@@ -171,7 +171,7 @@ export function Spinner({ className }: { className?: string }) {
 }
 
 /**
- * ソクウリのブランドマーク（ロゴアイコン）。
+ * カタヅケのブランドマーク（ロゴアイコン）。
  * 角丸タイル + 白の上向きグリフで「撮る → 価値が上がる」を象徴する。
  */
 export function BrandMark({ className }: { className?: string }) {

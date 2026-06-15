@@ -17,7 +17,7 @@ export default function Error({
   useEffect(() => {
     // 本番監視を導入後、ここで Sentry 等にレポート送信する
     // 現状は console.error のみ（ブラウザ側で見える）
-    console.error("[ソクウリ] レンダリングエラー", error);
+    console.error("[カタヅケ] レンダリングエラー", error);
   }, [error]);
 
   return (
