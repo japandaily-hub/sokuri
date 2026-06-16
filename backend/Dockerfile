@@ -2,6 +2,9 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# 標準出力/エラーを即時フラッシュ（起動失敗時のトレースバックをコンテナログに確実に出す）
+ENV PYTHONUNBUFFERED=1
+
 # Install system deps needed by asyncpg (libpq) and uvicorn
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
