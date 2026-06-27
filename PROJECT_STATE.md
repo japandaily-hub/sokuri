@@ -15,7 +15,11 @@
 - 🔴 **リリースブロッカー（spawn task task_b62c0b43）**: `/company`・`/legal` にデザインモック由来の**架空事業者情報**（古物商許可 第303291234号・代表者 山村大輔・資本金8000万・実績数値 等）。公開前に実値/明示プレースホルダへ差替必須。**未デプロイのブランチなので本番影響なし**。
 - **次アクション（loop P1）**: ①content残り（faq/photo-guide/examples）+ 単純auth（verify-email/password-reset/create-complete）を Workflow 並列 → ②複雑な既存配線ページ（signup 3step/create 多step/result）を個別に丁寧に再スキン（既存wiring維持）→ ③ユーザーアプリ/業者クラスタ。
 - **既知の要対応**: 実画像アセット未投入＝`PhImg` プレースホルダ（ユーザー決定: 進行）。LINE認証=未実装（準備中トースト）。contactフォーム送信=未配線（デモ文言）。
-- **gate_status**: build=GREEN / typecheck=GREEN / visualQA=ユーザー確認方式 / security=未 / 全33ページ=**9完了**(基盤+top+login+content6)/残24
+- **完了（イテレーション4・Workflow w97tixiok）**: クラスタ2=faq/photo-guide/examples/verify-email/password-reset/create-complete、build緑(31ルート)・commit `2755886`。
+- **進行中（イテレーション5・Workflow wzqnc87jc）**: クラスタ3=business + mypage/applications/notifications/mypage-profile/mypage-withdraw（bareクロム・AppHeader統一・commit `44cb307`で基盤先行）。
+- 補足: ログイン後アプリ画面は `AppHeader`（ロゴ+通知ベル）に統一。`SiteChrome` BARE_PREFIXES に /mypage・/applications・/notifications・/business 追加。
+- **次アクション（loop P1）**: クラスタ3完了→build検証→コミット。次クラスタ4=動的/対話系（vendors/[id]・chat/[id]・schedule・review・operator-chat・operator-profile）。**最後に複雑な既存配線ページ（signup 3step・create 多step・result・operator dashboard）を既存wiring維持で個別再スキン**。
+- **gate_status**: build=GREEN / typecheck=GREEN / visualQA=ユーザー確認方式 / security=未 / 全33ページ=**14完了**(基盤+top+login+content6+cluster2 6)/残18・うち6並列実装中
 
 ---
 
