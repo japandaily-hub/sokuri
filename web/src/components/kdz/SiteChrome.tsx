@@ -21,6 +21,10 @@ const BARE_PREFIXES = [
   "/applications",
   "/notifications",
   "/business",
+  "/vendors",
+  "/chat",
+  "/schedule",
+  "/review",
 ];
 
 export function SiteChrome({ children }: { children: React.ReactNode }) {

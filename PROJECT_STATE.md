@@ -19,7 +19,10 @@
 - **進行中（イテレーション5・Workflow wzqnc87jc）**: クラスタ3=business + mypage/applications/notifications/mypage-profile/mypage-withdraw（bareクロム・AppHeader統一・commit `44cb307`で基盤先行）。
 - 補足: ログイン後アプリ画面は `AppHeader`（ロゴ+通知ベル）に統一。`SiteChrome` BARE_PREFIXES に /mypage・/applications・/notifications・/business 追加。
 - **次アクション（loop P1）**: クラスタ3完了→build検証→コミット。次クラスタ4=動的/対話系（vendors/[id]・chat/[id]・schedule・review・operator-chat・operator-profile）。**最後に複雑な既存配線ページ（signup 3step・create 多step・result・operator dashboard）を既存wiring維持で個別再スキン**。
-- **gate_status**: build=GREEN / typecheck=GREEN / visualQA=ユーザー確認方式 / security=未 / 全33ページ=**14完了**(基盤+top+login+content6+cluster2 6)/残18・うち6並列実装中
+- **完了（イテレーション5・Workflow wzqnc87jc）**: クラスタ3=business/mypage/applications/notifications/profile/withdraw、build緑(37ルート)・commit `beb69d7`。business.css のコメント内 `.faq-*` +スラッシュが `*/` を形成→cssnano崩れを修正。
+- **進行中（イテレーション6・Workflow wec8yvvzf）**: クラスタ4=vendors/[id]・chat/[id]・schedule・review（bareクロム拡張・commit先行）。※初回は自作スクリプトのテンプレート文字列に `*/` 混入で失敗→array.join方式で再投入。
+- **次アクション（loop P1）**: クラスタ4完了→build→コミット。**残=複雑な既存配線ページのみ: signup(3step)/create(多step)/result(3状態)/operator dashboard + operator-chat/operator-profile**。これらは既存の signIn/katadzuke-api/middleware 配線を読み込み**維持したまま**個別丁寧に再スキン（Workflow agentに既存ファイルを渡すか、リーダー直実装）。
+- **gate_status**: build=GREEN / typecheck=GREEN / visualQA=ユーザー確認方式 / security=未 / 全33ページ=**20完了**(+cluster3 6)/残13・うち4並列実装中
 
 ---
 
