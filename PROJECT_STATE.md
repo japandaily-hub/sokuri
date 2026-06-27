@@ -11,9 +11,11 @@
   - **検証**: `npx tsc --noEmit` クリーン / `npm run build` 緑（23ルート・lint通過）。**視覚QAは未実施（次イテレーションで実施）**。
 - **完了（イテレーション2）**: `/login` 再スキン（commit 8331765）。認証/フォーム共通基盤を新設: `katazuke-pages.css`（auth-bar/auth-card/field/btn-line-auth/モーダル/トースト）+ `components/kdz/auth.tsx`（AuthBar/Field/PasswordField/LineAuthButton/TrustRow）。既存 signIn 配線維持。
 - **QA所見（重要）**: ①ローカル `next start`/`dev` で NextAuth が動くには `web/.env.local` に `AUTH_SECRET` 必須（追加済・gitignore）。②**preview_screenshot は本アプリで networkidle に達せず常時タイムアウト**（dev=HMR websocket / prod=フォントCDN待ち。ページ自体はSSR200・markup健全・console errorなし）。視覚QAはユーザーがブラウザで `localhost:3100`（`.claude/launch.json` の katazuke-web）を直接確認する方式に切替。プレビュー起動コマンドは `npm --prefix C:\sokuri\web run start -- -p 3100`。
-- **次アクション（loop P1）**: 認証/フロー残り（signup[3step]/verify-email/password-reset/create[多step]/create-complete）→ 以降 §KATAZUKE_REDESIGN_PLAN のクラスタ順。**両パターン（LP/auth）確立済のため、静的・単純ページ群は Workflow で並列実装可**。
-- **既知の要対応**: 実画像アセット未投入＝`PhImg` プレースホルダ。**ユーザー決定(2026-06-27): プレースホルダのまま進行**（再質問しない）。LINE認証=バックエンド未実装（準備中トースト）。
-- **gate_status**: build=GREEN / typecheck=GREEN / visualQA=ユーザー確認方式へ移行 / security=未 / 全33ページ=2完了(基盤+top+login)/残31
+- **完了（イテレーション3・Workflow並列）**: コンテンツ/法務6ページ（terms/privacy/legal/company/contact/404）を Workflow `wr9anbg0v`（6エージェント並列）で実装、統合build緑(25ルート)・commit `50bfa69`。各ページは SiteChrome配下でmainのみ描画、固有CSSは各ルートに co-located。
+- 🔴 **リリースブロッカー（spawn task task_b62c0b43）**: `/company`・`/legal` にデザインモック由来の**架空事業者情報**（古物商許可 第303291234号・代表者 山村大輔・資本金8000万・実績数値 等）。公開前に実値/明示プレースホルダへ差替必須。**未デプロイのブランチなので本番影響なし**。
+- **次アクション（loop P1）**: ①content残り（faq/photo-guide/examples）+ 単純auth（verify-email/password-reset/create-complete）を Workflow 並列 → ②複雑な既存配線ページ（signup 3step/create 多step/result）を個別に丁寧に再スキン（既存wiring維持）→ ③ユーザーアプリ/業者クラスタ。
+- **既知の要対応**: 実画像アセット未投入＝`PhImg` プレースホルダ（ユーザー決定: 進行）。LINE認証=未実装（準備中トースト）。contactフォーム送信=未配線（デモ文言）。
+- **gate_status**: build=GREEN / typecheck=GREEN / visualQA=ユーザー確認方式 / security=未 / 全33ページ=**9完了**(基盤+top+login+content6)/残24
 
 ---
 
