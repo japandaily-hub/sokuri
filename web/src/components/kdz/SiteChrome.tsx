@@ -25,6 +25,7 @@ const BARE_PREFIXES = [
   "/chat",
   "/schedule",
   "/review",
+  "/result",
 ];
 
 export function SiteChrome({ children }: { children: React.ReactNode }) {
