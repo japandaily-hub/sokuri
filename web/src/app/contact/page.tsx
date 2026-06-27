@@ -46,6 +46,10 @@ export default function ContactPage() {
       if (!el || !el.value.trim()) {
         next[id] = true;
         ok = false;
+      } else if (id === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(el.value.trim())) {
+        // メール形式の検証（noValidate のためネイティブ検証は効かない）
+        next[id] = true;
+        ok = false;
       }
     }
     setErrors(next);

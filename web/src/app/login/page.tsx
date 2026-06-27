@@ -8,11 +8,15 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { AuthBar, Field, PasswordField, LineAuthButton, TrustRow } from "@/components/kdz/auth";
+import { safeInternalPath } from "@/lib/safe-path";
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const callbackUrl = params.get("callbackUrl") ?? "/cases";
+  // オープンリダイレクト対策: サイト内パスのみ許可
+  const callbackUrl = safeInternalPath(params.get("callbackUrl"), "/cases");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,7 +29,7 @@ function LoginForm() {
     e.preventDefault();
     setAuthErr(null);
     let ok = true;
-    if (!email || !email.includes("@")) {
+    if (!EMAIL_RE.test(email)) {
       setEmailErr("メールアドレスを正しく入力してください");
       ok = false;
     } else setEmailErr(null);

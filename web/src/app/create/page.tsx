@@ -7,7 +7,7 @@
  * デザインは品目カード型だが、バックエンド契約（case単位）維持のため既存フローに視覚言語のみ適用。
  */
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Ic } from "@/components/kdz/Icons";
@@ -45,6 +45,13 @@ export default function CreateCasePage() {
     () => files.map((f) => ({ name: f.name, url: URL.createObjectURL(f) })),
     [files],
   );
+
+  // Blob URL のメモリリーク防止: previews 更新時/アンマウント時に旧URLを解放
+  useEffect(() => {
+    return () => {
+      previews.forEach((p) => URL.revokeObjectURL(p.url));
+    };
+  }, [previews]);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(e.target.files ?? []);

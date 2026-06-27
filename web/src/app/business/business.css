@@ -10,14 +10,14 @@
 .business-page { min-height: 100vh; }
 
 /* ヒーロー — ネイビー背景 */
-.biz-hero {
+.business-page .biz-hero {
   background: var(--navy);
   color: #fff;
   padding: clamp(72px, 9vw, 120px) 0 clamp(64px, 8vw, 104px);
   position: relative;
   overflow: hidden;
 }
-.biz-hero::before {
+.business-page .biz-hero::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -26,69 +26,69 @@
     radial-gradient(ellipse 60% 50% at -10% 90%, rgba(31, 84, 222, .25) 0%, transparent 60%);
   pointer-events: none;
 }
-.biz-hero .container { position: relative; z-index: 1; }
-.biz-hero .eyebrow { color: rgba(255, 255, 255, .7); }
-.biz-hero .eyebrow::before { background: rgba(255, 255, 255, .5); }
-.biz-hero h1 {
+.business-page .biz-hero .container { position: relative; z-index: 1; }
+.business-page .biz-hero .eyebrow { color: rgba(255, 255, 255, .7); }
+.business-page .biz-hero .eyebrow::before { background: rgba(255, 255, 255, .5); }
+.business-page .biz-hero h1 {
   font-size: clamp(30px, 4.5vw, 54px);
   color: #fff;
   margin-top: 18px;
   line-height: 1.28;
   text-wrap: balance;
 }
-.biz-hero h1 .hl { color: #5b9bff; }
-.biz-hero .hero-sub {
+.business-page .biz-hero h1 .hl { color: #5b9bff; }
+.business-page .biz-hero .hero-sub {
   font-size: clamp(15px, 1.6vw, 18px);
   color: rgba(255, 255, 255, .78);
   margin-top: 22px;
   max-width: 560px;
   line-height: 1.9;
 }
-.biz-hero-cta {
+.business-page .biz-hero-cta {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 14px;
   margin-top: 36px;
 }
-.btn-outline-white {
+.business-page .btn-outline-white {
   background: transparent;
   color: #fff;
   border: 1.5px solid rgba(255, 255, 255, .4);
 }
-.btn-outline-white:hover { border-color: rgba(255, 255, 255, .8); background: rgba(255, 255, 255, .08); }
+.business-page .btn-outline-white:hover { border-color: rgba(255, 255, 255, .8); background: rgba(255, 255, 255, .08); }
 
 /* 帯：数字実績 */
-.biz-stats {
+.business-page .biz-stats {
   background: var(--pale);
   border-bottom: 1px solid var(--line);
   padding: 36px 0;
 }
-.biz-stats .inner {
+.business-page .biz-stats .inner {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: clamp(32px, 6vw, 80px);
   flex-wrap: wrap;
 }
-.stat-item { text-align: center; }
-.stat-num {
+.business-page .stat-item { text-align: center; }
+.business-page .stat-num {
   font-family: var(--head);
   font-size: clamp(28px, 3.5vw, 40px);
   font-weight: 900;
   color: var(--navy);
   line-height: 1;
 }
-.stat-num span { font-size: .58em; font-weight: 700; color: var(--blue); margin-left: 2px; }
-.stat-label { font-size: 13px; color: var(--body-soft); margin-top: 6px; font-weight: 600; }
+.business-page .stat-num span { font-size: .58em; font-weight: 700; color: var(--blue); margin-left: 2px; }
+.business-page .stat-label { font-size: 13px; color: var(--body-soft); margin-top: 6px; font-weight: 600; }
 
 /* メリットグリッド */
-.merit-grid {
+.business-page .merit-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 24px;
 }
-.merit-card {
+.business-page .merit-card {
   background: #fff;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -96,8 +96,8 @@
   box-shadow: var(--shadow-s);
   transition: box-shadow .25s, transform .25s;
 }
-.merit-card:hover { box-shadow: var(--shadow-m); transform: translateY(-3px); }
-.merit-num {
+.business-page .merit-card:hover { box-shadow: var(--shadow-m); transform: translateY(-3px); }
+.business-page .merit-num {
   font-family: var(--head);
   font-size: 13px;
   font-weight: 900;
@@ -108,10 +108,10 @@
   align-items: center;
   gap: 8px;
 }
-.merit-num::after { content: ""; flex: 1; height: 1px; background: var(--line); }
-.merit-card h3 { font-size: clamp(16px, 1.7vw, 19px); margin-bottom: 12px; }
-.merit-card p { font-size: 14.5px; color: var(--body-soft); line-height: 1.85; }
-.merit-tag {
+.business-page .merit-num::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.business-page .merit-card h3 { font-size: clamp(16px, 1.7vw, 19px); margin-bottom: 12px; }
+.business-page .merit-card p { font-size: 14.5px; color: var(--body-soft); line-height: 1.85; }
+.business-page .merit-tag {
   display: inline-block;
   font-size: 12px;
   font-weight: 700;
@@ -119,18 +119,18 @@
   border-radius: 99px;
   margin-bottom: 12px;
 }
-.merit-tag.green { background: #e6f5ee; color: var(--green); }
-.merit-tag.blue { background: var(--pale); color: var(--blue); }
-.merit-tag.gold { background: #fdf5e6; color: var(--gold); }
+.business-page .merit-tag.green { background: #e6f5ee; color: var(--green); }
+.business-page .merit-tag.blue { background: var(--pale); color: var(--blue); }
+.business-page .merit-tag.gold { background: #fdf5e6; color: var(--gold); }
 
 /* フロー（業者視点） */
-.biz-flow {
+.business-page .biz-flow {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   position: relative;
 }
-.biz-flow::before {
+.business-page .biz-flow::before {
   content: "";
   position: absolute;
   top: 40px;
@@ -140,12 +140,12 @@
   background: linear-gradient(90deg, var(--blue) 0%, #5b9bff 100%);
   z-index: 0;
 }
-.biz-step {
+.business-page .biz-step {
   text-align: center;
   position: relative;
   z-index: 1;
 }
-.biz-step-ic {
+.business-page .biz-step-ic {
   width: 80px;
   height: 80px;
   border-radius: 50%;
@@ -160,8 +160,8 @@
   background: #fff;
   box-shadow: var(--shadow-s);
 }
-.biz-step-ic .ic { width: 32px; height: 32px; stroke-width: 1.9; }
-.biz-step-n {
+.business-page .biz-step-ic .ic { width: 32px; height: 32px; stroke-width: 1.9; }
+.business-page .biz-step-n {
   position: absolute;
   top: -6px;
   right: -6px;
@@ -177,16 +177,16 @@
   align-items: center;
   justify-content: center;
 }
-.biz-step h4 { font-size: 15px; margin-bottom: 8px; color: var(--navy); }
-.biz-step p { font-size: 13px; color: var(--body-soft); line-height: 1.75; }
+.business-page .biz-step h4 { font-size: 15px; margin-bottom: 8px; color: var(--navy); }
+.business-page .biz-step p { font-size: 13px; color: var(--body-soft); line-height: 1.75; }
 
 /* 要件カード */
-.req-grid {
+.business-page .req-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 20px;
 }
-.req-card {
+.business-page .req-card {
   display: flex;
   gap: 16px;
   align-items: flex-start;
@@ -195,7 +195,7 @@
   border-radius: var(--radius-s);
   padding: 24px 22px;
 }
-.req-ic {
+.business-page .req-ic {
   width: 44px;
   height: 44px;
   border-radius: 12px;
@@ -207,12 +207,12 @@
   color: var(--blue);
   font-size: 22px;
 }
-.req-ic .ic { width: 22px; height: 22px; stroke-width: 1.9; }
-.req-body h4 { font-size: 15px; margin-bottom: 6px; }
-.req-body p { font-size: 13.5px; color: var(--body-soft); line-height: 1.75; }
+.business-page .req-ic .ic { width: 22px; height: 22px; stroke-width: 1.9; }
+.business-page .req-body h4 { font-size: 15px; margin-bottom: 6px; }
+.business-page .req-body p { font-size: 13.5px; color: var(--body-soft); line-height: 1.75; }
 
 /* ============ 登録フォーム ============ */
-.reg-card {
+.business-page .reg-card {
   max-width: 680px;
   margin: 0 auto;
   background: #fff;
@@ -282,9 +282,9 @@
   box-shadow: 0 0 0 3px rgba(224, 92, 92, .12);
 }
 .business-page .field textarea { resize: vertical; min-height: 120px; }
-.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.select-wrap { position: relative; }
-.select-wrap::after {
+.business-page .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.business-page .select-wrap { position: relative; }
+.business-page .select-wrap::after {
   content: "";
   position: absolute;
   right: 16px;
@@ -296,14 +296,14 @@
   border-top: 6px solid var(--body-soft);
   pointer-events: none;
 }
-.select-wrap select { padding-right: 40px; cursor: pointer; }
-.check-field {
+.business-page .select-wrap select { padding-right: 40px; cursor: pointer; }
+.business-page .check-field {
   display: flex;
   align-items: flex-start;
   gap: 12px;
   margin-bottom: 28px;
 }
-.check-field input[type="checkbox"] {
+.business-page .check-field input[type="checkbox"] {
   width: 18px;
   height: 18px;
   flex-shrink: 0;
@@ -311,21 +311,21 @@
   accent-color: var(--blue);
   cursor: pointer;
 }
-.check-field label {
+.business-page .check-field label {
   font-size: 13.5px;
   color: var(--body-soft);
   line-height: 1.75;
   cursor: pointer;
 }
-.check-field.is-invalid label { color: #e05c5c; }
-.check-field label a { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; }
-.submit-area {
+.business-page .check-field.is-invalid label { color: #e05c5c; }
+.business-page .check-field label a { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; }
+.business-page .submit-area {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 14px;
 }
-.btn-submit {
+.business-page .btn-submit {
   width: 100%;
   max-width: 400px;
   font-size: 17px;
@@ -344,36 +344,36 @@
   justify-content: center;
   gap: 10px;
 }
-.btn-submit:hover { background: var(--blue-d); transform: translateY(-2px); box-shadow: 0 20px 34px -12px rgba(31, 84, 222, .75); }
-.btn-submit .biz-send-ic { width: 20px; height: 20px; }
-.submit-note { font-size: 12.5px; color: var(--body-soft); text-align: center; line-height: 1.75; }
+.business-page .btn-submit:hover { background: var(--blue-d); transform: translateY(-2px); box-shadow: 0 20px 34px -12px rgba(31, 84, 222, .75); }
+.business-page .btn-submit .biz-send-ic { width: 20px; height: 20px; }
+.business-page .submit-note { font-size: 12.5px; color: var(--body-soft); text-align: center; line-height: 1.75; }
 
 /* 送信完了 */
-.thanks { text-align: center; padding: 56px 32px; }
-.thanks-ic {
+.business-page .thanks { text-align: center; padding: 56px 32px; }
+.business-page .thanks-ic {
   width: 64px; height: 64px;
   background: var(--pale); border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   margin: 0 auto 24px;
   color: var(--blue); font-size: 32px;
 }
-.thanks-ic .ic { width: 32px; height: 32px; stroke-width: 2; }
-.thanks h3 { font-size: 22px; color: var(--navy); margin-bottom: 12px; }
-.thanks p { color: var(--body-soft); font-size: 15px; line-height: 1.9; margin-bottom: 28px; }
+.business-page .thanks-ic .ic { width: 32px; height: 32px; stroke-width: 2; }
+.business-page .thanks h3 { font-size: 22px; color: var(--navy); margin-bottom: 12px; }
+.business-page .thanks p { color: var(--body-soft); font-size: 15px; line-height: 1.9; margin-bottom: 28px; }
 
 /* ヘッダー内 send アイコン（共通スプライトに send が無いため inline 用） */
-.biz-send-ic { fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; display: inline-block; vertical-align: -.13em; }
+.business-page .biz-send-ic { fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; display: inline-block; vertical-align: -.13em; }
 
 /* レスポンシブ */
 @media (max-width: 900px) {
-  .merit-grid { grid-template-columns: repeat(2, 1fr); }
-  .biz-flow { grid-template-columns: repeat(2, 1fr); gap: 24px; }
-  .biz-flow::before { display: none; }
+  .business-page .merit-grid { grid-template-columns: repeat(2, 1fr); }
+  .business-page .biz-flow { grid-template-columns: repeat(2, 1fr); gap: 24px; }
+  .business-page .biz-flow::before { display: none; }
 }
 @media (max-width: 640px) {
-  .merit-grid { grid-template-columns: 1fr; }
-  .req-grid { grid-template-columns: 1fr; }
-  .field-row { grid-template-columns: 1fr; }
-  .biz-stats .inner { gap: 28px; }
-  .reg-card { padding: 28px 20px; }
+  .business-page .merit-grid { grid-template-columns: 1fr; }
+  .business-page .req-grid { grid-template-columns: 1fr; }
+  .business-page .field-row { grid-template-columns: 1fr; }
+  .business-page .biz-stats .inner { gap: 28px; }
+  .business-page .reg-card { padding: 28px 20px; }
 }

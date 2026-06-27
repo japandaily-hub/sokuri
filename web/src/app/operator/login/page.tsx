@@ -6,11 +6,13 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { AuthCard, ErrorNote, Field, inputClass, primaryButtonClass } from "@/components/AuthCard";
+import { safeInternalPath } from "@/lib/safe-path";
 
 function OperatorLoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const callbackUrl = params.get("callbackUrl") ?? "/operator/cases";
+  // オープンリダイレクト対策: サイト内パスのみ許可
+  const callbackUrl = safeInternalPath(params.get("callbackUrl"), "/operator/cases");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

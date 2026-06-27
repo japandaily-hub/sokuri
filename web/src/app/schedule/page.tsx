@@ -377,8 +377,10 @@ export default function SchedulePage() {
                 <path d="M5 12.5l4.5 4.5L19 7" />
               </svg>
             </div>
-            <h2>日程が確定しました！</h2>
+            <h2>希望日程を選択しました（デモ）</h2>
             <p>
+              ※ デモ画面です。実際の日程確定はまだ行われません。本番では
+              <br />
               {VENDOR.name}が
               <br />
               <strong>{confirmDateText}</strong>

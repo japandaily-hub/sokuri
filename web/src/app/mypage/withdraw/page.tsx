@@ -198,11 +198,11 @@ export default function WithdrawPage() {
                   <path d="M4 12.5l5.5 5.5L20 7" />
                 </svg>
               </div>
-              <h1 className="done-title">アカウントを削除しました</h1>
+              <h1 className="done-title">退会リクエストを受け付けました</h1>
               <p className="done-sub">
-                ご利用いただきありがとうございました。
+                ※ デモ画面です。現在アカウントの削除処理は実行されません。
                 <br />
-                またのご利用をお待ちしています。
+                ご利用いただきありがとうございました。
               </p>
               <Link href="/" className="btn btn-primary btn-lg">
                 トップページへ

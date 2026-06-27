@@ -79,6 +79,7 @@ export function SiteHeader({
             type="button"
             className="hamburger"
             aria-label="メニュー"
+            aria-controls="mobile-menu"
             aria-expanded={open}
             onClick={() => setOpen((o) => !o)}
           >
@@ -87,7 +88,7 @@ export function SiteHeader({
         </div>
       </header>
 
-      <div className="mobile-menu" id="mobile-menu">
+      <div className="mobile-menu" id="mobile-menu" aria-hidden={!open}>
         {mobileNav.map((n) => (
           <Link key={n.href} href={n.href} onClick={() => setOpen(false)}>
             {n.label}
