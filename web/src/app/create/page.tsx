@@ -1,23 +1,20 @@
 "use client";
 
 /**
- * 案件作成フォーム（4 STEP）。
- * STEP1: 写真撮影 → STEP2: 利用目的 → STEP3: 住居情報 → STEP4: 確認送信。
- * DefectUploader.tsx のファイル選択パターン / Stepper.tsx の進捗パターンを流用。
+ * 案件作成フロー（4 STEP・新デザイン）。
+ * STEP1 写真 → STEP2 利用目的 → STEP3 住居情報 → STEP4 確認送信。
+ * 既存の配線を完全維持: useToken / uploadCasePhoto ループ / createCase → /cases/{id}?created=1。
+ * デザインは品目カード型だが、バックエンド契約（case単位）維持のため既存フローに視覚言語のみ適用。
  */
 
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Icon, Spinner } from "@/components/Icon";
-import {
-  KdzStepper,
-  Notice,
-  btnPrimary,
-  btnSecondary,
-  inputBase,
-  useToken,
-} from "@/components/kdz/Ui";
+import Link from "next/link";
+import { Ic } from "@/components/kdz/Icons";
+import { KdzLogo } from "@/components/kdz/Logo";
+import { useToken } from "@/components/kdz/Ui";
 import { createCase, uploadCasePhoto, KdzApiError } from "@/lib/katadzuke-api";
+import "./create.css";
 
 const STEPS = ["写真", "利用目的", "住居情報", "確認"] as const;
 const PURPOSES = ["片付け整理", "遺品整理", "引っ越し", "その他"] as const;
@@ -53,10 +50,7 @@ export default function CreateCasePage() {
     const selected = Array.from(e.target.files ?? []);
     setFiles((prev) => {
       const existing = new Set(prev.map((f) => `${f.name}:${f.size}`));
-      return [...prev, ...selected.filter((f) => !existing.has(`${f.name}:${f.size}`))].slice(
-        0,
-        20,
-      );
+      return [...prev, ...selected.filter((f) => !existing.has(`${f.name}:${f.size}`))].slice(0, 20);
     });
     if (inputRef.current) inputRef.current.value = "";
   }
@@ -98,9 +92,7 @@ export default function CreateCasePage() {
       );
       router.push(`/cases/${created.id}?created=1`);
     } catch (err) {
-      setError(
-        err instanceof KdzApiError ? err.message : "送信に失敗しました。もう一度お試しください。",
-      );
+      setError(err instanceof KdzApiError ? err.message : "送信に失敗しました。もう一度お試しください。");
       setSubmitting(false);
       setProgress("");
     }
@@ -108,261 +100,201 @@ export default function CreateCasePage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <Spinner className="h-6 w-6 text-brand-600" />
+      <div className="create-page flow-bg">
+        <div className="form-loading">
+          <span className="spinning">↻</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="container-aw max-w-2xl py-10">
-      <h1 className="text-2xl font-bold text-slate-900">片付けを依頼する</h1>
-      <p className="mt-1.5 text-sm text-slate-500">
-        部屋の写真と住居情報を送ると、登録業者から見積もりが届きます。
-      </p>
-
-      <div className="mt-8">
-        <KdzStepper labels={STEPS} current={step} />
+    <div className="create-page flow-bg">
+      {/* flow-header */}
+      <div className="flow-header">
+        <div className="flow-header-inner">
+          <Link href="/" aria-label="カタヅケ トップへ">
+            <KdzLogo size={18} />
+          </Link>
+          <div className="flow-steps">
+            {STEPS.map((label, i) => {
+              const cls = i < step ? "done" : i === step ? "active" : "";
+              return (
+                <div key={label} className={`flow-step ${cls}`.trim()}>
+                  <div className="fs-dot">{i < step ? <Ic name="check" style={{ fontSize: 12, strokeWidth: 3 }} /> : i + 1}</div>
+                  <div className="fs-label">{label}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
-      <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        {error ? (
-          <div className="mb-4">
-            <Notice tone="error">{error}</Notice>
-          </div>
-        ) : null}
-
-        {/* ===== STEP 1: 写真 ===== */}
-        {step === 0 && (
-          <div className="space-y-4">
-            <h2 className="font-bold text-slate-900">片付けたい場所の写真</h2>
-            <p className="text-sm leading-relaxed text-slate-500">
-              部屋全体が写るように撮影してください（最大20枚）。
-              物量がわかるほど、正確な見積もりが届きやすくなります。
-            </p>
-            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-brand-300 bg-brand-50/50 px-4 py-8 text-sm font-semibold text-brand-700 transition-colors hover:bg-brand-50">
-              <Icon name="camera" className="h-5 w-5" />
-              写真を撮影・選択
-              <input
-                ref={inputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                capture="environment"
-                multiple
-                className="sr-only"
-                onChange={handleFileChange}
-              />
-            </label>
-            {previews.length > 0 && (
-              <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                {previews.map((p, i) => (
-                  <li key={p.url} className="group relative">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={p.url}
-                      alt={p.name}
-                      className="aspect-square w-full rounded-xl border border-slate-200 object-cover"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))}
-                      className="absolute right-1 top-1 rounded-full bg-slate-900/70 p-1 text-white opacity-80 transition-opacity hover:opacity-100"
-                      aria-label={`${p.name} を削除`}
-                    >
-                      <Icon name="close" className="h-3.5 w-3.5" strokeWidth={2.5} />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <p className="text-xs text-slate-400">{files.length} / 20 枚選択中</p>
-          </div>
-        )}
-
-        {/* ===== STEP 2: 利用目的 ===== */}
-        {step === 1 && (
-          <div className="space-y-4">
-            <h2 className="font-bold text-slate-900">利用目的</h2>
-            <div className="grid gap-2.5 sm:grid-cols-2">
-              {PURPOSES.map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setPurpose(p)}
-                  className={`rounded-xl border px-4 py-3.5 text-left text-sm font-semibold transition-colors ${
-                    purpose === p
-                      ? "border-brand-600 bg-brand-50 text-brand-700 ring-2 ring-brand-200"
-                      : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                  }`}
-                >
-                  {p}
-                </button>
-              ))}
+      <main id="main">
+        <div className="flow-wrap">
+          {error && (
+            <div className="auth-error" style={{ marginBottom: 16 }}>
+              <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: "none", stroke: "#cc3333", strokeWidth: 2, strokeLinecap: "round", flexShrink: 0 }}>
+                <circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" />
+              </svg>
+              {error}
             </div>
-          </div>
-        )}
+          )}
 
-        {/* ===== STEP 3: 住居情報 ===== */}
-        {step === 2 && (
-          <div className="space-y-4">
-            <h2 className="font-bold text-slate-900">住居情報</h2>
-            <p className="text-sm text-slate-500">
-              番地・建物名は業者決定まで公開されません（市区町村までを業者に提示します）。
-            </p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block">
-                <span className="mb-1.5 block text-sm font-medium text-slate-700">都道府県</span>
-                <select
-                  value={prefecture}
-                  onChange={(e) => setPrefecture(e.target.value)}
-                  className={inputBase}
-                >
-                  {PREFECTURES.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block">
-                <span className="mb-1.5 block text-sm font-medium text-slate-700">
-                  市区町村 <span className="text-red-500">*</span>
-                </span>
-                <input
-                  type="text"
-                  required
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  className={inputBase}
-                  placeholder="世田谷区"
-                />
-              </label>
-            </div>
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-slate-700">
-                番地・建物名・部屋番号（業者決定後にのみ開示）
-              </span>
-              <input
-                type="text"
-                value={addressDetail}
-                onChange={(e) => setAddressDetail(e.target.value)}
-                className={inputBase}
-                placeholder="桜丘1-2-3 メゾン桜 101号室"
-              />
-            </label>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block">
-                <span className="mb-1.5 block text-sm font-medium text-slate-700">住居タイプ</span>
-                <select
-                  value={housingType}
-                  onChange={(e) => setHousingType(e.target.value)}
-                  className={inputBase}
-                >
-                  {HOUSING_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block">
-                <span className="mb-1.5 block text-sm font-medium text-slate-700">間取り</span>
-                <select
-                  value={floorPlan}
-                  onChange={(e) => setFloorPlan(e.target.value)}
-                  className={inputBase}
-                >
-                  {FLOOR_PLANS.map((f) => (
-                    <option key={f} value={f}>
-                      {f}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block">
-                <span className="mb-1.5 block text-sm font-medium text-slate-700">階数</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={floorNumber}
-                  onChange={(e) => setFloorNumber(e.target.value)}
-                  className={inputBase}
-                  placeholder="3"
-                />
-              </label>
-              <label className="flex items-end gap-2 pb-2.5">
-                <input
-                  type="checkbox"
-                  checked={hasElevator}
-                  onChange={(e) => setHasElevator(e.target.checked)}
-                  className="h-5 w-5 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-                />
-                <span className="text-sm font-medium text-slate-700">エレベーターあり</span>
-              </label>
-            </div>
-          </div>
-        )}
-
-        {/* ===== STEP 4: 確認送信 ===== */}
-        {step === 3 && (
-          <div className="space-y-4">
-            <h2 className="font-bold text-slate-900">内容の確認</h2>
-            <dl className="divide-y divide-slate-100 text-sm">
-              {[
-                ["写真", `${files.length} 枚`],
-                ["利用目的", purpose],
-                ["エリア", `${prefecture} ${city}`],
-                ["住所詳細", addressDetail || "（未入力）"],
-                ["住居", `${housingType} / ${floorPlan}`],
-                [
-                  "階数・EV",
-                  `${floorNumber ? `${floorNumber}階` : "—"} / EV${hasElevator ? "あり" : "なし"}`,
-                ],
-              ].map(([k, v]) => (
-                <div key={k} className="flex justify-between gap-4 py-2.5">
-                  <dt className="shrink-0 font-medium text-slate-500">{k}</dt>
-                  <dd className="text-right text-slate-900">{v}</dd>
+          {/* STEP 1: 写真 */}
+          {step === 0 && (
+            <div>
+              <h2 className="step-title">片付けたい場所を撮影</h2>
+              <p className="step-desc">部屋全体が写るように撮影してください（最大20枚）。物量がわかるほど、正確な見積もりが届きやすくなります。</p>
+              <div className="form-card">
+                <label className="photo-drop">
+                  <span className="pd-ic"><Ic name="camera" /></span>
+                  <span className="pd-title">写真を撮影・選択</span>
+                  <span className="pd-sub">JPEG / PNG / WebP・最大20枚</span>
+                  <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" capture="environment" multiple className="sr-only" onChange={handleFileChange} />
+                </label>
+                {previews.length > 0 && (
+                  <div className="photo-grid">
+                    {previews.map((p, i) => (
+                      <div key={p.url} className="photo-thumb">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={p.url} alt={p.name} />
+                        <button type="button" className="photo-remove" onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))} aria-label={`${p.name} を削除`}>
+                          <Ic name="x" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <p className="photo-count">{files.length} / 20 枚選択中</p>
+                <div className="photo-quality-hint">
+                  <Ic name="spark" />
+                  <span><strong>コツ：</strong>部屋全体 → 気になる物のアップ、の順で撮ると物量が伝わりやすく、見積もりの精度が上がります。</span>
                 </div>
-              ))}
-            </dl>
-            <Notice tone="info">
-              送信するとAIが写真を解析して案件化し、登録業者へ公開されます。
-              住所詳細・連絡先は業者決定まで開示されません。
-            </Notice>
-          </div>
-        )}
+              </div>
+            </div>
+          )}
 
-        {/* ===== ナビゲーション ===== */}
-        <div className="mt-8 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => setStep((s) => Math.max(0, s - 1))}
-            disabled={step === 0 || submitting}
-            className={btnSecondary}
-          >
-            戻る
-          </button>
+          {/* STEP 2: 利用目的 */}
+          {step === 1 && (
+            <div>
+              <h2 className="step-title">ご利用目的を選択</h2>
+              <p className="step-desc">あてはまるものを選んでください。業者のマッチングに使用します。</p>
+              <div className="form-card">
+                <div className="purpose-grid">
+                  {PURPOSES.map((p) => (
+                    <button key={p} type="button" className={`purpose-card${purpose === p ? " selected" : ""}`} onClick={() => setPurpose(p)}>
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3: 住居情報 */}
+          {step === 2 && (
+            <div>
+              <h2 className="step-title">住居情報を入力</h2>
+              <p className="step-desc">番地・建物名は業者決定まで公開されません（市区町村までを業者に提示します）。</p>
+              <div className="form-card">
+                <div className="field-row">
+                  <div className="field">
+                    <label>都道府県</label>
+                    <div className="select-wrap">
+                      <select value={prefecture} onChange={(e) => setPrefecture(e.target.value)}>
+                        {PREFECTURES.map((p) => <option key={p} value={p}>{p}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="field">
+                    <label>市区町村<span className="req">必須</span></label>
+                    <input type="text" value={city} onChange={(e) => setCity(e.target.value)} placeholder="世田谷区" />
+                  </div>
+                </div>
+                <div className="field">
+                  <label>番地・建物名・部屋番号<span className="opt">業者決定後に開示</span></label>
+                  <input type="text" value={addressDetail} onChange={(e) => setAddressDetail(e.target.value)} placeholder="桜丘1-2-3 メゾン桜 101号室" />
+                </div>
+                <div className="field-row">
+                  <div className="field">
+                    <label>住居タイプ</label>
+                    <div className="select-wrap">
+                      <select value={housingType} onChange={(e) => setHousingType(e.target.value)}>
+                        {HOUSING_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="field">
+                    <label>間取り</label>
+                    <div className="select-wrap">
+                      <select value={floorPlan} onChange={(e) => setFloorPlan(e.target.value)}>
+                        {FLOOR_PLANS.map((f) => <option key={f} value={f}>{f}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <div className="field-row">
+                  <div className="field">
+                    <label>階数</label>
+                    <input type="number" min={0} max={100} value={floorNumber} onChange={(e) => setFloorNumber(e.target.value)} placeholder="3" />
+                  </div>
+                  <div className="field">
+                    <label>エレベーター</label>
+                    <div className="check-row">
+                      <input type="checkbox" id="ev" checked={hasElevator} onChange={(e) => setHasElevator(e.target.checked)} />
+                      <label htmlFor="ev">エレベーターあり</label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 4: 確認 */}
+          {step === 3 && (
+            <div>
+              <h2 className="step-title">内容を確認</h2>
+              <p className="step-desc">この内容で出品します。送信するとAIが写真を解析して案件化し、登録業者へ公開されます。</p>
+              <div className="form-card">
+                {[
+                  ["写真", `${files.length} 枚`],
+                  ["利用目的", purpose],
+                  ["エリア", `${prefecture} ${city}`],
+                  ["住所詳細", addressDetail || "（未入力）"],
+                  ["住居", `${housingType} / ${floorPlan}`],
+                  ["階数・EV", `${floorNumber ? `${floorNumber}階` : "—"} / EV${hasElevator ? "あり" : "なし"}`],
+                ].map(([k, v]) => (
+                  <div key={k} className="confirm-row"><span className="lbl">{k}</span><span className="val">{v}</span></div>
+                ))}
+              </div>
+              <div className="hint-banner">
+                <Ic name="lock" className="hint-ic" />
+                <span>住所詳細・連絡先は業者決定まで開示されません。査定に回るのは写真と品目・住居情報のみです。</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+
+      {/* flow-footer */}
+      <div className="flow-footer">
+        <div className="inner">
+          {step > 0 && (
+            <button type="button" className="btn-flow-back" onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={submitting}>
+              戻る
+            </button>
+          )}
           {step < STEPS.length - 1 ? (
-            <button
-              type="button"
-              onClick={() => canNext() && setStep((s) => s + 1)}
-              disabled={!canNext()}
-              className={btnPrimary}
-            >
-              次へ
+            <button type="button" className="btn-flow-next" onClick={() => canNext() && setStep((s) => s + 1)} disabled={!canNext()}>
+              次へ<Ic name="arrow" />
             </button>
           ) : (
-            <button type="button" onClick={submit} disabled={submitting} className={btnPrimary}>
+            <button type="button" className="btn-flow-next" onClick={submit} disabled={submitting}>
               {submitting ? (
-                <>
-                  <Spinner className="h-4 w-4" />
-                  {progress || "送信中…"}
-                </>
+                <><span className="spinning">↻</span> {progress || "送信中…"}</>
               ) : (
-                "この内容で依頼する"
+                <>この内容で依頼する<Ic name="arrow" /></>
               )}
             </button>
           )}
