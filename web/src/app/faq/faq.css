@@ -1,0 +1,404 @@
+/* FAQ ページ固有スタイル（デザインハンドオフ「よくある質問.html」由来）。
+ * 共通の .faq-list/.faq-item/.faq-q/.faq-a 等とは見た目が異なるため、
+ * すべて .faq-page 配下にスコープして共通CSS（LPのFAQ）への影響を防ぐ。
+ * .container/.section/.eyebrow/.btn 等の共通クラスは再定義しない。 */
+
+.faq-page {
+  background: #fff;
+}
+
+/* ヒーロー */
+.faq-page .faq-hero {
+  padding: clamp(56px, 7vw, 88px) 0 clamp(36px, 5vw, 60px);
+  border-bottom: 1px solid var(--line-soft);
+  background: radial-gradient(120% 80% at 10% 120%, #eaf0ff 0%, rgba(234, 240, 255, 0) 55%), #fff;
+}
+.faq-page .faq-hero h1 {
+  font-size: clamp(26px, 4vw, 42px);
+  color: var(--navy);
+  margin-top: 14px;
+}
+.faq-page .faq-hero p {
+  font-size: 15px;
+  color: var(--body-soft);
+  margin-top: 12px;
+  line-height: 1.85;
+}
+
+/* 検索 */
+.faq-page .faq-search-wrap {
+  margin-top: 24px;
+  position: relative;
+  max-width: 460px;
+}
+.faq-page .faq-search {
+  width: 100%;
+  padding: 14px 48px 14px 18px;
+  border: 1.5px solid var(--line);
+  border-radius: 99px;
+  font-size: 15px;
+  font-family: var(--sans);
+  color: var(--ink);
+  background: #fff;
+  transition: border-color .2s, box-shadow .2s;
+  outline: none;
+}
+.faq-page .faq-search:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(31, 84, 222, .1);
+}
+.faq-page .faq-search-icon {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: var(--body-soft);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.faq-page .faq-search-clear {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--line);
+  border: none;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--body-soft);
+  line-height: 1;
+}
+.faq-page .faq-search-clear.show {
+  display: flex;
+}
+.faq-page .search-hint {
+  font-size: 13px;
+  color: var(--body-soft);
+  margin-top: 10px;
+  min-height: 20px;
+}
+
+/* カテゴリタブ */
+.faq-page .faq-cats {
+  padding: 20px 0;
+  border-bottom: 1px solid var(--line-soft);
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 20;
+}
+.faq-page .faq-cats-inner {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.faq-page .cat-chip {
+  font-size: 13px;
+  font-weight: 700;
+  padding: 7px 16px;
+  border-radius: 99px;
+  border: 1.5px solid var(--line);
+  background: #fff;
+  color: var(--body-soft);
+  cursor: pointer;
+  transition: .2s;
+  font-family: var(--sans);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.faq-page .cat-chip:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+.faq-page .cat-chip.active {
+  background: var(--navy);
+  border-color: var(--navy);
+  color: #fff;
+}
+.faq-page .cat-chip .ic {
+  font-size: 13px;
+  stroke-width: 2;
+}
+
+/* コンテンツレイアウト */
+.faq-page .faq-body {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 0;
+  align-items: start;
+}
+.faq-page .faq-side {
+  padding: 32px 0;
+  position: sticky;
+  top: 70px;
+}
+.faq-page .faq-side-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  color: var(--body-soft);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+.faq-page .faq-side-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--body-soft);
+  text-decoration: none;
+  padding: 8px 12px;
+  border-radius: var(--radius-s);
+  transition: .15s;
+  cursor: pointer;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  font-family: var(--sans);
+}
+.faq-page .faq-side-link .ic {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.faq-page .faq-side-link:hover {
+  background: var(--pale);
+  color: var(--blue);
+}
+.faq-page .faq-side-link.active {
+  background: var(--pale);
+  color: var(--blue);
+  font-weight: 700;
+}
+
+.faq-page .faq-main {
+  padding: 32px 0 32px 40px;
+  border-left: 1px solid var(--line-soft);
+}
+
+/* セクション */
+.faq-page .faq-section {
+  margin-bottom: 48px;
+}
+.faq-page .faq-section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+  border-bottom: 2px solid var(--line-soft);
+}
+.faq-page .faq-section-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--pale);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.faq-page .faq-section-icon .ic {
+  font-size: 16px;
+  color: var(--blue);
+  stroke-width: 2.2;
+}
+.faq-page .faq-section-title {
+  font-size: 17px;
+  font-weight: 900;
+  color: var(--navy);
+  font-family: var(--head);
+}
+.faq-page .faq-section-count {
+  font-size: 12px;
+  color: var(--body-soft);
+  font-weight: 600;
+  background: var(--line-soft);
+  padding: 2px 8px;
+  border-radius: 99px;
+  margin-left: auto;
+}
+
+/* FAQ アイテム（共通 .faq-item を当ページ用に上書き） */
+.faq-page .faq-list {
+  max-width: none;
+  margin-inline: 0;
+  display: block;
+}
+.faq-page .faq-item {
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-s);
+  margin-bottom: 10px;
+  overflow: hidden;
+  transition: border-color .2s;
+  box-shadow: none;
+  background: #fff;
+}
+.faq-page .faq-item:hover {
+  border-color: #c8d8f8;
+}
+.faq-page .faq-item.open {
+  border-color: var(--blue);
+  box-shadow: none;
+}
+
+.faq-page .faq-q {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--sans);
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--ink);
+  transition: background .15s;
+}
+.faq-page .faq-q:hover {
+  background: var(--pale);
+}
+.faq-page .faq-item.open .faq-q {
+  background: var(--pale);
+  color: var(--blue);
+}
+
+.faq-page .qmark {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--blue);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  font-family: var(--head);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.faq-page .faq-item.open .qmark {
+  background: var(--blue);
+}
+
+.faq-page .faq-q-text {
+  flex: 1;
+}
+.faq-page .faq-chev {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: var(--body-soft);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+  transition: transform .3s;
+  margin-left: 0;
+  font-size: 18px;
+}
+.faq-page .faq-item.open .faq-chev {
+  transform: rotate(180deg);
+  stroke: var(--blue);
+  color: var(--blue);
+}
+
+.faq-page .faq-a {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height .35s cubic-bezier(.4, 0, .2, 1);
+}
+.faq-page .faq-a-inner {
+  padding: 0 18px 18px 56px;
+  font-size: 14px;
+  line-height: 1.85;
+  color: var(--body-soft);
+}
+.faq-page .faq-a-inner a {
+  color: var(--blue);
+}
+.faq-page .faq-a-inner mark {
+  background: #fff3c4;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+.faq-page .faq-a-cat {
+  font-size: 12px;
+  color: var(--body-soft);
+  font-style: italic;
+  display: block;
+  margin-bottom: 12px;
+}
+
+/* 空状態 */
+.faq-page .faq-empty {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--body-soft);
+}
+.faq-page .faq-empty .ic {
+  font-size: 40px;
+  stroke: var(--line);
+  stroke-width: 1.5;
+  margin: 0 auto 16px;
+  display: block;
+}
+
+/* Contact */
+.faq-page .faq-contact {
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius);
+  padding: 24px 28px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-top: 48px;
+  background: #fafbfe;
+}
+.faq-page .faq-contact > .ic {
+  font-size: 32px;
+  color: var(--blue);
+  stroke-width: 1.6;
+  flex-shrink: 0;
+}
+.faq-page .faq-contact-info h3 {
+  font-size: 16px;
+  color: var(--navy);
+  margin-bottom: 6px;
+}
+.faq-page .faq-contact-info p {
+  font-size: 14px;
+  color: var(--body-soft);
+  line-height: 1.7;
+}
+
+/* レスポンシブ */
+@media (max-width: 760px) {
+  .faq-page .faq-body {
+    grid-template-columns: 1fr;
+  }
+  .faq-page .faq-side {
+    display: none;
+  }
+  .faq-page .faq-main {
+    padding: 24px 0;
+    border-left: none;
+  }
+}
