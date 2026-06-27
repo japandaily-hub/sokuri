@@ -16,6 +16,11 @@ const BARE_PREFIXES = [
   "/create",
   "/password-reset",
   "/verify-email",
+  // ログイン後のアプリ画面（独自のアプリヘッダー=ロゴ+通知ベル等をページ側で描く）
+  "/mypage",
+  "/applications",
+  "/notifications",
+  "/business",
 ];
 
 export function SiteChrome({ children }: { children: React.ReactNode }) {
