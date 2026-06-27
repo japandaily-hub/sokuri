@@ -22,7 +22,9 @@
 - **完了（イテレーション5・Workflow wzqnc87jc）**: クラスタ3=business/mypage/applications/notifications/profile/withdraw、build緑(37ルート)・commit `beb69d7`。business.css のコメント内 `.faq-*` +スラッシュが `*/` を形成→cssnano崩れを修正。
 - **進行中（イテレーション6・Workflow wec8yvvzf）**: クラスタ4=vendors/[id]・chat/[id]・schedule・review（bareクロム拡張・commit先行）。※初回は自作スクリプトのテンプレート文字列に `*/` 混入で失敗→array.join方式で再投入。
 - **次アクション（loop P1）**: クラスタ4完了→build→コミット。**残=複雑な既存配線ページのみ: signup(3step)/create(多step)/result(3状態)/operator dashboard + operator-chat/operator-profile**。これらは既存の signIn/katadzuke-api/middleware 配線を読み込み**維持したまま**個別丁寧に再スキン（Workflow agentに既存ファイルを渡すか、リーダー直実装）。
-- **gate_status**: build=GREEN / typecheck=GREEN / visualQA=ユーザー確認方式 / security=未 / 全33ページ=**20完了**(+cluster3 6)/残13・うち4並列実装中
+- **完了（イテレーション6-8）**: クラスタ4(vendors/chat/schedule/review・commit `379c7e5`)＋クラスタ5(operator dashboard/chat/profile・commit `ae7336f`)＋**signup 3ステップ再スキン**(既存signupUser→signIn配線維持・commit `709e628`)。共有フローCSS(flow-header/footer/form-card/pw-strength)を katazuke-pages.css に集約。
+- **次アクション（loop P1）**: **残2のみ＝/create と /result**（最も複雑な既存配線）。/create は useToken/uploadCasePhoto/createCase→/cases/{id} 配線を読み込み**維持**しつつ新デザインのflow-header/footer/form-cardで再スキン。/result は既存セッション/状態配線を維持。リーダー直実装で慎重に（並列しない）。
+- **gate_status**: build=GREEN(41ルート) / typecheck=GREEN / visualQA=ユーザー確認方式 / security=未 / 全33ページ=**31完了**/残2(create・result)
 
 ---
 
