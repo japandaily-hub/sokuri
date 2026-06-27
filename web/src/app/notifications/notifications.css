@@ -1,0 +1,155 @@
+/* ============================================================
+   通知・お知らせ一覧 — ページ固有スタイル
+   （design_handoff_katazuke/通知・お知らせ一覧.html の <style> を移植）
+   共通クラス(.container/.btn/.field/.kdz-toast 等)は katazuke(-pages).css 側。
+   ここでは .notif-page スコープ配下の固有クラスのみ定義する。
+   ============================================================ */
+
+.notif-page { background: #f4f6fb; min-height: 100vh; }
+
+/* ── ラッパー ── */
+.notif-page .notif-wrap { max-width: 600px; margin: 0 auto; padding: 24px 20px 80px; }
+
+/* ── すべて既読ボタン（ヘッダー横ではなく本文上に配置） ── */
+.notif-page .notif-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 16px;
+}
+.notif-page .notif-toolbar-title {
+  font-family: var(--head); font-size: 18px; font-weight: 900; color: var(--navy);
+}
+.notif-page .btn-read-all {
+  font-size: 12.5px; font-weight: 700; color: var(--blue);
+  background: none; border: none; cursor: pointer; padding: 0;
+}
+.notif-page .btn-read-all:hover { text-decoration: underline; }
+.notif-page .btn-read-all:disabled { color: var(--body-soft); cursor: default; text-decoration: none; }
+
+/* ── フィルタータブ ── */
+.notif-page .notif-tabs {
+  display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap;
+}
+.notif-page .notif-tab {
+  padding: 7px 16px; border-radius: 99px;
+  border: 1.5px solid var(--line); background: #fff;
+  font-family: var(--head); font-size: 13px; font-weight: 700; color: var(--body-soft);
+  cursor: pointer; transition: .2s; white-space: nowrap;
+}
+.notif-page .notif-tab.active { border-color: var(--blue); background: var(--pale); color: var(--blue); }
+.notif-page .notif-tab .tab-badge {
+  display: inline-block; background: var(--blue); color: #fff;
+  font-size: 10px; font-weight: 900; padding: 1px 6px; border-radius: 99px;
+  margin-left: 4px; vertical-align: middle;
+}
+
+/* ── 通知カード ── */
+.notif-page .notif-group { margin-bottom: 20px; }
+.notif-page .notif-group-label {
+  font-size: 11.5px; font-weight: 700; color: var(--body-soft);
+  letter-spacing: .06em; margin-bottom: 8px; padding-left: 2px;
+}
+.notif-page .notif-card {
+  background: #fff; border-radius: 14px;
+  border: 1.5px solid var(--line-soft); box-shadow: var(--shadow-s);
+  margin-bottom: 8px; overflow: hidden;
+  transition: box-shadow .2s, border-color .2s, transform .2s;
+  text-decoration: none; display: block; cursor: pointer;
+}
+.notif-page .notif-card:hover { transform: translateY(-1px); box-shadow: var(--shadow-m); }
+.notif-page .notif-card.unread { border-left: 4px solid var(--blue); }
+.notif-page .notif-card.unread-green { border-left: 4px solid var(--green); }
+.notif-page .notif-card.unread-warn { border-left: 4px solid #f0a030; }
+.notif-page .notif-card-inner {
+  display: flex; align-items: flex-start; gap: 14px; padding: 16px 18px;
+}
+.notif-page .notif-icon {
+  width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+  display: grid; place-items: center;
+}
+.notif-page .notif-icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.notif-page .notif-icon.blue  { background: var(--pale);     color: var(--blue); }
+.notif-page .notif-icon.green { background: #e8faf0;          color: var(--green); }
+.notif-page .notif-icon.warn  { background: #fff8e0;          color: #9a6200; }
+.notif-page .notif-icon.gray  { background: var(--line-soft); color: var(--body-soft); }
+.notif-page .notif-body { flex: 1; min-width: 0; }
+.notif-page .notif-title {
+  font-family: var(--head); font-size: 14.5px; font-weight: 700;
+  color: var(--navy); line-height: 1.4; margin-bottom: 4px;
+}
+.notif-page .notif-card.read .notif-title { color: var(--body-soft); font-weight: 600; }
+.notif-page .notif-text {
+  font-size: 13px; color: var(--body-soft); line-height: 1.7;
+  overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.notif-page .notif-meta {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 8px; gap: 8px;
+}
+.notif-page .notif-time { font-size: 11.5px; color: var(--body-soft); font-weight: 600; }
+.notif-page .notif-badge {
+  font-size: 10.5px; font-weight: 700; padding: 3px 9px; border-radius: 99px;
+  white-space: nowrap;
+}
+.notif-page .notif-badge.blue  { background: var(--pale);    color: var(--blue); }
+.notif-page .notif-badge.green { background: #e8faf0;         color: var(--green); }
+.notif-page .notif-badge.warn  { background: #fff8e0;         color: #9a6200; }
+.notif-page .notif-badge.gray  { background: var(--line-soft); color: var(--body-soft); }
+.notif-page .notif-arrow {
+  flex-shrink: 0; color: var(--line); margin-top: 12px;
+}
+.notif-page .notif-arrow svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+
+/* 未読ドット */
+.notif-page .notif-card.unread .notif-title::before,
+.notif-page .notif-card.unread-green .notif-title::before,
+.notif-page .notif-card.unread-warn .notif-title::before {
+  content: '';
+  display: inline-block;
+  width: 7px; height: 7px; border-radius: 50%;
+  margin-right: 7px; vertical-align: middle;
+  flex-shrink: 0;
+}
+.notif-page .notif-card.unread .notif-title::before { background: var(--blue); }
+.notif-page .notif-card.unread-green .notif-title::before { background: var(--green); }
+.notif-page .notif-card.unread-warn .notif-title::before { background: #f0a030; }
+
+/* 空状態 */
+.notif-page .notif-empty {
+  text-align: center; padding: 60px 20px;
+}
+.notif-page .notif-empty-ic {
+  width: 72px; height: 72px; border-radius: 50%; background: var(--pale);
+  margin: 0 auto 18px; display: grid; place-items: center;
+}
+.notif-page .notif-empty-ic svg { width: 34px; height: 34px; fill: none; stroke: var(--blue); stroke-width: 1.6; stroke-linecap: round; }
+.notif-page .notif-empty h3 { font-family: var(--head); font-size: 18px; color: var(--navy); margin-bottom: 8px; }
+.notif-page .notif-empty p { font-size: 14px; color: var(--body-soft); line-height: 1.8; }
+
+/* 設定バナー */
+.notif-page .notif-settings-banner {
+  background: var(--pale); border-radius: 14px; border: 1px solid rgba(31,84,222,.15);
+  padding: 14px 18px; display: flex; align-items: center; gap: 12px; margin-bottom: 20px;
+}
+.notif-page .notif-settings-banner > svg { width: 22px; height: 22px; fill: none; stroke: var(--blue); stroke-width: 1.8; stroke-linecap: round; flex-shrink: 0; }
+.notif-page .notif-settings-text { flex: 1; font-size: 13px; color: var(--body); line-height: 1.7; }
+.notif-page .notif-settings-text strong { color: var(--navy); font-weight: 700; }
+.notif-page .btn-notif-setting {
+  font-size: 12.5px; font-weight: 700; color: var(--blue);
+  background: none; border: 1.5px solid var(--blue); border-radius: 99px;
+  padding: 7px 14px; cursor: pointer; transition: .2s; white-space: nowrap;
+}
+.notif-page .btn-notif-setting:hover { background: var(--blue); color: #fff; }
+
+@media (max-width: 480px) {
+  .notif-page .notif-card-inner { padding: 14px 12px; gap: 10px; }
+  .notif-page .notif-icon { width: 38px; height: 38px; border-radius: 10px; }
+  .notif-page .notif-wrap { padding: 16px 14px 80px; }
+  .notif-page .notif-tabs { gap: 5px; }
+  .notif-page .notif-tab { padding: 6px 12px; font-size: 12px; }
+  .notif-page .notif-title { font-size: 13.5px; }
+  .notif-page .notif-settings-banner { flex-wrap: wrap; gap: 8px; }
+  .notif-page .btn-notif-setting { width: 100%; text-align: center; }
+}
+@media (max-width: 360px) {
+  .notif-page .notif-tab .tab-badge { display: none; }
+}
