@@ -1,0 +1,125 @@
+/* ============================================================
+   カタヅケ — ページ/クラスタ共通スタイル（ハンドオフ各HTMLの <style> を集約）
+   globals.css から @import ... layer(components) で取り込む。
+   ============================================================ */
+
+/* ---------- 認証・フォーム共通（ログイン/新規登録/PWリセット等） ---------- */
+.auth-page { background: #f4f6fb; min-height: 100vh; }
+
+.auth-bar {
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+  padding: 0 24px;
+  height: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.auth-bar-link { font-size: 13px; font-weight: 600; color: var(--body-soft); transition: color .2s; }
+.auth-bar-link:hover { color: var(--blue); }
+
+.auth-wrap { max-width: 440px; margin: 0 auto; padding: 40px 20px 80px; }
+
+.auth-card {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: 0 4px 32px -8px rgba(15,37,82,.16), 0 1px 4px rgba(15,37,82,.06);
+  padding: 36px 32px 32px;
+  border: 1px solid var(--line-soft);
+}
+.auth-head { margin-bottom: 28px; }
+.auth-title { font-family: var(--head); font-size: 24px; font-weight: 900; color: var(--navy); line-height: 1.25; }
+.auth-sub { font-size: 13.5px; color: var(--body-soft); line-height: 1.75; margin-top: 8px; }
+
+.auth-divider {
+  display: flex; align-items: center; gap: 12px; margin: 20px 0;
+  color: var(--body-soft); font-size: 12px; font-weight: 600; letter-spacing: .04em;
+}
+.auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+/* フォームフィールド */
+.field { margin-bottom: 18px; }
+.field:last-child { margin-bottom: 0; }
+.field-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px; }
+.field label, .field .field-lbl { display: block; font-size: 13.5px; font-weight: 700; color: var(--ink); margin-bottom: 7px; }
+.field-top label, .field-top .field-lbl { margin-bottom: 0; }
+.forget-link { font-size: 12px; color: var(--blue); font-weight: 600; cursor: pointer; background: none; border: none; }
+.forget-link:hover { text-decoration: underline; }
+.field input, .field textarea, .field select {
+  width: 100%; font-family: var(--sans); font-size: 15px; color: var(--ink);
+  background: #fafbfe; border: 1.5px solid var(--line); border-radius: var(--radius-s);
+  padding: 12px 14px; outline: none; transition: border-color .2s, box-shadow .2s;
+}
+.field input::placeholder { color: #bcc3d4; }
+.field input:focus, .field textarea:focus, .field select:focus {
+  border-color: var(--blue); background: #fff; box-shadow: 0 0 0 3px rgba(31,84,222,.12);
+}
+.field.has-error input, .field.has-error textarea { border-color: #e05c5c; }
+.field-error { font-size: 12px; color: #e05c5c; margin-top: 5px; }
+
+/* パスワード表示切替 */
+.pw-wrap { position: relative; }
+.pw-toggle {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer; color: var(--body-soft);
+  padding: 4px; line-height: 1; transition: color .2s;
+}
+.pw-toggle:hover { color: var(--navy); }
+.pw-toggle svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; display: block; }
+.pw-wrap input { padding-right: 44px; }
+
+/* エラーバナー */
+.auth-error {
+  background: #fff3f3; border: 1px solid #ffc0c0; border-radius: 10px;
+  padding: 11px 14px; font-size: 13px; color: #cc3333; margin-bottom: 18px;
+  display: flex; align-items: center; gap: 8px; line-height: 1.5;
+}
+
+/* 信頼行 */
+.trust-row { display: flex; gap: 18px; margin-top: 22px; justify-content: center; flex-wrap: wrap; }
+.trust-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--body-soft); font-weight: 600; }
+.trust-item svg { width: 13px; height: 13px; fill: none; stroke: var(--green); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* 新規登録/ログイン誘導 */
+.auth-switch { text-align: center; margin-top: 24px; font-size: 13.5px; color: var(--body-soft); line-height: 1.8; }
+.auth-switch a { color: var(--blue); font-weight: 700; }
+.auth-switch a:hover { text-decoration: underline; }
+
+/* LINE ボタン（認証） */
+.btn-line-auth {
+  width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;
+  background: #06c755; color: #fff; border: none; border-radius: 99px; padding: 16px 20px;
+  font-family: var(--head); font-size: 15.5px; font-weight: 700; cursor: pointer;
+  box-shadow: 0 10px 22px -8px rgba(6,199,85,.55); transition: background .2s, transform .2s, box-shadow .2s;
+}
+.btn-line-auth:hover { background: #05b34c; transform: translateY(-2px); box-shadow: 0 14px 28px -8px rgba(6,199,85,.6); }
+.btn-line-auth:disabled { opacity: .7; cursor: default; transform: none; }
+.btn-line-auth svg { width: 20px; height: 20px; fill: #fff; flex-shrink: 0; }
+
+/* トースト通知 */
+.kdz-toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: var(--navy); color: #fff; font-family: var(--head); font-size: 14px; font-weight: 700;
+  padding: 14px 22px; border-radius: 99px; z-index: 200; box-shadow: 0 8px 24px -8px rgba(15,37,82,.5);
+}
+
+/* モーダル（共通） */
+.kdz-overlay {
+  position: fixed; inset: 0; background: rgba(15,37,82,.45); backdrop-filter: blur(4px);
+  z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.kdz-modal { background: #fff; border-radius: var(--radius); max-width: 400px; width: 100%; padding: 32px 28px; box-shadow: var(--shadow-l); }
+.kdz-modal h2 { font-family: var(--head); font-size: 20px; color: var(--navy); margin-bottom: 8px; }
+.kdz-modal .modal-sub { font-size: 13.5px; color: var(--body-soft); line-height: 1.75; margin-bottom: 22px; }
+
+/* ローディングスピナー */
+@keyframes kdz-spin { to { transform: rotate(360deg); } }
+.spinning { animation: kdz-spin .7s linear infinite; display: inline-block; }
+
+@media (max-width: 480px) {
+  .auth-card { padding: 24px 18px; }
+  .auth-wrap { padding-top: 20px; padding-left: 14px; padding-right: 14px; }
+  .auth-title { font-size: 21px; }
+  .trust-row { gap: 10px; }
+  .btn-line-auth { font-size: 14px; padding: 14px 18px; }
+}

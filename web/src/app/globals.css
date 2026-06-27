@@ -9,6 +9,7 @@
 /* デザインハンドオフCSSを components レイヤーへ取り込む。
    こうすることで Tailwind utilities が常に勝ち、既存 Tailwind ページを壊さない。 */
 @import "./katazuke.css" layer(components);
+@import "./katazuke-pages.css" layer(components);
 
 @tailwind base;
 @tailwind components;
