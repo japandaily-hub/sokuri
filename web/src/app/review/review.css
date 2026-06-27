@@ -1,0 +1,180 @@
+/* ============================================================
+   取引完了・評価ページ（カタヅケ）固有スタイル
+   デザイン正典: docs/design_handoff_katazuke/取引完了・評価.html の <style>
+   共通クラス（.container .section .btn .field .kdz-toast .kdz-overlay .kdz-modal .spinning）は再定義しない。
+   独自値は .review-page 配下にスコープし、共通スタイルへ影響しないようにする。
+   keyframes 名はページ固有（review-star-pop）で衝突回避。
+   ============================================================ */
+
+.review-page { background: #f4f6fb; min-height: 100vh; }
+
+/* ── ラッパー ── */
+.review-page .review-wrap { max-width: 540px; margin: 0 auto; padding: 28px 20px 80px; }
+
+/* ── 完了バナー ── */
+.review-page .done-banner {
+  background: linear-gradient(135deg, #e4f7ed, #d0f0e0);
+  border: 1.5px solid rgba(31, 138, 91, .2); border-radius: var(--radius);
+  padding: 24px 20px; text-align: center; margin-bottom: 24px;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  box-shadow: 0 6px 20px -8px rgba(31, 138, 91, .2);
+}
+.review-page .done-ic {
+  width: 72px; height: 72px; border-radius: 50%; background: var(--green);
+  margin: 0 auto 2px; display: grid; place-items: center; color: #fff;
+}
+.review-page .done-ic svg {
+  width: 36px; height: 36px; fill: none; stroke: #fff; stroke-width: 2.5;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.review-page .done-title { font-family: var(--head); font-size: 22px; font-weight: 900; color: var(--navy); margin-bottom: 4px; }
+.review-page .done-sub { font-size: 13.5px; color: var(--body-soft); line-height: 1.8; }
+
+/* ── 取引サマリー ── */
+.review-page .txn-card {
+  background: #fff; border-radius: var(--radius);
+  box-shadow: var(--shadow-s); border: 1px solid var(--line-soft);
+  padding: 20px; margin-bottom: 20px;
+}
+.review-page .txn-card-title { font-family: var(--head); font-size: 14px; font-weight: 700; color: var(--navy); margin-bottom: 14px; }
+.review-page .txn-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 14px; padding: 9px 0; border-bottom: 1px solid var(--line-soft); gap: 12px;
+}
+.review-page .txn-row:last-child { border-bottom: none; }
+.review-page .txn-lbl { color: var(--body-soft); font-size: 13px; }
+.review-page .txn-val { font-weight: 700; color: var(--ink); text-align: right; }
+.review-page .txn-amount { font-family: var(--head); font-size: 26px; font-weight: 900; color: var(--green); }
+
+/* ── 評価フォーム ── */
+.review-page .rate-card {
+  background: #fff; border-radius: var(--radius);
+  box-shadow: var(--shadow-s); border: 1px solid var(--line-soft);
+  padding: 24px 20px; margin-bottom: 14px;
+}
+.review-page .rate-card-title { font-family: var(--head); font-size: 16px; font-weight: 900; color: var(--navy); margin-bottom: 4px; }
+.review-page .rate-card-sub { font-size: 13px; color: var(--body-soft); margin-bottom: 22px; line-height: 1.7; }
+
+/* スター選択 */
+.review-page .star-selector {
+  display: flex; gap: 8px; justify-content: center; margin-bottom: 22px;
+}
+.review-page .star-btn {
+  font-size: 40px; cursor: pointer; transition: transform .15s, color .15s; line-height: 1;
+  color: var(--line); filter: none; background: none; border: none; padding: 2px;
+}
+.review-page .star-btn.active { color: #f0a030; transform: scale(1.15); }
+.review-page .star-btn.hover-active { color: #f0d080; }
+.review-page .star-btn:hover { transform: scale(1.1); }
+.review-page .star-label {
+  text-align: center; font-family: var(--head); font-size: 15px; font-weight: 700;
+  color: var(--navy); margin-bottom: 20px; min-height: 22px; transition: .2s;
+}
+
+/* 評価タグ */
+.review-page .tag-title { font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 10px; }
+.review-page .tag-grid { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 20px; }
+.review-page .tag-chip {
+  padding: 8px 14px; border-radius: 99px;
+  border: 1.5px solid var(--line); background: #fff;
+  font-size: 13px; font-weight: 700; color: var(--body-soft);
+  cursor: pointer; transition: .2s; user-select: none;
+}
+.review-page .tag-chip.selected { border-color: var(--blue); background: var(--pale); color: var(--blue); }
+.review-page .tag-chip:hover { border-color: var(--blue); }
+
+/* テキストエリア */
+.review-page .review-textarea {
+  width: 100%; font-family: var(--sans); font-size: 14px; color: var(--ink);
+  background: #fafbfe; border: 1.5px solid var(--line); border-radius: var(--radius-s);
+  padding: 14px; outline: none; resize: vertical; min-height: 110px; line-height: 1.75;
+  transition: border-color .2s, box-shadow .2s;
+}
+.review-page .review-textarea::placeholder { color: #bcc3d4; }
+.review-page .review-textarea:focus {
+  border-color: var(--blue); background: #fff;
+  box-shadow: 0 0 0 3px rgba(31, 84, 222, .12);
+}
+.review-page .textarea-count { font-size: 11.5px; color: var(--body-soft); text-align: right; margin-top: 5px; }
+
+/* 公開設定 */
+.review-page .publish-row {
+  display: flex; align-items: center; gap: 12px; padding: 14px 0;
+  border-top: 1px solid var(--line-soft); margin-top: 4px;
+}
+.review-page .publish-toggle { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
+.review-page .publish-toggle input { opacity: 0; width: 0; height: 0; }
+.review-page .toggle-slider {
+  position: absolute; inset: 0; border-radius: 99px;
+  background: var(--line); cursor: pointer; transition: .3s;
+}
+.review-page .toggle-slider::before {
+  content: ""; position: absolute; width: 18px; height: 18px;
+  border-radius: 50%; background: #fff; left: 3px; top: 3px;
+  transition: .3s; box-shadow: 0 1px 4px rgba(0, 0, 0, .2);
+}
+.review-page .publish-toggle input:checked + .toggle-slider { background: var(--green); }
+.review-page .publish-toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
+.review-page .publish-label { font-size: 13px; color: var(--body); line-height: 1.6; }
+.review-page .publish-label .publish-note { font-size: 11.5px; color: var(--body-soft); }
+
+/* 完了ボタン */
+.review-page .submit-area { padding-top: 6px; }
+
+/* 次のアクション */
+.review-page .next-card {
+  background: var(--pale); border-radius: var(--radius);
+  border: 1px solid rgba(31, 84, 222, .12); padding: 20px;
+  margin-bottom: 14px;
+}
+.review-page .next-card-title { font-family: var(--head); font-size: 14px; font-weight: 700; color: var(--navy); margin-bottom: 14px; }
+.review-page .next-actions { display: flex; flex-direction: column; gap: 10px; }
+.review-page .next-action-btn {
+  display: flex; align-items: center; gap: 12px;
+  background: #fff; border-radius: 12px; border: 1px solid var(--line-soft);
+  padding: 14px 16px; text-decoration: none; transition: .2s;
+}
+.review-page .next-action-btn:hover { box-shadow: var(--shadow-s); transform: translateY(-1px); }
+.review-page .next-action-ic {
+  width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+  display: grid; place-items: center;
+}
+.review-page .next-action-ic svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.review-page .next-action-body strong { display: block; font-family: var(--head); font-size: 14px; font-weight: 700; color: var(--navy); }
+.review-page .next-action-body span { font-size: 12px; color: var(--body-soft); }
+.review-page .next-action-arr { margin-left: auto; color: var(--line); display: grid; place-items: center; }
+.review-page .next-action-arr svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* 送信済み画面 */
+.review-page .submitted-screen { text-align: center; padding: 40px 0; }
+.review-page .submitted-ic {
+  width: 80px; height: 80px; border-radius: 50%; background: var(--pale);
+  margin: 0 auto 18px; display: grid; place-items: center; color: var(--blue);
+}
+.review-page .submitted-ic svg {
+  width: 40px; height: 40px; fill: none; stroke: currentColor; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.review-page .submitted-screen h2 { font-family: var(--head); font-size: 22px; color: var(--navy); margin-bottom: 10px; }
+.review-page .submitted-screen p { font-size: 14px; color: var(--body-soft); line-height: 1.82; margin-bottom: 28px; }
+
+@keyframes review-star-pop { 0% { transform: scale(1) } 50% { transform: scale(1.4) } 100% { transform: scale(1) } }
+.review-page .star-pop { animation: review-star-pop .2s ease; }
+
+@media (max-width: 480px) {
+  .review-page .review-wrap { padding: 18px 14px 80px; }
+  .review-page .rate-card { padding: 18px 14px; }
+  .review-page .txn-card { padding: 14px; }
+  .review-page .done-banner { padding: 18px 14px; }
+  .review-page .star-btn { font-size: 32px; }
+  .review-page .tag-grid { gap: 6px; }
+  .review-page .tag-chip { padding: 7px 11px; font-size: 12px; }
+  .review-page .next-action-btn { padding: 12px 14px; }
+  .review-page .submit-area .btn { font-size: 15px; }
+  .review-page .txn-amount { font-size: 22px; }
+}
+@media (max-width: 360px) {
+  .review-page .star-selector { gap: 4px; }
+  .review-page .star-btn { font-size: 28px; }
+  .review-page .tag-chip { padding: 6px 9px; font-size: 11.5px; }
+}
