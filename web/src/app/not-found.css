@@ -1,0 +1,222 @@
+/* ============================================================
+   404（ページが見つかりません）固有スタイル
+   デザイン正典: docs/design_handoff_katazuke/404.html の .err-* を移植。
+   共通クロム（SiteHeader/SiteFooter/Dock）配下で表示されるため、
+   デザインの .err-header は描かず、カード中身のみを担う。
+   トークン（--blue/--navy/--pale 等）は katazuke.css のグローバル定義を参照。
+   ============================================================ */
+
+.nf-main {
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+.nf-card {
+  max-width: 480px;
+  width: 100%;
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-m);
+  border: 1px solid var(--line-soft);
+  padding: 48px 36px;
+  text-align: center;
+}
+
+/* 404 大文字（グラデーション） */
+.nf-num {
+  font-family: var(--head);
+  font-size: clamp(80px, 15vw, 120px);
+  font-weight: 900;
+  line-height: 1;
+  background: linear-gradient(135deg, var(--blue), #6fa3ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 6px;
+}
+
+/* フローティングする箱アイコン */
+.nf-icon {
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 16px;
+  color: var(--blue);
+  animation: nf-float 3s ease-in-out infinite;
+}
+.nf-icon .ic {
+  width: 44px;
+  height: 44px;
+  stroke-width: 1.6;
+}
+
+.nf-title {
+  font-family: var(--head);
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--navy);
+  margin-bottom: 10px;
+}
+
+.nf-sub {
+  font-size: 14.5px;
+  color: var(--body-soft);
+  line-height: 1.85;
+  margin-bottom: 30px;
+}
+
+/* リンクカード群 */
+.nf-links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 28px;
+}
+
+.nf-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--pale);
+  border-radius: 12px;
+  border: 1px solid rgba(31, 84, 222, 0.12);
+  padding: 14px 16px;
+  text-decoration: none;
+  transition: 0.2s;
+  text-align: left;
+}
+.nf-link:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-s);
+}
+
+.nf-link-ic {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+}
+.nf-link-ic .ic,
+.nf-link-ic svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.nf-link-body strong {
+  display: block;
+  font-family: var(--head);
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--navy);
+}
+.nf-link-body span {
+  font-size: 12px;
+  color: var(--body-soft);
+}
+
+.nf-link-arr {
+  margin-left: auto;
+  color: var(--line);
+}
+.nf-link-arr .ic {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+/* 戻るボタン（トップへ） */
+.nf-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--body-soft);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.nf-back:hover {
+  color: var(--blue);
+}
+.nf-back .ic {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+@keyframes nf-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@media (max-width: 480px) {
+  .nf-card {
+    padding: 36px 22px;
+  }
+  .nf-num {
+    font-size: clamp(64px, 18vw, 100px);
+  }
+  .nf-title {
+    font-size: 19px;
+  }
+  .nf-sub {
+    font-size: 13.5px;
+  }
+  .nf-link {
+    padding: 12px 14px;
+  }
+  .nf-link-ic {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+  }
+  .nf-link-ic .ic,
+  .nf-link-ic svg {
+    width: 16px;
+    height: 16px;
+  }
+  .nf-link-body strong {
+    font-size: 13px;
+  }
+  .nf-link-body span {
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 360px) {
+  .nf-icon,
+  .nf-icon .ic {
+    width: 36px;
+    height: 36px;
+    margin-bottom: 12px;
+  }
+  .nf-links {
+    gap: 6px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nf-icon {
+    animation: none;
+  }
+}

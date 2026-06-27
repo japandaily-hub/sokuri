@@ -1,100 +1,211 @@
 /**
- * 特定商取引法に基づく表記（特商法ページ）
- * 運営者情報を反映済み（2026-06-16）。
- * 所在地（番地）・電話番号・代表者名は、特商法第11条および同法施行規則第10条に基づき
- * 「請求があった場合に遅滞なく開示する」省略運用としている（メールでの開示請求に対応すること）。
+ * 特定商取引法に基づく表記（/legal）
+ *
+ * デザイン正典 docs/design_handoff_katazuke/特定商取引法.html をピクセル忠実に再実装。
+ * 共通ヘッダー/フッターは SiteChrome がグローバルに付与するため、本ページは
+ * <main id="main"> の中身（doc-wrap）だけを描く。
+ *
+ * 事業者情報は特商法第11条・第58条の2に基づく開示運用（所在地番地・電話番号・代表者名は
+ * 「請求があれば遅滞なく開示」）をデザイン正典どおり記載。実値はユーザー記入事項のため
+ * 創作で埋めず、デザインの表記をそのまま保持する。
  */
+import Link from "next/link";
+import "./legal.css";
 
 export const metadata = {
-  title: "特定商取引法に基づく表記 | カタヅケ",
-  description: "カタヅケの特定商取引法に基づく表記ページです。",
+  title: "特定商取引法に基づく表記｜カタヅケ",
+  description:
+    "カタヅケの特定商取引法に基づく表記。運営者情報・サービス内容・料金・返品等について記載しています。",
 };
 
 export default function LegalPage() {
   return (
-    <div className="mx-auto max-w-2xl px-4 py-14">
-      <h1 className="text-2xl font-bold text-slate-900">特定商取引法に基づく表記</h1>
+    <main id="main">
+      <div className="doc-wrap">
+        <div className="doc-eyebrow">LEGAL</div>
+        <h1 className="doc-title">特定商取引法に基づく表記</h1>
+        <div className="doc-meta">最終更新：2026年6月1日</div>
 
-      <dl className="mt-8 divide-y divide-slate-100 text-sm">
-        <Row label="販売事業者">カタヅケ運営事務局</Row>
-        <Row label="代表者名">ご請求に応じて遅滞なく開示いたします</Row>
-        <Row label="所在地">
-          神奈川県横浜市（番地を含む正確な所在地は、ご請求に応じて遅滞なく開示いたします）
-        </Row>
-        <Row label="電話番号">
-          ご請求に応じて遅滞なく開示いたします（お問い合わせはメールにて承ります）
-        </Row>
-        <Row label="メールアドレス">
-          <a
-            href="mailto:katazuke-support@gmail.com"
-            className="text-brand-700 underline hover:text-brand-900"
-          >
-            katazuke-support@gmail.com
-          </a>
-        </Row>
-        <Row label="サービス名">カタヅケ（片付け案件マッチングプラットフォーム）</Row>
-        <Row label="サービス内容">
-          家庭内の不要品・遺品整理・引越しに伴う片付けを希望する依頼者と、
-          登録リユース業者とをマッチングするプラットフォームサービス。
-          カタヅケは取引の「場」を提供するものであり、実際の買取・回収・運搬は各業者が行います。
-        </Row>
-        <Row label="手数料・費用">
-          <span className="font-semibold">β期間中は完全無料</span>（依頼者・業者ともに手数料なし）。
-          将来有料化する場合は、事前にメール通知および本ページにて告知します。
-        </Row>
-        <Row label="支払時期・方法">
-          β期間中は費用が発生しないため、支払は不要です。
-        </Row>
-        <Row label="サービスの提供時期">
-          依頼登録後、業者入札は通常24〜72時間以内に開始されます（業者登録状況による）。
-        </Row>
-        <Row label="返品・キャンセル">
-          マッチング成立前であればキャンセル可能です。
-          業者訪問日確定後のキャンセルについては各業者の規定に従います。
-          デジタルサービスの性質上、成約後のキャンセルについては業者と依頼者間で協議してください。
-        </Row>
-        <Row label="免責事項">
-          カタヅケは業者紹介・マッチングの場を提供するサービスです。
-          査定額はAIおよび業者による参考値であり、実際の買取額は業者による現物確認後に決定します。
-          カタヅケは買取金額・作業品質・トラブルに関して一切の保証を行いません。
-          取引に関する最終判断は依頼者ご自身の責任において行ってください。
-        </Row>
-        <Row label="個人情報の取扱い">
-          <a href="/privacy" className="text-brand-700 underline hover:text-brand-900">
-            プライバシーポリシー
-          </a>
-          をご確認ください。
-        </Row>
-        <Row label="メール配信停止">
-          カタヅケからのご案内メールの配信停止を希望される方は、メール本文内の配信停止リンク、
-          または{" "}
-          <a
-            href="/unsubscribe"
-            className="text-brand-700 underline hover:text-brand-900"
-          >
-            配信停止ページ
-          </a>
-          {" "}よりお手続きください。
-        </Row>
-      </dl>
+        <p className="doc-lead">
+          本ページは、特定商取引に関する法律（特定商取引法）第11条および第58条の2に基づき、本サービスの運営者情報および取引条件を表示するものです。
+        </p>
 
-      <p className="mt-8 text-xs text-slate-500 leading-relaxed">
-        ※ 所在地（番地）・電話番号・代表者名は、特定商取引法第11条および同法施行規則第10条に基づき、
-        消費者の皆様からのご請求があった場合に、上記メールアドレス宛のご連絡により遅滞なく開示いたします。
-      </p>
+        {/* 運営者情報 */}
+        <h2 className="doc-section-title">サービス運営者情報</h2>
+        <table className="spec-table">
+          <tbody>
+            <tr>
+              <th>事業者名</th>
+              <td>カタヅケ 運営事務局</td>
+            </tr>
+            <tr>
+              <th>代表者名</th>
+              <td>（請求があれば開示します）</td>
+            </tr>
+            <tr>
+              <th>所在地</th>
+              <td>東京都内（請求があれば開示します）</td>
+            </tr>
+            <tr>
+              <th>電話番号</th>
+              <td>
+                請求があれば開示します
+                <br />
+                <span className="note">
+                  ※ メールでの対応を原則としています。お問い合わせは
+                  <Link href="/contact">お問い合わせフォーム</Link>
+                  をご利用ください。
+                </span>
+              </td>
+            </tr>
+            <tr>
+              <th>メールアドレス</th>
+              <td>
+                <Link href="/contact">お問い合わせフォームよりご連絡ください</Link>
+              </td>
+            </tr>
+            <tr>
+              <th>営業時間</th>
+              <td>平日 10:00〜18:00（土日祝・年末年始を除く）</td>
+            </tr>
+          </tbody>
+        </table>
 
-      <p className="mt-6 text-xs text-slate-400">
-        最終更新: 2026年6月16日
-      </p>
-    </div>
-  );
-}
+        {/* サービス内容 */}
+        <h2 className="doc-section-title">サービス内容・取引条件</h2>
+        <table className="spec-table">
+          <tbody>
+            <tr>
+              <th>サービス名</th>
+              <td>カタヅケ（家まるごと不用品まとめ買取マッチングサービス）</td>
+            </tr>
+            <tr>
+              <th>サービスの内容</th>
+              <td>
+                ユーザーが家庭内の不用品をまとめて出品し、複数の登録買取業者が買取総額で入札するマッチングプラットフォームの提供。当社はマッチングの場を提供するものであり、買取取引の当事者ではありません。
+              </td>
+            </tr>
+            <tr>
+              <th>対応エリア</th>
+              <td>東京都・千葉県・埼玉県・神奈川県（順次拡大予定）</td>
+            </tr>
+            <tr>
+              <th>ユーザー負担費用</th>
+              <td>
+                <strong style={{ color: "var(--green)" }}>無料</strong>
+                （出品・査定・お断りまで費用は一切かかりません）
+                <br />
+                <span className="note">
+                  ※ 成約に至った場合も、ユーザーへの費用請求はありません。
+                </span>
+              </td>
+            </tr>
+            <tr>
+              <th>業者手数料</th>
+              <td>
+                成約時に登録業者が支払う手数料：<strong>買取金額の8%</strong>
+                <br />
+                <span className="note">
+                  ※ 登録・掲載・入札費用は業者も無料です。
+                </span>
+              </td>
+            </tr>
+            <tr>
+              <th>入札・査定期間</th>
+              <td>出品後3日間（ユーザーは任意で早期終了も可能）</td>
+            </tr>
+            <tr>
+              <th>引き取り</th>
+              <td>
+                成約した登録業者がユーザー指定の場所へ訪問して引き取ります。日程は業者とのチャットで調整します。
+              </td>
+            </tr>
+            <tr>
+              <th>支払い方法</th>
+              <td>
+                業者によって異なります（現金・振込など）。詳細は交渉時に業者へご確認ください。
+              </td>
+            </tr>
+            <tr>
+              <th>支払い時期</th>
+              <td>
+                業者が引き取りを完了した時点で、業者とユーザーの間で精算されます。
+              </td>
+            </tr>
+          </tbody>
+        </table>
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="grid grid-cols-3 gap-4 py-4">
-      <dt className="font-semibold text-slate-700">{label}</dt>
-      <dd className="col-span-2 text-slate-600 leading-relaxed">{children}</dd>
-    </div>
+        {/* 返品・キャンセル */}
+        <h2 className="doc-section-title">返品・キャンセルについて</h2>
+        <table className="spec-table">
+          <tbody>
+            <tr>
+              <th>出品のキャンセル</th>
+              <td>
+                入札確定前（入札期間中）は、ユーザーが任意で出品を取り下げることができます。入札確定後のキャンセルは、業者との合意が必要です。
+              </td>
+            </tr>
+            <tr>
+              <th>
+                クーリングオフ
+                <br />
+                （ユーザー）
+              </th>
+              <td>
+                本サービスはユーザーから事前に依頼を受けて業者が訪問する形式です。ユーザーが引き取りを依頼した場合、特定商取引法の「訪問購入」に関するクーリングオフ（8日間）の規定が適用されます。
+                <br />
+                <span className="note">
+                  ※ 成約後も一定期間は取消し可能です。詳細は
+                  <Link href="/terms">利用規約</Link>をご確認ください。
+                </span>
+              </td>
+            </tr>
+            <tr>
+              <th>
+                クーリングオフ
+                <br />
+                （業者向け）
+              </th>
+              <td>
+                登録業者は特定商取引法に基づくクーリングオフの告知義務を負います。業者がこれを怠った場合、当社は登録を取り消すことがあります。
+              </td>
+            </tr>
+            <tr>
+              <th>買取後の返品</th>
+              <td>
+                成約・引き取り完了後の返品は、業者とユーザーの個別合意によります。当社が関与する取引ではありません。
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        {/* 個人情報 */}
+        <h2 className="doc-section-title">個人情報の取り扱い</h2>
+        <table className="spec-table">
+          <tbody>
+            <tr>
+              <th>個人情報の管理</th>
+              <td>
+                ユーザーの氏名・電話番号・住所は、査定段階では業者に開示されません。入札上位3社のみ、交渉開始時に必要な情報が開示されます。詳細は
+                <Link href="/privacy">プライバシーポリシー</Link>をご覧ください。
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div className="doc-warn">
+          <strong>ご注意</strong>
+          <br />
+          本サービスは不用品買取のマッチングプラットフォームであり、当社（カタヅケ運営事務局）は買取取引の当事者ではありません。買取金額・条件・日程等に関するご要望は、交渉相手である登録業者へ直接お問い合わせください。
+        </div>
+
+        <div className="doc-nav">
+          <Link href="/privacy">プライバシーポリシー</Link>
+          <Link href="/terms">利用規約・業者利用規約</Link>
+          <Link href="/contact">お問い合わせ</Link>
+          <Link href="/">トップページへ戻る</Link>
+        </div>
+      </div>
+    </main>
   );
 }

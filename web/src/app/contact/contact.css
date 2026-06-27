@@ -1,0 +1,265 @@
+/* ============================================================
+   お問い合わせページ固有スタイル
+   （共通クラス .container/.section/.eyebrow/.btn 等は katazuke.css の正典を使用。
+    ここはデザイン handoff の contact.html <style> 固有分のみ。
+    共通 .field と衝突しないよう、フォーム系は .contact-wrap 配下にスコープする。）
+   ============================================================ */
+
+/* ページヒーロー */
+.page-hero {
+  background: radial-gradient(120% 90% at 80% -10%, #eaf0ff 0%, rgba(234, 240, 255, 0) 55%), #fff;
+  padding: clamp(56px, 7vw, 96px) 0 clamp(48px, 6vw, 80px);
+  text-align: center;
+  border-bottom: 1px solid var(--line-soft);
+}
+.page-hero .eyebrow { justify-content: center; }
+.page-hero h1 {
+  font-size: clamp(28px, 4vw, 44px);
+  color: var(--navy);
+  margin-top: 16px;
+  font-family: var(--head);
+  font-weight: 900;
+  letter-spacing: -.01em;
+  text-wrap: balance;
+}
+.page-hero p {
+  color: var(--body-soft);
+  font-size: clamp(15px, 1.5vw, 17px);
+  margin-top: 16px;
+  line-height: 1.9;
+}
+
+/* LINE優先CTA */
+.line-first {
+  background: var(--pale);
+  border-radius: var(--radius);
+  padding: 36px 40px;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  margin-bottom: 48px;
+}
+.line-first-body { flex: 1; }
+.line-first-body strong {
+  display: block;
+  font-family: var(--head);
+  font-size: clamp(17px, 2vw, 20px);
+  color: var(--navy);
+  font-weight: 900;
+  margin-bottom: 6px;
+}
+.line-first-body p {
+  font-size: 14.5px;
+  color: var(--body-soft);
+  line-height: 1.75;
+}
+.line-first .btn { flex-shrink: 0; }
+
+/* フォームカード */
+.contact-wrap {
+  max-width: 720px;
+  margin: 0 auto;
+  padding-bottom: clamp(64px, 8vw, 108px);
+}
+.form-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: clamp(32px, 4vw, 56px);
+  box-shadow: var(--shadow-m);
+}
+.form-section-label {
+  font-family: var(--head);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  color: var(--blue);
+  text-transform: uppercase;
+  margin-bottom: 24px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+/* フォームフィールド（共通 .field を contact-wrap 配下で上書き） */
+.contact-wrap .field { margin-bottom: 24px; }
+.contact-wrap .field:last-of-type { margin-bottom: 0; }
+.contact-wrap .field label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.contact-wrap .field label .req {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--blue);
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+  letter-spacing: .04em;
+}
+.contact-wrap .field label .opt {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--body-soft);
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.contact-wrap .field input,
+.contact-wrap .field select,
+.contact-wrap .field textarea {
+  width: 100%;
+  font-family: var(--sans);
+  font-size: 15px;
+  color: var(--ink);
+  background: #fafbfe;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-s);
+  padding: 13px 16px;
+  transition: border-color .2s, box-shadow .2s;
+  appearance: none;
+  outline: none;
+  line-height: 1.6;
+}
+.contact-wrap .field input::placeholder,
+.contact-wrap .field textarea::placeholder { color: #bcc3d4; }
+.contact-wrap .field input:focus,
+.contact-wrap .field select:focus,
+.contact-wrap .field textarea:focus {
+  border-color: var(--blue);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(31, 84, 222, .12);
+}
+.contact-wrap .field input.has-error,
+.contact-wrap .field select.has-error,
+.contact-wrap .field textarea.has-error {
+  border-color: #e05c5c;
+  box-shadow: 0 0 0 3px rgba(224, 92, 92, .12);
+}
+.contact-wrap .field textarea { resize: vertical; min-height: 160px; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+/* セレクトラッパー */
+.select-wrap { position: relative; }
+.select-wrap::after {
+  content: "";
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid var(--body-soft);
+  pointer-events: none;
+}
+.select-wrap select { padding-right: 40px; cursor: pointer; }
+
+/* 送信ボタン */
+.submit-area {
+  margin-top: 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.submit-area .btn-submit {
+  width: 100%;
+  max-width: 400px;
+  font-size: 17px;
+  padding: 20px 36px;
+  background: var(--blue);
+  color: #fff;
+  border-radius: 999px;
+  font-family: var(--head);
+  font-weight: 900;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 14px 26px -12px rgba(31, 84, 222, .65);
+  transition: .25s var(--ease);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.submit-area .btn-submit:hover {
+  background: var(--blue-d);
+  transform: translateY(-2px);
+  box-shadow: 0 20px 34px -12px rgba(31, 84, 222, .75);
+}
+.submit-area .btn-submit:disabled {
+  opacity: .7;
+  cursor: default;
+  transform: none;
+}
+.submit-area .note {
+  font-size: 12.5px;
+  color: var(--body-soft);
+  text-align: center;
+  line-height: 1.75;
+}
+.submit-area .note a {
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* 送信完了状態 */
+.thanks {
+  text-align: center;
+  padding: 56px 32px;
+}
+.thanks-ic {
+  width: 64px;
+  height: 64px;
+  background: var(--pale);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 24px;
+  color: var(--blue);
+  font-size: 32px;
+}
+.thanks h3 {
+  font-size: 22px;
+  color: var(--navy);
+  margin-bottom: 12px;
+}
+.thanks p {
+  color: var(--body-soft);
+  font-size: 15px;
+  line-height: 1.9;
+  margin-bottom: 28px;
+}
+
+/* divider */
+.or-divider {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 40px 0 32px;
+  color: var(--body-soft);
+  font-size: 13px;
+  font-weight: 600;
+}
+.or-divider::before,
+.or-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+/* レスポンシブ */
+@media (max-width: 680px) {
+  .line-first { flex-direction: column; align-items: flex-start; gap: 20px; padding: 28px 24px; }
+  .field-row { grid-template-columns: 1fr; }
+  .form-card { padding: 28px 20px; }
+}

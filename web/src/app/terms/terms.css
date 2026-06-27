@@ -1,0 +1,56 @@
+/* ============================================================
+   利用規約ページ固有スタイル（design_handoff_katazuke/利用規約.html の <style> を移植）
+   共通クラス（.container/.eyebrow/.section 等）は katazuke.css 側を使用し再定義しない。
+   ============================================================ */
+
+.legal-hero {
+  background: var(--pale);
+  padding: clamp(40px, 5vw, 72px) 0 clamp(32px, 4vw, 56px);
+  border-bottom: 1px solid var(--line);
+}
+.legal-hero .eyebrow { justify-content: flex-start; }
+.legal-hero h1 { font-size: clamp(24px, 3.5vw, 36px); margin-top: 14px; }
+.legal-hero .updated { font-size: 13px; color: var(--body-soft); margin-top: 10px; }
+
+.legal-tabs { display: flex; gap: 0; border-bottom: 2px solid var(--line); margin-bottom: 0; }
+.legal-tab {
+  padding: 14px 28px; font-size: 14px; font-weight: 700; color: var(--body-soft); cursor: pointer;
+  border-bottom: 3px solid transparent; margin-bottom: -2px; transition: color .2s;
+  font-family: var(--head); background: none; border-top: none; border-left: none; border-right: none;
+}
+.legal-tab:hover { color: var(--blue); }
+.legal-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+.legal-pane { display: none; }
+.legal-pane.active { display: block; }
+
+.legal-body {
+  max-width: 760px; margin: 0 auto;
+  padding: clamp(40px, 5vw, 64px) 24px clamp(64px, 8vw, 108px);
+}
+.legal-body h2 {
+  font-size: 17px; color: var(--navy); margin: 36px 0 12px;
+  padding-bottom: 10px; border-bottom: 2px solid var(--line);
+}
+.legal-body h2:first-child { margin-top: 0; }
+.legal-body h3 { font-size: 15px; color: var(--ink); margin: 20px 0 8px; }
+.legal-body p { font-size: 14.5px; color: var(--body); line-height: 1.9; margin-bottom: 12px; }
+.legal-body ul, .legal-body ol { padding-left: 20px; margin-bottom: 14px; }
+.legal-body li { font-size: 14.5px; color: var(--body); line-height: 1.85; margin-bottom: 5px; }
+.legal-body .note {
+  background: #fff8e6; border-left: 3px solid var(--gold); padding: 14px 18px;
+  border-radius: 0 8px 8px 0; font-size: 13.5px; color: var(--body); margin: 20px 0; line-height: 1.8;
+}
+.legal-body .important {
+  background: #fff0f0; border-left: 3px solid #e05c5c; padding: 14px 18px;
+  border-radius: 0 8px 8px 0; font-size: 13.5px; color: var(--body); margin: 20px 0; line-height: 1.8;
+}
+
+.tab-wrap { background: #fff; border-bottom: 1px solid var(--line); position: sticky; top: 76px; z-index: 40; }
+.tab-inner { max-width: 760px; margin: 0 auto; padding: 0 24px; }
+
+.back-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13.5px; font-weight: 700; color: var(--blue); margin-bottom: 32px;
+}
+.back-link:hover { text-decoration: underline; }
