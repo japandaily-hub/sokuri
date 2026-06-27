@@ -9,9 +9,11 @@
   - 共通部品 `src/components/kdz/`（Icons / interactions / SiteHeader / chrome / SiteChrome / Logo）
   - `src/app/layout.tsx`（薄シェル化・共通クロム・SEO維持）+ `src/app/page.tsx`（**トップLP全16セクション再実装**）
   - **検証**: `npx tsc --noEmit` クリーン / `npm run build` 緑（23ルート・lint通過）。**視覚QAは未実施（次イテレーションで実施）**。
-- **次アクション（loop P1）**: ①`/` の視覚QA（dev server起動→スクショ→ハンドオフ比較）②認証/フロー クラスタ（login/signup/verify-email/password-reset/create/create-complete）を実装。以降 §KATAZUKE_REDESIGN_PLAN のクラスタ順。
-- **既知の要対応**: 実画像アセット（ロゴ/写真/カテゴリ）未投入＝`PhImg` プレースホルダで表示中。**[要ユーザー提供]** または `anthropic-skills:gpt-image` で生成。
-- **gate_status**: build=GREEN / typecheck=GREEN / visualQA=PENDING / security=未 / 全33ページ=1完了(基盤+top)/残32
+- **完了（イテレーション2）**: `/login` 再スキン（commit 8331765）。認証/フォーム共通基盤を新設: `katazuke-pages.css`（auth-bar/auth-card/field/btn-line-auth/モーダル/トースト）+ `components/kdz/auth.tsx`（AuthBar/Field/PasswordField/LineAuthButton/TrustRow）。既存 signIn 配線維持。
+- **QA所見（重要）**: ①ローカル `next start`/`dev` で NextAuth が動くには `web/.env.local` に `AUTH_SECRET` 必須（追加済・gitignore）。②**preview_screenshot は本アプリで networkidle に達せず常時タイムアウト**（dev=HMR websocket / prod=フォントCDN待ち。ページ自体はSSR200・markup健全・console errorなし）。視覚QAはユーザーがブラウザで `localhost:3100`（`.claude/launch.json` の katazuke-web）を直接確認する方式に切替。プレビュー起動コマンドは `npm --prefix C:\sokuri\web run start -- -p 3100`。
+- **次アクション（loop P1）**: 認証/フロー残り（signup[3step]/verify-email/password-reset/create[多step]/create-complete）→ 以降 §KATAZUKE_REDESIGN_PLAN のクラスタ順。**両パターン（LP/auth）確立済のため、静的・単純ページ群は Workflow で並列実装可**。
+- **既知の要対応**: 実画像アセット未投入＝`PhImg` プレースホルダ。**ユーザー決定(2026-06-27): プレースホルダのまま進行**（再質問しない）。LINE認証=バックエンド未実装（準備中トースト）。
+- **gate_status**: build=GREEN / typecheck=GREEN / visualQA=ユーザー確認方式へ移行 / security=未 / 全33ページ=2完了(基盤+top+login)/残31
 
 ---
 
