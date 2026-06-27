@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>査定結果｜カタヅケ</title>
+<meta name="theme-color" content="#1f54de">
+<link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="katazuke-main.css">
+<style>
+body { background: #f4f6fb; }
+
+/* ── デモ切替バー ── */
+.demo-bar {
+  background: var(--navy); color: rgba(255,255,255,.75);
+  font-size: 11.5px; font-weight: 600; font-family: var(--head);
+  padding: 7px 20px; display: flex; align-items: center;
+  justify-content: center; gap: 14px; flex-wrap: wrap;
+}
+.demo-bar span { opacity: .6; letter-spacing: .04em; }
+.demo-tabs { display: flex; gap: 4px; }
+.demo-tab {
+  padding: 5px 12px; border-radius: 99px;
+  border: 1px solid rgba(255,255,255,.3);
+  background: transparent; color: rgba(255,255,255,.7);
+  font-size: 11.5px; font-weight: 700; font-family: var(--head);
+  cursor: pointer; transition: .2s;
+}
+.demo-tab.active { background: rgba(255,255,255,.18); color: #fff; border-color: rgba(255,255,255,.5); }
+
+/* ── ヘッダー ── */
+.result-header {
+  background: #fff; border-bottom: 1px solid var(--line);
+  padding: 14px 20px; display: flex; align-items: center; gap: 16px;
+}
+.result-header img { height: 36px; }
+.result-header-back {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 700; color: var(--body-soft);
+  margin-left: auto; cursor: pointer; transition: color .2s;
+}
+.result-header-back:hover { color: var(--blue); }
+.result-header-back svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+
+/* ── 本体ラッパー ── */
+.result-wrap { max-width: 720px; margin: 0 auto; padding: 24px 20px 80px; }
+
+/* ── 出品サマリーカード ── */
+.listing-card {
+  background: #fff; border-radius: var(--radius);
+  box-shadow: var(--shadow-s); border: 1px solid var(--line-soft);
+  padding: 18px 20px; margin-bottom: 20px;
+  display: flex; align-items: center; gap: 16px;
+}
+.listing-thumbs { display: flex; gap: 4px; flex-shrink: 0; }
+.listing-thumb {
+  width: 52px; height: 52px; border-radius: 10px;
+  background: var(--pale); overflow: hidden;
+  border: 1px solid var(--line);
+}
+.listing-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.listing-more {
+  width: 52px; height: 52px; border-radius: 10px;
+  background: var(--pale); border: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--head); font-size: 14px; font-weight: 900; color: var(--blue);
+}
+.listing-info { flex: 1; min-width: 0; }
+.listing-title { font-family: var(--head); font-size: 15px; font-weight: 700; color: var(--navy); }
+.listing-meta { font-size: 12px; color: var(--body-soft); margin-top: 3px; }
+.listing-status-badge {
+  flex-shrink: 0;
+  padding: 7px 14px; border-radius: 99px;
+  font-family: var(--head); font-size: 12px; font-weight: 700;
+}
+.badge-waiting { background: #fff8e0; color: #9a6200; border: 1px solid #f0d080; }
+.badge-active  { background: #e8faf0; color: var(--green); border: 1px solid #a3e6c3; }
+.badge-done    { background: var(--pale); color: var(--blue); border: 1px solid #c0d0f8; }
+
+/* ── 入札待ち状態 ── */
+.waiting-block { display: none; }
+.waiting-block.show { display: block; }
+.waiting-banner {
+  background: #fff; border-radius: var(--radius);
+  box-shadow: var(--shadow-s); border: 1px solid var(--line-soft);
+  padding: 32px 24px; text-align: center; margin-bottom: 20px;
+}
+.waiting-icon {
+  width: 72px; height: 72px; border-radius: 50%;
+  background: var(--pale); margin: 0 auto 18px;
+  display: flex; align-items: center; justify-content: center;
+}
+.waiting-icon svg { width: 36px; height: 36px; fill: none; stroke: var(--blue); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+@keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(31,84,222,.3)} 50%{box-shadow:0 0 0 12px rgba(31,84,222,0)} }
+.waiting-icon { animation: pulse 2s ease infinite; }
+.waiting-title { font-family: var(--head); font-size: 20px; font-weight: 900; color: var(--navy); margin-bottom: 8px; }
+.waiting-sub { font-size: 14px; color: var(--body-soft); line-height: 1.8; margin-bottom: 24px; }
+.countdown {
+  display: inline-flex; gap: 12px; justify-content: center;
+  background: var(--pale); border-radius: 14px; padding: 16px 24px;
+}
+.countdown-unit { text-align: center; }
+.countdown-num { font-family: var(--head); font-size: 32px; font-weight: 900; color: var(--navy); line-height: 1; }
+.countdown-lbl { font-size: 11px; color: var(--body-soft); font-weight: 600; margin-top: 4px; }
+.countdown-sep { font-family: var(--head); font-size: 28px; font-weight: 900; color: var(--line); align-self: flex-start; margin-top: 4px; }
+/* スケルトンカード */
+.skeleton-card {
+  background: #fff; border-radius: var(--radius);
+  box-shadow: var(--shadow-s); border: 1px solid var(--line-soft);
+  padding: 20px 20px; margin-bottom: 12px;
+  display: flex; gap: 14px; align-items: center;
+}
+@keyframes shimmer {
+  0%{background-position:200% 0}
+  100%{background-position:-200% 0}
+}
+.skel {
+  background: linear-gradient(90deg, var(--line-soft) 25%, #eef1f7 50%, var(--line-soft) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 6px;
+}
+.skel-circle { width: 52px; height: 52px; border-radius: 50%; flex-shrink: 0; }
+.skel-lines { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.skel-amount { width: 100px; height: 32px; border-radius: 6px; margin-left: auto; flex-shrink: 0; }
+
+/* ── 入札あり・カード ── */
+.bids-block { display: none; }
+.bids-block.show { display: block; }
+.bids-banner {
+  background: linear-gradient(135deg, #e8f0ff, #d4e4ff);
+  border: 1px solid rgba(31,84,222,.2);
+  border-radius: 14px; padding: 16px 20px;
+  display: flex; align-items: center; gap: 14px;
+  margin-bottom: 20px;
+}
+.bids-banner-ic {
+  width: 44px; height: 44px; border-radius: 12px;
+  background: var(--blue); color: #fff; flex-shrink: 0;
+  display: grid; place-items: center;
+}
+.bids-banner-ic svg { width: 24px; height: 24px; fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.bids-banner-text strong { display: block; font-family: var(--head); font-size: 16px; font-weight: 700; color: var(--navy); }
+.bids-banner-text span { font-size: 13px; color: var(--body-soft); }
+.bids-deadline {
+  margin-left: auto; text-align: right; flex-shrink: 0;
+  font-family: var(--head); font-size: 12.5px; font-weight: 700; color: var(--body-soft);
+}
+.bids-deadline strong { display: block; font-size: 16px; color: var(--navy); }
+
+/* 入札カード */
+.bid-card {
+  background: #fff; border-radius: var(--radius);
+  box-shadow: var(--shadow-s); border: 1.5px solid var(--line-soft);
+  padding: 20px; margin-bottom: 14px;
+  transition: box-shadow .3s, border-color .3s, transform .3s;
+}
+.bid-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-m); }
+.bid-card.top { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(31,84,222,.1), var(--shadow-m); }
+.bid-card-head {
+  display: flex; align-items: center; gap: 14px; margin-bottom: 14px;
+}
+.biz-avatar {
+  width: 52px; height: 52px; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--head); font-size: 20px; font-weight: 900; color: #fff;
+  flex-shrink: 0;
+}
+.biz-info { flex: 1; min-width: 0; }
+.biz-name { font-family: var(--head); font-size: 16px; font-weight: 700; color: var(--navy); line-height: 1.3; }
+.biz-rating {
+  display: flex; align-items: center; gap: 6px; margin-top: 4px;
+  font-size: 12.5px; color: var(--body-soft);
+}
+.biz-stars { color: #f0a030; font-size: 13px; letter-spacing: -1px; }
+.biz-rating-num { font-weight: 700; color: var(--ink); }
+.biz-badges { display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap; }
+.biz-badge {
+  font-size: 10.5px; font-weight: 700; padding: 3px 9px; border-radius: 99px;
+}
+.biz-badge-verified { background: rgba(31,138,91,.1); color: var(--green); }
+.biz-badge-tag { background: var(--pale); color: var(--blue); }
+/* 金額エリア */
+.bid-amount-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 0; border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft);
+  margin-bottom: 14px; background: var(--line-soft); border-radius: 10px;
+  padding: 14px 16px; margin-top: 2px;
+}
+.bid-rank {
+  font-family: var(--head); font-size: 11px; font-weight: 700;
+  padding: 4px 10px; border-radius: 6px; flex-shrink: 0; align-self: center;
+}
+.bid-rank-1 { background: #fff4d0; color: #9a6200; border: 1px solid #f0d080; }
+.bid-rank-2 { background: #f0f2f6; color: var(--body-soft); border: 1px solid var(--line); }
+.bid-rank-3 { background: #f5f0eb; color: #8a6a4a; border: 1px solid #e0d0c0; }
+.bid-badge-top {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--blue); color: #fff;
+  font-family: var(--head); font-size: 11.5px; font-weight: 700;
+  padding: 4px 12px; border-radius: 99px;
+}
+.bid-amount {
+  flex: 1; text-align: right;
+  font-family: var(--head); font-size: 32px; font-weight: 900; color: var(--navy);
+  line-height: 1;
+}
+.bid-amount span { font-size: 16px; margin-right: 2px; }
+.bid-note { font-size: 11px; color: var(--body-soft); margin-top: 2px; text-align: right; }
+/* コメント */
+.bid-comment { font-size: 13.5px; color: var(--body); line-height: 1.82; margin-bottom: 14px; }
+.bid-comment-ic { color: var(--blue); margin-right: 4px; }
+/* アクション */
+.bid-actions { display: flex; gap: 10px; align-items: center; justify-content: flex-end; }
+.btn-bid-detail {
+  font-size: 13px; font-weight: 600; color: var(--blue);
+  background: none; border: none; cursor: pointer; padding: 0;
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.btn-bid-select {
+  padding: 12px 24px; border-radius: 99px;
+  border: none; background: var(--blue); color: #fff;
+  font-family: var(--head); font-size: 14.5px; font-weight: 700;
+  cursor: pointer; display: flex; align-items: center; gap: 7px;
+  box-shadow: 0 8px 18px -6px rgba(31,84,222,.55);
+  transition: background .2s, transform .2s;
+}
+.btn-bid-select:hover { background: var(--blue-d); transform: translateY(-1px); }
+.btn-bid-select svg { width: 15px; height: 15px; fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; }
+
+/* ── 選択完了状態 ── */
+.selected-block { display: none; }
+.selected-block.show { display: block; }
+.selected-banner {
+  background: linear-gradient(135deg, #d4f4e4, #c2edd8);
+  border: 1px solid rgba(31,138,91,.25); border-radius: 14px;
+  padding: 18px 20px; display: flex; align-items: center; gap: 14px; margin-bottom: 20px;
+}
+.selected-banner-ic {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: var(--green); color: #fff; flex-shrink: 0;
+  display: grid; place-items: center; font-size: 22px;
+}
+.selected-banner-text strong { display: block; font-family: var(--head); font-size: 16px; font-weight: 700; color: var(--navy); }
+.selected-banner-text span { font-size: 13px; color: var(--body-soft); }
+/* 決定済みカード */
+.decided-card {
+  background: #fff; border-radius: var(--radius);
+  box-shadow: var(--shadow-m); border: 2px solid var(--green);
+  padding: 24px; margin-bottom: 20px;
+}
+.decided-label {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(31,138,91,.1); color: var(--green);
+  font-family: var(--head); font-size: 12px; font-weight: 700;
+  padding: 5px 12px; border-radius: 99px; margin-bottom: 16px;
+}
+.decided-amount {
+  font-family: var(--head); font-size: 42px; font-weight: 900; color: var(--navy); line-height: 1;
+  margin: 12px 0 4px;
+}
+.decided-amount span { font-size: 20px; margin-right: 4px; color: var(--body-soft); }
+/* 次のステップ */
+.next-steps { list-style: none; display: flex; flex-direction: column; gap: 0; }
+.next-step {
+  display: flex; gap: 14px; align-items: flex-start;
+  padding: 16px 0; border-bottom: 1px solid var(--line-soft);
+}
+.next-step:last-child { border-bottom: none; }
+.ns-dot {
+  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+  display: grid; place-items: center;
+  font-family: var(--head); font-size: 13px; font-weight: 900;
+}
+.ns-dot.done { background: var(--green); color: #fff; }
+.ns-dot.current { background: var(--blue); color: #fff; box-shadow: 0 0 0 4px rgba(31,84,222,.18); }
+.ns-dot.future { background: var(--line-soft); color: var(--body-soft); }
+.ns-body h4 { font-family: var(--head); font-size: 15px; font-weight: 700; color: var(--navy); }
+.ns-body p { font-size: 13px; color: var(--body-soft); margin-top: 3px; line-height: 1.7; }
+
+/* ── モーダル ── */
+.modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(15,37,82,.5); backdrop-filter: blur(5px);
+  z-index: 200; align-items: center; justify-content: center; padding: 20px;
+}
+.modal-overlay.show { display: flex; }
+.modal-card {
+  background: #fff; border-radius: var(--radius);
+  max-width: 420px; width: 100%; padding: 32px 28px;
+  box-shadow: var(--shadow-l);
+}
+.modal-title { font-family: var(--head); font-size: 20px; font-weight: 900; color: var(--navy); margin-bottom: 6px; }
+.modal-sub { font-size: 13.5px; color: var(--body-soft); line-height: 1.75; margin-bottom: 22px; }
+.modal-biz {
+  background: var(--pale); border-radius: var(--radius-s);
+  padding: 14px 16px; margin-bottom: 22px;
+  display: flex; align-items: center; gap: 12px;
+}
+.modal-biz-avatar { width: 42px; height: 42px; border-radius: 10px; display: grid; place-items: center; font-family: var(--head); font-size: 18px; font-weight: 900; color: #fff; flex-shrink: 0; }
+.modal-biz-name { font-family: var(--head); font-size: 15px; font-weight: 700; color: var(--navy); }
+.modal-biz-amount { font-family: var(--head); font-size: 20px; font-weight: 900; color: var(--blue); margin-top: 2px; }
+.modal-actions { display: flex; gap: 10px; }
+.btn-modal-cancel { flex: 1; padding: 13px; border-radius: 99px; border: 1.5px solid var(--line); background: #fff; color: var(--navy); font-family: var(--head); font-size: 14px; font-weight: 700; cursor: pointer; transition: .2s; }
+.btn-modal-cancel:hover { border-color: var(--blue); color: var(--blue); }
+.btn-modal-confirm { flex: 1.4; padding: 13px; border-radius: 99px; border: none; background: var(--blue); color: #fff; font-family: var(--head); font-size: 15px; font-weight: 900; cursor: pointer; box-shadow: 0 8px 20px -8px rgba(31,84,222,.6); transition: .2s; }
+.btn-modal-confirm:hover { background: var(--blue-d); transform: translateY(-1px); }
+
+/* フッターCTA（選択後） */
+.result-footer {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
+  background: rgba(255,255,255,.94); backdrop-filter: blur(10px);
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -6px 24px -12px rgba(15,37,82,.2);
+  padding: 14px 20px; display: none;
+}
+.result-footer.show { display: block; }
+.result-footer-inner { max-width: 720px; margin: 0 auto; display: flex; gap: 12px; align-items: center; }
+.result-footer-inner .fl { flex: 1; }
+.result-footer-inner .fl strong { display: block; font-family: var(--head); font-size: 15px; font-weight: 700; color: var(--navy); }
+.result-footer-inner .fl span { font-size: 12.5px; color: var(--body-soft); }
+
+@keyframes fadeInUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:none; } }
+.bid-card { animation: fadeInUp .4s var(--ease) both; }
+.bid-card:nth-child(2) { animation-delay: .08s; }
+.bid-card:nth-child(3) { animation-delay: .16s; }
+
+@media(max-width: 560px) {
+  .bid-amount { font-size: 26px; }
+  .decided-amount { font-size: 34px; }
+  .listing-thumbs .listing-thumb:nth-child(n+3) { display: none; }
+  .bids-deadline { display: none; }
+  .bid-actions { flex-wrap: wrap; }
+  .btn-bid-select { flex: 1; justify-content: center; }
+}
+@media(max-width: 480px) {
+  .bid-amount { font-size: 22px; }
+  .decided-amount { font-size: 28px; }
+  .bid-card { padding: 14px; }
+  .listing-card { gap: 10px; padding: 12px 14px; }
+  .listing-thumbs .listing-thumb:nth-child(n+2) { display: none; }
+  .listing-title { font-size: 13px; }
+  .result-wrap { padding: 14px 12px 80px; }
+  .bids-banner { flex-wrap: wrap; padding: 12px 14px; }
+  .bid-card-head { gap: 10px; }
+  .biz-name { font-size: 14px; }
+  .ns-dot { width: 26px; height: 26px; font-size: 11px; }
+  .result-footer-inner { flex-wrap: wrap; }
+}
+  .listing-thumbs .listing-thumb:nth-child(n+3) { display: none; }
+  .bids-deadline { display: none; }
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M5 5h14a2 2 0 012 2v8a2 2 0 01-2 2H9l-4 4V7a2 2 0 012-2z"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></symbol>
+  <symbol id="i-truck" viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 4v4h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></symbol>
+  <symbol id="i-yen" viewBox="0 0 24 24"><path d="M12 15V21M8 9l4 6 4-6M6 9h12M6 12h12"/></symbol>
+</defs></svg>
+
+<!-- デモ切替バー -->
+<div class="demo-bar">
+  <span>デモ表示</span>
+  <div class="demo-tabs">
+    <button class="demo-tab" id="tab-waiting" onclick="setDemoState('waiting')">査定中</button>
+    <button class="demo-tab active" id="tab-revealed" onclick="setDemoState('revealed')">入札あり</button>
+    <button class="demo-tab" id="tab-selected" onclick="setDemoState('selected')">選択完了</button>
+  </div>
+</div>
+
+<!-- ページヘッダー -->
+<header class="result-header">
+  <a href="カタヅケ.html"><img src="img/logo-katazuke.png" alt="カタヅケ"></a>
+  <a href="申し込み状況.html" class="result-header-back">
+    <svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+    申し込み一覧
+  </a>
+</header>
+
+<main>
+<div class="result-wrap">
+
+  <!-- 出品サマリー -->
+  <div class="listing-card">
+    <div class="listing-thumbs">
+      <div class="listing-thumb" style="background:#e8f0ee;"><img src="img/cat-kaden.png" alt="" onerror="this.style.display='none'"></div>
+      <div class="listing-thumb" style="background:#f0e8f4;"><img src="img/cat-brand.png" alt="" onerror="this.style.display='none'"></div>
+      <div class="listing-more">+3</div>
+    </div>
+    <div class="listing-info">
+      <div class="listing-title">家電・ブランド品まとめ　5点</div>
+      <div class="listing-meta">出品日：2026年6月20日　入札期間：3日間</div>
+    </div>
+    <div class="listing-status-badge badge-waiting" id="listing-status-badge">入札受付中</div>
+  </div>
+
+  <!-- ── 査定中状態 ── -->
+  <div class="waiting-block" id="waiting-block">
+    <div class="waiting-banner">
+      <div class="waiting-icon">
+        <svg viewBox="0 0 24 24"><use href="#i-clock"></use></svg>
+      </div>
+      <h2 class="waiting-title">入札受付中です</h2>
+      <p class="waiting-sub">登録業者があなたの出品内容を確認しています。<br>入札が届き次第、LINEとメールでお知らせします。</p>
+      <div class="countdown">
+        <div class="countdown-unit"><div class="countdown-num" id="cd-h">02</div><div class="countdown-lbl">日</div></div>
+        <div class="countdown-sep">:</div>
+        <div class="countdown-unit"><div class="countdown-num" id="cd-m">14</div><div class="countdown-lbl">時間</div></div>
+        <div class="countdown-sep">:</div>
+        <div class="countdown-unit"><div class="countdown-num" id="cd-s">33</div><div class="countdown-lbl">分</div></div>
+      </div>
+    </div>
+    <!-- スケルトン3枚 -->
+    <div style="margin-top:20px;">
+      <p style="font-size:13px;color:var(--body-soft);font-weight:600;margin-bottom:12px;">入札が届くと、ここに業者が表示されます</p>
+      <div class="skeleton-card"><div class="skel skel-circle"></div><div class="skel-lines"><div class="skel" style="height:16px;width:60%;"></div><div class="skel" style="height:12px;width:40%;"></div></div><div class="skel skel-amount"></div></div>
+      <div class="skeleton-card"><div class="skel skel-circle"></div><div class="skel-lines"><div class="skel" style="height:16px;width:55%;"></div><div class="skel" style="height:12px;width:35%;"></div></div><div class="skel skel-amount"></div></div>
+      <div class="skeleton-card"><div class="skel skel-circle"></div><div class="skel-lines"><div class="skel" style="height:16px;width:50%;"></div><div class="skel" style="height:12px;width:38%;"></div></div><div class="skel skel-amount"></div></div>
+    </div>
+  </div>
+
+  <!-- ── 入札あり状態 ── -->
+  <div class="bids-block" id="bids-block">
+    <div class="bids-banner">
+      <div class="bids-banner-ic"><svg viewBox="0 0 24 24"><use href="#i-bell"></use></svg></div>
+      <div class="bids-banner-text">
+        <strong>3社から入札が届きました！</strong>
+        <span>3日以内に1社を選んで交渉を開始してください</span>
+      </div>
+      <div class="bids-deadline"><span>期限まで</span><strong>残り1日</strong></div>
+    </div>
+
+    <div id="bid-cards-container">
+      <!-- 入札カードはJSで生成 -->
+    </div>
+  </div>
+
+  <!-- ── 選択完了状態 ── -->
+  <div class="selected-block" id="selected-block">
+    <div class="selected-banner">
+      <div class="selected-banner-ic">✓</div>
+      <div class="selected-banner-text">
+        <strong>業者を選択しました！</strong>
+        <span>業者から連絡が届くまでしばらくお待ちください</span>
+      </div>
+    </div>
+
+    <!-- 決定済み業者カード -->
+    <div class="decided-card">
+      <div class="decided-label">✓ 決定済み</div>
+      <div style="display:flex;align-items:center;gap:14px;">
+        <div class="biz-avatar" id="decided-avatar" style="background:#1f54de;width:60px;height:60px;border-radius:16px;font-size:24px;">バ</div>
+        <div>
+          <div class="biz-name" id="decided-name" style="font-size:18px;">株式会社バリュー東京</div>
+          <div class="biz-rating">
+            <span class="biz-stars">★★★★★</span>
+            <span class="biz-rating-num">4.8</span>
+            <span>（口コミ156件）</span>
+          </div>
+        </div>
+      </div>
+      <div class="decided-amount"><span>¥</span><span id="decided-amount-num">54,000</span></div>
+      <div style="font-size:12.5px;color:var(--body-soft);margin-bottom:20px;">出品5点のまとめ買取金額（搬出費用込み）</div>
+      <a href="#" class="btn btn-primary btn-lg btn-block" id="btn-start-chat">
+        <svg style="width:18px;height:18px;fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round;"><use href="#i-chat"></use></svg>
+        チャットを開始する
+        <svg style="width:16px;height:16px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;"><use href="#i-arrow"></use></svg>
+      </a>
+    </div>
+
+    <!-- 次のステップ -->
+    <div class="form-card" style="margin-bottom:16px;">
+      <p style="font-family:var(--head);font-size:14px;font-weight:700;color:var(--navy);margin-bottom:16px;">これからの流れ</p>
+      <ul class="next-steps">
+        <li class="next-step"><div class="ns-dot done">✓</div><div class="ns-body"><h4>業者を選択</h4><p>完了しました</p></div></li>
+        <li class="next-step"><div class="ns-dot current">2</div><div class="ns-body"><h4>業者から連絡が届く</h4><p>LINEまたはメールで日程の連絡が来ます（通常24時間以内）</p></div></li>
+        <li class="next-step"><div class="ns-dot future">3</div><div class="ns-body"><h4>自宅で回収・査定</h4><p>業者がご自宅へ訪問。品物を確認してその場で査定します</p></div></li>
+        <li class="next-step"><div class="ns-dot future">4</div><div class="ns-body"><h4>その場で現金受け取り</h4><p>査定額に合意したら、現金またはお好みの方法で即日お支払い</p></div></li>
+      </ul>
+    </div>
+  </div>
+
+</div>
+</main>
+
+<!-- 選択後フッターCTA -->
+<div class="result-footer" id="result-footer">
+  <div class="result-footer-inner">
+    <div class="fl">
+      <strong id="footer-biz-name">株式会社バリュー東京</strong>
+      <span>チャットで日程調整を始めましょう</span>
+    </div>
+    <a href="#" class="btn btn-primary" id="btn-footer-chat">
+      <svg style="width:16px;height:16px;fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round;"><use href="#i-chat"></use></svg>
+      チャット開始
+    </a>
+  </div>
+</div>
+
+<!-- 確認モーダル -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal-card">
+    <h2 class="modal-title">この業者に決めますか？</h2>
+    <p class="modal-sub">一度決定すると変更できません。よろしければ確定ボタンを押してください。</p>
+    <div class="modal-biz">
+      <div class="modal-biz-avatar" id="modal-avatar" style="background:#1f54de;">バ</div>
+      <div>
+        <div class="modal-biz-name" id="modal-name">株式会社バリュー東京</div>
+        <div class="modal-biz-amount" id="modal-amount">¥54,000</div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" id="modal-cancel">キャンセル</button>
+      <button class="btn-modal-confirm" id="modal-confirm">決定する</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var currentState = 'revealed';
+  var selectedBidId = null;
+
+  var bids = [
+    {
+      id: 1, rank: 1,
+      name: '株式会社バリュー東京', initials: 'バ', color: '#1f54de',
+      rating: 4.8, reviewCount: 156, amount: 54000,
+      tags: ['即日対応', '家電特化', '搬出無料'],
+      comment: '家電・ブランド品を専門スタッフが丁寧に査定します。まとめてお持ちの方が有利です。即日訪問も対応可能ですのでお気軽にご相談ください。',
+    },
+    {
+      id: 2, rank: 2,
+      name: 'リサイクル侍', initials: 'サ', color: '#1f8a5b',
+      rating: 4.6, reviewCount: 89, amount: 47500,
+      tags: ['ブランド特化', '丁寧査定'],
+      comment: 'ブランド品・時計を中心に高額査定中。分かりやすい見積もりと丁寧な説明で安心してお任せいただけます。',
+    },
+    {
+      id: 3, rank: 3,
+      name: 'ハウスクリア関東', initials: 'ハ', color: '#7c5cbf',
+      rating: 4.4, reviewCount: 204, amount: 41000,
+      tags: ['遺品整理', '搬出無料', '実績多数'],
+      comment: '家まるごと片付けが得意です。処分費用ゼロを目指して1点1点丁寧に査定いたします。',
+    }
+  ];
+
+  var rankLabels = ['最高額','2位','3位'];
+  var rankClasses = ['bid-rank-1','bid-rank-2','bid-rank-3'];
+
+  function stars(n){
+    var s = '';
+    for(var i=0;i<5;i++) s += i < Math.round(n) ? '★' : '☆';
+    return s;
+  }
+
+  function buildBidCards(){
+    var container = document.getElementById('bid-cards-container');
+    container.innerHTML = '';
+    bids.forEach(function(bid){
+      var card = document.createElement('div');
+      card.className = 'bid-card' + (bid.rank === 1 ? ' top' : '');
+      card.innerHTML =
+        '<div class="bid-card-head">' +
+          '<div class="biz-avatar" style="background:' + bid.color + '">' + bid.initials + '</div>' +
+          '<div class="biz-info">' +
+            '<div class="biz-name">' + bid.name + '</div>' +
+            '<div class="biz-rating"><span class="biz-stars">' + stars(bid.rating) + '</span><span class="biz-rating-num">' + bid.rating + '</span><span>（口コミ' + bid.reviewCount + '件）</span></div>' +
+            '<div class="biz-badges"><span class="biz-badge biz-badge-verified">古物商許可済</span>' +
+            bid.tags.map(function(t){ return '<span class="biz-badge biz-badge-tag">' + t + '</span>'; }).join('') +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="bid-amount-row">' +
+          (bid.rank === 1
+            ? '<div class="bid-badge-top">🏆 最高額</div>'
+            : '<div class="bid-rank ' + rankClasses[bid.rank-1] + '">' + rankLabels[bid.rank-1] + '</div>') +
+          '<div style="flex:1;text-align:right;">' +
+            '<div class="bid-amount"><span>¥</span>' + bid.amount.toLocaleString() + '</div>' +
+            '<div class="bid-note">5点まとめ・搬出込み</div>' +
+          '</div>' +
+        '</div>' +
+        '<p class="bid-comment"><span class="bid-comment-ic">💬</span>' + bid.comment + '</p>' +
+        '<div class="bid-actions">' +
+          '<a href="業者詳細.html" class="btn-bid-detail">詳細を見る</a>' +
+          '<button class="btn-bid-select" data-bid-id="' + bid.id + '">' +
+            'この業者に決める' +
+            '<svg viewBox="0 0 24 24"><use href="#i-check"></use></svg>' +
+          '</button>' +
+        '</div>';
+      container.appendChild(card);
+    });
+
+    /* 「決める」ボタン */
+    container.querySelectorAll('.btn-bid-select').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var bidId = parseInt(this.dataset.bidId);
+        var bid = bids.find(function(b){ return b.id === bidId; });
+        if(!bid) return;
+        /* モーダル表示 */
+        document.getElementById('modal-avatar').textContent = bid.initials;
+        document.getElementById('modal-avatar').style.background = bid.color;
+        document.getElementById('modal-name').textContent = bid.name;
+        document.getElementById('modal-amount').textContent = '¥' + bid.amount.toLocaleString();
+        selectedBidId = bidId;
+        document.getElementById('modal-overlay').classList.add('show');
+      });
+    });
+  }
+
+  /* モーダル */
+  document.getElementById('modal-cancel').addEventListener('click', function(){
+    document.getElementById('modal-overlay').classList.remove('show');
+  });
+  document.getElementById('modal-overlay').addEventListener('click', function(e){
+    if(e.target === this) this.classList.remove('show');
+  });
+  document.getElementById('modal-confirm').addEventListener('click', function(){
+    document.getElementById('modal-overlay').classList.remove('show');
+    var bid = bids.find(function(b){ return b.id === selectedBidId; });
+    if(!bid) return;
+    /* 選択完了状態へ */
+    document.getElementById('decided-avatar').textContent = bid.initials;
+    document.getElementById('decided-avatar').style.background = bid.color;
+    document.getElementById('decided-name').textContent = bid.name;
+    document.getElementById('decided-amount-num').textContent = bid.amount.toLocaleString();
+    document.getElementById('footer-biz-name').textContent = bid.name;
+    setDemoState('selected');
+  });
+
+  /* デモ切替 */
+  window.setDemoState = function(state){
+    currentState = state;
+    /* ブロック表示切替 (waiting-block / bids-block / selected-block) */
+    var blockMap = { waiting:'waiting', revealed:'bids', selected:'selected' };
+    Object.keys(blockMap).forEach(function(key){
+      var block = document.getElementById(blockMap[key] + '-block');
+      if(block) block.classList.toggle('show', key === state);
+      var tab = document.getElementById('tab-' + key);
+      if(tab) tab.classList.toggle('active', key === state);
+    });
+    /* ステータスバッジ */
+    var badge = document.getElementById('listing-status-badge');
+    if(state === 'waiting'){ badge.className = 'listing-status-badge badge-waiting'; badge.textContent = '入札受付中'; }
+    else if(state === 'revealed'){ badge.className = 'listing-status-badge badge-active'; badge.textContent = '入札あり'; }
+    else { badge.className = 'listing-status-badge badge-done'; badge.textContent = '選択完了'; }
+    /* フッター */
+    var footer = document.getElementById('result-footer');
+    footer.classList.toggle('show', state === 'selected');
+  };
+
+  /* カウントダウン */
+  var h = 14, m = 33, s = 22;
+  var d = 2;
+  setInterval(function(){
+    s--;
+    if(s < 0){ s = 59; m--; }
+    if(m < 0){ m = 59; h--; }
+    if(h < 0 && d > 0){ h = 23; d--; }
+    document.getElementById('cd-h').textContent = String(d).padStart(2,'0');
+    document.getElementById('cd-m').textContent = String(h).padStart(2,'0');
+    document.getElementById('cd-s').textContent = String(m).padStart(2,'0');
+  }, 1000);
+
+  /* 初期化 */
+  buildBidCards();
+  setDemoState('revealed');
+})();
+</script>
+</body>
+</html>

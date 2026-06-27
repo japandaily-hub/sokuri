@@ -1,3 +1,15 @@
+/* デザインハンドオフ指定フォント（実行時ロード・ビルド非依存）。
+   フォールバックは katazuke.css の --head / --sans に OS 標準ゴシックを記載済み。 */
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap");
+
+/* カスケードレイヤー順を明示（base < components < utilities）。
+   名前のみの @layer 文は @import より前に置ける（仕様準拠）。 */
+@layer base, components, utilities;
+
+/* デザインハンドオフCSSを components レイヤーへ取り込む。
+   こうすることで Tailwind utilities が常に勝ち、既存 Tailwind ページを壊さない。 */
+@import "./katazuke.css" layer(components);
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

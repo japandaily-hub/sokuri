@@ -1,0 +1,1954 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>申し込み状況｜カタヅケ</title>
+<meta name="theme-color" content="#1f54de">
+<link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="katazuke-main.css">
+<style>
+/* ============================================================
+   申し込み状況ページ
+   ============================================================ */
+body { background: #fff; }
+
+/* ヘッダー */
+.header { background: #fff; }
+.logo-img { height: 44px; }
+
+/* ページ全体レイアウト */
+.page-wrap {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 32px 20px 80px;
+}
+
+/* ステータスバー */
+.status-bar {
+  background: #fff;
+  border-radius: var(--radius);
+  padding: 24px 28px;
+  margin-bottom: 20px;
+  box-shadow: none;
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.status-steps {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex: 1;
+  min-width: 260px;
+}
+.status-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  position: relative;
+}
+.status-step + .status-step::before {
+  content: "";
+  position: absolute;
+  left: -50%;
+  top: 14px;
+  width: 100%;
+  height: 2px;
+  background: var(--line);
+  z-index: 0;
+}
+.status-step.done + .status-step::before,
+.status-step.active + .status-step::before {
+  background: var(--blue);
+}
+.s-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--line);
+  border: 2px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 900;
+  color: #fff;
+  position: relative;
+  z-index: 1;
+  font-family: var(--head);
+  transition: background .3s;
+}
+.status-step.done .s-dot { background: var(--blue); border-color: var(--blue); }
+.status-step.active .s-dot {
+  background: var(--blue);
+  border-color: var(--blue);
+  box-shadow: 0 0 0 4px rgba(31,84,222,.18);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%,100% { box-shadow: 0 0 0 4px rgba(31,84,222,.18); }
+  50% { box-shadow: 0 0 0 8px rgba(31,84,222,.08); }
+}
+.s-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--body-soft);
+  text-align: center;
+  line-height: 1.3;
+}
+.status-step.active .s-label { color: var(--blue); font-weight: 700; }
+.status-step.done .s-label { color: var(--ink); }
+
+.status-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-left: 20px;
+  border-left: 1px solid var(--line);
+}
+.status-meta .s-id { font-size: 11.5px; color: var(--body-soft); }
+.status-meta .s-date { font-size: 12px; color: var(--body-soft); }
+
+/* 入札サマリーカード */
+.bid-summary {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin-bottom: 20px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-s);
+}
+.bid-summary::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 60% 50% at 100% 0%, rgba(234,240,255,.8) 0%, transparent 60%);
+  pointer-events: none;
+}
+.bid-summary-inner { position: relative; z-index: 1; display: flex; align-items: center; gap: 0; }
+.bid-count-area { flex: 1; padding: 0 24px 0 0; border-right: 1px solid var(--line); }
+.bid-highest {
+  background: none;
+  border: none;
+  border-right: 1px solid var(--line);
+  border-radius: 0;
+  padding: 0 24px;
+  min-width: 0;
+  flex: 1;
+}
+.bid-timer {
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 0 0 0 24px;
+  text-align: left;
+  min-width: 0;
+  flex: 1;
+}
+.bid-live-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--blue);
+  letter-spacing: .08em;
+  margin-bottom: 6px;
+}
+.live-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #4ade80;
+  animation: blink 1.4s infinite;
+}
+@keyframes blink {
+  0%,100% { opacity: 1; } 50% { opacity: .3; }
+}
+.bid-count-num {
+  font-family: var(--head);
+  font-size: 40px;
+  font-weight: 900;
+  color: var(--navy);
+  line-height: 1;
+}
+.bid-count-num span { font-size: 18px; font-weight: 700; color: var(--body-soft); margin-left: 3px; }
+.bid-count-sub { font-size: 12px; color: var(--body-soft); margin-top: 4px; }
+
+.bid-highest-label { font-size: 11px; font-weight: 700; color: var(--body-soft); letter-spacing: .08em; margin-bottom: 6px; }
+.bid-highest-amount {
+  font-family: var(--head);
+  font-size: 26px;
+  font-weight: 900;
+  color: var(--navy);
+}
+.bid-highest-amount span { font-size: 14px; font-weight: 600; color: var(--body-soft); margin-left: 2px; }
+.bid-highest-note { font-size: 11px; color: var(--body-soft); margin-top: 4px; }
+
+.bid-timer-label { font-size: 11px; color: var(--body-soft); font-weight: 600; margin-bottom: 4px; }
+.bid-timer-val { font-family: var(--head); font-size: 22px; font-weight: 900; color: var(--navy); letter-spacing: .06em; }
+.bid-timer-sub { font-size: 10.5px; color: var(--body-soft); margin-top: 3px; }
+.bid-stop-btn {
+  margin-top: 12px;
+  width: 100%;
+  background: #fff;
+  border: 1.5px solid var(--line);
+  color: var(--navy);
+  font-family: var(--head);
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 99px;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: .2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.bid-stop-btn:hover { background: rgba(255,255,255,.18); border-color: rgba(255,255,255,.5); }
+.bid-stop-btn svg { width:13px; height:13px; fill:none; stroke:#fff; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+
+/* 早期終了モーダル */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(10,20,50,.55);
+  backdrop-filter: blur(4px);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s;
+}
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+.modal {
+  background: #fff;
+  border-radius: 20px;
+  padding: 36px 32px 28px;
+  max-width: 440px;
+  width: 100%;
+  box-shadow: 0 24px 60px -10px rgba(10,20,50,.3);
+  transform: translateY(12px);
+  transition: transform .3s;
+}
+.modal-overlay.open .modal { transform: translateY(0); }
+.modal-ic {
+  width: 56px; height: 56px;
+  border-radius: 16px;
+  background: #fff5e6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+.modal h3 { font-size: 19px; color: var(--navy); margin-bottom: 10px; }
+.modal .modal-body { font-size: 14px; color: var(--body-soft); line-height: 1.85; margin-bottom: 24px; }
+.modal .modal-body strong { color: var(--ink); }
+.modal-bids-preview {
+  background: var(--pale);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.modal-bid-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+}
+.modal-bid-row .rank-chip {
+  font-size: 11px; font-weight: 900; font-family: var(--head);
+  padding: 2px 8px; border-radius: 99px; flex-shrink: 0;
+}
+.rank-chip.g { background: #f0b429; color: #7a5700; }
+.rank-chip.s { background: var(--pale); color: var(--blue); border: 1px solid var(--line); }
+.rank-chip.b { background: #f4f6fb; color: var(--body-soft); border: 1px solid var(--line); }
+.modal-bid-row .co { flex: 1; font-weight: 600; }
+.modal-bid-row .amt { font-family: var(--head); font-weight: 900; color: var(--navy); }
+.modal-warn {
+  font-size: 12.5px;
+  color: #b9892f;
+  background: #fdf5e6;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 22px;
+  line-height: 1.7;
+}
+.modal-actions { display: flex; gap: 10px; }
+.modal-actions .btn-cancel {
+  flex: 1;
+  padding: 14px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  font-family: var(--head);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: .2s;
+}
+.modal-actions .btn-cancel:hover { border-color: var(--blue); color: var(--blue); }
+.modal-actions .btn-confirm-stop {
+  flex: 1;
+  padding: 14px;
+  border-radius: 999px;
+  border: none;
+  background: #e05c5c;
+  color: #fff;
+  font-family: var(--head);
+  font-weight: 900;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 10px 22px -8px rgba(224,92,92,.5);
+  transition: .2s;
+}
+.modal-actions .btn-confirm-stop:hover { background: #c94a4a; transform: translateY(-1px); }
+
+/* 終了後バナー */
+.stopped-banner {
+  background: #fff5e6;
+  border: 1.5px solid #f0b429;
+  border-radius: var(--radius-s);
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  display: none;
+  align-items: center;
+  gap: 12px;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+.stopped-banner.show { display: flex; }
+.stopped-ic {
+  width: 32px; height: 32px;
+  background: #f0b429;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+}
+.stopped-banner strong { color: #7a5700; }
+.stopped-banner .stopped-time { margin-left: auto; font-size: 11.5px; color: var(--body-soft); white-space: nowrap; }
+
+/* 通知バー */
+.notif-bar {
+  background: #fff;
+  border: 1.5px solid #d1fae5;
+  border-radius: var(--radius-s);
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+.notif-ic {
+  width: 32px; height: 32px;
+  background: #d1fae5;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--green);
+  font-size: 16px;
+}
+.notif-bar strong { color: var(--green); }
+.notif-bar .notif-time { margin-left: auto; font-size: 11.5px; color: var(--body-soft); white-space: nowrap; }
+
+/* メイン2カラム */
+.main-cols {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 20px;
+  align-items: start;
+}
+
+/* 出品まとめカード */
+.listing-card {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: none;
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.card-head {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--line-soft);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.card-head h3 { font-size: 15px; flex: 1; }
+.card-head .item-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--blue);
+  background: var(--pale);
+  padding: 3px 10px;
+  border-radius: 99px;
+}
+.items-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  background: var(--line-soft);
+}
+.item-thumb {
+  aspect-ratio: 1;
+  background: #f0f2f8;
+  position: relative;
+  overflow: hidden;
+}
+.item-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.item-thumb .item-label {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(transparent, rgba(15,37,82,.65));
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 16px 8px 6px;
+}
+.item-thumb.more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+  background: var(--pale);
+}
+.item-thumb.more span {
+  font-family: var(--head);
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--blue);
+}
+.item-thumb.more small { font-size: 11px; color: var(--body-soft); }
+.listing-footer {
+  padding: 14px 20px;
+  border-top: 1px solid var(--line-soft);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.listing-footer .l-date { font-size: 12px; color: var(--body-soft); flex: 1; }
+
+/* 入札リスト */
+.bids-card {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: none;
+  border: 1px solid var(--line);
+}
+.bids-list { padding: 0 16px 16px; }
+.bid-item {
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-s);
+  padding: 16px;
+  margin-top: 12px;
+  position: relative;
+  transition: border-color .2s, box-shadow .2s;
+}
+.bid-item:hover { border-color: var(--blue); box-shadow: var(--shadow-s); }
+.bid-item.top1 { border-color: #f0b429; background: #fffdf0; }
+.bid-item.new-bid { border-color: var(--blue); }
+.bid-rank {
+  position: absolute;
+  top: -10px;
+  left: 14px;
+  font-size: 11px;
+  font-weight: 900;
+  font-family: var(--head);
+  padding: 2px 10px;
+  border-radius: 99px;
+  letter-spacing: .04em;
+}
+.bid-rank.rank1 { background: #f0b429; color: #7a5700; }
+.bid-rank.rank2 { background: var(--pale); color: var(--blue); }
+.bid-rank.rank3 { background: #f4f6fb; color: var(--body-soft); }
+.bid-rank.new { background: var(--blue); color: #fff; }
+.bid-item-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.bid-co-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--pale);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--head);
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--blue);
+  flex-shrink: 0;
+}
+.bid-co-name { font-size: 13px; font-weight: 700; color: var(--ink); }
+.bid-co-area { font-size: 11.5px; color: var(--body-soft); }
+.bid-amount-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.bid-amount {
+  font-family: var(--head);
+  font-size: 26px;
+  font-weight: 900;
+  color: var(--navy);
+}
+.bid-amount span { font-size: 13px; font-weight: 600; color: var(--body-soft); margin-left: 2px; }
+.bid-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: #d1fae5;
+  color: var(--green);
+}
+.bid-note { font-size: 12px; color: var(--body-soft); line-height: 1.6; }
+.bid-action {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+}
+.btn-sm {
+  font-size: 13px;
+  padding: 9px 16px;
+  border-radius: 99px;
+  font-family: var(--head);
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: .2s;
+}
+.btn-sm.primary { background: var(--blue); color: #fff; }
+.btn-sm.primary:hover { background: var(--blue-d); }
+.btn-sm.ghost { background: #fff; color: var(--navy); border: 1.5px solid var(--line); }
+.btn-sm.ghost:hover { border-color: var(--blue); color: var(--blue); }
+
+/* 隠し中の入札 */
+.bid-hidden {
+  background: #f7f9fc;
+  border: 1.5px dashed var(--line);
+  border-radius: var(--radius-s);
+  padding: 16px;
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.bid-hidden-ic {
+  width: 36px; height: 36px;
+  background: var(--line-soft);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--body-soft);
+  font-size: 18px;
+}
+.bid-hidden-body { flex: 1; }
+.bid-hidden-body p { font-size: 12.5px; color: var(--body-soft); line-height: 1.6; }
+.bid-hidden-body strong { color: var(--ink); font-size: 13px; }
+
+/* サイドバー */
+.sidebar { display: flex; flex-direction: column; gap: 16px; }
+.side-card {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: none;
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.side-card-head {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.side-card-head h4 { font-size: 14px; }
+.side-card-body { padding: 16px 20px; }
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 13px;
+}
+.info-row:last-child { border-bottom: none; }
+.info-row .lbl { color: var(--body-soft); }
+.info-row .val { font-weight: 600; color: var(--ink); }
+.info-row .val.green { color: var(--green); }
+.info-row .val.blue { color: var(--blue); }
+
+.timeline { list-style: none; padding: 0; }
+.tl-item {
+  display: flex;
+  gap: 12px;
+  padding-bottom: 18px;
+  position: relative;
+}
+.tl-item + .tl-item::before {
+  content: "";
+  position: absolute;
+  left: 11px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--line-soft);
+}
+.tl-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  position: relative;
+  z-index: 1;
+}
+.tl-dot.blue { background: var(--blue); color: #fff; }
+.tl-dot.green { background: #d1fae5; color: var(--green); }
+.tl-dot.gray { background: var(--line); color: var(--body-soft); }
+.tl-body { flex: 1; padding-top: 2px; }
+.tl-body p { font-size: 12.5px; color: var(--ink); line-height: 1.6; margin-bottom: 2px; }
+.tl-body time { font-size: 11px; color: var(--body-soft); }
+
+/* 入札なし・粗大ごみ案内 */
+.nobid-card {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: none;
+  border: 1px solid var(--line);
+  padding: clamp(28px,4vw,44px);
+  border-top: 4px solid var(--gold);
+}
+.nobid-head {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  margin-bottom: 28px;
+}
+.nobid-ic {
+  width: 52px; height: 52px;
+  border-radius: 14px;
+  background: #fdf5e6;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.nobid-head h3 { font-size: 18px; margin-bottom: 6px; }
+.nobid-head p { font-size: 14px; color: var(--body-soft); line-height: 1.75; }
+.zip-lookup {
+  background: var(--pale);
+  border-radius: var(--radius-s);
+  padding: 24px;
+  margin-bottom: 24px;
+}
+.zip-label { display: block; font-size: 14px; font-weight: 700; color: var(--ink); margin-bottom: 12px; }
+.zip-input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.zip-prefix { font-size: 18px; font-weight: 700; color: var(--navy); }
+.zip-input {
+  flex: 1;
+  max-width: 200px;
+  font-size: 18px;
+  font-weight: 700;
+  font-family: var(--head);
+  color: var(--ink);
+  background: #fff;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  padding: 11px 14px;
+  letter-spacing: .08em;
+  outline: none;
+  transition: border-color .2s;
+}
+.zip-input:focus { border-color: var(--blue); }
+.zip-hint { font-size: 12px; color: var(--body-soft); margin-top: 8px; }
+.zip-result {
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-s);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.zip-muni {
+  background: var(--navy);
+  color: #fff;
+  padding: 14px 20px;
+  font-family: var(--head);
+  font-size: 17px;
+  font-weight: 900;
+}
+.zip-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+.zip-info-item {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line-soft);
+  border-right: 1px solid var(--line-soft);
+}
+.zip-info-item:nth-child(even) { border-right: none; }
+.zip-info-item:nth-last-child(-n+2) { border-bottom: none; }
+.zip-info-label { font-size: 11px; font-weight: 700; color: var(--body-soft); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 6px; }
+.zip-info-val { font-size: 14px; font-weight: 600; color: var(--ink); line-height: 1.65; }
+.zip-info-val.green { color: var(--green); }
+.zip-steps { padding-left: 18px; margin: 0; }
+.zip-steps li { font-size: 13px; color: var(--body-soft); margin-bottom: 3px; }
+.zip-official-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--blue);
+  font-size: 13.5px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  padding: 14px 20px;
+  display: block;
+  border-top: 1px solid var(--line-soft);
+}
+.zip-notfound {
+  background: #f9fafb;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  padding: 20px;
+  font-size: 14px;
+  color: var(--body-soft);
+  line-height: 1.8;
+  margin-bottom: 20px;
+}
+.nobid-retry {
+  border-top: 1px solid var(--line-soft);
+  padding-top: 20px;
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.nobid-retry p { font-size: 13.5px; color: var(--body-soft); flex: 1; line-height: 1.7; }
+
+/* 粗大ごみ回収業者 */
+.or-divider-plain {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--body-soft);
+  font-size: 12.5px;
+  font-weight: 700;
+  margin: 24px 0;
+}
+.or-divider-plain::before,.or-divider-plain::after {
+  content:''; flex:1; height:1px; background:var(--line);
+}
+.disposal-section { margin-bottom: 24px; }
+.disposal-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  color: var(--body-soft);
+  text-transform: uppercase;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.disposal-label::after { content:''; flex:1; height:1px; background:var(--line-soft); }
+.paid-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #b9892f;
+  background: #fdf5e6;
+  border: 1px solid #f0d090;
+  border-radius: 99px;
+  padding: 3px 10px;
+  margin-bottom: 14px;
+}
+.disposal-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.disposal-card {
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  padding: 18px 16px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color .2s;
+  text-decoration: none;
+  color: inherit;
+}
+.disposal-card:hover { border-color: var(--blue); }
+.disposal-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.disposal-card-ic {
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  background: var(--pale);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.disposal-card-ic svg { width:18px; height:18px; fill:none; stroke:var(--blue); stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
+.disposal-card h5 { font-size: 13.5px; color: var(--navy); font-weight: 700; }
+.disposal-card p { font-size: 12px; color: var(--body-soft); line-height: 1.65; }
+.disposal-card .price-chip {
+  font-size: 11px; font-weight: 700;
+  color: #b9892f;
+  background: #fdf5e6;
+  border-radius: 99px;
+  padding: 2px 8px;
+  align-self: flex-start;
+  margin-top: 2px;
+}
+.disposal-search-btn {
+  width: 100%;
+  margin-top: 14px;
+  padding: 13px 20px;
+  background: var(--navy);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-family: var(--head);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: .2s;
+}
+.disposal-search-btn:hover { background: var(--blue); }
+.disposal-search-btn svg { width:16px; height:16px; fill:none; stroke:#fff; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+@media(max-width:480px){ .disposal-cards { grid-template-columns: 1fr; } }
+@media(max-width:560px){
+  .zip-info-grid { grid-template-columns: 1fr; }
+  .zip-info-item { border-right: none; }
+  .zip-info-item:nth-last-child(-n+2) { border-bottom: 1px solid var(--line-soft); }
+  .zip-info-item:last-child { border-bottom: none; }
+}
+
+/* CTA */
+.cta-card {
+  background: var(--navy);
+  border-radius: var(--radius);
+  padding: 24px 20px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.cta-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 80% 60% at 100% 0%, rgba(31,84,222,.5) 0%, transparent 65%);
+}
+.cta-card-inner { position: relative; z-index: 1; }
+.cta-card h4 { color: #fff; font-size: 15px; margin-bottom: 8px; }
+.cta-card p { font-size: 12px; color: rgba(255,255,255,.6); margin-bottom: 16px; line-height: 1.7; }
+.cta-card .btn-line { font-size: 14px; padding: 13px 20px; width: 100%; justify-content: center; }
+
+/* ============================================================
+   チャットパネル
+   ============================================================ */
+.chat-overlay {
+  position: fixed; inset: 0;
+  z-index: 300;
+  pointer-events: none;
+}
+.chat-overlay.open { pointer-events: all; }
+.chat-backdrop {
+  position: absolute; inset: 0;
+  background: rgba(10,20,50,.35);
+  backdrop-filter: blur(3px);
+  opacity: 0;
+  transition: opacity .3s;
+}
+.chat-overlay.open .chat-backdrop { opacity: 1; }
+.chat-panel {
+  position: absolute;
+  right: 0; top: 0; bottom: 0;
+  width: min(440px, 100vw);
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform .35s cubic-bezier(.22,.61,.36,1);
+  box-shadow: -8px 0 40px rgba(10,20,50,.12);
+}
+.chat-overlay.open .chat-panel { transform: translateX(0); }
+
+/* チャットヘッダー */
+.chat-head {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.chat-co-ic {
+  width: 40px; height: 40px;
+  border-radius: 12px;
+  background: var(--pale);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--head); font-size: 15px; font-weight: 900; color: var(--blue);
+  flex-shrink: 0;
+}
+.chat-co-info { flex: 1; }
+.chat-co-name { font-size: 14px; font-weight: 700; color: var(--navy); }
+.chat-co-bid { font-size: 12px; color: var(--body-soft); }
+.chat-co-bid strong { color: var(--blue); font-family: var(--head); }
+.chat-status {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 700; color: var(--green);
+  background: #d1fae5; border-radius: 99px; padding: 3px 8px;
+}
+.chat-status-dot { width:6px; height:6px; border-radius:50%; background:var(--green); }
+.chat-close {
+  width: 32px; height: 32px;
+  border-radius: 8px; border: none; background: #f4f6fb;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  color: var(--body-soft); font-size: 18px; transition: .2s;
+}
+.chat-close:hover { background: var(--line); color: var(--ink); }
+
+/* メッセージ一覧 */
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  scroll-behavior: smooth;
+}
+.chat-date-sep {
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--body-soft);
+  font-weight: 600;
+  position: relative;
+}
+.chat-date-sep::before, .chat-date-sep::after {
+  content:''; position:absolute; top:50%; width:30%; height:1px; background:var(--line);
+}
+.chat-date-sep::before { left:0; }
+.chat-date-sep::after { right:0; }
+
+/* バブル */
+.msg { display: flex; gap: 10px; align-items: flex-end; }
+.msg.mine { flex-direction: row-reverse; }
+.msg-av {
+  width: 32px; height: 32px; border-radius: 10px;
+  background: var(--pale); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--head); font-size: 12px; font-weight: 900; color: var(--blue);
+}
+.msg.mine .msg-av { background: var(--navy); color: #fff; }
+.msg-body { max-width: 78%; display: flex; flex-direction: column; gap: 4px; }
+.msg.mine .msg-body { align-items: flex-end; }
+.msg-bubble {
+  background: #f4f6fb;
+  border-radius: 16px 16px 16px 4px;
+  padding: 11px 14px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--ink);
+  word-break: break-word;
+}
+.msg.mine .msg-bubble {
+  background: var(--blue);
+  color: #fff;
+  border-radius: 16px 16px 4px 16px;
+}
+.msg-time { font-size: 10.5px; color: var(--body-soft); padding: 0 4px; }
+.msg-read { font-size: 10px; color: var(--blue); }
+
+/* システムメッセージ */
+.msg-system {
+  background: var(--pale);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 12.5px;
+  color: var(--body-soft);
+  line-height: 1.7;
+  text-align: center;
+}
+
+/* 入力エリア */
+.chat-input-area {
+  border-top: 1px solid var(--line);
+  padding: 12px 14px;
+  flex-shrink: 0;
+  background: #fff;
+}
+.chat-input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  background: #f4f6fb;
+  border-radius: 14px;
+  padding: 8px 8px 8px 14px;
+  border: 1.5px solid transparent;
+  transition: border-color .2s;
+}
+.chat-input-row:focus-within { border-color: var(--blue); background: #fff; }
+.chat-textarea {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--ink);
+  resize: none;
+  outline: none;
+  line-height: 1.6;
+  max-height: 120px;
+  min-height: 24px;
+}
+.chat-textarea::placeholder { color: #bcc3d4; }
+.chat-send {
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  background: var(--blue);
+  border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: .2s;
+}
+.chat-send:hover { background: var(--blue-d); transform: scale(1.05); }
+.chat-send:disabled { background: var(--line); cursor: not-allowed; transform: none; }
+.chat-send svg { width:16px; height:16px; fill:none; stroke:#fff; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.chat-hint { font-size: 11px; color: var(--body-soft); text-align:center; margin-top:8px; }
+
+/* タブ切替（複数業者） */
+.chat-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  flex-shrink: 0;
+  scrollbar-width: none;
+}
+.chat-tabs::-webkit-scrollbar { display:none; }
+.chat-tab {
+  padding: 10px 16px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--body-soft);
+  border: none; background: none;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: .2s;
+  white-space: nowrap;
+  display: flex; align-items: center; gap: 6px;
+}
+.chat-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+.chat-tab .unread {
+  min-width: 16px; height: 16px; border-radius: 99px;
+  background: #e05c5c; color: #fff;
+  font-size: 10px; font-weight: 900;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 4px;
+}
+  .main-cols { grid-template-columns: 1fr; }
+  .items-grid { grid-template-columns: repeat(3, 1fr); }
+  .bid-summary-inner { flex-direction: column; gap: 16px; }
+  .bid-count-area { padding: 0 0 16px 0; border-right: none; border-bottom: 1px solid var(--line); width: 100%; }
+  .bid-highest { padding: 0 0 16px 0; border-right: none; border-bottom: 1px solid var(--line); width: 100%; }
+  .bid-timer { padding: 0; width: 100%; }
+  .status-bar { flex-direction: column; align-items: flex-start; }
+  .status-meta { border-left: none; padding-left: 0; border-top: 1px solid var(--line); padding-top: 12px; }
+}
+@media(max-width: 768px){
+  .header nav, .header .h-cta { display: none; }
+  .hamburger { display: flex; }
+  .header.menu-open + .mobile-menu { display: flex; }
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M5 5h14a2 2 0 012 2v8a2 2 0 01-2 2H9l-4 4V7a2 2 0 012-2z"/><path d="M8 10h8M8 13h5"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V8a4 4 0 018 0v2"/></symbol>
+  <symbol id="i-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l2.5 2.5L16 9"/></symbol>
+  <symbol id="i-trend" viewBox="0 0 24 24"><path d="M4 17l5-5 3 3 7-7"/><path d="M16 8h4v4"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4.5l3 2"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><path d="M6 3h3l2 5-2.5 1.5a12 12 0 005 5L16 12l5 2v3a2 2 0 01-2 2A16 16 0 014 6a2 2 0 012-3z"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></symbol>
+</defs></svg>
+
+<!-- ============ HEADER ============ -->
+<header class="header" id="header">
+  <div class="container inner">
+    <a href="カタヅケ.html" class="logo"><img src="img/logo-katazuke.png" alt="カタヅケ" class="logo-img"></a>
+    <nav class="nav">
+      <a href="#bids">入札状況</a>
+      <a href="#items">出品内容</a>
+    </nav>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:12px;">
+      <button id="notif-btn" style="position:relative;width:40px;height:40px;border-radius:10px;background:var(--pale);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--blue);">
+        <svg class="ic" style="font-size:20px;"><use href="#i-bell"></use></svg>
+        <span id="notif-badge" style="position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:#e05c5c;display:block;"></span>
+      </button>
+      <div style="width:36px;height:36px;border-radius:50%;background:var(--navy);color:#fff;font-family:var(--head);font-weight:900;font-size:14px;display:flex;align-items:center;justify-content:center;">山</div>
+    </div>
+    <button class="hamburger" id="hamburger" aria-label="メニュー"><svg class="ic"><use href="#i-menu"></use></svg></button>
+  </div>
+</header>
+<div class="mobile-menu" id="mobile-menu">
+  <a href="#bids">入札状況</a>
+  <a href="#items">出品内容</a>
+</div>
+
+<main>
+<div class="page-wrap">
+
+  <!-- ステータスバー -->
+  <div class="status-bar">
+    <div class="status-steps">
+      <div class="status-step done">
+        <div class="s-dot">✓</div>
+        <div class="s-label">受付</div>
+      </div>
+      <div class="status-step active">
+        <div class="s-dot">2</div>
+        <div class="s-label">入札<br>受付中</div>
+      </div>
+      <div class="status-step">
+        <div class="s-dot">3</div>
+        <div class="s-label">業者と<br>交渉</div>
+      </div>
+      <div class="status-step">
+        <div class="s-dot">4</div>
+        <div class="s-label">引き取り<br>完了</div>
+      </div>
+    </div>
+    <div class="status-meta">
+      <span class="s-id">申し込みID：KTZ-2026-04821</span>
+      <span class="s-date">出品日：2026年6月23日</span>
+    </div>
+  </div>
+
+  <!-- 入札サマリー -->
+  <div class="bid-summary" id="bids">
+    <div class="bid-summary-inner">
+      <div class="bid-count-area">
+        <div class="bid-live-label"><span class="live-dot"></span>LIVE入札</div>
+        <div class="bid-count-num" id="bid-count">7<span>件</span></div>
+        <div class="bid-count-sub">業者が入札中。残り時間内に増える可能性があります。</div>
+      </div>
+      <div class="bid-highest">
+        <div class="bid-highest-label">現在の最高入札</div>
+        <div class="bid-highest-amount" id="highest-amount">68,000<span>円</span></div>
+        <div class="bid-highest-note">まとめ全体の買取総額</div>
+      </div>
+      <div class="bid-timer">
+        <div class="bid-timer-label">入札締め切り</div>
+        <div class="bid-timer-val" id="countdown">2日 14:23</div>
+        <div class="bid-timer-sub" id="timer-sub">3日間の入札期間</div>
+        <button class="bid-stop-btn" id="stop-btn">
+          <svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+          今すぐ入札を締め切る
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 早期終了モーダル -->
+  <div class="modal-overlay" id="stop-modal">
+    <div class="modal">
+      <div class="modal-ic">
+        <svg style="width:26px;height:26px;fill:none;stroke:#b9892f;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+      </div>
+      <h3>入札を今すぐ締め切りますか？</h3>
+      <p class="modal-body">現在届いている入札で確定します。<strong>この操作は取り消せません。</strong><br>締め切り後は上位3社と交渉に進めます。</p>
+      <div class="modal-bids-preview">
+        <div class="modal-bid-row"><span class="rank-chip g">1位</span><span class="co">グリーンリサイクル東京</span><span class="amt">¥68,000</span></div>
+        <div class="modal-bid-row"><span class="rank-chip s">2位</span><span class="co">アクトリユース</span><span class="amt">¥62,000</span></div>
+        <div class="modal-bid-row"><span class="rank-chip b">3位</span><span class="co">エコステーション千葉</span><span class="amt">¥58,000</span></div>
+      </div>
+      <p class="modal-warn">⚠ 締め切り後に追加入札は受け付けられません。残り期間を待てば、さらに高い入札が届く可能性があります。</p>
+      <div class="modal-actions">
+        <button class="btn-cancel" id="modal-cancel">キャンセル</button>
+        <button class="btn-confirm-stop" id="modal-confirm">締め切る</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 早期終了バナー -->
+  <div class="stopped-banner" id="stopped-banner">
+    <div class="stopped-ic">✓</div>
+    <span><strong>入札を締め切りました</strong>　上位3社と交渉に進めます</span>
+    <span class="stopped-time" id="stopped-time"></span>
+  </div>
+
+  <!-- 新着通知 -->
+  <div class="notif-bar">
+    <div class="notif-ic">
+      <svg style="width:16px;height:16px;fill:none;stroke:var(--green);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><use href="#i-trend"></use></svg>
+    </div>
+    <span><strong>新しい入札が届きました</strong>　グリーンリサイクル東京が ¥68,000 を提示</span>
+    <span class="notif-time">3分前</span>
+  </div>
+
+  <!-- メインコンテンツ -->
+  <div class="main-cols">
+
+    <!-- 左：出品内容 + 入札 -->
+    <div>
+
+      <!-- 出品まとめ -->
+      <div class="listing-card" id="items" style="margin-bottom:20px;">
+        <div class="card-head">
+          <h3>出品まとめ</h3>
+          <span class="item-count">14点</span>
+        </div>
+        <div class="items-grid">
+          <div class="item-thumb">
+            <img src="img/cat-kaden.png" alt="家電">
+            <div class="item-label">家電・PC類</div>
+          </div>
+          <div class="item-thumb">
+            <img src="img/cat-brand.png" alt="ブランド品">
+            <div class="item-label">バッグ・財布</div>
+          </div>
+          <div class="item-thumb">
+            <img src="img/cat-watch.png" alt="時計">
+            <div class="item-label">腕時計</div>
+          </div>
+          <div class="item-thumb">
+            <img src="img/cat-camera.png" alt="カメラ">
+            <div class="item-label">カメラ</div>
+          </div>
+          <div class="item-thumb">
+            <img src="img/cat-fashion.png" alt="衣類">
+            <div class="item-label">衣類・靴</div>
+          </div>
+          <div class="item-thumb more">
+            <span>+9</span>
+            <small>点を見る</small>
+          </div>
+        </div>
+        <div class="listing-footer">
+          <span class="l-date">出品日時：2026年6月23日 10:42</span>
+          <button class="btn-sm ghost" style="font-size:12px;">内容を編集</button>
+        </div>
+      </div>
+
+      <!-- 入札一覧 -->
+      <div class="bids-card">
+        <div class="card-head">
+          <h3>届いた入札</h3>
+          <span class="item-count" id="bid-count-label">7件</span>
+        </div>
+        <div class="bids-list">
+
+          <!-- 上位3件（見える） -->
+          <div class="bid-item top1">
+            <div class="bid-rank rank1">👑 1位</div>
+            <div class="bid-item-top">
+              <div class="bid-co-icon">グ</div>
+              <div>
+                <div class="bid-co-name">グリーンリサイクル東京</div>
+                <div class="bid-co-area">東京都・神奈川県対応　<a href="業者プロフィール.html" style="color:var(--blue);font-weight:700;font-size:11px;text-decoration:underline;text-underline-offset:2px;">プロフィール</a></div>
+              </div>
+            </div>
+            <div class="bid-amount-row">
+              <div class="bid-amount">68,000<span>円</span></div>
+              <span class="bid-badge">最高値</span>
+            </div>
+            <div class="bid-note">まとめ全体の買取総額。家電・ブランド品を中心に評価。引き取り日程は相談のうえ決定。</div>
+            <div class="bid-action">
+              <a href="chat.html" class="btn-sm primary"><svg class="ic" style="font-size:14px;"><use href="#i-chat"></use></svg>交渉する</a>
+              <a href="査定結果.html" class="btn-sm ghost">詳細を見る</a>
+            </div>
+          </div>
+
+          <div class="bid-item">
+            <div class="bid-rank rank2">2位</div>
+            <div class="bid-item-top">
+              <div class="bid-co-icon">ア</div>
+              <div>
+                <div class="bid-co-name">アクトリユース</div>
+                <div class="bid-co-area">東京都・埼玉県対応　<a href="業者プロフィール.html" style="color:var(--blue);font-weight:700;font-size:11px;text-decoration:underline;text-underline-offset:2px;">プロフィール</a></div>
+              </div>
+            </div>
+            <div class="bid-amount-row">
+              <div class="bid-amount">62,000<span>円</span></div>
+            </div>
+            <div class="bid-note">ブランド品・時計を高評価。梱包不要で玄関先での引き取り対応。</div>
+            <div class="bid-action">
+              <a href="chat.html" class="btn-sm primary"><svg class="ic" style="font-size:14px;"><use href="#i-chat"></use></svg>交渉する</a>
+              <a href="査定結果.html" class="btn-sm ghost">詳細を見る</a>
+            </div>
+          </div>
+
+          <div class="bid-item new-bid">
+            <div class="bid-rank new">NEW 3位</div>
+            <div class="bid-item-top">
+              <div class="bid-co-icon">エ</div>
+              <div>
+                <div class="bid-co-name">エコステーション千葉</div>
+                <div class="bid-co-area">千葉県・東京都対応　<a href="業者プロフィール.html" style="color:var(--blue);font-weight:700;font-size:11px;text-decoration:underline;text-underline-offset:2px;">プロフィール</a></div>
+              </div>
+            </div>
+            <div class="bid-amount-row">
+              <div class="bid-amount">58,000<span>円</span></div>
+            </div>
+            <div class="bid-note">家電・カメラ専門。値がつかない物もまとめて回収対応可能。</div>
+            <div class="bid-action">
+              <a href="chat.html" class="btn-sm primary"><svg class="ic" style="font-size:14px;"><use href="#i-chat"></use></svg>交渉する</a>
+              <a href="査定結果.html" class="btn-sm ghost">詳細を見る</a>
+            </div>
+          </div>
+
+          <!-- 4位以下（隠れている） -->
+          <div class="bid-hidden">
+            <div class="bid-hidden-ic">
+              <svg style="width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;"><use href="#i-lock"></use></svg>
+            </div>
+            <div class="bid-hidden-body">
+              <strong>他4件の入札は非表示</strong>
+              <p>上位3社以外の入札者の詳細は表示されません。連絡もありません。交渉は上位3社とだけ行えます。</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 右：サイドバー -->
+    <div class="sidebar">
+
+      <!-- 申し込み情報 -->
+      <div class="side-card">
+        <div class="side-card-head">
+          <h4>申し込み情報</h4>
+        </div>
+        <div class="side-card-body" style="padding:0 20px;">
+          <div class="info-row"><span class="lbl">状態</span><span class="val blue">入札受付中</span></div>
+          <div class="info-row"><span class="lbl">入札数</span><span class="val">7件</span></div>
+          <div class="info-row"><span class="lbl">最高額</span><span class="val">¥68,000</span></div>
+          <div class="info-row"><span class="lbl">出品点数</span><span class="val">14点</span></div>
+          <div class="info-row"><span class="lbl">対応エリア</span><span class="val">東京都</span></div>
+          <div class="info-row"><span class="lbl">ユーザー費用</span><span class="val green">無料</span></div>
+        </div>
+      </div>
+
+      <!-- タイムライン -->
+      <div class="side-card">
+        <div class="side-card-head">
+          <h4>活動タイムライン</h4>
+        </div>
+        <div class="side-card-body">
+          <ul class="timeline">
+            <li class="tl-item">
+              <div class="tl-dot blue">
+                <svg style="width:12px;height:12px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><use href="#i-trend"></use></svg>
+              </div>
+              <div class="tl-body">
+                <p><strong>新入札</strong>　グリーンリサイクル東京 ¥68,000</p>
+                <time>3分前</time>
+              </div>
+            </li>
+            <li class="tl-item">
+              <div class="tl-dot blue">
+                <svg style="width:12px;height:12px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><use href="#i-trend"></use></svg>
+              </div>
+              <div class="tl-body">
+                <p><strong>入札更新</strong>　アクトリユース ¥62,000</p>
+                <time>28分前</time>
+              </div>
+            </li>
+            <li class="tl-item">
+              <div class="tl-dot green">
+                <svg style="width:12px;height:12px;fill:none;stroke:var(--green);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><use href="#i-check"></use></svg>
+              </div>
+              <div class="tl-body">
+                <p><strong>業者へ公開</strong>　入札受付を開始</p>
+                <time>2時間前</time>
+              </div>
+            </li>
+            <li class="tl-item">
+              <div class="tl-dot green">
+                <svg style="width:12px;height:12px;fill:none;stroke:var(--green);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><use href="#i-check"></use></svg>
+              </div>
+              <div class="tl-body">
+                <p><strong>出品完了</strong>　14点を登録</p>
+                <time>6月23日 10:42</time>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+
+    </div>
+  </div>
+</div>
+</main>
+
+<!-- ============ 入札なし：粗大ごみ案内 ============ -->
+<div class="page-wrap" id="nobid-section" style="padding-top:0;display:none;">
+  <div class="nobid-card">
+    <div class="nobid-head">
+      <div class="nobid-ic">
+        <svg style="width:28px;height:28px;fill:none;stroke:#b9892f;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;"><use href="#i-clock"></use></svg>
+      </div>
+      <div>
+        <h3>入札期間が終了しました</h3>
+        <p>今回は業者からの入札がありませんでした。お住まいの地域の粗大ごみ制度をご案内します。</p>
+      </div>
+    </div>
+
+    <div class="zip-lookup">
+      <label class="zip-label">郵便番号を入力してください</label>
+      <div class="zip-input-row">
+        <span class="zip-prefix">〒</span>
+        <input type="text" id="zip-input" class="zip-input" placeholder="123-4567" maxlength="8" inputmode="numeric">
+        <button class="btn-sm primary" id="zip-btn">調べる</button>
+      </div>
+      <p class="zip-hint">ハイフンあり・なしどちらでも入力できます</p>
+    </div>
+
+    <div id="zip-result" class="zip-result" style="display:none;">
+      <div class="zip-muni" id="zip-muni-name"></div>
+      <div class="zip-info-grid">
+        <div class="zip-info-item">
+          <div class="zip-info-label">申し込み方法</div>
+          <div class="zip-info-val" id="zip-method"></div>
+        </div>
+        <div class="zip-info-item">
+          <div class="zip-info-label">費用の目安</div>
+          <div class="zip-info-val green" id="zip-price"></div>
+        </div>
+        <div class="zip-info-item">
+          <div class="zip-info-label">粗大ごみの基準</div>
+          <div class="zip-info-val" id="zip-note"></div>
+        </div>
+        <div class="zip-info-item">
+          <div class="zip-info-label">手順</div>
+          <div class="zip-info-val">
+            <ol class="zip-steps">
+              <li>粗大ごみ受付に申し込む</li>
+              <li>指定の有料シール（処理手数料）を購入</li>
+              <li>収集日に玄関前へ出す</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+      <a id="zip-link" href="#" target="_blank" rel="noopener" class="zip-official-link">
+        <svg style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:inline-block;vertical-align:-.1em;"><use href="#i-arrow"></use></svg>
+        公式サイトで詳細を確認する
+      </a>
+
+    <div id="zip-notfound" class="zip-notfound" style="display:none;">
+      <p>お住まいの地域の情報が見つかりませんでした。<br>市区町村の公式ウェブサイトで「粗大ごみ 申し込み」と検索してください。</p>
+    </div>
+
+    <!-- 粗大ごみ回収業者 -->
+    <div class="or-divider-plain">または、回収業者に依頼する</div>
+
+    <div class="disposal-section">
+      <div class="disposal-label">粗大ごみ回収業者</div>
+      <div class="paid-note">
+        <svg style="width:12px;height:12px;fill:none;stroke:#b9892f;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4.5M12 16h.01"/></svg>
+        回収には別途費用がかかります
+      </div>
+      <div class="disposal-cards">
+        <div class="disposal-card">
+          <div class="disposal-card-head">
+            <div class="disposal-card-ic">
+              <svg viewBox="0 0 24 24"><path d="M3 6h11v9H3z"/><path d="M14 9h4l3 3v3h-7z"/><circle cx="7" cy="18" r="1.6"/><circle cx="17" cy="18" r="1.6"/></svg>
+            </div>
+            <h5>不用品回収業者</h5>
+          </div>
+          <p>自宅まで来て一括回収。重い物・大きい物もお任せできます。</p>
+          <span class="price-chip">目安：5,000円〜</span>
+        </div>
+        <div class="disposal-card">
+          <div class="disposal-card-head">
+            <div class="disposal-card-ic">
+              <svg viewBox="0 0 24 24"><path d="M3 9h18M9 9V5a3 3 0 016 0v4"/><path d="M5 9l1 11h12l1-11"/></svg>
+            </div>
+            <h5>引越し・片付け業者</h5>
+          </div>
+          <p>引越しや遺品整理と合わせて依頼できます。まとめてお得に。</p>
+          <span class="price-chip">目安：20,000円〜</span>
+        </div>
+        <div class="disposal-card">
+          <div class="disposal-card-head">
+            <div class="disposal-card-ic">
+              <svg viewBox="0 0 24 24"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg>
+            </div>
+            <h5>家電リサイクル</h5>
+          </div>
+          <p>冷蔵庫・洗濯機・エアコン・テレビは法律上リサイクル料が必要です。</p>
+          <span class="price-chip">リサイクル料：1,000〜5,000円</span>
+        </div>
+        <div class="disposal-card">
+          <div class="disposal-card-head">
+            <div class="disposal-card-ic">
+              <svg viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.7-3 7.9-7 9-4-1.1-7-4.3-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg>
+            </div>
+            <h5>自治体の戸別回収</h5>
+          </div>
+          <p>有料シールを貼れば玄関前まで回収。申し込みはネット・電話で。</p>
+          <span class="price-chip">目安：400〜2,000円/点</span>
+        </div>
+      </div>
+      <button class="disposal-search-btn" id="disposal-search-btn" onclick="window.open('https://www.google.com/search?q=不用品回収業者+' + encodeURIComponent(document.getElementById('zip-input') && document.getElementById('zip-input').value ? '郵便番号' + document.getElementById('zip-input').value : '近く'), '_blank')">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+        近くの回収業者を検索する
+      </button>
+    </div>
+
+    <div class="nobid-retry">
+      <p>商品を追加・整理して再出品すると、入札が集まりやすくなります。</p>
+      <a href="出品登録.html" class="btn-sm primary">再出品する</a>
+    </div>
+  </div>
+</div>
+
+<!-- デモ切替 -->
+<div style="position:fixed;bottom:80px;right:16px;z-index:50;">
+  <button id="demo-toggle" style="font-size:11px;font-family:var(--sans);font-weight:700;background:var(--navy);color:#fff;border:none;border-radius:99px;padding:8px 14px;cursor:pointer;box-shadow:var(--shadow-m);opacity:.85;">入札なし状態を見る</button>
+</div>
+
+<!-- ============ チャットパネル ============ -->
+<div class="chat-overlay" id="chat-overlay">
+  <div class="chat-backdrop" id="chat-backdrop"></div>
+  <div class="chat-panel">
+
+    <!-- タブ（業者切替） -->
+    <div class="chat-tabs" id="chat-tabs"></div>
+
+    <!-- ヘッダー -->
+    <div class="chat-head">
+      <div class="chat-co-ic" id="chat-co-ic">グ</div>
+      <div class="chat-co-info">
+        <div class="chat-co-name" id="chat-co-name">グリーンリサイクル東京</div>
+        <div class="chat-co-bid">入札額：<strong id="chat-co-bid">¥68,000</strong></div>
+      </div>
+      <span class="chat-status"><span class="chat-status-dot"></span>オンライン</span>
+      <button class="chat-close" id="chat-close">✕</button>
+    </div>
+
+    <!-- メッセージ一覧 -->
+    <div class="chat-messages" id="chat-messages"></div>
+
+    <!-- 入力エリア -->
+    <div class="chat-input-area">
+      <div class="chat-input-row">
+        <textarea class="chat-textarea" id="chat-textarea" placeholder="メッセージを入力…" rows="1"></textarea>
+        <button class="chat-send" id="chat-send">
+          <svg viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2L15 22l-4-9-9-4 20-7z"/></svg>
+        </button>
+      </div>
+      <p class="chat-hint">LINEで通知 → このチャットで返信</p>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  /* ============================================================
+     チャットパネル
+     ============================================================ */
+  var chatOverlay = document.getElementById('chat-overlay');
+  var chatBackdrop = document.getElementById('chat-backdrop');
+  var chatClose = document.getElementById('chat-close');
+  var chatMessages = document.getElementById('chat-messages');
+  var chatTextarea = document.getElementById('chat-textarea');
+  var chatSend = document.getElementById('chat-send');
+  var chatTabs = document.getElementById('chat-tabs');
+
+  var companies = [
+    { ic:'グ', name:'グリーンリサイクル東京', bid:'¥68,000', msgs:[
+      { mine:false, text:'はじめまして。グリーンリサイクル東京です。ご出品いただいた内容を拝見し、¥68,000で入札させていただきました。', time:'10:42' },
+      { mine:false, text:'特に家電・ブランド品の評価が高く、まとめてお引き取りできれば上記の金額でご対応可能です。ご検討よろしくお願いします。', time:'10:43' }
+    ]},
+    { ic:'ア', name:'アクトリユース', bid:'¥62,000', msgs:[
+      { mine:false, text:'アクトリユースと申します。ブランド品・時計を中心に高く評価しております。¥62,000でのお引き取りをご提案します。', time:'11:05' }
+    ]},
+    { ic:'エ', name:'エコステーション千葉', bid:'¥58,000', msgs:[
+      { mine:false, text:'エコステーション千葉です。家電・カメラが得意分野です。値がつかないものもまとめて回収可能ですので、ぜひご検討ください。', time:'13:22' }
+    ]}
+  ];
+
+  var activeIdx = 0;
+  var userMsgs = [[], [], []];
+
+  function renderTabs(){
+    chatTabs.innerHTML = companies.map(function(c, i){
+      return '<button class="chat-tab' + (i === activeIdx ? ' active' : '') + '" onclick="switchTab(' + i + ')">' + c.name + '</button>';
+    }).join('');
+  }
+
+  function renderMessages(){
+    var c = companies[activeIdx];
+    var allMsgs = c.msgs.concat(userMsgs[activeIdx]);
+    chatMessages.innerHTML = '<div class="chat-date-sep">今日</div>' +
+      allMsgs.map(function(m){
+        return '<div class="msg' + (m.mine ? ' mine' : '') + '">' +
+          '<div class="msg-av">' + (m.mine ? '山' : c.ic) + '</div>' +
+          '<div class="msg-body">' +
+            '<div class="msg-bubble">' + m.text + '</div>' +
+            '<div class="msg-time">' + m.time + (m.mine ? ' <span class="msg-read">既読</span>' : '') + '</div>' +
+          '</div></div>';
+      }).join('');
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  function updateHead(){
+    var c = companies[activeIdx];
+    document.getElementById('chat-co-ic').textContent = c.ic;
+    document.getElementById('chat-co-name').textContent = c.name;
+    document.getElementById('chat-co-bid').textContent = c.bid;
+  }
+
+  window.openChat = function(idx){
+    activeIdx = idx || 0;
+    chatOverlay.classList.add('open');
+    renderTabs(); updateHead(); renderMessages();
+    chatTextarea.focus();
+  };
+  window.switchTab = function(idx){
+    activeIdx = idx;
+    renderTabs(); updateHead(); renderMessages();
+  };
+
+  chatClose && chatClose.addEventListener('click', function(){ chatOverlay.classList.remove('open'); });
+  chatBackdrop && chatBackdrop.addEventListener('click', function(){ chatOverlay.classList.remove('open'); });
+
+  function sendMsg(){
+    var text = chatTextarea.value.trim(); if(!text) return;
+    var now = new Date();
+    var t = now.getHours() + ':' + (now.getMinutes() < 10 ? '0' : '') + now.getMinutes();
+    userMsgs[activeIdx].push({ mine:true, text:text, time:t });
+    chatTextarea.value = ''; chatTextarea.style.height = 'auto';
+    renderMessages();
+    var replies = ['ありがとうございます。確認して折り返しご連絡します。','かしこまりました。ご都合のよい日時を教えてください。','詳細を確認次第ご連絡いたします。'];
+    setTimeout(function(){
+      var n = new Date();
+      companies[activeIdx].msgs.push({ mine:false, text:replies[Math.floor(Math.random()*replies.length)], time:n.getHours()+':'+(n.getMinutes()<10?'0':'')+n.getMinutes() });
+      renderMessages();
+    }, 1800);
+  }
+
+  chatSend && chatSend.addEventListener('click', sendMsg);
+  chatTextarea && chatTextarea.addEventListener('keydown', function(e){
+    if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMsg(); }
+  });
+  chatTextarea && chatTextarea.addEventListener('input', function(){
+    this.style.height='auto'; this.style.height=Math.min(this.scrollHeight,120)+'px';
+  });
+
+  /* ヘッダー scroll */
+  var header = document.getElementById('header');
+  function onScroll(){
+    header.classList.toggle('scrolled', (window.pageYOffset||document.documentElement.scrollTop) > 8);
+  }
+  window.addEventListener('scroll', onScroll, {passive:true});
+  onScroll();
+
+  /* ハンバーガー */
+  var burger = document.getElementById('hamburger');
+  if(burger){
+    burger.addEventListener('click', function(){ header.classList.toggle('menu-open'); });
+    document.getElementById('mobile-menu').addEventListener('click', function(e){
+      if(e.target.closest('a')) header.classList.remove('menu-open');
+    });
+  }
+
+  /* 早期終了 */
+  var stopBtn = document.getElementById('stop-btn');
+  var stopModal = document.getElementById('stop-modal');
+  var modalCancel = document.getElementById('modal-cancel');
+  var modalConfirm = document.getElementById('modal-confirm');
+  var stoppedBanner = document.getElementById('stopped-banner');
+  var stoppedTime = document.getElementById('stopped-time');
+  var timerSub = document.getElementById('timer-sub');
+  var stopped = false;
+
+  if(stopBtn) stopBtn.addEventListener('click', function(){
+    stopModal.classList.add('open');
+  });
+  if(modalCancel) modalCancel.addEventListener('click', function(){
+    stopModal.classList.remove('open');
+  });
+  stopModal && stopModal.addEventListener('click', function(e){
+    if(e.target === stopModal) stopModal.classList.remove('open');
+  });
+  if(modalConfirm) modalConfirm.addEventListener('click', function(){
+    stopped = true;
+    stopModal.classList.remove('open');
+    /* タイマー停止 */
+    timerEl.textContent = '終了';
+    if(timerSub) timerSub.textContent = '早期終了されました';
+    if(stopBtn){ stopBtn.style.display = 'none'; }
+    /* バナー表示 */
+    var now = new Date();
+    var h = now.getHours(), m = now.getMinutes();
+    if(stoppedTime) stoppedTime.textContent = h + ':' + pad(m);
+    if(stoppedBanner) stoppedBanner.classList.add('show');
+    /* タイムラインに追記 */
+    var tl = document.querySelector('.timeline');
+    if(tl){
+      var li = document.createElement('li');
+      li.className = 'tl-item';
+      li.innerHTML = '<div class="tl-dot blue" style="background:#f0b429;"><svg style="width:12px;height:12px;fill:none;stroke:#fff;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;"><use href="#i-check"></use></svg></div><div class="tl-body"><p><strong>入札を早期終了</strong>　7件の入札で確定</p><time>たった今</time></div>';
+      tl.insertBefore(li, tl.firstChild);
+    }
+  });
+
+  /* カウントダウンタイマー（3日間） */
+  var totalSecs = (2 * 24 + 14) * 3600 + 23 * 60 + 45; /* 残り約2日14時間 */
+  var timerEl = document.getElementById('countdown');
+  function tick(){
+    if(stopped) return;
+    if(totalSecs <= 0){ timerEl.textContent = '終了'; return; }
+    totalSecs--;
+    var d = Math.floor(totalSecs / 86400);
+    var h = Math.floor((totalSecs % 86400) / 3600);
+    var m = Math.floor((totalSecs % 3600) / 60);
+    if(d > 0){ timerEl.textContent = d + '日 ' + pad(h) + ':' + pad(m); }
+    else if(h > 0){ timerEl.textContent = pad(h) + ':' + pad(m); }
+    else { timerEl.textContent = pad(m) + ':' + pad(totalSecs % 60); }
+  }
+  function pad(n){ return n < 10 ? '0' + n : String(n); }
+  setInterval(tick, 1000);
+
+  /* デモ：入札がじわじわ増えるアニメーション */
+  var count = 7;
+  var highest = 68000;
+  setTimeout(function(){
+    count = 8;
+    highest = 71000;
+    document.getElementById('bid-count').innerHTML = count + '<span>件</span>';
+    document.getElementById('bid-count-label').textContent = count + '件';
+    document.getElementById('highest-amount').innerHTML = highest.toLocaleString() + '<span>円</span>';
+    /* 通知バッジを点滅 */
+    var badge = document.getElementById('notif-badge');
+    badge.style.background = '#e05c5c';
+    setTimeout(function(){ badge.style.background = '#e05c5c'; }, 200);
+  }, 18000);
+
+  /* デモ切替 */
+  var demoBtn = document.getElementById('demo-toggle');
+  var nobidSection = document.getElementById('nobid-section');
+  var mainCols = document.querySelector('.main-cols');
+  var bidSummary = document.querySelector('.bid-summary');
+  var notifBar = document.querySelector('.notif-bar');
+  var nobidMode = false;
+  if(demoBtn){
+    demoBtn.addEventListener('click', function(){
+      nobidMode = !nobidMode;
+      nobidSection.style.display = nobidMode ? 'block' : 'none';
+      if(mainCols) mainCols.style.opacity = nobidMode ? '.3' : '1';
+      if(bidSummary) bidSummary.style.opacity = nobidMode ? '.3' : '1';
+      if(notifBar) notifBar.style.display = nobidMode ? 'none' : 'flex';
+      demoBtn.textContent = nobidMode ? '通常状態に戻す' : '入札なし状態を見る';
+    });
+  }
+
+  /* 郵便番号 → 市区町村DB */
+  var muniDB = {
+    /* 東京23区 */
+    '100':{ name:'千代田区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,000円/点', note:'最大辺が30cm以上', url:'https://www.city.chiyoda.lg.jp' },
+    '101':{ name:'千代田区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,000円/点', note:'最大辺が30cm以上', url:'https://www.city.chiyoda.lg.jp' },
+    '103':{ name:'中央区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,200円/点', note:'最大辺が30cm以上', url:'https://www.city.chuo.lg.jp' },
+    '104':{ name:'中央区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,200円/点', note:'最大辺が30cm以上', url:'https://www.city.chuo.lg.jp' },
+    '105':{ name:'港区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,000円/点', note:'最大辺が30cm以上', url:'https://www.city.minato.tokyo.jp' },
+    '106':{ name:'港区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,000円/点', note:'最大辺が30cm以上', url:'https://www.city.minato.tokyo.jp' },
+    '107':{ name:'港区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,000円/点', note:'最大辺が30cm以上', url:'https://www.city.minato.tokyo.jp' },
+    '140':{ name:'品川区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,200円/点', note:'最大辺が30cm以上', url:'https://www.city.shinagawa.tokyo.jp' },
+    '141':{ name:'品川区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,200円/点', note:'最大辺が30cm以上', url:'https://www.city.shinagawa.tokyo.jp' },
+    '142':{ name:'品川区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,200円/点', note:'最大辺が30cm以上', url:'https://www.city.shinagawa.tokyo.jp' },
+    '150':{ name:'渋谷区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,200円/点', note:'最大辺が30cm以上', url:'https://www.city.shibuya.tokyo.jp' },
+    '151':{ name:'渋谷区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,200円/点', note:'最大辺が30cm以上', url:'https://www.city.shibuya.tokyo.jp' },
+    '153':{ name:'目黒区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,200円/点', note:'最大辺が30cm以上', url:'https://www.city.meguro.tokyo.jp' },
+    '154':{ name:'世田谷区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,000円/点', note:'最大辺が30cm以上', url:'https://www.city.setagaya.lg.jp' },
+    '155':{ name:'世田谷区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,000円/点', note:'最大辺が30cm以上', url:'https://www.city.setagaya.lg.jp' },
+    '156':{ name:'世田谷区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,000円/点', note:'最大辺が30cm以上', url:'https://www.city.setagaya.lg.jp' },
+    '157':{ name:'世田谷区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,000円/点', note:'最大辺が30cm以上', url:'https://www.city.setagaya.lg.jp' },
+    '160':{ name:'新宿区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,000円/点', note:'最大辺が30cm以上', url:'https://www.city.shinjuku.lg.jp' },
+    '161':{ name:'新宿区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,000円/点', note:'最大辺が30cm以上', url:'https://www.city.shinjuku.lg.jp' },
+    '162':{ name:'新宿区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,000円/点', note:'最大辺が30cm以上', url:'https://www.city.shinjuku.lg.jp' },
+    '164':{ name:'中野区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,200円/点', note:'最大辺が30cm以上', url:'https://www.city.tokyo-nakano.lg.jp' },
+    '165':{ name:'中野区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,200円/点', note:'最大辺が30cm以上', url:'https://www.city.tokyo-nakano.lg.jp' },
+    '166':{ name:'杉並区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,000円/点', note:'最大辺が30cm以上', url:'https://www.city.suginami.tokyo.jp' },
+    '167':{ name:'杉並区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,000円/点', note:'最大辺が30cm以上', url:'https://www.city.suginami.tokyo.jp' },
+    '168':{ name:'杉並区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,000円/点', note:'最大辺が30cm以上', url:'https://www.city.suginami.tokyo.jp' },
+    '170':{ name:'豊島区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,200円/点', note:'最大辺が30cm以上', url:'https://www.city.toshima.lg.jp' },
+    '171':{ name:'豊島区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,200円/点', note:'最大辺が30cm以上', url:'https://www.city.toshima.lg.jp' },
+    '173':{ name:'板橋区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,000円/点', note:'最大辺が30cm以上', url:'https://www.city.itabashi.tokyo.jp' },
+    '174':{ name:'板橋区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,000円/点', note:'最大辺が30cm以上', url:'https://www.city.itabashi.tokyo.jp' },
+    '175':{ name:'板橋区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,000円/点', note:'最大辺が30cm以上', url:'https://www.city.itabashi.tokyo.jp' },
+    '176':{ name:'練馬区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,000円/点', note:'最大辺が30cm以上', url:'https://www.city.nerima.tokyo.jp' },
+    '177':{ name:'練馬区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,000円/点', note:'最大辺が30cm以上', url:'https://www.city.nerima.tokyo.jp' },
+    '120':{ name:'足立区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,000円/点', note:'最大辺が30cm以上', url:'https://www.city.adachi.tokyo.jp' },
+    '121':{ name:'足立区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,000円/点', note:'最大辺が30cm以上', url:'https://www.city.adachi.tokyo.jp' },
+    '123':{ name:'足立区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,000円/点', note:'最大辺が30cm以上', url:'https://www.city.adachi.tokyo.jp' },
+    '130':{ name:'墨田区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,000円/点', note:'最大辺が30cm以上', url:'https://www.city.sumida.lg.jp' },
+    '131':{ name:'墨田区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,000円/点', note:'最大辺が30cm以上', url:'https://www.city.sumida.lg.jp' },
+    '132':{ name:'江戸川区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,000円/点', note:'最大辺が30cm以上', url:'https://www.city.edogawa.tokyo.jp' },
+    '133':{ name:'江戸川区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,000円/点', note:'最大辺が30cm以上', url:'https://www.city.edogawa.tokyo.jp' },
+    '134':{ name:'江戸川区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,000円/点', note:'最大辺が30cm以上', url:'https://www.city.edogawa.tokyo.jp' },
+    '135':{ name:'江東区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,000円/点', note:'最大辺が30cm以上', url:'https://www.city.koto.lg.jp' },
+    '136':{ name:'江東区', pref:'東京都', method:'インターネット・電話', price:'400円〜2,000円/点', note:'最大辺が30cm以上', url:'https://www.city.koto.lg.jp' },
+    /* 神奈川 */
+    '210':{ name:'川崎市', pref:'神奈川県', method:'インターネット・電話・ハガキ', price:'300円〜2,100円/点', note:'最大辺が30cm以上', url:'https://www.city.kawasaki.jp/570/category/63-5-0-0-0.html' },
+    '211':{ name:'川崎市', pref:'神奈川県', method:'インターネット・電話・ハガキ', price:'300円〜2,100円/点', note:'最大辺が30cm以上', url:'https://www.city.kawasaki.jp/570/category/63-5-0-0-0.html' },
+    '212':{ name:'川崎市', pref:'神奈川県', method:'インターネット・電話・ハガキ', price:'300円〜2,100円/点', note:'最大辺が30cm以上', url:'https://www.city.kawasaki.jp/570/category/63-5-0-0-0.html' },
+    '213':{ name:'川崎市', pref:'神奈川県', method:'インターネット・電話・ハガキ', price:'300円〜2,100円/点', note:'最大辺が30cm以上', url:'https://www.city.kawasaki.jp/570/category/63-5-0-0-0.html' },
+    '214':{ name:'川崎市', pref:'神奈川県', method:'インターネット・電話・ハガキ', price:'300円〜2,100円/点', note:'最大辺が30cm以上', url:'https://www.city.kawasaki.jp/570/category/63-5-0-0-0.html' },
+    '216':{ name:'川崎市', pref:'神奈川県', method:'インターネット・電話・ハガキ', price:'300円〜2,100円/点', note:'最大辺が30cm以上', url:'https://www.city.kawasaki.jp/570/category/63-5-0-0-0.html' },
+    '220':{ name:'横浜市', pref:'神奈川県', method:'インターネット・電話', price:'200円〜1,400円/点', note:'最大辺が30cm以上', url:'https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/' },
+    '221':{ name:'横浜市', pref:'神奈川県', method:'インターネット・電話', price:'200円〜1,400円/点', note:'最大辺が30cm以上', url:'https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/' },
+    '222':{ name:'横浜市', pref:'神奈川県', method:'インターネット・電話', price:'200円〜1,400円/点', note:'最大辺が30cm以上', url:'https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/' },
+    '223':{ name:'横浜市', pref:'神奈川県', method:'インターネット・電話', price:'200円〜1,400円/点', note:'最大辺が30cm以上', url:'https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/' },
+    '224':{ name:'横浜市', pref:'神奈川県', method:'インターネット・電話', price:'200円〜1,400円/点', note:'最大辺が30cm以上', url:'https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/' },
+    '230':{ name:'横浜市', pref:'神奈川県', method:'インターネット・電話', price:'200円〜1,400円/点', note:'最大辺が30cm以上', url:'https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/' },
+    '231':{ name:'横浜市', pref:'神奈川県', method:'インターネット・電話', price:'200円〜1,400円/点', note:'最大辺が30cm以上', url:'https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/' },
+    '232':{ name:'横浜市', pref:'神奈川県', method:'インターネット・電話', price:'200円〜1,400円/点', note:'最大辺が30cm以上', url:'https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/' },
+    '235':{ name:'横浜市', pref:'神奈川県', method:'インターネット・電話', price:'200円〜1,400円/点', note:'最大辺が30cm以上', url:'https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/' },
+    '240':{ name:'横浜市', pref:'神奈川県', method:'インターネット・電話', price:'200円〜1,400円/点', note:'最大辺が30cm以上', url:'https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/' },
+    '241':{ name:'横浜市', pref:'神奈川県', method:'インターネット・電話', price:'200円〜1,400円/点', note:'最大辺が30cm以上', url:'https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/' },
+    '245':{ name:'横浜市', pref:'神奈川県', method:'インターネット・電話', price:'200円〜1,400円/点', note:'最大辺が30cm以上', url:'https://www.city.yokohama.lg.jp/kurashi/sumai-kurashi/gomi-recycle/' },
+    /* 埼玉 */
+    '330':{ name:'さいたま市', pref:'埼玉県', method:'インターネット・電話', price:'250円〜1,800円/点', note:'最大辺が50cm以上', url:'https://www.city.saitama.jp/001/011/009/' },
+    '331':{ name:'さいたま市', pref:'埼玉県', method:'インターネット・電話', price:'250円〜1,800円/点', note:'最大辺が50cm以上', url:'https://www.city.saitama.jp/001/011/009/' },
+    '332':{ name:'さいたま市', pref:'埼玉県', method:'インターネット・電話', price:'250円〜1,800円/点', note:'最大辺が50cm以上', url:'https://www.city.saitama.jp/001/011/009/' },
+    '336':{ name:'さいたま市', pref:'埼玉県', method:'インターネット・電話', price:'250円〜1,800円/点', note:'最大辺が50cm以上', url:'https://www.city.saitama.jp/001/011/009/' },
+    '337':{ name:'さいたま市', pref:'埼玉県', method:'インターネット・電話', price:'250円〜1,800円/点', note:'最大辺が50cm以上', url:'https://www.city.saitama.jp/001/011/009/' },
+    '338':{ name:'さいたま市', pref:'埼玉県', method:'インターネット・電話', price:'250円〜1,800円/点', note:'最大辺が50cm以上', url:'https://www.city.saitama.jp/001/011/009/' },
+    '339':{ name:'さいたま市', pref:'埼玉県', method:'インターネット・電話', price:'250円〜1,800円/点', note:'最大辺が50cm以上', url:'https://www.city.saitama.jp/001/011/009/' },
+    '340':{ name:'草加市', pref:'埼玉県', method:'電話申込', price:'200円〜1,800円/点', note:'最大辺が50cm以上', url:'https://www.city.soka.saitama.jp/cont/s1014/020/' },
+    '343':{ name:'越谷市', pref:'埼玉県', method:'インターネット・電話', price:'250円〜2,000円/点', note:'最大辺が50cm以上', url:'https://www.city.koshigaya.saitama.jp/kurashi_sangyo/gomi/' },
+    '345':{ name:'北葛飾郡', pref:'埼玉県', method:'電話申込', price:'300円〜2,000円/点', note:'最大辺が50cm以上', url:'https://www.pref.saitama.lg.jp' },
+    '350':{ name:'川越市', pref:'埼玉県', method:'インターネット・電話', price:'200円〜2,000円/点', note:'最大辺が50cm以上', url:'https://www.city.kawagoe.saitama.jp/kurashi/gomi/' },
+    '360':{ name:'熊谷市', pref:'埼玉県', method:'電話申込', price:'300円〜2,200円/点', note:'最大辺が50cm以上', url:'https://www.city.kumagaya.lg.jp/kurashi/gomitogomi/' },
+    /* 千葉 */
+    '260':{ name:'千葉市', pref:'千葉県', method:'インターネット・電話', price:'250円〜1,600円/点', note:'最大辺が30cm以上', url:'https://www.city.chiba.jp/kankyo/haikibutsu/sodaigomi.html' },
+    '261':{ name:'千葉市', pref:'千葉県', method:'インターネット・電話', price:'250円〜1,600円/点', note:'最大辺が30cm以上', url:'https://www.city.chiba.jp/kankyo/haikibutsu/sodaigomi.html' },
+    '262':{ name:'千葉市', pref:'千葉県', method:'インターネット・電話', price:'250円〜1,600円/点', note:'最大辺が30cm以上', url:'https://www.city.chiba.jp/kankyo/haikibutsu/sodaigomi.html' },
+    '263':{ name:'千葉市', pref:'千葉県', method:'インターネット・電話', price:'250円〜1,600円/点', note:'最大辺が30cm以上', url:'https://www.city.chiba.jp/kankyo/haikibutsu/sodaigomi.html' },
+    '264':{ name:'千葉市', pref:'千葉県', method:'インターネット・電話', price:'250円〜1,600円/点', note:'最大辺が30cm以上', url:'https://www.city.chiba.jp/kankyo/haikibutsu/sodaigomi.html' },
+    '272':{ name:'市川市', pref:'千葉県', method:'インターネット・電話', price:'300円〜2,200円/点', note:'最大辺が30cm以上', url:'https://www.city.ichikawa.lg.jp/env01/1111000114.html' },
+    '273':{ name:'船橋市', pref:'千葉県', method:'インターネット・電話', price:'200円〜1,600円/点', note:'最大辺が30cm以上', url:'https://www.city.funabashi.lg.jp/machi/gomi/' },
+    '274':{ name:'船橋市', pref:'千葉県', method:'インターネット・電話', price:'200円〜1,600円/点', note:'最大辺が30cm以上', url:'https://www.city.funabashi.lg.jp/machi/gomi/' },
+    '275':{ name:'白井市・鎌ケ谷市', pref:'千葉県', method:'電話申込', price:'300円〜2,000円/点', note:'最大辺が50cm以上', url:'https://www.city.shiroi.chiba.jp/soshiki/kankyou/' },
+    '277':{ name:'柏市', pref:'千葉県', method:'インターネット・電話', price:'250円〜2,000円/点', note:'最大辺が50cm以上', url:'https://www.city.kashiwa.lg.jp/kankyoubu/junkan/sodai.html' },
+    '278':{ name:'野田市', pref:'千葉県', method:'電話申込', price:'300円〜2,200円/点', note:'最大辺が50cm以上', url:'https://www.city.noda.chiba.jp/kurashi/gomi/' },
+    '279':{ name:'浦安市', pref:'千葉県', method:'インターネット・電話', price:'200円〜1,200円/点', note:'最大辺が30cm以上', url:'https://www.city.urayasu.lg.jp/shimin/kankyou/gomi/' }
+  };
+
+  /* 郵便番号検索 */
+  function lookupZip(){
+    var raw = (document.getElementById('zip-input').value || '').replace(/[^0-9]/g, '');
+    if(raw.length < 3){ alert('郵便番号を入力してください'); return; }
+    var key3 = raw.substring(0, 3);
+    var result = document.getElementById('zip-result');
+    var notfound = document.getElementById('zip-notfound');
+    var muni = muniDB[key3];
+    result.style.display = 'none';
+    notfound.style.display = 'none';
+    if(muni){
+      document.getElementById('zip-muni-name').textContent = muni.pref + ' ' + muni.name;
+      document.getElementById('zip-method').textContent = muni.method;
+      document.getElementById('zip-price').textContent = muni.price;
+      document.getElementById('zip-note').textContent = muni.note;
+      document.getElementById('zip-link').href = muni.url;
+      result.style.display = 'block';
+    } else {
+      notfound.style.display = 'block';
+    }
+  }
+  var zipBtn = document.getElementById('zip-btn');
+  var zipInput = document.getElementById('zip-input');
+  if(zipBtn) zipBtn.addEventListener('click', lookupZip);
+  if(zipInput){
+    zipInput.addEventListener('keydown', function(e){ if(e.key === 'Enter') lookupZip(); });
+    zipInput.addEventListener('input', function(){
+      var v = this.value.replace(/[^0-9]/g,'');
+      if(v.length > 3) v = v.substring(0,3) + '-' + v.substring(3,7);
+      this.value = v;
+    });
+  }
+
+})();
+</script>
+
+<footer style="border-top:1px solid var(--line);padding:20px 24px;display:flex;align-items:center;justify-content:center;gap:20px;flex-wrap:wrap;font-size:12px;background:#fff;">
+  <span style="color:var(--body-soft)">© 2026 カタヅケ</span>
+  <a href="特定商取引法.html" style="color:var(--body-soft);text-decoration:underline;text-underline-offset:2px;">特定商取引法に基づく表記</a>
+  <a href="プライバシーポリシー.html" style="color:var(--body-soft);text-decoration:underline;text-underline-offset:2px;">プライバシーポリシー</a>
+  <a href="利用規約.html" style="color:var(--body-soft);text-decoration:underline;text-underline-offset:2px;">利用規約</a>
+  <a href="contact.html" style="color:var(--body-soft);text-decoration:underline;text-underline-offset:2px;">お問い合わせ</a>
+  <a href="カタヅケ.html" style="color:var(--body-soft);text-decoration:underline;text-underline-offset:2px;">トップページ</a>
+</footer>
+</body>
+</html>

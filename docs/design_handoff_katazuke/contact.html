@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>お問い合わせ｜カタヅケ</title>
+<meta name="description" content="カタヅケへのお問い合わせはこちら。サービスに関するご質問・ご要望などお気軽にどうぞ。">
+<meta name="theme-color" content="#1f54de">
+<link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="katazuke-main.css">
+<style>
+/* ============================================================
+   お問い合わせページ固有スタイル
+   ============================================================ */
+
+/* ページヒーロー */
+.page-hero {
+  background: radial-gradient(120% 90% at 80% -10%, #eaf0ff 0%, rgba(234,240,255,0) 55%), #fff;
+  padding: clamp(56px, 7vw, 96px) 0 clamp(48px, 6vw, 80px);
+  text-align: center;
+  border-bottom: 1px solid var(--line-soft);
+}
+.page-hero .eyebrow { justify-content: center; }
+.page-hero h1 {
+  font-size: clamp(28px, 4vw, 44px);
+  color: var(--navy);
+  margin-top: 16px;
+  font-family: var(--head);
+  font-weight: 900;
+  letter-spacing: -.01em;
+  text-wrap: balance;
+}
+.page-hero p {
+  color: var(--body-soft);
+  font-size: clamp(15px, 1.5vw, 17px);
+  margin-top: 16px;
+  line-height: 1.9;
+}
+
+/* LINE優先CTA */
+.line-first {
+  background: var(--pale);
+  border-radius: var(--radius);
+  padding: 36px 40px;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  margin-bottom: 48px;
+}
+.line-first-body { flex: 1; }
+.line-first-body strong {
+  display: block;
+  font-family: var(--head);
+  font-size: clamp(17px, 2vw, 20px);
+  color: var(--navy);
+  font-weight: 900;
+  margin-bottom: 6px;
+}
+.line-first-body p {
+  font-size: 14.5px;
+  color: var(--body-soft);
+  line-height: 1.75;
+}
+.line-first .btn { flex-shrink: 0; }
+
+/* フォームカード */
+.contact-wrap {
+  max-width: 720px;
+  margin: 0 auto;
+  padding-bottom: clamp(64px, 8vw, 108px);
+}
+.form-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: clamp(32px, 4vw, 56px);
+  box-shadow: var(--shadow-m);
+}
+.form-section-label {
+  font-family: var(--head);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  color: var(--blue);
+  text-transform: uppercase;
+  margin-bottom: 24px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+/* フォームフィールド */
+.field { margin-bottom: 24px; }
+.field:last-of-type { margin-bottom: 0; }
+.field label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.field label .req {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--blue);
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+  letter-spacing: .04em;
+}
+.field label .opt {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--body-soft);
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  font-family: var(--sans);
+  font-size: 15px;
+  color: var(--ink);
+  background: #fafbfe;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-s);
+  padding: 13px 16px;
+  transition: border-color .2s, box-shadow .2s;
+  appearance: none;
+  outline: none;
+  line-height: 1.6;
+}
+.field input::placeholder,
+.field textarea::placeholder { color: #bcc3d4; }
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  border-color: var(--blue);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(31,84,222,.12);
+}
+.field textarea { resize: vertical; min-height: 160px; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+/* セレクトラッパー */
+.select-wrap { position: relative; }
+.select-wrap::after {
+  content: "";
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid var(--body-soft);
+  pointer-events: none;
+}
+.select-wrap select { padding-right: 40px; cursor: pointer; }
+
+/* 送信ボタン */
+.submit-area {
+  margin-top: 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.submit-area .btn-submit {
+  width: 100%;
+  max-width: 400px;
+  font-size: 17px;
+  padding: 20px 36px;
+  background: var(--blue);
+  color: #fff;
+  border-radius: 999px;
+  font-family: var(--head);
+  font-weight: 900;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 14px 26px -12px rgba(31,84,222,.65);
+  transition: .25s var(--ease);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.submit-area .btn-submit:hover {
+  background: var(--blue-d);
+  transform: translateY(-2px);
+  box-shadow: 0 20px 34px -12px rgba(31,84,222,.75);
+}
+.submit-area .note {
+  font-size: 12.5px;
+  color: var(--body-soft);
+  text-align: center;
+  line-height: 1.75;
+}
+.submit-area .note a {
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* 送信完了状態 */
+.thanks {
+  display: none;
+  text-align: center;
+  padding: 56px 32px;
+}
+.thanks-ic {
+  width: 64px;
+  height: 64px;
+  background: var(--pale);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 24px;
+  color: var(--blue);
+  font-size: 32px;
+}
+.thanks h3 {
+  font-size: 22px;
+  color: var(--navy);
+  margin-bottom: 12px;
+}
+.thanks p {
+  color: var(--body-soft);
+  font-size: 15px;
+  line-height: 1.9;
+  margin-bottom: 28px;
+}
+
+/* divider */
+.or-divider {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 40px 0 32px;
+  color: var(--body-soft);
+  font-size: 13px;
+  font-weight: 600;
+}
+.or-divider::before,
+.or-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+/* レスポンシブ */
+@media(max-width:680px){
+  .line-first { flex-direction: column; align-items: flex-start; gap: 20px; padding: 28px 24px; }
+  .field-row { grid-template-columns: 1fr; }
+  .form-card { padding: 28px 20px; }
+}
+@media(max-width:768px){
+  .header nav, .header .h-cta { display: none; }
+  .hamburger { display: flex; }
+  .header.menu-open + .mobile-menu { display: flex; }
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M5 5h14a2 2 0 012 2v8a2 2 0 01-2 2H9l-4 4V7a2 2 0 012-2z"/><path d="M8 10h8M8 13h5"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2L15 22l-4-9-9-4 20-7z"/></symbol>
+  <symbol id="i-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l2.5 2.5L16 9"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s7-6.3 7-11a7 7 0 10-14 0c0 4.7 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.7-3 7.9-7 9-4-1.1-7-4.3-7-9V6z"/><path d="M9 12l2 2 4-4"/></symbol>
+</defs></svg>
+
+<div class="scroll-progress" id="scroll-progress" aria-hidden="true"></div>
+
+<!-- ============ HEADER ============ -->
+<header class="header" id="header">
+  <div class="container inner">
+    <a href="カタヅケ.html" class="logo"><img src="img/logo-katazuke.png" alt="カタヅケ｜家まるごと片付け買取" class="logo-img"></a>
+    <nav class="nav">
+      <a href="カタヅケ.html#flow">使い方</a>
+      <a href="カタヅケ.html#auction">仕組み</a>
+      <a href="カタヅケ.html#trust">安心</a>
+      <a href="カタヅケ.html#cats">対応カテゴリ</a>
+      <a href="カタヅケ.html#faq">よくある質問</a>
+    </nav>
+    <a href="#form" class="btn btn-line h-cta"><svg class="ic"><use href="#i-chat"></use></svg>LINEではじめる</a>
+    <button class="hamburger" id="hamburger" aria-label="メニュー"><svg class="ic"><use href="#i-menu"></use></svg></button>
+  </div>
+</header>
+<div class="mobile-menu" id="mobile-menu">
+  <a href="カタヅケ.html#flow">使い方</a>
+  <a href="カタヅケ.html#auction">仕組み</a>
+  <a href="カタヅケ.html#trust">安心</a>
+  <a href="カタヅケ.html#cats">対応カテゴリ</a>
+  <a href="カタヅケ.html#faq">よくある質問</a>
+  <a href="#form" class="btn btn-line btn-block mm-cta"><svg class="ic"><use href="#i-chat"></use></svg>LINEではじめる</a>
+</div>
+
+<!-- ============ ページヒーロー ============ -->
+<section class="page-hero">
+  <div class="container">
+    <span class="eyebrow">CONTACT</span>
+    <h1>お問い合わせ</h1>
+    <p>サービスに関するご質問・ご要望など、<br>お気軽にお問い合わせください。</p>
+  </div>
+</section>
+
+<!-- ============ フォーム ============ -->
+<main>
+<div class="section tight">
+  <div class="contact-wrap container">
+
+    <!-- LINE 優先案内 -->
+    <div class="line-first">
+      <div class="line-first-body">
+        <strong>片付けを始めるなら、LINEが最短です</strong>
+        <p>査定・出品のご依頼はLINEから。友だち追加するだけで、すぐに出品をはじめられます。</p>
+      </div>
+      <a href="#" class="btn btn-line btn-lg"><svg class="ic"><use href="#i-chat"></use></svg>LINEではじめる<svg class="ic arw"><use href="#i-arrow"></use></svg></a>
+    </div>
+
+    <div class="or-divider">または、フォームからお問い合わせ</div>
+
+    <!-- フォームカード -->
+    <div class="form-card" id="form">
+      <div id="form-body">
+        <p class="form-section-label">お問い合わせフォーム</p>
+
+        <form id="contact-form" novalidate>
+          <div class="field-row">
+            <div class="field">
+              <label for="name">お名前<span class="req">必須</span></label>
+              <input type="text" id="name" name="name" placeholder="山田 花子" autocomplete="name" required>
+            </div>
+            <div class="field">
+              <label for="kana">フリガナ<span class="opt">任意</span></label>
+              <input type="text" id="kana" name="kana" placeholder="ヤマダ ハナコ" autocomplete="off">
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="email">メールアドレス<span class="req">必須</span></label>
+            <input type="email" id="email" name="email" placeholder="example@email.com" autocomplete="email" required>
+          </div>
+
+          <div class="field">
+            <label for="phone">電話番号<span class="opt">任意</span></label>
+            <input type="tel" id="phone" name="phone" placeholder="090-0000-0000" autocomplete="tel">
+          </div>
+
+          <div class="field">
+            <label for="category">お問い合わせ種別<span class="req">必須</span></label>
+            <div class="select-wrap">
+              <select id="category" name="category" required>
+                <option value="" disabled selected>選択してください</option>
+                <option value="service">サービスについて</option>
+                <option value="pricing">料金・費用について</option>
+                <option value="area">対応エリアについて</option>
+                <option value="privacy">個人情報の取り扱いについて</option>
+                <option value="trouble">トラブル・クレーム</option>
+                <option value="partner">業者登録・提携について</option>
+                <option value="press">取材・メディア掲載</option>
+                <option value="other">その他</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="message">お問い合わせ内容<span class="req">必須</span></label>
+            <textarea id="message" name="message" placeholder="ご質問・ご要望をできるだけ詳しくご記入ください。" required></textarea>
+          </div>
+
+          <div class="submit-area">
+            <button type="submit" class="btn-submit">
+              <svg class="ic" style="font-size:20px;fill:none;stroke:#fff;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;width:1em;height:1em;display:inline-block;vertical-align:-.13em;"><use href="#i-send"></use></svg>
+              送信する
+            </button>
+            <p class="note">
+              送信いただいた内容は、通常3営業日以内にご返信します。<br>
+              ご送信をもって<a href="プライバシーポリシー.html">プライバシーポリシー</a>に同意したものとみなします。
+            </p>
+          </div>
+        </form>
+      </div>
+
+      <!-- 送信完了 -->
+      <div class="thanks" id="thanks">
+        <div class="thanks-ic">
+          <svg style="width:32px;height:32px;fill:none;stroke:var(--blue);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><use href="#i-check-circle"></use></svg>
+        </div>
+        <h3>送信が完了しました</h3>
+        <p>お問い合わせありがとうございます。<br>通常3営業日以内にご連絡いたします。<br>しばらくお待ちください。</p>
+        <a href="カタヅケ.html" class="btn btn-ghost btn-lg">トップページへ戻る</a>
+      </div>
+    </div>
+
+  </div>
+</div>
+</main>
+
+<!-- ============ FOOTER ============ -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <a href="カタヅケ.html" class="logo footer-logo"><img src="img/logo-katazuke.png" alt="カタヅケ"></a>
+        <p class="about">家まるごと、まとめて片付け買取。業者が買取総額で競い合う、営業電話に追われない不用品買取マッチング。東京・千葉・埼玉・神奈川対応。</p>
+      </div>
+      <div>
+        <h5>サービス</h5>
+        <ul>
+          <li><a href="カタヅケ.html#flow">使い方</a></li>
+          <li><a href="カタヅケ.html#auction">仕組み</a></li>
+          <li><a href="カタヅケ.html#fee">料金</a></li>
+          <li><a href="カタヅケ.html#cats">対応カテゴリ</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>安心・サポート</h5>
+        <ul>
+          <li><a href="カタヅケ.html#trust">安心の取り組み</a></li>
+          <li><a href="カタヅケ.html#faq">よくある質問</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>カタヅケについて</h5>
+        <ul>
+          <li><a href="カタヅケ.html#founder">運営者メッセージ</a></li>
+          <li><a href="業者向け.html">業者登録</a></li>
+          <li><a href="contact.html">お問い合わせ</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 カタヅケ</span>
+      <span>東京都・千葉県・埼玉県・神奈川県（順次拡大）</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  /* ヘッダー scroll */
+  var header = document.getElementById('header');
+  var prog = document.querySelector('.scroll-progress');
+  function onScroll(){
+    var y = window.pageYOffset || document.documentElement.scrollTop;
+    if(header) header.classList.toggle('scrolled', y > 8);
+    if(prog){
+      var h = document.documentElement.scrollHeight - window.innerHeight;
+      prog.style.width = (h > 0 ? (y / h * 100) : 0) + '%';
+    }
+  }
+  window.addEventListener('scroll', onScroll, {passive: true});
+  onScroll();
+
+  /* ハンバーガー */
+  var burger = document.getElementById('hamburger');
+  if(burger){
+    burger.addEventListener('click', function(){
+      header.classList.toggle('menu-open');
+    });
+    document.getElementById('mobile-menu').addEventListener('click', function(e){
+      if(e.target.closest('a')) header.classList.remove('menu-open');
+    });
+  }
+
+  /* フォーム送信（デモ） */
+  var form = document.getElementById('contact-form');
+  var formBody = document.getElementById('form-body');
+  var thanks = document.getElementById('thanks');
+  if(form){
+    form.addEventListener('submit', function(e){
+      e.preventDefault();
+      /* バリデーション */
+      var ok = true;
+      ['name','email','category','message'].forEach(function(id){
+        var el = document.getElementById(id);
+        if(!el.value.trim()){
+          el.style.borderColor = '#e05c5c';
+          el.style.boxShadow = '0 0 0 3px rgba(224,92,92,.12)';
+          ok = false;
+          el.addEventListener('input', function(){
+            el.style.borderColor = '';
+            el.style.boxShadow = '';
+          }, {once: true});
+        }
+      });
+      if(!ok) return;
+      /* 送信完了表示 */
+      formBody.style.display = 'none';
+      thanks.style.display = 'block';
+      window.scrollTo({top: document.getElementById('form').offsetTop - 80, behavior: 'smooth'});
+    });
+  }
+})();
+</script>
+</body>
+</html>

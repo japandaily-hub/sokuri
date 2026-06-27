@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>メールアドレス確認完了｜カタヅケ</title>
+<meta name="theme-color" content="#1f54de">
+<link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="katazuke-main.css">
+<style>
+html, body { height: 100%; }
+body {
+  background: linear-gradient(160deg, #f0f4ff 0%, #f4f6fb 60%);
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; min-height: 100vh; padding: 32px 20px;
+}
+
+/* ── カード ── */
+.confirm-card {
+  background: #fff; border-radius: var(--radius);
+  box-shadow: var(--shadow-m); border: 1px solid var(--line-soft);
+  max-width: 460px; width: 100%; padding: 44px 36px 36px;
+  text-align: center; position: relative; overflow: hidden;
+}
+/* デコレーション */
+.confirm-card::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 5px;
+  background: linear-gradient(90deg, var(--blue), #6fa3ff);
+}
+
+/* アイコン */
+.confirm-ic-wrap { margin: 0 auto 24px; position: relative; display: inline-block; }
+.confirm-circle {
+  width: 90px; height: 90px; border-radius: 50%;
+  background: linear-gradient(135deg, #e8f0ff, var(--pale));
+  border: 3px solid rgba(31,84,222,.2);
+  display: grid; place-items: center; margin: 0 auto;
+}
+.confirm-circle svg { width: 46px; height: 46px; fill: none; stroke: var(--blue); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+/* confetti */
+@keyframes confetti-fall { 0%{opacity:0;transform:translateY(-20px) rotate(0deg)} 20%{opacity:1} 100%{opacity:0;transform:translateY(60px) rotate(360deg)} }
+.confetti-dot {
+  position: absolute; width: 8px; height: 8px; border-radius: 2px;
+  animation: confetti-fall 1.2s ease forwards;
+}
+
+/* テキスト */
+.confirm-title { font-family: var(--head); font-size: 24px; font-weight: 900; color: var(--navy); margin-bottom: 10px; line-height: 1.3; }
+.confirm-sub { font-size: 14.5px; color: var(--body-soft); line-height: 1.85; margin-bottom: 28px; }
+.confirm-email {
+  display: inline-block; background: var(--pale); color: var(--blue);
+  font-family: var(--head); font-size: 14px; font-weight: 700;
+  padding: 8px 18px; border-radius: 99px; border: 1px solid rgba(31,84,222,.2);
+  margin-bottom: 28px;
+}
+
+/* ステップ */
+.welcome-steps {
+  background: #f8faff; border-radius: 14px;
+  padding: 18px 20px; margin-bottom: 24px; text-align: left;
+}
+.welcome-step {
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 10px 0; border-bottom: 1px solid var(--line-soft);
+}
+.welcome-step:last-child { border-bottom: none; padding-bottom: 0; }
+.ws-num {
+  width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+  background: var(--blue); color: #fff;
+  font-family: var(--head); font-size: 12px; font-weight: 900;
+  display: grid; place-items: center;
+}
+.ws-body strong { display: block; font-family: var(--head); font-size: 13.5px; font-weight: 700; color: var(--navy); }
+.ws-body span { font-size: 12.5px; color: var(--body-soft); line-height: 1.7; }
+
+/* ロゴ */
+.confirm-logo { margin-bottom: 32px; }
+.confirm-logo img { height: 38px; }
+
+/* ボトムリンク */
+.confirm-bottom {
+  margin-top: 20px; font-size: 12.5px; color: var(--body-soft); text-align: center; line-height: 2;
+}
+.confirm-bottom a { color: var(--blue); font-weight: 700; }
+
+@media(max-width:480px){
+  .confirm-card { padding: 36px 20px 28px; }
+  .confirm-title { font-size: 20px; }
+  .confirm-sub { font-size: 13.5px; }
+  .confirm-email { font-size: 13px; padding: 7px 14px; }
+  .welcome-steps { padding: 14px 14px; }
+  .ws-num { width: 22px; height: 22px; font-size: 11px; }
+  body { padding: 20px 14px; }
+  .confirm-logo img { height: 32px; }
+}
+@media(max-width:360px){
+  .confirm-circle { width: 76px; height: 76px; }
+  .confirm-circle svg { width: 38px; height: 38px; }
+  .confirm-title { font-size: 18px; }
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-mail-check" viewBox="0 0 24 24"><path d="M22 13V6a2 2 0 00-2-2H4a2 2 0 00-2 2v12a2 2 0 002 2h9"/><path d="M22 6l-10 7L2 6"/><path d="M16 19l2 2 4-4"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+</defs></svg>
+
+<a href="カタヅケ.html" class="confirm-logo"><img src="img/logo-katazuke.png" alt="カタヅケ"></a>
+
+<div class="confirm-card" id="confirm-card">
+
+  <!-- アイコン（confettiはJSで追加） -->
+  <div class="confirm-ic-wrap" id="ic-wrap">
+    <div class="confirm-circle">
+      <svg viewBox="0 0 24 24"><use href="#i-mail-check"></use></svg>
+    </div>
+  </div>
+
+  <h1 class="confirm-title">メールアドレスを<br>確認しました！</h1>
+  <p class="confirm-sub">以下のアドレスの確認が完了しました。<br>カタヅケのすべての機能がご利用いただけます。</p>
+  <div class="confirm-email" id="confirmed-email">example@email.com</div>
+
+  <!-- ステップ -->
+  <div class="welcome-steps">
+    <div class="welcome-step">
+      <div class="ws-num">1</div>
+      <div class="ws-body"><strong>出品する</strong><span>写真を撮って不用品を出品。5分で完了します。</span></div>
+    </div>
+    <div class="welcome-step">
+      <div class="ws-num">2</div>
+      <div class="ws-body"><strong>入札を待つ</strong><span>登録業者が競い合って入札。自動的にお知らせが届きます。</span></div>
+    </div>
+    <div class="welcome-step">
+      <div class="ws-num">3</div>
+      <div class="ws-body"><strong>業者を選んで現金受け取り</strong><span>気に入った業者を選べばOK。自宅で即日現金を受け取れます。</span></div>
+    </div>
+  </div>
+
+  <a href="出品登録.html" class="btn btn-primary btn-block btn-lg">
+    さっそく出品してみる
+    <svg style="width:17px;height:17px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><use href="#i-arrow"></use></svg>
+  </a>
+  <a href="カタヅケ.html" class="btn btn-ghost btn-block" style="margin-top:10px;">トップページへ</a>
+
+</div>
+
+<div class="confirm-bottom">
+  <a href="ログイン.html">ログイン</a>　·　
+  <a href="よくある質問.html">よくある質問</a>　·　
+  <a href="contact.html">お問い合わせ</a>
+</div>
+
+<script>
+(function(){
+  /* URLパラメータからメールを取得（デモ用） */
+  var params = new URLSearchParams(window.location.search);
+  var email = params.get('email') || 'example@email.com';
+  document.getElementById('confirmed-email').textContent = email;
+
+  /* confetti */
+  var colors = ['#1f54de','#6fa3ff','#f0a030','#1f8a5b','#e05c5c','#9b59b6'];
+  var wrap = document.getElementById('ic-wrap');
+  for(var i=0;i<12;i++){
+    var dot = document.createElement('div');
+    dot.className = 'confetti-dot';
+    dot.style.cssText =
+      'background:' + colors[i % colors.length] + ';' +
+      'left:' + (Math.random()*100-10) + '%;' +
+      'top:' + (Math.random()*20-10) + '%;' +
+      'animation-delay:' + (i*.07) + 's;' +
+      'animation-duration:' + (.9 + Math.random()*.6) + 's;' +
+      'transform-origin:center;';
+    wrap.appendChild(dot);
+  }
+})();
+</script>
+</body>
+</html>

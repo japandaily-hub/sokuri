@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>訪問日程調整｜カタヅケ</title>
+<meta name="theme-color" content="#1f54de">
+<link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="katazuke-main.css">
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+body { background: #f7f8fc; }
+
+/* ヘッダー */
+.sch-header {
+  height: 60px;
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+.sch-header .logo-img { height: 36px; }
+.sch-header-sep { width: 1px; height: 20px; background: var(--line); }
+.sch-header-title { font-size: 13.5px; font-weight: 700; color: var(--body-soft); }
+.sch-header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+
+/* 進捗ステップ */
+.sch-progress {
+  background: #fff;
+  border-bottom: 1px solid var(--line-soft);
+  padding: 14px 0;
+}
+.sch-steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+}
+.sch-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--body-soft);
+}
+.sch-step.done { color: var(--green); }
+.sch-step.active { color: var(--blue); }
+.step-num {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  font-size: 12px;
+  font-weight: 900;
+  font-family: var(--head);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+}
+.sch-step.done .step-num { background: var(--green); border-color: var(--green); color: #fff; }
+.sch-step.active .step-num { background: var(--blue); border-color: var(--blue); color: #fff; }
+.step-sep {
+  width: 48px;
+  height: 2px;
+  background: var(--line);
+  flex-shrink: 0;
+}
+.step-sep.done { background: var(--green); }
+
+/* メインレイアウト */
+.sch-wrap {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 28px 20px 80px;
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 20px;
+  align-items: start;
+}
+
+/* 業者情報カード */
+.biz-card {
+  background: #fff;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.biz-avatar {
+  width: 44px; height: 44px;
+  border-radius: 10px;
+  background: var(--pale);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-family: var(--head);
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--blue);
+}
+.biz-name { font-size: 15px; font-weight: 900; color: var(--navy); }
+.biz-sub { font-size: 12.5px; color: var(--body-soft); margin-top: 3px; display: flex; align-items: center; gap: 6px; }
+.biz-sub svg { width: 12px; height: 12px; fill: none; stroke: var(--body-soft); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.biz-badge {
+  margin-left: auto;
+  background: #d1fae5;
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 900;
+  font-family: var(--head);
+  padding: 4px 12px;
+  border-radius: 99px;
+}
+.biz-amount {
+  margin-left: auto;
+  text-align: right;
+}
+.biz-amount .label { font-size: 11px; color: var(--body-soft); font-weight: 600; }
+.biz-amount .amount { font-family: var(--head); font-size: 22px; font-weight: 900; color: var(--navy); }
+.biz-amount .amount span { font-size: 12px; color: var(--body-soft); }
+
+/* カレンダー */
+.cal-card {
+  background: #fff;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.cal-month { font-family: var(--head); font-size: 17px; font-weight: 900; color: var(--navy); }
+.cal-nav { display: flex; gap: 4px; }
+.cal-nav-btn {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line);
+  background: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: .15s;
+  font-family: var(--sans);
+}
+.cal-nav-btn:hover { border-color: var(--blue); color: var(--blue); }
+.cal-nav-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+.cal-grid-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0;
+  padding: 8px 12px 4px;
+}
+.cal-dow {
+  text-align: center;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--body-soft);
+  padding: 4px 0;
+}
+.cal-dow.sun { color: #ef4444; }
+.cal-dow.sat { color: #3b82f6; }
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  padding: 4px 12px 16px;
+}
+.cal-day {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  position: relative;
+  transition: .15s;
+  border: 2px solid transparent;
+}
+.cal-day:hover:not(.disabled):not(.past) { background: var(--pale); }
+.cal-day.disabled, .cal-day.past { color: var(--line); cursor: default; pointer-events: none; }
+.cal-day.sun { color: #ef4444; }
+.cal-day.sat { color: #3b82f6; }
+.cal-day.today { font-weight: 900; color: var(--blue); }
+.cal-day.available { background: #f0fdf4; color: var(--green); font-weight: 900; }
+.cal-day.available::after {
+  content: "";
+  position: absolute;
+  bottom: 3px; left: 50%;
+  transform: translateX(-50%);
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: var(--green);
+}
+.cal-day.selected { background: var(--blue); color: #fff; border-color: var(--blue-d); }
+.cal-day.selected::after { background: #fff; }
+
+.cal-legend {
+  display: flex;
+  gap: 16px;
+  padding: 0 16px 14px;
+  font-size: 12px;
+  color: var(--body-soft);
+}
+.cal-legend span { display: flex; align-items: center; gap: 5px; }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* 時間帯選択 */
+.time-card {
+  background: #fff;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-top: 16px;
+}
+.time-card-title {
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--navy);
+  margin-bottom: 14px;
+  font-family: var(--head);
+}
+.time-slots {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.time-slot {
+  padding: 11px 8px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-s);
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+  transition: .15s;
+  background: #fff;
+  font-family: var(--sans);
+}
+.time-slot:hover:not(.disabled) { border-color: var(--blue); color: var(--blue); }
+.time-slot.selected { background: var(--blue); border-color: var(--blue); color: #fff; }
+.time-slot.disabled { color: var(--line); cursor: default; background: #fafafa; }
+.time-slot .ts-label { font-size: 11px; color: inherit; opacity: .75; margin-top: 2px; }
+
+/* 備考 */
+.note-card {
+  background: #fff;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-top: 16px;
+}
+.note-card label { font-size: 14px; font-weight: 700; color: var(--navy); display: block; margin-bottom: 10px; font-family: var(--head); }
+.note-textarea {
+  width: 100%;
+  min-height: 90px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-s);
+  font-size: 14px;
+  font-family: var(--sans);
+  color: var(--ink);
+  resize: vertical;
+  outline: none;
+  transition: border-color .2s;
+  line-height: 1.7;
+}
+.note-textarea:focus { border-color: var(--blue); }
+.note-hint { font-size: 12px; color: var(--body-soft); margin-top: 8px; }
+
+/* サイドパネル */
+.sch-side { display: flex; flex-direction: column; gap: 16px; }
+
+.confirm-card {
+  background: #fff;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px;
+  position: sticky;
+  top: 80px;
+}
+.confirm-title { font-size: 14px; font-weight: 900; color: var(--navy); margin-bottom: 16px; font-family: var(--head); }
+.confirm-row {
+  display: flex;
+  gap: 10px;
+  font-size: 13.5px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.confirm-row:last-of-type { border-bottom: none; }
+.confirm-lbl { color: var(--body-soft); font-weight: 600; width: 80px; flex-shrink: 0; }
+.confirm-val { color: var(--ink); font-weight: 700; }
+.confirm-val.pending { color: var(--line); font-weight: 600; font-style: italic; }
+
+.confirm-btn {
+  width: 100%;
+  padding: 14px;
+  background: var(--blue);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 900;
+  font-family: var(--head);
+  border: none;
+  border-radius: 99px;
+  cursor: pointer;
+  margin-top: 16px;
+  transition: .2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.confirm-btn:hover:not(:disabled) { background: var(--blue-d); transform: translateY(-1px); }
+.confirm-btn:disabled { background: var(--line); cursor: not-allowed; transform: none; }
+.confirm-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+
+.notice-box {
+  background: var(--pale);
+  border: 1px solid #c7d9ff;
+  border-radius: var(--radius-s);
+  padding: 14px 16px;
+  font-size: 13px;
+  color: var(--blue);
+  line-height: 1.7;
+}
+.notice-box svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vertical-align: -.15em; margin-right: 4px; }
+
+/* モーダル */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s;
+  padding: 20px;
+}
+.modal-overlay.open { opacity: 1; pointer-events: auto; }
+.modal {
+  background: #fff;
+  border-radius: var(--radius);
+  padding: 36px 32px;
+  max-width: 400px;
+  width: 100%;
+  text-align: center;
+  transform: translateY(16px);
+  transition: transform .3s;
+}
+.modal-overlay.open .modal { transform: none; }
+.modal-icon {
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  background: #d1fae5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+.modal-icon svg { width: 26px; height: 26px; fill: none; stroke: var(--green); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.modal h2 { font-size: 20px; color: var(--navy); margin-bottom: 10px; }
+.modal p { font-size: 14px; color: var(--body-soft); line-height: 1.8; margin-bottom: 24px; }
+.modal-btns { display: flex; flex-direction: column; gap: 10px; }
+
+/* レスポンシブ */
+@media(max-width:720px){
+  .sch-wrap { grid-template-columns: 1fr; }
+  .sch-side { order: -1; }
+  .confirm-card { position: static; }
+  .time-slots { grid-template-columns: repeat(2,1fr); }
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-chev-l" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+  <symbol id="i-chev-r" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4.5l3 2"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v1M12 11v5"/></symbol>
+  <symbol id="i-map" viewBox="0 0 24 24"><path d="M12 21s7-6.3 7-11a7 7 0 10-14 0c0 4.7 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M5 5h14a2 2 0 012 2v8a2 2 0 01-2 2H9l-4 4V7a2 2 0 012-2z"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+</defs></svg>
+
+<!-- ヘッダー -->
+<header class="sch-header">
+  <a href="カタヅケ.html"><img src="img/logo-katazuke.png" alt="カタヅケ" class="logo-img"></a>
+  <div class="sch-header-sep"></div>
+  <span class="sch-header-title">訪問日程調整</span>
+  <div class="sch-header-right">
+    <a href="chat.html" style="font-size:13px;font-weight:700;color:var(--blue);text-decoration:underline;text-underline-offset:2px;">
+      <svg style="width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:inline-block;vertical-align:-.1em;" viewBox="0 0 24 24"><use href="#i-chat"></use></svg>
+      チャットに戻る
+    </a>
+  </div>
+</header>
+
+<!-- 進捗ステップ -->
+<div class="sch-progress">
+  <div class="container">
+    <div class="sch-steps">
+      <div class="sch-step done">
+        <div class="step-num"><svg style="width:12px;height:12px;fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;" viewBox="0 0 24 24"><use href="#i-check"></use></svg></div>
+        出品
+      </div>
+      <div class="step-sep done"></div>
+      <div class="sch-step done">
+        <div class="step-num"><svg style="width:12px;height:12px;fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;" viewBox="0 0 24 24"><use href="#i-check"></use></svg></div>
+        入札・交渉
+      </div>
+      <div class="step-sep done"></div>
+      <div class="sch-step active">
+        <div class="step-num">3</div>
+        日程調整
+      </div>
+      <div class="step-sep"></div>
+      <div class="sch-step">
+        <div class="step-num">4</div>
+        訪問・完了
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sch-wrap container">
+
+  <!-- 左：メインエリア -->
+  <div class="sch-main">
+
+    <!-- 業者情報 -->
+    <div class="biz-card">
+      <div class="biz-avatar">緑</div>
+      <div>
+        <div class="biz-name">グリーンリサイクル株式会社</div>
+        <div class="biz-sub">
+          <svg viewBox="0 0 24 24"><use href="#i-map"></use></svg>東京都世田谷区エリア対応
+        </div>
+      </div>
+      <div class="biz-amount">
+        <div class="label">成約買取額</div>
+        <div class="amount">¥72,000<span>円</span></div>
+      </div>
+    </div>
+
+    <!-- カレンダー -->
+    <div class="cal-card">
+      <div class="cal-header">
+        <div class="cal-month" id="cal-month">2026年7月</div>
+        <div class="cal-nav">
+          <button class="cal-nav-btn" id="cal-prev" title="前月"><svg viewBox="0 0 24 24"><use href="#i-chev-l"></use></svg></button>
+          <button class="cal-nav-btn" id="cal-next" title="翌月"><svg viewBox="0 0 24 24"><use href="#i-chev-r"></use></svg></button>
+        </div>
+      </div>
+      <div class="cal-grid-header">
+        <div class="cal-dow sun">日</div>
+        <div class="cal-dow">月</div>
+        <div class="cal-dow">火</div>
+        <div class="cal-dow">水</div>
+        <div class="cal-dow">木</div>
+        <div class="cal-dow">金</div>
+        <div class="cal-dow sat">土</div>
+      </div>
+      <div class="cal-grid" id="cal-grid"></div>
+      <div class="cal-legend">
+        <span><span class="legend-dot" style="background:var(--green);"></span>業者対応可能日</span>
+        <span><span class="legend-dot" style="background:var(--blue);"></span>選択中</span>
+        <span><span class="legend-dot" style="background:var(--line);"></span>選択不可</span>
+      </div>
+    </div>
+
+    <!-- 時間帯 -->
+    <div class="time-card" id="time-card" style="display:none;">
+      <div class="time-card-title">
+        <svg style="width:15px;height:15px;fill:none;stroke:var(--navy);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:inline-block;vertical-align:-.15em;margin-right:6px;" viewBox="0 0 24 24"><use href="#i-clock"></use></svg>
+        希望時間帯を選んでください
+      </div>
+      <div class="time-slots">
+        <button class="time-slot" data-time="9:00〜12:00">
+          9:00〜12:00<div class="ts-label">午前</div>
+        </button>
+        <button class="time-slot" data-time="12:00〜15:00">
+          12:00〜15:00<div class="ts-label">昼</div>
+        </button>
+        <button class="time-slot" data-time="15:00〜18:00">
+          15:00〜18:00<div class="ts-label">午後</div>
+        </button>
+        <button class="time-slot disabled" data-time="18:00〜21:00">
+          18:00〜21:00<div class="ts-label">夜（×）</div>
+        </button>
+        <button class="time-slot" data-time="時間指定なし">
+          時間指定なし<div class="ts-label">業者に一任</div>
+        </button>
+      </div>
+    </div>
+
+    <!-- 備考 -->
+    <div class="note-card" id="note-card" style="display:none;">
+      <label for="note-input">
+        <svg style="width:15px;height:15px;fill:none;stroke:var(--navy);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:inline-block;vertical-align:-.15em;margin-right:6px;" viewBox="0 0 24 24"><use href="#i-chat"></use></svg>
+        業者へのひとこと（任意）
+      </label>
+      <textarea class="note-textarea" id="note-input" placeholder="例：玄関前に荷物をまとめておきます。ご来訪前にお電話ください。"></textarea>
+      <p class="note-hint">入力した内容は業者へ共有されます。</p>
+    </div>
+
+  </div>
+
+  <!-- 右：確認パネル -->
+  <div class="sch-side">
+
+    <div class="confirm-card">
+      <div class="confirm-title">
+        <svg style="width:15px;height:15px;fill:none;stroke:var(--navy);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:inline-block;vertical-align:-.15em;margin-right:6px;" viewBox="0 0 24 24"><use href="#i-calendar"></use></svg>
+        日程確認
+      </div>
+      <div class="confirm-row">
+        <span class="confirm-lbl">業者</span>
+        <span class="confirm-val">グリーンリサイクル</span>
+      </div>
+      <div class="confirm-row">
+        <span class="confirm-lbl">買取額</span>
+        <span class="confirm-val">¥72,000</span>
+      </div>
+      <div class="confirm-row">
+        <span class="confirm-lbl">訪問日</span>
+        <span class="confirm-val pending" id="confirm-date">日付を選んでください</span>
+      </div>
+      <div class="confirm-row">
+        <span class="confirm-lbl">時間帯</span>
+        <span class="confirm-val pending" id="confirm-time">時間帯を選んでください</span>
+      </div>
+      <button class="confirm-btn" id="confirm-btn" disabled>
+        <svg viewBox="0 0 24 24"><use href="#i-check"></use></svg>
+        この日程で確定する
+      </button>
+    </div>
+
+    <div class="notice-box">
+      <svg viewBox="0 0 24 24"><use href="#i-info"></use></svg>
+      日程確定後はLINEで通知が届きます。変更が必要な場合はチャットで業者へご連絡ください。
+    </div>
+
+    <div class="notice-box" style="background:#fff8f0;border-color:#fed7aa;color:#9a3412;">
+      <svg viewBox="0 0 24 24"><use href="#i-info"></use></svg>
+      訪問買取は特定商取引法によりクーリングオフの対象です。詳しくは<a href="特定商取引法.html" style="color:inherit;">こちら</a>。
+    </div>
+
+  </div>
+
+</div>
+
+<!-- 完了モーダル -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-icon">
+      <svg viewBox="0 0 24 24"><use href="#i-check"></use></svg>
+    </div>
+    <h2>日程が確定しました！</h2>
+    <p id="modal-text">グリーンリサイクル株式会社が<br><strong id="modal-date"></strong><br><strong id="modal-time"></strong>に訪問します。<br>LINEにも通知が届きます。</p>
+    <div class="modal-btns">
+      <a href="申し込み状況.html" class="btn btn-primary btn-lg">申し込み状況を確認する<svg class="ic arw"><use href="#i-arrow"></use></svg></a>
+      <a href="マイページ.html" class="btn btn-ghost btn-lg">マイページへ</a>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+
+  /* ====== カレンダー ====== */
+  var today = new Date(2026, 5, 25); // デモ固定
+  var viewYear = 2026;
+  var viewMonth = 6; // 7月（0-indexed=6）
+
+  /* 業者対応可能日（デモ） */
+  var available = {
+    '2026-7-2': true, '2026-7-3': true, '2026-7-4': true,
+    '2026-7-7': true, '2026-7-8': true, '2026-7-9': true, '2026-7-10': true,
+    '2026-7-14': true, '2026-7-15': true, '2026-7-16': true,
+    '2026-7-21': true, '2026-7-22': true, '2026-7-23': true,
+    '2026-7-28': true, '2026-7-29': true, '2026-7-30': true
+  };
+
+  var selectedDate = null;
+  var selectedTime = null;
+
+  function renderCal(){
+    var grid = document.getElementById('cal-grid');
+    var monthLabel = document.getElementById('cal-month');
+    var d = new Date(viewYear, viewMonth, 1);
+    monthLabel.textContent = viewYear + '年' + (viewMonth + 1) + '月';
+
+    var firstDow = d.getDay();
+    var lastDay = new Date(viewYear, viewMonth + 1, 0).getDate();
+
+    var html = '';
+    for(var i = 0; i < firstDow; i++){
+      html += '<div class="cal-day disabled"></div>';
+    }
+    for(var day = 1; day <= lastDay; day++){
+      var key = viewYear + '-' + (viewMonth + 1) + '-' + day;
+      var date = new Date(viewYear, viewMonth, day);
+      var dow = date.getDay();
+      var isPast = date < new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      var isToday = date.toDateString() === today.toDateString();
+      var isAvail = !!available[key];
+      var isSelected = selectedDate && selectedDate.key === key;
+
+      var cls = 'cal-day';
+      if(dow === 0) cls += ' sun';
+      else if(dow === 6) cls += ' sat';
+      if(isPast){ cls += ' past disabled'; }
+      else if(isSelected){ cls += ' selected'; }
+      else if(isAvail){ cls += ' available'; }
+      if(isToday && !isSelected) cls += ' today';
+      if(!isAvail && !isPast) cls += ' disabled';
+
+      html += '<div class="' + cls + '" data-key="' + key + '" data-day="' + day + '">' + day + '</div>';
+    }
+    grid.innerHTML = html;
+
+    grid.querySelectorAll('.cal-day:not(.disabled)').forEach(function(el){
+      el.addEventListener('click', function(){
+        var k = el.dataset.key;
+        var isNowSelected = selectedDate && selectedDate.key === k;
+        if(isNowSelected){ return; }
+        selectedDate = { key: k, label: (viewMonth + 1) + '月' + el.dataset.day + '日（' + ['日','月','火','水','木','金','土'][new Date(viewYear, viewMonth, parseInt(el.dataset.day)).getDay()] + '）' };
+        selectedTime = null;
+        updateConfirm();
+        renderCal();
+        document.getElementById('time-card').style.display = '';
+        document.getElementById('note-card').style.display = '';
+        document.querySelectorAll('.time-slot').forEach(function(b){ b.classList.remove('selected'); });
+      });
+    });
+  }
+
+  document.getElementById('cal-prev').addEventListener('click', function(){
+    viewMonth--;
+    if(viewMonth < 0){ viewMonth = 11; viewYear--; }
+    renderCal();
+  });
+  document.getElementById('cal-next').addEventListener('click', function(){
+    viewMonth++;
+    if(viewMonth > 11){ viewMonth = 0; viewYear++; }
+    renderCal();
+  });
+
+  renderCal();
+
+  /* ====== 時間帯選択 ====== */
+  document.getElementById('time-card').addEventListener('click', function(e){
+    var slot = e.target.closest('.time-slot:not(.disabled)');
+    if(!slot) return;
+    document.querySelectorAll('.time-slot').forEach(function(b){ b.classList.remove('selected'); });
+    slot.classList.add('selected');
+    selectedTime = slot.dataset.time;
+    updateConfirm();
+  });
+
+  /* ====== 確認パネル更新 ====== */
+  function updateConfirm(){
+    var dateEl = document.getElementById('confirm-date');
+    var timeEl = document.getElementById('confirm-time');
+    var btn = document.getElementById('confirm-btn');
+
+    if(selectedDate){
+      dateEl.textContent = '2026年' + selectedDate.label;
+      dateEl.classList.remove('pending');
+    } else {
+      dateEl.textContent = '日付を選んでください';
+      dateEl.classList.add('pending');
+    }
+    if(selectedTime){
+      timeEl.textContent = selectedTime;
+      timeEl.classList.remove('pending');
+    } else {
+      timeEl.textContent = '時間帯を選んでください';
+      timeEl.classList.add('pending');
+    }
+
+    btn.disabled = !(selectedDate && selectedTime);
+  }
+
+  /* ====== 確定ボタン ====== */
+  document.getElementById('confirm-btn').addEventListener('click', function(){
+    document.getElementById('modal-date').textContent = '2026年' + selectedDate.label;
+    document.getElementById('modal-time').textContent = selectedTime;
+    document.getElementById('modal').classList.add('open');
+
+    /* localStorage に保存 */
+    try{
+      localStorage.setItem('katazuke_schedule', JSON.stringify({ date: selectedDate.label, time: selectedTime }));
+    }catch(e){}
+  });
+
+  /* モーダル外クリックで閉じない（意図的）*/
+
+})();
+</script>
+</body>
+</html>

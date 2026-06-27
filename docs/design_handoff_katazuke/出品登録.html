@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>出品登録｜カタヅケ</title>
+<meta name="theme-color" content="#1f54de">
+<link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="katazuke-main.css">
+<script src="image-slot.js"></script>
+<style>
+/* ============================================================
+   出品登録フロー
+   ============================================================ */
+body { background: #f4f6fb; }
+
+/* プログレスバー */
+.flow-header {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+  box-shadow: var(--shadow-s);
+}
+.flow-header-inner {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.flow-logo img { height: 36px; }
+.flow-steps {
+  flex: 1;
+  display: flex;
+  gap: 0;
+  align-items: center;
+}
+.flow-step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  position: relative;
+}
+.flow-step + .flow-step::before {
+  content: "";
+  position: absolute;
+  left: -50%;
+  top: 12px;
+  width: 100%;
+  height: 2px;
+  background: var(--line);
+  z-index: 0;
+}
+.flow-step.done + .flow-step::before,
+.flow-step.active + .flow-step::before { background: var(--blue); }
+.fs-dot {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  background: var(--line);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 900;
+  color: var(--body-soft);
+  font-family: var(--head);
+  position: relative; z-index: 1;
+  transition: background .3s, color .3s;
+}
+.flow-step.done .fs-dot { background: var(--blue); color: #fff; }
+.flow-step.active .fs-dot {
+  background: var(--blue); color: #fff;
+  box-shadow: 0 0 0 4px rgba(31,84,222,.18);
+}
+.fs-label { font-size: 10px; font-weight: 600; color: var(--body-soft); white-space: nowrap; }
+.flow-step.active .fs-label { color: var(--blue); font-weight: 700; }
+.flow-step.done .fs-label { color: var(--ink); }
+
+/* ページ本体 */
+.flow-wrap {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 28px 20px 80px;
+}
+
+/* ステップ共通 */
+.step-pane { display: none; }
+.step-pane.active { display: block; }
+.step-title {
+  font-family: var(--head);
+  font-size: clamp(20px, 3vw, 26px);
+  font-weight: 900;
+  color: var(--navy);
+  margin-bottom: 8px;
+  line-height: 1.35;
+}
+.step-desc {
+  font-size: 14px;
+  color: var(--body-soft);
+  line-height: 1.8;
+  margin-bottom: 24px;
+}
+
+/* フォームカード */
+.form-card {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-s);
+  padding: 24px;
+  margin-bottom: 16px;
+}
+.field { margin-bottom: 20px; }
+.field:last-child { margin-bottom: 0; }
+.field label {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 7px;
+}
+.field label .req {
+  font-size: 10.5px; font-weight: 700;
+  color: #fff; background: var(--blue);
+  padding: 1px 6px; border-radius: 4px;
+  margin-left: 5px; vertical-align: middle;
+}
+.field input, .field select, .field textarea {
+  width: 100%;
+  font-family: var(--sans);
+  font-size: 15px; color: var(--ink);
+  background: #fafbfe;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-s);
+  padding: 12px 14px;
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
+  appearance: none; line-height: 1.6;
+}
+.field input::placeholder, .field textarea::placeholder { color: #bcc3d4; }
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: var(--blue); background: #fff;
+  box-shadow: 0 0 0 3px rgba(31,84,222,.12);
+}
+.field textarea { resize: vertical; min-height: 90px; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.select-wrap { position: relative; }
+.select-wrap::after {
+  content: ""; position: absolute;
+  right: 14px; top: 50%; transform: translateY(-50%);
+  width: 0; height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid var(--body-soft);
+  pointer-events: none;
+}
+.select-wrap select { padding-right: 36px; cursor: pointer; }
+
+/* 品目カード */
+.items-container { display: flex; flex-direction: column; gap: 16px; }
+.item-card {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-s);
+  overflow: hidden;
+  border: 1.5px solid var(--line);
+  transition: border-color .2s;
+}
+.item-card.filled { border-color: var(--blue); }
+.item-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px 0;
+}
+.item-num {
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  background: var(--pale);
+  color: var(--blue);
+  font-family: var(--head);
+  font-size: 13px; font-weight: 900;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.item-card-title { font-size: 14px; font-weight: 700; color: var(--ink); flex: 1; }
+.item-del {
+  width: 28px; height: 28px;
+  border-radius: 8px;
+  background: #fff0f0;
+  border: none; cursor: pointer;
+  color: #e05c5c;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px;
+  transition: background .2s;
+}
+.item-del:hover { background: #ffe0e0; }
+.item-card-body {
+  padding: 14px 16px 16px;
+}
+.item-photos-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.photo-slot-wrap { display: flex; flex-direction: column; gap: 5px; }
+.photo-slot-wrap image-slot {
+  width: 100%; aspect-ratio: 1;
+  border-radius: 10px;
+  display: block;
+}
+.slot-label {
+  font-size: 10.5px; font-weight: 600;
+  color: var(--body-soft);
+  text-align: center;
+  display: flex; align-items: center; justify-content: center; gap: 3px;
+  line-height: 1.3;
+}
+.slot-req {
+  font-size: 9px; font-weight: 800;
+  background: var(--blue); color: #fff;
+  padding: 1px 5px; border-radius: 3px;
+}
+.slot-opt {
+  font-size: 9px; font-weight: 700;
+  color: var(--body-soft);
+}
+.photo-quality-hint {
+  background: linear-gradient(135deg, #fff8e6, #fdf3d0);
+  border: 1px solid #f0d080;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  font-size: 12.5px;
+  color: #7a5700;
+  line-height: 1.7;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.photo-quality-hint strong { color: #5a3e00; }
+.item-fields { display: flex; flex-direction: column; gap: 10px; }
+.item-field label {
+  display: block;
+  font-size: 11.5px; font-weight: 700;
+  color: var(--body-soft);
+  margin-bottom: 4px;
+  letter-spacing: .04em;
+}
+.item-field input, .item-field select, .item-field textarea {
+  width: 100%;
+  font-family: var(--sans);
+  font-size: 13.5px; color: var(--ink);
+  background: #f8f9fc;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 12px;
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
+  appearance: none;
+}
+.item-field input:focus, .item-field select:focus, .item-field textarea:focus {
+  border-color: var(--blue); background: #fff;
+  box-shadow: 0 0 0 3px rgba(31,84,222,.1);
+}
+.item-field textarea { resize: none; height: 56px; line-height: 1.5; }
+.item-field .select-wrap::after {
+  right: 10px; border-top-width: 5px;
+}
+.item-field select { padding-right: 30px; }
+
+/* 品目追加ボタン */
+.add-item-btn {
+  width: 100%;
+  padding: 16px;
+  border: 2px dashed var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-family: var(--head);
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--blue);
+  transition: border-color .2s, background .2s;
+}
+.add-item-btn:hover { border-color: var(--blue); background: var(--pale); }
+.add-icon { font-size: 22px; font-weight: 900; line-height: 1; }
+
+/* ヒントバナー */
+.hint-banner {
+  background: var(--pale);
+  border-radius: var(--radius-s);
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  color: var(--body);
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  line-height: 1.75;
+}
+.hint-ic { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+
+/* 確認画面 */
+.confirm-summary {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-s);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.confirm-head {
+  background: var(--navy);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.confirm-head h3 { color: #fff; font-size: 16px; }
+.confirm-badge {
+  margin-left: auto;
+  background: rgba(255,255,255,.15);
+  color: #fff;
+  font-size: 12px; font-weight: 700;
+  padding: 3px 12px; border-radius: 99px;
+}
+.confirm-items {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2px;
+  background: var(--line-soft);
+}
+.confirm-item-thumb {
+  aspect-ratio: 1;
+  background: var(--pale);
+  position: relative;
+  overflow: hidden;
+}
+.confirm-item-thumb image-slot {
+  width: 100%; height: 100%;
+  border-radius: 0;
+}
+.confirm-item-label {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: linear-gradient(transparent, rgba(15,37,82,.7));
+  color: #fff;
+  font-size: 9.5px; font-weight: 600;
+  padding: 14px 6px 5px;
+}
+.confirm-info {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.confirm-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13.5px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line-soft);
+  align-items: center;
+}
+.confirm-row:last-child { border-bottom: none; }
+.confirm-row .lbl { color: var(--body-soft); }
+.confirm-row .val { font-weight: 700; color: var(--ink); }
+.confirm-row .val.green { color: var(--green); }
+
+/* 約束カード */
+.promise-card {
+  background: var(--pale);
+  border: 1px solid rgba(31,84,222,.2);
+  border-radius: var(--radius-s);
+  padding: 18px 20px;
+  margin-bottom: 16px;
+}
+.promise-card h4 { font-size: 14px; color: var(--navy); margin-bottom: 10px; }
+.promise-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.promise-list li {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13px; color: var(--body);
+}
+.promise-list li::before {
+  content: "✓";
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--blue);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 900;
+  flex-shrink: 0;
+}
+
+/* 完了画面 */
+.done-screen { text-align: center; padding: 48px 20px; }
+.done-circle {
+  width: 80px; height: 80px;
+  border-radius: 50%;
+  background: var(--pale);
+  margin: 0 auto 24px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--blue); font-size: 36px;
+}
+.done-screen h2 { font-size: 24px; color: var(--navy); margin-bottom: 12px; }
+.done-screen p { font-size: 15px; color: var(--body-soft); line-height: 1.85; margin-bottom: 32px; }
+.done-actions { display: flex; flex-direction: column; gap: 12px; align-items: center; }
+
+/* フッターボタン */
+.flow-footer {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: #fff;
+  border-top: 1px solid var(--line);
+  padding: 14px 20px;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  max-width: 680px;
+  margin: 0 auto;
+  box-shadow: 0 -4px 20px -8px rgba(15,37,82,.15);
+  z-index: 50;
+}
+.flow-footer-inner {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 50;
+  background: #fff;
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -4px 20px -8px rgba(15,37,82,.15);
+}
+.flow-footer-inner .inner {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 14px 20px;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  align-items: center;
+}
+.flow-footer-inner .item-count-label {
+  flex: 1;
+  font-size: 13px;
+  color: var(--body-soft);
+}
+.flow-footer-inner .item-count-label strong { color: var(--blue); }
+
+.btn-flow-back {
+  padding: 13px 22px;
+  border-radius: 99px;
+  border: 1.5px solid var(--line);
+  background: #fff;
+  color: var(--navy);
+  font-family: var(--head);
+  font-size: 14px; font-weight: 700;
+  cursor: pointer;
+  transition: .2s;
+}
+.btn-flow-back:hover { border-color: var(--blue); color: var(--blue); }
+.btn-flow-next {
+  padding: 13px 28px;
+  border-radius: 99px;
+  border: none;
+  background: var(--blue);
+  color: #fff;
+  font-family: var(--head);
+  font-size: 15px; font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 8px 20px -8px rgba(31,84,222,.6);
+  transition: .2s;
+  display: flex; align-items: center; gap: 8px;
+}
+.btn-flow-next:hover { background: var(--blue-d); transform: translateY(-1px); }
+.btn-flow-next:disabled { background: var(--line); box-shadow: none; cursor: not-allowed; transform: none; }
+
+/* 完了済みストリップ */
+.completed-strip {
+  background: #fff;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--line);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+.completed-strip-label {
+  font-size: 11.5px; font-weight: 700;
+  color: var(--body-soft); letter-spacing: .06em;
+  margin-bottom: 10px;
+}
+.completed-strip-inner {
+  display: flex; gap: 10px; flex-wrap: wrap;
+}
+.completed-thumb {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--pale);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 12.5px; font-weight: 700;
+  color: var(--navy);
+}
+.completed-thumb .thumb-num {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--blue); color: #fff;
+  font-size: 11px; font-weight: 900;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--head);
+}
+
+/* 1品完了後のアクションボタン */
+.item-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 16px;
+}
+.btn-add-next {
+  padding: 15px 18px;
+  border-radius: 99px;
+  border: 2px dashed var(--blue);
+  background: #fff;
+  color: var(--blue);
+  font-family: var(--head); font-size: 14.5px; font-weight: 900;
+  cursor: pointer;
+  transition: .2s;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.btn-add-next:hover { background: var(--pale); }
+.btn-finish-items {
+  padding: 15px 18px;
+  border-radius: 99px;
+  border: none;
+  background: var(--blue);
+  color: #fff;
+  font-family: var(--head); font-size: 14.5px; font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 8px 20px -8px rgba(31,84,222,.6);
+  transition: .2s;
+}
+.btn-finish-items:hover { background: var(--blue-d); transform: translateY(-1px); }
+@media(max-width: 480px){
+  .item-actions { grid-template-columns: 1fr; }
+}
+.has-error input, .has-error select { border-color: #e05c5c; }
+.field-error { font-size:12px; color:#e05c5c; margin-top:5px; display:none; }
+/* 連絡先タブ */
+.contact-toggle { display:flex; gap:0; border-radius:10px; overflow:hidden; border:1.5px solid var(--line); }
+.contact-tab { flex:1; padding:10px; font-family:var(--head); font-size:13.5px; font-weight:700; color:var(--body-soft); background:#fff; border:none; cursor:pointer; transition:.2s; }
+.contact-tab.active { background:var(--blue); color:#fff; }
+.line-connect-card { border:1.5px solid var(--line); border-radius:10px; padding:14px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:8px; flex-wrap:wrap; }
+.line-connect-body { display:flex; align-items:center; gap:10px; }
+
+@media(max-width: 500px){
+  .field-row { grid-template-columns: 1fr; }
+  .item-photos-grid { grid-template-columns: repeat(3, 1fr); }
+  .confirm-items { grid-template-columns: repeat(3, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+  <symbol id="i-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l2.5 2.5L16 9"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M5 5h14a2 2 0 012 2v8a2 2 0 01-2 2H9l-4 4V7a2 2 0 012-2z"/><path d="M8 10h8M8 13h5"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.6"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+</defs></svg>
+
+<!-- ヘッダー（プログレス） -->
+<div class="flow-header">
+  <div class="flow-header-inner">
+    <a href="カタヅケ.html" class="flow-logo"><img src="img/logo-katazuke.png" alt="カタヅケ"></a>
+    <div class="flow-steps" id="flow-steps">
+      <div class="flow-step active" data-step="1">
+        <div class="fs-dot">1</div>
+        <div class="fs-label">品物を撮る</div>
+      </div>
+      <div class="flow-step" data-step="2">
+        <div class="fs-dot">2</div>
+        <div class="fs-label">基本情報</div>
+      </div>
+      <div class="flow-step" data-step="3">
+        <div class="fs-dot">3</div>
+        <div class="fs-label">確認・送信</div>
+      </div>
+      <div class="flow-step" data-step="4">
+        <div class="fs-dot fs-check">✓</div>
+        <div class="fs-label">完了</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<main>
+<div class="flow-wrap">
+
+  <!-- STEP 1: 品物を撮る -->
+  <div class="step-pane active" id="step-1">
+    <h2 class="step-title">まず、品物を<br>撮影・登録してください</h2>
+    <p class="step-desc">写真をドラッグ＆ドロップするか、クリックして選択。まとめて多いほど査定が有利になります。</p>
+
+    <div class="hint-banner">
+      <span class="hint-ic">📸</span>
+      <span>品番・型番が見えるように撮ると査定精度が上がります。値がつかない物も、まとめて出すとお得です。<a href="撮影のコツ.html" style="color:var(--blue);font-weight:700;">撮影のコツを見る→</a></span>
+    </div>
+
+    <!-- 完了済みサムネイル -->
+    <div class="completed-strip" id="completed-strip" style="display:none;">
+      <div class="completed-strip-label">登録済み</div>
+      <div class="completed-strip-inner" id="completed-strip-inner"></div>
+    </div>
+
+    <!-- 現在入力中の1品 -->
+    <div id="current-item-wrap"></div>
+
+    <!-- インラインボタン -->
+    <div class="item-actions">
+      <button class="btn-add-next" id="btn-add-next">&#43; 次の品物を追加</button>
+      <button class="btn-finish-items" id="btn-finish-items">出品を完了する（0点）</button>
+    </div>
+  </div>
+
+  <!-- STEP 2: 基本情報 -->
+  <div class="step-pane" id="step-2">
+    <h2 class="step-title">最後に、<br>基本情報を教えてください</h2>
+    <p class="step-desc">連絡先は交渉成立後に開示されます。査定段階では写真と品目のみです。</p>
+
+    <div class="form-card">
+      <div class="field" id="f-name">
+        <label>お名前<span class="req">必須</span></label>
+        <input type="text" id="inp-name" placeholder="山田 花子" autocomplete="name">
+        <div class="field-error">お名前を入力してください</div>
+      </div>
+
+      <div class="field" id="f-zip">
+        <label>郵便番号<span class="req">必須</span></label>
+        <input type="text" id="inp-zip" placeholder="123-4567" maxlength="8" inputmode="numeric" style="max-width:200px;">
+        <div class="field-error">郵便番号を入力してください</div>
+      </div>
+
+      <div class="field" id="f-address" style="display:none;">
+        <label>住所（自動入力）</label>
+        <input type="text" id="inp-address-auto" readonly style="background:#f0f4ff;color:var(--ink);font-weight:600;">
+      </div>
+
+      <div class="field" id="f-contact">
+        <label>連絡先<span class="req">必須</span></label>
+        <div class="contact-toggle">
+          <button type="button" class="contact-tab active" data-tab="email">メールアドレス</button>
+          <button type="button" class="contact-tab" data-tab="line">LINE連携</button>
+        </div>
+        <div id="contact-email-pane">
+          <input type="email" id="inp-email" placeholder="example@email.com" autocomplete="email" style="margin-top:8px;">
+        </div>
+        <div id="contact-line-pane" style="display:none;">
+          <div class="line-connect-card">
+            <div class="line-connect-body">
+              <span class="line-ic">
+                <svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:#06c755;"><path d="M12 2C6.48 2 2 6.1 2 11.1c0 4.5 3.6 8.3 8.5 9-.3.8-.4 2-.4 2s-.1.7.4.9c.5.2 1-.2 1-.2s2.7-1.8 3.8-2.5c.4.1.9.1 1.3.1C17.7 20.4 22 16.4 22 11.1 22 6.1 17.5 2 12 2z"/></svg>
+              </span>
+              <div>
+                <div style="font-weight:700;font-size:14px;color:var(--ink);">LINEで友だち追加</div>
+                <div style="font-size:12.5px;color:var(--body-soft);ライン本人確認、入札連絡はすべてLINEで受け取れます">LINE入札連絡はすべてLINEで受け取れます</div>
+              </div>
+            </div>
+            <a href="#" class="btn btn-line" style="font-size:13.5px;padding:11px 18px;">
+              <svg class="ic"><use href="#i-chat"></use></svg>LINEで友だち追加
+            </a>
+          </div>
+          <input type="hidden" id="inp-line-id" value="">
+          <div id="line-connected" style="display:none;background:#d1fae5;border-radius:8px;padding:10px 14px;font-size:13px;color:var(--green);font-weight:700;margin-top:8px;">✓ LINE連携済み</div>
+        </div>
+        <div class="field-error" id="contact-error">メールアドレスまたはLINE連携が必要です</div>
+      </div>
+    </div>
+
+    <div class="hint-banner">
+      <span class="hint-ic">🔒</span>
+      <span>連絡先（電話・住所）は<strong>交渉が成立した業者とだけ</strong>共有されます。査定段階では写真と品目のみです。</span>
+    </div>
+  </div>
+
+  <!-- STEP 3: 確認・送信 -->
+  <div class="step-pane" id="step-3">
+    <h2 class="step-title">内容を確認して<br>送信してください</h2>
+    <p class="step-desc">送信後、登録業者が3日以内に入札します。入札状況は「申し込み状況」ページで確認できます。</p>
+
+    <div class="confirm-summary">
+      <div class="confirm-head">
+        <h3>出品まとめ</h3>
+        <span class="confirm-badge" id="confirm-count-badge">0点</span>
+      </div>
+      <div class="confirm-items" id="confirm-items-grid"></div>
+      <div class="confirm-info">
+        <div class="confirm-row"><span class="lbl">出品者</span><span class="val" id="conf-name">—</span></div>
+        <div class="confirm-row"><span class="lbl">住所</span><span class="val" id="conf-area">—</span></div>
+        <div class="confirm-row"><span class="lbl">連絡先</span><span class="val" id="conf-timing">—</span></div>
+        <div class="confirm-row"><span class="lbl">入札期間</span><span class="val">出品から3日間</span></div>
+        <div class="confirm-row"><span class="lbl">ユーザー費用</span><span class="val green">無料</span></div>
+      </div>
+    </div>
+
+    <div class="promise-card">
+      <h4>カタヅケのお約束</h4>
+      <ul class="promise-list">
+        <li>連絡先は成約した業者にのみ開示されます</li>
+        <li>上位3社以外からの連絡は来ません</li>
+        <li>査定後に断っても、費用は一切かかりません</li>
+        <li>参加業者は古物商許可を確認した登録事業者のみ</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- STEP 4: 完了 -->
+  <div class="step-pane" id="step-4">
+    <div class="done-screen">
+      <div class="done-circle">
+        <svg style="width:40px;height:40px;fill:none;stroke:var(--blue);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;"><use href="#i-check-circle"></use></svg>
+      </div>
+      <h2>出品が完了しました</h2>
+      <p>登録業者があなたの品物まとめを確認し、<br>3日以内に入札が届きます。<br>通知はLINEでお知らせします。</p>
+      <div class="done-actions">
+        <a href="申し込み状況.html" class="btn btn-primary btn-lg">
+          入札状況を確認する
+          <svg class="ic arw"><use href="#i-arrow"></use></svg>
+        </a>
+        <a href="カタヅケ.html" class="btn btn-ghost btn-lg">トップへ戻る</a>
+      </div>
+    </div>
+  </div>
+
+</div>
+</main>
+
+<!-- フッターボタン -->
+<div class="flow-footer-inner" id="flow-footer">
+  <div class="inner">
+    <span class="item-count-label" id="footer-item-label"></span>
+    <button class="btn-flow-back" id="btn-back" style="display:none;">戻る</button>
+    <button class="btn-flow-next" id="btn-next">
+      次へ<svg style="width:16px;height:16px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><use href="#i-arrow"></use></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+(function(){
+  var currentStep = 1;
+  var totalSteps = 4;
+  var items = [];
+  var itemCounter = 0;
+
+  var cats = [
+    '家電・デジタル','ブランド品','時計・貴金属','ファッション',
+    'ゲーム・おもちゃ','カメラ','楽器・オーディオ','本・コミック',
+    'スポーツ・アウトドア','家具・インテリア','美容・コスメ','アート・その他'
+  ];
+
+  var timingLabels = {
+    '': '特に指定なし', 'asap': 'できるだけ早く',
+    '1w': '1週間以内', '2w': '2週間以内',
+    '1m': '1ヶ月以内', 'undecided': '未定'
+  };
+  var areaLabels = {
+    'tokyo': '東京都', 'chiba': '千葉県',
+    'saitama': '埼玉県', 'kanagawa': '神奈川県'
+  };
+
+  /* ---- アイテム管理（1品ずつ） ---- */
+  var currentItemId = null;
+
+  function startItem(){
+    itemCounter++;
+    var id = itemCounter;
+    currentItemId = id;
+    items.push({ id: id });
+    renderCurrentItem(id);
+    updateFinishBtn();
+  }
+
+  function renderCurrentItem(id){
+    var idx = items.findIndex(function(i){ return i.id === id; });
+    var wrap = document.getElementById('current-item-wrap');
+    var card = document.createElement('div');
+    card.className = 'item-card';
+    card.id = 'item-card-' + id;
+    card.innerHTML =
+      '<div class="item-card-head">' +
+        '<div class="item-num">' + (idx + 1) + '</div>' +
+        '<div class="item-card-title">品物 ' + (idx + 1) + '</div>' +
+      '</div>' +
+      '<div class="item-card-body">' +
+        '<div class="photo-quality-hint">' +
+          '<span style="flex-shrink:0">⭐</span>' +
+          '<span><strong>写真が多いほど高査定につながりやすくなります。</strong>正面は必須、背面・側面・型番まで撑えると業者が自信を持って高額入札しやすくなります。</span>' +
+        '</div>' +
+        '<div class="item-photos-grid">' +
+          '<div class="photo-slot-wrap">' +
+            '<image-slot id="item-photo-front-' + id + '" shape="rounded" radius="10" placeholder="正面" fit="cover"></image-slot>' +
+            '<div class="slot-label">正面 <span class="slot-req">必須</span></div>' +
+          '</div>' +
+          '<div class="photo-slot-wrap">' +
+            '<image-slot id="item-photo-back-' + id + '" shape="rounded" radius="10" placeholder="背面" fit="cover"></image-slot>' +
+            '<div class="slot-label">胍面 <span class="slot-opt">任意</span></div>' +
+          '</div>' +
+          '<div class="photo-slot-wrap">' +
+            '<image-slot id="item-photo-left-' + id + '" shape="rounded" radius="10" placeholder="左" fit="cover"></image-slot>' +
+            '<div class="slot-label">左側面 <span class="slot-opt">任意</span></div>' +
+          '</div>' +
+          '<div class="photo-slot-wrap">' +
+            '<image-slot id="item-photo-right-' + id + '" shape="rounded" radius="10" placeholder="右" fit="cover"></image-slot>' +
+            '<div class="slot-label">右側面 <span class="slot-opt">任意</span></div>' +
+          '</div>' +
+          '<div class="photo-slot-wrap">' +
+            '<image-slot id="item-photo-detail-' + id + '" shape="rounded" radius="10" placeholder="型番" fit="cover"></image-slot>' +
+            '<div class="slot-label">詳細・ラベル <span class="slot-opt">任意</span></div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="item-fields">' +
+          '<div class="item-field">' +
+            '<label>カテゴリ</label>' +
+            '<div class="select-wrap">' +
+              '<select id="item-cat-' + id + '">' +
+                '<option value="" disabled selected>選択してください</option>' +
+                cats.map(function(c){ return '<option>' + c + '</option>'; }).join('') +
+              '</select>' +
+            '</div>' +
+          '</div>' +
+          '<div class="item-field">' +
+            '<label>品名・メモ（任意）</label>' +
+            '<textarea id="item-memo-' + id + '" placeholder="例：ソニー製テレビ 42型、使用感あり"></textarea>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    wrap.innerHTML = '';
+    wrap.appendChild(card);
+  }
+
+  function addCompletedThumb(id){
+    var idx = items.findIndex(function(i){ return i.id === id; });
+    var strip = document.getElementById('completed-strip');
+    var inner = document.getElementById('completed-strip-inner');
+    var cat = (document.getElementById('item-cat-' + id) || {}).value || '未分類';
+    var thumb = document.createElement('div');
+    thumb.className = 'completed-thumb';
+    thumb.innerHTML = '<span class="thumb-num">' + (idx + 1) + '</span><span>' + cat + '</span>';
+    inner.appendChild(thumb);
+    strip.style.display = 'block';
+  }
+
+  function updateFinishBtn(){
+    var btn = document.getElementById('btn-finish-items');
+    if(btn) btn.textContent = '出品を完了する（' + items.length + '点）';
+  }
+
+  /* 次の品物へ */
+  document.getElementById('btn-add-next').addEventListener('click', function(){
+    addCompletedThumb(currentItemId);
+    startItem();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  /* 出品完了 */
+  document.getElementById('btn-finish-items').addEventListener('click', function(){
+    if(items.length === 0){ alert('品物を1点以上登録してください'); return; }
+    addCompletedThumb(currentItemId);
+    goTo(2);
+  });
+  /* ---- ステップ管理 ---- */
+  function goTo(step){
+    document.querySelectorAll('.step-pane').forEach(function(p){ p.classList.remove('active'); });
+    document.getElementById('step-' + step).classList.add('active');
+
+    /* ステップインジケーター */
+    document.querySelectorAll('.flow-step').forEach(function(el){
+      var s = parseInt(el.dataset.step);
+      el.classList.remove('active', 'done');
+      if(s < step) el.classList.add('done');
+      if(s === step) el.classList.add('active');
+    });
+
+    currentStep = step;
+    var backBtn = document.getElementById('btn-back');
+    var nextBtn = document.getElementById('btn-next');
+    backBtn.style.display = step > 1 && step < 4 ? 'block' : 'none';
+
+    if(step === 1){
+      nextBtn.style.display = 'none';
+    } else if(step === 3){
+      nextBtn.style.display = 'flex';
+      nextBtn.innerHTML = '送信する <svg style="width:16px;height:16px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:inline-block;vertical-align:-.1em;"><use href="#i-arrow"></use></svg>';
+      buildConfirm();
+    } else if(step === 4){
+      document.getElementById('flow-footer').style.display = 'none';
+    } else {
+      nextBtn.style.display = 'flex';
+      nextBtn.innerHTML = '次へ <svg style="width:16px;height:16px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:inline-block;vertical-align:-.1em;"><use href="#i-arrow"></use></svg>';
+    }
+    updateFooter();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  /* ---- バリデーション ---- */
+  function validateStep1(){
+    if(items.length === 0){
+      alert('品物を1点以上追加してください');
+      return false;
+    }
+    return true;
+  }
+
+  function validateStep2(){
+    var ok = true;
+    /* 名前 */
+    var nameEl = document.getElementById('inp-name');
+    var nameWrap = document.getElementById('f-name');
+    if(!nameEl.value.trim()){
+      nameWrap.classList.add('has-error');
+      nameWrap.querySelector('.field-error').style.display = 'block';
+      ok = false;
+    } else { nameWrap.classList.remove('has-error'); nameWrap.querySelector('.field-error').style.display = 'none'; }
+    /* 郵便番号 */
+    var zipEl = document.getElementById('inp-zip');
+    var zipWrap = document.getElementById('f-zip');
+    if(zipEl.value.replace(/[^0-9]/g,'').length < 7){
+      zipWrap.classList.add('has-error');
+      zipWrap.querySelector('.field-error').style.display = 'block';
+      ok = false;
+    } else { zipWrap.classList.remove('has-error'); zipWrap.querySelector('.field-error').style.display = 'none'; }
+    /* 連絡先 */
+    var activeTab = document.querySelector('.contact-tab.active');
+    var contactOk = false;
+    if(activeTab && activeTab.dataset.tab === 'email'){
+      contactOk = !!document.getElementById('inp-email').value.trim();
+    } else {
+      contactOk = document.getElementById('inp-line-id').value !== '';
+    }
+    var contactErr = document.getElementById('contact-error');
+    var contactWrap = document.getElementById('f-contact');
+    if(!contactOk){
+      contactErr.style.display = 'block';
+      contactWrap.classList.add('has-error');
+      ok = false;
+    } else { contactErr.style.display = 'none'; contactWrap.classList.remove('has-error'); }
+    return ok;
+  }
+
+  /* ---- 確認画面生成 ---- */
+  function buildConfirm(){
+    document.getElementById('conf-name').textContent = document.getElementById('inp-name').value || '—';
+    var addr = document.getElementById('inp-address-auto').value || '';
+    document.getElementById('conf-area').textContent = addr || '—';
+    var activeTab = document.querySelector('.contact-tab.active');
+    var contact = '';
+    if(activeTab && activeTab.dataset.tab === 'email'){
+      contact = document.getElementById('inp-email').value || '—';
+    } else {
+      contact = 'LINE連携済み';
+    }
+    document.getElementById('conf-timing').textContent = contact;
+    document.getElementById('confirm-count-badge').textContent = items.length + '点';
+
+    var grid = document.getElementById('confirm-items-grid');
+    grid.innerHTML = '';
+    items.forEach(function(item){
+      var cat = (document.getElementById('item-cat-' + item.id) || {}).value || '';
+      var div = document.createElement('div');
+      div.className = 'confirm-item-thumb';
+      /* image-slotをクローン表示 */
+      var origSlot = document.getElementById('item-photo-front-' + item.id);
+      if(origSlot){
+        var cloneSlot = document.createElement('image-slot');
+        cloneSlot.setAttribute('id', 'conf-photo-' + item.id);
+        cloneSlot.setAttribute('shape', 'rect');
+        cloneSlot.setAttribute('fit', 'cover');
+        cloneSlot.style.width = '100%';
+        cloneSlot.style.height = '100%';
+        cloneSlot.style.display = 'block';
+        div.appendChild(cloneSlot);
+      }
+      if(cat){
+        var lbl = document.createElement('div');
+        lbl.className = 'confirm-item-label';
+        lbl.textContent = cat;
+        div.appendChild(lbl);
+      }
+      grid.appendChild(div);
+    });
+  }
+
+  /* ---- フッター更新 ---- */
+  function updateFooter(){
+    var lbl = document.getElementById('footer-item-label');
+    if(currentStep === 2){
+      lbl.innerHTML = '登録済み：<strong>' + items.length + '点</strong>';
+    } else {
+      lbl.innerHTML = '';
+    }
+  }
+
+  /* ---- ナビ ---- */
+  document.getElementById('btn-next').addEventListener('click', function(){
+    if(currentStep === 1) return;
+    if(currentStep === 2 && !validateStep2()) return;
+    if(currentStep === 3){
+      goTo(4); return;
+    }
+    if(currentStep < totalSteps) goTo(currentStep + 1);
+  });
+  document.getElementById('btn-back').addEventListener('click', function(){
+    if(currentStep > 1) goTo(currentStep - 1);
+  });
+
+  /* ---- 郵便番号フォーマット＋住所自動入力 ---- */
+  document.getElementById('inp-zip').addEventListener('input', function(){
+    var v = this.value.replace(/[^0-9]/g,'');
+    if(v.length > 3) v = v.substring(0,3) + '-' + v.substring(3,7);
+    this.value = v;
+    if(v.replace(/[^0-9]/g,'').length === 7) lookupZipAddress();
+  });
+  function lookupZipAddress(){
+    var zip = document.getElementById('inp-zip').value.replace(/[^0-9]/g,'');
+    if(zip.length < 7) return;
+    fetch('https://zipcloud.ibsregion.co.jp/api/search?zipcode=' + zip)
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if(d.results && d.results[0]){
+          var r = d.results[0];
+          var addr = r.address1 + r.address2 + r.address3;
+          document.getElementById('inp-address-auto').value = addr;
+          document.getElementById('f-address').style.display = 'block';
+          document.getElementById('f-zip').classList.remove('has-error');
+          document.getElementById('f-zip').querySelector('.field-error').style.display = 'none';
+        } else {
+          document.getElementById('inp-address-auto').value = '';
+          document.getElementById('f-address').style.display = 'none';
+        }
+      })
+      .catch(function(){
+        document.getElementById('f-address').style.display = 'block';
+        var autoEl = document.getElementById('inp-address-auto');
+        autoEl.removeAttribute('readonly');
+        autoEl.placeholder = '住所を入力してください';
+      });
+  }
+  /* 連絡先タブ切替 */
+  document.querySelectorAll('.contact-tab').forEach(function(tab){
+    tab.addEventListener('click', function(){
+      document.querySelectorAll('.contact-tab').forEach(function(t){ t.classList.remove('active'); });
+      tab.classList.add('active');
+      document.getElementById('contact-email-pane').style.display = tab.dataset.tab === 'email' ? 'block' : 'none';
+      document.getElementById('contact-line-pane').style.display = tab.dataset.tab === 'line' ? 'block' : 'none';
+    });
+  });
+  /* LINEデモ連携 */
+  document.querySelector('.line-connect-card a').addEventListener('click', function(e){
+    e.preventDefault();
+    document.getElementById('inp-line-id').value = 'LINE_USER_DEMO';
+    document.getElementById('line-connected').style.display = 'block';
+    this.style.display = 'none';
+  });
+
+  /* ---- 初期：1品目を表示 ---- */
+  startItem();
+
+})();
+</script>
+</body>
+</html>

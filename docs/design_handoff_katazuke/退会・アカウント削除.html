@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>アカウント削除｜カタヅケ</title>
+<meta name="theme-color" content="#1f54de">
+<link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="katazuke-main.css">
+<style>
+body{background:#f4f6fb;}
+.del-header{background:#fff;border-bottom:1px solid var(--line);padding:0 20px;height:60px;display:flex;align-items:center;gap:12px;}
+.del-header img{height:36px;}
+.del-header-back{margin-left:auto;display:flex;align-items:center;gap:5px;font-size:13px;font-weight:700;color:var(--body-soft);text-decoration:none;transition:color .2s;}
+.del-header-back:hover{color:var(--blue);}
+.del-header-back svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;}
+.del-wrap{max-width:480px;margin:0 auto;padding:28px 20px 80px;}
+
+/* ステップ */
+.panel{display:none;}
+.panel.active{display:block;}
+
+/* 警告バナー */
+.warn-banner{background:#fff3f3;border:1.5px solid #ffc0c0;border-radius:14px;padding:18px 20px;margin-bottom:20px;display:flex;gap:12px;align-items:flex-start;}
+.warn-ic{width:36px;height:36px;border-radius:10px;background:#ffe0e0;flex-shrink:0;display:grid;place-items:center;font-size:20px;}
+.warn-body strong{display:block;font-family:var(--head);font-size:15px;font-weight:700;color:#cc3333;margin-bottom:4px;}
+.warn-body span{font-size:13px;color:#993333;line-height:1.75;}
+
+/* 削除対象リスト */
+.del-list{display:flex;flex-direction:column;gap:0;}
+.del-item{display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--line-soft);}
+.del-item:last-child{border-bottom:none;}
+.del-item-ic{width:36px;height:36px;border-radius:10px;flex-shrink:0;display:grid;place-items:center;background:#ffe0e0;}
+.del-item-ic svg{width:18px;height:18px;fill:none;stroke:#cc3333;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+.del-item-body strong{display:block;font-size:14px;font-weight:700;color:var(--navy);}
+.del-item-body span{font-size:12.5px;color:var(--body-soft);}
+
+/* フォーム */
+.form-card{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow-s);border:1px solid var(--line-soft);padding:20px;margin-bottom:14px;}
+.form-card-title{font-family:var(--head);font-size:14px;font-weight:700;color:var(--navy);margin-bottom:14px;}
+.field label{display:block;font-size:13px;font-weight:700;color:var(--ink);margin-bottom:7px;}
+.field input{width:100%;font-family:var(--sans);font-size:15px;background:#fafbfe;border:1.5px solid var(--line);border-radius:var(--radius-s);padding:12px 14px;outline:none;color:var(--ink);transition:.2s;}
+.field input::placeholder{color:#bcc3d4;}
+.field input:focus{border-color:#e05c5c;background:#fff;box-shadow:0 0 0 3px rgba(220,70,70,.12);}
+.field-error{font-size:12px;color:#e05c5c;margin-top:5px;display:none;}
+
+/* 確認チェック */
+.check-list{display:flex;flex-direction:column;gap:10px;margin-bottom:4px;}
+.check-row{display:flex;align-items:flex-start;gap:10px;}
+.check-row input[type="checkbox"]{width:18px;height:18px;flex-shrink:0;margin-top:2px;accent-color:#e05c5c;cursor:pointer;}
+.check-row label{font-size:13.5px;color:var(--body);line-height:1.7;cursor:pointer;}
+
+/* 削除ボタン */
+.btn-delete{width:100%;padding:15px;border-radius:99px;border:none;background:#e05c5c;color:#fff;font-family:var(--head);font-size:16px;font-weight:900;cursor:pointer;transition:.2s;display:flex;align-items:center;justify-content:center;gap:8px;}
+.btn-delete:hover:not(:disabled){background:#c94040;transform:translateY(-1px);}
+.btn-delete:disabled{background:var(--line);cursor:not-allowed;}
+.btn-delete svg{width:18px;height:18px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+
+/* 完了画面 */
+.done-screen{text-align:center;padding:40px 0;}
+.done-ic{font-size:48px;margin-bottom:16px;}
+.done-title{font-family:var(--head);font-size:22px;color:var(--navy);margin-bottom:10px;}
+.done-sub{font-size:14px;color:var(--body-soft);line-height:1.85;margin-bottom:28px;}
+
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinning{animation:spin .7s linear infinite;display:inline-block;}
+
+@media(max-width: 480px) {
+  .del-wrap { padding: 20px 14px 80px; }
+  .form-card { padding: 18px 14px; }
+  .warn-banner { padding: 14px 14px; gap: 10px; }
+  .warn-ic { width: 30px; height: 30px; font-size: 16px; }
+  .warn-body strong { font-size: 14px; }
+  .del-item { gap: 10px; padding: 12px 0; }
+  .btn-delete { font-size: 14px; padding: 14px; }
+  .done-screen { padding: 30px 0; }
+  .done-ic { font-size: 40px; }
+  .done-title { font-size: 20px; }
+}
+@media(max-width: 360px) {
+  .check-row label { font-size: 12.5px; }
+  .del-item-body strong { font-size: 13px; }
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute"><defs>
+  <symbol id="i-trash" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M5 5h14a2 2 0 012 2v8a2 2 0 01-2 2H9l-4 4V7a2 2 0 012-2z"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+</defs></svg>
+
+<header class="del-header">
+  <a href="カタヅケ.html"><img src="img/logo-katazuke.png" alt="カタヅケ"></a>
+  <a href="プロフィール編集.html" class="del-header-back">
+    <svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+    プロフィール編集
+  </a>
+</header>
+
+<main>
+<div class="del-wrap">
+
+  <!-- 確認画面 -->
+  <div class="panel active" id="panel-confirm">
+
+    <div class="warn-banner">
+      <div class="warn-ic">⚠️</div>
+      <div class="warn-body">
+        <strong>この操作は取り消せません</strong>
+        <span>アカウントを削除すると、以下のデータがすべて完全に削除されます。</span>
+      </div>
+    </div>
+
+    <div class="form-card">
+      <div class="form-card-title">削除されるデータ</div>
+      <div class="del-list">
+        <div class="del-item"><div class="del-item-ic"><svg viewBox="0 0 24 24"><use href="#i-user"></use></svg></div><div class="del-item-body"><strong>アカウント情報</strong><span>名前・メールアドレス・設定</span></div></div>
+        <div class="del-item"><div class="del-item-ic"><svg viewBox="0 0 24 24"><use href="#i-list"></use></svg></div><div class="del-item-body"><strong>出品データ・取引履歴</strong><span>3件の出品・2件の成約記録</span></div></div>
+        <div class="del-item"><div class="del-item-ic"><svg viewBox="0 0 24 24"><use href="#i-chat"></use></svg></div><div class="del-item-body"><strong>メッセージ履歴</strong><span>業者とのやり取りすべて</span></div></div>
+      </div>
+    </div>
+
+    <!-- 確認チェック -->
+    <div class="form-card">
+      <div class="form-card-title">削除前の確認</div>
+      <div class="check-list">
+        <div class="check-row"><input type="checkbox" id="chk1" onchange="checkAll()"><label for="chk1">上記のデータがすべて削除されることを理解しています</label></div>
+        <div class="check-row"><input type="checkbox" id="chk2" onchange="checkAll()"><label for="chk2">進行中の取引・入札がある場合、自動的にキャンセルされます</label></div>
+        <div class="check-row"><input type="checkbox" id="chk3" onchange="checkAll()"><label for="chk3">この操作は元に戻せないことを理解しています</label></div>
+      </div>
+    </div>
+
+    <!-- パスワード確認 -->
+    <div class="form-card">
+      <div class="form-card-title">パスワードを入力して確認</div>
+      <div class="field">
+        <label>現在のパスワード</label>
+        <input type="password" id="inp-pw" placeholder="パスワードを入力">
+        <div class="field-error" id="pw-error">パスワードを入力してください</div>
+      </div>
+    </div>
+
+    <button class="btn-delete" id="btn-delete" disabled onclick="doDelete()">
+      <svg viewBox="0 0 24 24"><use href="#i-trash"></use></svg>
+      アカウントを完全に削除する
+    </button>
+    <div style="text-align:center;margin-top:16px;">
+      <a href="プロフィール編集.html" style="font-size:13px;color:var(--body-soft);">キャンセルして戻る</a>
+    </div>
+  </div>
+
+  <!-- 完了画面 -->
+  <div class="panel" id="panel-done">
+    <div class="done-screen">
+      <div class="done-ic">👋</div>
+      <h1 class="done-title">アカウントを削除しました</h1>
+      <p class="done-sub">ご利用いただきありがとうございました。<br>またのご利用をお待ちしています。</p>
+      <a href="カタヅケ.html" class="btn btn-primary btn-lg">トップページへ</a>
+    </div>
+  </div>
+
+</div>
+</main>
+
+<script>
+function checkAll(){
+  var all = document.getElementById('chk1').checked && document.getElementById('chk2').checked && document.getElementById('chk3').checked;
+  document.getElementById('btn-delete').disabled = !all;
+}
+function doDelete(){
+  var pw = document.getElementById('inp-pw').value;
+  if(!pw){ document.getElementById('pw-error').style.display='block'; return; }
+  document.getElementById('pw-error').style.display='none';
+  var btn = document.getElementById('btn-delete');
+  btn.innerHTML = '<span class="spinning">↻</span> 削除中…'; btn.disabled = true;
+  setTimeout(function(){
+    document.getElementById('panel-confirm').classList.remove('active');
+    document.getElementById('panel-done').classList.add('active');
+  }, 1500);
+}
+</script>
+</body>
+</html>

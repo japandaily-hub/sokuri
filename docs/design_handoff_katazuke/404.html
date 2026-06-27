@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ページが見つかりません｜カタヅケ</title>
+<meta name="theme-color" content="#1f54de">
+<link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="katazuke-main.css">
+<style>
+html,body{height:100%;}
+body{background:#f4f6fb;display:flex;flex-direction:column;min-height:100vh;}
+.err-header{background:#fff;border-bottom:1px solid var(--line);padding:0 24px;height:60px;display:flex;align-items:center;}
+.err-header img{height:36px;}
+.err-main{flex:1;display:flex;align-items:center;justify-content:center;padding:40px 20px;}
+.err-card{max-width:480px;width:100%;background:#fff;border-radius:var(--radius);box-shadow:var(--shadow-m);border:1px solid var(--line-soft);padding:48px 36px;text-align:center;}
+
+/* 404大文字 */
+.err-num{
+  font-family:var(--head);font-size:clamp(80px,15vw,120px);font-weight:900;line-height:1;
+  background:linear-gradient(135deg,var(--blue),#6fa3ff);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  margin-bottom:6px;
+}
+.err-icon{font-size:40px;margin-bottom:16px;}
+.err-title{font-family:var(--head);font-size:22px;font-weight:900;color:var(--navy);margin-bottom:10px;}
+.err-sub{font-size:14.5px;color:var(--body-soft);line-height:1.85;margin-bottom:30px;}
+
+/* リンクカード */
+.err-links{display:flex;flex-direction:column;gap:8px;margin-bottom:28px;}
+.err-link{
+  display:flex;align-items:center;gap:12px;
+  background:var(--pale);border-radius:12px;border:1px solid rgba(31,84,222,.12);
+  padding:14px 16px;text-decoration:none;transition:.2s;
+}
+.err-link:hover{transform:translateY(-1px);box-shadow:var(--shadow-s);}
+.err-link-ic{width:36px;height:36px;border-radius:10px;flex-shrink:0;display:grid;place-items:center;}
+.err-link-ic svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+.err-link-body strong{display:block;font-family:var(--head);font-size:13.5px;font-weight:700;color:var(--navy);}
+.err-link-body span{font-size:12px;color:var(--body-soft);}
+.err-link-arr{margin-left:auto;color:var(--line);}
+.err-link-arr svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;}
+
+/* 戻るボタン */
+.err-back{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--body-soft);text-decoration:none;transition:color .2s;}
+.err-back:hover{color:var(--blue);}
+.err-back svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;}
+
+/* アニメーション */
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.err-icon{animation:float 3s ease-in-out infinite;}
+
+@media(max-width:480px){
+  .err-card { padding: 36px 22px; }
+  .err-num { font-size: clamp(64px,18vw,100px); }
+  .err-title { font-size: 19px; }
+  .err-sub { font-size: 13.5px; }
+  .err-link { padding: 12px 14px; }
+  .err-link-ic { width: 32px; height: 32px; border-radius: 9px; }
+  .err-link-ic svg { width: 16px; height: 16px; }
+  .err-link-body strong { font-size: 13px; }
+  .err-link-body span { font-size: 11px; }
+}
+@media(max-width:360px){
+  .err-icon { font-size: 32px; margin-bottom: 12px; }
+  .err-links { gap: 6px; }
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5L12 3l9 7.5V21a1 1 0 01-1 1H5a1 1 0 01-1-1V10.5z"/><path d="M9 22V12h6v10"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></symbol>
+  <symbol id="i-question" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+</defs></svg>
+
+<header class="err-header">
+  <a href="カタヅケ.html"><img src="img/logo-katazuke.png" alt="カタヅケ"></a>
+</header>
+
+<main class="err-main">
+  <div class="err-card">
+    <div class="err-icon">📦</div>
+    <div class="err-num">404</div>
+    <h1 class="err-title">ページが見つかりません</h1>
+    <p class="err-sub">お探しのページは移動・削除されたか、<br>URLが正しくない可能性があります。</p>
+
+    <div class="err-links">
+      <a href="カタヅケ.html" class="err-link">
+        <div class="err-link-ic" style="background:var(--pale);color:var(--blue);"><svg viewBox="0 0 24 24"><use href="#i-home"></use></svg></div>
+        <div class="err-link-body"><strong>トップページへ</strong><span>カタヅケのトップに戻る</span></div>
+        <div class="err-link-arr"><svg viewBox="0 0 24 24"><use href="#i-arrow"></use></svg></div>
+      </a>
+      <a href="出品登録.html" class="err-link">
+        <div class="err-link-ic" style="background:#e8faf0;color:var(--green);"><svg viewBox="0 0 24 24"><use href="#i-box"></use></svg></div>
+        <div class="err-link-body"><strong>出品してみる</strong><span>不用品を出品して業者に入札してもらう</span></div>
+        <div class="err-link-arr"><svg viewBox="0 0 24 24"><use href="#i-arrow"></use></svg></div>
+      </a>
+      <a href="よくある質問.html" class="err-link">
+        <div class="err-link-ic" style="background:#f6eeff;color:#6c3495;"><svg viewBox="0 0 24 24"><use href="#i-question"></use></svg></div>
+        <div class="err-link-body"><strong>よくある質問</strong><span>お困りの場合はこちら</span></div>
+        <div class="err-link-arr"><svg viewBox="0 0 24 24"><use href="#i-arrow"></use></svg></div>
+      </a>
+    </div>
+
+    <a href="javascript:history.back()" class="err-back">
+      <svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+      前のページに戻る
+    </a>
+  </div>
+</main>
+</body>
+</html>

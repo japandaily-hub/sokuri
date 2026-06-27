@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>カタヅケ｜家まるごと、まとめて片付け買取。撮るだけ・待つだけ</title>
+<meta name="description" content="家じゅうの不用品を、まとめて撮って待つだけ。登録業者が“買取総額”で競い合い、連絡が来るのは上位3社だけ。値がつかない物もまとめて回収。営業電話に追われない、家まるごとの片付け買取マッチング。">
+<meta name="theme-color" content="#1f54de">
+<link rel="canonical" href="https://katazuke.jp/">
+<link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
+<link rel="icon" type="image/png" sizes="128x128" href="img/favicon.png">
+<link rel="apple-touch-icon" href="img/favicon-180.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="カタヅケ">
+<meta property="og:title" content="カタヅケ｜家まるごと、まとめて片付け買取">
+<meta property="og:description" content="まとめて撮って待つだけ。業者が買取総額で競い合います。連絡は上位3社だけ。値がつかない物もまとめて回収。">
+<meta property="og:image" content="https://katazuke.jp/img/p-hero.png">
+<meta property="og:locale" content="ja_JP">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@graph":[
+{"@type":"Organization","name":"カタヅケ","description":"家まるごと、まとめて片付け買取。業者が買取総額で競い合う、営業電話に追われない不用品買取マッチング。","areaServed":["東京都","千葉県","埼玉県","神奈川県"],"logo":"img/logo-katazuke.png"},
+{"@type":"FAQPage","mainEntity":[
+{"@type":"Question","name":"1点だけでも依頼できますか？","acceptedAnswer":{"@type":"Answer","text":"はい。ただし、まとめて出すほど業者の買取総額が伸びやすく、値がつかない物も一緒に引き取ってもらいやすくなります。"}},
+{"@type":"Question","name":"値段がつかない物はどうなりますか？","acceptedAnswer":{"@type":"Answer","text":"業者は1点ごとではなく“まとめ全体”の金額で入札します。単体では値がつきにくい物も、まとめに含めて引き取ってもらえる場合があります。"}},
+{"@type":"Question","name":"しつこい営業電話は来ますか？","acceptedAnswer":{"@type":"Answer","text":"連絡が来るのは査定額の上位3社のみ。他の業者には自動でお断りが入り、一斉架電は起こりません。"}},
+{"@type":"Question","name":"個人情報はどう扱われますか？","acceptedAnswer":{"@type":"Answer","text":"査定段階で業者に渡るのは写真と品目のみ。お名前・電話・住所は交渉成立後に開示されます。"}},
+{"@type":"Question","name":"利用にお金はかかりますか？","acceptedAnswer":{"@type":"Answer","text":"出品・査定・成約まで、すべて無料です。費用は一切かかりません。"}},
+{"@type":"Question","name":"訪問買取に不安があります","acceptedAnswer":{"@type":"Answer","text":"参加するのは古物商許可を確認した登録事業者のみ。訪問買取は特定商取引法によりクーリングオフの対象です。"}}
+]}
+]}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="katazuke-main.css">
+</head>
+<body>
+<script>
+/* 画像生成前/失敗時のプレースホルダ表示（早期定義） */
+function ph(img){try{img.style.display='none';var n=img.nextElementSibling;if(n&&n.classList.contains('imgph'))n.style.display='flex';}catch(e){}}
+</script>
+<div class="scroll-progress" id="scroll-progress" aria-hidden="true"></div>
+
+<!-- ============ SVG ICON SPRITE ============ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.6"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.8 4.9L19 9.7l-4.9 1.8L12 16l-2.1-4.5L5 9.7l5.2-1.8z"/></symbol>
+  <symbol id="i-trend" viewBox="0 0 24 24"><path d="M4 17l5-5 3 3 7-7"/><path d="M16 8h4v4"/></symbol>
+  <symbol id="i-people" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.8-3.4 4-5 5.5-5s4.7 1.6 5.5 5"/><path d="M16 6.2A3 3 0 0118 11.6M17.5 14c1.6.3 3.4 1.7 4 5"/></symbol>
+  <symbol id="i-scan" viewBox="0 0 24 24"><path d="M4 8V5h3M20 8V5h-3M4 16v3h3M20 16v3h-3"/><path d="M4 12h16"/></symbol>
+  <symbol id="i-scale" viewBox="0 0 24 24"><path d="M12 4v16M6 8h12"/><path d="M6 8l-3 6a3 3 0 006 0zM18 8l-3 6a3 3 0 006 0z"/><path d="M8 20h8"/></symbol>
+  <symbol id="i-truck" viewBox="0 0 24 24"><path d="M3 6h11v9H3z"/><path d="M14 9h4l3 3v3h-7z"/><circle cx="7" cy="18" r="1.6"/><circle cx="17" cy="18" r="1.6"/></symbol>
+  <symbol id="i-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l2.5 2.5L16 9"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.7-3 7.9-7 9-4-1.1-7-4.3-7-9V6z"/><path d="M9 12l2 2 4-4"/></symbol>
+  <symbol id="i-bag" viewBox="0 0 24 24"><path d="M5 8h14l-1.4 11H6.4z"/><path d="M9 8a3 3 0 016 0"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V8a4 4 0 018 0v2"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></symbol>
+  <symbol id="i-tag" viewBox="0 0 24 24"><path d="M4 4h7l9 9-7 7-9-9z"/><circle cx="8.5" cy="8.5" r="1.3"/></symbol>
+  <symbol id="i-zoom" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.3-4.3M11 8.5v5M8.5 11h5"/></symbol>
+  <symbol id="i-crop" viewBox="0 0 24 24"><path d="M6 2v14a2 2 0 002 2h14"/><path d="M2 6h14a2 2 0 012 2v14"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M5 5h14a2 2 0 012 2v8a2 2 0 01-2 2H9l-4 4V7a2 2 0 012-2z"/><path d="M8 10h8M8 13h5"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V6M6 12l6-6 6 6"/></symbol>
+  <symbol id="i-house" viewBox="0 0 24 24"><path d="M3.5 11.2L12 4l8.5 7.2"/><path d="M5.6 10v9.2h12.8V10"/></symbol>
+  <symbol id="i-crown" viewBox="0 0 24 24"><path d="M4 8l3.5 3L12 5l4.5 6L20 8l-1.6 10H5.6z"/><path d="M5.6 18h12.8"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><path d="M6 3h3l2 5-2.5 1.5a12 12 0 005 5L16 12l5 2v3a2 2 0 01-2 2A16 16 0 014 6a2 2 0 012-3z"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4.5l3 2"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s7-6.3 7-11a7 7 0 10-14 0c0 4.7 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+  <symbol id="i-sofa" viewBox="0 0 24 24"><path d="M4 11V8a2 2 0 012-2h12a2 2 0 012 2v3"/><path d="M3 12a2 2 0 012 2v3h14v-3a2 2 0 012-2 2 2 0 00-2-2 2 2 0 00-2 2v1H7v-1a2 2 0 00-2-2 2 2 0 00-2 2z"/><path d="M6 17v2M18 17v2"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M3 7.5L12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5L12 12l9-4.5M12 12v9"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-yen" viewBox="0 0 24 24"><path d="M12 13v7M7 4l5 7 5-7M8 13h8M8 16.5h8"/></symbol>
+</defs></svg>
+
+<!-- ============ HEADER ============ -->
+<header class="header" id="header">
+  <div class="container inner">
+    <a href="#top" class="logo"><img src="img/logo-katazuke.png" alt="カタヅケ｜家まるごと片付け買取" class="logo-img"></a>
+    <nav class="nav">
+      <a href="#flow">使い方</a>
+      <a href="成約事例.html">成約事例</a>
+      <a href="撮影ガイド.html">撮影ガイド</a>
+      <a href="よくある質問.html">よくある質問</a>
+    </nav>
+    <a href="ログイン.html" style="font-size:14px;font-weight:600;color:var(--ink);transition:color .2s;" onmouseover="this.style.color='var(--blue)'" onmouseout="this.style.color='var(--ink)'">ログイン</a>
+    <a href="出品登録.html" class="btn btn-line h-cta"><svg class="ic"><use href="#i-chat"></use></svg>LINEではじめる</a>
+    <button class="hamburger" id="hamburger" aria-label="メニュー"><svg class="ic"><use href="#i-menu"></use></svg></button>
+  </div>
+</header>
+<div class="mobile-menu" id="mobile-menu">
+  <a href="#flow">使い方</a>
+  <a href="#auction">仕組み</a>
+  <a href="#trust">安心</a>
+  <a href="#cats">対応カテゴリ</a>
+  <a href="#faq">よくある質問</a>
+  <a href="ログイン.html">ログイン</a>
+  <a href="マイページ.html">マイページ</a>
+  <a href="出品登録.html" class="btn btn-line btn-block mm-cta"><svg class="ic"><use href="#i-chat"></use></svg>LINEではじめる</a>
+</div>
+
+<main id="top">
+
+<!-- ============ HERO ============ -->
+<section class="hero" data-screen-label="ヒーロー">
+  <div class="container hero-grid">
+    <div class="hero-copy">
+      <span class="hero-eyebrow"><span class="dot"></span>家まるごと、まとめて片付け買取</span>
+      <h1>片付けたい。でも、<br><span class="hl">動けない</span>あなたへ。</h1>
+      <p class="hero-sub">家じゅうの不用品を、<strong>まとめて撮って待つだけ</strong>。登録業者が“買取総額”で競い合い、値がつかない物もまとめて引き取ります。営業電話に追われることはありません。</p>
+      <ul class="hero-trust">
+        <li><span class="tb"><svg class="ic"><use href="#i-check"></use></svg></span>撮るだけ・待つだけ</li>
+        <li><span class="tb"><svg class="ic"><use href="#i-check"></use></svg></span>まとめるほど高くなりやすい</li>
+        <li><span class="tb"><svg class="ic"><use href="#i-check"></use></svg></span>値がつかない物も回収</li>
+        <li><span class="tb"><svg class="ic"><use href="#i-check"></use></svg></span>連絡は上位3社だけ</li>
+      </ul>
+      <div class="hero-how">
+        <div class="hw-step"><span class="hw-n">1</span><svg class="ic hw-ic"><use href="#i-camera"></use></svg><span>撮る</span></div>
+        <svg class="ic hw-arr"><use href="#i-arrow"></use></svg>
+        <div class="hw-step"><span class="hw-n">2</span><svg class="ic hw-ic"><use href="#i-trend"></use></svg><span>業者が競う</span></div>
+        <svg class="ic hw-arr"><use href="#i-arrow"></use></svg>
+        <div class="hw-step"><span class="hw-n">3</span><svg class="ic hw-ic"><use href="#i-crown"></use></svg><span>上位3社と交渉</span></div>
+        <svg class="ic hw-arr"><use href="#i-arrow"></use></svg>
+        <div class="hw-step"><span class="hw-n">4</span><svg class="ic hw-ic"><use href="#i-truck"></use></svg><span>引き取り完了</span></div>
+      </div>
+      <div class="hero-cta">
+        <a href="出品登録.html" class="btn btn-line btn-lg"><svg class="ic"><use href="#i-chat"></use></svg>LINEで無料ではじめる<svg class="ic arw"><use href="#i-arrow"></use></svg></a>
+        <a href="#auction" class="btn btn-ghost btn-lg">仕組みを確認する</a>
+      </div>
+    </div>
+    <div class="hero-figure">
+      <figure class="hero-photo ph-wrap">
+        <img src="img/p-hero.png" alt="自宅のリビングで、家じゅうの不用品をまとめてスマホで撮影する女性" onerror="ph(this)">
+        <div class="imgph" style="display:none"><svg class="ic"><use href="#i-camera"></use></svg><small>p-hero.png</small></div>
+      </figure>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============ 信頼の根拠（帯） ============ -->
+<section class="assure" aria-label="サービスの安心ポイント">
+  <div class="container">
+    <div class="assure-item"><span class="ai"><svg class="ic"><use href="#i-shield"></use></svg></span><span><b>登録事業者のみ</b><span>古物商許可を確認</span></span></div>
+    <div class="assure-item"><span class="ai"><svg class="ic"><use href="#i-lock"></use></svg></span><span><b>連絡先は成立後に開示</b><span>査定は写真と品目だけ</span></span></div>
+    <div class="assure-item"><span class="ai"><svg class="ic"><use href="#i-phone"></use></svg></span><span><b>一斉架電なし</b><span>連絡は上位3社だけ</span></span></div>
+    <div class="assure-item"><span class="ai"><svg class="ic"><use href="#i-pin"></use></svg></span><span><b>東京・千葉・埼玉・神奈川</b><span>順次エリア拡大中</span></span></div>
+  </div>
+</section>
+
+<!-- ============ 共感（悩み） ============ -->
+<section class="section empathy" data-screen-label="お悩み">
+  <div class="container">
+    <div class="section-head">
+      <span class="eyebrow">YOUR WORRIES</span>
+      <h2>片付け、こんな“めんどう”で<br class="sp-br">止まっていませんか</h2>
+      <p class="sub">「家じゅうを片付けたい」気持ちはあるのに、最初の一歩でつまずく。多くの方が、同じところで止まっています。</p>
+    </div>
+    <div class="emp-grid">
+      <article class="emp-card rv">
+        <div class="emp-photo ph-wrap"><img src="img/worry-1.png" alt="出品や発送の手間を思って気が重くなる女性" loading="lazy" onerror="ph(this)"><div class="imgph" style="display:none"><svg class="ic"><use href="#i-camera"></use></svg><small>worry-1.png</small></div></div>
+        <div class="emp-body"><h3>出品も発送も、正直めんどう</h3><p>撮影・採寸・説明文・梱包・発送・購入者対応。フリマは手間が多く、量が多いほど踏み出せません。</p></div>
+      </article>
+      <article class="emp-card rv" data-d="1">
+        <div class="emp-photo ph-wrap"><img src="img/worry-2.png" alt="一括査定の営業電話が一斉にかかってきて不安な女性" loading="lazy" onerror="ph(this)"><div class="imgph" style="display:none"><svg class="ic"><use href="#i-phone"></use></svg><small>worry-2.png</small></div></div>
+        <div class="emp-body"><h3>営業電話が、一斉にかかってくる</h3><p>一括査定に申し込んだ途端、多数の業者から電話が殺到。応対だけで疲れ、結局決めきれません。</p></div>
+      </article>
+      <article class="emp-card rv" data-d="2">
+        <div class="emp-photo ph-wrap"><img src="img/worry-3.png" alt="物の山を前に、何から手をつけるか迷う女性" loading="lazy" onerror="ph(this)"><div class="imgph" style="display:none"><svg class="ic"><use href="#i-box"></use></svg><small>worry-3.png</small></div></div>
+        <div class="emp-body"><h3>そもそも、何から手をつければ</h3><p>売れる物・売れない物、仕分けの基準がわからない。家まるごととなると、考えるだけで腰が重くなります。</p></div>
+      </article>
+    </div>
+    <div class="turn"><p>カタヅケなら、その「めんどう」を<span class="accent">まとめて撮るだけ</span>に変えます。</p></div>
+  </div>
+</section>
+
+<!-- ============ STEPS（使い方） ============ -->
+<section class="section steps" id="flow" data-screen-label="使い方">
+  <div class="container">
+    <div class="section-head">
+      <span class="eyebrow">HOW IT WORKS</span>
+      <h2>あなたがするのは、<br class="sp-br">「撮る」と「選ぶ」だけ</h2>
+      <p class="sub">たった4ステップ。梱包も発送も、価格交渉も要りません。</p>
+    </div>
+    <div class="steps-grid">
+      <article class="step rv">
+        <div class="step-photo ph-wrap"><img src="img/step-1.png" alt="スマホで品物を1点ずつ撮影する手元" loading="lazy" onerror="ph(this)"><div class="imgph" style="display:none"><svg class="ic"><use href="#i-camera"></use></svg><small>step-1.png</small></div></div>
+        <div class="step-body"><span class="step-n"><span class="num">1</span>SHOOT</span><h3>まとめて撮る</h3><p>家じゅうの不用品を1点ずつ撮影。写真と品目をまとめて登録するだけで出品完了です。</p></div>
+      </article>
+      <article class="step rv" data-d="1">
+        <div class="step-photo ph-wrap"><img src="img/step-2.png" alt="スマホに査定が届くのを確認する手元" loading="lazy" onerror="ph(this)"><div class="imgph" style="display:none"><svg class="ic"><use href="#i-scan"></use></svg><small>step-2.png</small></div></div>
+        <div class="step-body"><span class="step-n"><span class="num">2</span>WAIT</span><h3>査定が届く</h3><p>登録業者が、まとめ全体に買取総額で入札。あなたは待つだけで査定が集まります。</p></div>
+      </article>
+      <article class="step rv" data-d="2">
+        <div class="step-photo ph-wrap"><img src="img/step-3.png" alt="上位3社の査定を見比べる手元" loading="lazy" onerror="ph(this)"><div class="imgph" style="display:none"><svg class="ic"><use href="#i-scale"></use></svg><small>step-3.png</small></div></div>
+        <div class="step-body"><span class="step-n"><span class="num">3</span>CHOOSE</span><h3>上位3社と交渉</h3><p>金額上位の3社とだけやりとり。条件を比べて、納得の1社を選べます。</p></div>
+      </article>
+      <article class="step rv" data-d="3">
+        <div class="step-photo ph-wrap"><img src="img/step-4.png" alt="玄関先で業者に品物を引き渡す様子" loading="lazy" onerror="ph(this)"><div class="imgph" style="display:none"><svg class="ic"><use href="#i-truck"></use></svg><small>step-4.png</small></div></div>
+        <div class="step-body"><span class="step-n"><span class="num">4</span>DONE</span><h3>引き取りに来てもらう</h3><p>成立した業者がまとめて引き取りに。玄関先で渡すだけで、片付け完了です。</p></div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 中間CTA ============ -->
+<div class="section-cta" data-screen-label="中間CTA">
+  <div class="container">
+    <div class="scta-inner rv">
+      <div class="scta-text">
+        <strong>まず1枚、撮るだけ。今日から始められます。</strong>
+        <span>登録・査定・お断りまですべて無料</span>
+      </div>
+      <a href="出品登録.html" class="btn btn-line btn-lg">
+        <svg class="ic"><use href="#i-chat"></use></svg>LINEで無料ではじめる<svg class="ic arw"><use href="#i-arrow"></use></svg>
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- ============ BUNDLE（核：まとめて出すほど有利） ============ -->
+<section class="section bundle" id="bundle" data-screen-label="まとめて高く">
+  <div class="container">
+    <div class="bundle-lead">
+      <div class="bundle-figure ph-wrap rv">
+        <img src="img/bundle-3d.png" alt="さまざまな不用品がひとつの箱にまとまり、まとめて1つの価格がつくイメージ" loading="lazy" onerror="ph(this)">
+        <div class="imgph" style="display:none"><svg class="ic"><use href="#i-box"></use></svg><small>bundle-3d.png</small></div>
+      </div>
+      <div class="bundle-copy rv" data-d="1">
+        <span class="eyebrow">BUNDLE &amp; SELL</span>
+        <h2>まとめて出すほど、<span style="color:var(--blue)">有利</span>になる。</h2>
+        <p class="lead">カタヅケは“家まるごと”の片付け向け。1点ずつではなく、たまった不用品をまとめて査定に出すほど、買取総額が伸びやすく、値がつかない物まで一緒に手放せます。</p>
+      </div>
+    </div>
+    <div class="bundle-grid">
+      <article class="bundle-c rv">
+        <span class="bc-ic"><svg class="ic"><use href="#i-up"></use></svg></span>
+        <h3>数が多いほど、総額が伸びやすい</h3>
+        <p>業者は「まとめ買い」を望むため、点数が増えるほど買取総額の条件が良くなりやすい。1点ずつ売るより、まとめたほうがお得です。</p>
+      </article>
+      <article class="bundle-c key rv" data-d="1">
+        <span class="bc-badge">ここがポイント</span>
+        <span class="bc-ic"><svg class="ic"><use href="#i-bag"></use></svg></span>
+        <h3>値がつかない物も、まとめて回収</h3>
+        <p>業者は1点ごとではなく<strong>“まとめ全体”の金額で入札</strong>します。だから単体では値がつきにくい物も、まとめに含めて引き取り。「これは売れないかも」も、一緒に手放せます。</p>
+      </article>
+      <article class="bundle-c rv" data-d="2">
+        <span class="bc-ic"><svg class="ic"><use href="#i-camera"></use></svg></span>
+        <h3>仕分け・分別は不要</h3>
+        <p>ジャンルが混ざっていてもOK。家じゅうの「どうしよう」を、思いついた物から撮ってまとめるだけ。あとは業者がまとめて査定します。</p>
+      </article>
+    </div>
+    <p class="bundle-note">※ 引き取りの可否・条件は品物や業者により異なります。一部、引き取りが難しい物は手放す導線をご案内します。</p>
+  </div>
+</section>
+
+<!-- ============ AUCTION（業者が競う仕組み） ============ -->
+<section class="section auction" id="auction" data-screen-label="仕組み">
+  <div class="container">
+    <div class="section-head">
+      <span class="eyebrow">HOW THE AUCTION WORKS</span>
+      <h2>業者が“買取総額”で競うから、<br class="sp-br">高くなりやすい。</h2>
+      <p class="sub">あなたが出したのは写真だけ。あとは登録業者どうしが、あなたの品物まとめに買取総額で入札し合います。</p>
+    </div>
+    <div class="auc-grid">
+      <div class="auc-figure ph-wrap rv">
+        <img src="img/bid-3d.png" alt="複数の業者キャラクターが、まとめた不用品の箱に買取総額を提示して競り合うイメージ" loading="lazy" onerror="ph(this)">
+        <div class="imgph" style="display:none"><svg class="ic"><use href="#i-trend"></use></svg><small>bid-3d.png</small></div>
+      </div>
+      <ol class="auc-steps rv" data-d="1">
+        <li><span class="an">1</span><div><h4>写真と品目だけが業者に届く</h4><p>あなたの連絡先は伏せたまま。査定に回るのは「写真」と「品目」だけです。</p></div></li>
+        <li><span class="an">2</span><div><h4>登録業者が買取総額で入札</h4><p>複数の業者が、まとめ全体に対して金額を提示。競争で総額が引き上げられます。</p></div></li>
+        <li><span class="an">3</span><div><h4>連絡が来るのは上位3社だけ</h4><p>金額上位の3社とだけやりとり。それ以外は自動でお断り。営業電話の一斉架電はありません。</p></div></li>
+        <li><span class="an">4</span><div><h4>あなたは選んで、引き取りを待つだけ</h4><p>提示を見比べて1社を選択。成立後に連絡先を開示し、引き取り日時を決めます。</p></div></li>
+      </ol>
+    </div>
+    <p class="auc-note">※ 最終的な買取額は業者の現物査定により決まります。</p>
+  </div>
+</section>
+
+<!-- ============ HANDOVER ============ -->
+<section class="section" data-screen-label="引き渡し">
+  <div class="container media-split">
+    <div class="media-figure ph-wrap rv">
+      <img src="img/handover-new.png" alt="玄関先で、業者スタッフがまとめた品物を受け取る様子" loading="lazy" onerror="ph(this)">
+      <div class="imgph" style="display:none"><svg class="ic"><use href="#i-truck"></use></svg><small>handover-new.png</small></div>
+    </div>
+    <div class="media-copy rv" data-d="1">
+      <span class="eyebrow">HANDOVER</span>
+      <h2>業者が直接、引き取りに来ます</h2>
+      <p class="sub">梱包も発送も、あなたはしなくていい。選んだ業者がまとめて引き取りに来ます。やりとりするのは、交渉が成立した相手とだけです。</p>
+      <ul class="mlist">
+        <li><span class="ck"><svg class="ic"><use href="#i-check"></use></svg></span>梱包も発送も不要。玄関先で引き渡すだけ。</li>
+        <li><span class="ck"><svg class="ic"><use href="#i-check"></use></svg></span>連絡先が業者に渡るのは、交渉成立後。</li>
+        <li><span class="ck"><svg class="ic"><use href="#i-check"></use></svg></span>訪問日時は、あなたの都合で選べます。</li>
+        <li><span class="ck"><svg class="ic"><use href="#i-check"></use></svg></span>大型家具や大量の品も、まとめて相談OK。</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 利用シーン ============ -->
+<section class="section bg-pale" data-screen-label="利用シーン">
+  <div class="container">
+    <div class="section-head">
+      <span class="eyebrow">USE CASES</span>
+      <h2>“家まるごと”の片付けに</h2>
+      <p class="sub">まとまった量を手放したいときほど、カタヅケが力を発揮します。</p>
+    </div>
+    <div class="scenes-grid">
+      <article class="scene-card rv">
+        <div class="scene-img ph-wrap"><img src="img/p-female.png" alt="断捨離で身軽になる女性" loading="lazy" onerror="ph(this)"><div class="imgph" style="display:none"><svg class="ic"><use href="#i-spark"></use></svg><small>p-female.png</small></div></div>
+        <div class="scene-body"><span class="scene-tag"><svg class="ic"><use href="#i-spark"></use></svg>断捨離</span><h3>暮らしを身軽に</h3><p>使わない物をまとめて手放し、すっきりした部屋に。1点からでも、まとめてでも。</p></div>
+      </article>
+      <article class="scene-card rv" data-d="1">
+        <div class="scene-img ph-wrap"><img src="img/p-moving.png" alt="引越し前の荷造りで不用品をまとめる女性" loading="lazy" onerror="ph(this)"><div class="imgph" style="display:none"><svg class="ic"><use href="#i-truck"></use></svg><small>p-moving.png</small></div></div>
+        <div class="scene-body"><span class="scene-tag"><svg class="ic"><use href="#i-truck"></use></svg>引越し</span><h3>新居に持っていかない物を</h3><p>荷造りのついでに撮るだけ。運ぶ前にまとめて買取・回収できます。</p></div>
+      </article>
+      <article class="scene-card rv" data-d="2">
+        <div class="scene-img ph-wrap"><img src="img/p-senior.png" alt="実家じまいを家族で進める様子" loading="lazy" onerror="ph(this)"><div class="imgph" style="display:none"><svg class="ic"><use href="#i-house"></use></svg><small>p-senior.png</small></div></div>
+        <div class="scene-body"><span class="scene-tag"><svg class="ic"><use href="#i-people"></use></svg>実家じまい</span><h3>家族で、まとめて整理</h3><p>量が多く判断に迷う実家の整理も、撮ってまとめれば業者がまとめて査定。</p></div>
+      </article>
+      <article class="scene-card rv" data-d="3">
+        <div class="scene-img ph-wrap"><img src="img/p-ihin.png" alt="遺品整理で思い出の品を手に取る様子" loading="lazy" onerror="ph(this)"><div class="imgph" style="display:none"><svg class="ic"><use href="#i-shield"></use></svg><small>p-ihin.png</small></div></div>
+        <div class="scene-body"><span class="scene-tag"><svg class="ic"><use href="#i-shield"></use></svg>遺品整理</span><h3>ていねいに、まとめて</h3><p>値がつかない物も含めてまとめて回収。気持ちの整理も、無理なく進められます。</p></div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TRUST（安心・信頼） ============ -->
+<section class="section" id="trust" data-screen-label="安心">
+  <div class="container">
+    <div class="section-head">
+      <span class="eyebrow">SAFE &amp; SECURE</span>
+      <h2>はじめてでも、安心して任せられる</h2>
+      <p class="sub">「知らない業者は不安」を解消するために。カタヅケは、参加する業者とあなたの情報の扱いに、きちんと線を引いています。</p>
+    </div>
+    <div class="trust-grid">
+      <article class="trust-c rv">
+        <div class="tc-illus ph-wrap"><img src="img/trust-illus-1.png" alt="登録事業者を審査・確認するイメージ" loading="lazy" onerror="ph(this)"><div class="imgph" style="display:none"><svg class="ic"><use href="#i-shield"></use></svg><small>trust-illus-1.png</small></div></div>
+        <div class="tc-body"><span class="tc-ic"><svg class="ic"><use href="#i-shield"></use></svg></span><h3>登録制の事業者のみ</h3><p>査定に参加するのは登録された買取事業者だけ。古物営業に必要な古物商許可を、登録時・取引前に確認します。</p></div>
+      </article>
+      <article class="trust-c rv" data-d="1">
+        <div class="tc-illus ph-wrap"><img src="img/trust-illus-2.png" alt="連絡先は交渉成立後に開示されるイメージ" loading="lazy" onerror="ph(this)"><div class="imgph" style="display:none"><svg class="ic"><use href="#i-lock"></use></svg><small>trust-illus-2.png</small></div></div>
+        <div class="tc-body"><span class="tc-ic"><svg class="ic"><use href="#i-lock"></use></svg></span><h3>連絡先は成立後に開示</h3><p>査定段階で業者に渡るのは「写真と品目」のみ。お名前・電話・住所は、交渉が成立するまで開示されません。</p></div>
+      </article>
+      <article class="trust-c rv" data-d="2">
+        <div class="tc-illus ph-wrap"><img src="img/trust-illus-3.png" alt="訪問買取はクーリングオフの対象となるイメージ" loading="lazy" onerror="ph(this)"><div class="imgph" style="display:none"><svg class="ic"><use href="#i-check-circle"></use></svg><small>trust-illus-3.png</small></div></div>
+        <div class="tc-body"><span class="tc-ic"><svg class="ic"><use href="#i-check-circle"></use></svg></span><h3>訪問買取はクーリングオフ対象</h3><p>訪問による買取には特定商取引法が適用され、法定書面の交付や8日間のクーリングオフ等の保護を受けられます。</p></div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 料金（透明性） ============ -->
+<section class="section bg-pale" id="fee" data-screen-label="料金">
+  <div class="container">
+    <div class="section-head">
+      <span class="eyebrow">PRICING</span>
+      <h2>費用は、一切かかりません</h2>
+      <p class="sub">出品・査定・成約まで、すべて無料です。</p>
+    </div>
+    <div class="fee-card rv">
+      <div class="fee-head"><h3>出品から成約まで、お金はかかりません</h3><p>出品・査定・お断りまで、すべて無料</p></div>
+      <div class="fee-rows">
+        <div class="fee-row"><span class="fl">写真・品目の登録<small>まとめて出品するだけ</small></span><span class="fv">無料</span></div>
+        <div class="fee-row"><span class="fl">出品・査定<small>業者への出品と入札の受け取り</small></span><span class="fv">無料</span></div>
+        <div class="fee-row"><span class="fl">査定を見て断る<small>金額に納得できなければ取りやめOK</small></span><span class="fv">無料</span></div>
+        <div class="fee-row"><span class="fl">成約・引き取り<small>買取額や条件は事前に明示</small></span><span class="fv">無料</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 対応カテゴリ ============ -->
+<section class="section" id="cats" data-screen-label="対応カテゴリ">
+  <div class="container">
+    <div class="section-head">
+      <span class="eyebrow">CATEGORIES</span>
+      <h2>こんな物が対象です</h2>
+      <p class="sub">「これって売れる？」のほとんどに対応。迷ったら、まずは撮ってまとめてみてください。</p>
+    </div>
+    <div class="cats-grid" id="cats-grid"></div>
+    <div class="cats-note rv">
+      <span class="cn-ic"><svg class="ic"><use href="#i-bag"></use></svg></span>
+      <div class="cn-body">
+        <h4>「売れないかも」と思う物も、まずは撮ってまとめて。</h4>
+        <p>点数がそろうと<strong>“まとめて一括買取”</strong>の対象になりやすく、単体では値がつきにくい物も一緒に引き取れる場合があります。引き取りが難しい物は、手放す導線をご案内します。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 運営者メッセージ ============ -->
+<section class="section" id="founder" data-screen-label="運営者">
+  <div class="container founder-grid">
+    <figure class="founder-photo ph-wrap rv">
+      <img src="img/founder-new.png" alt="カタヅケ運営事務局のスタッフ" loading="lazy" onerror="ph(this)">
+      <div class="imgph" style="display:none"><svg class="ic"><use href="#i-people"></use></svg><small>founder-new.png</small></div>
+      <figcaption>カタヅケ運営事務局</figcaption>
+    </figure>
+    <div class="founder-copy rv" data-d="1">
+      <img src="img/logo-katazuke.png" alt="カタヅケ" class="founder-logo">
+      <span class="eyebrow">OUR MISSION</span>
+      <h2>「片付けたい」を、<br>めんどうで終わらせない。</h2>
+      <p>片付けが進まないのは、やる気の問題ではありません。出品の手間、営業電話の不安、何から手をつけるかの迷い——その一つひとつが、最初の一歩を重くしています。</p>
+      <p>カタヅケは、それを「まとめて撮るだけ」に変えるために生まれました。業者が競い、値がつかない物まで引き取り、連絡は上位3社だけ。あなたが背負うものを、できる限り減らします。</p>
+      <p>カタヅケが目指すのは、顧客と業者を結ぶ、無駄のない場所です。顧客は手軽に手放せ、業者は効率よく仕入れられる。双方が納得できるから、取引が成立し、プラットフォームとして長く続く。<strong>顧客・業者・社会の三者に喜びと安心を</strong>——それが、カタヅケの根にある考え方です。</p>
+      <p class="founder-sign"><span>カタヅケ 運営事務局</span>顧客にも業者にも、社会にも。三方よしの場所をつくります。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FAQ ============ -->
+<section class="section bg-pale" id="faq" data-screen-label="よくある質問">
+  <div class="container">
+    <div class="section-head">
+      <span class="eyebrow">FAQ</span>
+      <h2>よくある質問</h2>
+    </div>
+    <div class="faq-list" id="faq-list"></div>
+    <div style="text-align:center;margin-top:32px;">
+      <a href="よくある質問.html" class="btn btn-ghost btn-lg">すべてのQ&amp;Aを見る<svg class="ic arw"><use href="#i-arrow"></use></svg></a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 最終CTA ============ -->
+<section class="section final" id="contact" data-screen-label="お申し込み">
+  <div class="container">
+    <div class="cta-staff">
+      <img src="img/staff-w20.png" alt="カタヅケのスタッフ" loading="lazy" onerror="this.style.visibility='hidden'">
+      <img src="img/staff-m30.png" alt="カタヅケのスタッフ" loading="lazy" onerror="this.style.visibility='hidden'">
+      <img src="img/staff-w40.png" alt="カタヅケのスタッフ" loading="lazy" onerror="this.style.visibility='hidden'">
+    </div>
+    <img src="img/logo-mark.png" alt="" class="final-logo" aria-hidden="true">
+    <h2>今日、その「片付けたい」を動かす</h2>
+    <p>まずは1枚、撮ってみることから。LINEで友だち追加すれば、すぐに出品をはじめられます。登録・査定は無料です。</p>
+    <div class="final-cta">
+      <a href="出品登録.html" class="btn btn-line btn-lg"><svg class="ic"><use href="#i-chat"></use></svg>LINEではじめる<svg class="ic arw"><use href="#i-arrow"></use></svg></a>
+      <a href="#bundle" class="btn btn-ghost btn-lg">もう一度、仕組みを見る</a>
+    </div>
+    <p class="final-note">※ 最終的な買取額は業者の現物査定により決まります。</p>
+  </div>
+</section>
+
+</main>
+
+<!-- ============ 業者向け導線 ============ -->
+<section class="biz-banner" data-screen-label="業者向け導線">
+  <div class="container">
+    <div class="biz-banner-inner">
+      <div class="biz-banner-copy">
+        <span class="eyebrow">FOR BUYERS</span>
+        <h2>買取業者の方へ。<br>カタヅケに参加しませんか。</h2>
+        <p>顧客と業者、双方に無駄がない。だから長く続く。<br>まとめ出品への入札で、効率的な仕入れルートを開拓できます。</p>
+        <div class="biz-banner-tags">
+          <span class="biz-tag">初期費用・月額費用 無料</span>
+          <span class="biz-tag">成約時8%のみ</span>
+          <span class="biz-tag">下見なし・一斉架電なし</span>
+          <span class="biz-tag">古物商許可が必要</span>
+        </div>
+      </div>
+      <div class="biz-banner-cta">
+        <a href="業者向け.html" class="btn btn-white btn-lg">業者登録の詳細を見る<svg class="ic arw"><use href="#i-arrow"></use></svg></a>
+        <span style="font-size:12px;color:rgba(255,255,255,.45);">審査制・登録無料</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <a href="#top" class="logo footer-logo"><img src="img/logo-katazuke.png" alt="カタヅケ"></a>
+        <p class="about">家まるごと、まとめて片付け買取。業者が買取総額で競い合う、営業電話に追われない不用品買取マッチング。東京・千葉・埼玉・神奈川対応。</p>
+      </div>
+      <div>
+        <h5>サービス</h5>
+        <ul>
+          <li><a href="#flow">使い方</a></li>
+          <li><a href="出品登録.html">出品する</a></li>
+          <li><a href="撮影ガイド.html">撕影ガイド</a></li>
+          <li><a href="成約事例.html">成約事例</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>安心・サポート</h5>
+        <ul>
+          <li><a href="#trust">安心の取り組み</a></li>
+          <li><a href="#fee">料金</a></li>
+          <li><a href="よくある質問.html">よくある質問</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>カタヅケについて</h5>
+        <ul>
+          <li><a href="#founder">運営者メッセージ</a></li>
+          <li><a href="会社概要.html">会社概要</a></li>
+          <li><a href="業者向け.html">業者登録</a></li>
+          <li><a href="特定商取引法.html">特定商取引法に基づく表記</a></li>
+          <li><a href="プライバシーポリシー.html">プライバシーポリシー</a></li>
+          <li><a href="利用規約.html">利用規約</a></li>
+          <li><a href="contact.html">お問い合わせ</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 カタヅケ</span>
+      <span>東京都・千葉県・埼玉県・神奈川県（順次拡大）</span>
+    </div>
+  </div>
+</footer>
+
+<!-- ============ 追従CTA（モバイル） ============ -->
+<div class="dock">
+  <a href="出品登録.html" class="btn btn-line"><svg class="ic"><use href="#i-chat"></use></svg>LINEではじめる</a>
+</div>
+
+<script src="katazuke-app.js"></script>
+<template id="__bundler_thumbnail"><svg viewBox="0 0 80 56" xmlns="http://www.w3.org/2000/svg"><rect width="80" height="56" fill="#fff"/><rect x="8" y="8" width="40" height="24" rx="3" fill="#eef3ff"/><rect x="8" y="36" width="24" height="4" rx="2" fill="#1f54de" opacity=".7"/><rect x="8" y="44" width="32" height="3" rx="1.5" fill="#e4e8f0"/></svg></template>
+</body>
+</html>

@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>交渉チャット（業者）｜カタヅケ</title>
+<meta name="theme-color" content="#1f54de">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --blue:#1f54de; --blue-d:#1742b0; --navy:#0f2552; --ink:#16213a;
+  --body:#3f4a60; --body-soft:#697288; --line:#e4e8f0; --line-soft:#eef1f7;
+  --pale:#eef3ff; --green:#1f8a5b; --gold:#b9892f; --white:#fff;
+  --radius:18px; --radius-s:12px;
+  --shadow-s:0 2px 10px -4px rgba(15,37,82,.14);
+  --shadow-m:0 16px 36px -20px rgba(15,37,82,.30);
+  --ease:cubic-bezier(.22,.61,.36,1);
+  --head:"Zen Kaku Gothic New",sans-serif;
+  --sans:"Noto Sans JP",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:var(--sans);color:var(--body);background:#f4f6fb;display:flex;flex-direction:column;}
+a{color:inherit;text-decoration:none;}
+img{display:block;max-width:100%;}
+
+/* ヘッダー */
+.chat-header{
+  height:56px; background:#fff; border-bottom:1px solid var(--line);
+  display:flex; align-items:center; padding:0 16px; gap:12px;
+  flex-shrink:0; position:relative; z-index:10;
+}
+.ch-logo img{height:28px;}
+.ch-divider{width:1px;height:20px;background:var(--line);}
+.ch-title{font-family:var(--head);font-size:14px;font-weight:700;color:var(--navy);}
+.ch-badge{font-size:11px;font-weight:700;background:#fff8e6;color:var(--gold);border:1px solid #f0d080;padding:3px 10px;border-radius:99px;}
+.ch-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
+.ch-company{font-size:13px;font-weight:700;color:var(--ink);}
+.ch-bell{width:36px;height:36px;border-radius:10px;background:var(--pale);display:flex;align-items:center;justify-content:center;color:var(--blue);cursor:pointer;position:relative;}
+.bell-dot{position:absolute;top:6px;right:6px;width:7px;height:7px;border-radius:50%;background:#e05c5c;}
+
+/* メインレイアウト：左サイドバー・チャット・右パネル */
+.chat-layout{display:flex;flex:1;overflow:hidden;}
+
+/* 案件リスト */
+.case-sidebar{
+  width:220px;flex-shrink:0;
+  background:#fff;border-right:1px solid var(--line);
+  display:flex;flex-direction:column;overflow-y:auto;
+}
+.case-sidebar-head{
+  padding:14px 14px 10px;
+  font-size:11.5px;font-weight:700;color:var(--body-soft);letter-spacing:.06em;
+  border-bottom:1px solid var(--line-soft);
+}
+.case-item{
+  padding:12px 14px;cursor:pointer;
+  border-bottom:1px solid var(--line-soft);
+  transition:background .15s;position:relative;
+}
+.case-item:hover{background:var(--pale);}
+.case-item.active{background:var(--pale);border-left:3px solid var(--blue);}
+.case-status{
+  font-size:10px;font-weight:700;
+  padding:2px 7px;border-radius:99px;
+  display:inline-block;margin-bottom:6px;
+}
+.status-negotiating{background:#d1fae5;color:var(--green);}
+.status-waiting{background:var(--pale);color:var(--blue);}
+.status-scheduled{background:#fff8e6;color:var(--gold);}
+.case-id{font-size:11px;color:var(--body-soft);margin-bottom:4px;}
+.case-preview{font-size:12.5px;color:var(--body-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.case-bid-row{display:flex;justify-content:space-between;align-items:center;margin-top:6px;}
+.case-bid{font-size:13px;font-weight:700;color:var(--blue);}
+.case-time{font-size:10.5px;color:var(--body-soft);}
+.case-unread{width:8px;height:8px;border-radius:50%;background:var(--blue);position:absolute;bottom:14px;right:14px;}
+
+/* メインチャット */
+.chat-main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;}
+
+/* 相手（ユーザー）ヘッダー */
+.chat-peer-header{
+  background:#fff;border-bottom:1px solid var(--line);
+  padding:12px 20px;display:flex;align-items:center;gap:14px;flex-shrink:0;
+}
+.peer-avatar{
+  width:40px;height:40px;border-radius:12px;
+  background:#f0f2f8;color:var(--body-soft);
+  font-family:var(--head);font-size:16px;font-weight:900;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.peer-info{flex:1;}
+.peer-name{font-size:15px;font-weight:900;color:var(--navy);font-family:var(--head);}
+.peer-sub{font-size:12px;color:var(--body-soft);margin-top:2px;}
+.amount-chip{
+  background:var(--pale);border:1px solid var(--line);
+  border-radius:10px;padding:8px 14px;text-align:center;
+}
+.amount-label{font-size:10px;font-weight:700;color:var(--body-soft);letter-spacing:.06em;}
+.amount-val{font-family:var(--head);font-size:18px;font-weight:900;color:var(--navy);}
+
+/* ステータスバー */
+.status-bar{
+  background:#f0fff8;border-bottom:1px solid #a7f0cc;
+  padding:9px 20px;display:flex;align-items:center;gap:8px;
+  font-size:12.5px;color:#1a6040;flex-shrink:0;
+}
+.status-dot{width:8px;height:8px;border-radius:50%;background:#06c755;flex-shrink:0;}
+
+/* メッセージ */
+.messages-area{
+  flex:1;overflow-y:auto;padding:20px;
+  display:flex;flex-direction:column;gap:16px;
+}
+.msg{display:flex;gap:10px;align-items:flex-end;}
+.msg.me{flex-direction:row-reverse;}
+.msg-avatar{
+  width:32px;height:32px;border-radius:10px;
+  background:var(--pale);color:var(--blue);
+  font-family:var(--head);font-size:13px;font-weight:900;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.bubble{
+  max-width:68%;padding:12px 16px;
+  border-radius:18px;font-size:14px;line-height:1.7;
+}
+.msg.them .bubble{background:#fff;border:1px solid var(--line);border-bottom-left-radius:4px;color:var(--ink);}
+.msg.me .bubble{background:var(--blue);color:#fff;border-bottom-right-radius:4px;}
+.msg-time{font-size:10.5px;color:var(--body-soft);margin-bottom:4px;white-space:nowrap;}
+.msg.me .msg-time{text-align:right;}
+.date-sep{
+  text-align:center;font-size:12px;color:var(--body-soft);font-weight:600;
+  display:flex;align-items:center;gap:12px;
+}
+.date-sep::before,.date-sep::after{content:"";flex:1;height:1px;background:var(--line);}
+
+/* 日程提案カード */
+.schedule-propose{
+  background:var(--pale);border:1.5px solid var(--blue);
+  border-radius:var(--radius-s);padding:16px 18px;
+  max-width:360px;margin-left:42px;
+}
+.sp-head{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+.sp-options{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;}
+.sp-opt-row{display:flex;gap:8px;align-items:center;}
+.sp-date-input{
+  flex:1;font-family:var(--sans);font-size:13px;color:var(--ink);
+  background:#fff;border:1.5px solid var(--line);border-radius:8px;
+  padding:8px 10px;outline:none;
+  transition:border-color .2s;
+}
+.sp-date-input:focus{border-color:var(--blue);}
+.sp-remove{
+  width:28px;height:28px;border-radius:8px;background:#fff0f0;
+  border:none;cursor:pointer;color:#e05c5c;font-size:16px;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.btn-add-slot{
+  font-size:12.5px;font-weight:700;color:var(--blue);
+  background:none;border:none;cursor:pointer;padding:4px 0;
+  display:flex;align-items:center;gap:4px;
+}
+.btn-send-schedule{
+  width:100%;padding:11px;border-radius:99px;border:none;
+  background:var(--blue);color:#fff;
+  font-family:var(--head);font-size:14px;font-weight:900;
+  cursor:pointer;margin-top:12px;transition:.2s;
+}
+.btn-send-schedule:hover{background:var(--blue-d);}
+
+/* 入力エリア */
+.input-area{
+  background:#fff;border-top:1px solid var(--line);
+  padding:12px 16px;display:flex;gap:10px;align-items:center;flex-shrink:0;
+}
+.input-tools{display:flex;gap:6px;}
+.tool-btn{
+  width:36px;height:36px;border-radius:10px;
+  background:var(--pale);border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--blue);font-size:18px;transition:.2s;flex-shrink:0;
+}
+.tool-btn:hover{background:#dde8ff;}
+.msg-input{
+  flex:1;background:#f4f6fb;
+  border:1.5px solid var(--line);border-radius:99px;
+  padding:10px 18px;font-family:var(--sans);font-size:14px;color:var(--ink);
+  outline:none;transition:border-color .2s;
+}
+.msg-input:focus{border-color:var(--blue);background:#fff;}
+.msg-input::placeholder{color:#bcc3d4;}
+.btn-send{
+  width:40px;height:40px;border-radius:50%;border:none;
+  background:var(--blue);color:#fff;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.2s;
+}
+.btn-send:hover{background:var(--blue-d);}
+.btn-send svg{width:18px;height:18px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+
+/* 右サイドパネル：出品内容 */
+.detail-panel{
+  width:240px;flex-shrink:0;
+  background:#fff;border-left:1px solid var(--line);
+  display:flex;flex-direction:column;overflow-y:auto;
+}
+.dp-head{
+  padding:14px 16px;font-size:12px;font-weight:700;
+  color:var(--body-soft);letter-spacing:.06em;
+  border-bottom:1px solid var(--line-soft);
+}
+.dp-case-id{padding:12px 16px;border-bottom:1px solid var(--line-soft);}
+.dp-case-id .lbl{font-size:11px;color:var(--body-soft);font-weight:600;margin-bottom:4px;}
+.dp-case-id .val{font-size:13px;font-weight:700;color:var(--ink);}
+.dp-items-grid{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:2px;background:var(--line-soft);
+  margin:12px 16px;border-radius:10px;overflow:hidden;
+}
+.dp-item-thumb{
+  aspect-ratio:1;background:#f0f2f8;
+  display:flex;align-items:center;justify-content:center;
+  font-size:24px;position:relative;
+}
+.dp-item-label{
+  position:absolute;bottom:0;left:0;right:0;
+  background:linear-gradient(transparent,rgba(15,37,82,.6));
+  color:#fff;font-size:9px;font-weight:600;padding:8px 4px 3px;
+}
+.dp-info{padding:0 16px 16px;display:flex;flex-direction:column;gap:8px;}
+.dp-row{
+  display:flex;justify-content:space-between;
+  font-size:12.5px;padding:8px 0;
+  border-bottom:1px solid var(--line-soft);align-items:center;
+}
+.dp-row:last-child{border-bottom:none;}
+.dp-row .lbl{color:var(--body-soft);}
+.dp-row .val{font-weight:700;color:var(--ink);font-size:12.5px;}
+.dp-row .val.green{color:var(--green);}
+.dp-row .val.blue{color:var(--blue);}
+.btn-propose{
+  margin:0 16px 16px;
+  padding:11px;border-radius:99px;border:none;
+  background:var(--navy);color:#fff;
+  font-family:var(--head);font-size:13.5px;font-weight:900;
+  cursor:pointer;transition:.2s;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.btn-propose:hover{background:var(--blue-d);}
+
+@media(max-width:900px){.detail-panel{display:none;}}
+@media(max-width:600px){.case-sidebar{width:160px;}.detail-panel{display:none;}}
+</style>
+</head>
+<body>
+
+<!-- ヘッダー -->
+<div class="chat-header">
+  <div class="ch-logo">
+    <a href="業者向け.html"><img src="img/logo-katazuke.png" alt="カタヅケ"></a>
+  </div>
+  <div class="ch-divider"></div>
+  <span class="ch-title">交渉チャット</span>
+  <span class="ch-badge">業者管理画面</span>
+  <div class="ch-right">
+    <span class="ch-company">グリーンリサイクル東京</span>
+    <div class="ch-bell">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+      <span class="bell-dot"></span>
+    </div>
+  </div>
+</div>
+
+<div class="chat-layout">
+
+  <!-- 案件リスト -->
+  <div class="case-sidebar">
+    <div class="case-sidebar-head">交渉中の案件</div>
+
+    <div class="case-item active" onclick="selectCase(this,0)">
+      <span class="case-status status-negotiating">交渉中</span>
+      <div class="case-id">KTZ-2026-04821</div>
+      <div class="case-preview">家電・ブランド品 他12点</div>
+      <div class="case-bid-row">
+        <span class="case-bid">¥72,000</span>
+        <span class="case-time">15:42</span>
+      </div>
+    </div>
+
+    <div class="case-item" onclick="selectCase(this,1)">
+      <span class="case-status status-scheduled">日程確定</span>
+      <div class="case-id">KTZ-2026-04756</div>
+      <div class="case-preview">家具・インテリア 他8点</div>
+      <div class="case-bid-row">
+        <span class="case-bid">¥45,000</span>
+        <span class="case-time">昨日</span>
+      </div>
+    </div>
+
+    <div class="case-item" onclick="selectCase(this,2)">
+      <span class="case-status status-waiting">返信待ち</span>
+      <div class="case-id">KTZ-2026-04690</div>
+      <div class="case-preview">ブランド品・時計 他5点</div>
+      <div class="case-bid-row">
+        <span class="case-bid">¥38,000</span>
+        <span class="case-time">6/22</span>
+      </div>
+      <span class="case-unread"></span>
+    </div>
+
+  </div>
+
+  <!-- チャット本体 -->
+  <div class="chat-main">
+
+    <div class="chat-peer-header">
+      <div class="peer-avatar">山</div>
+      <div class="peer-info">
+        <div class="peer-name">山田 花子 様</div>
+        <div class="peer-sub">東京都 世田谷区　KTZ-2026-04821</div>
+      </div>
+      <div class="amount-chip">
+        <div class="amount-label">合意額</div>
+        <div class="amount-val">¥72,000</div>
+      </div>
+    </div>
+
+    <div class="status-bar">
+      <span class="status-dot"></span>
+      交渉成立済み。引き取り日程を確定してください。
+    </div>
+
+    <div class="messages-area" id="messages-area">
+
+      <div class="msg me">
+        <div class="msg-avatar" style="background:var(--pale);color:var(--blue);">グ</div>
+        <div>
+          <div class="bubble">家電・ブランド品を中心に高評価しております。値がつかないものも含めてまとめて回収いたします。引き取りは弊社スタッフ2名でお伺いしますので、重いものも安心してお任せください。</div>
+          <div class="msg-time">13:11</div>
+        </div>
+      </div>
+
+      <div class="msg them">
+        <div class="msg-avatar">山</div>
+        <div>
+          <div class="bubble">ご連絡ありがとうございます。金額について、もう少し上げていただくことは可能でしょうか？</div>
+          <div class="msg-time">13:45</div>
+        </div>
+      </div>
+
+      <div class="msg me">
+        <div class="msg-avatar" style="background:var(--pale);color:var(--blue);">グ</div>
+        <div>
+          <div class="bubble">ご要望ありがとうございます。社内で検討いたしました。カメラ機材の評価を見直し、¥72,000での買取であれば対応可能です。いかがでしょうか。</div>
+          <div class="msg-time">14:20</div>
+        </div>
+      </div>
+
+      <div class="msg them">
+        <div class="msg-avatar">山</div>
+        <div>
+          <div class="bubble">ありがとうございます。¥72,000でお願いします。日程はいつ頃が可能ですか？</div>
+          <div class="msg-time">15:10</div>
+        </div>
+      </div>
+
+      <div class="date-sep">6月24日（火）</div>
+
+      <!-- 日程提案カード（業者が送信） -->
+      <div class="schedule-propose" id="schedule-propose">
+        <div class="sp-head">📅 引き取り候補日を提案する</div>
+        <div class="sp-options" id="sp-options">
+          <div class="sp-opt-row">
+            <input type="text" class="sp-date-input" value="7月5日（土）10:00〜12:00" placeholder="日程を入力">
+            <button class="sp-remove" onclick="removeSlot(this)">×</button>
+          </div>
+          <div class="sp-opt-row">
+            <input type="text" class="sp-date-input" value="7月6日（日）13:00〜15:00" placeholder="日程を入力">
+            <button class="sp-remove" onclick="removeSlot(this)">×</button>
+          </div>
+          <div class="sp-opt-row">
+            <input type="text" class="sp-date-input" value="7月12日（土）10:00〜12:00" placeholder="日程を入力">
+            <button class="sp-remove" onclick="removeSlot(this)">×</button>
+          </div>
+        </div>
+        <button class="btn-add-slot" onclick="addSlot()">＋ 候補日を追加</button>
+        <button class="btn-send-schedule" onclick="sendSchedule()">候補日を送信する</button>
+      </div>
+
+      <div class="msg me" style="margin-top:4px;">
+        <div class="msg-avatar" style="background:var(--pale);color:var(--blue);">グ</div>
+        <div>
+          <div class="bubble">引き取り日程の候補をお送りしました。ご都合の良い日程をお選びください。当日はスタッフ2名でお伺いします。</div>
+          <div class="msg-time">09:31</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 入力エリア -->
+    <div class="input-area">
+      <div class="input-tools">
+        <button class="tool-btn" title="日程を提案" onclick="toggleScheduleCard()">📅</button>
+      </div>
+      <input type="text" class="msg-input" id="msg-input" placeholder="メッセージを入力…">
+      <button class="btn-send" onclick="sendMsg()">
+        <svg viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2L15 22l-4-9-9-4 20-7z"/></svg>
+      </button>
+    </div>
+
+  </div>
+
+  <!-- 右パネル：出品内容 -->
+  <div class="detail-panel">
+    <div class="dp-head">出品内容</div>
+    <div class="dp-case-id">
+      <div class="lbl">案件ID</div>
+      <div class="val">KTZ-2026-04821</div>
+    </div>
+    <div class="dp-items-grid">
+      <div class="dp-item-thumb"><img src="img/cat-kaden.png" alt="家電" style="width:100%;height:100%;object-fit:contain;"><div class="dp-item-label">家電・PC</div></div>
+      <div class="dp-item-thumb"><img src="img/cat-brand.png" alt="ブランド" style="width:100%;height:100%;object-fit:contain;"><div class="dp-item-label">バッグ</div></div>
+      <div class="dp-item-thumb"><img src="img/cat-camera.png" alt="カメラ" style="width:100%;height:100%;object-fit:contain;"><div class="dp-item-label">カメラ</div></div>
+      <div class="dp-item-thumb" style="background:#eef3ff;color:var(--blue);font-size:16px;font-weight:900;font-family:var(--head);">+9</div>
+    </div>
+    <div class="dp-info">
+      <div class="dp-row"><span class="lbl">点数</span><span class="val">14点</span></div>
+      <div class="dp-row"><span class="lbl">エリア</span><span class="val">東京都 世田谷区</span></div>
+      <div class="dp-row"><span class="lbl">合意額</span><span class="val blue">¥72,000</span></div>
+      <div class="dp-row"><span class="lbl">手数料(8%)</span><span class="val">¥5,760</span></div>
+      <div class="dp-row"><span class="lbl">ステータス</span><span class="val green">交渉中</span></div>
+    </div>
+    <button class="btn-propose" onclick="toggleScheduleCard()">
+      📅 引き取り日程を提案
+    </button>
+  </div>
+
+</div>
+
+<script>
+var caseData = [
+  { id:'KTZ-2026-04821', name:'山田 花子 様', area:'東京都 世田谷区', amount:'¥72,000', status:'交渉中' },
+  { id:'KTZ-2026-04756', name:'田中 一郎 様', area:'神奈川県 横浜市', amount:'¥45,000', status:'日程確定済み' },
+  { id:'KTZ-2026-04690', name:'鈴木 美咲 様', area:'東京都 練馬区', amount:'¥38,000', status:'返信待ち' }
+];
+
+function selectCase(el, idx){
+  document.querySelectorAll('.case-item').forEach(function(i){ i.classList.remove('active'); });
+  el.classList.add('active');
+  var d = caseData[idx];
+  document.querySelector('.peer-name').textContent = d.name;
+  document.querySelector('.peer-info .peer-sub').textContent = d.area + '　' + d.id;
+  document.querySelector('.amount-val').textContent = d.amount;
+  var unread = el.querySelector('.case-unread');
+  if(unread) unread.remove();
+}
+
+function removeSlot(btn){
+  btn.closest('.sp-opt-row').remove();
+}
+
+function addSlot(){
+  var opts = document.getElementById('sp-options');
+  var row = document.createElement('div');
+  row.className = 'sp-opt-row';
+  row.innerHTML = '<input type="text" class="sp-date-input" placeholder="日程を入力（例：7月13日（日）10:00〜12:00）"><button class="sp-remove" onclick="removeSlot(this)">×</button>';
+  opts.appendChild(row);
+}
+
+function sendSchedule(){
+  var inputs = document.querySelectorAll('.sp-date-input');
+  var dates = [];
+  inputs.forEach(function(i){ if(i.value.trim()) dates.push(i.value.trim()); });
+  if(dates.length === 0){ alert('候補日を1つ以上入力してください'); return; }
+  var card = document.getElementById('schedule-propose');
+  card.style.display = 'none';
+  addMsg('me', '引き取り候補日：\n' + dates.map(function(d,i){ return '・' + d; }).join('\n') + '\n\nご都合の良い日程をお選びください。');
+}
+
+function toggleScheduleCard(){
+  var card = document.getElementById('schedule-propose');
+  card.style.display = card.style.display === 'none' ? 'block' : 'none';
+  if(card.style.display === 'block') card.scrollIntoView({ behavior:'smooth', block:'center' });
+}
+
+function addMsg(type, text){
+  var area = document.getElementById('messages-area');
+  var isMe = type === 'me';
+  var avatar = isMe
+    ? '<div class="msg-avatar" style="background:var(--pale);color:var(--blue);">\u30b0</div>'
+    : '<div class="msg-avatar">\u5c71</div>';
+  var div = document.createElement('div');
+  div.className = 'msg ' + type;
+  var formattedText = text.replace(/\n/g, '<br>');
+  div.innerHTML = avatar + '<div><div class="bubble">' + formattedText + '</div><div class="msg-time">' + new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}) + '</div></div>';
+  area.appendChild(div);
+  area.scrollTop = area.scrollHeight;
+}
+
+function sendMsg(){
+  var inp = document.getElementById('msg-input');
+  var t = inp.value.trim();
+  if(!t) return;
+  addMsg('me', t);
+  inp.value = '';
+}
+
+document.getElementById('msg-input').addEventListener('keydown', function(e){
+  if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendMsg(); }
+});
+
+document.getElementById('messages-area').scrollTop = 9999;
+</script>
+</body>
+</html>

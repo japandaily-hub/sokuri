@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>パスワードをリセット｜カタヅケ</title>
+<meta name="theme-color" content="#1f54de">
+<link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="katazuke-main.css">
+<style>
+html,body{height:100%;}
+body{background:#f4f6fb;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:32px 20px;}
+.reset-logo{margin-bottom:28px;}
+.reset-logo img{height:38px;}
+.reset-card{max-width:420px;width:100%;background:#fff;border-radius:var(--radius);box-shadow:var(--shadow-m);border:1px solid var(--line-soft);padding:36px 30px;position:relative;overflow:hidden;}
+.reset-card::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,var(--blue),#6fa3ff);}
+
+/* ステップインジケーター */
+.step-ind{display:flex;align-items:center;gap:0;margin-bottom:28px;}
+.si-step{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;position:relative;}
+.si-step+.si-step::before{content:"";position:absolute;left:-50%;top:12px;width:100%;height:2px;background:var(--line);z-index:0;transition:background .4s;}
+.si-step.done+.si-step::before,.si-step.active+.si-step::before{background:var(--blue);}
+.si-dot{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-family:var(--head);font-size:11px;font-weight:900;position:relative;z-index:1;transition:.3s;}
+.si-step.done .si-dot{background:var(--blue);color:#fff;}
+.si-step.active .si-dot{background:var(--blue);color:#fff;box-shadow:0 0 0 4px rgba(31,84,222,.18);}
+.si-step.future .si-dot{background:var(--line-soft);color:var(--body-soft);}
+.si-lbl{font-size:10px;font-weight:600;color:var(--body-soft);}
+.si-step.active .si-lbl{color:var(--blue);font-weight:700;}
+
+/* パネル */
+.panel{display:none;}
+.panel.active{display:block;}
+.panel-title{font-family:var(--head);font-size:22px;font-weight:900;color:var(--navy);margin-bottom:8px;}
+.panel-sub{font-size:13.5px;color:var(--body-soft);line-height:1.8;margin-bottom:22px;}
+
+/* フィールド */
+.field{margin-bottom:18px;}
+.field:last-child{margin-bottom:0;}
+.field label{display:block;font-size:13px;font-weight:700;color:var(--ink);margin-bottom:7px;}
+.field input{width:100%;font-family:var(--sans);font-size:15px;color:var(--ink);background:#fafbfe;border:1.5px solid var(--line);border-radius:var(--radius-s);padding:12px 14px;outline:none;transition:.2s;}
+.field input::placeholder{color:#bcc3d4;}
+.field input:focus{border-color:var(--blue);background:#fff;box-shadow:0 0 0 3px rgba(31,84,222,.12);}
+.field-error{font-size:12px;color:#e05c5c;margin-top:5px;display:none;}
+.has-error input{border-color:#e05c5c!important;}
+
+/* パスワード */
+.pw-wrap{position:relative;}
+.pw-toggle{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--body-soft);padding:4px;}
+.pw-toggle svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;display:block;}
+.pw-wrap input{padding-right:42px;}
+
+/* 強度バー */
+.pw-strength{display:flex;gap:5px;align-items:center;margin-top:8px;}
+.pw-bar{flex:1;height:4px;border-radius:2px;background:var(--line);transition:background .3s;}
+.pw-bar-lbl{font-size:11px;font-weight:700;min-width:32px;text-align:right;}
+
+/* 送信済みアイコン */
+.sent-ic{width:72px;height:72px;border-radius:50%;background:var(--pale);margin:0 auto 18px;display:grid;place-items:center;}
+.sent-ic svg{width:36px;height:36px;fill:none;stroke:var(--blue);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+
+/* 完了 */
+.done-ic{width:80px;height:80px;border-radius:50%;background:#e8faf0;margin:0 auto 18px;display:grid;place-items:center;font-size:36px;}
+
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinning{animation:spin .7s linear infinite;display:inline-block;}
+
+@media(max-width: 480px) {
+  .reset-card { padding: 28px 20px; }
+  .panel-title { font-size: 19px; }
+  .panel-sub { font-size: 13px; }
+  .step-ind { gap: 0; }
+  .si-lbl { font-size: 9px; }
+  .si-dot { width: 22px; height: 22px; font-size: 10px; }
+  .sent-ic { width: 60px; height: 60px; }
+  .sent-ic svg { width: 30px; height: 30px; }
+  .done-ic { width: 68px; height: 68px; font-size: 30px; }
+}
+@media(max-width: 360px) {
+  .si-lbl { display: none; }
+  .reset-card { padding: 24px 16px; }
+  body { padding: 24px 14px; }
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute"><defs>
+  <symbol id="i-mail" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="M22 6l-10 7L2 6"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+</defs></svg>
+
+<a href="カタヅケ.html" class="reset-logo"><img src="img/logo-katazuke.png" alt="カタヅケ"></a>
+
+<div class="reset-card">
+
+  <!-- ステップ -->
+  <div class="step-ind" id="step-ind">
+    <div class="si-step active" data-step="1"><div class="si-dot">1</div><div class="si-lbl">メール送信</div></div>
+    <div class="si-step future" data-step="2"><div class="si-dot">2</div><div class="si-lbl">新しいパスワード</div></div>
+    <div class="si-step future" data-step="3"><div class="si-dot">✓</div><div class="si-lbl">完了</div></div>
+  </div>
+
+  <!-- STEP 1: メール入力 -->
+  <div class="panel active" id="panel-1">
+    <div class="panel-title">パスワードをリセット</div>
+    <p class="panel-sub">登録したメールアドレスを入力してください。リセット用のURLを送信します。</p>
+    <div class="field" id="f-email">
+      <label>メールアドレス</label>
+      <input type="email" id="inp-email" placeholder="example@email.com" autocomplete="email" inputmode="email">
+      <div class="field-error">メールアドレスを正しく入力してください</div>
+    </div>
+    <button class="btn btn-primary btn-block btn-lg" style="margin-top:4px;" id="btn-send">リセットメールを送信</button>
+    <div style="text-align:center;margin-top:16px;"><a href="ログイン.html" style="font-size:13px;color:var(--body-soft);">ログインに戻る</a></div>
+  </div>
+
+  <!-- STEP 2: メール送信済み -->
+  <div class="panel" id="panel-2">
+    <div class="sent-ic"><svg viewBox="0 0 24 24"><use href="#i-mail"></use></svg></div>
+    <div class="panel-title" style="text-align:center;">メールを送信しました</div>
+    <p class="panel-sub" style="text-align:center;">
+      <strong id="sent-email" style="color:var(--navy);"></strong><br>
+      にリセット用URLを送信しました。<br>メールを確認してリンクをクリックしてください。
+    </p>
+    <div style="background:var(--pale);border-radius:12px;padding:14px 16px;font-size:13px;color:var(--body);line-height:1.75;margin-bottom:18px;">
+      💡 メールが届かない場合は、迷惑メールフォルダも確認してください。数分経っても届かない場合は再送信できます。
+    </div>
+    <button class="btn btn-primary btn-block" id="btn-simulate">（デモ）リセットリンクをクリック</button>
+    <div style="text-align:center;margin-top:12px;"><button class="btn btn-ghost" style="width:100%;font-size:13px;" id="btn-resend">メールを再送信する</button></div>
+  </div>
+
+  <!-- STEP 3: 新パスワード入力 -->
+  <div class="panel" id="panel-3">
+    <div class="panel-title">新しいパスワードを設定</div>
+    <p class="panel-sub">8文字以上の新しいパスワードを入力してください。</p>
+    <div class="field">
+      <label>新しいパスワード</label>
+      <div class="pw-wrap">
+        <input type="password" id="inp-pw1" placeholder="8文字以上" oninput="pwStrength(this.value)">
+        <button type="button" class="pw-toggle" id="ptog1"><svg viewBox="0 0 24 24"><path d="M1 12S5 5 12 5s11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      </div>
+      <div class="pw-strength" id="pw-strength" style="display:none;">
+        <div class="pw-bar" id="pb1"></div><div class="pw-bar" id="pb2"></div><div class="pw-bar" id="pb3"></div>
+        <span class="pw-bar-lbl" id="pbl"></span>
+      </div>
+    </div>
+    <div class="field">
+      <label>確認用パスワード</label>
+      <div class="pw-wrap">
+        <input type="password" id="inp-pw2" placeholder="もう一度入力">
+        <button type="button" class="pw-toggle" id="ptog2"><svg viewBox="0 0 24 24"><path d="M1 12S5 5 12 5s11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      </div>
+    </div>
+    <button class="btn btn-primary btn-block btn-lg" style="margin-top:4px;" id="btn-reset">パスワードを変更する</button>
+  </div>
+
+  <!-- STEP 4: 完了 -->
+  <div class="panel" id="panel-4">
+    <div class="done-ic">✓</div>
+    <div class="panel-title" style="text-align:center;">パスワードを変更しました！</div>
+    <p class="panel-sub" style="text-align:center;">新しいパスワードでログインできます。</p>
+    <a href="ログイン.html" class="btn btn-primary btn-block btn-lg">ログインする</a>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  var step = 1;
+  function goTo(s){
+    document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('active'); });
+    document.getElementById('panel-' + s).classList.add('active');
+    document.querySelectorAll('.si-step').forEach(function(el){
+      var n = parseInt(el.dataset.step);
+      el.classList.remove('active','done','future');
+      if(n < s) el.classList.add('done');
+      else if(n === s) el.classList.add('active');
+      else el.classList.add('future');
+    });
+    step = s;
+  }
+
+  /* Step 1 送信 */
+  document.getElementById('btn-send').addEventListener('click', function(){
+    var email = document.getElementById('inp-email').value.trim();
+    var f = document.getElementById('f-email');
+    if(!email || !email.includes('@')){ f.classList.add('has-error'); f.querySelector('.field-error').style.display='block'; return; }
+    f.classList.remove('has-error'); f.querySelector('.field-error').style.display='none';
+    this.innerHTML = '<span class="spinning">↻</span> 送信中…'; this.disabled = true;
+    setTimeout(function(){
+      document.getElementById('sent-email').textContent = email;
+      goTo(2);
+    }, 900);
+  });
+
+  /* デモ用：リセットリンクをシミュレート */
+  document.getElementById('btn-simulate').addEventListener('click', function(){ goTo(3); });
+
+  /* 再送信 */
+  document.getElementById('btn-resend').addEventListener('click', function(){
+    this.textContent = '送信しました ✓'; this.disabled = true;
+    setTimeout(function(){ document.getElementById('btn-resend').textContent = 'メールを再送信する'; document.getElementById('btn-resend').disabled = false; }, 5000);
+  });
+
+  /* パスワード強度 */
+  window.pwStrength = function(v){
+    var el = document.getElementById('pw-strength');
+    el.style.display = v.length ? 'flex' : 'none';
+    var sc = 0;
+    if(v.length >= 8) sc++;
+    if(/[A-Z0-9]/.test(v)) sc++;
+    if(/[^A-Za-z0-9]/.test(v) || v.length >= 12) sc++;
+    var cols = ['#e05c5c','#f0a030','var(--green)'];
+    var lbls = ['弱い','普通','強い'];
+    ['pb1','pb2','pb3'].forEach(function(id,i){ document.getElementById(id).style.background = i<sc ? cols[Math.min(sc-1,2)] : 'var(--line)'; });
+    var lbl = document.getElementById('pbl');
+    lbl.textContent = sc ? lbls[Math.min(sc-1,2)] : '';
+    lbl.style.color = cols[Math.min(sc-1,2)];
+  };
+
+  /* パスワード表示 */
+  [['ptog1','inp-pw1'],['ptog2','inp-pw2']].forEach(function(pair){
+    var show = false;
+    document.getElementById(pair[0]).addEventListener('click', function(){
+      show = !show;
+      document.getElementById(pair[1]).type = show ? 'text' : 'password';
+    });
+  });
+
+  /* Step 3 確定 */
+  document.getElementById('btn-reset').addEventListener('click', function(){
+    var p1 = document.getElementById('inp-pw1').value;
+    var p2 = document.getElementById('inp-pw2').value;
+    if(p1.length < 8){ alert('8文字以上で入力してください'); return; }
+    if(p1 !== p2){ alert('パスワードが一致しません'); return; }
+    this.innerHTML = '<span class="spinning">↻</span> 変更中…'; this.disabled = true;
+    setTimeout(function(){ goTo(4); }, 900);
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>業者登録｜カタヅケ — 家まるごと買取の入札プラットフォーム</title>
+<meta name="description" content="カタヅケは買取業者向けの入札プラットフォームです。まとめて出品された不用品に買取総額で入札。効率的な仕入れルートを開拓できます。">
+<meta name="theme-color" content="#1f54de">
+<link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="katazuke-main.css">
+<style>
+/* ============================================================
+   業者向けページ固有スタイル
+   ============================================================ */
+
+/* ヒーロー — ネイビー背景 */
+.biz-hero {
+  background: var(--navy);
+  color: #fff;
+  padding: clamp(72px, 9vw, 120px) 0 clamp(64px, 8vw, 104px);
+  position: relative;
+  overflow: hidden;
+}
+.biz-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 110% 10%, rgba(31,84,222,.45) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at -10% 90%, rgba(31,84,222,.25) 0%, transparent 60%);
+  pointer-events: none;
+}
+.biz-hero .container { position: relative; z-index: 1; }
+.biz-hero .eyebrow { color: rgba(255,255,255,.7); }
+.biz-hero .eyebrow::before { background: rgba(255,255,255,.5); }
+.biz-hero h1 {
+  font-size: clamp(30px, 4.5vw, 54px);
+  color: #fff;
+  margin-top: 18px;
+  line-height: 1.28;
+  text-wrap: balance;
+}
+.biz-hero h1 .hl { color: #5b9bff; }
+.biz-hero .hero-sub {
+  font-size: clamp(15px, 1.6vw, 18px);
+  color: rgba(255,255,255,.78);
+  margin-top: 22px;
+  max-width: 560px;
+  line-height: 1.9;
+}
+.biz-hero-cta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 36px;
+}
+.btn-white {
+  background: #fff;
+  color: var(--navy);
+  box-shadow: 0 14px 26px -12px rgba(0,0,0,.3);
+}
+.btn-white:hover { background: #eef3ff; transform: translateY(-2px); }
+.btn-outline-white {
+  background: transparent;
+  color: #fff;
+  border: 1.5px solid rgba(255,255,255,.4);
+}
+.btn-outline-white:hover { border-color: rgba(255,255,255,.8); background: rgba(255,255,255,.08); }
+
+/* 帯：数字実績 */
+.biz-stats {
+  background: var(--pale);
+  border-bottom: 1px solid var(--line);
+  padding: 36px 0;
+}
+.biz-stats .inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(32px, 6vw, 80px);
+  flex-wrap: wrap;
+}
+.stat-item { text-align: center; }
+.stat-num {
+  font-family: var(--head);
+  font-size: clamp(28px, 3.5vw, 40px);
+  font-weight: 900;
+  color: var(--navy);
+  line-height: 1;
+}
+.stat-num span { font-size: .58em; font-weight: 700; color: var(--blue); margin-left: 2px; }
+.stat-label { font-size: 13px; color: var(--body-soft); margin-top: 6px; font-weight: 600; }
+
+/* メリットグリッド */
+.merit-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+.merit-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 32px 28px;
+  box-shadow: var(--shadow-s);
+  transition: box-shadow .25s, transform .25s;
+}
+.merit-card:hover { box-shadow: var(--shadow-m); transform: translateY(-3px); }
+.merit-num {
+  font-family: var(--head);
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--blue);
+  letter-spacing: .1em;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.merit-num::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.merit-card h3 { font-size: clamp(16px, 1.7vw, 19px); margin-bottom: 12px; }
+.merit-card p { font-size: 14.5px; color: var(--body-soft); line-height: 1.85; }
+.merit-tag {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 99px;
+  margin-bottom: 12px;
+}
+.merit-tag.green { background: #e6f5ee; color: var(--green); }
+.merit-tag.blue { background: var(--pale); color: var(--blue); }
+.merit-tag.gold { background: #fdf5e6; color: var(--gold); }
+
+/* フロー（業者視点） */
+.biz-flow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  position: relative;
+}
+.biz-flow::before {
+  content: "";
+  position: absolute;
+  top: 40px;
+  left: calc(12.5% + 8px);
+  right: calc(12.5% + 8px);
+  height: 2px;
+  background: linear-gradient(90deg, var(--blue) 0%, #5b9bff 100%);
+  z-index: 0;
+}
+.biz-step {
+  text-align: center;
+  position: relative;
+  z-index: 1;
+}
+.biz-step-ic {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--pale);
+  border: 2px solid var(--blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 18px;
+  color: var(--blue);
+  font-size: 28px;
+  position: relative;
+  background: #fff;
+  box-shadow: var(--shadow-s);
+}
+.biz-step-n {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 24px;
+  height: 24px;
+  background: var(--blue);
+  color: #fff;
+  border-radius: 50%;
+  font-family: var(--head);
+  font-size: 12px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.biz-step h4 { font-size: 15px; margin-bottom: 8px; color: var(--navy); }
+.biz-step p { font-size: 13px; color: var(--body-soft); line-height: 1.75; }
+
+/* 要件カード */
+.req-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+.req-card {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  padding: 24px 22px;
+}
+.req-ic {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--pale);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--blue);
+  font-size: 22px;
+}
+.req-body h4 { font-size: 15px; margin-bottom: 6px; }
+.req-body p { font-size: 13.5px; color: var(--body-soft); line-height: 1.75; }
+
+/* FAQ */
+.faq-item { border-bottom: 1px solid var(--line-soft); }
+.faq-q {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 20px 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-family: var(--head);
+  font-weight: 700;
+  font-size: 15.5px;
+  color: var(--ink);
+  transition: color .2s;
+}
+.faq-q:hover { color: var(--blue); }
+.qmark {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--pale);
+  color: var(--blue);
+  font-family: var(--head);
+  font-size: 14px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.faq-q .chev { margin-left: auto; font-size: 18px; color: var(--body-soft); transition: transform .3s; }
+.faq-item.open .faq-q .chev { transform: rotate(180deg); }
+.faq-a { max-height: 0; overflow: hidden; transition: max-height .35s cubic-bezier(.22,.61,.36,1); }
+.faq-a-inner { padding: 0 0 20px 42px; font-size: 14.5px; color: var(--body-soft); line-height: 1.9; }
+
+/* 登録フォームカード */
+.reg-card {
+  max-width: 680px;
+  margin: 0 auto;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: clamp(32px, 4vw, 56px);
+  box-shadow: var(--shadow-m);
+}
+.field { margin-bottom: 22px; }
+.field label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.field label .req {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--blue);
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.field label .opt {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--body-soft);
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.field input, .field select, .field textarea {
+  width: 100%;
+  font-family: var(--sans);
+  font-size: 15px;
+  color: var(--ink);
+  background: #fafbfe;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-s);
+  padding: 13px 16px;
+  transition: border-color .2s, box-shadow .2s;
+  appearance: none;
+  outline: none;
+  line-height: 1.6;
+}
+.field input::placeholder, .field textarea::placeholder { color: #bcc3d4; }
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: var(--blue);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(31,84,222,.12);
+}
+.field textarea { resize: vertical; min-height: 120px; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.select-wrap { position: relative; }
+.select-wrap::after {
+  content: "";
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0; height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid var(--body-soft);
+  pointer-events: none;
+}
+.select-wrap select { padding-right: 40px; cursor: pointer; }
+.check-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+.check-field input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin-top: 3px;
+  accent-color: var(--blue);
+  cursor: pointer;
+}
+.check-field label {
+  font-size: 13.5px;
+  color: var(--body-soft);
+  line-height: 1.75;
+  cursor: pointer;
+}
+.check-field label a { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; }
+.submit-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.btn-submit {
+  width: 100%;
+  max-width: 400px;
+  font-size: 17px;
+  padding: 20px 36px;
+  background: var(--blue);
+  color: #fff;
+  border-radius: 999px;
+  font-family: var(--head);
+  font-weight: 900;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 14px 26px -12px rgba(31,84,222,.65);
+  transition: .25s var(--ease);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.btn-submit:hover { background: var(--blue-d); transform: translateY(-2px); box-shadow: 0 20px 34px -12px rgba(31,84,222,.75); }
+.submit-note { font-size: 12.5px; color: var(--body-soft); text-align: center; line-height: 1.75; }
+
+/* 送信完了 */
+.thanks { display: none; text-align: center; padding: 56px 32px; }
+.thanks-ic {
+  width: 64px; height: 64px;
+  background: var(--pale); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 24px;
+  color: var(--blue); font-size: 32px;
+}
+.thanks h3 { font-size: 22px; color: var(--navy); margin-bottom: 12px; }
+.thanks p { color: var(--body-soft); font-size: 15px; line-height: 1.9; margin-bottom: 28px; }
+
+/* レスポンシブ */
+@media(max-width: 900px){
+  .merit-grid { grid-template-columns: repeat(2, 1fr); }
+  .biz-flow { grid-template-columns: repeat(2, 1fr); gap: 24px; }
+  .biz-flow::before { display: none; }
+}
+@media(max-width: 640px){
+  .merit-grid { grid-template-columns: 1fr; }
+  .req-grid { grid-template-columns: 1fr; }
+  .field-row { grid-template-columns: 1fr; }
+  .biz-stats .inner { gap: 28px; }
+  .reg-card { padding: 28px 20px; }
+}
+@media(max-width: 768px){
+  .header nav, .header .h-cta { display: none; }
+  .hamburger { display: flex; }
+  .header.menu-open + .mobile-menu { display: flex; }
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M5 5h14a2 2 0 012 2v8a2 2 0 01-2 2H9l-4 4V7a2 2 0 012-2z"/><path d="M8 10h8M8 13h5"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.7-3 7.9-7 9-4-1.1-7-4.3-7-9V6z"/><path d="M9 12l2 2 4-4"/></symbol>
+  <symbol id="i-trend" viewBox="0 0 24 24"><path d="M4 17l5-5 3 3 7-7"/><path d="M16 8h4v4"/></symbol>
+  <symbol id="i-people" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.8-3.4 4-5 5.5-5s4.7 1.6 5.5 5"/><path d="M16 6.2A3 3 0 0118 11.6M17.5 14c1.6.3 3.4 1.7 4 5"/></symbol>
+  <symbol id="i-bag" viewBox="0 0 24 24"><path d="M5 8h14l-1.4 11H6.4z"/><path d="M9 8a3 3 0 016 0"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.6"/></symbol>
+  <symbol id="i-truck" viewBox="0 0 24 24"><path d="M3 6h11v9H3z"/><path d="M14 9h4l3 3v3h-7z"/><circle cx="7" cy="18" r="1.6"/><circle cx="17" cy="18" r="1.6"/></symbol>
+  <symbol id="i-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l2.5 2.5L16 9"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-yen" viewBox="0 0 24 24"><path d="M12 13v7M7 4l5 7 5-7M8 13h8M8 16.5h8"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2L15 22l-4-9-9-4 20-7z"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V8a4 4 0 018 0v2"/></symbol>
+  <symbol id="i-tag" viewBox="0 0 24 24"><path d="M4 4h7l9 9-7 7-9-9z"/><circle cx="8.5" cy="8.5" r="1.3"/></symbol>
+  <symbol id="i-crown" viewBox="0 0 24 24"><path d="M4 8l3.5 3L12 5l4.5 6L20 8l-1.6 10H5.6z"/><path d="M5.6 18h12.8"/></symbol>
+</defs></svg>
+
+<div class="scroll-progress" id="scroll-progress" aria-hidden="true"></div>
+
+<!-- ============ HEADER ============ -->
+<header class="header" id="header">
+  <div class="container inner">
+    <a href="カタヅケ.html" class="logo"><img src="img/logo-katazuke.png" alt="カタヅケ｜家まるごと片付け買取" class="logo-img"></a>
+    <nav class="nav">
+      <a href="#merit">参加メリット</a>
+      <a href="#flow">掲載の流れ</a>
+      <a href="#requirements">登録要件</a>
+      <a href="#faq">よくある質問</a>
+    </nav>
+    <a href="#register" class="btn btn-primary h-cta"><svg class="ic"><use href="#i-send"></use></svg>業者登録を申し込む</a>
+    <button class="hamburger" id="hamburger" aria-label="メニュー"><svg class="ic"><use href="#i-menu"></use></svg></button>
+  </div>
+</header>
+<div class="mobile-menu" id="mobile-menu">
+  <a href="#merit">参加メリット</a>
+  <a href="#flow">掲載の流れ</a>
+  <a href="#requirements">登録要件</a>
+  <a href="#faq">よくある質問</a>
+  <a href="#register" class="btn btn-primary btn-block mm-cta"><svg class="ic"><use href="#i-send"></use></svg>業者登録を申し込む</a>
+</div>
+
+<main>
+
+<!-- ============ HERO ============ -->
+<section class="biz-hero" data-screen-label="ヒーロー">
+  <div class="container">
+    <span class="eyebrow">FOR BUYERS</span>
+    <h1>まとめ買取の仕入れルートを、<br><span class="hl">カタヅケ</span>で開拓する。</h1>
+    <p class="hero-sub">個人が家じゅうの不用品をまとめて出品。業者は写真だけで買取総額を入札し、上位3社だけがユーザーと交渉できます。下見なし・一斉架電なし・まとめて効率的な仕入れ。費用は成約時の<strong style="color:#fff">買取金額8%のみ</strong>。カタヅケは片付けニーズを恒久的につなぐプラットフォームを目指します。<br>顧客も業者も無駄がなく、納得できる——だから安定する。</p>
+    <div class="biz-hero-cta">
+      <a href="#register" class="btn btn-white btn-lg"><svg class="ic"><use href="#i-send"></use></svg>業者登録を申し込む<svg class="ic arw"><use href="#i-arrow"></use></svg></a>
+      <a href="#merit" class="btn btn-outline-white btn-lg">参加メリットを見る</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 実績帯 ============ -->
+<section class="biz-stats">
+  <div class="container">
+    <div class="inner">
+      <div class="stat-item">
+        <div class="stat-num">4<span>都県</span></div>
+        <div class="stat-label">東京・千葉・埼玉・神奈川</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num">0<span>円</span></div>
+        <div class="stat-label">初期費用・月額費用</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num">8<span>%</span></div>
+        <div class="stat-label">成約時の手数料のみ</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num">12<span>カテゴリ</span></div>
+        <div class="stat-label">家電〜ブランド品まで対応</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num">上位<span>3社</span></div>
+        <div class="stat-label">に絞られた交渉機会</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 参加メリット ============ -->
+<section class="section" id="merit" data-screen-label="メリット">
+  <div class="container">
+    <div class="section-head">
+      <span class="eyebrow">MERIT</span>
+      <h2>カタヅケで仕入れる、3つの理由</h2>
+      <p class="sub">家まるごとのまとめ出品だからこそ、業者にとって効率的な仕入れルートになります。</p>
+    </div>
+    <div class="merit-grid">
+      <article class="merit-card rv">
+        <div class="merit-num">01</div>
+        <span class="merit-tag green">効率</span>
+        <h3>まとめ買いで、1件の効率が高い</h3>
+        <p>ユーザーは家じゅうの不用品をまとめて出品します。1件の訪問でまとまった点数を仕入れられるため、1点ずつ集める買取より移動・交渉コストを大幅に削減できます。</p>
+      </article>
+      <article class="merit-card rv" data-d="1">
+        <div class="merit-num">02</div>
+        <span class="merit-tag blue">透明</span>
+        <h3>写真査定で、下見コスト不要</h3>
+        <p>出品情報は写真と品目で構成。現物確認の前に買取総額の入札ができるため、下見の移動コストがかかりません。入札した上位3社だけが交渉に進めます。</p>
+      </article>
+      <article class="merit-card rv" data-d="2">
+        <div class="merit-num">03</div>
+        <span class="merit-tag gold">競争</span>
+        <h3>入札制で、適正価格を見極められる</h3>
+        <p>複数業者が買取総額で競う入札制。過度な値引き競争ではなく、まとめ全体の価値に対して適正な金額を提示できます。自社の買取基準に合った案件だけに入札可能です。</p>
+      </article>
+      <article class="merit-card rv" data-d="0">
+        <div class="merit-num">04</div>
+        <span class="merit-tag blue">安心</span>
+        <h3>営業電話の一斉架電なし</h3>
+        <p>ユーザーへの連絡は上位3社のみ。無駄な電話をかける必要がなく、交渉に進んだユーザーとだけ丁寧にやりとりできます。信頼関係を築きやすい環境です。</p>
+      </article>
+      <article class="merit-card rv" data-d="1">
+        <div class="merit-num">05</div>
+        <span class="merit-tag green">シンプル</span>
+        <h3>費用は成約時の8%のみ</h3>
+        <p>登録・掲載・入札はすべて無料。成約が決まった際に、買取金額の8%のみ手数料として発生します。それ以外の費用は一切かかりません。固定費ゼロで始められます。</p>
+      </article>
+      <article class="merit-card rv" data-d="2">
+        <div class="merit-num">06</div>
+        <span class="merit-tag gold">三方よし</span>
+        <h3>顧客・業者・社会、三者に喜びと安心を</h3>
+        <p>顧客は手軽に手放せ、業者は効率よく仕入れられる。双方が納得できる取引が成立し、不用品が社会に循環する。カタヅケは「三方よし」の仕組みだからこそ、長く安定したプラットフォームになれると考えています。</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 業者視点のフロー ============ -->
+<section class="section bg-pale" id="flow" data-screen-label="フロー">
+  <div class="container">
+    <div class="section-head">
+      <span class="eyebrow">HOW IT WORKS</span>
+      <h2>入札から成約までの流れ</h2>
+      <p class="sub">登録後はシンプルな4ステップ。下見なし、一斉架電なしで効率的に進められます。</p>
+    </div>
+    <div class="biz-flow">
+      <div class="biz-step rv">
+        <div class="biz-step-ic">
+          <span class="biz-step-n">1</span>
+          <svg style="width:32px;height:32px;fill:none;stroke:var(--blue);stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;"><use href="#i-camera"></use></svg>
+        </div>
+        <h4>案件を確認</h4>
+        <p>出品された「まとめ」の写真・品目リストを確認。気になる案件に入札します。</p>
+      </div>
+      <div class="biz-step rv" data-d="1">
+        <div class="biz-step-ic">
+          <span class="biz-step-n">2</span>
+          <svg style="width:32px;height:32px;fill:none;stroke:var(--blue);stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;"><use href="#i-yen"></use></svg>
+        </div>
+        <h4>買取総額で入札</h4>
+        <p>まとめ全体に対して、買取総額を提示。他社と競い合います。</p>
+      </div>
+      <div class="biz-step rv" data-d="2">
+        <div class="biz-step-ic">
+          <span class="biz-step-n">3</span>
+          <svg style="width:32px;height:32px;fill:none;stroke:var(--blue);stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;"><use href="#i-chat"></use></svg>
+        </div>
+        <h4>上位3社として交渉</h4>
+        <p>上位3社に入れば連絡先が開示されユーザーと交渉。条件を調整して成約へ。</p>
+      </div>
+      <div class="biz-step rv" data-d="3">
+        <div class="biz-step-ic">
+          <span class="biz-step-n">4</span>
+          <svg style="width:32px;height:32px;fill:none;stroke:var(--blue);stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;"><use href="#i-truck"></use></svg>
+        </div>
+        <h4>訪問・引き取り</h4>
+        <p>成約後に訪問日時を決定。まとめて引き取りを行います。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 登録要件 ============ -->
+<section class="section" id="requirements" data-screen-label="登録要件">
+  <div class="container">
+    <div class="section-head">
+      <span class="eyebrow">REQUIREMENTS</span>
+      <h2>参加に必要な要件</h2>
+      <p class="sub">ユーザーの安心のため、登録時に以下を確認させていただきます。</p>
+    </div>
+    <div class="req-grid rv">
+      <div class="req-card">
+        <div class="req-ic"><svg style="width:22px;height:22px;fill:none;stroke:var(--blue);stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;"><use href="#i-shield"></use></svg></div>
+        <div class="req-body">
+          <h4>古物商許可証</h4>
+          <p>古物営業法に基づく古物商許可を取得していること。登録時に許可証のコピーをご提出いただきます。</p>
+        </div>
+      </div>
+      <div class="req-card">
+        <div class="req-ic"><svg style="width:22px;height:22px;fill:none;stroke:var(--blue);stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;"><use href="#i-people"></use></svg></div>
+        <div class="req-body">
+          <h4>法人または個人事業主</h4>
+          <p>事業として買取・リユースを営んでいること。個人での副業・転売目的の登録はお断りしています。</p>
+        </div>
+      </div>
+      <div class="req-card">
+        <div class="req-ic"><svg style="width:22px;height:22px;fill:none;stroke:var(--blue);stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;"><use href="#i-tag"></use></svg></div>
+        <div class="req-body">
+          <h4>対応エリア内での訪問買取</h4>
+          <p>東京都・千葉県・埼玉県・神奈川県のいずれかで訪問買取ができること。</p>
+        </div>
+      </div>
+      <div class="req-card">
+        <div class="req-ic"><svg style="width:22px;height:22px;fill:none;stroke:var(--blue);stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;"><use href="#i-check-circle"></use></svg></div>
+        <div class="req-body">
+          <h4>特定商取引法の遵守</h4>
+          <p>訪問買取において特定商取引法（クーリングオフ等）を遵守していること。審査時に確認させていただきます。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FAQ ============ -->
+<section class="section bg-pale" id="faq" data-screen-label="よくある質問">
+  <div class="container">
+    <div class="section-head">
+      <span class="eyebrow">FAQ</span>
+      <h2>業者向けよくある質問</h2>
+    </div>
+    <div class="faq-list" id="faq-list" style="max-width:760px;margin:0 auto;"></div>
+  </div>
+</section>
+
+<!-- ============ 登録フォーム ============ -->
+<section class="section" id="register" data-screen-label="登録フォーム">
+  <div class="container">
+    <div class="section-head">
+      <span class="eyebrow">APPLY</span>
+      <h2>業者登録を申し込む</h2>
+      <p class="sub">内容を確認のうえ、担当者よりご連絡いたします。</p>
+    </div>
+
+    <div class="reg-card rv">
+      <div id="form-body">
+        <form id="reg-form" novalidate>
+          <div class="field-row">
+            <div class="field">
+              <label for="company">会社名・屋号<span class="req">必須</span></label>
+              <input type="text" id="company" name="company" placeholder="株式会社〇〇" required>
+            </div>
+            <div class="field">
+              <label for="rep">担当者名<span class="req">必須</span></label>
+              <input type="text" id="rep" name="rep" placeholder="山田 太郎" required>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="email">メールアドレス<span class="req">必須</span></label>
+            <input type="email" id="email" name="email" placeholder="info@company.co.jp" required>
+          </div>
+
+          <div class="field">
+            <label for="phone">電話番号<span class="req">必須</span></label>
+            <input type="tel" id="phone" name="phone" placeholder="03-0000-0000" required>
+          </div>
+
+          <div class="field">
+            <label for="biz-type">事業形態<span class="req">必須</span></label>
+            <div class="select-wrap">
+              <select id="biz-type" name="biz-type" required>
+                <option value="" disabled selected>選択してください</option>
+                <option value="corp">法人</option>
+                <option value="sole">個人事業主</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="area">主な対応エリア<span class="req">必須</span></label>
+            <div class="select-wrap">
+              <select id="area" name="area" required>
+                <option value="" disabled selected>選択してください</option>
+                <option value="tokyo">東京都</option>
+                <option value="chiba">千葉県</option>
+                <option value="saitama">埼玉県</option>
+                <option value="kanagawa">神奈川県</option>
+                <option value="multi">複数都県</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="cats">得意なカテゴリ<span class="opt">任意</span></label>
+            <input type="text" id="cats" name="cats" placeholder="例：家電・ブランド品・家具">
+          </div>
+
+          <div class="field">
+            <label for="message">ご質問・備考<span class="opt">任意</span></label>
+            <textarea id="message" name="message" placeholder="ご質問や確認したいことがあればご記入ください。"></textarea>
+          </div>
+
+          <div class="check-field">
+            <input type="checkbox" id="agree" name="agree" required>
+            <label for="agree"><a href="特定商取引法.html">特定商取引法に基づく表記</a>・<a href="プライバシーポリシー.html">プライバシーポリシー</a>および<a href="利用規約.html">業者利用規約</a>に同意します</label>
+          </div>
+
+          <div class="submit-area">
+            <button type="submit" class="btn-submit">
+              <svg style="width:20px;height:20px;fill:none;stroke:#fff;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;display:inline-block;vertical-align:-.13em;"><use href="#i-send"></use></svg>
+              登録を申し込む
+            </button>
+            <p class="submit-note">送信後、担当者より3営業日以内にご連絡します。</p>
+          </div>
+        </form>
+      </div>
+
+      <div class="thanks" id="thanks">
+        <div class="thanks-ic">
+          <svg style="width:32px;height:32px;fill:none;stroke:var(--blue);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><use href="#i-check-circle"></use></svg>
+        </div>
+        <h3>お申し込みを受け付けました</h3>
+        <p>ご登録ありがとうございます。<br>担当者より3営業日以内にご連絡いたします。<br>審査通過後、ダッシュボードから案件への入札が始められます。</p>
+        <a href="業者ダッシュボード.html" class="btn btn-primary btn-lg" style="margin-bottom:10px;">業者ダッシュボードを見る<svg class="ic arw"><use href="#i-arrow"></use></svg></a>
+        <a href="カタヅケ.html" class="btn btn-ghost btn-lg">トップページへ戻る</a>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+</main>
+
+<!-- ============ FOOTER ============ -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <a href="カタヅケ.html" class="logo footer-logo"><img src="img/logo-katazuke.png" alt="カタヅケ"></a>
+        <p class="about">家まるごと、まとめて片付け買取。業者が買取総額で競い合う、営業電話に追われない不用品買取マッチング。東京・千葉・埼玉・神奈川対応。</p>
+      </div>
+      <div>
+        <h5>業者の方へ</h5>
+        <ul>
+          <li><a href="#merit">参加メリット</a></li>
+          <li><a href="#flow">掲載の流れ</a></li>
+          <li><a href="#requirements">登録要件</a></li>
+          <li><a href="#register">業者登録を申し込む</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>ユーザーの方へ</h5>
+        <ul>
+          <li><a href="カタヅケ.html#flow">使い方</a></li>
+          <li><a href="カタヅケ.html#auction">仕組み</a></li>
+          <li><a href="カタヅケ.html#trust">安心の取り組み</a></li>
+          <li><a href="カタヅケ.html#faq">よくある質問</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>カタヅケについて</h5>
+        <ul>
+          <li><a href="カタヅケ.html#founder">運営者メッセージ</a></li>
+          <li><a href="contact.html">お問い合わせ</a></li>
+          <li><a href="特定商取引法.html">特定商取引法に基づく表記</a></li>
+          <li><a href="プライバシーポリシー.html">プライバシーポリシー・利用規約</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 カタヅケ</span>
+      <span>東京都・千葉県・埼玉県・神奈川県（順次拡大）</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  /* ヘッダー scroll */
+  var header = document.getElementById('header');
+  var prog = document.querySelector('.scroll-progress');
+  function onScroll(){
+    var y = window.pageYOffset || document.documentElement.scrollTop;
+    if(header) header.classList.toggle('scrolled', y > 8);
+    if(prog){
+      var h = document.documentElement.scrollHeight - window.innerHeight;
+      prog.style.width = (h > 0 ? (y / h * 100) : 0) + '%';
+    }
+  }
+  window.addEventListener('scroll', onScroll, {passive: true});
+  onScroll();
+
+  /* ハンバーガー */
+  var burger = document.getElementById('hamburger');
+  if(burger){
+    burger.addEventListener('click', function(){
+      header.classList.toggle('menu-open');
+    });
+    document.getElementById('mobile-menu').addEventListener('click', function(e){
+      if(e.target.closest('a')) header.classList.remove('menu-open');
+    });
+  }
+
+  /* スクロール演出 */
+  var revs = [].slice.call(document.querySelectorAll('.rv'));
+  if('IntersectionObserver' in window){
+    var io = new IntersectionObserver(function(es){
+      es.forEach(function(en){ if(en.isIntersecting){ en.target.classList.add('in'); io.unobserve(en.target); } });
+    }, {threshold: .12, rootMargin: '0px 0px -6% 0px'});
+    revs.forEach(function(el){ io.observe(el); });
+  } else { revs.forEach(function(el){ el.classList.add('in'); }); }
+
+  /* FAQ */
+  var faqs = [
+    {q:'手数料はいくらですか？', a:'登録・掲載・入札はすべて無料です。費用が発生するのは成約時のみで、買取金額の8%が手数料として発生します。それ以外の費用は一切かかりません。'},
+    {q:'古物商許可がなくても登録できますか？', a:'いいえ。カタヅケへの業者登録には、有効な古物商許可証が必要です。許可取得後に改めてお申し込みください。'},
+    {q:'入札した案件はすべて交渉できますか？', a:'入札額の上位3社のみユーザーとの交渉に進めます。4位以下の入札は自動でお断りとなり、ユーザーへの連絡はできません。'},
+    {q:'エリア外の案件に入札できますか？', a:'現在は東京都・千葉県・埼玉県・神奈川県が対応エリアです。エリア外への訪問買取は受け付けていません。'},
+    {q:'最終的な買取額は入札額と異なってもいいですか？', a:'提示した買取金額を下回る変更は、査定現場で商品を確認し、理由を明示したうえで顧客の了解を得た場合にのみ可能です。顧客の同意なく一方的に減額することはできません。'},
+    {q:'審査にはどのくらい時間がかかりますか？', a:'お申し込みから通常5営業日以内に審査結果をご連絡します。古物商許可証の確認が必要なため、書類に不備がある場合は時間がかかることがあります。'}
+  ];
+  var fl = document.getElementById('faq-list');
+  if(fl){
+    fl.innerHTML = faqs.map(function(f){
+      return '<div class="faq-item rv">'+
+        '<button class="faq-q" type="button"><span class="qmark">Q</span><span>'+f.q+'</span><svg class="ic chev" style="fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;width:1em;height:1em;display:inline-block;vertical-align:-.13em;font-size:18px;color:var(--body-soft);transition:transform .3s;margin-left:auto;"><use href="#i-chev"></use></svg></button>'+
+        '<div class="faq-a"><div class="faq-a-inner">'+f.a+'</div></div></div>';
+    }).join('');
+    fl.addEventListener('click', function(e){
+      var btn = e.target.closest('.faq-q'); if(!btn) return;
+      var item = btn.parentElement, a = item.querySelector('.faq-a'), open = item.classList.contains('open');
+      [].slice.call(fl.querySelectorAll('.faq-item')).forEach(function(it){
+        it.classList.remove('open'); it.querySelector('.faq-a').style.maxHeight = null;
+      });
+      if(!open){ item.classList.add('open'); a.style.maxHeight = a.scrollHeight + 'px'; }
+    });
+    /* 生成後に表示演出を適用 */
+    if('IntersectionObserver' in window){
+      [].slice.call(fl.querySelectorAll('.rv')).forEach(function(el){
+        var o = new IntersectionObserver(function(es,ob){ es.forEach(function(en){ if(en.isIntersecting){ en.target.classList.add('in'); ob.unobserve(en.target); } }); },{threshold:.1});
+        o.observe(el);
+      });
+    } else { [].slice.call(fl.querySelectorAll('.rv')).forEach(function(el){ el.classList.add('in'); }); }
+  }
+
+  /* 登録フォーム送信 */
+  var form = document.getElementById('reg-form');
+  var formBody = document.getElementById('form-body');
+  var thanks = document.getElementById('thanks');
+  if(form){
+    form.addEventListener('submit', function(e){
+      e.preventDefault();
+      var ok = true;
+      ['company','rep','email','phone','biz-type','area'].forEach(function(id){
+        var el = document.getElementById(id);
+        if(!el || !el.value.trim()){
+          if(el){ el.style.borderColor = '#e05c5c'; el.style.boxShadow = '0 0 0 3px rgba(224,92,92,.12)'; }
+          ok = false;
+          if(el) el.addEventListener('input', function(){ el.style.borderColor = ''; el.style.boxShadow = ''; }, {once: true});
+        }
+      });
+      var agree = document.getElementById('agree');
+      if(agree && !agree.checked){ ok = false; agree.parentElement.style.color = '#e05c5c'; }
+      if(!ok) return;
+      formBody.style.display = 'none';
+      thanks.style.display = 'block';
+      window.scrollTo({top: document.getElementById('register').offsetTop - 80, behavior: 'smooth'});
+    });
+  }
+})();
+</script>
+</body>
+</html>

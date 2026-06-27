@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>取引完了・評価｜カタヅケ</title>
+<meta name="theme-color" content="#1f54de">
+<link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="katazuke-main.css">
+<style>
+body { background: #f4f6fb; }
+
+/* ── ヘッダー ── */
+.review-header {
+  background: #fff; border-bottom: 1px solid var(--line);
+  padding: 0 20px; height: 60px;
+  display: flex; align-items: center; gap: 12px;
+}
+.review-header img { height: 36px; }
+
+/* ── ラッパー ── */
+.review-wrap { max-width: 540px; margin: 0 auto; padding: 28px 20px 80px; }
+
+/* ── 完了バナー ── */
+.done-banner {
+  background: linear-gradient(135deg, #e4f7ed, #d0f0e0);
+  border: 1.5px solid rgba(31,138,91,.2); border-radius: var(--radius);
+  padding: 24px 20px; text-align: center; margin-bottom: 24px;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  box-shadow: 0 6px 20px -8px rgba(31,138,91,.2);
+}
+.done-ic {
+  width: 72px; height: 72px; border-radius: 50%; background: var(--green);
+  margin: 0 auto 2px; display: grid; place-items: center;
+  font-size: 32px;
+}
+.done-title { font-family: var(--head); font-size: 22px; font-weight: 900; color: var(--navy); margin-bottom: 4px; }
+.done-sub { font-size: 13.5px; color: var(--body-soft); line-height: 1.8; }
+
+/* ── 取引サマリー ── */
+.txn-card {
+  background: #fff; border-radius: var(--radius);
+  box-shadow: var(--shadow-s); border: 1px solid var(--line-soft);
+  padding: 20px; margin-bottom: 20px;
+}
+.txn-card-title { font-family: var(--head); font-size: 14px; font-weight: 700; color: var(--navy); margin-bottom: 14px; }
+.txn-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 14px; padding: 9px 0; border-bottom: 1px solid var(--line-soft); gap: 12px;
+}
+.txn-row:last-child { border-bottom: none; }
+.txn-lbl { color: var(--body-soft); font-size: 13px; }
+.txn-val { font-weight: 700; color: var(--ink); text-align: right; }
+.txn-amount { font-family: var(--head); font-size: 26px; font-weight: 900; color: var(--green); }
+
+/* ── 評価フォーム ── */
+.rate-card {
+  background: #fff; border-radius: var(--radius);
+  box-shadow: var(--shadow-s); border: 1px solid var(--line-soft);
+  padding: 24px 20px; margin-bottom: 14px;
+}
+.rate-card-title { font-family: var(--head); font-size: 16px; font-weight: 900; color: var(--navy); margin-bottom: 4px; }
+.rate-card-sub { font-size: 13px; color: var(--body-soft); margin-bottom: 22px; line-height: 1.7; }
+
+/* スター選択 */
+.star-selector {
+  display: flex; gap: 8px; justify-content: center; margin-bottom: 22px;
+}
+.star-btn {
+  font-size: 40px; cursor: pointer; transition: transform .15s color .15s; line-height: 1;
+  color: var(--line); filter: none; background: none; border: none; padding: 2px;
+}
+.star-btn.active { color: #f0a030; transform: scale(1.15); }
+.star-btn.hover-active { color: #f0d080; }
+.star-btn:hover { transform: scale(1.1); }
+.star-label {
+  text-align: center; font-family: var(--head); font-size: 15px; font-weight: 700;
+  color: var(--navy); margin-bottom: 20px; min-height: 22px; transition: .2s;
+}
+
+/* 評価タグ */
+.tag-title { font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 10px; }
+.tag-grid { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 20px; }
+.tag-chip {
+  padding: 8px 14px; border-radius: 99px;
+  border: 1.5px solid var(--line); background: #fff;
+  font-size: 13px; font-weight: 700; color: var(--body-soft);
+  cursor: pointer; transition: .2s; user-select: none;
+}
+.tag-chip.selected { border-color: var(--blue); background: var(--pale); color: var(--blue); }
+.tag-chip:hover { border-color: var(--blue); }
+
+/* テキストエリア */
+.review-textarea {
+  width: 100%; font-family: var(--sans); font-size: 14px; color: var(--ink);
+  background: #fafbfe; border: 1.5px solid var(--line); border-radius: var(--radius-s);
+  padding: 14px; outline: none; resize: vertical; min-height: 110px; line-height: 1.75;
+  transition: border-color .2s, box-shadow .2s;
+}
+.review-textarea::placeholder { color: #bcc3d4; }
+.review-textarea:focus {
+  border-color: var(--blue); background: #fff;
+  box-shadow: 0 0 0 3px rgba(31,84,222,.12);
+}
+.textarea-count { font-size: 11.5px; color: var(--body-soft); text-align: right; margin-top: 5px; }
+
+/* 公開設定 */
+.publish-row {
+  display: flex; align-items: center; gap: 12px; padding: 14px 0;
+  border-top: 1px solid var(--line-soft); margin-top: 4px;
+}
+.publish-toggle { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
+.publish-toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; inset: 0; border-radius: 99px;
+  background: var(--line); cursor: pointer; transition: .3s;
+}
+.toggle-slider::before {
+  content: ""; position: absolute; width: 18px; height: 18px;
+  border-radius: 50%; background: #fff; left: 3px; top: 3px;
+  transition: .3s; box-shadow: 0 1px 4px rgba(0,0,0,.2);
+}
+.publish-toggle input:checked + .toggle-slider { background: var(--green); }
+.publish-toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
+.publish-label { font-size: 13px; color: var(--body); line-height: 1.6; }
+
+/* 完了ボタン */
+.submit-area { padding-top: 6px; }
+
+/* 次のアクション */
+.next-card {
+  background: var(--pale); border-radius: var(--radius);
+  border: 1px solid rgba(31,84,222,.12); padding: 20px;
+  margin-bottom: 14px;
+}
+.next-card-title { font-family: var(--head); font-size: 14px; font-weight: 700; color: var(--navy); margin-bottom: 14px; }
+.next-actions { display: flex; flex-direction: column; gap: 10px; }
+.next-action-btn {
+  display: flex; align-items: center; gap: 12px;
+  background: #fff; border-radius: 12px; border: 1px solid var(--line-soft);
+  padding: 14px 16px; text-decoration: none; transition: .2s;
+}
+.next-action-btn:hover { box-shadow: var(--shadow-s); transform: translateY(-1px); }
+.next-action-ic {
+  width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+  display: grid; place-items: center;
+}
+.next-action-ic svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.next-action-body strong { display: block; font-family: var(--head); font-size: 14px; font-weight: 700; color: var(--navy); }
+.next-action-body span { font-size: 12px; color: var(--body-soft); }
+.next-action-arr { margin-left: auto; color: var(--line); }
+.next-action-arr svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+
+/* 送信済み画面 */
+.submitted-screen { display: none; text-align: center; padding: 40px 0; }
+.submitted-screen.show { display: block; }
+.submitted-ic {
+  width: 80px; height: 80px; border-radius: 50%; background: var(--pale);
+  margin: 0 auto 18px; display: grid; place-items: center; font-size: 40px;
+}
+.submitted-screen h2 { font-family: var(--head); font-size: 22px; color: var(--navy); margin-bottom: 10px; }
+.submitted-screen p { font-size: 14px; color: var(--body-soft); line-height: 1.82; margin-bottom: 28px; }
+
+@keyframes pop { 0%{transform:scale(1)} 50%{transform:scale(1.4)} 100%{transform:scale(1)} }
+.star-pop { animation: pop .2s ease; }
+
+@media(max-width: 480px) {
+  .review-wrap { padding: 18px 14px 80px; }
+  .rate-card { padding: 18px 14px; }
+  .txn-card { padding: 14px; }
+  .done-banner { padding: 18px 14px; }
+  .star-btn { font-size: 32px; }
+  .tag-grid { gap: 6px; }
+  .tag-chip { padding: 7px 11px; font-size: 12px; }
+  .next-action-btn { padding: 12px 14px; }
+  .submit-area .btn { font-size: 15px; }
+  .txn-amount { font-size: 22px; }
+}
+@media(max-width: 360px) {
+  .star-selector { gap: 4px; }
+  .star-btn { font-size: 28px; }
+  .tag-chip { padding: 6px 9px; font-size: 11.5px; }
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></symbol>
+</defs></svg>
+
+<!-- ヘッダー -->
+<header class="review-header">
+  <a href="カタヅケ.html"><img src="img/logo-katazuke.png" alt="カタヅケ"></a>
+</header>
+
+<main>
+<div class="review-wrap">
+
+  <!-- 完了バナー -->
+  <div class="done-banner">
+    <div class="done-ic" style="background:var(--green);color:#fff;font-size:0;display:grid;place-items:center;">
+      <svg style="width:36px;height:36px;fill:none;stroke:#fff;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg>
+    </div>
+    <div class="done-title">取引が完了しました！</div>
+    <div class="done-sub">グリーンリサイクル東京 との取引が正常に完了しました。<br>ご利用ありがとうございました。</div>
+  </div>
+
+  <!-- 取引サマリー -->
+  <div class="txn-card">
+    <div class="txn-card-title">取引内容</div>
+    <div class="txn-row"><span class="txn-lbl">業者名</span><span class="txn-val">グリーンリサイクル東京</span></div>
+    <div class="txn-row"><span class="txn-lbl">出品内容</span><span class="txn-val">家電・ブランド品 5点</span></div>
+    <div class="txn-row"><span class="txn-lbl">訪問日時</span><span class="txn-val">2026年6月21日（土）13:30</span></div>
+    <div class="txn-row"><span class="txn-lbl">受取金額</span><span class="txn-val txn-amount">¥58,000</span></div>
+  </div>
+
+  <!-- 評価フォーム -->
+  <div id="review-form-area">
+    <div class="rate-card">
+      <div class="rate-card-title">業者を評価してください</div>
+      <div class="rate-card-sub">評価はほかのユーザーの業者選びに役立ちます。ぜひご協力ください（任意）。</div>
+
+      <!-- スター -->
+      <div class="star-selector" id="star-selector">
+        <button class="star-btn" data-val="1">★</button>
+        <button class="star-btn" data-val="2">★</button>
+        <button class="star-btn" data-val="3">★</button>
+        <button class="star-btn" data-val="4">★</button>
+        <button class="star-btn" data-val="5">★</button>
+      </div>
+      <div class="star-label" id="star-label">タップして評価する</div>
+
+      <!-- タグ -->
+      <div class="tag-title">良かった点（複数選択可）</div>
+      <div class="tag-grid" id="tag-grid">
+        <div class="tag-chip" data-tag="price">査定額が高い</div>
+        <div class="tag-chip" data-tag="speed">対応が速い</div>
+        <div class="tag-chip" data-tag="kind">スタッフが親切</div>
+        <div class="tag-chip" data-tag="explain">説明が丁寧</div>
+        <div class="tag-chip" data-tag="carry">搬出が丁寧</div>
+        <div class="tag-chip" data-tag="cancel">キャンセル対応</div>
+      </div>
+
+      <!-- テキスト -->
+      <div class="tag-title">コメント（任意）</div>
+      <textarea class="review-textarea" id="review-text" placeholder="業者の対応や査定の印象をご記入ください。" maxlength="300" oninput="document.getElementById('char-count').textContent=this.value.length"></textarea>
+      <div class="textarea-count"><span id="char-count">0</span>/300文字</div>
+
+      <!-- 公開設定 -->
+      <div class="publish-row">
+        <label class="publish-toggle">
+          <input type="checkbox" id="pub-toggle" checked>
+          <span class="toggle-slider"></span>
+        </label>
+        <span class="publish-label">評価をほかのユーザーに公開する<br><span style="font-size:11.5px;color:var(--body-soft);">名前は「田中 美○」のように一部伏字で表示されます</span></span>
+      </div>
+
+      <div class="submit-area">
+        <button class="btn btn-primary btn-block btn-lg" id="btn-submit-review">評価を送信する</button>
+        <button class="btn btn-ghost btn-block" style="margin-top:10px;" id="btn-skip">スキップする</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 送信済み -->
+  <div class="submitted-screen" id="submitted-screen">
+    <div class="submitted-ic">🎉</div>
+    <h2>評価を送信しました！</h2>
+    <p>ご協力ありがとうございました。<br>評価は審査後に公開されます。</p>
+  </div>
+
+  <!-- 次のアクション -->
+  <div class="next-card">
+    <div class="next-card-title">次に何をしますか？</div>
+    <div class="next-actions">
+      <a href="出品登録.html" class="next-action-btn">
+        <div class="next-action-ic" style="background:var(--pale);color:var(--blue);">
+          <svg viewBox="0 0 24 24"><use href="#i-box"></use></svg>
+        </div>
+        <div class="next-action-body">
+          <strong>また出品する</strong>
+          <span>まだ片付けたいものがありますか？</span>
+        </div>
+        <div class="next-action-arr"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+      </a>
+      <a href="申し込み状況.html" class="next-action-btn">
+        <div class="next-action-ic" style="background:#e8faf0;color:var(--green);">
+          <svg viewBox="0 0 24 24"><use href="#i-list"></use></svg>
+        </div>
+        <div class="next-action-body">
+          <strong>申し込み状況を確認</strong>
+          <span>他の出品の入札状況を見る</span>
+        </div>
+        <div class="next-action-arr"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+      </a>
+    </div>
+  </div>
+
+</div>
+</main>
+
+<script>
+(function(){
+  var selectedStar = 0;
+  var selectedTags = [];
+  var starLabels = ['','がっかりした','もう少し…','普通','良かった！','最高でした！'];
+
+  /* スター */
+  var starBtns = document.querySelectorAll('.star-btn');
+  starBtns.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      selectedStar = parseInt(this.dataset.val);
+      starBtns.forEach(function(b){ b.classList.toggle('active', parseInt(b.dataset.val) <= selectedStar); });
+      this.classList.add('star-pop');
+      setTimeout(function(){ document.querySelector('.star-btn.star-pop') && document.querySelector('.star-btn.star-pop').classList.remove('star-pop'); }, 200);
+      document.getElementById('star-label').textContent = starLabels[selectedStar] || '';
+    });
+    btn.addEventListener('mouseenter', function(){
+      var v = parseInt(this.dataset.val);
+      starBtns.forEach(function(b){ b.style.color = parseInt(b.dataset.val) <= v ? '#f0a030' : 'var(--line)'; });
+    });
+    btn.addEventListener('mouseleave', function(){
+      starBtns.forEach(function(b){ b.style.color = ''; b.classList.toggle('active', parseInt(b.dataset.val) <= selectedStar); });
+    });
+  });
+
+  /* タグ */
+  document.querySelectorAll('.tag-chip').forEach(function(chip){
+    chip.addEventListener('click', function(){
+      this.classList.toggle('selected');
+      var tag = this.dataset.tag;
+      var idx = selectedTags.indexOf(tag);
+      if(idx > -1) selectedTags.splice(idx,1); else selectedTags.push(tag);
+    });
+  });
+
+  /* 送信 */
+  document.getElementById('btn-submit-review').addEventListener('click', function(){
+    this.innerHTML = '<span style="animation:spin .7s linear infinite;display:inline-block;">↻</span> 送信中…';
+    this.disabled = true;
+    setTimeout(function(){
+      document.getElementById('review-form-area').style.display = 'none';
+      document.getElementById('submitted-screen').classList.add('show');
+    }, 900);
+  });
+
+  /* スキップ */
+  document.getElementById('btn-skip').addEventListener('click', function(){
+    document.getElementById('review-form-area').style.display = 'none';
+    document.getElementById('submitted-screen').classList.add('show');
+    document.getElementById('submitted-screen').querySelector('h2').textContent = 'ありがとうございました';
+    document.getElementById('submitted-screen').querySelector('p').textContent = 'またのご利用をお待ちしています。';
+    document.getElementById('submitted-screen').querySelector('.submitted-ic').textContent = '👋';
+  });
+})();
+</script>
+</body>
+</html>

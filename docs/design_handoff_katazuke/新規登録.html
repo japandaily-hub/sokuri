@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>新規登録｜カタヅケ</title>
+<meta name="theme-color" content="#1f54de">
+<link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="katazuke-main.css">
+<style>
+body { background: #f4f6fb; }
+
+/* ── flow-header（出品登録と同スタイル） ── */
+.flow-header {
+  position: sticky; top: 0; z-index: 60;
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+  box-shadow: var(--shadow-s);
+}
+.flow-header-inner {
+  max-width: 600px; margin: 0 auto;
+  padding: 14px 20px;
+  display: flex; align-items: center; gap: 16px;
+}
+.flow-logo img { height: 36px; }
+.flow-steps { flex: 1; display: flex; gap: 0; align-items: center; }
+.flow-step {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; gap: 3px; position: relative;
+}
+.flow-step + .flow-step::before {
+  content: ""; position: absolute;
+  left: -50%; top: 12px; width: 100%; height: 2px;
+  background: var(--line); z-index: 0;
+  transition: background .4s;
+}
+.flow-step.done + .flow-step::before,
+.flow-step.active + .flow-step::before { background: var(--blue); }
+.fs-dot {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--line); display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 900; color: var(--body-soft);
+  font-family: var(--head); position: relative; z-index: 1;
+  transition: background .3s, color .3s, box-shadow .3s;
+}
+.flow-step.done .fs-dot { background: var(--blue); color: #fff; }
+.flow-step.active .fs-dot {
+  background: var(--blue); color: #fff;
+  box-shadow: 0 0 0 4px rgba(31,84,222,.18);
+}
+.fs-label { font-size: 10px; font-weight: 600; color: var(--body-soft); white-space: nowrap; }
+.flow-step.active .fs-label { color: var(--blue); font-weight: 700; }
+.flow-step.done .fs-label { color: var(--ink); }
+
+/* ── 本体 ── */
+.flow-wrap {
+  max-width: 600px; margin: 0 auto;
+  padding: 28px 20px 100px;
+}
+.step-pane { display: none; }
+.step-pane.active { display: block; }
+.step-title {
+  font-family: var(--head); font-size: clamp(20px,3vw,26px);
+  font-weight: 900; color: var(--navy); margin-bottom: 8px; line-height: 1.35;
+}
+.step-desc { font-size: 14px; color: var(--body-soft); line-height: 1.8; margin-bottom: 24px; }
+
+/* ── form-card ── */
+.form-card {
+  background: #fff; border-radius: var(--radius);
+  box-shadow: var(--shadow-s); padding: 26px 24px; margin-bottom: 16px;
+}
+.field { margin-bottom: 20px; }
+.field:last-child { margin-bottom: 0; }
+.field label {
+  display: block; font-size: 13.5px; font-weight: 700;
+  color: var(--ink); margin-bottom: 7px;
+}
+.field label .req {
+  font-size: 10.5px; font-weight: 700; color: #fff;
+  background: var(--blue); padding: 1px 6px; border-radius: 4px;
+  margin-left: 5px; vertical-align: middle;
+}
+.field label .opt {
+  font-size: 10.5px; font-weight: 600; color: var(--body-soft);
+  background: var(--line-soft); padding: 1px 6px; border-radius: 4px;
+  margin-left: 5px; vertical-align: middle;
+}
+.field input, .field select {
+  width: 100%; font-family: var(--sans); font-size: 15px; color: var(--ink);
+  background: #fafbfe; border: 1.5px solid var(--line); border-radius: var(--radius-s);
+  padding: 12px 14px; outline: none; transition: border-color .2s, box-shadow .2s;
+  appearance: none; line-height: 1.6;
+}
+.field input::placeholder { color: #bcc3d4; }
+.field input:focus, .field select:focus {
+  border-color: var(--blue); background: #fff;
+  box-shadow: 0 0 0 3px rgba(31,84,222,.12);
+}
+.has-error input, .has-error select { border-color: #e05c5c !important; }
+.field-error { font-size: 12px; color: #e05c5c; margin-top: 5px; display: none; }
+
+/* セレクト */
+.select-wrap { position: relative; }
+.select-wrap::after {
+  content: ""; position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+  width: 0; height: 0; border-left: 5px solid transparent;
+  border-right: 5px solid transparent; border-top: 6px solid var(--body-soft);
+  pointer-events: none;
+}
+.select-wrap select { padding-right: 36px; cursor: pointer; }
+
+/* パスワード表示 */
+.pw-wrap { position: relative; }
+.pw-toggle {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer; color: var(--body-soft);
+  padding: 4px; line-height: 1; transition: color .2s;
+}
+.pw-toggle:hover { color: var(--navy); }
+.pw-toggle svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; display: block; }
+.pw-wrap input { padding-right: 44px; }
+
+/* 強度バー */
+.pw-strength { margin-top: 8px; display: flex; gap: 5px; align-items: center; }
+.pw-strength-bar {
+  flex: 1; height: 4px; border-radius: 2px; background: var(--line);
+  transition: background .3s;
+}
+.pw-strength-label { font-size: 11px; font-weight: 700; color: var(--body-soft); min-width: 36px; text-align: right; }
+
+/* 利用目的チップ */
+.role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.role-card {
+  border: 2px solid var(--line); border-radius: var(--radius-s);
+  padding: 16px 14px; cursor: pointer;
+  transition: border-color .2s, background .2s, box-shadow .2s;
+  user-select: none;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.role-card:hover { border-color: var(--blue); background: var(--pale); }
+.role-card.selected { border-color: var(--blue); background: var(--pale); box-shadow: 0 0 0 3px rgba(31,84,222,.12); }
+.role-card .rc-ic {
+  width: 40px; height: 40px; border-radius: 11px;
+  background: var(--pale); color: var(--blue);
+  display: grid; place-items: center;
+}
+.role-card.selected .rc-ic { background: var(--blue); color: #fff; }
+.role-card .rc-ic svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.role-card .rc-title { font-family: var(--head); font-size: 15px; font-weight: 700; color: var(--navy); }
+.role-card .rc-sub { font-size: 12px; color: var(--body-soft); line-height: 1.6; }
+
+/* エリアグリッド */
+.area-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.area-chip {
+  border: 1.5px solid var(--line); border-radius: 9px;
+  padding: 10px 8px; text-align: center; cursor: pointer;
+  font-family: var(--head); font-size: 13.5px; font-weight: 700; color: var(--ink);
+  transition: border-color .2s, background .2s, color .2s;
+  user-select: none;
+}
+.area-chip:hover { border-color: var(--blue); color: var(--blue); }
+.area-chip.selected { border-color: var(--blue); background: var(--blue); color: #fff; }
+
+/* ヒント */
+.hint-banner {
+  background: var(--pale); border-radius: var(--radius-s);
+  padding: 14px 18px; margin-bottom: 18px;
+  font-size: 13px; color: var(--body);
+  display: flex; gap: 10px; align-items: flex-start; line-height: 1.75;
+}
+.hint-ic { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+
+/* 同意 */
+.agree-row {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 14px 0; border-top: 1px solid var(--line-soft);
+  margin-top: 4px;
+}
+.agree-cb { width: 20px; height: 20px; flex-shrink: 0; accent-color: var(--blue); margin-top: 2px; cursor: pointer; }
+.agree-row label { font-size: 13px; color: var(--body); line-height: 1.75; cursor: pointer; }
+.agree-row a { color: var(--blue); font-weight: 600; }
+
+/* 完了画面 */
+.done-screen { text-align: center; padding: 52px 20px; }
+.done-circle {
+  width: 88px; height: 88px; border-radius: 50%;
+  background: var(--pale); margin: 0 auto 24px;
+  display: flex; align-items: center; justify-content: center;
+}
+.done-circle svg { width: 46px; height: 46px; fill: none; stroke: var(--blue); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.done-screen h2 { font-size: 24px; color: var(--navy); margin-bottom: 12px; }
+.done-screen p { font-size: 15px; color: var(--body-soft); line-height: 1.85; margin-bottom: 32px; }
+.done-actions { display: flex; flex-direction: column; gap: 12px; align-items: center; }
+
+/* フッター */
+.flow-footer-inner {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
+  background: #fff; border-top: 1px solid var(--line);
+  box-shadow: 0 -4px 20px -8px rgba(15,37,82,.15);
+}
+.flow-footer-inner .inner {
+  max-width: 600px; margin: 0 auto;
+  padding: 14px 20px;
+  display: flex; gap: 12px; justify-content: flex-end; align-items: center;
+}
+.btn-flow-back {
+  padding: 13px 22px; border-radius: 99px; border: 1.5px solid var(--line);
+  background: #fff; color: var(--navy); font-family: var(--head);
+  font-size: 14px; font-weight: 700; cursor: pointer; transition: .2s;
+}
+.btn-flow-back:hover { border-color: var(--blue); color: var(--blue); }
+.btn-flow-next {
+  padding: 13px 28px; border-radius: 99px; border: none;
+  background: var(--blue); color: #fff; font-family: var(--head);
+  font-size: 15px; font-weight: 900; cursor: pointer;
+  box-shadow: 0 8px 20px -8px rgba(31,84,222,.6);
+  transition: .2s; display: flex; align-items: center; gap: 8px;
+}
+.btn-flow-next:hover { background: var(--blue-d); transform: translateY(-1px); }
+.btn-flow-next:disabled { background: var(--line); box-shadow: none; cursor: not-allowed; transform: none; }
+
+/* 確認ブロック */
+.confirm-row {
+  display: flex; justify-content: space-between;
+  font-size: 14px; padding: 12px 0;
+  border-bottom: 1px solid var(--line-soft); align-items: baseline; gap: 16px;
+}
+.confirm-row:last-child { border-bottom: none; }
+.confirm-row .lbl { color: var(--body-soft); font-size: 13px; flex-shrink: 0; }
+.confirm-row .val { font-weight: 700; color: var(--ink); text-align: right; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinning { animation: spin .7s linear infinite; display: inline-block; }
+
+@media(max-width: 480px) {
+  .area-grid { grid-template-columns: repeat(2, 1fr); }
+  .role-grid { grid-template-columns: 1fr; }
+  .flow-wrap { padding: 18px 14px 90px; }
+  .step-title { font-size: 18px; }
+  .fs-label { font-size: 9px; }
+  .flow-header-inner { gap: 8px; padding: 10px 14px; }
+  .flow-logo img { height: 28px; }
+  .btn-flow-next { padding: 12px 18px; font-size: 14px; }
+  .form-card { padding: 18px 14px; }
+  .confirm-row { flex-direction: column; gap: 2px; }
+  .confirm-row .val { text-align: left; }
+}
+@media(max-width: 360px) {
+  .fs-label { display: none; }
+  .flow-steps { gap: 0; }
+  .hint-banner { padding: 10px 12px; font-size: 12px; }
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+  <symbol id="i-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l2.5 2.5L16 9"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5L12 3l9 7.5V21a1 1 0 01-1 1H5a1 1 0 01-1-1V10.5z"/><path d="M9 22V12h6v10"/></symbol>
+  <symbol id="i-shop" viewBox="0 0 24 24"><path d="M3 9l1-5h16l1 5M3 9h18M3 9v11a1 1 0 001 1h16a1 1 0 001-1V9"/><path d="M9 21v-6h6v6"/></symbol>
+</defs></svg>
+
+<!-- flow-header -->
+<div class="flow-header">
+  <div class="flow-header-inner">
+    <a href="カタヅケ.html" class="flow-logo"><img src="img/logo-katazuke.png" alt="カタヅケ"></a>
+    <div class="flow-steps" id="flow-steps">
+      <div class="flow-step active" data-step="1"><div class="fs-dot">1</div><div class="fs-label">アカウント</div></div>
+      <div class="flow-step" data-step="2"><div class="fs-dot">2</div><div class="fs-label">プロフィール</div></div>
+      <div class="flow-step" data-step="3"><div class="fs-dot">3</div><div class="fs-label">確認</div></div>
+      <div class="flow-step" data-step="4"><div class="fs-dot">✓</div><div class="fs-label">完了</div></div>
+    </div>
+  </div>
+</div>
+
+<main>
+<div class="flow-wrap">
+
+  <!-- STEP 1: アカウント情報 -->
+  <div class="step-pane active" id="step-1">
+    <h2 class="step-title">アカウントを作成する</h2>
+    <p class="step-desc">メールアドレスとパスワードを設定してください。LINEで続けることもできます。</p>
+
+    <button class="btn btn-line btn-block" style="font-size:15px;padding:16px;margin-bottom:18px;" id="btn-line-reg">
+      <svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:#fff;flex-shrink:0;"><path d="M12 2C6.48 2 2 6.1 2 11.1c0 4.5 3.6 8.3 8.5 9-.3.8-.4 2-.4 2s-.1.7.4.9c.5.2 1-.2 1-.2s2.7-1.8 3.8-2.5c.4.1.9.1 1.3.1C17.7 20.4 22 16.4 22 11.1 22 6.1 17.5 2 12 2z"/></svg>
+      LINEで無料登録
+    </button>
+
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;color:var(--body-soft);font-size:12px;font-weight:600;letter-spacing:.04em;">
+      <div style="flex:1;height:1px;background:var(--line);"></div>
+      メールアドレスで登録
+      <div style="flex:1;height:1px;background:var(--line);"></div>
+    </div>
+
+    <div class="form-card">
+      <div class="field" id="f-email">
+        <label for="inp-email">メールアドレス<span class="req">必須</span></label>
+        <input type="email" id="inp-email" placeholder="example@email.com" autocomplete="email" inputmode="email">
+        <div class="field-error">メールアドレスを正しく入力してください</div>
+      </div>
+      <div class="field" id="f-pw">
+        <label for="inp-pw">パスワード<span class="req">必須</span></label>
+        <div class="pw-wrap">
+          <input type="password" id="inp-pw" placeholder="8文字以上" autocomplete="new-password" oninput="checkPwStrength(this.value)">
+          <button type="button" class="pw-toggle" id="pw-toggle1" aria-label="表示切替">
+            <svg id="eye1" viewBox="0 0 24 24"><path d="M1 12S5 5 12 5s11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <div class="pw-strength" id="pw-strength" style="display:none;">
+          <div class="pw-strength-bar" id="psb1"></div>
+          <div class="pw-strength-bar" id="psb2"></div>
+          <div class="pw-strength-bar" id="psb3"></div>
+          <div class="pw-strength-label" id="psl"></div>
+        </div>
+        <div class="field-error">8文字以上で入力してください</div>
+      </div>
+      <div class="field" id="f-pw2">
+        <label for="inp-pw2">パスワード（確認）<span class="req">必須</span></label>
+        <div class="pw-wrap">
+          <input type="password" id="inp-pw2" placeholder="もう一度入力" autocomplete="new-password">
+          <button type="button" class="pw-toggle" id="pw-toggle2" aria-label="表示切替">
+            <svg id="eye2" viewBox="0 0 24 24"><path d="M1 12S5 5 12 5s11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <div class="field-error">パスワードが一致しません</div>
+      </div>
+    </div>
+
+    <p style="font-size:12.5px;color:var(--body-soft);text-align:center;line-height:1.75;">
+      すでにアカウントをお持ちの方は<a href="ログイン.html" style="color:var(--blue);font-weight:700;">ログイン →</a>
+    </p>
+  </div>
+
+  <!-- STEP 2: プロフィール -->
+  <div class="step-pane" id="step-2">
+    <h2 class="step-title">プロフィールを設定する</h2>
+    <p class="step-desc">あなたのエリアと利用目的を教えてください。適切な業者をマッチングするために使用します。</p>
+
+    <div class="form-card">
+      <div class="field" id="f-name">
+        <label for="inp-name">お名前<span class="req">必須</span></label>
+        <input type="text" id="inp-name" placeholder="山田 花子" autocomplete="name">
+        <div class="field-error">お名前を入力してください</div>
+      </div>
+      <div class="field">
+        <label>お住まいのエリア<span class="req">必須</span></label>
+        <div class="area-grid" id="area-grid">
+          <div class="area-chip" data-area="tokyo">東京都</div>
+          <div class="area-chip" data-area="kanagawa">神奈川県</div>
+          <div class="area-chip" data-area="saitama">埼玉県</div>
+          <div class="area-chip" data-area="chiba">千葉県</div>
+          <div class="area-chip" data-area="osaka">大阪府</div>
+          <div class="area-chip" data-area="aichi">愛知県</div>
+          <div class="area-chip" data-area="fukuoka">福岡県</div>
+          <div class="area-chip" data-area="other">その他</div>
+        </div>
+        <div class="field-error" id="area-error" style="margin-top:8px;">エリアを選択してください</div>
+      </div>
+    </div>
+
+    <div class="form-card">
+      <div class="field" style="margin-bottom:0;">
+        <label>ご利用目的<span class="req">必須</span></label>
+        <div class="role-grid" id="role-grid">
+          <div class="role-card" data-role="seller">
+            <div class="rc-ic"><svg viewBox="0 0 24 24"><use href="#i-home"></use></svg></div>
+            <div class="rc-title">売りたい・片付けたい</div>
+            <div class="rc-sub">不用品や遺品の買取・整理をお願いしたい方</div>
+          </div>
+          <div class="role-card" data-role="buyer">
+            <div class="rc-ic"><svg viewBox="0 0 24 24"><use href="#i-shop"></use></svg></div>
+            <div class="rc-title">業者として入札したい</div>
+            <div class="rc-sub">出品された物件に入札・買取参加したい業者</div>
+          </div>
+        </div>
+        <div class="field-error" id="role-error" style="margin-top:8px;">利用目的を選択してください</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3: 確認 -->
+  <div class="step-pane" id="step-3">
+    <h2 class="step-title">内容を確認して<br>登録を完了してください</h2>
+    <p class="step-desc">以下の内容で登録します。よろしければ同意の上、登録ボタンを押してください。</p>
+
+    <div class="form-card" id="confirm-card">
+      <div class="confirm-row"><span class="lbl">メールアドレス</span><span class="val" id="conf-email">—</span></div>
+      <div class="confirm-row"><span class="lbl">お名前</span><span class="val" id="conf-name">—</span></div>
+      <div class="confirm-row"><span class="lbl">エリア</span><span class="val" id="conf-area">—</span></div>
+      <div class="confirm-row"><span class="lbl">利用目的</span><span class="val" id="conf-role">—</span></div>
+      <div class="confirm-row"><span class="lbl">登録費用</span><span class="val" style="color:var(--green);">完全無料</span></div>
+    </div>
+
+    <div class="form-card" style="padding:18px 24px;">
+      <div class="agree-row">
+        <input type="checkbox" class="agree-cb" id="agree1">
+        <label for="agree1"><a href="利用規約.html">利用規約</a>および<a href="プライバシーポリシー.html">プライバシーポリシー</a>に同意します</label>
+      </div>
+      <div class="agree-row">
+        <input type="checkbox" class="agree-cb" id="agree2">
+        <label for="agree2">入札情報・サービスに関するメール通知を受け取ることに同意します（任意）</label>
+      </div>
+    </div>
+
+    <div class="hint-banner">
+      <span class="hint-ic">🔒</span>
+      <span>登録後、入力したメールアドレスに確認メールが届きます。メール内のリンクをクリックして登録を完了してください。</span>
+    </div>
+  </div>
+
+  <!-- STEP 4: 完了 -->
+  <div class="step-pane" id="step-4">
+    <div class="done-screen">
+      <div class="done-circle">
+        <svg viewBox="0 0 24 24"><use href="#i-check-circle"></use></svg>
+      </div>
+      <h2>登録が完了しました！</h2>
+      <p>確認メールを送信しました。<br>メール内のリンクをクリックして<br>登録を有効化してください。</p>
+      <div class="done-actions">
+        <a href="出品登録.html" class="btn btn-primary btn-lg">
+          さっそく出品してみる
+          <svg style="width:16px;height:16px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><use href="#i-arrow"></use></svg>
+        </a>
+        <a href="カタヅケ.html" class="btn btn-ghost btn-lg">トップへ戻る</a>
+      </div>
+    </div>
+  </div>
+
+</div>
+</main>
+
+<!-- フッターボタン -->
+<div class="flow-footer-inner" id="flow-footer">
+  <div class="inner">
+    <button class="btn-flow-back" id="btn-back" style="display:none;">戻る</button>
+    <button class="btn-flow-next" id="btn-next">
+      次へ<svg style="width:16px;height:16px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><use href="#i-arrow"></use></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+(function(){
+  var currentStep = 1;
+  var selectedArea = '';
+  var selectedRole = '';
+
+  /* ── パスワード強度 ── */
+  window.checkPwStrength = function(val){
+    var st = document.getElementById('pw-strength');
+    st.style.display = val.length > 0 ? 'flex' : 'none';
+    var score = 0;
+    if(val.length >= 8) score++;
+    if(/[A-Z]/.test(val) || /[0-9]/.test(val)) score++;
+    if(/[^A-Za-z0-9]/.test(val) || val.length >= 12) score++;
+    var colors = ['#e05c5c','#f0a030','#1f8a5b'];
+    var labels = ['弱い','普通','強い'];
+    ['psb1','psb2','psb3'].forEach(function(id, i){
+      document.getElementById(id).style.background = i < score ? colors[Math.min(score-1,2)] : 'var(--line)';
+    });
+    document.getElementById('psl').textContent = score > 0 ? labels[Math.min(score-1,2)] : '';
+    document.getElementById('psl').style.color = colors[Math.min(score-1,2)];
+  };
+
+  /* パスワード表示切替 */
+  function makePwToggle(btnId, inputId, eyeId){
+    var show = false;
+    document.getElementById(btnId).addEventListener('click', function(){
+      show = !show;
+      document.getElementById(inputId).type = show ? 'text' : 'password';
+      document.getElementById(eyeId).innerHTML = show
+        ? '<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-7-11-7a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 7 11 7a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>'
+        : '<path d="M1 12S5 5 12 5s11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/>';
+    });
+  }
+  makePwToggle('pw-toggle1','inp-pw','eye1');
+  makePwToggle('pw-toggle2','inp-pw2','eye2');
+
+  /* エリア選択 */
+  document.querySelectorAll('.area-chip').forEach(function(chip){
+    chip.addEventListener('click', function(){
+      document.querySelectorAll('.area-chip').forEach(function(c){ c.classList.remove('selected'); });
+      chip.classList.add('selected');
+      selectedArea = chip.dataset.area;
+      document.getElementById('area-error').style.display = 'none';
+    });
+  });
+
+  /* 利用目的選択 */
+  document.querySelectorAll('.role-card').forEach(function(card){
+    card.addEventListener('click', function(){
+      document.querySelectorAll('.role-card').forEach(function(c){ c.classList.remove('selected'); });
+      card.classList.add('selected');
+      selectedRole = card.dataset.role;
+      document.getElementById('role-error').style.display = 'none';
+    });
+  });
+
+  /* バリデーション */
+  function showErr(fId, show, msg){
+    var f = document.getElementById(fId);
+    f.classList.toggle('has-error', show);
+    var e = f.querySelector('.field-error');
+    if(e){ e.style.display = show ? 'block' : 'none'; if(msg) e.textContent = msg; }
+  }
+
+  function validateStep1(){
+    var email = document.getElementById('inp-email').value.trim();
+    var pw = document.getElementById('inp-pw').value;
+    var pw2 = document.getElementById('inp-pw2').value;
+    var ok = true;
+    showErr('f-email', !email || !email.includes('@'));
+    if(!email || !email.includes('@')) ok = false;
+    showErr('f-pw', pw.length < 8);
+    if(pw.length < 8) ok = false;
+    showErr('f-pw2', pw !== pw2 || !pw2, 'パスワードが一致しません');
+    if(pw !== pw2 || !pw2) ok = false;
+    return ok;
+  }
+
+  function validateStep2(){
+    var name = document.getElementById('inp-name').value.trim();
+    var ok = true;
+    showErr('f-name', !name);
+    if(!name) ok = false;
+    if(!selectedArea){ document.getElementById('area-error').style.display = 'block'; ok = false; }
+    if(!selectedRole){ document.getElementById('role-error').style.display = 'block'; ok = false; }
+    return ok;
+  }
+
+  /* 確認画面の値セット */
+  function buildConfirm(){
+    var areaMap = { tokyo:'東京都', kanagawa:'神奈川県', saitama:'埼玉県', chiba:'千葉県', osaka:'大阪府', aichi:'愛知県', fukuoka:'福岡県', other:'その他' };
+    var roleMap = { seller:'売りたい・片付けたい', buyer:'業者として入札' };
+    document.getElementById('conf-email').textContent = document.getElementById('inp-email').value;
+    document.getElementById('conf-name').textContent = document.getElementById('inp-name').value;
+    document.getElementById('conf-area').textContent = areaMap[selectedArea] || selectedArea;
+    document.getElementById('conf-role').textContent = roleMap[selectedRole] || selectedRole;
+  }
+
+  /* ステップ遷移 */
+  function goTo(step){
+    document.querySelectorAll('.step-pane').forEach(function(p){ p.classList.remove('active'); });
+    document.getElementById('step-' + step).classList.add('active');
+    document.querySelectorAll('.flow-step').forEach(function(el){
+      var s = parseInt(el.dataset.step);
+      el.classList.remove('active','done');
+      if(s < step) el.classList.add('done');
+      if(s === step) el.classList.add('active');
+    });
+    currentStep = step;
+    var back = document.getElementById('btn-back');
+    var next = document.getElementById('btn-next');
+    back.style.display = step > 1 && step < 4 ? 'block' : 'none';
+    if(step === 4){
+      document.getElementById('flow-footer').style.display = 'none';
+    } else if(step === 3){
+      next.innerHTML = '登録する <svg style="width:16px;height:16px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><use href="#i-arrow"></use></svg>';
+    } else {
+      next.innerHTML = '次へ <svg style="width:16px;height:16px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><use href="#i-arrow"></use></svg>';
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  document.getElementById('btn-next').addEventListener('click', function(){
+    if(currentStep === 1 && !validateStep1()) return;
+    if(currentStep === 2 && !validateStep2()) return;
+    if(currentStep === 3){
+      if(!document.getElementById('agree1').checked){
+        alert('利用規約への同意が必要です');
+        return;
+      }
+      var btn = document.getElementById('btn-next');
+      btn.innerHTML = '<span class="spinning">↻</span> 登録中…';
+      btn.disabled = true;
+      setTimeout(function(){ window.location.href = 'メール確認完了.html'; }, 1200);
+      return;
+    }
+    if(currentStep === 2) buildConfirm();
+    goTo(currentStep + 1);
+  });
+
+  document.getElementById('btn-back').addEventListener('click', function(){
+    if(currentStep > 1) goTo(currentStep - 1);
+  });
+
+  /* LINE登録（デモ） */
+  document.getElementById('btn-line-reg').addEventListener('click', function(){
+    this.innerHTML = '<span class="spinning">↻</span> LINE 認証中…';
+    this.disabled = true;
+    setTimeout(function(){ window.location.href = '出品登録.html'; }, 1200);
+  });
+})();
+</script>
+</body>
+</html>

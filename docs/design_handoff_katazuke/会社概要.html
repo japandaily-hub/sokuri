@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>会社概要｜カタヅケ</title>
+<meta name="theme-color" content="#1f54de">
+<link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="katazuke-main.css">
+<style>
+body{background:#f4f6fb;}
+/* ヘッダー */
+.about-header{background:#fff;border-bottom:1px solid var(--line);padding:0 24px;height:68px;display:flex;align-items:center;justify-content:space-between;}
+.about-header img{height:42px;}
+.about-header-nav{display:flex;align-items:center;gap:24px;}
+.about-header-nav a{font-size:14px;color:var(--body-soft);font-weight:600;text-decoration:none;transition:color .2s;}
+.about-header-nav a:hover{color:var(--blue);}
+
+/* ヒーロー */
+.about-hero{background:linear-gradient(135deg,#0f2552,#1f54de);color:#fff;padding:64px 24px 56px;text-align:center;}
+.about-hero-logo{height:56px;margin:0 auto 24px;display:block;filter:brightness(10);}
+.about-hero h1{font-family:var(--head);font-size:clamp(26px,4vw,40px);font-weight:900;line-height:1.3;margin-bottom:14px;}
+.about-hero p{font-size:16px;color:rgba(255,255,255,.75);max-width:560px;margin:0 auto;line-height:1.85;}
+
+/* メイン */
+.about-wrap{max-width:860px;margin:0 auto;padding:48px 24px 80px;}
+
+/* セクション */
+.about-section{margin-bottom:52px;}
+.section-badge{display:inline-block;font-family:var(--head);font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--blue);background:var(--pale);padding:4px 12px;border-radius:99px;border:1px solid rgba(31,84,222,.2);margin-bottom:10px;}
+.about-section h2{font-family:var(--head);font-size:clamp(20px,3vw,26px);font-weight:900;color:var(--navy);margin-bottom:16px;line-height:1.35;}
+.about-section p{font-size:15px;color:var(--body);line-height:1.9;}
+
+/* 会社情報テーブル */
+.company-table{width:100%;border-collapse:collapse;}
+.company-table tr{border-bottom:1px solid var(--line-soft);}
+.company-table tr:first-child{border-top:1px solid var(--line-soft);}
+.company-table th{padding:16px 18px;font-size:13.5px;font-weight:700;color:var(--body-soft);background:var(--line-soft);width:140px;text-align:left;vertical-align:top;}
+.company-table td{padding:16px 18px;font-size:14.5px;color:var(--ink);line-height:1.75;vertical-align:top;}
+
+/* ミッション */
+.mission-card{background:linear-gradient(135deg,var(--pale),#dce8ff);border:1px solid rgba(31,84,222,.15);border-radius:var(--radius);padding:32px 28px;margin-bottom:52px;}
+.mission-card blockquote{font-family:var(--head);font-size:clamp(18px,2.5vw,22px);font-weight:900;color:var(--navy);line-height:1.55;margin-bottom:12px;}
+.mission-card p{font-size:14.5px;color:var(--body-soft);line-height:1.85;}
+
+/* 数字実績 */
+.numbers-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:52px;}
+.number-card{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow-s);border:1px solid var(--line-soft);padding:24px 18px;text-align:center;}
+.number-val{font-family:var(--head);font-size:clamp(28px,4vw,38px);font-weight:900;color:var(--blue);line-height:1;}
+.number-unit{font-size:14px;color:var(--body-soft);font-weight:600;margin-left:2px;}
+.number-lbl{font-size:12.5px;color:var(--body-soft);margin-top:6px;font-weight:600;line-height:1.5;}
+
+/* チームメンバー */
+.team-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;}
+.team-card{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow-s);border:1px solid var(--line-soft);padding:22px 18px;text-align:center;}
+.team-avatar{width:72px;height:72px;border-radius:50%;margin:0 auto 14px;display:grid;place-items:center;font-family:var(--head);font-size:26px;font-weight:900;color:#fff;}
+.team-name{font-family:var(--head);font-size:15px;font-weight:700;color:var(--navy);}
+.team-role{font-size:12px;color:var(--blue);font-weight:600;margin-top:3px;}
+.team-bio{font-size:12.5px;color:var(--body-soft);line-height:1.7;margin-top:8px;}
+
+/* CTA */
+.about-cta{background:var(--navy);border-radius:var(--radius);padding:40px 32px;text-align:center;color:#fff;}
+.about-cta h3{font-family:var(--head);font-size:22px;font-weight:900;margin-bottom:10px;}
+.about-cta p{font-size:14.5px;color:rgba(255,255,255,.7);margin-bottom:24px;line-height:1.8;}
+.about-cta-btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;}
+
+@media(max-width:700px){
+  .about-wrap { padding: 32px 16px 60px; }
+  .mission-card { padding: 22px 18px; }
+  .about-cta { padding: 28px 20px; }
+  .about-cta-btns { flex-direction: column; align-items: stretch; }
+  .about-cta-btns a { text-align: center; }
+}
+@media(max-width:600px){
+  .numbers-grid { grid-template-columns: repeat(3,1fr); gap: 10px; }
+  .number-val { font-size: clamp(22px,5vw,34px); }
+  .company-table th { width: 90px; font-size: 12px; padding: 12px 10px; }
+  .company-table td { font-size: 13px; padding: 12px 10px; }
+  .about-header-nav a:not(.btn) { display: none; }
+}
+@media(max-width:400px){
+  .numbers-grid { grid-template-columns: repeat(2,1fr); }
+  .number-card:last-child { grid-column: 1/-1; }
+}
+</style>
+</head>
+<body>
+
+<!-- ヘッダー -->
+<header class="about-header">
+  <a href="カタヅケ.html"><img src="img/logo-katazuke.png" alt="カタヅケ"></a>
+  <nav class="about-header-nav">
+    <a href="カタヅケ.html">トップ</a>
+    <a href="contact.html">お問い合わせ</a>
+    <a href="出品登録.html" class="btn btn-primary" style="font-size:13px;padding:9px 18px;">出品する</a>
+  </nav>
+</header>
+
+<!-- ヒーロー -->
+<div class="about-hero">
+  <img src="img/logo-katazuke.png" alt="カタヅケ" class="about-hero-logo" onerror="this.style.display='none'">
+  <h1>「片付ける」を、<br>もっとかんたんに。</h1>
+  <p>カタヅケは、家の不用品をまとめて複数の業者に入札してもらい、最高額で手放せるプラットフォームです。</p>
+</div>
+
+<main>
+<div class="about-wrap">
+
+  <!-- ミッション -->
+  <div class="mission-card">
+    <blockquote>「不用品を手放すことは、新しい暮らしのはじまり。その最初の一歩を、もっと気軽に、もっと納得できるものにしたい。」</blockquote>
+    <p>引越し・遺品整理・断捨離。それぞれのライフイベントで生まれる不用品には、まだ価値があります。カタヅケは、ユーザーと誠実な買取業者をつなぐことで、その価値を適切に届けます。</p>
+  </div>
+
+  <!-- 数字 -->
+  <div class="numbers-grid">
+    <div class="number-card"><div class="number-val">12,400<span class="number-unit">+</span></div><div class="number-lbl">累計出品件数</div></div>
+    <div class="number-card"><div class="number-val">4.8<span class="number-unit"></span></div><div class="number-lbl">平均評価（5点満点）</div></div>
+    <div class="number-card"><div class="number-val">380<span class="number-unit">社</span></div><div class="number-lbl">登録買取業者数</div></div>
+  </div>
+
+  <!-- 会社概要 -->
+  <div class="about-section">
+    <div class="section-badge">COMPANY</div>
+    <h2>会社概要</h2>
+    <div style="background:#fff;border-radius:var(--radius);box-shadow:var(--shadow-s);border:1px solid var(--line-soft);overflow:hidden;">
+      <table class="company-table">
+        <tr><th>会社名</th><td>株式会社カタヅケ</td></tr>
+        <tr><th>設立</th><td>2023年4月</td></tr>
+        <tr><th>代表取締役</th><td>山村 大輔</td></tr>
+        <tr><th>所在地</th><td>〒150-0001<br>東京都渋谷区神宮前6丁目23-4<br>JPR神宮前ビル 3F</td></tr>
+        <tr><th>事業内容</th><td>不用品買取マッチングプラットフォームの運営<br>買取業者向けSaaS提供</td></tr>
+        <tr><th>資本金</th><td>8,000万円</td></tr>
+        <tr><th>従業員数</th><td>32名（2026年6月現在）</td></tr>
+        <tr><th>許認可</th><td>古物商許可（東京都公安委員会 第303291234号）</td></tr>
+        <tr><th>加盟団体</th><td>一般社団法人リユース業協会</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- チーム -->
+  <div class="about-section">
+    <div class="section-badge">TEAM</div>
+    <h2>創業チーム</h2>
+    <div class="team-grid">
+      <div class="team-card">
+        <div class="team-avatar" style="background:#1f54de;">山</div>
+        <div class="team-name">山村 大輔</div>
+        <div class="team-role">代表取締役CEO</div>
+        <div class="team-bio">元リサイクル業界営業10年。業界の非効率を解消するために創業。</div>
+      </div>
+      <div class="team-card">
+        <div class="team-avatar" style="background:#1f8a5b;">佐</div>
+        <div class="team-name">佐々木 理恵</div>
+        <div class="team-role">CTO</div>
+        <div class="team-bio">元メガベンチャーエンジニア。プラットフォーム開発・運営を統括。</div>
+      </div>
+      <div class="team-card">
+        <div class="team-avatar" style="background:#9b59b6;">田</div>
+        <div class="team-name">田中 孝文</div>
+        <div class="team-role">COO / 業者渉外</div>
+        <div class="team-bio">元古物商。全国380社との業者ネットワークを構築。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 理念 -->
+  <div class="about-section">
+    <div class="section-badge">VALUES</div>
+    <h2>私たちが大切にすること</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;">
+      <div style="background:#fff;border-radius:14px;padding:20px;border:1px solid var(--line-soft);">
+        <div style="font-size:24px;margin-bottom:10px;">🤝</div>
+        <strong style="font-family:var(--head);font-size:15px;color:var(--navy);display:block;margin-bottom:6px;">透明性</strong>
+        <p style="font-size:13px;color:var(--body-soft);line-height:1.75;">入札価格・手数料・評価情報をすべて公開。ユーザーが納得して判断できる環境を作ります。</p>
+      </div>
+      <div style="background:#fff;border-radius:14px;padding:20px;border:1px solid var(--line-soft);">
+        <div style="font-size:24px;margin-bottom:10px;">🔒</div>
+        <strong style="font-family:var(--head);font-size:15px;color:var(--navy);display:block;margin-bottom:6px;">安全・安心</strong>
+        <p style="font-size:13px;color:var(--body-soft);line-height:1.75;">古物商許可確認・本人確認済みの業者のみ掲載。すべての取引に保証制度を整備。</p>
+      </div>
+      <div style="background:#fff;border-radius:14px;padding:20px;border:1px solid var(--line-soft);">
+        <div style="font-size:24px;margin-bottom:10px;">♻️</div>
+        <strong style="font-family:var(--head);font-size:15px;color:var(--navy);display:block;margin-bottom:6px;">サーキュラーエコノミー</strong>
+        <p style="font-size:13px;color:var(--body-soft);line-height:1.75;">まだ使えるものを廃棄ではなく再流通へ。環境負荷を減らす経済の循環に貢献します。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div class="about-cta">
+    <h3>一緒に、片付けをもっと良くしませんか？</h3>
+    <p>採用情報・業者登録・提携のお問い合わせはこちらから</p>
+    <div class="about-cta-btns">
+      <a href="出品登録.html" class="btn btn-white btn-lg" style="background:#fff;color:var(--navy);font-size:14.5px;">出品してみる</a>
+      <a href="contact.html" class="btn btn-outline-white btn-lg" style="border:1.5px solid rgba(255,255,255,.4);color:#fff;background:transparent;font-size:14.5px;padding:14px 24px;border-radius:99px;font-family:var(--head);font-weight:700;text-decoration:none;transition:.2s;">お問い合わせ</a>
+    </div>
+  </div>
+
+</div>
+</main>
+
+<!-- フッター -->
+<footer style="background:var(--navy);padding:24px;text-align:center;">
+  <div style="display:flex;gap:20px;justify-content:center;flex-wrap:wrap;margin-bottom:14px;">
+    <a href="カタヅケ.html" style="font-size:13px;color:rgba(255,255,255,.5);text-decoration:none;">トップ</a>
+    <a href="特定商取引法.html" style="font-size:13px;color:rgba(255,255,255,.5);text-decoration:none;">特定商取引法</a>
+    <a href="プライバシーポリシー.html" style="font-size:13px;color:rgba(255,255,255,.5);text-decoration:none;">プライバシーポリシー</a>
+    <a href="利用規約.html" style="font-size:13px;color:rgba(255,255,255,.5);text-decoration:none;">利用規約</a>
+    <a href="contact.html" style="font-size:13px;color:rgba(255,255,255,.5);text-decoration:none;">お問い合わせ</a>
+  </div>
+  <p style="font-size:12px;color:rgba(255,255,255,.3);">© 2026 株式会社カタヅケ All rights reserved.</p>
+</footer>
+</body>
+</html>

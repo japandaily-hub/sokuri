@@ -1,5 +1,20 @@
 # PROJECT_STATE — カタヅケ クローズドβ
 
+## 🎨 2026-06-27〜 デザインハンドオフ実装（/loop 自走・strategy-agents Leader）
+- **ブランチ**: `feat/design-handoff-katazuke`（main=本番には未マージ。デプロイはユーザー承認操作のため自動実行しない）
+- **タスク**: 新デザインハンドオフ（`docs/design_handoff_katazuke/` 33画面・高忠実度）を `web/` にピクセル忠実実装。DoD正本=リポジトリ直下 `KATAZUKE_REDESIGN_PLAN.md`。
+- **正本の確定**: 稼働ファイルは **C:\sokuri**。OneDrive側（…\Projects\ソクウリ）は**ソース脱水の空殻（.tsx 0件・package.json無）＝編集禁止**。
+- **完了（イテレーション1・基盤）**:
+  - `src/app/katazuke.css`（ハンドオフCSS移植）+ `globals.css`（layer順宣言→`@import ... layer(components)`）+ `tailwind.config.ts`（kdz-* トークン・container無効化）+ フォント（Zen Kaku/Noto Sans を @import url 実行時ロード）
+  - 共通部品 `src/components/kdz/`（Icons / interactions / SiteHeader / chrome / SiteChrome / Logo）
+  - `src/app/layout.tsx`（薄シェル化・共通クロム・SEO維持）+ `src/app/page.tsx`（**トップLP全16セクション再実装**）
+  - **検証**: `npx tsc --noEmit` クリーン / `npm run build` 緑（23ルート・lint通過）。**視覚QAは未実施（次イテレーションで実施）**。
+- **次アクション（loop P1）**: ①`/` の視覚QA（dev server起動→スクショ→ハンドオフ比較）②認証/フロー クラスタ（login/signup/verify-email/password-reset/create/create-complete）を実装。以降 §KATAZUKE_REDESIGN_PLAN のクラスタ順。
+- **既知の要対応**: 実画像アセット（ロゴ/写真/カテゴリ）未投入＝`PhImg` プレースホルダで表示中。**[要ユーザー提供]** または `anthropic-skills:gpt-image` で生成。
+- **gate_status**: build=GREEN / typecheck=GREEN / visualQA=PENDING / security=未 / 全33ページ=1完了(基盤+top)/残32
+
+---
+
 最終更新: 2026-06-13 / **本番デプロイ&E2E全合格済み（β稼働中）。現フェーズ＝業者獲得（量・スケール）。プラン正本: 業者獲得スケールプラン_v1.md**
 
 ## 🔧 2026-06-16 デプロイ前是正（strategy-agents Leader）— push-vendor-engine.ps1 の本番事故を2件修正

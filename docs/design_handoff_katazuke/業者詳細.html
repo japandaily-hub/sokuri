@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>業者詳細｜カタヅケ</title>
+<meta name="theme-color" content="#1f54de">
+<link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="katazuke-main.css">
+<style>
+body { background: #f4f6fb; }
+
+/* ── ヘッダー ── */
+.biz-header {
+  background: #fff; border-bottom: 1px solid var(--line);
+  padding: 0 20px; height: 60px;
+  display: flex; align-items: center; gap: 12px;
+  position: sticky; top: 0; z-index: 60;
+}
+.biz-header img { height: 36px; }
+.biz-header-back {
+  margin-left: auto; display: flex; align-items: center; gap: 5px;
+  font-size: 13px; font-weight: 700; color: var(--body-soft); text-decoration: none; transition: color .2s;
+}
+.biz-header-back:hover { color: var(--blue); }
+.biz-header-back svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+
+/* ── ラッパー ── */
+.biz-wrap { max-width: 720px; margin: 0 auto; padding: 24px 20px 80px; }
+
+/* ── ヒーロー ── */
+.biz-hero {
+  background: #fff; border-radius: var(--radius);
+  box-shadow: var(--shadow-m); border: 1px solid var(--line-soft);
+  padding: 28px 24px; margin-bottom: 16px;
+}
+.biz-hero-head { display: flex; gap: 18px; align-items: flex-start; margin-bottom: 20px; }
+.biz-big-avatar {
+  width: 80px; height: 80px; border-radius: 20px; flex-shrink: 0;
+  display: grid; place-items: center;
+  font-family: var(--head); font-size: 32px; font-weight: 900; color: #fff;
+}
+.biz-hero-info { flex: 1; min-width: 0; }
+.biz-hero-name { font-family: var(--head); font-size: clamp(18px,3vw,22px); font-weight: 900; color: var(--navy); line-height: 1.3; }
+.biz-hero-area { font-size: 13px; color: var(--body-soft); margin-top: 4px; }
+.biz-hero-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.biz-tag {
+  font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 99px;
+}
+.biz-tag-green { background: rgba(31,138,91,.1); color: var(--green); }
+.biz-tag-blue  { background: var(--pale); color: var(--blue); }
+
+/* 評価スター */
+.biz-rating-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.stars-big { font-size: 22px; color: #f0a030; letter-spacing: -1px; }
+.rating-num { font-family: var(--head); font-size: 28px; font-weight: 900; color: var(--navy); }
+.rating-count { font-size: 13px; color: var(--body-soft); }
+
+/* 評価バー */
+.rating-bars { display: flex; flex-direction: column; gap: 5px; margin-bottom: 20px; }
+.rating-bar-row { display: flex; align-items: center; gap: 8px; }
+.rating-bar-lbl { font-size: 11.5px; color: var(--body-soft); font-weight: 700; width: 14px; text-align: right; }
+.rating-bar-track { flex: 1; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.rating-bar-fill { height: 100%; background: #f0a030; border-radius: 3px; }
+.rating-bar-num { font-size: 11.5px; color: var(--body-soft); width: 28px; text-align: right; }
+
+/* 統計グリッド */
+.biz-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 20px; }
+.biz-stat {
+  background: var(--pale); border-radius: 12px; padding: 14px 10px; text-align: center;
+}
+.biz-stat-val { font-family: var(--head); font-size: 22px; font-weight: 900; color: var(--navy); line-height: 1; }
+.biz-stat-val small { font-size: 12px; color: var(--body-soft); margin-left: 2px; }
+.biz-stat-lbl { font-size: 11px; color: var(--body-soft); margin-top: 4px; font-weight: 600; }
+
+/* ── 専門カテゴリ ── */
+.cat-grid { display: flex; gap: 8px; flex-wrap: wrap; }
+.cat-chip {
+  background: var(--pale); color: var(--blue);
+  font-family: var(--head); font-size: 13px; font-weight: 700;
+  padding: 8px 14px; border-radius: 10px; border: 1.5px solid rgba(31,84,222,.2);
+}
+
+/* ── セクションカード ── */
+.detail-card {
+  background: #fff; border-radius: var(--radius);
+  box-shadow: var(--shadow-s); border: 1px solid var(--line-soft);
+  padding: 22px 22px; margin-bottom: 14px;
+}
+.detail-card-title {
+  font-family: var(--head); font-size: 15px; font-weight: 700; color: var(--navy);
+  margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+}
+.detail-card-title svg { width: 18px; height: 18px; fill: none; stroke: var(--blue); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* 口コミ */
+.review-item { padding: 16px 0; border-bottom: 1px solid var(--line-soft); }
+.review-item:last-child { border-bottom: none; padding-bottom: 0; }
+.review-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.reviewer-avatar {
+  width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+  display: grid; place-items: center;
+  font-family: var(--head); font-size: 14px; font-weight: 900; color: #fff;
+}
+.reviewer-info { flex: 1; }
+.reviewer-name { font-family: var(--head); font-size: 13.5px; font-weight: 700; color: var(--navy); }
+.review-meta { font-size: 11.5px; color: var(--body-soft); margin-top: 2px; }
+.review-stars { color: #f0a030; font-size: 13px; letter-spacing: -1px; }
+.review-text { font-size: 13.5px; color: var(--body); line-height: 1.82; }
+.review-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.review-tag { font-size: 11px; background: var(--line-soft); color: var(--body-soft); padding: 3px 9px; border-radius: 99px; font-weight: 600; }
+
+/* 対応エリア */
+.area-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.area-tag {
+  font-size: 13px; font-weight: 700; padding: 7px 14px; border-radius: 10px;
+  background: #f0f4ff; color: var(--blue); border: 1px solid rgba(31,84,222,.15);
+}
+
+/* 業者の約束 */
+.promise-list { display: flex; flex-direction: column; gap: 12px; }
+.promise-item { display: flex; align-items: flex-start; gap: 12px; }
+.promise-ic {
+  width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0;
+  background: #e8faf0; color: var(--green);
+  display: grid; place-items: center;
+}
+.promise-ic svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.promise-body strong { display: block; font-family: var(--head); font-size: 13.5px; font-weight: 700; color: var(--navy); }
+.promise-body span { font-size: 12.5px; color: var(--body-soft); line-height: 1.7; }
+
+/* ── 入札状況 ── */
+.bid-highlight {
+  background: linear-gradient(135deg, #e4edff 0%, #d0e0ff 100%);
+  border: 1.5px solid rgba(31,84,222,.22); border-radius: var(--radius);
+  padding: 24px; margin-bottom: 14px;
+  box-shadow: 0 8px 24px -12px rgba(31,84,222,.25);
+}
+.bid-highlight-top { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.bid-label-badge {
+  background: var(--blue); color: #fff;
+  font-family: var(--head); font-size: 12px; font-weight: 700;
+  padding: 4px 12px; border-radius: 99px;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.bid-amount-big { font-family: var(--head); font-size: 40px; font-weight: 900; color: var(--navy); line-height: 1; }
+.bid-amount-big small { font-size: 16px; color: var(--body-soft); margin-right: 4px; }
+.bid-amount-note { font-size: 12.5px; color: var(--body-soft); margin-top: 4px; }
+.bid-cta-row { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+
+/* フッターCTA */
+.biz-footer-cta {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
+  background: rgba(255,255,255,.95); backdrop-filter: blur(10px);
+  border-top: 1px solid var(--line); padding: 14px 20px;
+  box-shadow: 0 -6px 24px -12px rgba(15,37,82,.2);
+}
+.biz-footer-inner {
+  max-width: 720px; margin: 0 auto;
+  display: flex; gap: 12px; align-items: center;
+}
+.biz-footer-info { flex: 1; }
+.biz-footer-info strong { display: block; font-family: var(--head); font-size: 15px; font-weight: 900; color: var(--navy); }
+.biz-footer-info span { font-size: 12px; color: var(--body-soft); }
+
+@media(max-width:560px){
+  .biz-stats { grid-template-columns: repeat(3,1fr); }
+  .bid-amount-big { font-size: 28px; }
+  .biz-hero-head { flex-direction: row; }
+  .biz-wrap { padding: 16px 14px 100px; }
+  .biz-hero { padding: 20px 16px; }
+  .detail-card { padding: 18px 16px; }
+  .bid-cta-row .btn { flex: 1; min-width: 0; }
+  .biz-footer-inner { gap: 8px; }
+  .biz-footer-inner .btn { font-size: 13px; padding: 10px 14px; }
+}
+@media(max-width:400px){
+  .biz-big-avatar { width: 64px; height: 64px; font-size: 26px; border-radius: 16px; }
+  .biz-hero-name { font-size: 16px; }
+  .biz-stat-val { font-size: 18px; }
+  .bid-amount-big { font-size: 24px; }
+  .bid-cta-row { flex-direction: column; }
+  .bid-cta-row .btn { width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M5 5h14a2 2 0 012 2v8a2 2 0 01-2 2H9l-4 4V7a2 2 0 012-2z"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z"/><path d="M9 12l2 2 4-4"/></symbol>
+  <symbol id="i-truck" viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 4v4h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></symbol>
+  <symbol id="i-tag" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><circle cx="7" cy="7" r="1.5"/></symbol>
+  <symbol id="i-map" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></symbol>
+</defs></svg>
+
+<!-- ヘッダー -->
+<header class="biz-header">
+  <a href="カタヅケ.html"><img src="img/logo-katazuke.png" alt="カタヅケ"></a>
+  <a href="査定結果.html" class="biz-header-back">
+    <svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+    査定結果に戻る
+  </a>
+</header>
+
+<main>
+<div class="biz-wrap">
+
+  <!-- ヒーロー -->
+  <div class="biz-hero">
+    <div class="biz-hero-head">
+      <div class="biz-big-avatar" style="background:#1f54de;">バ</div>
+      <div class="biz-hero-info">
+        <div class="biz-hero-name">株式会社バリュー東京</div>
+        <div class="biz-hero-area">
+          <svg style="width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;vertical-align:-.1em;" viewBox="0 0 24 24"><use href="#i-map"></use></svg>
+          東京都・神奈川県・埼玉県
+        </div>
+        <div class="biz-hero-badges">
+          <span class="biz-tag biz-tag-green">✓ 古物商許可済</span>
+          <span class="biz-tag biz-tag-green">✓ 個人情報保護</span>
+          <span class="biz-tag biz-tag-blue">即日対応可</span>
+          <span class="biz-tag biz-tag-blue">家電特化</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 評価 -->
+    <div class="biz-rating-row">
+      <div class="stars-big">★★★★★</div>
+      <div class="rating-num">4.8</div>
+      <div class="rating-count">（口コミ156件）</div>
+    </div>
+    <div class="rating-bars">
+      <div class="rating-bar-row"><span class="rating-bar-lbl">5</span><div class="rating-bar-track"><div class="rating-bar-fill" style="width:78%"></div></div><span class="rating-bar-num">121</span></div>
+      <div class="rating-bar-row"><span class="rating-bar-lbl">4</span><div class="rating-bar-track"><div class="rating-bar-fill" style="width:15%"></div></div><span class="rating-bar-num">23</span></div>
+      <div class="rating-bar-row"><span class="rating-bar-lbl">3</span><div class="rating-bar-track"><div class="rating-bar-fill" style="width:5%"></div></div><span class="rating-bar-num">8</span></div>
+      <div class="rating-bar-row"><span class="rating-bar-lbl">2</span><div class="rating-bar-track"><div class="rating-bar-fill" style="width:2%"></div></div><span class="rating-bar-num">3</span></div>
+      <div class="rating-bar-row"><span class="rating-bar-lbl">1</span><div class="rating-bar-track"><div class="rating-bar-fill" style="width:1%"></div></div><span class="rating-bar-num">1</span></div>
+    </div>
+
+    <!-- 統計 -->
+    <div class="biz-stats">
+      <div class="biz-stat"><div class="biz-stat-val">3.2<small>年</small></div><div class="biz-stat-lbl">登録年数</div></div>
+      <div class="biz-stat"><div class="biz-stat-val">482<small>件</small></div><div class="biz-stat-lbl">成約実績</div></div>
+      <div class="biz-stat"><div class="biz-stat-val">98<small>%</small></div><div class="biz-stat-lbl">リピート率</div></div>
+    </div>
+
+    <!-- 専門カテゴリ -->
+    <div style="margin-bottom:6px;font-size:12px;font-weight:700;color:var(--body-soft);">専門カテゴリ</div>
+    <div class="cat-grid">
+      <div class="cat-chip">🏠 家電</div>
+      <div class="cat-chip">👜 ブランド品</div>
+      <div class="cat-chip">⌚ 時計・ジュエリー</div>
+      <div class="cat-chip">📷 カメラ</div>
+      <div class="cat-chip">🎮 ゲーム機</div>
+    </div>
+  </div>
+
+  <!-- 現在の入札 -->
+  <div class="bid-highlight">
+    <div class="bid-highlight-top">
+      <span class="bid-label-badge">🏆 あなたへの最高額入札</span>
+    </div>
+    <div class="bid-amount-big"><small>¥</small>54,000</div>
+    <div class="bid-amount-note">5点まとめ買取・搬出費用込み</div>
+    <div style="font-size:13px;color:var(--body);line-height:1.82;margin-top:14px;">
+      💬「家電・ブランド品を専門スタッフが丁寧に査定します。まとめてお持ちの方が有利です。即日訪問も対応可能ですのでお気軽にご相談ください。お見積もり後のキャンセルも無料です。」
+    </div>
+    <div class="bid-cta-row">
+      <a href="査定結果.html" class="btn btn-primary btn-lg" style="flex:1.5;">
+        <svg style="width:17px;height:17px;fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round;"><use href="#i-check"></use></svg>
+        この業者に決める
+      </a>
+      <a href="chat.html" class="btn btn-ghost btn-lg" style="flex:1;">
+        <svg style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;"><use href="#i-chat"></use></svg>
+        質問する
+      </a>
+    </div>
+  </div>
+
+  <!-- 業者の約束 -->
+  <div class="detail-card">
+    <div class="detail-card-title"><svg viewBox="0 0 24 24"><use href="#i-shield"></use></svg>サービスの特徴</div>
+    <div class="promise-list">
+      <div class="promise-item">
+        <div class="promise-ic"><svg viewBox="0 0 24 24"><use href="#i-truck"></use></svg></div>
+        <div class="promise-body"><strong>搬出費用完全無料</strong><span>大型家電や家具も追加費用なしで搬出します。エレベーターなしの建物も対応可。</span></div>
+      </div>
+      <div class="promise-item">
+        <div class="promise-ic"><svg viewBox="0 0 24 24"><use href="#i-clock"></use></svg></div>
+        <div class="promise-body"><strong>最短即日訪問</strong><span>午前中のご連絡で、当日午後の訪問が可能です。急ぎの引越し・遺品整理にも対応。</span></div>
+      </div>
+      <div class="promise-item">
+        <div class="promise-ic"><svg viewBox="0 0 24 24"><use href="#i-check"></use></svg></div>
+        <div class="promise-body"><strong>査定後キャンセル無料</strong><span>訪問後に査定額に納得できなければ、キャンセルは無料です。プレッシャーなしで査定を受けられます。</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 口コミ -->
+  <div class="detail-card">
+    <div class="detail-card-title"><svg viewBox="0 0 24 24"><use href="#i-star"></use></svg>口コミ（156件）</div>
+
+    <div class="review-item">
+      <div class="review-head">
+        <div class="reviewer-avatar" style="background:#4a90d9;">田</div>
+        <div class="reviewer-info">
+          <div class="reviewer-name">田中 美香</div>
+          <div class="review-meta"><span class="review-stars">★★★★★</span>　2026年6月</div>
+        </div>
+      </div>
+      <div class="review-text">引越し前日にお願いしたのに、当日午後に来てくれて本当に助かりました。家電5点と服をまとめて買い取っていただき、¥62,000になりました。スタッフの方もとても丁寧で、また利用したいと思います。</div>
+      <div class="review-tags"><span class="review-tag">即日対応</span><span class="review-tag">スタッフ丁寧</span><span class="review-tag">高額査定</span></div>
+    </div>
+
+    <div class="review-item">
+      <div class="review-head">
+        <div class="reviewer-avatar" style="background:#e06b6b;">山</div>
+        <div class="reviewer-info">
+          <div class="reviewer-name">山本 健太</div>
+          <div class="review-meta"><span class="review-stars">★★★★★</span>　2026年5月</div>
+        </div>
+      </div>
+      <div class="review-text">遺品整理でお世話になりました。デリケートな状況を理解していただき、丁寧な対応でした。値段の説明も明確で納得感があり、安心してお任せできました。</div>
+      <div class="review-tags"><span class="review-tag">遺品整理</span><span class="review-tag">説明明確</span></div>
+    </div>
+
+    <div class="review-item">
+      <div class="review-head">
+        <div class="reviewer-avatar" style="background:#5cb85c;">佐</div>
+        <div class="reviewer-info">
+          <div class="reviewer-name">佐藤 由美</div>
+          <div class="review-meta"><span class="review-stars">★★★★☆</span>　2026年4月</div>
+        </div>
+      </div>
+      <div class="review-text">思っていたより査定額が高くて驚きました。テレビ・冷蔵庫・洗濯機の3点で¥28,000。搬出も丁寧にやっていただきました。</div>
+      <div class="review-tags"><span class="review-tag">家電</span><span class="review-tag">搬出丁寧</span></div>
+    </div>
+
+    <div style="text-align:center;margin-top:16px;">
+      <button style="font-size:13.5px;font-weight:700;color:var(--blue);background:none;border:none;cursor:pointer;text-decoration:underline;text-underline-offset:3px;">すべての口コミを見る（156件）</button>
+    </div>
+  </div>
+
+  <!-- 対応エリア -->
+  <div class="detail-card">
+    <div class="detail-card-title"><svg viewBox="0 0 24 24"><use href="#i-map"></use></svg>対応エリア</div>
+    <div class="area-tags">
+      <div class="area-tag">東京都</div>
+      <div class="area-tag">神奈川県</div>
+      <div class="area-tag">埼玉県</div>
+      <div class="area-tag">千葉県（一部）</div>
+    </div>
+  </div>
+
+</div>
+</main>
+
+<!-- フッターCTA -->
+<div class="biz-footer-cta">
+  <div class="biz-footer-inner">
+    <div class="biz-footer-info">
+      <strong>¥54,000 で入札中</strong>
+      <span>株式会社バリュー東京 · 最高額</span>
+    </div>
+    <a href="査定結果.html" class="btn btn-primary">
+      <svg style="width:16px;height:16px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;"><use href="#i-check"></use></svg>
+      決める
+    </a>
+    <a href="chat.html" class="btn btn-ghost">質問</a>
+  </div>
+</div>
+
+</body>
+</html>

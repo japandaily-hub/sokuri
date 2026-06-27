@@ -1,1105 +1,419 @@
-'use client';
+import Link from "next/link";
+import { Ic, type IcName } from "@/components/kdz/Icons";
+import { Reveal, PhImg, FaqAccordion } from "@/components/kdz/interactions";
+import { KdzLogo } from "@/components/kdz/Logo";
 
-import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { analyzeImage, ApiError, type AnalyzeResponse } from "@/lib/api";
-import { fileToBase64 } from "@/lib/format";
-import { Icon, Spinner, type IconName } from "@/components/Icon";
-import { ServiceIntro } from "@/components/landing/ServiceIntro";
-import { Features } from "@/components/landing/Features";
-import { Comparison } from "@/components/landing/Comparison";
-import { Faq } from "@/components/landing/Faq";
-
-type PageState = "idle" | "loading" | "error";
-
-const SESSION_KEY_ANALYZE = "aw_analyze_result";
-
-// ===== カテゴリ定義 =====
-const CATEGORIES: { icon: IconName; label: string; sub: string }[] = [
-  { icon: "device", label: "家電・デジタル", sub: "スマホ・PC・カメラ" },
-  { icon: "apparel", label: "ファッション", sub: "衣類・シューズ・帽子" },
-  { icon: "bag", label: "ブランド品", sub: "バッグ・財布・小物" },
-  { icon: "gem", label: "時計・貴金属", sub: "腕時計・指輪・ネックレス" },
-  { icon: "gamepad", label: "ゲーム・おもちゃ", sub: "ゲーム機・フィギュア" },
-  { icon: "music", label: "楽器", sub: "ギター・鍵盤・管楽器" },
-  { icon: "book", label: "本・コミック", sub: "書籍・漫画・雑誌" },
-  { icon: "sport", label: "スポーツ・アウトドア", sub: "用具・ウェア・自転車" },
-  { icon: "sofa", label: "家具・インテリア", sub: "テーブル・チェア・照明" },
-  { icon: "beauty", label: "美容・コスメ", sub: "スキンケア・メイク" },
-  { icon: "art", label: "アート・コレクション", sub: "絵画・切手・コイン" },
-  { icon: "car", label: "カー用品", sub: "パーツ・カーナビ・タイヤ" },
+/** 対応カテゴリ（実画像未投入のためアイコンタイルで表現） */
+const CATEGORIES: { icon: IcName; name: string; ex: string }[] = [
+  { icon: "sun", name: "生活家電", ex: "冷蔵庫・洗濯機ほか" },
+  { icon: "bag", name: "ブランド品", ex: "バッグ・財布" },
+  { icon: "sofa", name: "家具", ex: "ソファ・収納" },
+  { icon: "camera", name: "カメラ・PC", ex: "一眼・ノートPC" },
+  { icon: "clock", name: "時計・宝飾", ex: "腕時計・アクセ" },
+  { icon: "box", name: "ゲーム・玩具", ex: "ゲーム機・フィギュア" },
+  { icon: "tag", name: "ファッション", ex: "衣類・靴・小物" },
+  { icon: "spark", name: "楽器・趣味", ex: "ギター・道具" },
+  { icon: "crop", name: "食器・骨董", ex: "食器・茶道具" },
+  { icon: "trend", name: "スポーツ", ex: "ゴルフ・アウトドア" },
+  { icon: "scale", name: "工具・DIY", ex: "電動工具ほか" },
+  { icon: "house", name: "その他いろいろ", ex: "まずは撮ってみる" },
 ];
 
-// ===== 利用イメージの物語（8場面ジャーニー） =====
-// 「片付けたいなあ」→ すっきり、への変化軸。phase 0:痛み / 1:手軽さ / 2:満足。
-// 各場面に生成イラスト（/img/story-01.png … story-08.png）を配置。未生成でも崩れないよう onError でフォールバック。
-const STORY: {
-  no: string;
-  title: string;
-  desc: string;
-  emo: string;
-  phase: 0 | 1 | 2;
-  alt: string;
-}[] = [
-  {
-    no: "01",
-    title: "「家を片付けたいなあ…」",
-    desc: "散らかった部屋を前に、ひと息。何から手をつけるか決まらない、その状態が出発点です。",
-    emo: "痛みの起点",
-    phase: 0,
-    alt: "散らかった部屋を前に、片付けに踏み出せず立ちすくむ女性",
-  },
-  {
-    no: "02",
-    title: "気になる品物を1点ずつ撮影",
-    desc: "売りたい物を1点ずつ、スマホで撮るだけ。きれいに並べる必要はありません。撮った品物はアルバムにたまっていきます。",
-    emo: "手軽さ",
-    phase: 1,
-    alt: "ソファに座り、不用品を1点ずつスマートフォンで撮影する女性",
-  },
-  {
-    no: "03",
-    title: "AIが1点ずつ品目・状態・相場を仮査定",
-    desc: "写真からAIが品目と状態を読み取り、相場をもとに参考の仮査定額を1点ずつ提示します。",
-    emo: "スピード",
-    phase: 1,
-    alt: "スマホ画面に品物ごとのAI仮査定額が表示されている様子",
-  },
-  {
-    no: "04",
-    title: "たまった品物をまとめて業者へ共有",
-    desc: "アルバムにたまった品物を、まとめて登録業者へ共有。共有するのは「写真と品目」のみです。",
-    emo: "期待",
-    phase: 1,
-    alt: "たまった品物のアルバムをまとめて登録業者へ共有するイメージ",
-  },
-  {
-    no: "05",
-    title: "登録業者が査定額で競う",
-    desc: "複数の登録業者がオンラインで査定額を提示。競争原理がはたらき、査定が伸びやすくなります。",
-    emo: "期待",
-    phase: 1,
-    alt: "複数の登録業者が査定額を提示し合うオンライン入札のイメージ",
-  },
-  {
-    no: "06",
-    title: "選ばれた上位3社だけが連絡",
-    desc: "連絡が来るのは査定額の上位3社のみ。それ以外の業者には自動でお断りが入り、一斉架電は起こりません。",
-    emo: "安心",
-    phase: 2,
-    alt: "ソファでくつろぎ、上位3社からの連絡をゆったり待つ女性",
-  },
-  {
-    no: "07",
-    title: "現物査定して、納得の1社を選ぶ",
-    desc: "上位3社と日程を調整し、現物を確認。訪問かオンラインかは、あなたが選べます。3社を比べて、納得できる1社を選ぶだけです。",
-    emo: "納得",
-    phase: 2,
-    alt: "玄関先で買取業者に品物を笑顔で引き渡す女性",
-  },
-  {
-    no: "08",
-    title: "家もすっきり／手間なく断捨離成功",
-    desc: "片付いた部屋で、ひと安心。売れる物はまとめて一括買取、手間なく断捨離が完了します。",
-    emo: "すっきり",
-    phase: 2,
-    alt: "片付いてすっきりした明るい部屋で、満足そうにくつろぐ女性",
-  },
+const FAQ_ITEMS = [
+  { q: "1点だけでも依頼できますか？", a: "はい。ただし、まとめて出すほど業者の買取総額が伸びやすく、値がつかない物も一緒に引き取ってもらいやすくなります。" },
+  { q: "値段がつかない物はどうなりますか？", a: "業者は1点ごとではなく“まとめ全体”の金額で入札します。単体では値がつきにくい物も、まとめに含めて引き取ってもらえる場合があります。" },
+  { q: "しつこい営業電話は来ますか？", a: "連絡が来るのは査定額の上位3社のみ。他の業者には自動でお断りが入り、一斉架電は起こりません。" },
+  { q: "個人情報はどう扱われますか？", a: "査定段階で業者に渡るのは写真と品目のみ。お名前・電話・住所は交渉成立後に開示されます。" },
+  { q: "利用にお金はかかりますか？", a: "出品・査定・成約まで、すべて無料です。費用は一切かかりません。" },
+  { q: "訪問買取に不安があります", a: "参加するのは古物商許可を確認した登録事業者のみ。訪問買取は特定商取引法によりクーリングオフの対象です。" },
 ];
 
-// ===== 仕組み 4ステップ =====
-const STEPS: { step: string; icon: IconName; title: string; desc: string }[] = [
-  {
-    step: "01",
-    icon: "camera",
-    title: "品物を1点ずつ撮るだけ",
-    desc: "売りたい物を1点ずつ撮影。AIが1点ずつ仮査定し、たまった品物をまとめて依頼します。",
-  },
-  {
-    step: "02",
-    icon: "scan",
-    title: "業者から査定が届く",
-    desc: "たまった品物（アルバム）を見た登録業者が査定額を提示。あなたは待つだけです。",
-  },
-  {
-    step: "03",
-    icon: "scale",
-    title: "上位3社と交渉",
-    desc: "査定額の上位3社が交渉権を獲得。条件を比べて選べます。",
-  },
-  {
-    step: "04",
-    icon: "check-circle",
-    title: "取引・引き取り",
-    desc: "いちばん条件のよい業者と取引。受け取り日時を選んで完了です。",
-  },
+const STEPS: { n: string; en: string; icon: IcName; h: string; p: string; img: string }[] = [
+  { n: "1", en: "SHOOT", icon: "camera", h: "まとめて撮る", p: "家じゅうの不用品を1点ずつ撮影。写真と品目をまとめて登録するだけで出品完了です。", img: "step-1.png" },
+  { n: "2", en: "WAIT", icon: "scan", h: "査定が届く", p: "登録業者が、まとめ全体に買取総額で入札。あなたは待つだけで査定が集まります。", img: "step-2.png" },
+  { n: "3", en: "CHOOSE", icon: "scale", h: "上位3社と交渉", p: "金額上位の3社とだけやりとり。条件を比べて、納得の1社を選べます。", img: "step-3.png" },
+  { n: "4", en: "DONE", icon: "truck", h: "引き取りに来てもらう", p: "成立した業者がまとめて引き取りに。玄関先で渡すだけで、片付け完了です。", img: "step-4.png" },
 ];
 
-// ===== 上位3社の査定オークション図解（イメージ値） =====
-// ランキングバー描画用。クラス名は完全文字列（動的連結禁止）で保持する。
-const AUCTION_BIDS: {
-  name: string;
-  amount: string;
-  selected: boolean;
-  barWidth: string;
-  barDelay: string;
-}[] = [
-  { name: "A社", amount: "¥48,000", selected: true, barWidth: "w-full", barDelay: "[animation-delay:140ms]" },
-  { name: "B社", amount: "¥45,500", selected: true, barWidth: "w-[86%]", barDelay: "[animation-delay:280ms]" },
-  { name: "C社", amount: "¥44,000", selected: true, barWidth: "w-[76%]", barDelay: "[animation-delay:420ms]" },
-  { name: "D社", amount: "自動でお断り", selected: false, barWidth: "w-[42%]", barDelay: "[animation-delay:560ms]" },
+const SCENES: { tag: string; tagIcon: IcName; h: string; p: string; img: string; icon: IcName }[] = [
+  { tag: "断捨離", tagIcon: "spark", h: "暮らしを身軽に", p: "使わない物をまとめて手放し、すっきりした部屋に。1点からでも、まとめてでも。", img: "p-female.png", icon: "spark" },
+  { tag: "引越し", tagIcon: "truck", h: "新居に持っていかない物を", p: "荷造りのついでに撮るだけ。運ぶ前にまとめて買取・回収できます。", img: "p-moving.png", icon: "truck" },
+  { tag: "実家じまい", tagIcon: "people", h: "家族で、まとめて整理", p: "量が多く判断に迷う実家の整理も、撮ってまとめれば業者がまとめて査定。", img: "p-senior.png", icon: "house" },
+  { tag: "遺品整理", tagIcon: "shield", h: "ていねいに、まとめて", p: "値がつかない物も含めてまとめて回収。気持ちの整理も、無理なく進められます。", img: "p-ihin.png", icon: "shield" },
 ];
 
-// ===== 対応エリア =====
-const AREAS: { name: string; desc: string }[] = [
-  { name: "東京", desc: "23区を中心に対応" },
-  { name: "千葉", desc: "県内主要エリアに対応" },
-  { name: "埼玉", desc: "県内主要エリアに対応" },
-  { name: "神奈川", desc: "県内主要エリアに対応" },
-];
-
-// ===== 安心・個人情報 =====
-const SAFETY: { icon: IconName; title: string; desc: string }[] = [
-  {
-    icon: "lock",
-    title: "情報は段階的に開示",
-    desc: "査定段階で業者へ共有するのは「写真と品目」のみ。連絡先・住所は交渉が成立した業者にのみ、あなたの同意のうえで開示します。",
-  },
-  {
-    icon: "shield",
-    title: "訪問買取はクーリングオフ対象",
-    desc: "訪問による買取には特定商取引法が適用されます。法定書面の交付、8日間のクーリングオフ、その期間中の物品引き渡し拒絶権など、消費者としての保護を受けられます。",
-  },
-  {
-    icon: "close",
-    title: "辞退後の再連絡はなし",
-    desc: "連絡や取引を辞退した場合、その業者からの再勧誘は行われません。一斉架電のない、落ち着いたやり取りを設計しています。",
-  },
-];
-
-// ===== ヒーローの信頼シグナル =====
-const TRUST_CHIPS = ["撮るだけ・待つだけ", "業者登録は当面無料", "一斉架電なし", "東京・千葉・埼玉・神奈川"];
+const delayOf = (i: number) => ((i % 3 || undefined) as 1 | 2 | undefined);
 
 export default function HomePage() {
-  const router = useRouter();
-  const inputRef = useRef<HTMLInputElement>(null);
-  const negoRef = useRef<HTMLDivElement>(null);
-
-  // 査定オークション図解: スクロール到達でランキングバーの成長を起動する
-  useEffect(() => {
-    const el = negoRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          el.classList.add("nego-inview");
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.35 }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string>("");
-  const [pageState, setPageState] = useState<PageState>("idle");
-  const [errorMessage, setErrorMessage] = useState<string>("");
-
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0] ?? null;
-    if (!file) return;
-    setSelectedFile(file);
-    setErrorMessage("");
-    setPageState("idle");
-    setPreviewUrl((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return URL.createObjectURL(file);
-    });
-  }
-
-  function clearSelectedFile() {
-    setSelectedFile(null);
-    setPreviewUrl((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return "";
-    });
-    if (inputRef.current) inputRef.current.value = "";
-  }
-
-  async function handleSubmit() {
-    if (!selectedFile) return;
-    setPageState("loading");
-    setErrorMessage("");
-    try {
-      const base64 = await fileToBase64(selectedFile);
-      const result: AnalyzeResponse = await analyzeImage({
-        image: base64,
-        mime_type: selectedFile.type || "image/jpeg",
-      });
-      sessionStorage.setItem(SESSION_KEY_ANALYZE, JSON.stringify(result));
-      router.push(`/analyzing?item_id=${encodeURIComponent(result.item_id)}`);
-    } catch (err) {
-      const message =
-        err instanceof ApiError
-          ? `エラー (${err.status}): ${err.message}`
-          : "解析に失敗しました。もう一度お試しください。";
-      setErrorMessage(message);
-      setPageState("error");
-    }
-  }
-
-  const isLoading = pageState === "loading";
-
   return (
-    <div className="pb-20 lg:pb-0">
-      {/* ============================================================
-          HERO — アップロードエリア
-      ============================================================ */}
-      <section className="hero-surface relative overflow-hidden">
-        {/* 微細グリッド: 上部のみ見せて下方向へフェードアウト */}
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-grid-faint [mask-image:linear-gradient(to_bottom,black,transparent_70%)]"
-        />
-        <div className="container-aw relative grid items-center gap-10 py-14 lg:grid-cols-2 lg:gap-14 lg:py-20">
-          {/* 左: キャッチコピー */}
-          <div className="animate-fade-up">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
-              <Icon name="sparkle" className="h-3.5 w-3.5" />
-              不用品の買取マッチング
-            </span>
-
-            <h1 className="mt-5 text-[2.35rem] font-bold leading-[1.1] tracking-tight text-slate-900 sm:text-[3.2rem] lg:text-[3.5rem]">
-              片付けたい。
-              <br />
-              でも、
-              <span className="rounded-sm bg-gradient-to-t from-brand-100 to-transparent to-45% px-1 text-brand-700">
-                動けない
+    <>
+      <main id="main">
+        {/* ============ HERO ============ */}
+        <section className="hero" id="top">
+          <div className="container hero-grid">
+            <div className="hero-copy">
+              <span className="hero-eyebrow">
+                <span className="dot" />
+                家まるごと、まとめて片付け買取
               </span>
-              あなたへ。
-            </h1>
+              <h1>
+                片付けたい。でも、
+                <br />
+                <span className="hl">動けない</span>あなたへ。
+              </h1>
+              <p className="hero-sub">
+                家じゅうの不用品を、<strong>まとめて撮って待つだけ</strong>。登録業者が“買取総額”で競い合い、値がつかない物もまとめて引き取ります。営業電話に追われることはありません。
+              </p>
+              <ul className="hero-trust">
+                <li><span className="tb"><Ic name="check" /></span>撮るだけ・待つだけ</li>
+                <li><span className="tb"><Ic name="check" /></span>まとめるほど高くなりやすい</li>
+                <li><span className="tb"><Ic name="check" /></span>値がつかない物も回収</li>
+                <li><span className="tb"><Ic name="check" /></span>連絡は上位3社だけ</li>
+              </ul>
+              <div className="hero-how">
+                <div className="hw-step"><span className="hw-n">1</span><Ic name="camera" className="hw-ic" /><span>撮る</span></div>
+                <Ic name="arrow" className="hw-arr" />
+                <div className="hw-step"><span className="hw-n">2</span><Ic name="trend" className="hw-ic" /><span>業者が競う</span></div>
+                <Ic name="arrow" className="hw-arr" />
+                <div className="hw-step"><span className="hw-n">3</span><Ic name="crown" className="hw-ic" /><span>上位3社と交渉</span></div>
+                <Ic name="arrow" className="hw-arr" />
+                <div className="hw-step"><span className="hw-n">4</span><Ic name="truck" className="hw-ic" /><span>引き取り完了</span></div>
+              </div>
+              <div className="hero-cta">
+                <Link href="/create" className="btn btn-line btn-lg">
+                  <Ic name="chat" />LINEで無料ではじめる<Ic name="arrow" className="arw" />
+                </Link>
+                <Link href="/#auction" className="btn btn-ghost btn-lg">仕組みを確認する</Link>
+              </div>
+            </div>
+            <div className="hero-figure">
+              <figure className="hero-photo ph-wrap">
+                <PhImg src="/img/p-hero.png" alt="自宅のリビングで、家じゅうの不用品をまとめてスマホで撮影する女性" label="p-hero.png" icon="camera" imgStyle={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              </figure>
+            </div>
+          </div>
+        </section>
 
-            <p className="mt-5 max-w-md text-base leading-relaxed text-slate-600">
-              撮るだけ・待つだけ。あとは業者が査定額で競い合う。
-              <strong className="font-semibold text-slate-900">競うから査定が伸びやすく</strong>、
-              連絡が来るのは上位3社だけ。鳴り止まない営業電話は、もうありません。
-            </p>
+        {/* ============ 信頼の根拠（帯） ============ */}
+        <section className="assure" aria-label="サービスの安心ポイント">
+          <div className="container">
+            <div className="assure-item"><span className="ai"><Ic name="shield" /></span><span><b>登録事業者のみ</b><span>古物商許可を確認</span></span></div>
+            <div className="assure-item"><span className="ai"><Ic name="lock" /></span><span><b>連絡先は成立後に開示</b><span>査定は写真と品目だけ</span></span></div>
+            <div className="assure-item"><span className="ai"><Ic name="phone" /></span><span><b>一斉架電なし</b><span>連絡は上位3社だけ</span></span></div>
+            <div className="assure-item"><span className="ai"><Ic name="pin" /></span><span><b>東京・千葉・埼玉・神奈川</b><span>順次エリア拡大中</span></span></div>
+          </div>
+        </section>
 
-            <ul className="mt-6 flex flex-wrap gap-2">
-              {TRUST_CHIPS.map((chip) => (
-                <li
-                  key={chip}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-xs ring-1 ring-slate-200"
-                >
-                  <Icon name="check" className="h-3.5 w-3.5 text-accent-600" strokeWidth={2.5} />
-                  {chip}
-                </li>
+        {/* ============ 共感（悩み） ============ */}
+        <section className="section empathy">
+          <div className="container">
+            <div className="section-head">
+              <span className="eyebrow">YOUR WORRIES</span>
+              <h2>片付け、こんな“めんどう”で<br className="sp-br" />止まっていませんか</h2>
+              <p className="sub">「家じゅうを片付けたい」気持ちはあるのに、最初の一歩でつまずく。多くの方が、同じところで止まっています。</p>
+            </div>
+            <div className="emp-grid">
+              <Reveal as="article" className="emp-card">
+                <div className="emp-photo ph-wrap"><PhImg src="/img/worry-1.png" alt="出品や発送の手間を思って気が重くなる女性" label="worry-1.png" icon="camera" imgStyle={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>
+                <div className="emp-body"><h3>出品も発送も、正直めんどう</h3><p>撮影・採寸・説明文・梱包・発送・購入者対応。フリマは手間が多く、量が多いほど踏み出せません。</p></div>
+              </Reveal>
+              <Reveal as="article" className="emp-card" delay={1}>
+                <div className="emp-photo ph-wrap"><PhImg src="/img/worry-2.png" alt="一括査定の営業電話が一斉にかかってきて不安な女性" label="worry-2.png" icon="phone" imgStyle={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>
+                <div className="emp-body"><h3>営業電話が、一斉にかかってくる</h3><p>一括査定に申し込んだ途端、多数の業者から電話が殺到。応対だけで疲れ、結局決めきれません。</p></div>
+              </Reveal>
+              <Reveal as="article" className="emp-card" delay={2}>
+                <div className="emp-photo ph-wrap"><PhImg src="/img/worry-3.png" alt="物の山を前に、何から手をつけるか迷う女性" label="worry-3.png" icon="box" imgStyle={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>
+                <div className="emp-body"><h3>そもそも、何から手をつければ</h3><p>売れる物・売れない物、仕分けの基準がわからない。家まるごととなると、考えるだけで腰が重くなります。</p></div>
+              </Reveal>
+            </div>
+            <div className="turn"><p>カタヅケなら、その「めんどう」を<span className="accent">まとめて撮るだけ</span>に変えます。</p></div>
+          </div>
+        </section>
+
+        {/* ============ STEPS（使い方） ============ */}
+        <section className="section steps" id="flow">
+          <div className="container">
+            <div className="section-head">
+              <span className="eyebrow">HOW IT WORKS</span>
+              <h2>あなたがするのは、<br className="sp-br" />「撮る」と「選ぶ」だけ</h2>
+              <p className="sub">たった4ステップ。梱包も発送も、価格交渉も要りません。</p>
+            </div>
+            <div className="steps-grid">
+              {STEPS.map((s, i) => (
+                <Reveal as="article" className="step" delay={delayOf(i)} key={s.n}>
+                  <div className="step-photo ph-wrap"><PhImg src={`/img/${s.img}`} alt={s.h} label={s.img} icon={s.icon} imgStyle={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>
+                  <div className="step-body">
+                    <span className="step-n"><span className="num">{s.n}</span>{s.en}</span>
+                    <h3>{s.h}</h3>
+                    <p>{s.p}</p>
+                  </div>
+                </Reveal>
               ))}
-            </ul>
-
-            <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3">
-              <a
-                href="#estimate"
-                className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-6 py-3.5 text-base font-semibold text-white shadow-cta transition-all hover:-translate-y-0.5 hover:bg-brand-700 focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
-              >
-                <Icon name="camera" className="h-5 w-5" />
-                品物を撮ってAI仮査定
-              </a>
-              <span className="inline-flex cursor-default items-center gap-1.5 text-sm text-slate-500">
-                <Icon name="external" className="h-4 w-4" />
-                LINEで受付（準備中）
-              </span>
             </div>
           </div>
+        </section>
 
-          {/* 右: 主役写真 + アップロードカード（モバイルはカードを先に） */}
-          <div className="flex flex-col animate-fade-up [animation-delay:120ms]">
-            {/* 主役写真: スマホで品物を1点ずつ撮影する女性 */}
-            <div className="relative order-2 aspect-[16/9] overflow-hidden rounded-2xl border border-slate-200/70 bg-gradient-to-br from-brand-100 via-brand-200 to-brand-400 shadow-elevated lg:order-1 lg:mb-5">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/img/hero.png"
-                alt="明るい部屋で、不用品をスマートフォンで1点ずつ撮影する女性"
-                width={1280}
-                height={720}
-                loading="eager"
-                onError={(e) => {
-                  e.currentTarget.style.display = "none";
-                }}
-                className="absolute inset-0 h-full w-full object-cover"
-              />
-              <span
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-900/55 via-slate-900/10 to-transparent"
-              />
-              <span className="absolute bottom-3 left-4 right-4 text-sm font-semibold leading-snug text-white drop-shadow">
-                品物を1点ずつ撮るだけ。きれいに並べなくて大丈夫。
-              </span>
-              {/* フローティングチップ: AI仮査定のイメージ */}
-              <span className="absolute right-3 top-3 flex items-center gap-2.5 rounded-xl bg-white/95 px-3.5 py-2.5 shadow-card backdrop-blur-sm animate-fade-up [animation-delay:500ms]">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-100 text-accent-600">
-                  <Icon name="yen" className="h-4 w-4" />
-                </span>
-                <span className="text-left">
-                  <span className="block text-[10px] font-medium leading-tight text-slate-400">
-                    AI仮査定・参考値のイメージ
-                  </span>
-                  <span className="block text-sm font-bold tabular-nums text-slate-900">
-                    ¥48,000
-                  </span>
-                </span>
-              </span>
-            </div>
-
-          {/* アップロードカード */}
-          <div
-            id="estimate"
-            className="order-1 mb-5 rounded-2xl border border-slate-200/70 bg-white p-5 shadow-elevated sm:p-6 lg:order-2 lg:mb-0"
-          >
-            <div className="flex items-center gap-2.5">
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
-                <Icon name="camera" className="h-5 w-5" />
-              </span>
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-brand-600">
-                  Step 1
-                </p>
-                <h2 className="text-sm font-bold text-slate-900">品物を1点ずつ撮ってAI仮査定を依頼</h2>
+        {/* ============ 中間CTA ============ */}
+        <div className="section-cta">
+          <div className="container">
+            <Reveal className="scta-inner">
+              <div className="scta-text">
+                <strong>まず1枚、撮るだけ。今日から始められます。</strong>
+                <span>登録・査定・お断りまですべて無料</span>
               </div>
-            </div>
-
-            {/* アップロードエリア */}
-            <div className="mt-4">
-              {/* file input は常時マウント（プレビュー中も全CTAから inputRef.click() を有効に保つ） */}
-              <input
-                ref={inputRef}
-                id="file-input"
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="sr-only"
-                onChange={handleFileChange}
-              />
-              {previewUrl ? (
-                <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-900">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={previewUrl}
-                    alt="選択した商品画像"
-                    className="mx-auto max-h-60 w-full object-contain"
-                  />
-                  <button
-                    type="button"
-                    onClick={clearSelectedFile}
-                    className="absolute right-2.5 top-2.5 rounded-full bg-slate-900/70 p-2 text-white backdrop-blur-sm transition-colors hover:bg-slate-900 focus-visible:ring-2 focus-visible:ring-white"
-                    aria-label="画像を削除"
-                  >
-                    <Icon name="close" className="h-4 w-4" strokeWidth={2.5} />
-                  </button>
-                </div>
-              ) : (
-                <label
-                  htmlFor="file-input"
-                  className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-6 py-9 text-center transition-colors hover:border-brand-400 hover:bg-brand-50/50"
-                >
-                  <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-white text-brand-500 shadow-xs ring-1 ring-slate-200">
-                    <Icon name="image" className="h-6 w-6" />
-                  </span>
-                  <span className="mt-3 text-sm font-semibold text-slate-800">
-                    写真を撮影 / ファイルを選択
-                  </span>
-                  <span className="mt-1 text-xs text-slate-400">
-                    家電・家具・ブランド品など、品物を1点ずつアップロード
-                  </span>
-                </label>
-              )}
-            </div>
-
-            {/* エラー */}
-            {pageState === "error" && (
-              <div className="mt-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3">
-                <Icon name="alert" className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
-                <p className="text-sm text-red-700">{errorMessage}</p>
-              </div>
-            )}
-
-            {/* 査定ボタン */}
-            <button
-              type="button"
-              disabled={!selectedFile || isLoading}
-              onClick={handleSubmit}
-              className="relative mt-4 inline-flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-brand-600 px-6 py-3.5 text-base font-semibold text-white shadow-cta transition-all duration-200 hover:-translate-y-0.5 hover:bg-brand-700 hover:shadow-[0_14px_32px_-8px_rgb(31_84_222/0.55)] active:translate-y-0 active:scale-[0.99] active:bg-brand-800 focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none disabled:hover:translate-y-0 disabled:hover:bg-slate-300 disabled:hover:shadow-none"
-            >
-              {!isLoading && selectedFile && (
-                <span
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent animate-[shimmer_2.6s_ease_infinite]"
-                />
-              )}
-              {isLoading ? (
-                <>
-                  <Spinner className="h-5 w-5" />
-                  解析中…
-                </>
-              ) : (
-                <>
-                  AI仮査定を依頼する
-                  <Icon name="arrow-right" className="h-4 w-4" strokeWidth={2.25} />
-                </>
-              )}
-            </button>
-
-            <ul className="mt-3 space-y-1.5">
-              <li className="flex items-start gap-1.5 text-xs leading-relaxed text-slate-500">
-                <Icon
-                  name="check"
-                  className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent-600"
-                  strokeWidth={2.5}
-                />
-                この時点で連絡先の入力は不要です
-              </li>
-              <li className="flex items-start gap-1.5 text-xs leading-relaxed text-slate-500">
-                <Icon
-                  name="check"
-                  className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent-600"
-                  strokeWidth={2.5}
-                />
-                業者に渡るのは写真と品目のみ。連絡先は交渉成立後、あなたの同意のうえで開示
-              </li>
-            </ul>
-            <p className="mt-2 text-xs text-slate-400">
-              AI仮査定は無料でお試しいただけます。査定額は参考値です。
-            </p>
-          </div>
+              <Link href="/create" className="btn btn-line btn-lg">
+                <Ic name="chat" />LINEで無料ではじめる<Ic name="arrow" className="arw" />
+              </Link>
+            </Reveal>
           </div>
         </div>
-      </section>
 
-      {/* ===== 課題提起（ヒーロー直後で「なぜ動けないか」を先に示す） ===== */}
-      <ServiceIntro />
-
-      {/* ============================================================
-          STORY — 利用イメージの物語化（8場面ジャーニー）
-      ============================================================ */}
-      <section id="story" className="bg-white py-16 sm:py-20 lg:py-24">
-        <div className="container-aw">
-          <div className="mx-auto max-w-2xl text-center">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-600">
-              変化のストーリー
-            </p>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-              「片付けたいなあ」が、すっきりに変わるまで
-            </h2>
-            <p className="mt-3 text-sm leading-relaxed text-slate-500">
-              あなたがするのは、品物を1点ずつ撮ること。AIが1点ずつ仮査定し、たまった品物をまとめて業者へ。あとは競った査定が届くのを待つだけ。痛みから、すっきりへ。8つの場面でご覧ください。
-            </p>
+        {/* ============ BUNDLE ============ */}
+        <section className="section bundle" id="bundle">
+          <div className="container">
+            <div className="bundle-lead">
+              <Reveal className="bundle-figure ph-wrap">
+                <PhImg src="/img/bundle-3d.png" alt="さまざまな不用品がひとつの箱にまとまり、まとめて1つの価格がつくイメージ" label="bundle-3d.png" icon="box" imgStyle={{ width: "100%", height: "100%", objectFit: "contain" }} />
+              </Reveal>
+              <Reveal className="bundle-copy" delay={1}>
+                <span className="eyebrow">BUNDLE &amp; SELL</span>
+                <h2>まとめて出すほど、<span style={{ color: "var(--blue)" }}>有利</span>になる。</h2>
+                <p className="lead">カタヅケは“家まるごと”の片付け向け。1点ずつではなく、たまった不用品をまとめて査定に出すほど、買取総額が伸びやすく、値がつかない物まで一緒に手放せます。</p>
+              </Reveal>
+            </div>
+            <div className="bundle-grid">
+              <Reveal as="article" className="bundle-c">
+                <span className="bc-ic"><Ic name="up" /></span>
+                <h3>数が多いほど、総額が伸びやすい</h3>
+                <p>業者は「まとめ買い」を望むため、点数が増えるほど買取総額の条件が良くなりやすい。1点ずつ売るより、まとめたほうがお得です。</p>
+              </Reveal>
+              <Reveal as="article" className="bundle-c key" delay={1}>
+                <span className="bc-badge">ここがポイント</span>
+                <span className="bc-ic"><Ic name="bag" /></span>
+                <h3>値がつかない物も、まとめて回収</h3>
+                <p>業者は1点ごとではなく<strong>“まとめ全体”の金額で入札</strong>します。だから単体では値がつきにくい物も、まとめに含めて引き取り。「これは売れないかも」も、一緒に手放せます。</p>
+              </Reveal>
+              <Reveal as="article" className="bundle-c" delay={2}>
+                <span className="bc-ic"><Ic name="camera" /></span>
+                <h3>仕分け・分別は不要</h3>
+                <p>ジャンルが混ざっていてもOK。家じゅうの「どうしよう」を、思いついた物から撮ってまとめるだけ。あとは業者がまとめて査定します。</p>
+              </Reveal>
+            </div>
+            <p className="bundle-note">※ 引き取りの可否・条件は品物や業者により異なります。一部、引き取りが難しい物は手放す導線をご案内します。</p>
           </div>
+        </section>
 
-          {/* 感情の流れ（痛み → 手軽さ → 満足） */}
-          <div
-            aria-hidden="true"
-            className="mx-auto mt-8 flex max-w-2xl items-center justify-between gap-2 text-xs font-medium text-slate-400"
-          >
-            <span className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-slate-300" />
-              痛み
-            </span>
-            <span className="h-px flex-1 bg-gradient-to-r from-slate-300 via-brand-300 to-accent-400" />
-            <span className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-brand-400" />
-              手軽さ
-            </span>
-            <span className="h-px flex-1 bg-gradient-to-r from-brand-300 to-accent-400" />
-            <span className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-accent-500" />
-              満足
-            </span>
+        {/* ============ AUCTION ============ */}
+        <section className="section auction" id="auction">
+          <div className="container">
+            <div className="section-head">
+              <span className="eyebrow">HOW THE AUCTION WORKS</span>
+              <h2>業者が“買取総額”で競うから、<br className="sp-br" />高くなりやすい。</h2>
+              <p className="sub">あなたが出したのは写真だけ。あとは登録業者どうしが、あなたの品物まとめに買取総額で入札し合います。</p>
+            </div>
+            <div className="auc-grid">
+              <Reveal className="auc-figure ph-wrap">
+                <PhImg src="/img/bid-3d.png" alt="複数の業者が、まとめた不用品に買取総額を提示して競り合うイメージ" label="bid-3d.png" icon="trend" imgStyle={{ width: "100%", height: "100%", objectFit: "contain" }} />
+              </Reveal>
+              <ol className="auc-steps">
+                <li><span className="an">1</span><div><h4>写真と品目だけが業者に届く</h4><p>あなたの連絡先は伏せたまま。査定に回るのは「写真」と「品目」だけです。</p></div></li>
+                <li><span className="an">2</span><div><h4>登録業者が買取総額で入札</h4><p>複数の業者が、まとめ全体に対して金額を提示。競争で総額が引き上げられます。</p></div></li>
+                <li><span className="an">3</span><div><h4>連絡が来るのは上位3社だけ</h4><p>金額上位の3社とだけやりとり。それ以外は自動でお断り。営業電話の一斉架電はありません。</p></div></li>
+                <li><span className="an">4</span><div><h4>あなたは選んで、引き取りを待つだけ</h4><p>提示を見比べて1社を選択。成立後に連絡先を開示し、引き取り日時を決めます。</p></div></li>
+              </ol>
+            </div>
+            <p className="auc-note">※ 最終的な買取額は業者の現物査定により決まります。</p>
           </div>
+        </section>
 
-          {/* ジャーニー: 横スクロール（右端フェードで続きを示唆） */}
-          <div className="relative mt-8">
-          <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 sm:gap-5">
-            {STORY.map((scene) => {
-              const ring = ["ring-slate-200", "ring-brand-200", "ring-accent-300"][scene.phase];
-              const topBar = ["border-t-slate-300", "border-t-brand-400", "border-t-accent-400"][
-                scene.phase
-              ];
-              const gradient = [
-                "from-slate-100 via-slate-200 to-brand-100",
-                "from-brand-100 via-brand-200 to-brand-300",
-                "from-accent-100 via-brand-100 to-accent-200",
-              ][scene.phase];
-              const fallbackTint = [
-                "text-slate-400",
-                "text-brand-500",
-                "text-accent-500",
-              ][scene.phase];
-              const chip = [
-                "bg-slate-100 text-slate-600",
-                "bg-brand-50 text-brand-700",
-                "bg-accent-50 text-accent-700",
-              ][scene.phase];
-              return (
-                <article
-                  key={scene.no}
-                  className={`flex w-[78vw] max-w-[19rem] shrink-0 snap-start flex-col rounded-2xl border border-slate-200 border-t-4 ${topBar} bg-white p-6 shadow-card ring-1 ring-inset ${ring} transition-shadow hover:shadow-card-hover sm:w-72`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold tabular-nums text-slate-300">
-                      {scene.no}
-                      <span className="text-slate-200"> / 08</span>
-                    </span>
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${chip}`}>
-                      {scene.emo}
-                    </span>
+        {/* ============ HANDOVER ============ */}
+        <section className="section">
+          <div className="container media-split">
+            <Reveal className="media-figure ph-wrap">
+              <PhImg src="/img/handover-new.png" alt="玄関先で、業者スタッフがまとめた品物を受け取る様子" label="handover-new.png" icon="truck" imgStyle={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            </Reveal>
+            <Reveal className="media-copy" delay={1}>
+              <span className="eyebrow">HANDOVER</span>
+              <h2>業者が直接、引き取りに来ます</h2>
+              <p className="sub">梱包も発送も、あなたはしなくていい。選んだ業者がまとめて引き取りに来ます。やりとりするのは、交渉が成立した相手とだけです。</p>
+              <ul className="mlist">
+                <li><span className="ck"><Ic name="check" /></span>梱包も発送も不要。玄関先で引き渡すだけ。</li>
+                <li><span className="ck"><Ic name="check" /></span>連絡先が業者に渡るのは、交渉成立後。</li>
+                <li><span className="ck"><Ic name="check" /></span>訪問日時は、あなたの都合で選べます。</li>
+                <li><span className="ck"><Ic name="check" /></span>大型家具や大量の品も、まとめて相談OK。</li>
+              </ul>
+            </Reveal>
+          </div>
+        </section>
+
+        {/* ============ 利用シーン ============ */}
+        <section className="section bg-pale">
+          <div className="container">
+            <div className="section-head">
+              <span className="eyebrow">USE CASES</span>
+              <h2>“家まるごと”の片付けに</h2>
+              <p className="sub">まとまった量を手放したいときほど、カタヅケが力を発揮します。</p>
+            </div>
+            <div className="scenes-grid">
+              {SCENES.map((s, i) => (
+                <Reveal as="article" className="scene-card" delay={delayOf(i)} key={s.tag}>
+                  <div className="scene-img ph-wrap"><PhImg src={`/img/${s.img}`} alt={s.h} label={s.img} icon={s.icon} imgStyle={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>
+                  <div className="scene-body">
+                    <span className="scene-tag"><Ic name={s.tagIcon} />{s.tag}</span>
+                    <h3>{s.h}</h3>
+                    <p>{s.p}</p>
                   </div>
-                  {/* 場面イラスト（生成画像）。未生成時は極薄の線画アイコンへフォールバック */}
-                  <div
-                    className={`relative mt-4 flex aspect-[4/3] items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br ${gradient} ${fallbackTint}`}
-                  >
-                    <Icon name="image" className="h-9 w-9 opacity-40" aria-hidden="true" />
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={`/img/story-${scene.no}.png`}
-                      alt={scene.alt}
-                      width={480}
-                      height={360}
-                      loading="lazy"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                      }}
-                      className="absolute inset-0 h-full w-full object-cover"
-                    />
+                </Reveal>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ============ TRUST ============ */}
+        <section className="section" id="trust">
+          <div className="container">
+            <div className="section-head">
+              <span className="eyebrow">SAFE &amp; SECURE</span>
+              <h2>はじめてでも、安心して任せられる</h2>
+              <p className="sub">「知らない業者は不安」を解消するために。カタヅケは、参加する業者とあなたの情報の扱いに、きちんと線を引いています。</p>
+            </div>
+            <div className="trust-grid">
+              <Reveal as="article" className="trust-c">
+                <div className="tc-illus ph-wrap"><PhImg src="/img/trust-illus-1.png" alt="登録事業者を審査・確認するイメージ" label="trust-illus-1.png" icon="shield" imgStyle={{ width: "100%", height: "100%", objectFit: "contain", padding: 10 }} /></div>
+                <div className="tc-body"><span className="tc-ic"><Ic name="shield" /></span><h3>登録制の事業者のみ</h3><p>査定に参加するのは登録された買取事業者だけ。古物営業に必要な古物商許可を、登録時・取引前に確認します。</p></div>
+              </Reveal>
+              <Reveal as="article" className="trust-c" delay={1}>
+                <div className="tc-illus ph-wrap"><PhImg src="/img/trust-illus-2.png" alt="連絡先は交渉成立後に開示されるイメージ" label="trust-illus-2.png" icon="lock" imgStyle={{ width: "100%", height: "100%", objectFit: "contain", padding: 10 }} /></div>
+                <div className="tc-body"><span className="tc-ic"><Ic name="lock" /></span><h3>連絡先は成立後に開示</h3><p>査定段階で業者に渡るのは「写真と品目」のみ。お名前・電話・住所は、交渉が成立するまで開示されません。</p></div>
+              </Reveal>
+              <Reveal as="article" className="trust-c" delay={2}>
+                <div className="tc-illus ph-wrap"><PhImg src="/img/trust-illus-3.png" alt="訪問買取はクーリングオフの対象となるイメージ" label="trust-illus-3.png" icon="check-circle" imgStyle={{ width: "100%", height: "100%", objectFit: "contain", padding: 10 }} /></div>
+                <div className="tc-body"><span className="tc-ic"><Ic name="check-circle" /></span><h3>訪問買取はクーリングオフ対象</h3><p>訪問による買取には特定商取引法が適用され、法定書面の交付や8日間のクーリングオフ等の保護を受けられます。</p></div>
+              </Reveal>
+            </div>
+          </div>
+        </section>
+
+        {/* ============ 料金 ============ */}
+        <section className="section bg-pale" id="fee">
+          <div className="container">
+            <div className="section-head">
+              <span className="eyebrow">PRICING</span>
+              <h2>費用は、一切かかりません</h2>
+              <p className="sub">出品・査定・成約まで、すべて無料です。</p>
+            </div>
+            <Reveal className="fee-card">
+              <div className="fee-head"><h3>出品から成約まで、お金はかかりません</h3><p>出品・査定・お断りまで、すべて無料</p></div>
+              <div className="fee-rows">
+                <div className="fee-row"><span className="fl">写真・品目の登録<small>まとめて出品するだけ</small></span><span className="fv">無料</span></div>
+                <div className="fee-row"><span className="fl">出品・査定<small>業者への出品と入札の受け取り</small></span><span className="fv">無料</span></div>
+                <div className="fee-row"><span className="fl">査定を見て断る<small>金額に納得できなければ取りやめOK</small></span><span className="fv">無料</span></div>
+                <div className="fee-row"><span className="fl">成約・引き取り<small>買取額や条件は事前に明示</small></span><span className="fv">無料</span></div>
+              </div>
+            </Reveal>
+          </div>
+        </section>
+
+        {/* ============ 対応カテゴリ ============ */}
+        <section className="section" id="cats">
+          <div className="container">
+            <div className="section-head">
+              <span className="eyebrow">CATEGORIES</span>
+              <h2>こんな物が対象です</h2>
+              <p className="sub">「これって売れる？」のほとんどに対応。迷ったら、まずは撮ってまとめてみてください。</p>
+            </div>
+            <div className="cats-grid">
+              {CATEGORIES.map((c) => (
+                <Link href="/create" className="cat" key={c.name}>
+                  <div className="cat-img" style={{ display: "grid", placeItems: "center" }}>
+                    <Ic name={c.icon} style={{ fontSize: 32, color: "var(--blue)", strokeWidth: 1.8 }} />
                   </div>
-                  <h3 className="mt-5 text-base font-bold leading-snug text-slate-900">
-                    {scene.title}
-                  </h3>
-                  <p className="mt-2 text-sm leading-relaxed text-slate-500">{scene.desc}</p>
-                </article>
-              );
-            })}
-
-            {/* 9枚目: 物語の入口へ誘うCTAカード */}
-            <article className="flex w-[78vw] max-w-[19rem] shrink-0 snap-start flex-col justify-center rounded-2xl bg-gradient-to-br from-brand-700 to-brand-900 p-6 text-white shadow-card sm:w-72">
-              <h3 className="text-lg font-bold leading-snug">
-                この物語は、写真1枚から始まります
-              </h3>
-              <button
-                type="button"
-                onClick={() => inputRef.current?.click()}
-                className="mt-5 inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-brand-700 shadow-lg transition-transform hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand-900"
-              >
-                <Icon name="camera" className="h-4 w-4" />
-                まず1枚、撮ってみる
-              </button>
-              <p className="mt-3 text-xs leading-relaxed text-brand-200">
-                査定額は参考値。合わなければ断れます。
-              </p>
-            </article>
-          </div>
-          {/* 右端フェード: スクロールの続きを示唆 */}
-          <span
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-y-0 right-0 w-14 bg-gradient-to-l from-white to-transparent"
-          />
-          </div>
-          <p className="mt-4 flex justify-center">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-500">
-              横にスクロール
-              <Icon name="arrow-right" className="h-3.5 w-3.5" strokeWidth={2.25} />
-            </span>
-          </p>
-
-          <p className="mx-auto mt-8 max-w-3xl text-center text-xs leading-relaxed text-slate-400">
-            査定額はAIと業者による参考値です。最終的な買取額は業者の現物査定で決まります。複数の登録業者が査定額で競うため、査定が伸びやすい仕組みです。
-          </p>
-        </div>
-      </section>
-
-      {/* ===== 特徴・比較 ===== */}
-      <Features />
-      <Comparison />
-
-      {/* ============================================================
-          CATEGORY SECTION
-      ============================================================ */}
-      <section id="categories" className="bg-slate-50 py-16 sm:py-20 lg:py-24">
-        <div className="container-aw">
-          <div className="mx-auto max-w-2xl text-center">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">
-              Categories
-            </p>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-              ほぼ全カテゴリに対応
-            </h2>
-            <p className="mt-3 text-sm leading-relaxed text-slate-500">
-              気になるカテゴリを選んで、そのまま写真をアップロード。家電からブランド品まで幅広く査定できます。
-            </p>
-          </div>
-
-          <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {CATEGORIES.map(({ icon, label, sub }) => (
-              <button
-                key={label}
-                type="button"
-                onClick={() => inputRef.current?.click()}
-                className="group flex items-center gap-3.5 rounded-2xl border border-slate-200 bg-white p-4 text-left transition-all hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-card focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
-              >
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 transition-all group-hover:scale-110 group-hover:bg-brand-100">
-                  <Icon name={icon} className="h-6 w-6" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold text-slate-900">
-                    {label}
-                  </span>
-                  <span className="block truncate text-xs text-slate-400">{sub}</span>
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ============================================================
-          HOW IT WORKS
-      ============================================================ */}
-      <section id="how-it-works" className="bg-white py-16 sm:py-20 lg:py-24">
-        <div className="container-aw">
-          <div className="mx-auto max-w-2xl text-center">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">
-              How it works
-            </p>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-              ご利用の流れは4ステップ
-            </h2>
-            <p className="mt-3 text-sm text-slate-500">
-              あなたがすることは、撮ることと、選ぶことだけです。
-            </p>
-          </div>
-
-          <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {STEPS.map(({ step, icon, title, desc }, index) => (
-              <div
-                key={step}
-                className="relative rounded-2xl border border-slate-200 bg-white p-6 shadow-card"
-              >
-                {/* ステップ間のコネクタ: 矢印玉（PC表示のみ） */}
-                {index < STEPS.length - 1 && (
-                  <span
-                    aria-hidden="true"
-                    className="absolute -right-[23px] top-12 z-10 hidden h-7 w-7 items-center justify-center rounded-full bg-white text-brand-400 ring-1 ring-slate-200 lg:flex"
-                  >
-                    <Icon name="chevron-right" className="h-4 w-4" strokeWidth={2.5} />
-                  </span>
-                )}
-                <div className="flex items-center gap-3">
-                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-600 text-white">
-                    <Icon name={icon} className="h-6 w-6" />
-                  </span>
-                  <span className="text-4xl font-bold tracking-tight text-brand-100">{step}</span>
-                </div>
-                <h3 className="mt-4 text-base font-bold text-slate-900">{title}</h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-slate-500">{desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ============================================================
-          NEGOTIATION — 上位3社の査定オークション図解
-      ============================================================ */}
-      <section id="nego" className="relative overflow-hidden bg-brand-950 py-16 sm:py-20 lg:py-24">
-        {/* ダーク面の微細グリッド: 中央上部のみ見せる */}
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-grid-faint-light [mask-image:radial-gradient(70%_60%_at_50%_30%,black,transparent)]"
-        />
-        <div className="container-aw relative">
-          <div className="mx-auto max-w-2xl text-center">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-300">
-              上位3社と交渉
-            </p>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">
-              査定額の上位3社が、交渉権を得る
-            </h2>
-            <p className="mt-3 text-sm leading-relaxed text-brand-100/90">
-              登録業者が査定額を提示し、条件のよい上位3社だけがあなたへ連絡。残りの業者には自動でお断りの連絡が入ります。一斉架電は起こりません。
-            </p>
-          </div>
-
-          <div
-            ref={negoRef}
-            className="nego-stage mx-auto mt-10 max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-elevated sm:p-8"
-          >
-            {/* あなた */}
-            <div className="flex items-center justify-center">
-              <div className="flex items-center gap-3 rounded-xl border border-brand-200 bg-white px-5 py-3 shadow-xs">
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 text-white">
-                  <Icon name="camera" className="h-5 w-5" />
-                </span>
-                <span className="text-left">
-                  <span className="block text-sm font-semibold text-slate-900">あなた</span>
-                  <span className="block text-xs text-slate-400">1点ずつ撮って依頼</span>
-                </span>
-              </div>
-            </div>
-
-            {/* コネクタ 1: 共有の流れ */}
-            <div className="flex flex-col items-center gap-2 py-3">
-              <span
-                aria-hidden="true"
-                className="h-7 w-px bg-gradient-to-b from-brand-300 to-slate-200"
-              />
-              <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
-                写真と品目のみを一斉共有
-              </span>
-            </div>
-
-            {/* 登録業者群: 査定額のランキングバー */}
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
-              <p className="mb-3 text-center text-xs font-semibold uppercase tracking-wider text-slate-400">
-                登録業者が査定額を提示
-              </p>
-              <div className="space-y-2.5">
-                {AUCTION_BIDS.map((bid, index) =>
-                  bid.selected ? (
-                    <div key={bid.name} className="flex items-center gap-3">
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white">
-                        {index + 1}
-                      </span>
-                      <span className="w-8 shrink-0 text-xs font-semibold text-slate-700">
-                        {bid.name}
-                      </span>
-                      <div className="relative h-9 flex-1 rounded-lg bg-slate-100">
-                        <span
-                          aria-hidden="true"
-                          className={`absolute inset-y-0 left-0 ${bid.barWidth} origin-left rounded-lg bg-gradient-to-r from-brand-500 to-brand-600 animate-[bar-grow_0.9s_cubic-bezier(0.16,1,0.3,1)_both] ${bid.barDelay}`}
-                        />
-                        <span
-                          className={`nego-amount absolute inset-y-0 left-0 flex ${bid.barWidth} items-center justify-end pr-3 text-sm font-bold tabular-nums text-white`}
-                        >
-                          {bid.amount}
-                        </span>
-                      </div>
-                      {index === 0 && (
-                        <span className="ml-2 rounded-full bg-accent-100 px-2 py-0.5 text-[10px] font-semibold text-accent-700">
-                          最有力
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    <div key={bid.name} className="flex items-center gap-3">
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-400">
-                        <Icon name="close" className="h-3.5 w-3.5" strokeWidth={2.5} />
-                      </span>
-                      <span className="w-8 shrink-0 text-xs font-semibold text-slate-400">
-                        {bid.name}
-                      </span>
-                      <div className="relative h-9 flex-1 rounded-lg bg-slate-100">
-                        <span
-                          aria-hidden="true"
-                          className={`absolute inset-y-0 left-0 ${bid.barWidth} origin-left rounded-lg bg-slate-200 animate-[bar-grow_0.9s_cubic-bezier(0.16,1,0.3,1)_both] ${bid.barDelay}`}
-                        />
-                      </div>
-                      <span className="shrink-0 text-xs text-slate-400">{bid.amount}</span>
-                    </div>
-                  )
-                )}
-              </div>
-            </div>
-
-            {/* コネクタ 2: 連絡の流れ */}
-            <div className="flex flex-col items-center gap-2 py-3">
-              <span
-                aria-hidden="true"
-                className="h-7 w-px bg-gradient-to-b from-brand-300 to-slate-200"
-              />
-              <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
-                上位3社だけがあなたへ連絡
-              </span>
-            </div>
-
-            {/* 上位3社が交渉権を獲得 */}
-            <div className="rounded-xl border border-brand-200 bg-brand-50 px-5 py-4 text-center">
-              <p className="text-sm font-semibold text-brand-900">上位3社が交渉権を獲得</p>
-              <p className="mt-1 text-xs leading-relaxed text-brand-800">
-                あなたは3社の条件を比べて、いちばん納得できる業者を選び、取引・引き取りまで進めます。
-              </p>
-            </div>
-            <p className="mt-4 text-center text-xs leading-relaxed text-slate-400">
-              表示額はイメージです。査定額はAIと業者による参考値で、最終的な買取額は業者の現物査定により決まります。
-            </p>
-          </div>
-
-          {/* 写真: 玄関先で品物を引き渡す女性の笑顔 */}
-          <div className="mx-auto mt-8 flex max-w-3xl flex-col items-center gap-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-card sm:flex-row sm:p-6">
-            <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden rounded-xl bg-gradient-to-br from-brand-100 via-brand-200 to-accent-200 ring-1 ring-slate-200/70 sm:w-56">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/img/handover.png"
-                alt="玄関先で、買取業者に品物を笑顔で引き渡す女性"
-                width={800}
-                height={600}
-                loading="lazy"
-                onError={(e) => {
-                  e.currentTarget.style.display = "none";
-                }}
-                className="absolute inset-0 h-full w-full object-cover"
-              />
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-600">
-                最後は、笑顔で
-              </p>
-              <h3 className="mt-1.5 text-base font-bold text-slate-900">
-                選んだ1社と、引き渡しまでスムーズに
-              </h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                条件のよい業者を選んだら、あとは受け取り日時を決めるだけ。訪問かオンラインかも、あなたが選べます。
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ============================================================
-          TIDY — 片付く価値
-      ============================================================ */}
-      <section id="tidy" className="bg-white py-16 sm:py-20 lg:py-24">
-        <div className="container-aw">
-          <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-2">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-600">
-                片付く価値
-              </p>
-              <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-                売れる物はまとめて一括買取。
-                <br className="hidden sm:block" />
-                残りも、手放す導線までご案内
-              </h2>
-              <p className="mt-4 text-sm leading-relaxed text-slate-500">
-                1点ずつ売る必要はありません。まとめて査定・一括買取で、まとめて片付きます。値段がつかない物についても、自治体の回収や無償譲渡など「手放す導線」を情報としてご案内します。
-              </p>
-              <div className="mt-6 space-y-3">
-                {[
-                  "まとめて一括査定・一括買取。点数が多くても、ひとまとめで依頼できます。",
-                  "手放す導線のご案内。自治体回収・無償譲渡・寄付などの選択肢を情報提供します。",
-                  "取引・引き取りは業者が実施。あなたは案内に沿って受け取り日時を選ぶだけです。",
-                ].map((text) => (
-                  <div key={text} className="flex items-start gap-3">
-                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent-100 text-accent-700">
-                      <Icon name="check" className="h-3.5 w-3.5" strokeWidth={2.5} />
-                    </span>
-                    <p className="text-sm leading-relaxed text-slate-600">{text}</p>
+                  <div className="cat-body">
+                    <div className="cl">{c.name}</div>
+                    <div className="cs">{c.ex}</div>
                   </div>
-                ))}
-              </div>
+                </Link>
+              ))}
             </div>
+            <Reveal className="cats-note">
+              <span className="cn-ic"><Ic name="bag" /></span>
+              <div className="cn-body">
+                <h4>「売れないかも」と思う物も、まずは撮ってまとめて。</h4>
+                <p>点数がそろうと<strong>“まとめて一括買取”</strong>の対象になりやすく、単体では値がつきにくい物も一緒に引き取れる場合があります。引き取りが難しい物は、手放す導線をご案内します。</p>
+              </div>
+            </Reveal>
+          </div>
+        </section>
 
-            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">
-              {/* 写真: 片付いてすっきりした部屋で満足げな女性 */}
-              <div className="relative aspect-[4/3] w-full bg-gradient-to-br from-accent-100 via-brand-100 to-brand-200">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/img/after.png"
-                  alt="片付いてすっきりした明るい部屋で、満足そうにくつろぐ女性"
-                  width={800}
-                  height={600}
-                  loading="lazy"
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
-                  }}
-                  className="absolute inset-0 h-full w-full object-cover"
-                />
-              </div>
-              <div className="p-6 sm:p-8">
-              <h3 className="text-base font-bold text-slate-900">品物の扱われ方</h3>
-              <div className="mt-4 space-y-3">
-                <div className="rounded-xl border border-accent-200 bg-accent-50/60 p-4">
-                  <p className="text-sm font-semibold text-accent-700">値段がつく物</p>
-                  <p className="mt-1 text-sm leading-relaxed text-slate-600">
-                    上位3社と交渉し、まとめて一括買取。条件のよい業者と取引します。
-                  </p>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-sm font-semibold text-slate-700">値段がつかない物</p>
-                  <p className="mt-1 text-sm leading-relaxed text-slate-600">
-                    自治体の粗大ごみ・拠点回収、無償譲渡、寄付などの手放す導線をご案内します。
-                  </p>
-                </div>
-              </div>
-              <p className="mt-4 flex items-start gap-1.5 text-xs leading-relaxed text-slate-400">
-                <Icon name="info" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                カタヅケは取引の「場」を提供します。買取・回収・運搬は各業者または各導線が行います。
-              </p>
-              </div>
+        {/* ============ 運営者メッセージ ============ */}
+        <section className="section" id="founder">
+          <div className="container founder-grid">
+            <Reveal as="figure" className="founder-photo ph-wrap">
+              <PhImg src="/img/founder-new.png" alt="カタヅケ運営事務局のスタッフ" label="founder-new.png" icon="people" imgStyle={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              <figcaption>カタヅケ運営事務局</figcaption>
+            </Reveal>
+            <Reveal className="founder-copy" delay={1}>
+              <span className="mb-4 inline-block"><KdzLogo size={20} /></span>
+              <span className="eyebrow">OUR MISSION</span>
+              <h2>「片付けたい」を、<br />めんどうで終わらせない。</h2>
+              <p>片付けが進まないのは、やる気の問題ではありません。出品の手間、営業電話の不安、何から手をつけるかの迷い——その一つひとつが、最初の一歩を重くしています。</p>
+              <p>カタヅケは、それを「まとめて撮るだけ」に変えるために生まれました。業者が競い、値がつかない物まで引き取り、連絡は上位3社だけ。あなたが背負うものを、できる限り減らします。</p>
+              <p>カタヅケが目指すのは、顧客と業者を結ぶ、無駄のない場所です。<strong>顧客・業者・社会の三者に喜びと安心を</strong>——それが、カタヅケの根にある考え方です。</p>
+              <p className="founder-sign"><span>カタヅケ 運営事務局</span>顧客にも業者にも、社会にも。三方よしの場所をつくります。</p>
+            </Reveal>
+          </div>
+        </section>
+
+        {/* ============ FAQ ============ */}
+        <section className="section bg-pale" id="faq">
+          <div className="container">
+            <div className="section-head">
+              <span className="eyebrow">FAQ</span>
+              <h2>よくある質問</h2>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ============================================================
-          AREA — 対応エリア
-      ============================================================ */}
-      <section id="area" className="bg-slate-50 py-16 sm:py-20 lg:py-24">
-        <div className="container-aw">
-          <div className="mx-auto max-w-2xl text-center">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-600">
-              対応エリア
-            </p>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-              首都圏1都3県でご利用いただけます
-            </h2>
-            <p className="mt-3 text-sm leading-relaxed text-slate-500">
-              現在の対応エリアは、東京・千葉・埼玉・神奈川です。
-            </p>
-          </div>
-
-          <div className="mx-auto mt-10 grid max-w-3xl grid-cols-2 gap-4 sm:grid-cols-4">
-            {AREAS.map(({ name, desc }) => (
-              <div
-                key={name}
-                className="flex flex-col items-center gap-2 rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-card transition-all hover:border-brand-300 hover:shadow-card-hover"
-              >
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
-                  <Icon name="package" className="h-6 w-6" />
-                </span>
-                <span className="text-base font-semibold text-slate-900">{name}</span>
-                <span className="text-xs text-slate-400">{desc}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ============================================================
-          SAFETY — 安心・個人情報
-      ============================================================ */}
-      <section id="safety" className="bg-white py-16 sm:py-20 lg:py-24">
-        <div className="container-aw">
-          <div className="grid items-center gap-10 lg:grid-cols-2">
-            {/* 写真: ソファでくつろぎ連絡を待つ女性 */}
-            <div className="relative order-2 aspect-[4/3] overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-brand-100 via-brand-200 to-brand-300 shadow-card lg:order-1">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/img/relief.png"
-                alt="ソファでスマートフォンを見ながら、業者からの連絡をゆったり待つ女性"
-                width={800}
-                height={600}
-                loading="lazy"
-                onError={(e) => {
-                  e.currentTarget.style.display = "none";
-                }}
-                className="absolute inset-0 h-full w-full object-cover"
-              />
-            </div>
-            <div className="order-1 lg:order-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-600">
-                安心・個人情報
-              </p>
-              <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-                追い立てられない。
-                <br className="hidden sm:block" />
-                あなたのペースで手放せる
-              </h2>
-              <p className="mt-4 text-sm leading-relaxed text-slate-500">
-                電話が一斉に鳴ることも、急かされることもありません。情報も権利も守られた状態で、ソファで待つだけ。落ち着いてやり取りできる設計です。
-              </p>
+            <FaqAccordion items={FAQ_ITEMS} />
+            <div style={{ textAlign: "center", marginTop: 32 }}>
+              <Link href="/faq" className="btn btn-ghost btn-lg">すべてのQ&amp;Aを見る<Ic name="arrow" className="arw" /></Link>
             </div>
           </div>
+        </section>
 
-          <div className="mt-12 grid grid-cols-1 gap-5 md:grid-cols-3">
-            {SAFETY.map(({ icon, title, desc }) => (
-              <div
-                key={title}
-                className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card"
-              >
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
-                  <Icon name={icon} className="h-6 w-6" />
-                </span>
-                <h3 className="mt-4 text-base font-bold text-slate-900">{title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-slate-500">{desc}</p>
-              </div>
-            ))}
+        {/* ============ 最終CTA ============ */}
+        <section className="section final" id="contact">
+          <div className="container">
+            <h2>今日、その「片付けたい」を動かす</h2>
+            <p>まずは1枚、撮ってみることから。LINEで友だち追加すれば、すぐに出品をはじめられます。登録・査定は無料です。</p>
+            <div className="final-cta">
+              <Link href="/create" className="btn btn-line btn-lg"><Ic name="chat" />LINEではじめる<Ic name="arrow" className="arw" /></Link>
+              <Link href="/#bundle" className="btn btn-ghost btn-lg">もう一度、仕組みを見る</Link>
+            </div>
+            <p className="final-note">※ 最終的な買取額は業者の現物査定により決まります。</p>
           </div>
+        </section>
+      </main>
 
-          <div className="mx-auto mt-6 max-w-3xl rounded-2xl border border-amber-200 bg-amber-50 p-5">
-            <div className="flex items-start gap-3">
-              <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">
-                PR / 広告
-              </span>
-              <p className="text-xs leading-relaxed text-amber-900">
-                業者の紹介・将来の手数料が関わる箇所には「広告 / PR」を明示します。AIによる査定額は参考値であり、実際の買取額は各業者の現物査定により決定します。
-              </p>
+      {/* ============ 業者向け導線 ============ */}
+      <section className="biz-banner">
+        <div className="container">
+          <div className="biz-banner-inner">
+            <div className="biz-banner-copy">
+              <span className="eyebrow">FOR BUYERS</span>
+              <h2>買取業者の方へ。<br />カタヅケに参加しませんか。</h2>
+              <p>顧客と業者、双方に無駄がない。だから長く続く。<br />まとめ出品への入札で、効率的な仕入れルートを開拓できます。</p>
+              <div className="biz-banner-tags">
+                <span className="biz-tag">初期費用・月額費用 無料</span>
+                <span className="biz-tag">成約時8%のみ</span>
+                <span className="biz-tag">下見なし・一斉架電なし</span>
+                <span className="biz-tag">古物商許可が必要</span>
+              </div>
+            </div>
+            <div className="biz-banner-cta">
+              <Link href="/business" className="btn btn-white btn-lg">業者登録の詳細を見る<Ic name="arrow" className="arw" /></Link>
+              <span style={{ fontSize: 12, color: "rgba(255,255,255,.45)" }}>審査制・登録無料</span>
             </div>
           </div>
         </div>
       </section>
-
-      {/* ===== FAQ ===== */}
-      <Faq />
-
-      {/* ============================================================
-          CTA BANNER
-      ============================================================ */}
-      <section className="bg-white py-16 sm:py-20 lg:py-24">
-        <div className="container-aw">
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-800 to-brand-950 px-6 py-14 text-center ring-1 ring-white/10 sm:px-12">
-            {/* 装飾光彩 */}
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-brand-500/30 blur-3xl"
-            />
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute -bottom-24 -left-16 h-56 w-56 rounded-full bg-brand-400/20 blur-3xl"
-            />
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 bg-grid-faint-light"
-            />
-            <div className="relative">
-              <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                今日、その「片付けたい」を動かす
-              </h2>
-              <p className="mt-3 text-sm text-brand-100 sm:text-base">
-                品物を1点ずつ撮るだけ。あとは待つだけで、競った査定が届きます。
-              </p>
-              <div className="mt-7 flex justify-center">
-                <button
-                  type="button"
-                  onClick={() => inputRef.current?.click()}
-                  className="inline-flex items-center gap-2 rounded-xl bg-white px-7 py-3.5 text-base font-semibold text-brand-700 shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-elevated focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand-900"
-                >
-                  <Icon name="camera" className="h-5 w-5" />
-                  AI仮査定を依頼する
-                  <Icon name="arrow-right" className="h-4 w-4" strokeWidth={2.25} />
-                </button>
-              </div>
-              <p className="mt-3 text-xs text-brand-200">
-                写真1枚から、AI仮査定を無料でお試しいただけます。査定額は参考値です。
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ============================================================
-          モバイル固定CTAバー
-      ============================================================ */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur lg:hidden">
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-6 py-3 text-sm font-semibold text-white shadow-cta transition-colors hover:bg-brand-700 active:bg-brand-800 focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
-        >
-          <Icon name="camera" className="h-5 w-5" />
-          品物を撮ってAI仮査定（参考値）
-        </button>
-      </div>
-    </div>
+    </>
   );
 }

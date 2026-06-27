@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ページ導線マップ｜カタヅケ</title>
+<link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;700&family=Zen+Kaku+Gothic+New:wght@700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --blue:#1f54de;--blue-d:#1742b0;--navy:#0f2552;--ink:#16213a;
+  --body:#3f4a60;--body-soft:#697288;--line:#e4e8f0;--line-soft:#eef1f7;
+  --pale:#eef3ff;--green:#1f8a5b;
+  --radius:16px;--shadow-s:0 2px 10px -4px rgba(15,37,82,.14);
+  --shadow-m:0 16px 36px -20px rgba(15,37,82,.30);
+  --head:"Zen Kaku Gothic New",sans-serif;--sans:"Noto Sans JP",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--sans);background:#f4f6fb;color:var(--body);padding:28px 20px 80px;-webkit-font-smoothing:antialiased;}
+
+/* ── ヘッダー ── */
+.fm-top{max-width:1060px;margin:0 auto 24px;display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap;}
+.fm-top-left h1{font-family:var(--head);font-size:clamp(20px,2.5vw,26px);font-weight:900;color:var(--navy);}
+.fm-top-left p{font-size:13px;color:var(--body-soft);margin-top:6px;line-height:1.7;}
+.fm-back{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--body-soft);text-decoration:none;transition:color .2s;}
+.fm-back:hover{color:var(--blue);}
+.fm-back svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;}
+
+/* ── 統計バー ── */
+.fm-stats{max-width:1060px;margin:0 auto 22px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+.fm-stat{background:#fff;border:1px solid var(--line-soft);border-radius:var(--radius);padding:12px 14px;box-shadow:var(--shadow-s);}
+.fm-stat-val{font-family:var(--head);font-size:24px;font-weight:900;color:var(--navy);line-height:1;}
+.fm-stat-lbl{font-size:11px;color:var(--body-soft);margin-top:3px;font-weight:600;}
+.fm-stat.green .fm-stat-val{color:var(--green);}
+.fm-stat.blue  .fm-stat-val{color:var(--blue);}
+
+/* ── 凡例 ── */
+.legend{max-width:1060px;margin:0 auto 18px;display:flex;gap:12px;flex-wrap:wrap;}
+.lg-item{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--body-soft);}
+.lg-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0;}
+
+/* ── セクション ── */
+.fm-section{max-width:1060px;margin:0 auto 16px;background:#fff;border-radius:var(--radius);box-shadow:var(--shadow-s);border:1px solid var(--line-soft);overflow:hidden;}
+.fm-section-head{display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--line-soft);}
+.fm-section-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.fm-section-title{font-family:var(--head);font-size:13.5px;font-weight:700;color:var(--navy);}
+.fm-section-count{font-size:11px;color:var(--body-soft);background:var(--line-soft);padding:2px 8px;border-radius:99px;font-weight:600;margin-left:auto;}
+.fm-section-body{padding:18px;}
+
+/* ── フロー ── */
+.fm-lane{margin-bottom:14px;}
+.fm-lane:last-child{margin-bottom:0;}
+.fm-lane-label{font-size:10.5px;font-weight:700;color:var(--body-soft);letter-spacing:.08em;margin-bottom:7px;text-transform:uppercase;}
+.fm-chain{display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+.fm-arr{color:var(--body-soft);font-size:14px;flex-shrink:0;padding:0 2px;}
+.fm-or{font-size:11px;font-weight:700;color:var(--body-soft);padding:0 4px;}
+
+/* ── ページノード ── */
+.pn{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:7px 11px;border-radius:8px;
+  border:1.5px solid var(--line);background:#fff;
+  font-family:var(--head);font-size:12px;font-weight:700;color:var(--navy);
+  text-decoration:none;white-space:nowrap;position:relative;
+  transition:transform .2s,box-shadow .2s,border-color .2s;
+}
+.pn:hover{transform:translateY(-2px);box-shadow:var(--shadow-m);}
+.pn-lp   {border-color:var(--blue);background:var(--pale);color:var(--blue);}
+.pn-auth {border-color:#9b59b6;background:#f6eeff;color:#6c3495;}
+.pn-biz  {border-color:var(--green);background:#eafaf0;color:#176a46;}
+.pn-info {background:#f7f8fc;color:var(--body-soft);border-color:var(--line-soft);font-size:11.5px;padding:6px 9px;}
+/* バッジ */
+.pn-new::after{
+  content:"NEW";font-size:8.5px;font-weight:900;font-family:var(--head);
+  padding:1px 5px;border-radius:99px;background:var(--blue);color:#fff;
+  position:absolute;top:-8px;right:-2px;white-space:nowrap;
+}
+.pn-fixed::after{
+  content:"修正";font-size:8.5px;font-weight:900;font-family:var(--head);
+  padding:1px 5px;border-radius:99px;background:var(--green);color:#fff;
+  position:absolute;top:-8px;right:-2px;white-space:nowrap;
+}
+
+/* ── 修正ログ ── */
+.fixes{max-width:1060px;margin:0 auto 16px;}
+.fixes-title{font-family:var(--head);font-size:14px;font-weight:700;color:var(--navy);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.fixes-title-ic{width:22px;height:22px;border-radius:50%;background:var(--green);color:#fff;font-size:11px;font-weight:900;display:grid;place-items:center;flex-shrink:0;}
+.fix-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;}
+.fix-item{background:#fff;border:1px solid #a3e6c3;border-radius:10px;padding:12px 14px;display:flex;gap:10px;align-items:flex-start;}
+.fix-num{width:20px;height:20px;border-radius:50%;background:var(--green);color:#fff;font-size:10px;font-weight:900;font-family:var(--head);display:grid;place-items:center;flex-shrink:0;margin-top:1px;}
+.fix-body strong{display:block;font-family:var(--head);font-size:13px;font-weight:700;color:var(--navy);}
+.fix-body span{font-size:12px;color:var(--body-soft);line-height:1.65;}
+.fix-file{display:inline-flex;align-items:center;font-family:var(--head);font-size:10.5px;font-weight:700;background:var(--pale);color:var(--blue);padding:1px 7px;border-radius:4px;margin-right:3px;}
+
+/* 情報ラップ */
+.info-wrap{display:flex;gap:6px;flex-wrap:wrap;}
+
+@media(max-width:700px){
+  .fm-stats{grid-template-columns:repeat(2,1fr);}
+  .fix-grid{grid-template-columns:1fr;}
+  body{padding:16px 14px 60px;}
+}
+</style>
+</head>
+<body>
+
+<!-- ヘッダー -->
+<div class="fm-top">
+  <div class="fm-top-left">
+    <h1>📐 ページ導線マップ</h1>
+    <p>カタヅケ — 全ページの繋がりと導線。各ノードをクリックするとページが新タブで開きます。</p>
+  </div>
+  <a href="カタヅケ.html" class="fm-back">
+    <svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+    トップへ
+  </a>
+</div>
+
+<!-- 統計 -->
+<div class="fm-stats">
+  <div class="fm-stat blue"><div class="fm-stat-val">35</div><div class="fm-stat-lbl">総ページ数</div></div>
+  <div class="fm-stat"><div class="fm-stat-val">8</div><div class="fm-stat-lbl">新規作成</div></div>
+  <div class="fm-stat green"><div class="fm-stat-val">9</div><div class="fm-stat-lbl">修正リンク数</div></div>
+  <div class="fm-stat"><div class="fm-stat-val">4</div><div class="fm-stat-lbl">主要フロー</div></div>
+</div>
+
+<!-- 凡例 -->
+<div class="legend">
+  <div class="lg-item"><div class="lg-dot" style="background:var(--pale);border:1.5px solid var(--blue);"></div> LP・トップ</div>
+  <div class="lg-item"><div class="lg-dot" style="background:#f6eeff;border:1.5px solid #9b59b6;"></div> 認証</div>
+  <div class="lg-item"><div class="lg-dot" style="background:#fff;border:1.5px solid var(--line);"></div> ユーザーフロー</div>
+  <div class="lg-item"><div class="lg-dot" style="background:#eafaf0;border:1.5px solid var(--green);"></div> 業者フロー</div>
+  <div class="lg-item"><div class="lg-dot" style="background:#f7f8fc;border:1.5px solid var(--line-soft);"></div> 情報ページ</div>
+  <div class="lg-item"><div class="lg-dot" style="background:var(--green);border-radius:99px;width:28px;height:10px;"></div> 修正済</div>
+  <div class="lg-item"><div class="lg-dot" style="background:var(--blue);border-radius:99px;width:28px;height:10px;"></div> 新規作成</div>
+</div>
+
+<!-- ユーザーフロー -->
+<div class="fm-section">
+  <div class="fm-section-head">
+    <div class="fm-section-dot" style="background:var(--blue);"></div>
+    <div class="fm-section-title">ユーザーフロー（売主）</div>
+    <div class="fm-section-count">16ページ</div>
+  </div>
+  <div class="fm-section-body">
+
+    <div class="fm-lane">
+      <div class="fm-lane-label">メイン導線</div>
+      <div class="fm-chain">
+        <a class="pn pn-lp" href="カタヅケ.html" target="_blank">カタヅケ.html</a>
+        <span class="fm-arr">→</span>
+        <a class="pn" href="出品登録.html" target="_blank">出品登録.html</a>
+        <span class="fm-arr">→</span>
+        <a class="pn" href="出品完了.html" target="_blank">出品完了.html</a>
+        <span class="fm-arr">→</span>
+        <a class="pn pn-fixed" href="申し込み状況.html" target="_blank">申し込み状況.html</a>
+        <span class="fm-arr">→</span>
+        <a class="pn pn-fixed pn-new" href="査定結果.html" target="_blank">査定結果.html</a>
+        <span class="fm-arr">→</span>
+        <a class="pn pn-new" href="業者詳細.html" target="_blank">業者詳細.html</a>
+        <span class="fm-arr">→</span>
+        <a class="pn" href="chat.html" target="_blank">chat.html</a>
+        <span class="fm-arr">→</span>
+        <a class="pn" href="訪問日程調整.html" target="_blank">訪問日程調整.html</a>
+        <span class="fm-arr">→</span>
+        <a class="pn pn-new" href="取引完了・評価.html" target="_blank">取引完了・評価.html</a>
+      </div>
+    </div>
+
+    <div class="fm-lane" style="margin-top:12px;">
+      <div class="fm-lane-label">認証フロー</div>
+      <div class="fm-chain">
+        <a class="pn pn-lp" href="カタヅケ.html" target="_blank">カタヅケ.html</a>
+        <span class="fm-arr">→</span>
+        <a class="pn pn-auth pn-new" href="ログイン.html" target="_blank">ログイン.html</a>
+        <span class="fm-arr">↔</span>
+        <a class="pn pn-auth pn-new" href="新規登録.html" target="_blank">新規登録.html</a>
+        <span class="fm-arr">→</span>
+        <a class="pn pn-auth pn-new" href="メール確認完了.html" target="_blank">メール確認完了.html</a>
+        <span class="fm-arr">→</span>
+        <a class="pn" href="出品登録.html" target="_blank">出品登録.html</a>
+      </div>
+    </div>
+
+    <div class="fm-lane" style="margin-top:12px;">
+      <div class="fm-lane-label">マイページ</div>
+      <div class="fm-chain">
+        <a class="pn pn-auth pn-fixed" href="マイページ.html" target="_blank">マイページ.html</a>
+        <span class="fm-arr">→</span>
+        <a class="pn pn-new" href="通知・お知らせ一覧.html" target="_blank">通知・お知らせ一覧.html</a>
+        <span class="fm-arr">→</span>
+        <a class="pn pn-fixed" href="申し込み状況.html" target="_blank">申し込み状況.html</a>
+        <span class="fm-arr">→</span>
+        <a class="pn pn-new" href="査定結果.html" target="_blank">査定結果.html</a>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 業者フロー -->
+<div class="fm-section">
+  <div class="fm-section-head">
+    <div class="fm-section-dot" style="background:var(--green);"></div>
+    <div class="fm-section-title">業者フロー</div>
+    <div class="fm-section-count">4ページ</div>
+  </div>
+  <div class="fm-section-body">
+    <div class="fm-lane">
+      <div class="fm-chain">
+        <a class="pn pn-biz" href="業者向け.html" target="_blank">業者向け.html</a>
+        <span class="fm-arr">→</span>
+        <a class="pn pn-biz" href="業者ダッシュボード.html" target="_blank">業者ダッシュボード.html</a>
+        <span class="fm-arr">→</span>
+        <a class="pn pn-biz" href="業者プロフィール.html" target="_blank">業者プロフィール.html</a>
+        <span class="fm-arr">→</span>
+        <a class="pn pn-biz" href="業者チャット.html" target="_blank">業者チャット.html</a>
+        <span class="fm-arr">→</span>
+        <a class="pn pn-biz pn-new" href="業者詳細.html" target="_blank">業者詳細.html</a>
+        <span class="fm-or">（ユーザーから参照）</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- サポートページ -->
+<div class="fm-section">
+  <div class="fm-section-head">
+    <div class="fm-section-dot" style="background:var(--body-soft);"></div>
+    <div class="fm-section-title">情報・サポートページ</div>
+    <div class="fm-section-count">11ページ</div>
+  </div>
+  <div class="fm-section-body">
+    <div class="fm-lane">
+      <div class="fm-lane-label">コンテンツ</div>
+      <div class="info-wrap">
+        <a class="pn pn-info" href="成約事例.html" target="_blank">成約事例.html</a>
+        <a class="pn pn-info" href="撮影ガイド.html" target="_blank">撮影ガイド.html</a>
+        <a class="pn pn-info" href="撮影のコツ.html" target="_blank">撮影のコツ.html</a>
+        <a class="pn pn-info" href="よくある質問.html" target="_blank">よくある質問.html</a>
+        <a class="pn pn-info" href="contact.html" target="_blank">contact.html</a>
+      </div>
+    </div>
+    <div class="fm-lane" style="margin-top:10px;">
+      <div class="fm-lane-label">法的ページ</div>
+      <div class="info-wrap">
+        <a class="pn pn-info" href="プライバシーポリシー.html" target="_blank">プライバシーポリシー.html</a>
+        <a class="pn pn-info" href="利用規約.html" target="_blank">利用規約.html</a>
+        <a class="pn pn-info" href="特定商取引法.html" target="_blank">特定商取引法.html</a>
+        <a class="pn pn-info" href="ソクウリ LP.html" target="_blank">ソクウリ LP.html</a>
+        <a class="pn pn-info" href="index.html" target="_blank">index.html</a>
+        <a class="pn pn-info" href="ページ導線マップ.html" target="_blank">ページ導線マップ.html</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 修正ログ -->
+<div class="fixes">
+  <div class="fixes-title"><div class="fixes-title-ic">✓</div>今セッションの修正・追加（9件）</div>
+  <div class="fix-grid">
+    <div class="fix-item"><div class="fix-num">1</div><div class="fix-body"><strong><span class="fix-file">カタヅケ.html</span>フッターのtypo修正</strong><span>撕影ガイド.html → 撮影ガイド.html</span></div></div>
+    <div class="fix-item"><div class="fix-num">2</div><div class="fix-body"><strong><span class="fix-file">マイページ.html</span>サマリーカードをリンク化</strong><span>入札受付中・交渉中・成約済みカード → 申し込み状況.html へ</span></div></div>
+    <div class="fix-item"><div class="fix-num">3</div><div class="fix-body"><strong><span class="fix-file">マイページ.html</span>通知ベルを追加</strong><span>ヘッダーに未読バッジ付きベルアイコン → 通知・お知らせ一覧.html へ</span></div></div>
+    <div class="fix-item"><div class="fix-num">4</div><div class="fix-body"><strong><span class="fix-file">査定結果.html</span>「詳細を見る」をリンク化</strong><span>ボタン → 業者詳細.html へのリンクに変更</span></div></div>
+    <div class="fix-item"><div class="fix-num">5</div><div class="fix-body"><strong><span class="fix-file">新規登録.html</span>登録完了後のリダイレクト修正</strong><span>step-4完了画面 → メール確認完了.html へ遷移</span></div></div>
+    <div class="fix-item"><div class="fix-num">6</div><div class="fix-body"><strong>通知・お知らせ一覧.html を新規作成</strong><span>フィルタータブ・既読管理・各ページへのリンク付き</span></div></div>
+    <div class="fix-item"><div class="fix-num">7</div><div class="fix-body"><strong>業者詳細.html を新規作成</strong><span>評価バー・口コミ・専門カテゴリ・フッターCTA付き</span></div></div>
+    <div class="fix-item"><div class="fix-num">8</div><div class="fix-body"><strong>取引完了・評価.html を新規作成</strong><span>取引サマリー・5段階スター評価・タグ選択・公開設定付き</span></div></div>
+    <div class="fix-item"><div class="fix-num">9</div><div class="fix-body"><strong>メール確認完了.html を新規作成</strong><span>confettiアニメ・3ステップ説明・出品CTA付き</span></div></div>
+  </div>
+</div>
+
+<!-- フッター -->
+<div style="max-width:1060px;margin:0 auto;padding-top:14px;border-top:1px solid var(--line-soft);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+  <span style="font-size:12px;color:var(--body-soft);">カタヅケ — ページ導線マップ　2026年6月27日更新</span>
+  <a href="カタヅケ.html" style="font-size:12.5px;color:var(--blue);font-weight:700;text-decoration:none;">← トップへ戻る</a>
+</div>
+
+</body>
+</html>

@@ -93,3 +93,23 @@
 
 UIの新規設計・改善・レビューは `.claude/agents/ui-designer.md`（デザイナーエージェント）に依頼する。
 本書を更新したら、エージェント定義の該当箇所も同期すること。
+
+---
+
+## 8. デザインハンドオフ移行（2026-06／feat/design-handoff-katazuke）
+
+高忠実度ハンドオフ `docs/design_handoff_katazuke/`（33画面）を正典として採用し、本書の旧方針を以下で上書きする。
+
+- **正典CSS**: `src/app/katazuke.css`（ハンドオフ `katazuke-main.css` を移植）。`globals.css` から
+  `@layer base, components, utilities;` → `@import "./katazuke.css" layer(components);` で取り込む。
+  これにより Tailwind utilities が常に上書きでき、既存 Tailwind ページの余白も壊さない。
+- **フォント**: 旧「Webフォント非依存」を撤回。**Zen Kaku Gothic New（見出し900）+ Noto Sans JP（本文）**を
+  `globals.css` の `@import url()` で実行時ロード（ビルド非依存）。フォールバックに OS 標準ゴシックを残す。
+- **font-black（900）**: 旧「原則禁止」を撤回。見出し・価格はハンドオフ通り 900 を使用する。
+- **トークン**: `tailwind.config.ts` に `kdz-*`（navy/ink/body/pale/line/green/gold/LINE green）、`shadow-kdz-s/m/l`、
+  `rounded-kdz`、`font-head` を追加。`.container`（Tailwind core）は `corePlugins.container:false` で無効化
+  （ハンドオフ `.container` max-width:1140px と衝突回避）。
+- **共通部品**: `src/components/kdz/`（Icons[スプライト+Ic]/interactions[Reveal,PhImg,FaqAccordion,ScrollProgress]/
+  SiteHeader/chrome[SiteFooter,Dock]/SiteChrome[ルート別クロム出し分け]/Logo[SVGワードマーク]）。
+- **画像**: ハンドオフに同梱なし。`PhImg` がプレースホルダで堅牢化。実アセット（ロゴ/写真/カテゴリ）は**[要ユーザー提供]**。
+- 進捗とDoDは リポジトリ直下 `KATAZUKE_REDESIGN_PLAN.md` で管理する。

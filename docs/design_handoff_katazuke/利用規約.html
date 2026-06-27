@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>利用規約｜カタヅケ</title>
+<link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="katazuke-main.css">
+<style>
+.legal-hero { background: var(--pale); padding: clamp(40px,5vw,72px) 0 clamp(32px,4vw,56px); border-bottom: 1px solid var(--line); }
+.legal-hero .eyebrow { justify-content: flex-start; }
+.legal-hero h1 { font-size: clamp(24px,3.5vw,36px); margin-top: 14px; }
+.legal-hero .updated { font-size: 13px; color: var(--body-soft); margin-top: 10px; }
+.legal-tabs { display: flex; gap: 0; border-bottom: 2px solid var(--line); margin-bottom: 0; }
+.legal-tab { padding: 14px 28px; font-size: 14px; font-weight: 700; color: var(--body-soft); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: color .2s; font-family: var(--head); background: none; border-top: none; border-left: none; border-right: none; }
+.legal-tab:hover { color: var(--blue); }
+.legal-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+.legal-pane { display: none; }
+.legal-pane.active { display: block; }
+.legal-body { max-width: 760px; margin: 0 auto; padding: clamp(40px,5vw,64px) 24px clamp(64px,8vw,108px); }
+.legal-body h2 { font-size: 17px; color: var(--navy); margin: 36px 0 12px; padding-bottom: 10px; border-bottom: 2px solid var(--line); }
+.legal-body h2:first-child { margin-top: 0; }
+.legal-body h3 { font-size: 15px; color: var(--ink); margin: 20px 0 8px; }
+.legal-body p { font-size: 14.5px; color: var(--body); line-height: 1.9; margin-bottom: 12px; }
+.legal-body ul, .legal-body ol { padding-left: 20px; margin-bottom: 14px; }
+.legal-body li { font-size: 14.5px; color: var(--body); line-height: 1.85; margin-bottom: 5px; }
+.legal-body .note { background: #fff8e6; border-left: 3px solid var(--gold); padding: 14px 18px; border-radius: 0 8px 8px 0; font-size: 13.5px; color: var(--body); margin: 20px 0; line-height: 1.8; }
+.legal-body .important { background: #fff0f0; border-left: 3px solid #e05c5c; padding: 14px 18px; border-radius: 0 8px 8px 0; font-size: 13.5px; color: var(--body); margin: 20px 0; line-height: 1.8; }
+.tab-wrap { background: #fff; border-bottom: 1px solid var(--line); position: sticky; top: 76px; z-index: 40; }
+.tab-inner { max-width: 760px; margin: 0 auto; padding: 0 24px; }
+.back-link { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 700; color: var(--blue); margin-bottom: 32px; }
+</style>
+</head>
+<body>
+<header class="header" id="header">
+  <div class="container inner">
+    <a href="カタヅケ.html" class="logo"><img src="img/logo-katazuke.png" alt="カタヅケ" class="logo-img"></a>
+  </div>
+</header>
+
+<section class="legal-hero">
+  <div class="container">
+    <span class="eyebrow">TERMS OF SERVICE</span>
+    <h1>利用規約</h1>
+    <p class="updated">制定・施行：2026年4月1日　最終改定：2026年6月25日</p>
+  </div>
+</section>
+
+<div class="tab-wrap">
+  <div class="tab-inner">
+    <div class="legal-tabs">
+      <button class="legal-tab active" data-tab="user">ユーザー利用規約</button>
+      <button class="legal-tab" data-tab="biz">業者利用規約</button>
+    </div>
+  </div>
+</div>
+
+<!-- ユーザー利用規約 -->
+<div class="legal-pane active" id="pane-user">
+  <div class="legal-body">
+    <a href="カタヅケ.html" class="back-link">← トップへ戻る</a>
+
+    <h2>第1条　適用</h2>
+    <p>本規約は、カタヅケ運営事務局（以下「当社」）が提供する不用品買取マッチングサービス「カタヅケ」（以下「本サービス」）を利用するすべてのユーザーに適用されます。本サービスをご利用いただくことで、本規約に同意したものとみなします。</p>
+
+    <h2>第2条　サービス概要</h2>
+    <p>本サービスは、不用品を手放したいユーザーと買取業者をマッチングするプラットフォームです。当社はマッチングの場を提供するものであり、買取取引の当事者にはなりません。</p>
+
+    <h2>第3条　利用登録</h2>
+    <p>本サービスの利用には登録が必要です。登録にあたり、正確な情報を提供してください。虚偽の情報による登録は禁止します。</p>
+
+    <h2>第4条　出品・査定について</h2>
+    <ul>
+      <li>出品できる品物は、法律上売買が許可されているものに限ります</li>
+      <li>出品情報（写真・品目）は登録業者に公開されます</li>
+      <li>入札期間は出品から<strong>3日間</strong>です</li>
+      <li>入札がなかった場合でも、再出品することができます</li>
+      <li>査定額・入札額は参考値であり、現物確認後に最終額が決定します</li>
+    </ul>
+
+    <h2>第5条　個人情報の開示タイミング</h2>
+    <p>氏名・電話番号・住所などの連絡先は、取引交渉が成立した業者にのみ開示されます。査定段階では写真と品目のみが業者に渡ります。</p>
+    <div class="note">連絡が来るのは入札額上位3社のみです。それ以外の業者への連絡先開示・架電は行われません。</div>
+
+    <h2>第6条　ユーザーの費用</h2>
+    <p>ユーザーが本サービスを利用するための費用は<strong>一切かかりません</strong>。出品・査定・お断りまですべて無料です。</p>
+
+    <h2>第7条　禁止事項</h2>
+    <ul>
+      <li>虚偽の品物情報・写真の掲載</li>
+      <li>法律で売買が禁止されている品物の出品</li>
+      <li>業者への不当な要求・ハラスメント</li>
+      <li>本サービスを経由せずに業者と直接取引を行うこと（登録業者との脱プラットフォーム行為）</li>
+      <li>アカウントの第三者への譲渡・売買</li>
+      <li>その他、当社が不適切と判断する行為</li>
+    </ul>
+
+    <h2>第8条　クーリングオフ</h2>
+    <p>訪問買取は特定商取引法の適用を受けます。業者から法定書面を受け取った日から8日以内であれば、書面により取引を解除できます（クーリングオフ）。</p>
+
+    <h2>第9条　免責事項</h2>
+    <p>当社は、業者の買取額・品質・対応について保証しません。取引はユーザーと業者間の合意に基づくものです。ただし、登録業者の古物商許可確認等、安全なマッチング環境の整備に努めます。</p>
+
+    <h2>第10条　規約の変更</h2>
+    <p>当社は必要に応じて本規約を変更できます。重要な変更はウェブサイト上で告知します。変更後も本サービスを利用した場合、変更後の規約に同意したものとみなします。</p>
+
+    <h2>第11条　準拠法・裁判管轄</h2>
+    <p>本規約は日本法に準拠します。本サービスに関する紛争については、東京地方裁判所を第一審の専属的合意管轄裁判所とします。</p>
+  </div>
+</div>
+
+<!-- 業者利用規約 -->
+<div class="legal-pane" id="pane-biz">
+  <div class="legal-body">
+    <a href="業者向け.html" class="back-link">← 業者ページへ戻る</a>
+
+    <h2>第1条　適用</h2>
+    <p>本規約は、カタヅケ運営事務局（以下「当社」）が提供する本サービスに登録業者として参加するすべての事業者（以下「業者」）に適用されます。</p>
+
+    <h2>第2条　登録要件</h2>
+    <ul>
+      <li>有効な古物商許可を取得していること</li>
+      <li>法人または個人事業主として買取・リユース業を営んでいること</li>
+      <li>対応エリア（東京都・千葉県・埼玉県・神奈川県のいずれか）で訪問買取が可能なこと</li>
+      <li>特定商取引法を遵守していること</li>
+    </ul>
+
+    <h2>第3条　手数料</h2>
+    <p>登録・掲載・入札はすべて無料です。取引が成約した場合のみ、<strong>買取金額の8%</strong>を手数料として当社に支払う義務が生じます。</p>
+    <div class="note">手数料は成約金額（ユーザーに提示・合意した買取総額）に対して課されます。現物確認後の減額分がある場合は、最終成約額を基準とします。</div>
+
+    <h2>第4条　入札のルール</h2>
+    <ul>
+      <li>入札は買取総額（まとめ全体に対する金額）で行います</li>
+      <li>入札額の上位3社のみがユーザーとの交渉に進めます</li>
+      <li>4位以下の入札はユーザーに通知されず、連絡先も開示されません</li>
+      <li>入札額は誠実な査定に基づくものとし、意図的な高額入札による落札後の大幅減額は禁止します</li>
+    </ul>
+
+    <h2>第5条　買取金額の変更</h2>
+    <p>提示した買取金額を下回る変更は、<strong>査定現場で商品を実際に確認し、変更理由を明示したうえでユーザーの了解を得た場合にのみ</strong>可能です。ユーザーの同意なく一方的に減額することはできません。</p>
+    <div class="important">正当な理由のない大幅減額・強引な交渉は、登録停止・除名処分の対象となります。</div>
+
+    <h2>第6条　個人情報の取り扱い</h2>
+    <ul>
+      <li>取引を通じて取得したユーザーの個人情報は、当該取引目的のみに使用すること</li>
+      <li>取引成立後に開示されたユーザーの連絡先を、取引以外の目的で使用することを禁止します</li>
+      <li>第三者への個人情報提供・売買を禁止します</li>
+    </ul>
+
+    <h2>第7条　特定商取引法の遵守</h2>
+    <p>訪問買取においては特定商取引法を遵守し、法定書面の交付・クーリングオフへの適切な対応を行ってください。違反が確認された場合、即時登録停止処分とします。</p>
+
+    <h2>第8条　禁止事項</h2>
+    <ul>
+      <li>虚偽の会社情報・古物商許可情報の提供</li>
+      <li>サービスを経由せず直接ユーザーと取引するための情報収集（脱プラットフォーム行為）</li>
+      <li>複数アカウントの作成・入札操作</li>
+      <li>ユーザーへの不当な勧誘・ハラスメント</li>
+      <li>古物商許可の失効後の継続利用</li>
+    </ul>
+
+    <h2>第9条　登録の停止・取消</h2>
+    <p>当社は、業者が本規約に違反した場合、または当社が不適切と判断した場合、事前通知なしに登録を停止または取消することができます。</p>
+
+    <h2>第10条　準拠法・裁判管轄</h2>
+    <p>本規約は日本法に準拠します。本サービスに関する紛争については、東京地方裁判所を第一審の専属的合意管轄裁判所とします。</p>
+  </div>
+</div>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer-bottom">
+      <span>© 2026 カタヅケ</span>
+      <span><a href="プライバシーポリシー.html" style="color:#9fb0cf;">プライバシーポリシー</a>　<a href="利用規約.html" style="color:#9fb0cf;">利用規約</a></span>
+    </div>
+  </div>
+</footer>
+
+<script>
+document.querySelectorAll('.legal-tab').forEach(function(tab){
+  tab.addEventListener('click', function(){
+    document.querySelectorAll('.legal-tab').forEach(function(t){ t.classList.remove('active'); });
+    document.querySelectorAll('.legal-pane').forEach(function(p){ p.classList.remove('active'); });
+    tab.classList.add('active');
+    document.getElementById('pane-' + tab.dataset.tab).classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+});
+var h = document.getElementById('header');
+window.addEventListener('scroll', function(){ h.classList.toggle('scrolled', window.pageYOffset > 8); }, {passive:true});
+</script>
+</body>
+</html>

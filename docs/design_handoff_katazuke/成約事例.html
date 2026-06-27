@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>成約事例｜カタヅケ</title>
+<meta name="description" content="カタヅケの成約事例。実際にまとめて買取に出したユーザーの体験談と買取額をご紹介します。">
+<meta name="theme-color" content="#1f54de">
+<link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="katazuke-main.css">
+<style>
+body { background: #fff; }
+
+/* ヒーロー */
+.cases-hero {
+  padding: clamp(56px,7vw,88px) 0 clamp(40px,5vw,64px);
+  border-bottom: 1px solid var(--line-soft);
+  background: radial-gradient(120% 90% at 80% -10%, #eaf0ff 0%, rgba(234,240,255,0) 55%), #fff;
+}
+.cases-hero h1 { font-size: clamp(28px,4vw,44px); color: var(--navy); margin-top: 16px; }
+.cases-hero p { font-size: clamp(14px,1.6vw,17px); color: var(--body-soft); margin-top: 14px; max-width: 520px; line-height: 1.85; }
+
+/* 実績バー */
+.stats-bar {
+  background: var(--navy);
+  padding: 28px 0;
+}
+.stats-bar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(28px,5vw,72px);
+  flex-wrap: wrap;
+}
+.stats-item { text-align: center; }
+.stats-num {
+  font-family: var(--head);
+  font-size: clamp(28px,3.5vw,42px);
+  font-weight: 900;
+  color: #fff;
+  line-height: 1;
+}
+.stats-num span { font-size: .55em; color: rgba(255,255,255,.6); font-weight: 700; margin-left: 2px; }
+.stats-lbl { font-size: 13px; color: rgba(255,255,255,.55); margin-top: 6px; font-weight: 600; }
+
+/* フィルター */
+.filter-bar {
+  padding: 20px 0;
+  border-bottom: 1px solid var(--line-soft);
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 20;
+}
+.filter-inner {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.filter-chip {
+  font-size: 13px;
+  font-weight: 700;
+  padding: 7px 16px;
+  border-radius: 99px;
+  border: 1.5px solid var(--line);
+  background: #fff;
+  color: var(--body-soft);
+  cursor: pointer;
+  transition: .2s;
+  font-family: var(--sans);
+}
+.filter-chip:hover { border-color: var(--blue); color: var(--blue); }
+.filter-chip.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+.filter-count { margin-left: auto; font-size: 13px; color: var(--body-soft); }
+
+/* 事例グリッド */
+.cases-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+  margin-bottom: 48px;
+}
+
+/* 事例カード */
+.case-card {
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #fff;
+  transition: border-color .2s, box-shadow .2s;
+  display: flex;
+  flex-direction: column;
+}
+.case-card:hover { border-color: #b8c8f0; box-shadow: var(--shadow-m); }
+
+.case-photos {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 2px;
+  background: var(--line-soft);
+  aspect-ratio: 16/8;
+}
+.case-photo {
+  overflow: hidden;
+  background: #f0f2f8;
+}
+.case-photo img { width:100%; height:100%; object-fit:contain; }
+.case-photo:first-child { grid-row: 1 / 3; }
+
+.case-body { padding: 22px 24px; flex: 1; display: flex; flex-direction: column; gap: 14px; }
+
+.case-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.case-persona {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.case-avatar {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--pale);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--head);
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--blue);
+  flex-shrink: 0;
+}
+.case-persona-info .name { font-size: 14px; font-weight: 700; color: var(--ink); }
+.case-persona-info .attr { font-size: 12px; color: var(--body-soft); margin-top: 2px; }
+
+.case-amount-box {
+  text-align: right;
+  flex-shrink: 0;
+}
+.case-amount-label { font-size: 11px; font-weight: 700; color: var(--body-soft); margin-bottom: 3px; }
+.case-amount {
+  font-family: var(--head);
+  font-size: 26px;
+  font-weight: 900;
+  color: var(--navy);
+  line-height: 1;
+}
+.case-amount span { font-size: 13px; font-weight: 600; color: var(--body-soft); }
+.case-bid-info { font-size: 11.5px; color: var(--body-soft); margin-top: 3px; }
+
+.case-cats { display: flex; gap: 6px; flex-wrap: wrap; }
+.case-cat {
+  font-size: 12px; font-weight: 700;
+  padding: 3px 10px; border-radius: 99px;
+  border: 1px solid var(--line);
+  color: var(--body-soft);
+}
+
+.case-quote {
+  background: var(--pale);
+  border-radius: var(--radius-s);
+  padding: 14px 16px;
+  font-size: 14px;
+  color: var(--ink);
+  line-height: 1.8;
+  position: relative;
+}
+.case-quote::before {
+  content: "\201C";
+  font-family: Georgia, serif;
+  font-size: 36px;
+  color: var(--blue);
+  opacity: .3;
+  position: absolute;
+  top: 4px;
+  left: 10px;
+  line-height: 1;
+}
+.case-quote p { padding-left: 20px; }
+
+.case-meta {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 12.5px;
+  color: var(--body-soft);
+}
+.case-meta span { display: flex; align-items: center; gap: 5px; }
+.case-meta svg { width:13px; height:13px; fill:none; stroke:var(--body-soft); stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
+
+/* 注目事例（大カード） */
+.featured-case {
+  border: 1.5px solid #b8c8f0;
+  border-radius: var(--radius);
+  background: #fff;
+  overflow: hidden;
+  margin-bottom: 32px;
+  grid-column: 1 / -1;
+}
+.featured-badge {
+  background: var(--blue);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 900;
+  font-family: var(--head);
+  padding: 6px 16px;
+  letter-spacing: .06em;
+  display: inline-block;
+}
+.featured-inner {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+.featured-photos {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  background: var(--line-soft);
+}
+.featured-photos .case-photo { aspect-ratio: 1; }
+.featured-photos .case-photo:first-child { grid-row: auto; }
+.featured-body { padding: 28px 32px; display: flex; flex-direction: column; gap: 16px; }
+.featured-amount {
+  font-family: var(--head);
+  font-size: 48px;
+  font-weight: 900;
+  color: var(--navy);
+  line-height: 1;
+}
+.featured-amount span { font-size: 18px; font-weight: 600; color: var(--body-soft); }
+
+/* CTA */
+.cases-cta {
+  background: var(--navy);
+  border-radius: var(--radius);
+  padding: clamp(32px,4vw,52px);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  margin-top: 48px;
+}
+.cases-cta::before {
+  content: "";
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse 70% 60% at 100% 0%, rgba(31,84,222,.5) 0%, transparent 65%);
+}
+.cases-cta-inner { position: relative; z-index: 1; }
+.cases-cta h2 { font-size: clamp(20px,2.5vw,28px); color: #fff; margin-bottom: 10px; }
+.cases-cta p { font-size: 15px; color: rgba(255,255,255,.65); margin-bottom: 24px; line-height: 1.8; }
+.btn-white { background:#fff; color:var(--navy); font-weight:900; box-shadow:0 10px 24px -8px rgba(0,0,0,.3); }
+.btn-white:hover { background:#eef3ff; transform:translateY(-2px); }
+
+/* レスポンシブ */
+@media(max-width:720px){
+  .cases-grid { grid-template-columns: 1fr; }
+  .featured-inner { grid-template-columns: 1fr; }
+  .featured-body { padding: 20px 20px; }
+  .featured-amount { font-size: 36px; }
+}
+@media(max-width:480px){
+  .stats-bar-inner { gap: 20px; }
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-map" viewBox="0 0 24 24"><path d="M12 21s7-6.3 7-11a7 7 0 10-14 0c0 4.7 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4.5l3 2"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></symbol>
+  <symbol id="i-trend" viewBox="0 0 24 24"><path d="M4 17l5-5 3 3 7-7"/><path d="M16 8h4v4"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M5 5h14a2 2 0 012 2v8a2 2 0 01-2 2H9l-4 4V7a2 2 0 012-2z"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="currentColor"/></symbol>
+</defs></svg>
+
+<!-- ヘッダー -->
+<header class="header" id="header">
+  <div class="container inner">
+    <a href="カタヅケ.html" class="logo"><img src="img/logo-katazuke.png" alt="カタヅケ" class="logo-img"></a>
+    <nav class="nav">
+      <a href="カタヅケ.html#flow">使い方</a>
+      <a href="撮影ガイド.html">撮影ガイド</a>
+      <a href="カタヅケ.html#faq">よくある質問</a>
+    </nav>
+    <a href="出品登録.html" class="btn btn-line h-cta"><svg class="ic"><use href="#i-chat"></use></svg>LINEではじめる</a>
+    <button class="hamburger" id="hamburger" aria-label="メニュー"><svg class="ic"><use href="#i-menu"></use></svg></button>
+  </div>
+</header>
+<div class="mobile-menu" id="mobile-menu">
+  <a href="カタヅケ.html#flow">使い方</a>
+  <a href="撮影ガイド.html">撮影ガイド</a>
+  <a href="カタヅケ.html#faq">よくある質問</a>
+  <a href="出品登録.html" class="btn btn-line btn-block mm-cta"><svg class="ic"><use href="#i-chat"></use></svg>LINEではじめる</a>
+</div>
+
+<!-- ヒーロー -->
+<section class="cases-hero">
+  <div class="container">
+    <span class="eyebrow">CASES</span>
+    <h1>実際の成約事例</h1>
+    <p>まとめて出品することで、どのくらいの金額になるのか。実際にカタヅケを利用したユーザーの事例をご紹介します。</p>
+  </div>
+</section>
+
+<!-- 実績バー -->
+<div class="stats-bar">
+  <div class="container">
+    <div class="stats-bar-inner">
+      <div class="stats-item">
+        <div class="stats-num">¥68,000<span>〜</span></div>
+        <div class="stats-lbl">最高入札額（直近30日）</div>
+      </div>
+      <div class="stats-item">
+        <div class="stats-num">7.4<span>件</span></div>
+        <div class="stats-lbl">平均入札件数</div>
+      </div>
+      <div class="stats-item">
+        <div class="stats-num">78<span>%</span></div>
+        <div class="stats-lbl">入札があった割合</div>
+      </div>
+      <div class="stats-item">
+        <div class="stats-num">2.1<span>日</span></div>
+        <div class="stats-lbl">平均成約までの日数</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<main>
+<div class="section">
+<div class="container">
+
+  <!-- フィルター -->
+  <div class="filter-bar">
+    <div class="filter-inner">
+      <button class="filter-chip active" onclick="filterCases('all',this)">すべて</button>
+      <button class="filter-chip" onclick="filterCases('移住・引越し',this)">引越し</button>
+      <button class="filter-chip" onclick="filterCases('実家整理',this)">実家整理</button>
+      <button class="filter-chip" onclick="filterCases('断捨離',this)">断捨離</button>
+      <button class="filter-chip" onclick="filterCases('遺品整理',this)">遺品整理</button>
+      <button class="filter-chip" onclick="filterCases('模様替え',this)">模様替え</button>
+      <span class="filter-count" id="filter-count">6件</span>
+    </div>
+  </div>
+
+  <div class="cases-grid" id="cases-grid"></div>
+
+  <!-- CTA -->
+  <div class="cases-cta rv">
+    <div class="cases-cta-inner">
+      <h2>あなたの家の不用品、いくらになる？</h2>
+      <p>まとめて撮って、業者に競ってもらうだけ。<br>出品・査定・お断りまで、ユーザーの費用は一切無料です。</p>
+      <div style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap;">
+        <a href="出品登録.html" class="btn btn-white btn-lg">無料で出品してみる<svg class="ic arw"><use href="#i-arrow"></use></svg></a>
+        <a href="撮影ガイド.html" class="btn btn-ghost btn-lg" style="color:rgba(255,255,255,.7);border-color:rgba(255,255,255,.3);">撮影ガイドを見る</a>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <a href="カタヅケ.html" class="logo footer-logo"><img src="img/logo-katazuke.png" alt="カタヅケ"></a>
+        <p class="about">家まるごと、まとめて片付け買取。業者が買取総額で競い合う、営業電話に追われない不用品買取マッチング。</p>
+      </div>
+      <div>
+        <h5>サービス</h5>
+        <ul>
+          <li><a href="カタヅケ.html#flow">使い方</a></li>
+          <li><a href="出品登録.html">出品する</a></li>
+          <li><a href="撮影ガイド.html">撮影ガイド</a></li>
+          <li><a href="成約事例.html">成約事例</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>安心・サポート</h5>
+        <ul>
+          <li><a href="カタヅケ.html#trust">安心の取り組み</a></li>
+          <li><a href="カタヅケ.html#faq">よくある質問</a></li>
+          <li><a href="業者向け.html">業者登録</a></li>
+          <li><a href="contact.html">お問い合わせ</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>法的情報</h5>
+        <ul>
+          <li><a href="特定商取引法.html">特定商取引法に基づく表記</a></li>
+          <li><a href="プライバシーポリシー.html">プライバシーポリシー</a></li>
+          <li><a href="利用規約.html">利用規約</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 カタヅケ</span>
+      <span>東京都・千葉県・埼玉県・神奈川県（順次拡大）</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  /* ヘッダー */
+  var header = document.getElementById('header');
+  window.addEventListener('scroll', function(){ header.classList.toggle('scrolled', window.pageYOffset > 8); }, {passive:true});
+  var burger = document.getElementById('hamburger');
+  if(burger){
+    burger.addEventListener('click', function(){ header.classList.toggle('menu-open'); });
+    document.getElementById('mobile-menu').addEventListener('click', function(e){ if(e.target.closest('a')) header.classList.remove('menu-open'); });
+  }
+
+  /* スクロール演出 */
+  if('IntersectionObserver' in window){
+    var io = new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } }); }, {threshold:.08});
+    document.querySelectorAll('.rv').forEach(function(el){ io.observe(el); });
+  }
+
+  /* ====== 事例データ ====== */
+  var cases = [
+    {
+      id: 1,
+      featured: true,
+      tag: '実家整理',
+      persona: '60代・女性（東京都練馬区）',
+      avatar: '田',
+      name: '田中さん',
+      amount: 148000,
+      bidCount: 11,
+      days: 2,
+      area: '東京都練馬区',
+      cats: ['家電・PC','家具','ブランド品','時計','カメラ'],
+      count: 32,
+      quote: '実家の片付けで途方に暮れていましたが、まとめて撮影するだけで業者さんが競ってくれるとは。引越し業者への追加依頼もなく、スタッフ2名で丁寧に運んでくれました。',
+      photos: ['cat-kaden','cat-furniture','cat-brand','cat-watch','cat-camera','cat-other']
+    },
+    {
+      id: 2,
+      featured: false,
+      tag: '引越し',
+      persona: '30代・男性（東京都渋谷区）',
+      avatar: '鈴',
+      name: '鈴木さん',
+      amount: 72000,
+      bidCount: 7,
+      days: 3,
+      area: '東京都渋谷区',
+      cats: ['家電・PC','カメラ','ブランド品'],
+      count: 14,
+      quote: '引越し前に使わない家電やカメラをまとめて出品。個別に売るより楽で、思ったより高い金額がついてびっくりしました。',
+      photos: ['cat-kaden','cat-camera','cat-brand','cat-other']
+    },
+    {
+      id: 3,
+      featured: false,
+      tag: '断捨離',
+      persona: '40代・女性（神奈川県横浜市）',
+      avatar: '佐',
+      name: '佐藤さん',
+      amount: 58000,
+      bidCount: 6,
+      days: 2,
+      area: '神奈川県横浜市',
+      cats: ['ブランド品','時計','衣類・靴'],
+      count: 11,
+      quote: 'ブランド品を10点ほど。1点ずつメルカリに出すのが億劫で試してみたら、まとめての評価で思いがけない金額に。何より連絡が上位3社だけなのが助かりました。',
+      photos: ['cat-brand','cat-watch','cat-fashion','cat-other']
+    },
+    {
+      id: 4,
+      featured: false,
+      tag: '遺品整理',
+      persona: '50代・男性（千葉県船橋市）',
+      avatar: '山',
+      name: '山口さん',
+      amount: 95000,
+      bidCount: 8,
+      days: 2,
+      area: '千葉県船橋市',
+      cats: ['家電・PC','家具','音楽','ゲーム'],
+      count: 24,
+      quote: '父の遺品整理で大量の品物がありました。一括で見てもらえるのでとても楽でした。業者の方も丁寧に対応してくれ、感謝しています。',
+      photos: ['cat-kaden','cat-furniture','cat-music','cat-game']
+    },
+    {
+      id: 5,
+      featured: false,
+      tag: '模様替え',
+      persona: '20代・女性（東京都世田谷区）',
+      avatar: '中',
+      name: '中村さん',
+      amount: 31000,
+      bidCount: 4,
+      days: 3,
+      area: '東京都世田谷区',
+      cats: ['家具','衣類・靴','本・メディア'],
+      count: 9,
+      quote: '模様替えで不要になった家具と洋服。重い家具も玄関まで出してもらえて、部屋がすっきりしました。3社から連絡が来て、一番丁寧な業者さんに決めました。',
+      photos: ['cat-furniture','cat-fashion','cat-book','cat-other']
+    },
+    {
+      id: 6,
+      featured: false,
+      tag: '引越し',
+      persona: '30代・夫婦（埼玉県さいたま市）',
+      avatar: '小',
+      name: '小林さん夫婦',
+      amount: 112000,
+      bidCount: 9,
+      days: 1,
+      area: '埼玉県さいたま市',
+      cats: ['家電・PC','家具','スポーツ','ゲーム'],
+      count: 19,
+      quote: '2LDKの引越しで家電・家具をまるごと出品。引越し当日に合わせて引き取り日を調整してもらえ、タイミングもぴったりでした。',
+      photos: ['cat-kaden','cat-furniture','cat-sport','cat-game']
+    }
+  ];
+
+  var activeFilter = 'all';
+
+  function stars(n){
+    return '<span style="color:#f0b429;font-size:13px;">' + '★'.repeat(n) + '</span>';
+  }
+
+  function renderFeatured(c){
+    return '<div class="featured-case rv">'
+      + '<div class="featured-badge">✦ 注目の成約事例</div>'
+      + '<div class="featured-inner">'
+      + '<div class="featured-photos">'
+      + c.photos.slice(0,6).map(function(p){ return '<div class="case-photo"><img src="img/' + p + '.png" alt="" onerror="this.style.opacity=0"></div>'; }).join('')
+      + '</div>'
+      + '<div class="featured-body">'
+      + '<div><span style="font-size:12px;font-weight:700;color:var(--blue);background:var(--pale);padding:3px 10px;border-radius:99px;">' + c.tag + '</span></div>'
+      + '<div class="case-persona" style="margin-top:12px;">'
+      + '<div class="case-avatar" style="width:48px;height:48px;font-size:18px;">' + c.avatar + '</div>'
+      + '<div class="case-persona-info"><div class="name" style="font-size:16px;">' + c.name + '</div><div class="attr">' + c.persona + '</div></div>'
+      + '</div>'
+      + '<div>'
+      + '<div style="font-size:13px;color:var(--body-soft);margin-bottom:4px;">成約買取額</div>'
+      + '<div class="featured-amount">¥' + c.amount.toLocaleString() + '<span>円</span></div>'
+      + '<div style="font-size:13px;color:var(--body-soft);margin-top:6px;">' + c.bidCount + '社が入札 / ' + c.count + '点まとめ / ' + c.days + '日で成約</div>'
+      + '</div>'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + c.cats.map(function(cat){ return '<span class="case-cat">' + cat + '</span>'; }).join('') + '</div>'
+      + '<div class="case-quote"><p>' + c.quote + '</p></div>'
+      + '</div>'
+      + '</div>'
+      + '</div>';
+  }
+
+  function renderCard(c){
+    return '<div class="case-card rv" data-tag="' + c.tag + '">'
+      + '<div class="case-photos">'
+      + c.photos.slice(0,4).map(function(p,i){ return '<div class="case-photo' + (i>0?' case-photo-sm':'') + '"><img src="img/' + p + '.png" alt="" onerror="this.style.opacity=0"></div>'; }).join('')
+      + '</div>'
+      + '<div class="case-body">'
+      + '<div class="case-header">'
+      + '<div class="case-persona"><div class="case-avatar">' + c.avatar + '</div><div class="case-persona-info"><div class="name">' + c.name + '</div><div class="attr">' + c.persona + '</div></div></div>'
+      + '<div class="case-amount-box"><div class="case-amount-label">成約買取額</div><div class="case-amount">¥' + c.amount.toLocaleString() + '<span>円</span></div><div class="case-bid-info">' + c.bidCount + '社入札</div></div>'
+      + '</div>'
+      + '<div class="case-cats"><span style="font-size:12px;font-weight:700;color:var(--blue);background:var(--pale);padding:2px 10px;border-radius:99px;">' + c.tag + '</span>' + c.cats.map(function(cat){ return '<span class="case-cat">' + cat + '</span>'; }).join('') + '</div>'
+      + '<div class="case-quote"><p>' + c.quote + '</p></div>'
+      + '<div class="case-meta">'
+      + '<span><svg viewBox="0 0 24 24"><use href="#i-box"></use></svg>' + c.count + '点</span>'
+      + '<span><svg viewBox="0 0 24 24"><use href="#i-map"></use></svg>' + c.area + '</span>'
+      + '<span><svg viewBox="0 0 24 24"><use href="#i-clock"></use></svg>' + c.days + '日で成約</span>'
+      + '</div>'
+      + '</div>'
+      + '</div>';
+  }
+
+  function render(){
+    var grid = document.getElementById('cases-grid');
+    var filtered = activeFilter === 'all' ? cases : cases.filter(function(c){ return c.tag === activeFilter; });
+    document.getElementById('filter-count').textContent = filtered.length + '件';
+
+    var html = '';
+    filtered.forEach(function(c){
+      if(c.featured && activeFilter === 'all') html += renderFeatured(c);
+      else html += renderCard(c);
+    });
+    grid.innerHTML = html || '<div style="grid-column:1/-1;text-align:center;padding:48px;color:var(--body-soft);">該当する事例が見つかりませんでした。</div>';
+
+    /* スクロール演出を再適用 */
+    if('IntersectionObserver' in window){
+      var io2 = new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io2.unobserve(e.target); } }); }, {threshold:.06});
+      grid.querySelectorAll('.rv').forEach(function(el){ io2.observe(el); });
+    } else {
+      grid.querySelectorAll('.rv').forEach(function(el){ el.classList.add('in'); });
+    }
+  }
+
+  window.filterCases = function(tag, btn){
+    activeFilter = tag;
+    document.querySelectorAll('.filter-chip').forEach(function(b){ b.classList.remove('active'); });
+    btn.classList.add('active');
+    render();
+  };
+
+  render();
+
+})();
+</script>
+</body>
+</html>

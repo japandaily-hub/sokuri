@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>交渉チャット｜カタヅケ</title>
+<meta name="theme-color" content="#1f54de">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --blue:#1f54de; --blue-d:#1742b0; --navy:#0f2552; --ink:#16213a;
+  --body:#3f4a60; --body-soft:#697288; --line:#e4e8f0; --line-soft:#eef1f7;
+  --pale:#eef3ff; --green:#1f8a5b; --white:#fff;
+  --radius:18px; --radius-s:12px;
+  --shadow-s:0 2px 10px -4px rgba(15,37,82,.14);
+  --shadow-m:0 16px 36px -20px rgba(15,37,82,.30);
+  --ease:cubic-bezier(.22,.61,.36,1);
+  --head:"Zen Kaku Gothic New",sans-serif;
+  --sans:"Noto Sans JP",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:var(--sans);color:var(--body);background:#f4f6fb;display:flex;flex-direction:column;}
+a{color:inherit;text-decoration:none;}
+img{display:block;max-width:100%;}
+
+/* ヘッダー */
+.chat-header{
+  height:56px;
+  background:#fff;
+  border-bottom:1px solid var(--line);
+  display:flex;
+  align-items:center;
+  padding:0 16px;
+  gap:12px;
+  flex-shrink:0;
+  position:relative;
+  z-index:10;
+}
+.ch-logo{display:flex;align-items:center;gap:6px;}
+.ch-logo img{height:30px;}
+.ch-divider{width:1px;height:20px;background:var(--line);}
+.ch-title{font-family:var(--head);font-size:14.5px;font-weight:700;color:var(--navy);}
+.ch-id{margin-left:auto;font-size:12px;font-weight:600;color:var(--body-soft);background:var(--pale);padding:4px 10px;border-radius:99px;}
+.ch-bell{width:36px;height:36px;border-radius:10px;background:var(--pale);display:flex;align-items:center;justify-content:center;color:var(--blue);cursor:pointer;position:relative;flex-shrink:0;}
+.bell-dot{position:absolute;top:6px;right:6px;width:7px;height:7px;border-radius:50%;background:#e05c5c;}
+
+/* メインレイアウト */
+.chat-layout{display:flex;flex:1;overflow:hidden;}
+
+/* サイドバー（業者リスト） */
+.biz-sidebar{
+  width:200px;
+  flex-shrink:0;
+  background:#fff;
+  border-right:1px solid var(--line);
+  display:flex;
+  flex-direction:column;
+  overflow-y:auto;
+}
+.biz-sidebar-head{
+  padding:14px 14px 10px;
+  font-size:11.5px;
+  font-weight:700;
+  color:var(--body-soft);
+  letter-spacing:.06em;
+  border-bottom:1px solid var(--line-soft);
+}
+.biz-item{
+  padding:12px 14px;
+  cursor:pointer;
+  border-bottom:1px solid var(--line-soft);
+  transition:background .15s;
+  position:relative;
+}
+.biz-item:hover{background:var(--pale);}
+.biz-item.active{background:var(--pale);border-left:3px solid var(--blue);}
+.biz-rank{
+  width:22px;height:22px;
+  border-radius:50%;
+  background:var(--line);
+  color:var(--body-soft);
+  font-size:11px;font-weight:900;
+  font-family:var(--head);
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+  margin-bottom:6px;
+}
+.biz-item.active .biz-rank,.biz-item:first-of-type .biz-rank{background:#f0b429;color:#7a5700;}
+.biz-name{font-size:13px;font-weight:700;color:var(--ink);margin-bottom:3px;line-height:1.3;}
+.biz-preview{font-size:11.5px;color:var(--body-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;}
+.biz-meta{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+.biz-time{font-size:10.5px;color:var(--body-soft);}
+.biz-bid{font-size:12px;font-weight:700;color:var(--blue);}
+.biz-unread{width:8px;height:8px;border-radius:50%;background:var(--blue);position:absolute;bottom:14px;right:14px;}
+
+/* メインチャットエリア */
+.chat-main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;}
+
+/* チャット相手ヘッダー */
+.chat-peer-header{
+  background:#fff;
+  border-bottom:1px solid var(--line);
+  padding:12px 20px;
+  display:flex;
+  align-items:center;
+  gap:14px;
+  flex-shrink:0;
+}
+.peer-avatar{
+  width:40px;height:40px;
+  border-radius:12px;
+  background:var(--pale);
+  color:var(--blue);
+  font-family:var(--head);font-size:16px;font-weight:900;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.peer-name-block{flex:1;}
+.peer-name{font-size:15px;font-weight:900;color:var(--navy);font-family:var(--head);}
+.peer-sub{font-size:12px;color:var(--body-soft);margin-top:2px;}
+.peer-link{font-size:12px;color:var(--blue);font-weight:600;text-decoration:underline;text-underline-offset:2px;cursor:pointer;}
+.peer-bid-chip{
+  background:var(--pale);
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:8px 14px;
+  text-align:center;
+}
+.peer-bid-label{font-size:10px;font-weight:700;color:var(--body-soft);letter-spacing:.06em;}
+.peer-bid-amount{font-family:var(--head);font-size:18px;font-weight:900;color:var(--navy);}
+
+/* アクションバー */
+.action-bar{
+  background:#fff7e6;
+  border-bottom:1px solid #f0d080;
+  padding:10px 20px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  flex-shrink:0;
+}
+.action-bar-ic{font-size:16px;flex-shrink:0;}
+.action-bar-text{font-size:13px;color:var(--ink);flex:1;}
+.action-bar-text strong{color:#7a5700;}
+.btn-action{
+  padding:7px 16px;
+  border-radius:99px;
+  border:none;
+  background:var(--blue);
+  color:#fff;
+  font-family:var(--head);font-size:13px;font-weight:700;
+  cursor:pointer;
+  white-space:nowrap;
+  transition:.2s;
+}
+.btn-action:hover{background:var(--blue-d);}
+
+/* LINE通知バナー */
+.line-banner{
+  background:#f0fff8;
+  border-bottom:1px solid #a7f0cc;
+  padding:9px 20px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:12.5px;
+  color:#1a6040;
+  flex-shrink:0;
+}
+.line-dot{width:8px;height:8px;border-radius:50%;background:#06c755;flex-shrink:0;}
+
+/* メッセージエリア */
+.messages-area{
+  flex:1;
+  overflow-y:auto;
+  padding:20px;
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+}
+
+/* メッセージバブル */
+.msg{display:flex;gap:10px;align-items:flex-end;}
+.msg.me{flex-direction:row-reverse;}
+.msg-avatar{
+  width:32px;height:32px;
+  border-radius:10px;
+  background:var(--pale);
+  color:var(--blue);
+  font-family:var(--head);font-size:13px;font-weight:900;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.bubble{
+  max-width:68%;
+  padding:12px 16px;
+  border-radius:18px;
+  font-size:14px;
+  line-height:1.7;
+}
+.msg.them .bubble{
+  background:#fff;
+  border:1px solid var(--line);
+  border-bottom-left-radius:4px;
+  color:var(--ink);
+}
+.msg.me .bubble{
+  background:var(--blue);
+  color:#fff;
+  border-bottom-right-radius:4px;
+}
+.msg-time{font-size:10.5px;color:var(--body-soft);margin-bottom:4px;white-space:nowrap;}
+.msg.me .msg-time{text-align:right;}
+
+/* 日付区切り */
+.date-sep{
+  text-align:center;
+  font-size:12px;
+  color:var(--body-soft);
+  font-weight:600;
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.date-sep::before,.date-sep::after{content:"";flex:1;height:1px;background:var(--line);}
+
+/* 引き取り日程カード */
+.schedule-card{
+  background:#fff;
+  border:1.5px solid var(--blue);
+  border-radius:var(--radius-s);
+  padding:16px 18px;
+  max-width:320px;
+  margin-left:42px;
+}
+.schedule-card-head{
+  display:flex;align-items:center;gap:8px;
+  font-size:13px;font-weight:700;color:var(--navy);
+  margin-bottom:12px;
+}
+.schedule-ic{font-size:16px;}
+.schedule-options{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;}
+.schedule-opt{
+  display:flex;align-items:center;gap:8px;
+  font-size:13.5px;color:var(--body);
+  cursor:pointer;
+  padding:6px 0;
+}
+.schedule-opt input[type="radio"]{accent-color:var(--blue);width:16px;height:16px;}
+.schedule-opt label{cursor:pointer;}
+.btn-schedule{
+  width:100%;
+  padding:11px;
+  border-radius:99px;
+  border:none;
+  background:var(--blue);
+  color:#fff;
+  font-family:var(--head);font-size:14px;font-weight:900;
+  cursor:pointer;
+  transition:.2s;
+}
+.btn-schedule:hover{background:var(--blue-d);}
+
+/* メッセージ入力 */
+.input-area{
+  background:#fff;
+  border-top:1px solid var(--line);
+  padding:12px 16px;
+  display:flex;
+  gap:10px;
+  align-items:center;
+  flex-shrink:0;
+}
+.msg-input{
+  flex:1;
+  background:#f4f6fb;
+  border:1.5px solid var(--line);
+  border-radius:99px;
+  padding:10px 18px;
+  font-family:var(--sans);font-size:14px;color:var(--ink);
+  outline:none;
+  transition:border-color .2s;
+}
+.msg-input:focus{border-color:var(--blue);background:#fff;}
+.msg-input::placeholder{color:#bcc3d4;}
+.btn-send{
+  width:40px;height:40px;
+  border-radius:50%;
+  border:none;
+  background:var(--blue);
+  color:#fff;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+  transition:.2s;
+}
+.btn-send:hover{background:var(--blue-d);}
+.btn-send svg{width:18px;height:18px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+
+@media(max-width:600px){
+  .biz-sidebar{width:160px;}
+  .peer-bid-chip{display:none;}
+}
+</style>
+</head>
+<body>
+
+<!-- ヘッダー -->
+<div class="chat-header">
+  <div class="ch-logo">
+    <a href="カタヅケ.html"><img src="img/logo-katazuke.png" alt="カタヅケ"></a>
+  </div>
+  <div class="ch-divider"></div>
+  <span class="ch-title">交渉チャット</span>
+  <span class="ch-id">KTZ-2026-04821</span>
+  <div class="ch-bell">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+    <span class="bell-dot"></span>
+  </div>
+</div>
+
+<!-- メインレイアウト -->
+<div class="chat-layout">
+
+  <!-- 業者リスト -->
+  <div class="biz-sidebar">
+    <div class="biz-sidebar-head">上位の業者</div>
+
+    <div class="biz-item active" onclick="selectBiz(this,0)">
+      <div class="biz-meta">
+        <div class="biz-rank">1</div>
+        <span class="biz-time">15:42</span>
+      </div>
+      <div class="biz-name">グリーンリサイクル東京</div>
+      <div class="biz-preview">引き取り日程はご都合の…</div>
+      <span class="biz-bid">¥68,000</span>
+    </div>
+
+    <div class="biz-item" onclick="selectBiz(this,1)">
+      <div class="biz-meta">
+        <div class="biz-rank" style="background:var(--pale);color:var(--blue);">2</div>
+        <span class="biz-time">14:31</span>
+      </div>
+      <div class="biz-name">アクトリユース</div>
+      <div class="biz-preview">ご検討いただきましたら…</div>
+      <span class="biz-bid">¥62,000</span>
+      <span class="biz-unread"></span>
+    </div>
+
+    <div class="biz-item" onclick="selectBiz(this,2)">
+      <div class="biz-meta">
+        <div class="biz-rank" style="background:#f4f6fb;color:var(--body-soft);">3</div>
+        <span class="biz-time">13:05</span>
+      </div>
+      <div class="biz-name">エコステーション千葉</div>
+      <div class="biz-preview">はじめまして。この度は…</div>
+      <span class="biz-bid">¥58,000</span>
+      <span class="biz-unread"></span>
+    </div>
+  </div>
+
+  <!-- チャット本体 -->
+  <div class="chat-main">
+
+    <!-- 相手ヘッダー -->
+    <div class="chat-peer-header">
+      <div class="peer-avatar">グ</div>
+      <div class="peer-name-block">
+        <div class="peer-name">グリーンリサイクル東京</div>
+        <div class="peer-sub">東京都・神奈川県対応　古物商許可あり　<span class="peer-link">プロフィールを見る</span></div>
+      </div>
+      <div class="peer-bid-chip">
+        <div class="peer-bid-label">入札額</div>
+        <div class="peer-bid-amount">¥68,000</div>
+      </div>
+    </div>
+
+    <!-- アクションバー -->
+    <div class="action-bar" id="action-bar">
+      <span class="action-bar-ic">📅</span>
+      <span class="action-bar-text"><strong>引き取り日程を確定しましょう</strong>　業者が候補日を提案しています</span>
+      <button class="btn-action" onclick="scrollToSchedule()">確認する</button>
+    </div>
+
+    <!-- LINE通知バナー -->
+    <div class="line-banner">
+      <span class="line-dot"></span>
+      新着メッセージはLINEにも通知されます。返信はこのページで行えます。
+    </div>
+
+    <!-- メッセージ -->
+    <div class="messages-area" id="messages-area">
+
+      <div class="msg them">
+        <div class="msg-avatar">グ</div>
+        <div>
+          <div class="bubble">家電・ブランド品を中心に高評価しております。値がつかないものも含めてまとめて回収いたします。引き取りは弊社スタッフ2名でお伺いしますので、重いものも安心してお任せください。</div>
+          <div class="msg-time">13:11</div>
+        </div>
+      </div>
+
+      <div class="msg me">
+        <div class="msg-avatar" style="background:var(--navy);color:#fff;">山</div>
+        <div>
+          <div class="bubble">ご連絡ありがとうございます。金額について、もう少し上げていただくことは可能でしょうか？</div>
+          <div class="msg-time">13:45</div>
+        </div>
+      </div>
+
+      <div class="msg them">
+        <div class="msg-avatar">グ</div>
+        <div>
+          <div class="bubble">ご要望ありがとうございます。社内で検討いたしました。カメラ機材の評価を見直し、¥72,000での買取であれば対応可能です。いかがでしょうか。</div>
+          <div class="msg-time">14:20</div>
+        </div>
+      </div>
+
+      <div class="msg me">
+        <div class="msg-avatar" style="background:var(--navy);color:#fff;">山</div>
+        <div>
+          <div class="bubble">ありがとうございます。¥72,000でお願いします。日程はいつ頃が可能ですか？</div>
+          <div class="msg-time">15:10</div>
+        </div>
+      </div>
+
+      <div class="date-sep">6月24日（火）</div>
+
+      <!-- 引き取り日程カード -->
+      <div class="schedule-card" id="schedule-card">
+        <div class="schedule-card-head">
+          <span class="schedule-ic">📅</span>引き取り候補日
+        </div>
+        <div class="schedule-options">
+          <div class="schedule-opt">
+            <input type="radio" name="schedule" id="s1" checked>
+            <label for="s1">7月5日（土）10:00〜12:00</label>
+          </div>
+          <div class="schedule-opt">
+            <input type="radio" name="schedule" id="s2">
+            <label for="s2">7月6日（日）13:00〜15:00</label>
+          </div>
+          <div class="schedule-opt">
+            <input type="radio" name="schedule" id="s3">
+            <label for="s3">7月12日（土）10:00〜12:00</label>
+          </div>
+        </div>
+        <button class="btn-schedule" onclick="confirmSchedule()">7月5日（土）を選ぶ</button>
+      </div>
+
+      <div class="msg them" style="margin-top:4px;">
+        <div class="msg-avatar">グ</div>
+        <div>
+          <div class="bubble">引き取り日程の候補をお送りしました。ご都合の良い日程をお選びください。当日はスタッフ2名でお伺いします。</div>
+          <div class="msg-time">09:31</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 入力エリア -->
+    <div class="input-area">
+      <input type="text" class="msg-input" id="msg-input" placeholder="メッセージを入力…">
+      <button class="btn-send" onclick="sendMsg()">
+        <svg viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2L15 22l-4-9-9-4 20-7z"/></svg>
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+var bizData = [
+  { name:'グリーンリサイクル東京', area:'東京都・神奈川県対応', bid:'¥72,000', initial:'グ' },
+  { name:'アクトリユース', area:'東京都・埼玉県対応', bid:'¥62,000', initial:'ア' },
+  { name:'エコステーション千葉', area:'千葉県・東京都対応', bid:'¥58,000', initial:'エ' }
+];
+
+function selectBiz(el, idx){
+  document.querySelectorAll('.biz-item').forEach(function(i){ i.classList.remove('active'); });
+  el.classList.add('active');
+  var d = bizData[idx];
+  document.querySelector('.peer-name').textContent = d.name;
+  document.querySelector('.peer-sub').innerHTML = d.area + '　古物商許可あり　<span class="peer-link">プロフィールを見る</span>';
+  document.querySelector('.peer-bid-amount').textContent = d.bid;
+  document.querySelector('.peer-avatar').textContent = d.initial;
+  var unread = el.querySelector('.biz-unread');
+  if(unread) unread.remove();
+}
+
+function scrollToSchedule(){
+  var sc = document.getElementById('schedule-card');
+  if(sc) sc.scrollIntoView({ behavior:'smooth', block:'center' });
+}
+
+function confirmSchedule(){
+  var checked = document.querySelector('input[name="schedule"]:checked');
+  var label = checked ? checked.nextElementSibling.textContent : '';
+  var btn = document.querySelector('.btn-schedule');
+  btn.textContent = label + ' ✓ 選択済み';
+  btn.style.background = 'var(--green)';
+  btn.disabled = true;
+  document.getElementById('action-bar').style.display = 'none';
+  addMsg('me', label + ' でお願いします。よろしくお願いいたします！');
+  setTimeout(function(){
+    addMsg('them', 'ありがとうございます。' + label + ' にお伺いします。当日は10分前を目安にご連絡いたします。');
+  }, 1200);
+}
+
+function addMsg(type, text){
+  var area = document.getElementById('messages-area');
+  var d = bizData[0];
+  var avatar = type === 'me'
+    ? '<div class="msg-avatar" style="background:var(--navy);color:#fff;">\u5c71</div>'
+    : '<div class="msg-avatar">' + d.initial + '</div>';
+  var div = document.createElement('div');
+  div.className = 'msg ' + type;
+  div.innerHTML = avatar + '<div><div class="bubble">' + text + '</div><div class="msg-time">' + new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}) + '</div></div>';
+  area.appendChild(div);
+  area.scrollTop = area.scrollHeight;
+}
+
+function sendMsg(){
+  var inp = document.getElementById('msg-input');
+  var t = inp.value.trim();
+  if(!t) return;
+  addMsg('me', t);
+  inp.value = '';
+}
+
+document.getElementById('msg-input').addEventListener('keydown', function(e){
+  if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendMsg(); }
+});
+
+document.getElementById('messages-area').scrollTop = 9999;
+
+// ラジオボタンでボタンラベル更新
+document.querySelectorAll('input[name="schedule"]').forEach(function(r){
+  r.addEventListener('change', function(){
+    var lbl = this.nextElementSibling.textContent;
+    document.querySelector('.btn-schedule').textContent = lbl + ' を選ぶ';
+  });
+});
+</script>
+</body>
+</html>

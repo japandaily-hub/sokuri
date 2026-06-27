@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>業者ダッシュボード｜カタヅケ</title>
+<meta name="theme-color" content="#1f54de">
+<link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="katazuke-main.css">
+<style>
+/* ============================================================
+   業者ダッシュボード
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; }
+body { background: #fff; }
+
+/* ヘッダー */
+.biz-header {
+  height: 60px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 16px;
+  background: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+.biz-header .logo-img { height: 36px; }
+.biz-header-sep { width: 1px; height: 20px; background: var(--line); margin: 0 4px; }
+.biz-header-title { font-size: 13.5px; font-weight: 700; color: var(--body-soft); }
+.biz-header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.biz-header-co {
+  font-size: 13px; font-weight: 700; color: var(--ink);
+  display: flex; align-items: center; gap: 8px;
+}
+.biz-header-co .co-dot {
+  width: 28px; height: 28px; border-radius: 8px;
+  background: var(--navy); color: #fff;
+  font-family: var(--head); font-size: 11px; font-weight: 900;
+  display: flex; align-items: center; justify-content: center;
+}
+.notif-btn {
+  width: 36px; height: 36px; border-radius: 10px;
+  background: var(--pale); border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--blue); position: relative; transition: .2s;
+}
+.notif-btn:hover { background: #dde6ff; }
+.notif-btn svg { width:18px; height:18px; fill:none; stroke:var(--blue); stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
+.notif-dot { position: absolute; top:6px; right:6px; width:7px; height:7px; border-radius:50%; background:#e05c5c; }
+
+/* ページ全体 */
+.dash-wrap { max-width: 1100px; margin: 0 auto; padding: 28px 24px 80px; }
+
+/* タブ */
+.dash-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--line);
+  margin-bottom: 28px;
+}
+.dash-tab {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--body-soft);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color .2s;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  font-family: var(--sans);
+}
+.dash-tab:hover { color: var(--ink); }
+.dash-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+.tab-badge {
+  font-size: 11px;
+  font-weight: 900;
+  background: var(--blue);
+  color: #fff;
+  border-radius: 99px;
+  padding: 1px 7px;
+  font-family: var(--head);
+}
+.tab-badge.gray { background: var(--line); color: var(--body-soft); }
+
+/* サマリー帯 */
+.summary-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 28px;
+}
+.sum-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  padding: 18px 20px;
+  background: #fff;
+}
+.sum-label { font-size: 12px; font-weight: 700; color: var(--body-soft); margin-bottom: 8px; }
+.sum-val { font-family: var(--head); font-size: 26px; font-weight: 900; color: var(--navy); line-height: 1; }
+.sum-val span { font-size: 13px; font-weight: 600; color: var(--body-soft); margin-left: 2px; }
+.sum-sub { font-size: 11.5px; color: var(--body-soft); margin-top: 5px; }
+.sum-card.highlight { border-color: var(--blue); background: var(--pale); }
+.sum-card.highlight .sum-val { color: var(--blue); }
+
+/* フィルター */
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.filter-select {
+  font-family: var(--sans);
+  font-size: 13.5px;
+  color: var(--ink);
+  background: #fff;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 32px 8px 12px;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238a95aa' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  transition: border-color .2s;
+}
+.filter-select:focus { border-color: var(--blue); }
+.filter-label { font-size: 13px; font-weight: 600; color: var(--body-soft); white-space: nowrap; }
+.filter-count { margin-left: auto; font-size: 13px; color: var(--body-soft); white-space: nowrap; }
+
+/* 案件カード */
+.lot-grid { display: flex; flex-direction: column; gap: 16px; }
+.lot-card {
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  overflow: hidden;
+  transition: border-color .2s;
+}
+.lot-card:hover { border-color: #b8c8f0; }
+.lot-card.winning { border-color: #86efac; }
+.lot-card.outbid { border-color: #fca5a5; }
+
+.lot-card-inner {
+  display: grid;
+  grid-template-columns: 200px 1fr auto;
+  gap: 0;
+}
+
+/* 写真グリッド */
+.lot-photos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 2px;
+  aspect-ratio: 4/3;
+  background: var(--line-soft);
+  flex-shrink: 0;
+}
+.lot-photo { overflow: hidden; background: #f0f2f8; }
+.lot-photo img { width: 100%; height: 100%; object-fit: contain; }
+.lot-photo:first-child { grid-row: 1 / 3; }
+.lot-photo-more {
+  background: var(--pale);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 2px;
+}
+.lot-photo-more span { font-family: var(--head); font-size: 15px; font-weight: 900; color: var(--blue); }
+.lot-photo-more small { font-size: 10px; color: var(--body-soft); }
+
+/* 案件情報 */
+.lot-info { padding: 18px 20px; display: flex; flex-direction: column; gap: 8px; }
+.lot-info-top { display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+.lot-id { font-size: 11px; font-weight: 700; color: var(--body-soft); letter-spacing: .06em; }
+.lot-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.lot-tag {
+  font-size: 11px; font-weight: 700;
+  padding: 2px 9px; border-radius: 99px;
+  border: 1px solid var(--line);
+  color: var(--body-soft);
+}
+.lot-tag.blue { border-color: #b8c8f0; color: var(--blue); background: var(--pale); }
+.lot-tag.green { border-color: #86efac; color: var(--green); background: #f0fdf4; }
+.lot-tag.red { border-color: #fca5a5; color: #dc2626; background: #fff5f5; }
+.lot-items-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.lot-item-chip {
+  font-size: 12px;
+  color: var(--ink);
+  background: #f4f6fb;
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-weight: 600;
+}
+.lot-meta { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 4px; }
+.lot-meta-item { font-size: 12.5px; color: var(--body-soft); display: flex; align-items: center; gap: 5px; }
+.lot-meta-item svg { width:13px; height:13px; fill:none; stroke:var(--body-soft); stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; }
+.lot-timer {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.lot-timer.urgent { color: #dc2626; }
+.lot-timer.normal { color: var(--body-soft); }
+.live-dot { width:6px; height:6px; border-radius:50%; background:#4ade80; animation: blink 1.4s infinite; flex-shrink:0; }
+@keyframes blink { 0%,100%{opacity:1}50%{opacity:.3} }
+
+/* 入札エリア */
+.lot-bid-area {
+  border-left: 1px solid var(--line-soft);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 220px;
+  background: #fafbfe;
+}
+.bid-status {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.bid-status.winning { color: var(--green); }
+.bid-status.outbid { color: #dc2626; }
+.bid-status.none { color: var(--body-soft); }
+.bid-status svg { width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
+
+.current-top { font-size: 12px; color: var(--body-soft); margin-bottom: 2px; }
+.current-amount {
+  font-family: var(--head);
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--navy);
+  line-height: 1;
+}
+.current-amount span { font-size: 12px; color: var(--body-soft); font-weight: 600; margin-left: 2px; }
+.my-bid-row {
+  background: #fff;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  color: var(--body-soft);
+}
+.my-bid-row strong { color: var(--ink); font-size: 14px; }
+
+/* 入札フォーム */
+.bid-form { display: flex; flex-direction: column; gap: 8px; }
+.bid-input-wrap {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: border-color .2s;
+}
+.bid-input-wrap:focus-within { border-color: var(--blue); }
+.bid-yen {
+  padding: 0 10px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--body-soft);
+  border-right: 1px solid var(--line-soft);
+  height: 40px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.bid-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-family: var(--head);
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--navy);
+  padding: 0 10px;
+  height: 40px;
+  background: transparent;
+  min-width: 0;
+  letter-spacing: .02em;
+}
+.bid-input::placeholder { color: #bcc3d4; font-size: 14px; font-weight: 400; }
+.bid-en { padding: 0 10px; font-size: 13px; color: var(--body-soft); flex-shrink: 0; }
+.bid-submit {
+  width: 100%;
+  padding: 11px;
+  background: var(--blue);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-family: var(--head);
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: .2s;
+}
+.bid-submit:hover { background: var(--blue-d); }
+.bid-submit.update { background: #fff; color: var(--blue); border: 1.5px solid var(--blue); }
+.bid-submit.update:hover { background: var(--pale); }
+.bid-hint { font-size: 11px; color: var(--body-soft); text-align: center; line-height: 1.5; }
+
+/* 入札数 */
+.bid-count-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--body-soft); }
+.bid-count-row strong { color: var(--ink); font-size: 14px; font-family: var(--head); }
+
+/* タブコンテンツ */
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* 交渉中タブ */
+.negotiation-card {
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 14px;
+  background: #fff;
+  transition: border-color .2s;
+}
+.negotiation-card:hover { border-color: #b8c8f0; }
+.neg-user-ic {
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  background: var(--pale);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--head);
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--blue);
+  flex-shrink: 0;
+}
+.neg-info { flex: 1; min-width: 0; }
+.neg-lot { font-size: 13px; font-weight: 700; color: var(--navy); margin-bottom: 3px; }
+.neg-preview { font-size: 12.5px; color: var(--body-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.neg-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0; }
+.neg-amount { font-family: var(--head); font-size: 18px; font-weight: 900; color: var(--navy); }
+.neg-time { font-size: 11.5px; color: var(--body-soft); }
+.unread-chip {
+  font-size: 11px; font-weight: 900;
+  background: var(--blue); color: #fff;
+  border-radius: 99px; padding: 2px 8px;
+  font-family: var(--head);
+}
+
+/* 空状態 */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--body-soft);
+}
+.empty-state svg { width:40px; height:40px; fill:none; stroke:var(--line); stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; margin-bottom:16px; }
+.empty-state p { font-size: 14px; line-height: 1.8; }
+
+/* 入札確認モーダル */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(10,20,50,.45);
+  backdrop-filter: blur(4px);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s;
+}
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+.modal {
+  background: #fff;
+  border-radius: 20px;
+  padding: 32px 28px 24px;
+  max-width: 400px;
+  width: 100%;
+  box-shadow: 0 24px 60px -10px rgba(10,20,50,.25);
+  transform: translateY(10px);
+  transition: transform .3s;
+}
+.modal-overlay.open .modal { transform: translateY(0); }
+.modal h3 { font-size: 18px; color: var(--navy); margin-bottom: 8px; }
+.modal-body { font-size: 14px; color: var(--body-soft); line-height: 1.8; margin-bottom: 20px; }
+.modal-amount { font-family: var(--head); font-size: 32px; font-weight: 900; color: var(--navy); text-align: center; padding: 16px; background: var(--pale); border-radius: 12px; margin-bottom: 20px; }
+.modal-amount span { font-size: 15px; font-weight: 600; color: var(--body-soft); }
+.modal-warn { font-size: 12.5px; color: #b9892f; background: #fdf5e6; border-radius: 8px; padding: 10px 14px; margin-bottom: 20px; line-height: 1.7; }
+.modal-actions { display: flex; gap: 10px; }
+.btn-cancel { flex:1; padding:13px; border-radius:999px; border:1.5px solid var(--line); background:#fff; color:var(--ink); font-family:var(--head); font-weight:700; font-size:14px; cursor:pointer; transition:.2s; }
+.btn-cancel:hover { border-color:var(--blue); color:var(--blue); }
+.btn-confirm { flex:1; padding:13px; border-radius:999px; border:none; background:var(--blue); color:#fff; font-family:var(--head); font-weight:900; font-size:14px; cursor:pointer; box-shadow:0 10px 22px -8px rgba(31,84,222,.5); transition:.2s; }
+.btn-confirm:hover { background:var(--blue-d); transform:translateY(-1px); }
+
+/* 入札成功トースト */
+.toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--navy);
+  color: #fff;
+  border-radius: 99px;
+  padding: 13px 24px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--head);
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: var(--shadow-l);
+  transition: transform .35s cubic-bezier(.22,.61,.36,1);
+  white-space: nowrap;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+.toast svg { width:18px; height:18px; fill:none; stroke:#4ade80; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
+
+/* レスポンシブ */
+@media(max-width:860px){
+  .lot-card-inner { grid-template-columns: 140px 1fr; }
+  .lot-bid-area { display: none; }
+  .summary-bar { grid-template-columns: repeat(2,1fr); }
+}
+@media(max-width:580px){
+  .lot-card-inner { grid-template-columns: 1fr; }
+  .lot-photos { aspect-ratio: 16/7; grid-template-rows: 1fr; }
+  .lot-photo:first-child { grid-row: auto; }
+  .summary-bar { grid-template-columns: repeat(2,1fr); }
+  .dash-wrap { padding: 20px 16px 60px; }
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-map" viewBox="0 0 24 24"><path d="M12 21s7-6.3 7-11a7 7 0 10-14 0c0 4.7 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4.5l3 2"/></symbol>
+  <symbol id="i-trend" viewBox="0 0 24 24"><path d="M4 17l5-5 3 3 7-7"/><path d="M16 8h4v4"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M5 5h14a2 2 0 012 2v8a2 2 0 01-2 2H9l-4 4V7a2 2 0 012-2z"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></symbol>
+</defs></svg>
+
+<!-- ヘッダー -->
+<header class="biz-header">
+  <a href="カタヅケ.html"><img src="img/logo-katazuke.png" alt="カタヅケ" class="logo-img"></a>
+  <div class="biz-header-sep"></div>
+  <span class="biz-header-title">業者ダッシュボード</span>
+  <div class="biz-header-right">
+    <button class="notif-btn">
+      <svg viewBox="0 0 24 24"><use href="#i-bell"></use></svg>
+      <span class="notif-dot"></span>
+    </button>
+    <div class="biz-header-co">
+      <div class="co-dot">グ</div>
+      グリーンリサイクル東京
+    </div>
+  </div>
+</header>
+
+<div class="dash-wrap">
+
+  <!-- サマリー帯 -->
+  <div class="summary-bar">
+    <div class="sum-card highlight">
+      <div class="sum-label">入札中の案件</div>
+      <div class="sum-val">3<span>件</span></div>
+      <div class="sum-sub">うち首位 2件</div>
+    </div>
+    <div class="sum-card">
+      <div class="sum-label">交渉中</div>
+      <div class="sum-val">1<span>件</span></div>
+      <div class="sum-sub">未読メッセージ 2件</div>
+    </div>
+    <div class="sum-card">
+      <div class="sum-label">今月の成約</div>
+      <div class="sum-val">4<span>件</span></div>
+      <div class="sum-sub">買取総額 ¥312,000</div>
+    </div>
+    <div class="sum-card">
+      <div class="sum-label">新着案件</div>
+      <div class="sum-val">8<span>件</span></div>
+      <div class="sum-sub">今日追加</div>
+    </div>
+  </div>
+
+  <!-- タブ -->
+  <div class="dash-tabs">
+    <button class="dash-tab active" onclick="switchTab('lots')">
+      <svg style="width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;" viewBox="0 0 24 24"><use href="#i-list"></use></svg>
+      案件一覧
+      <span class="tab-badge">24</span>
+    </button>
+    <button class="dash-tab" onclick="switchTab('bids')">
+      <svg style="width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;" viewBox="0 0 24 24"><use href="#i-trend"></use></svg>
+      入札中
+      <span class="tab-badge">3</span>
+    </button>
+    <button class="dash-tab" onclick="switchTab('neg')">
+      <svg style="width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;" viewBox="0 0 24 24"><use href="#i-chat"></use></svg>
+      交渉中
+      <span class="tab-badge">1</span>
+    </button>
+    <button class="dash-tab" onclick="switchTab('done')">
+      <svg style="width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;" viewBox="0 0 24 24"><use href="#i-check"></use></svg>
+      成約済み
+      <span class="tab-badge gray">4</span>
+    </button>
+  </div>
+
+  <!-- 案件一覧タブ -->
+  <div class="tab-content active" id="tab-lots">
+    <div class="filter-row">
+      <span class="filter-label">絞り込み</span>
+      <select class="filter-select">
+        <option>全エリア</option>
+        <option>東京都</option>
+        <option>神奈川県</option>
+        <option>千葉県</option>
+        <option>埼玉県</option>
+      </select>
+      <select class="filter-select">
+        <option>全カテゴリ</option>
+        <option>家電・PC</option>
+        <option>ブランド品</option>
+        <option>カメラ</option>
+        <option>家具</option>
+        <option>衣類・靴</option>
+      </select>
+      <select class="filter-select">
+        <option>新着順</option>
+        <option>締め切り近い順</option>
+        <option>入札額高い順</option>
+        <option>点数多い順</option>
+      </select>
+      <span class="filter-count">24件</span>
+    </div>
+
+    <div class="lot-grid" id="lot-grid"></div>
+  </div>
+
+  <!-- 入札中タブ -->
+  <div class="tab-content" id="tab-bids">
+    <div class="lot-grid" id="bid-grid"></div>
+  </div>
+
+  <!-- 交渉中タブ -->
+  <div class="tab-content" id="tab-neg">
+    <a href="chat.html" class="negotiation-card" style="text-decoration:none;color:inherit;">
+      <div class="neg-user-ic">山</div>
+      <div class="neg-info">
+        <div class="neg-lot">KTZ-2026-04821　家電・ブランド品など14点</div>
+        <div class="neg-preview">引き取り日程はいつ頃が可能ですか？</div>
+      </div>
+      <div class="neg-right">
+        <div class="neg-amount">¥72,000</div>
+        <div class="neg-time">15:42</div>
+        <span class="unread-chip">未読 2</span>
+      </div>
+    </a>
+  </div>
+
+  <!-- 成約済みタブ -->
+  <div class="tab-content" id="tab-done">
+    <div style="display:flex;flex-direction:column;gap:14px;" id="done-list"></div>
+  </div>
+
+</div>
+
+<!-- 入札確認モーダル -->
+<div class="modal-overlay" id="bid-modal">
+  <div class="modal">
+    <h3>入札を確定しますか？</h3>
+    <p class="modal-body">以下の金額でこのまとめに入札します。上位3社に入れば交渉に進めます。</p>
+    <div class="modal-amount" id="modal-amount">¥<span id="modal-amount-val">—</span><span>円</span></div>
+    <p class="modal-warn">⚠ 提示した金額を大きく下回る減額は、査定現場での顧客合意が必要です。</p>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="modal-cancel">キャンセル</button>
+      <button class="btn-confirm" id="modal-confirm">入札する</button>
+    </div>
+  </div>
+</div>
+
+<!-- トースト -->
+<div class="toast" id="toast">
+  <svg viewBox="0 0 24 24"><use href="#i-check"></use></svg>
+  <span id="toast-msg">入札しました</span>
+</div>
+
+<script>
+(function(){
+
+  /* ====== データ ====== */
+  var lots = [
+    {
+      id:'KTZ-2026-05102', area:'東京都世田谷区', items:['家電・PC','ブランド品','時計','カメラ'],
+      count:18, topBid:85000, myBid:null, bidCount:5,
+      expires:'1日 22:10', urgent:false,
+      photos:['cat-kaden','cat-brand','cat-watch','cat-camera'],
+      status:'none'
+    },
+    {
+      id:'KTZ-2026-05089', area:'神奈川県横浜市', items:['家具','家電・PC','衣類・靴'],
+      count:11, topBid:42000, myBid:42000, bidCount:3,
+      expires:'2日 08:44', urgent:false,
+      photos:['cat-furniture','cat-kaden','cat-fashion','cat-other'],
+      status:'winning'
+    },
+    {
+      id:'KTZ-2026-05077', area:'東京都練馬区', items:['ゲーム','カメラ','音楽'],
+      count:9, topBid:38000, myBid:32000, bidCount:7,
+      expires:'0日 04:12', urgent:true,
+      photos:['cat-game','cat-camera','cat-music','cat-other'],
+      status:'outbid'
+    },
+    {
+      id:'KTZ-2026-05063', area:'千葉県船橋市', items:['ブランド品','時計','スポーツ'],
+      count:14, topBid:61000, myBid:null, bidCount:4,
+      expires:'2日 17:30', urgent:false,
+      photos:['cat-brand','cat-watch','cat-sport','cat-other'],
+      status:'none'
+    },
+    {
+      id:'KTZ-2026-05051', area:'東京都渋谷区', items:['家電・PC','カメラ','ブランド品','本・メディア'],
+      count:22, topBid:94000, myBid:null, bidCount:8,
+      expires:'1日 11:05', urgent:false,
+      photos:['cat-kaden','cat-camera','cat-brand','cat-book'],
+      status:'none'
+    }
+  ];
+
+  var done = [
+    { id:'KTZ-2026-04821', area:'東京都足立区', items:['家電・PC','ブランド品','カメラ'], count:14, amount:72000, date:'2026年6月25日' },
+    { id:'KTZ-2026-04712', area:'東京都板橋区', items:['家具','家電・PC'], count:8, amount:45000, date:'2026年6月18日' },
+    { id:'KTZ-2026-04680', area:'神奈川県川崎市', items:['ブランド品','時計'], count:6, amount:38000, date:'2026年6月10日' },
+    { id:'KTZ-2026-04601', area:'東京都杉並区', items:['家電・PC','ゲーム','本・メディア'], count:20, amount:52000, date:'2026年6月2日' }
+  ];
+
+  /* ====== レンダリング ====== */
+  function renderLot(lot){
+    var statusTag = '';
+    if(lot.status==='winning') statusTag = '<span class="lot-tag green">入札首位</span>';
+    else if(lot.status==='outbid') statusTag = '<span class="lot-tag red">入札順位外</span>';
+
+    var myBidHtml = '';
+    if(lot.myBid){
+      myBidHtml = '<div class="my-bid-row">自社入札 <strong>¥'+lot.myBid.toLocaleString()+'</strong></div>';
+    }
+    var submitLabel = lot.myBid ? '入札額を更新する' : '入札する';
+    var submitClass = lot.myBid ? 'bid-submit update' : 'bid-submit';
+    var inputPlaceholder = lot.myBid ? lot.myBid.toLocaleString() : '金額を入力';
+
+    return '<div class="lot-card'+( lot.status==='winning'?' winning':lot.status==='outbid'?' outbid':'')+'" id="lot-'+lot.id+'">'
+      +'<div class="lot-card-inner">'
+      +'<div class="lot-photos">'
+      +'<div class="lot-photo"><img src="img/'+lot.photos[0]+'.png" alt="" onerror="this.style.opacity=0"></div>'
+      +'<div class="lot-photo"><img src="img/'+lot.photos[1]+'.png" alt="" onerror="this.style.opacity=0"></div>'
+      +'<div class="lot-photo"><img src="img/'+lot.photos[2]+'.png" alt="" onerror="this.style.opacity=0"></div>'
+      +'<div class="lot-photo lot-photo-more"><span>+'+( lot.count-3 )+'</span><small>点</small></div>'
+      +'</div>'
+      +'<div class="lot-info">'
+      +'<div class="lot-info-top"><span class="lot-id">'+lot.id+'</span>'+statusTag+'</div>'
+      +'<div class="lot-items-row">'+lot.items.map(function(i){return '<span class="lot-item-chip">'+i+'</span>'}).join('')+'</div>'
+      +'<div class="lot-meta">'
+      +'<span class="lot-meta-item"><svg viewBox="0 0 24 24"><use href="#i-map"></use></svg>'+lot.area+'</span>'
+      +'<span class="lot-meta-item"><svg viewBox="0 0 24 24"><use href="#i-box"></use></svg>'+lot.count+'点まとめ</span>'
+      +'<span class="lot-meta-item bid-count-row"><strong>'+lot.bidCount+'</strong>社が入札中</span>'
+      +'</div>'
+      +'<div class="lot-timer '+(lot.urgent?'urgent':'normal')+'">'
+      +'<span class="live-dot"></span>残り '+lot.expires
+      +'</div>'
+      +'</div>'
+      +'<div class="lot-bid-area">'
+      +'<div>'
+      +'<div class="current-top">現在の最高入札</div>'
+      +'<div class="current-amount">'+lot.topBid.toLocaleString()+'<span>円</span></div>'
+      +'</div>'
+      +myBidHtml
+      +'<div class="bid-form">'
+      +'<div class="bid-input-wrap">'
+      +'<span class="bid-yen">¥</span>'
+      +'<input class="bid-input" type="number" placeholder="'+inputPlaceholder+'" min="1000" step="1000" data-lot="'+lot.id+'">'
+      +'<span class="bid-en">円</span>'
+      +'</div>'
+      +'<button class="'+submitClass+'" onclick="openBidModal(\''+lot.id+'\')">'+submitLabel+'</button>'
+      +'<p class="bid-hint">成約時のみ買取額の8%が手数料</p>'
+      +'</div>'
+      +'</div>'
+      +'</div>'
+      +'</div>';
+  }
+
+  function renderDone(d){
+    return '<div class="negotiation-card" style="cursor:default;">'
+      +'<div class="neg-user-ic" style="background:#d1fae5;color:var(--green);">✓</div>'
+      +'<div class="neg-info">'
+      +'<div class="neg-lot">'+d.id+'　'+d.items.join('・')+'など'+d.count+'点</div>'
+      +'<div class="neg-preview">'+d.area+'　成約日：'+d.date+'</div>'
+      +'</div>'
+      +'<div class="neg-right">'
+      +'<div class="neg-amount">¥'+d.amount.toLocaleString()+'</div>'
+      +'</div>'
+      +'</div>';
+  }
+
+  /* グリッド描画 */
+  var lotGrid = document.getElementById('lot-grid');
+  lotGrid.innerHTML = lots.map(renderLot).join('');
+
+  var bidGrid = document.getElementById('bid-grid');
+  var biddingLots = lots.filter(function(l){ return l.myBid; });
+  bidGrid.innerHTML = biddingLots.length ? biddingLots.map(renderLot).join('') : '<div class="empty-state"><svg viewBox="0 0 24 24"><use href="#i-trend"></use></svg><p>現在入札中の案件はありません。<br>「案件一覧」から入札してみましょう。</p></div>';
+
+  var doneList = document.getElementById('done-list');
+  doneList.innerHTML = done.map(renderDone).join('');
+
+  /* ====== タブ切替 ====== */
+  window.switchTab = function(key){
+    document.querySelectorAll('.dash-tab').forEach(function(b){ b.classList.remove('active'); });
+    document.querySelectorAll('.tab-content').forEach(function(c){ c.classList.remove('active'); });
+    var map = {lots:'tab-lots', bids:'tab-bids', neg:'tab-neg', done:'tab-done'};
+    document.getElementById(map[key]).classList.add('active');
+    event.currentTarget.classList.add('active');
+  };
+
+  /* ====== 入札モーダル ====== */
+  var currentLotId = null;
+  var modal = document.getElementById('bid-modal');
+  var modalAmountVal = document.getElementById('modal-amount-val');
+
+  window.openBidModal = function(lotId){
+    currentLotId = lotId;
+    var input = document.querySelector('[data-lot="'+lotId+'"]');
+    var val = input ? parseInt(input.value) : 0;
+    if(!val || val < 1000){ alert('入札金額を入力してください（1,000円以上）'); return; }
+    modalAmountVal.textContent = val.toLocaleString();
+    modal.classList.add('open');
+  };
+
+  document.getElementById('modal-cancel').addEventListener('click', function(){ modal.classList.remove('open'); });
+  modal.addEventListener('click', function(e){ if(e.target===modal) modal.classList.remove('open'); });
+
+  document.getElementById('modal-confirm').addEventListener('click', function(){
+    modal.classList.remove('open');
+    var input = document.querySelector('[data-lot="'+currentLotId+'"]');
+    var val = parseInt(input ? input.value : 0);
+    /* カード更新（デモ） */
+    var lot = lots.find(function(l){ return l.id===currentLotId; });
+    if(lot){
+      lot.myBid = val;
+      lot.status = val >= lot.topBid ? 'winning' : 'outbid';
+      if(val > lot.topBid) lot.topBid = val;
+      var card = document.getElementById('lot-'+currentLotId);
+      if(card) card.outerHTML = renderLot(lot);
+    }
+    showToast('¥' + val.toLocaleString() + ' で入札しました');
+  });
+
+  function showToast(msg){
+    var t = document.getElementById('toast');
+    document.getElementById('toast-msg').textContent = msg;
+    t.classList.add('show');
+    setTimeout(function(){ t.classList.remove('show'); }, 3000);
+  }
+
+})();
+</script>
+
+<footer style="border-top:1px solid var(--line);padding:20px 24px;display:flex;align-items:center;justify-content:center;gap:20px;flex-wrap:wrap;background:#fff;font-size:12px;">
+  <span style="color:var(--body-soft);">© 2026 カタヅケ</span>
+  <a href="プライバシーポリシー.html" style="color:var(--body-soft);text-decoration:underline;text-underline-offset:2px;">プライバシーポリシー</a>
+  <a href="利用規約.html" style="color:var(--body-soft);text-decoration:underline;text-underline-offset:2px;">利用規約・業者利用規約</a>
+  <a href="contact.html" style="color:var(--body-soft);text-decoration:underline;text-underline-offset:2px;">お問い合わせ</a>
+  <a href="カタヅケ.html" style="color:var(--body-soft);text-decoration:underline;text-underline-offset:2px;">トップページ</a>
+</footer>
+</body>
+</html>

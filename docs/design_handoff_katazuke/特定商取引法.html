@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>特定商取引法に基づく表記｜カタヅケ</title>
+<meta name="description" content="カタヅケの特定商取引法に基づく表記。運営者情報・サービス内容・料金・返品等について記載しています。">
+<meta name="theme-color" content="#1f54de">
+<link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="katazuke-main.css">
+<style>
+body { background: #fff; }
+
+.doc-wrap {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: clamp(40px,6vw,80px) 24px clamp(64px,8vw,108px);
+}
+.doc-eyebrow {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  color: var(--blue);
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+.doc-title {
+  font-family: var(--head);
+  font-size: clamp(24px,3.5vw,36px);
+  font-weight: 900;
+  color: var(--navy);
+  margin-bottom: 10px;
+  letter-spacing: -.01em;
+}
+.doc-meta {
+  font-size: 13px;
+  color: var(--body-soft);
+  margin-bottom: 40px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+.doc-lead {
+  font-size: 14.5px;
+  color: var(--body-soft);
+  line-height: 1.9;
+  margin-bottom: 36px;
+  padding: 16px 20px;
+  background: var(--pale);
+  border-radius: var(--radius-s);
+  border-left: 3px solid var(--blue);
+}
+
+/* テーブル */
+.spec-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 40px;
+  font-size: 14.5px;
+}
+.spec-table th {
+  width: 200px;
+  text-align: left;
+  vertical-align: top;
+  padding: 16px 20px 16px 0;
+  border-top: 1px solid var(--line-soft);
+  font-weight: 700;
+  color: var(--navy);
+  font-size: 14px;
+  white-space: nowrap;
+}
+.spec-table td {
+  padding: 16px 0;
+  border-top: 1px solid var(--line-soft);
+  color: var(--ink);
+  line-height: 1.85;
+  vertical-align: top;
+}
+.spec-table tr:first-child th,
+.spec-table tr:first-child td {
+  border-top: 2px solid var(--navy);
+}
+.spec-table tr:last-child th,
+.spec-table tr:last-child td {
+  border-bottom: 2px solid var(--line-soft);
+}
+.spec-table td a {
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.spec-table td ul {
+  padding-left: 18px;
+  margin: 6px 0 0;
+}
+.spec-table td li {
+  margin-bottom: 4px;
+  line-height: 1.75;
+}
+.spec-table td .note {
+  font-size: 13px;
+  color: var(--body-soft);
+  margin-top: 6px;
+}
+
+/* セクション */
+.doc-section-title {
+  font-family: var(--head);
+  font-size: 17px;
+  font-weight: 900;
+  color: var(--navy);
+  margin: 44px 0 16px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--pale);
+}
+
+/* 注意書き */
+.doc-warn {
+  background: #fdf5e6;
+  border: 1px solid #f0d090;
+  border-radius: var(--radius-s);
+  padding: 16px 18px;
+  font-size: 13.5px;
+  color: var(--ink);
+  line-height: 1.8;
+  margin-bottom: 28px;
+}
+.doc-warn strong { color: #92620a; }
+
+/* フッターナビ */
+.doc-nav {
+  display: flex;
+  gap: 16px;
+  margin-top: 48px;
+  flex-wrap: wrap;
+  padding-top: 24px;
+  border-top: 1px solid var(--line-soft);
+}
+.doc-nav a {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media(max-width:560px){
+  .spec-table th { width: 130px; font-size: 13px; }
+  .spec-table td { font-size: 13.5px; }
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M5 5h14a2 2 0 012 2v8a2 2 0 01-2 2H9l-4 4V7a2 2 0 012-2z"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+</defs></svg>
+
+<!-- ヘッダー -->
+<header class="header" id="header">
+  <div class="container inner">
+    <a href="カタヅケ.html" class="logo"><img src="img/logo-katazuke.png" alt="カタヅケ" class="logo-img"></a>
+    <nav class="nav">
+      <a href="カタヅケ.html#flow">使い方</a>
+      <a href="カタヅケ.html#faq">よくある質問</a>
+      <a href="contact.html">お問い合わせ</a>
+    </nav>
+    <a href="出品登録.html" class="btn btn-line h-cta"><svg class="ic"><use href="#i-chat"></use></svg>LINEではじめる</a>
+    <button class="hamburger" id="hamburger" aria-label="メニュー"><svg class="ic"><use href="#i-menu"></use></svg></button>
+  </div>
+</header>
+<div class="mobile-menu" id="mobile-menu">
+  <a href="カタヅケ.html#flow">使い方</a>
+  <a href="カタヅケ.html#faq">よくある質問</a>
+  <a href="contact.html">お問い合わせ</a>
+  <a href="出品登録.html" class="btn btn-line btn-block mm-cta"><svg class="ic"><use href="#i-chat"></use></svg>LINEではじめる</a>
+</div>
+
+<main>
+<div class="doc-wrap">
+
+  <div class="doc-eyebrow">LEGAL</div>
+  <h1 class="doc-title">特定商取引法に基づく表記</h1>
+  <div class="doc-meta">最終更新：2026年6月1日</div>
+
+  <p class="doc-lead">本ページは、特定商取引に関する法律（特定商取引法）第11条および第58条の2に基づき、本サービスの運営者情報および取引条件を表示するものです。</p>
+
+  <!-- 運営者情報 -->
+  <h2 class="doc-section-title">サービス運営者情報</h2>
+  <table class="spec-table">
+    <tbody>
+      <tr>
+        <th>事業者名</th>
+        <td>カタヅケ 運営事務局</td>
+      </tr>
+      <tr>
+        <th>代表者名</th>
+        <td>（請求があれば開示します）</td>
+      </tr>
+      <tr>
+        <th>所在地</th>
+        <td>東京都内（請求があれば開示します）</td>
+      </tr>
+      <tr>
+        <th>電話番号</th>
+        <td>請求があれば開示します<br>
+          <span class="note">※ メールでの対応を原則としています。お問い合わせは<a href="contact.html">お問い合わせフォーム</a>をご利用ください。</span>
+        </td>
+      </tr>
+      <tr>
+        <th>メールアドレス</th>
+        <td><a href="contact.html">お問い合わせフォームよりご連絡ください</a></td>
+      </tr>
+      <tr>
+        <th>営業時間</th>
+        <td>平日 10:00〜18:00（土日祝・年末年始を除く）</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- サービス内容 -->
+  <h2 class="doc-section-title">サービス内容・取引条件</h2>
+  <table class="spec-table">
+    <tbody>
+      <tr>
+        <th>サービス名</th>
+        <td>カタヅケ（家まるごと不用品まとめ買取マッチングサービス）</td>
+      </tr>
+      <tr>
+        <th>サービスの内容</th>
+        <td>ユーザーが家庭内の不用品をまとめて出品し、複数の登録買取業者が買取総額で入札するマッチングプラットフォームの提供。当社はマッチングの場を提供するものであり、買取取引の当事者ではありません。</td>
+      </tr>
+      <tr>
+        <th>対応エリア</th>
+        <td>東京都・千葉県・埼玉県・神奈川県（順次拡大予定）</td>
+      </tr>
+      <tr>
+        <th>ユーザー負担費用</th>
+        <td>
+          <strong style="color:var(--green);">無料</strong>（出品・査定・お断りまで費用は一切かかりません）<br>
+          <span class="note">※ 成約に至った場合も、ユーザーへの費用請求はありません。</span>
+        </td>
+      </tr>
+      <tr>
+        <th>業者手数料</th>
+        <td>
+          成約時に登録業者が支払う手数料：<strong>買取金額の8%</strong><br>
+          <span class="note">※ 登録・掲載・入札費用は業者も無料です。</span>
+        </td>
+      </tr>
+      <tr>
+        <th>入札・査定期間</th>
+        <td>出品後3日間（ユーザーは任意で早期終了も可能）</td>
+      </tr>
+      <tr>
+        <th>引き取り</th>
+        <td>成約した登録業者がユーザー指定の場所へ訪問して引き取ります。日程は業者とのチャットで調整します。</td>
+      </tr>
+      <tr>
+        <th>支払い方法</th>
+        <td>業者によって異なります（現金・振込など）。詳細は交渉時に業者へご確認ください。</td>
+      </tr>
+      <tr>
+        <th>支払い時期</th>
+        <td>業者が引き取りを完了した時点で、業者とユーザーの間で精算されます。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 返品・キャンセル -->
+  <h2 class="doc-section-title">返品・キャンセルについて</h2>
+  <table class="spec-table">
+    <tbody>
+      <tr>
+        <th>出品のキャンセル</th>
+        <td>入札確定前（入札期間中）は、ユーザーが任意で出品を取り下げることができます。入札確定後のキャンセルは、業者との合意が必要です。</td>
+      </tr>
+      <tr>
+        <th>クーリングオフ<br>（ユーザー）</th>
+        <td>
+          本サービスはユーザーから事前に依頼を受けて業者が訪問する形式です。ユーザーが引き取りを依頼した場合、特定商取引法の「訪問購入」に関するクーリングオフ（8日間）の規定が適用されます。<br>
+          <span class="note">※ 成約後も一定期間は取消し可能です。詳細は<a href="利用規約.html">利用規約</a>をご確認ください。</span>
+        </td>
+      </tr>
+      <tr>
+        <th>クーリングオフ<br>（業者向け）</th>
+        <td>登録業者は特定商取引法に基づくクーリングオフの告知義務を負います。業者がこれを怠った場合、当社は登録を取り消すことがあります。</td>
+      </tr>
+      <tr>
+        <th>買取後の返品</th>
+        <td>成約・引き取り完了後の返品は、業者とユーザーの個別合意によります。当社が関与する取引ではありません。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 個人情報 -->
+  <h2 class="doc-section-title">個人情報の取り扱い</h2>
+  <table class="spec-table">
+    <tbody>
+      <tr>
+        <th>個人情報の管理</th>
+        <td>ユーザーの氏名・電話番号・住所は、査定段階では業者に開示されません。入札上位3社のみ、交渉開始時に必要な情報が開示されます。詳細は<a href="プライバシーポリシー.html">プライバシーポリシー</a>をご覧ください。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="doc-warn">
+    <strong>ご注意</strong><br>
+    本サービスは不用品買取のマッチングプラットフォームであり、当社（カタヅケ運営事務局）は買取取引の当事者ではありません。買取金額・条件・日程等に関するご要望は、交渉相手である登録業者へ直接お問い合わせください。
+  </div>
+
+  <div class="doc-nav">
+    <a href="プライバシーポリシー.html">プライバシーポリシー</a>
+    <a href="利用規約.html">利用規約・業者利用規約</a>
+    <a href="contact.html">お問い合わせ</a>
+    <a href="カタヅケ.html">トップページへ戻る</a>
+  </div>
+
+</div>
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <a href="カタヅケ.html" class="logo footer-logo"><img src="img/logo-katazuke.png" alt="カタヅケ"></a>
+        <p class="about">家まるごと、まとめて片付け買取。業者が買取総額で競い合う、営業電話に追われない不用品買取マッチング。</p>
+      </div>
+      <div>
+        <h5>サービス</h5>
+        <ul>
+          <li><a href="カタヅケ.html#flow">使い方</a></li>
+          <li><a href="カタヅケ.html#auction">仕組み</a></li>
+          <li><a href="カタヅケ.html#fee">料金</a></li>
+          <li><a href="カタヅケ.html#cats">対応カテゴリ</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>安心・サポート</h5>
+        <ul>
+          <li><a href="カタヅケ.html#trust">安心の取り組み</a></li>
+          <li><a href="カタヅケ.html#faq">よくある質問</a></li>
+          <li><a href="業者向け.html">業者登録</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>法的情報</h5>
+        <ul>
+          <li><a href="特定商取引法.html">特定商取引法に基づく表記</a></li>
+          <li><a href="プライバシーポリシー.html">プライバシーポリシー</a></li>
+          <li><a href="利用規約.html">利用規約</a></li>
+          <li><a href="contact.html">お問い合わせ</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 カタヅケ</span>
+      <span>東京都・千葉県・埼玉県・神奈川県（順次拡大）</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  var header = document.getElementById('header');
+  window.addEventListener('scroll', function(){
+    header.classList.toggle('scrolled', window.pageYOffset > 8);
+  }, {passive:true});
+  var burger = document.getElementById('hamburger');
+  if(burger){
+    burger.addEventListener('click', function(){ header.classList.toggle('menu-open'); });
+    document.getElementById('mobile-menu').addEventListener('click', function(e){
+      if(e.target.closest('a')) header.classList.remove('menu-open');
+    });
+  }
+})();
+</script>
+</body>
+</html>
