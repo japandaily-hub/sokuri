@@ -1,0 +1,38 @@
+/* 新規登録 固有スタイル。共通フロー(.flow-header / .form-card / .flow-footer 等)と
+   共通フォーム(.field / .pw-wrap)は katazuke-pages.css を使用。ここは固有のみ。 */
+
+.signup-page .area-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.signup-page .area-chip { border: 1.5px solid var(--line); border-radius: 9px; padding: 10px 8px; text-align: center; cursor: pointer; font-family: var(--head); font-size: 13.5px; font-weight: 700; color: var(--ink); transition: border-color .2s, background .2s, color .2s; user-select: none; }
+.signup-page .area-chip:hover { border-color: var(--blue); color: var(--blue); }
+.signup-page .area-chip.selected { border-color: var(--blue); background: var(--blue); color: #fff; }
+
+.signup-page .role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.signup-page .role-card { border: 2px solid var(--line); border-radius: var(--radius-s); padding: 16px 14px; cursor: pointer; transition: border-color .2s, background .2s, box-shadow .2s; user-select: none; display: flex; flex-direction: column; gap: 6px; text-align: left; background: #fff; }
+.signup-page .role-card:hover { border-color: var(--blue); background: var(--pale); }
+.signup-page .role-card.selected { border-color: var(--blue); background: var(--pale); box-shadow: 0 0 0 3px rgba(31,84,222,.12); }
+.signup-page .role-card .rc-ic { width: 40px; height: 40px; border-radius: 11px; background: var(--pale); color: var(--blue); display: grid; place-items: center; }
+.signup-page .role-card.selected .rc-ic { background: var(--blue); color: #fff; }
+.signup-page .role-card .rc-ic .ic { font-size: 22px; }
+.signup-page .role-card .rc-title { font-family: var(--head); font-size: 15px; font-weight: 700; color: var(--navy); }
+.signup-page .role-card .rc-sub { font-size: 12px; color: var(--body-soft); line-height: 1.6; }
+
+.signup-page .hint-banner { background: var(--pale); border-radius: var(--radius-s); padding: 14px 18px; margin-bottom: 18px; font-size: 13px; color: var(--body); display: flex; gap: 10px; align-items: flex-start; line-height: 1.75; }
+.signup-page .hint-banner .hint-ic { color: var(--blue); flex-shrink: 0; margin-top: 1px; }
+
+.signup-page .agree-row { display: flex; align-items: flex-start; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line-soft); margin-top: 4px; }
+.signup-page .agree-row:first-child { border-top: none; margin-top: 0; }
+.signup-page .agree-cb { width: 20px; height: 20px; flex-shrink: 0; accent-color: var(--blue); margin-top: 2px; cursor: pointer; }
+.signup-page .agree-row label { font-size: 13px; color: var(--body); line-height: 1.75; cursor: pointer; }
+.signup-page .agree-row a { color: var(--blue); font-weight: 600; }
+
+.signup-page .done-screen { text-align: center; padding: 52px 20px; }
+.signup-page .done-circle { width: 88px; height: 88px; border-radius: 50%; background: var(--pale); margin: 0 auto 24px; display: flex; align-items: center; justify-content: center; }
+.signup-page .done-circle .ic { font-size: 46px; color: var(--blue); stroke-width: 1.7; }
+.signup-page .done-screen h2 { font-size: 24px; color: var(--navy); margin-bottom: 12px; }
+.signup-page .done-screen p { font-size: 15px; color: var(--body-soft); line-height: 1.85; margin-bottom: 32px; }
+.signup-page .done-actions { display: flex; flex-direction: column; gap: 12px; align-items: center; }
+
+@media (max-width: 480px) {
+  .signup-page .area-grid { grid-template-columns: repeat(2, 1fr); }
+  .signup-page .role-grid { grid-template-columns: 1fr; }
+}

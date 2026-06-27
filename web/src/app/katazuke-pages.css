@@ -123,3 +123,63 @@
   .trust-row { gap: 10px; }
   .btn-line-auth { font-size: 14px; padding: 14px 18px; }
 }
+
+/* ---------- フロー共通（新規登録 / 出品登録 で共有: flow-header / footer / form-card） ---------- */
+.flow-bg { background: #f4f6fb; min-height: 100vh; }
+
+.flow-header { position: sticky; top: 0; z-index: 60; background: #fff; border-bottom: 1px solid var(--line); box-shadow: var(--shadow-s); }
+.flow-header-inner { max-width: 600px; margin: 0 auto; padding: 14px 20px; display: flex; align-items: center; gap: 16px; }
+.flow-steps { flex: 1; display: flex; gap: 0; align-items: center; }
+.flow-step { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; position: relative; }
+.flow-step + .flow-step::before { content: ""; position: absolute; left: -50%; top: 12px; width: 100%; height: 2px; background: var(--line); z-index: 0; transition: background .4s; }
+.flow-step.done + .flow-step::before, .flow-step.active + .flow-step::before { background: var(--blue); }
+.fs-dot { width: 24px; height: 24px; border-radius: 50%; background: var(--line); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 900; color: var(--body-soft); font-family: var(--head); position: relative; z-index: 1; transition: background .3s, color .3s, box-shadow .3s; }
+.flow-step.done .fs-dot { background: var(--blue); color: #fff; }
+.flow-step.active .fs-dot { background: var(--blue); color: #fff; box-shadow: 0 0 0 4px rgba(31,84,222,.18); }
+.fs-label { font-size: 10px; font-weight: 600; color: var(--body-soft); white-space: nowrap; }
+.flow-step.active .fs-label { color: var(--blue); font-weight: 700; }
+.flow-step.done .fs-label { color: var(--ink); }
+
+.flow-wrap { max-width: 600px; margin: 0 auto; padding: 28px 20px 100px; }
+.step-title { font-family: var(--head); font-size: clamp(20px,3vw,26px); font-weight: 900; color: var(--navy); margin-bottom: 8px; line-height: 1.35; }
+.step-desc { font-size: 14px; color: var(--body-soft); line-height: 1.8; margin-bottom: 24px; }
+
+.form-card { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow-s); padding: 26px 24px; margin-bottom: 16px; }
+.field label .req { font-size: 10.5px; font-weight: 700; color: #fff; background: var(--blue); padding: 1px 6px; border-radius: 4px; margin-left: 5px; vertical-align: middle; }
+.field label .opt { font-size: 10.5px; font-weight: 600; color: var(--body-soft); background: var(--line-soft); padding: 1px 6px; border-radius: 4px; margin-left: 5px; vertical-align: middle; }
+
+.select-wrap { position: relative; }
+.select-wrap::after { content: ""; position: absolute; right: 14px; top: 50%; transform: translateY(-50%); width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid var(--body-soft); pointer-events: none; }
+.select-wrap select { width: 100%; font-family: var(--sans); font-size: 15px; color: var(--ink); background: #fafbfe; border: 1.5px solid var(--line); border-radius: var(--radius-s); padding: 12px 36px 12px 14px; outline: none; appearance: none; cursor: pointer; }
+.select-wrap select:focus { border-color: var(--blue); background: #fff; box-shadow: 0 0 0 3px rgba(31,84,222,.12); }
+
+.pw-strength { margin-top: 8px; display: flex; gap: 5px; align-items: center; }
+.pw-strength-bar { flex: 1; height: 4px; border-radius: 2px; background: var(--line); transition: background .3s; }
+.pw-strength-label { font-size: 11px; font-weight: 700; color: var(--body-soft); min-width: 36px; text-align: right; }
+
+.flow-footer { position: fixed; bottom: 0; left: 0; right: 0; z-index: 50; background: #fff; border-top: 1px solid var(--line); box-shadow: 0 -4px 20px -8px rgba(15,37,82,.15); }
+.flow-footer .inner { max-width: 600px; margin: 0 auto; padding: 14px 20px; display: flex; gap: 12px; justify-content: flex-end; align-items: center; }
+.btn-flow-back { padding: 13px 22px; border-radius: 99px; border: 1.5px solid var(--line); background: #fff; color: var(--navy); font-family: var(--head); font-size: 14px; font-weight: 700; cursor: pointer; transition: .2s; }
+.btn-flow-back:hover { border-color: var(--blue); color: var(--blue); }
+.btn-flow-next { padding: 13px 28px; border-radius: 99px; border: none; background: var(--blue); color: #fff; font-family: var(--head); font-size: 15px; font-weight: 900; cursor: pointer; box-shadow: 0 8px 20px -8px rgba(31,84,222,.6); transition: .2s; display: flex; align-items: center; gap: 8px; }
+.btn-flow-next:hover { background: var(--blue-d); transform: translateY(-1px); }
+.btn-flow-next:disabled { background: var(--line); box-shadow: none; cursor: not-allowed; transform: none; }
+
+.confirm-row { display: flex; justify-content: space-between; font-size: 14px; padding: 12px 0; border-bottom: 1px solid var(--line-soft); align-items: baseline; gap: 16px; }
+.confirm-row:last-child { border-bottom: none; }
+.confirm-row .lbl { color: var(--body-soft); font-size: 13px; flex-shrink: 0; }
+.confirm-row .val { font-weight: 700; color: var(--ink); text-align: right; }
+
+@media (max-width: 480px) {
+  .flow-wrap { padding: 18px 14px 90px; }
+  .step-title { font-size: 18px; }
+  .fs-label { font-size: 9px; }
+  .flow-header-inner { gap: 8px; padding: 10px 14px; }
+  .btn-flow-next { padding: 12px 18px; font-size: 14px; }
+  .form-card { padding: 18px 14px; }
+  .confirm-row { flex-direction: column; gap: 2px; }
+  .confirm-row .val { text-align: left; }
+}
+@media (max-width: 360px) {
+  .fs-label { display: none; }
+}
