@@ -3,74 +3,27 @@ import { Ic, type IcName } from "@/components/kdz/Icons";
 import "./company.css";
 
 export const metadata = {
-  title: "会社概要 | カタヅケ",
+  title: "運営者情報 | カタヅケ",
   description:
-    "カタヅケ（家まるごと・まとめて片付け買取プラットフォーム）の会社概要・ミッション・運営チームのご紹介です。",
+    "カタヅケ（家まるごと・まとめて片付け買取プラットフォーム）の運営者情報・ミッションのご紹介です。",
 };
 
-/** 数字実績（デザインの .numbers-grid） */
-const NUMBERS: { val: string; unit?: string; label: string }[] = [
-  { val: "12,400", unit: "+", label: "累計出品件数" },
-  { val: "4.8", label: "平均評価（5点満点）" },
-  { val: "380", unit: "社", label: "登録買取業者数" },
-];
-
-/** 会社情報テーブル（デザインの .company-table） */
+/**
+ * 運営者情報テーブル（デザインの .company-table）
+ *
+ * 運営主体は個人事業主（事業者名「カタヅケ運営事務局」）。法人前提の項目
+ * （資本金・従業員数・設立登記・加盟団体）、未取得の古物商許可番号、実績のない数字・
+ * 架空の創業チームは、虚偽表示を避けるため掲載しない。代表者名・電話番号など
+ * 特商法上の開示事項は /legal（特定商取引法に基づく表記）側で扱う。
+ */
 const COMPANY_ROWS: { th: string; td: React.ReactNode }[] = [
-  { th: "会社名", td: "株式会社カタヅケ" },
-  { th: "設立", td: "2023年4月" },
-  { th: "代表取締役", td: "山村 大輔" },
+  { th: "事業者名", td: "カタヅケ運営事務局" },
+  { th: "所在地", td: "神奈川県横浜市" },
   {
-    th: "所在地",
-    td: (
-      <>
-        〒150-0001
-        <br />
-        東京都渋谷区神宮前6丁目23-4
-        <br />
-        JPR神宮前ビル 3F
-      </>
-    ),
+    th: "お問い合わせ",
+    td: <a href="mailto:katazuke.info@gmail.com">katazuke.info@gmail.com</a>,
   },
-  {
-    th: "事業内容",
-    td: (
-      <>
-        不用品買取マッチングプラットフォームの運営
-        <br />
-        買取業者向けSaaS提供
-      </>
-    ),
-  },
-  { th: "資本金", td: "8,000万円" },
-  { th: "従業員数", td: "32名（2026年6月現在）" },
-  { th: "許認可", td: "古物商許可（東京都公安委員会 第303291234号）" },
-  { th: "加盟団体", td: "一般社団法人リユース業協会" },
-];
-
-/** 創業チーム（デザインの .team-grid） */
-const TEAM: { initial: string; bg: string; name: string; role: string; bio: string }[] = [
-  {
-    initial: "山",
-    bg: "#1f54de",
-    name: "山村 大輔",
-    role: "代表取締役CEO",
-    bio: "元リサイクル業界営業10年。業界の非効率を解消するために創業。",
-  },
-  {
-    initial: "佐",
-    bg: "#1f8a5b",
-    name: "佐々木 理恵",
-    role: "CTO",
-    bio: "元メガベンチャーエンジニア。プラットフォーム開発・運営を統括。",
-  },
-  {
-    initial: "田",
-    bg: "#9b59b6",
-    name: "田中 孝文",
-    role: "COO / 業者渉外",
-    bio: "元古物商。全国380社との業者ネットワークを構築。",
-  },
+  { th: "事業内容", td: "不用品買取マッチングプラットフォームの運営" },
 ];
 
 /** 私たちが大切にすること（デザインの VALUES。絵文字はアイコンに置換） */
@@ -118,23 +71,10 @@ export default function CompanyPage() {
           </p>
         </div>
 
-        {/* ============ 数字実績 ============ */}
-        <div className="numbers-grid">
-          {NUMBERS.map((n) => (
-            <div className="number-card" key={n.label}>
-              <div className="number-val">
-                {n.val}
-                {n.unit ? <span className="number-unit">{n.unit}</span> : null}
-              </div>
-              <div className="number-lbl">{n.label}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* ============ 会社概要テーブル ============ */}
+        {/* ============ 運営者情報テーブル ============ */}
         <div className="about-section">
           <span className="section-badge">COMPANY</span>
-          <h2>会社概要</h2>
+          <h2>運営者情報</h2>
           <div className="company-table-wrap">
             <table className="company-table">
               <tbody>
@@ -146,24 +86,6 @@ export default function CompanyPage() {
                 ))}
               </tbody>
             </table>
-          </div>
-        </div>
-
-        {/* ============ 創業チーム ============ */}
-        <div className="about-section">
-          <span className="section-badge">TEAM</span>
-          <h2>創業チーム</h2>
-          <div className="team-grid">
-            {TEAM.map((m) => (
-              <div className="team-card" key={m.name}>
-                <div className="team-avatar" style={{ background: m.bg }}>
-                  {m.initial}
-                </div>
-                <div className="team-name">{m.name}</div>
-                <div className="team-role">{m.role}</div>
-                <div className="team-bio">{m.bio}</div>
-              </div>
-            ))}
           </div>
         </div>
 

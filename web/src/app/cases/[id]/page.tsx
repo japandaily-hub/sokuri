@@ -32,7 +32,7 @@ import {
   listBids,
   photoSrc,
   selectBid,
-  KdzApiError,
+  toDisplayMessage,
   type BidOut,
   type CaseOut,
   type TransactionDetail,
@@ -64,7 +64,7 @@ export default function UserCaseDetailPage() {
         setTxn(await getTransaction(selected.transaction_id, token));
       }
     } catch (e) {
-      setError(e instanceof KdzApiError ? e.message : "取得に失敗しました");
+      setError(toDisplayMessage(e, "取得に失敗しました"));
     }
   }, [caseId, token]);
 
@@ -81,7 +81,7 @@ export default function UserCaseDetailPage() {
       await fn();
       await reload();
     } catch (e) {
-      setError(e instanceof KdzApiError ? e.message : "操作に失敗しました");
+      setError(toDisplayMessage(e, "操作に失敗しました"));
     } finally {
       setBusy(false);
     }

@@ -51,6 +51,9 @@ def _to_masked_out(case: Case, my_operator_id: uuid.UUID | None = None) -> CaseM
                 if bid.status == "selected" and bid.transaction is not None:
                     my_bid.transaction_id = bid.transaction.id
                 break
+    # 最高入札額（自社入札を含む全業者の最高額）。入札が無ければ None。
+    # 秘匿しない方針（確定済み製品判断）のため全業者に開示する。
+    top_bid_amount = max((bid.amount for bid in case.bids), default=None)
     return CaseMaskedOut(
         id=case.id,
         status=case.status,
@@ -66,6 +69,7 @@ def _to_masked_out(case: Case, my_operator_id: uuid.UUID | None = None) -> CaseM
         photos=[CasePhotoOut.model_validate(p) for p in case.photos],
         bid_count=len(case.bids),
         my_bid=my_bid,
+        top_bid_amount=top_bid_amount,
     )
 
 
@@ -145,7 +149,9 @@ async def create_case(
     await session.commit()
     await session.refresh(case, attribute_names=["photos", "bids"])
 
-    background.add_task(notify.send_case_created, user.email, str(case.id))
+    # LINE専用ユーザーの仮メール（実メール未設定）宛には送信しない。
+    if not notify.is_placeholder_email(user.email):
+        background.add_task(notify.send_case_created, user.email, str(case.id))
     return _to_case_out(case)
 
 
@@ -170,12 +176,9 @@ async def list_cases(
         return [_to_case_out(c) for c in cases]
 
     assert actor.operator is not None
-    _op = actor.operator
-    if not (_op.vendor_status in ("limited", "active") or _op.verified_at is not None):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="アカウントの登録承認が完了していません。承認後に案件を閲覧できます。",
-        )
+    # 案件の「閲覧」は vendor_status を問わず許可する（pending/limited/active いずれも可）。
+    # 入札のみ get_verified_operator（vendor_status == "active"）で別途ブロックする。
+    # is_suspended（アカウント停止）は get_current_actor 側で既に弾かれている。
     cases = (
         await session.scalars(
             select(Case)
@@ -207,10 +210,5 @@ async def get_case(
         return _to_case_out(case)
 
     assert actor.operator is not None
-    _op = actor.operator
-    if not (_op.vendor_status in ("limited", "active") or _op.verified_at is not None):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="アカウントの登録承認が完了していません。",
-        )
+    # 一覧同様、閲覧は vendor_status を問わず許可する（入札は別ゲートでブロック）。
     return _to_masked_out(case, actor.operator.id)

@@ -1,13 +1,14 @@
 /**
  * 特定商取引法に基づく表記（/legal）
  *
- * デザイン正典 docs/design_handoff_katazuke/特定商取引法.html をピクセル忠実に再実装。
+ * デザイン正典 docs/design_handoff_katazuke/特定商取引法.html をベースに実装。
  * 共通ヘッダー/フッターは SiteChrome がグローバルに付与するため、本ページは
  * <main id="main"> の中身（doc-wrap）だけを描く。
  *
- * 事業者情報は特商法第11条・第58条の2に基づく開示運用（所在地番地・電話番号・代表者名は
- * 「請求があれば遅滞なく開示」）をデザイン正典どおり記載。実値はユーザー記入事項のため
- * 創作で埋めず、デザインの表記をそのまま保持する。
+ * 運営主体は個人事業主。事業者名（カタヅケ運営事務局）・所在地（神奈川県横浜市）・
+ * 連絡先メール（katazuke.info@gmail.com）は確定値を記載。代表者名・詳細住所（番地）・
+ * 電話番号は特商法第11条施行規則に基づく「請求があれば遅滞なく開示」の省略運用とする。
+ * 古物商許可は申請中・未取得のため、許可番号は取得後に追記する（現時点では非掲載）。
  */
 import Link from "next/link";
 import "./legal.css";
@@ -36,37 +37,43 @@ export default function LegalPage() {
           <tbody>
             <tr>
               <th>事業者名</th>
-              <td>カタヅケ 運営事務局</td>
+              <td>カタヅケ運営事務局</td>
             </tr>
             <tr>
               <th>代表者名</th>
-              <td>（請求があれば開示します）</td>
+              <td>請求があれば遅滞なく開示します</td>
             </tr>
             <tr>
               <th>所在地</th>
-              <td>東京都内（請求があれば開示します）</td>
+              <td>
+                神奈川県横浜市
+                <br />
+                <span className="note">
+                  ※ 詳細な住所（番地等）は、請求があれば遅滞なく開示します。
+                </span>
+              </td>
             </tr>
             <tr>
               <th>電話番号</th>
               <td>
-                請求があれば開示します
+                請求があれば遅滞なく開示します
                 <br />
                 <span className="note">
                   ※ メールでの対応を原則としています。お問い合わせは
                   <Link href="/contact">お問い合わせフォーム</Link>
-                  をご利用ください。
+                  または下記メールアドレスをご利用ください。
                 </span>
               </td>
             </tr>
             <tr>
               <th>メールアドレス</th>
               <td>
-                <Link href="/contact">お問い合わせフォームよりご連絡ください</Link>
+                <a href="mailto:katazuke.info@gmail.com">katazuke.info@gmail.com</a>
+                <br />
+                <span className="note">
+                  ※ <Link href="/contact">お問い合わせフォーム</Link>もご利用いただけます。
+                </span>
               </td>
-            </tr>
-            <tr>
-              <th>営業時間</th>
-              <td>平日 10:00〜18:00（土日祝・年末年始を除く）</td>
             </tr>
           </tbody>
         </table>

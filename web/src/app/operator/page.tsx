@@ -9,27 +9,40 @@
  *
  * クライアント化の理由（純表示では不可）:
  *  - タブ切替（案件一覧 / 入札中 / 交渉中 / 成約済み）
- *  - 入札フォーム入力 → 確認モーダル → 確定でカード更新（デモ）
+ *  - 入札フォーム入力 → 確認モーダル → 確定で API 呼び出し
  *  - 入札成功トースト
  *  - 絞り込みセレクトの状態保持
  *
- * バックエンド未配線: KPI / 案件 / 入札はすべてモック定数。入札確定は実処理せず
- * UI 挙動のみ（トースト「…で入札しました（デモ）」）。
- * 実機能の案件一覧/落札管理は既存 /operator/cases ・ /operator/transactions にある。
+ * バックエンド配線: 案件一覧は listOpenCases()、成約済みは listTransactions()
+ * （既存 /operator/cases ・ /operator/transactions と同じ実装済み関数を再利用）。
+ * KPI サマリーは上記2つのレスポンスからフロント側で集計する（専用APIは無い）。
+ * 「交渉中」タブはチャットAPI未実装のため、当面 空状態のみ表示する。
  */
 
 import "./dashboard.css";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useSession } from "next-auth/react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Ic, type IcName } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
+import { Spinner } from "@/components/Icon";
+import { useToken } from "@/components/kdz/Ui";
+import {
+  KdzApiError,
+  createBid,
+  formatYen,
+  listOpenCases,
+  listTransactions,
+  photoSrc,
+  toDisplayMessage,
+  type CaseMasked,
+  type TransactionListItem,
+} from "@/lib/katadzuke-api";
 
 /* ============================================================
-   モックデータ
+   表示ユーティリティ
    ============================================================ */
-
-type LotStatus = "none" | "winning" | "outbid";
 
 /** カテゴリ名 → スプライトアイコン（写真プレースホルダ用の近似） */
 const CAT_ICON: Record<string, IcName> = {
@@ -46,99 +59,42 @@ const CAT_ICON: Record<string, IcName> = {
 };
 const catIcon = (name: string): IcName => CAT_ICON[name] ?? "box";
 
+const yen = (n: number) => n.toLocaleString("ja-JP");
+
+type LotStatus = "none" | "winning" | "outbid";
+
+/** CaseMasked をカード表示用の形にフロント側でマッピングしたもの。 */
 type Lot = {
   id: string;
   area: string;
-  items: string[];
+  purpose: string;
   count: number;
-  topBid: number;
+  topBid: number | null;
   myBid: number | null;
   bidCount: number;
-  expires: string;
-  urgent: boolean;
   status: LotStatus;
+  photoUrl: string | null;
 };
 
-const INITIAL_LOTS: Lot[] = [
-  {
-    id: "KTZ-2026-05102",
-    area: "東京都世田谷区",
-    items: ["家電・PC", "ブランド品", "時計", "カメラ"],
-    count: 18,
-    topBid: 85000,
-    myBid: null,
-    bidCount: 5,
-    expires: "1日 22:10",
-    urgent: false,
-    status: "none",
-  },
-  {
-    id: "KTZ-2026-05089",
-    area: "神奈川県横浜市",
-    items: ["家具", "家電・PC", "衣類・靴"],
-    count: 11,
-    topBid: 42000,
-    myBid: 42000,
-    bidCount: 3,
-    expires: "2日 08:44",
-    urgent: false,
-    status: "winning",
-  },
-  {
-    id: "KTZ-2026-05077",
-    area: "東京都練馬区",
-    items: ["ゲーム", "カメラ", "音楽"],
-    count: 9,
-    topBid: 38000,
-    myBid: 32000,
-    bidCount: 7,
-    expires: "0日 04:12",
-    urgent: true,
-    status: "outbid",
-  },
-  {
-    id: "KTZ-2026-05063",
-    area: "千葉県船橋市",
-    items: ["ブランド品", "時計", "スポーツ"],
-    count: 14,
-    topBid: 61000,
-    myBid: null,
-    bidCount: 4,
-    expires: "2日 17:30",
-    urgent: false,
-    status: "none",
-  },
-  {
-    id: "KTZ-2026-05051",
-    area: "東京都渋谷区",
-    items: ["家電・PC", "カメラ", "ブランド品", "本・メディア"],
-    count: 22,
-    topBid: 94000,
-    myBid: null,
-    bidCount: 8,
-    expires: "1日 11:05",
-    urgent: false,
-    status: "none",
-  },
-];
-
-type DoneItem = {
-  id: string;
-  area: string;
-  items: string[];
-  count: number;
-  amount: number;
-  date: string;
-};
-
-const DONE: DoneItem[] = [
-  { id: "KTZ-2026-04821", area: "東京都足立区", items: ["家電・PC", "ブランド品", "カメラ"], count: 14, amount: 72000, date: "2026年6月25日" },
-  { id: "KTZ-2026-04712", area: "東京都板橋区", items: ["家具", "家電・PC"], count: 8, amount: 45000, date: "2026年6月18日" },
-  { id: "KTZ-2026-04680", area: "神奈川県川崎市", items: ["ブランド品", "時計"], count: 6, amount: 38000, date: "2026年6月10日" },
-  { id: "KTZ-2026-04601", area: "東京都杉並区", items: ["家電・PC", "ゲーム", "本・メディア"], count: 20, amount: 52000, date: "2026年6月2日" },
-];
-
-const yen = (n: number) => n.toLocaleString("ja-JP");
+function toLot(c: CaseMasked): Lot {
+  const myBidAmount = c.my_bid?.amount ?? null;
+  const topBid = c.top_bid_amount ?? myBidAmount;
+  let status: LotStatus = "none";
+  if (myBidAmount != null) {
+    status = topBid != null && myBidAmount < topBid ? "outbid" : "winning";
+  }
+  return {
+    id: c.id,
+    area: `${c.prefecture} ${c.city}`,
+    purpose: c.purpose,
+    count: c.photos.length,
+    topBid,
+    myBid: myBidAmount,
+    bidCount: c.bid_count,
+    status,
+    photoUrl: c.photos[0]?.url ?? null,
+  };
+}
 
 type TabKey = "lots" | "bids" | "neg" | "done";
 
@@ -146,7 +102,15 @@ type TabKey = "lots" | "bids" | "neg" | "done";
    案件カード
    ============================================================ */
 
-function LotCard({ lot, onBid }: { lot: Lot; onBid: (lotId: string, value: number) => void }) {
+function LotCard({
+  lot,
+  busy,
+  onBid,
+}: {
+  lot: Lot;
+  busy: boolean;
+  onBid: (lotId: string, value: number) => void;
+}) {
   const [draft, setDraft] = useState("");
 
   const statusTag =
@@ -160,41 +124,43 @@ function LotCard({ lot, onBid }: { lot: Lot; onBid: (lotId: string, value: numbe
   const submitClass = lot.myBid ? "bid-submit update" : "bid-submit";
   const placeholder = lot.myBid ? yen(lot.myBid) : "金額を入力";
 
-  // 写真は3枚分のプレースホルダ + 「+N点」タイル
-  const previewItems = lot.items.slice(0, 3);
-  while (previewItems.length < 3) previewItems.push(previewItems[previewItems.length - 1] ?? "その他");
-
   return (
-    <div className={`lot-card${lot.status === "winning" ? " winning" : lot.status === "outbid" ? " outbid" : ""}`}>
+    <div
+      className={`lot-card${lot.status === "winning" ? " winning" : lot.status === "outbid" ? " outbid" : ""}`}
+    >
       <div className="lot-card-inner">
-        {/* 写真グリッド（実アセット未投入 → カテゴリアイコンのプレースホルダ） */}
+        {/* 写真グリッド（実アセット未投入 or 1枚のみの場合はカテゴリアイコンでフォールバック） */}
         <div className="lot-photos">
-          {previewItems.map((cat, i) => (
-            <div className="lot-photo" key={i}>
+          {lot.photoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={photoSrc(lot.photoUrl)}
+              alt=""
+              className="lot-photo"
+              style={{ gridRow: "1 / 3", objectFit: "cover", width: "100%", height: "100%" }}
+            />
+          ) : (
+            <div className="lot-photo" style={{ gridRow: "1 / 3" }}>
               <div className="imgph">
-                <Ic name={catIcon(cat)} />
-                <small>{cat}</small>
+                <Ic name={catIcon(lot.purpose)} />
+                <small>{lot.purpose}</small>
               </div>
             </div>
-          ))}
+          )}
           <div className="lot-photo lot-photo-more">
-            <span>+{lot.count - 3}</span>
-            <small>点</small>
+            <span>{lot.count}</span>
+            <small>枚</small>
           </div>
         </div>
 
         {/* 案件情報 */}
         <div className="lot-info">
           <div className="lot-info-top">
-            <span className="lot-id">{lot.id}</span>
+            <span className="lot-id">{lot.id.slice(0, 8)}</span>
             {statusTag}
           </div>
           <div className="lot-items-row">
-            {lot.items.map((it) => (
-              <span className="lot-item-chip" key={it}>
-                {it}
-              </span>
-            ))}
+            <span className="lot-item-chip">{lot.purpose}</span>
           </div>
           <div className="lot-meta">
             <span className="lot-meta-item">
@@ -202,16 +168,8 @@ function LotCard({ lot, onBid }: { lot: Lot; onBid: (lotId: string, value: numbe
               {lot.area}
             </span>
             <span className="lot-meta-item">
-              <Ic name="box" />
-              {lot.count}点まとめ
-            </span>
-            <span className="lot-meta-item">
               <strong>{lot.bidCount}</strong>社が入札中
             </span>
-          </div>
-          <div className={`lot-timer ${lot.urgent ? "urgent" : "normal"}`}>
-            <span className="live-dot" />
-            残り {lot.expires}
           </div>
         </div>
 
@@ -220,7 +178,7 @@ function LotCard({ lot, onBid }: { lot: Lot; onBid: (lotId: string, value: numbe
           <div>
             <div className="current-top">現在の最高入札</div>
             <div className="current-amount">
-              {yen(lot.topBid)}
+              {lot.topBid != null ? yen(lot.topBid) : "—"}
               <span>円</span>
             </div>
           </div>
@@ -247,6 +205,7 @@ function LotCard({ lot, onBid }: { lot: Lot; onBid: (lotId: string, value: numbe
             <button
               type="button"
               className={submitClass}
+              disabled={busy}
               onClick={() => {
                 const val = parseInt(draft, 10);
                 if (!val || val < 1000) {
@@ -256,7 +215,7 @@ function LotCard({ lot, onBid }: { lot: Lot; onBid: (lotId: string, value: numbe
                 onBid(lot.id, val);
               }}
             >
-              {submitLabel}
+              {busy ? "送信中…" : submitLabel}
             </button>
             <p className="bid-hint">成約時のみ買取額の8%が手数料</p>
           </div>
@@ -271,12 +230,20 @@ function LotCard({ lot, onBid }: { lot: Lot; onBid: (lotId: string, value: numbe
    ============================================================ */
 
 export default function OperatorDashboardPage() {
+  const { token, loading } = useToken();
+  const { data: session } = useSession();
+  const companyName = session?.user?.name ?? "";
   const [activeTab, setActiveTab] = useState<TabKey>("lots");
-  const [lots, setLots] = useState<Lot[]>(INITIAL_LOTS);
+
+  const [cases, setCases] = useState<CaseMasked[] | null>(null);
+  const [transactions, setTransactions] = useState<TransactionListItem[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pendingApproval, setPendingApproval] = useState(false);
 
   // 入札確認モーダル
   const [modalLotId, setModalLotId] = useState<string | null>(null);
   const [modalAmount, setModalAmount] = useState<number>(0);
+  const [bidBusy, setBidBusy] = useState(false);
 
   // トースト
   const [toast, setToast] = useState<string | null>(null);
@@ -285,6 +252,49 @@ export default function OperatorDashboardPage() {
     setToast(msg);
     window.setTimeout(() => setToast(null), 3000);
   }
+
+  const reload = useCallback(async () => {
+    if (!token) return;
+    try {
+      const c = await listOpenCases(token);
+      setCases(c);
+      setPendingApproval(false);
+    } catch (e) {
+      if (e instanceof KdzApiError && e.status === 403) {
+        setPendingApproval(true);
+        setCases([]);
+      } else {
+        setError(toDisplayMessage(e, "案件の取得に失敗しました"));
+      }
+    }
+    try {
+      setTransactions(await listTransactions(token));
+    } catch (e) {
+      setError((prev) => prev ?? toDisplayMessage(e, "取引の取得に失敗しました"));
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  const lots = useMemo(() => (cases ?? []).map(toLot), [cases]);
+  const biddingLots = lots.filter((l) => l.myBid != null);
+  const winningLots = biddingLots.filter((l) => l.status === "winning");
+  const doneTxns = useMemo(
+    () => (transactions ?? []).filter((t) => t.status === "completed"),
+    [transactions],
+  );
+
+  const now = new Date();
+  const thisMonthDone = doneTxns.filter((t) => {
+    const d = new Date(t.created_at);
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  });
+  const thisMonthAmount = thisMonthDone.reduce(
+    (sum, t) => sum + (t.final_amount ?? t.initial_amount),
+    0,
+  );
 
   function requestBid(lotId: string, value: number) {
     if (Number.isNaN(value)) {
@@ -295,30 +305,28 @@ export default function OperatorDashboardPage() {
     setModalAmount(value);
   }
 
-  function confirmBid() {
+  async function confirmBid() {
     const lotId = modalLotId;
     const val = modalAmount;
     setModalLotId(null);
-    if (!lotId || !val) return;
-    // カード更新（デモ。バックエンド未配線）
-    setLots((prev) =>
-      prev.map((lot) => {
-        if (lot.id !== lotId) return lot;
-        const nextTop = val > lot.topBid ? val : lot.topBid;
-        const status: LotStatus = val >= lot.topBid ? "winning" : "outbid";
-        return { ...lot, myBid: val, topBid: nextTop, status };
-      })
-    );
-    showToast(`¥${yen(val)} で入札しました（デモ）`);
+    if (!lotId || !val || !token) return;
+    setBidBusy(true);
+    try {
+      await createBid(lotId, { amount: val }, token);
+      await reload();
+      showToast(`¥${yen(val)} で入札しました`);
+    } catch (e) {
+      showToast(toDisplayMessage(e, "入札に失敗しました"));
+    } finally {
+      setBidBusy(false);
+    }
   }
 
-  const biddingLots = lots.filter((l) => l.myBid);
-
   const TABS: { key: TabKey; icon: IcName; label: string; badge: number; gray?: boolean }[] = [
-    { key: "lots", icon: "menu", label: "案件一覧", badge: 24 },
+    { key: "lots", icon: "menu", label: "案件一覧", badge: lots.length },
     { key: "bids", icon: "trend", label: "入札中", badge: biddingLots.length },
-    { key: "neg", icon: "chat", label: "交渉中", badge: 1 },
-    { key: "done", icon: "check", label: "成約済み", badge: DONE.length, gray: true },
+    { key: "neg", icon: "chat", label: "交渉中", badge: 0 },
+    { key: "done", icon: "check", label: "成約済み", badge: doneTxns.length, gray: true },
   ];
 
   const NAV: { href: string; label: string; icon: IcName; active?: boolean }[] = [
@@ -327,6 +335,8 @@ export default function OperatorDashboardPage() {
     { href: "/operator/transactions", label: "取引", icon: "trend" },
     { href: "/operator/profile", label: "プロフィール", icon: "people" },
   ];
+
+  const isLoading = loading || (!cases && !error && !pendingApproval);
 
   return (
     <div className="op-dash">
@@ -352,162 +362,198 @@ export default function OperatorDashboardPage() {
             <Ic name="chat" />
             <span className="notif-dot" />
           </Link>
-          <span className="biz-header-co">
-            <span className="co-dot">グ</span>
-            <span className="biz-header-co-name">グリーンリサイクル東京</span>
-          </span>
+          {companyName ? (
+            <span className="biz-header-co">
+              <span className="co-dot">{companyName.slice(0, 1)}</span>
+              <span className="biz-header-co-name">{companyName}</span>
+            </span>
+          ) : null}
           <Link href="/operator/login" className="biz-logout">
             ログアウト
           </Link>
         </div>
       </header>
 
-      <div className="dash-wrap">
-        {/* ---------- サマリー帯（KPI） ---------- */}
-        <div className="summary-bar">
-          <div className="sum-card highlight">
-            <div className="sum-label">入札中の案件</div>
-            <div className="sum-val">
-              3<span>件</span>
-            </div>
-            <div className="sum-sub">うち首位 2件</div>
-          </div>
-          <div className="sum-card">
-            <div className="sum-label">交渉中</div>
-            <div className="sum-val">
-              1<span>件</span>
-            </div>
-            <div className="sum-sub">未読メッセージ 2件</div>
-          </div>
-          <div className="sum-card">
-            <div className="sum-label">今月の成約</div>
-            <div className="sum-val">
-              4<span>件</span>
-            </div>
-            <div className="sum-sub">買取総額 ¥312,000</div>
-          </div>
-          <div className="sum-card">
-            <div className="sum-label">新着案件</div>
-            <div className="sum-val">
-              8<span>件</span>
-            </div>
-            <div className="sum-sub">今日追加</div>
-          </div>
+      {isLoading ? (
+        <div className="flex min-h-[50vh] items-center justify-center">
+          <Spinner className="h-6 w-6 text-brand-600" />
         </div>
-
-        {/* ---------- タブ ---------- */}
-        <div className="dash-tabs" role="tablist">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === t.key}
-              className={`dash-tab${activeTab === t.key ? " active" : ""}`}
-              onClick={() => setActiveTab(t.key)}
+      ) : (
+        <div className="dash-wrap">
+          {error ? (
+            <div
+              role="alert"
+              style={{
+                marginBottom: 20,
+                padding: "12px 16px",
+                borderRadius: "var(--radius-s)",
+                background: "#fff5f5",
+                color: "#dc2626",
+                fontSize: 13,
+                border: "1px solid #fca5a5",
+              }}
             >
-              <Ic name={t.icon} />
-              {t.label}
-              <span className={`tab-badge${t.gray ? " gray" : ""}`}>{t.badge}</span>
-            </button>
-          ))}
-        </div>
+              {error}
+            </div>
+          ) : null}
+          {pendingApproval ? (
+            <div
+              role="status"
+              style={{
+                marginBottom: 20,
+                padding: "12px 16px",
+                borderRadius: "var(--radius-s)",
+                background: "var(--pale)",
+                color: "var(--body)",
+                fontSize: 13,
+              }}
+            >
+              アカウントは運営の承認待ちです。承認が完了すると案件を閲覧できます（通常1営業日以内）。
+            </div>
+          ) : null}
 
-        {/* ---------- 案件一覧タブ ---------- */}
-        <div className={`tab-content${activeTab === "lots" ? " active" : ""}`}>
-          <div className="filter-row">
-            <span className="filter-label">絞り込み</span>
-            <select className="filter-select" aria-label="エリアで絞り込み" defaultValue="全エリア">
-              <option>全エリア</option>
-              <option>東京都</option>
-              <option>神奈川県</option>
-              <option>千葉県</option>
-              <option>埼玉県</option>
-            </select>
-            <select className="filter-select" aria-label="カテゴリで絞り込み" defaultValue="全カテゴリ">
-              <option>全カテゴリ</option>
-              <option>家電・PC</option>
-              <option>ブランド品</option>
-              <option>カメラ</option>
-              <option>家具</option>
-              <option>衣類・靴</option>
-            </select>
-            <select className="filter-select" aria-label="並び替え" defaultValue="新着順">
-              <option>新着順</option>
-              <option>締め切り近い順</option>
-              <option>入札額高い順</option>
-              <option>点数多い順</option>
-            </select>
-            <span className="filter-count">24件</span>
+          {/* ---------- サマリー帯（KPI） ---------- */}
+          <div className="summary-bar">
+            <div className="sum-card highlight">
+              <div className="sum-label">入札中の案件</div>
+              <div className="sum-val">
+                {biddingLots.length}
+                <span>件</span>
+              </div>
+              <div className="sum-sub">うち首位 {winningLots.length}件</div>
+            </div>
+            <div className="sum-card">
+              <div className="sum-label">交渉中</div>
+              <div className="sum-val">
+                0<span>件</span>
+              </div>
+              <div className="sum-sub">準備中</div>
+            </div>
+            <div className="sum-card">
+              <div className="sum-label">今月の成約</div>
+              <div className="sum-val">
+                {thisMonthDone.length}
+                <span>件</span>
+              </div>
+              <div className="sum-sub">買取総額 ¥{yen(thisMonthAmount)}</div>
+            </div>
+            <div className="sum-card">
+              <div className="sum-label">案件一覧</div>
+              <div className="sum-val">
+                {lots.length}
+                <span>件</span>
+              </div>
+              <div className="sum-sub">現在入札可能</div>
+            </div>
           </div>
 
-          <div className="lot-grid">
-            {lots.map((lot) => (
-              <LotCard key={lot.id} lot={lot} onBid={requestBid} />
+          {/* ---------- タブ ---------- */}
+          <div className="dash-tabs" role="tablist">
+            {TABS.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === t.key}
+                className={`dash-tab${activeTab === t.key ? " active" : ""}`}
+                onClick={() => setActiveTab(t.key)}
+              >
+                <Ic name={t.icon} />
+                {t.label}
+                <span className={`tab-badge${t.gray ? " gray" : ""}`}>{t.badge}</span>
+              </button>
             ))}
           </div>
-        </div>
 
-        {/* ---------- 入札中タブ ---------- */}
-        <div className={`tab-content${activeTab === "bids" ? " active" : ""}`}>
-          {biddingLots.length ? (
-            <div className="lot-grid">
-              {biddingLots.map((lot) => (
-                <LotCard key={lot.id} lot={lot} onBid={requestBid} />
-              ))}
+          {/* ---------- 案件一覧タブ ---------- */}
+          <div className={`tab-content${activeTab === "lots" ? " active" : ""}`}>
+            <div className="filter-row">
+              <span className="filter-count">{lots.length}件</span>
             </div>
-          ) : (
+
+            {lots.length === 0 ? (
+              <div className="empty-state">
+                <Ic name="box" />
+                <p>現在、入札可能な案件はありません。</p>
+              </div>
+            ) : (
+              <div className="lot-grid">
+                {lots.map((lot) => (
+                  <LotCard key={lot.id} lot={lot} busy={bidBusy} onBid={requestBid} />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* ---------- 入札中タブ ---------- */}
+          <div className={`tab-content${activeTab === "bids" ? " active" : ""}`}>
+            {biddingLots.length ? (
+              <div className="lot-grid">
+                {biddingLots.map((lot) => (
+                  <LotCard key={lot.id} lot={lot} busy={bidBusy} onBid={requestBid} />
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state">
+                <Ic name="trend" />
+                <p>
+                  現在入札中の案件はありません。
+                  <br />
+                  「案件一覧」から入札してみましょう。
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* ---------- 交渉中タブ ---------- */}
+          <div className={`tab-content${activeTab === "neg" ? " active" : ""}`}>
             <div className="empty-state">
-              <Ic name="trend" />
+              <Ic name="chat" />
               <p>
-                現在入札中の案件はありません。
+                交渉機能は準備中です。
                 <br />
-                「案件一覧」から入札してみましょう。
+                落札状況は「取引」ページからご確認いただけます。
               </p>
             </div>
-          )}
-        </div>
+          </div>
 
-        {/* ---------- 交渉中タブ ---------- */}
-        <div className={`tab-content${activeTab === "neg" ? " active" : ""}`}>
-          <Link href="/operator/chat/1" className="negotiation-card">
-            <div className="neg-user-ic">山</div>
-            <div className="neg-info">
-              <div className="neg-lot">KTZ-2026-04821　家電・ブランド品など14点</div>
-              <div className="neg-preview">引き取り日程はいつ頃が可能ですか？</div>
-            </div>
-            <div className="neg-right">
-              <div className="neg-amount">¥72,000</div>
-              <div className="neg-time">15:42</div>
-              <span className="unread-chip">未読 2</span>
-            </div>
-          </Link>
-        </div>
-
-        {/* ---------- 成約済みタブ ---------- */}
-        <div className={`tab-content${activeTab === "done" ? " active" : ""}`}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {DONE.map((d) => (
-              <div className="negotiation-card" key={d.id} style={{ cursor: "default" }}>
-                <div className="neg-user-ic done" aria-hidden="true">
-                  <Ic name="check" />
-                </div>
-                <div className="neg-info">
-                  <div className="neg-lot">
-                    {d.id}　{d.items.join("・")}など{d.count}点
-                  </div>
-                  <div className="neg-preview">
-                    {d.area}　成約日：{d.date}
-                  </div>
-                </div>
-                <div className="neg-right">
-                  <div className="neg-amount">¥{yen(d.amount)}</div>
-                </div>
+          {/* ---------- 成約済みタブ ---------- */}
+          <div className={`tab-content${activeTab === "done" ? " active" : ""}`}>
+            {doneTxns.length === 0 ? (
+              <div className="empty-state">
+                <Ic name="check" />
+                <p>成約済みの案件はまだありません。</p>
               </div>
-            ))}
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {doneTxns.map((t) => (
+                  <Link
+                    href={`/operator/transactions/${t.id}`}
+                    className="negotiation-card"
+                    key={t.id}
+                  >
+                    <div className="neg-user-ic done" aria-hidden="true">
+                      <Ic name="check" />
+                    </div>
+                    <div className="neg-info">
+                      <div className="neg-lot">{t.purpose}</div>
+                      <div className="neg-preview">
+                        {t.prefecture} {t.city}　成約日：
+                        {new Date(t.created_at).toLocaleDateString("ja-JP")}
+                      </div>
+                    </div>
+                    <div className="neg-right">
+                      <div className="neg-amount">
+                        {formatYen(t.final_amount ?? t.initial_amount)}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
         </div>
-      </div>
+      )}
 
       {/* ---------- フッター ---------- */}
       <footer className="biz-footer">
@@ -540,8 +586,8 @@ export default function OperatorDashboardPage() {
             <button type="button" className="btn-cancel" onClick={() => setModalLotId(null)}>
               キャンセル
             </button>
-            <button type="button" className="btn-confirm" onClick={confirmBid}>
-              入札する
+            <button type="button" className="btn-confirm" disabled={bidBusy} onClick={confirmBid}>
+              {bidBusy ? "送信中…" : "入札する"}
             </button>
           </div>
         </div>

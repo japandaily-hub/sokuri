@@ -78,10 +78,14 @@ async def get_current_operator(
 async def get_verified_operator(
     operator: Operator = Depends(get_current_operator),
 ) -> Operator:
-    """Allow vendor_status limited/active (or legacy verified_at for migration)."""
-    status_ok = operator.vendor_status in ("limited", "active")
-    legacy_ok = operator.verified_at is not None
-    if not (status_ok or legacy_ok):
+    """入札等のフル稼働操作を許可するゲート。
+
+    全業者は admin 承認必須。vendor_status="active" の業者のみ許可する
+    （"pending"=未承認、"limited"=レガシー値のいずれも入札不可）。
+    案件の閲覧はこのゲートを経由しない別ゲート（get_current_actor等）で
+    pending でも許可している点に注意（意図的な非対称: 閲覧可・入札不可）。
+    """
+    if operator.vendor_status != "active":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account not yet approved.",

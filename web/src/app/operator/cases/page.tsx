@@ -18,6 +18,7 @@ import {
   formatYen,
   listOpenCases,
   photoSrc,
+  toDisplayMessage,
   type CaseMasked,
 } from "@/lib/katadzuke-api";
 
@@ -35,7 +36,7 @@ export default function OperatorCasesPage() {
         if (e instanceof KdzApiError && e.status === 403) {
           setPendingApproval(true);
         } else {
-          setError(e instanceof Error ? e.message : "取得に失敗しました");
+          setError(toDisplayMessage(e, "取得に失敗しました"));
         }
       });
   }, [token]);

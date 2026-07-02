@@ -18,15 +18,16 @@ import {
   inputBase,
   useToken,
 } from "@/components/kdz/Ui";
+import { DisclosureNotice } from "@/components/kdz/DisclosureNotice";
 import {
   TXN_STATUS_LABEL,
-  KdzApiError,
   cancelTransaction,
   createReduction,
   createReview,
   formatYen,
   getTransaction,
   photoSrc,
+  toDisplayMessage,
   type TransactionDetail,
 } from "@/lib/katadzuke-api";
 
@@ -54,7 +55,7 @@ export default function OperatorTransactionPage() {
     try {
       setTxn(await getTransaction(txnId, token));
     } catch (e) {
-      setError(e instanceof KdzApiError ? e.message : "取得に失敗しました");
+      setError(toDisplayMessage(e, "取得に失敗しました"));
     }
   }, [txnId, token]);
 
@@ -71,7 +72,7 @@ export default function OperatorTransactionPage() {
       await fn();
       await reload();
     } catch (e) {
-      setError(e instanceof KdzApiError ? e.message : "操作に失敗しました");
+      setError(toDisplayMessage(e, "操作に失敗しました"));
     } finally {
       setBusy(false);
     }
@@ -119,6 +120,14 @@ export default function OperatorTransactionPage() {
           <StatusBadge value={txn.status} label={TXN_STATUS_LABEL[txn.status]} />
         </div>
 
+        <div className="mt-4">
+          <DisclosureNotice
+            viewer="operator"
+            disclosed={Boolean(txn.address) && !txn.awaiting_approval}
+            awaitingApproval={txn.awaiting_approval}
+          />
+        </div>
+
         {txn.address ? (
           <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600">
@@ -131,7 +140,7 @@ export default function OperatorTransactionPage() {
               <p className="mt-1 text-sm text-slate-600">お客様連絡先: {txn.contact_email}</p>
             ) : null}
           </div>
-        ) : (
+        ) : txn.awaiting_approval ? null : (
           <Notice tone="warn">住所詳細は表示できません（キャンセル済みの可能性）。</Notice>
         )}
 

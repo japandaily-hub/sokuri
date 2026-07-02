@@ -71,4 +71,8 @@ if ($exit -le 3) {
 } elseif ($exit -le 7) {
     "RESULT: WARN (mismatched/extra)" | Out-File -FilePath $log -Append -Encoding UTF8
 } else {
-    "RESULT: ERROR (som
+    "RESULT: ERROR (一部失敗 — ファイルロックまたは robocopy エラーの可能性)" | Out-File -FilePath $log -Append -Encoding UTF8
+}
+
+"=== AppData backup END: $(Get-Date -Format o) ===" | Out-File -FilePath $log -Append -Encoding UTF8
+"次の手順: OneDrive sync 完了を待ってから、新 PC で restore-appdata-claude.ps1 を実行してください。" | Out-File -FilePath $log -Append -Encoding UTF8

@@ -16,6 +16,7 @@ import {
   CASE_STATUS_LABEL,
   listMyCases,
   photoSrc,
+  toDisplayMessage,
   type CaseOut,
 } from "@/lib/katadzuke-api";
 
@@ -28,7 +29,7 @@ export default function MyCasesPage() {
     if (!token) return;
     listMyCases(token)
       .then(setCases)
-      .catch((e) => setError(e instanceof Error ? e.message : "取得に失敗しました"));
+      .catch((e) => setError(toDisplayMessage(e, "取得に失敗しました")));
   }, [token]);
 
   if (loading || (!cases && !error)) {

@@ -106,6 +106,11 @@ export interface CaseMasked {
   photos: CasePhoto[];
   bid_count: number;
   my_bid: BidOut | null;
+  /**
+   * 現在の最高入札額（バックエンド並行実装中のため optional）。
+   * 未対応の間は undefined/null のまま届く想定で、フロントは「—」等にフォールバックする。
+   */
+  top_bid_amount?: number | null;
 }
 
 export interface BidOut {
@@ -176,6 +181,160 @@ export interface TransactionDetail extends TransactionOut {
   awaiting_approval: boolean;
   reduction_requests: ReductionOut[];
   reviews: ReviewOut[];
+  /** 相手が送信し、自分がまだ既読にしていないメッセージ数。 */
+  unread_count: number;
+}
+
+// ---------------------------------------------------------------------------
+// チャット
+// ---------------------------------------------------------------------------
+
+export type MessageSenderType = "user" | "operator" | "system";
+export type MessageKind = "text" | "schedule_proposal" | "schedule_confirmed" | "system";
+
+export interface MessageOut {
+  id: string;
+  sender_type: MessageSenderType;
+  body: string;
+  kind: MessageKind;
+  meta: Record<string, unknown> | null;
+  created_at: string;
+  /** 自分が送信したメッセージかどうか（サーバー側で actor から判定済み）。 */
+  mine: boolean;
+}
+
+/** チャットメッセージ一覧。after 指定時はそれ以降の差分のみ返る。 */
+export function listMessages(
+  transactionId: string,
+  token: string,
+  after?: string,
+): Promise<MessageOut[]> {
+  const query = after ? `?after=${encodeURIComponent(after)}` : "";
+  return request(`/transactions/${transactionId}/messages${query}`, { token });
+}
+
+export function sendMessage(
+  transactionId: string,
+  body: string,
+  token: string,
+): Promise<MessageOut> {
+  return request(`/transactions/${transactionId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ body }),
+    token,
+  });
+}
+
+export function markMessagesRead(
+  transactionId: string,
+  token: string,
+): Promise<TransactionOut> {
+  return request(`/transactions/${transactionId}/messages/read`, {
+    method: "POST",
+    token,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 日程調整
+// ---------------------------------------------------------------------------
+
+/** 訪問日程の候補提示（落札業者のみ）。 */
+export function proposeSchedule(
+  transactionId: string,
+  slots: string[],
+  token: string,
+): Promise<MessageOut> {
+  return request(`/transactions/${transactionId}/schedule/propose`, {
+    method: "POST",
+    body: JSON.stringify({ slots }),
+    token,
+  });
+}
+
+/** 訪問日程の確定（所有ユーザーのみ）。 */
+export function confirmSchedule(
+  transactionId: string,
+  payload: { visit_date: string; visit_time_slot: string; note?: string },
+  token: string,
+): Promise<TransactionOut> {
+  return request(`/transactions/${transactionId}/schedule/confirm`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+    token,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 業者プロフィール
+// ---------------------------------------------------------------------------
+
+export interface OperatorProfile {
+  operator_id: string;
+  company_name: string;
+  license_number: string | null;
+  verified_at: string | null;
+  vendor_status: string;
+  rating: number | null;
+  areas: string[];
+  categories: string[];
+  strong_categories: string[];
+  staff_count: number | null;
+  business_hours: string | null;
+  intro_message: string | null;
+  is_public: boolean;
+  show_stats: boolean;
+  show_reviews: boolean;
+  show_message: boolean;
+  accept_unsellable: boolean;
+}
+
+export interface OperatorProfileUpdatePayload {
+  areas: string[];
+  categories: string[];
+  strong_categories: string[];
+  staff_count: number | null;
+  business_hours: string | null;
+  intro_message: string | null;
+  is_public: boolean;
+  show_stats: boolean;
+  show_reviews: boolean;
+  show_message: boolean;
+  accept_unsellable: boolean;
+}
+
+export function getOperatorProfile(token: string): Promise<OperatorProfile> {
+  return request("/operator/profile", { token });
+}
+
+export function updateOperatorProfile(
+  payload: OperatorProfileUpdatePayload,
+  token: string,
+): Promise<OperatorProfile> {
+  return request("/operator/profile", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+    token,
+  });
+}
+
+export interface OperatorPublicProfile {
+  operator_id: string;
+  company_name: string;
+  verified_at: string | null;
+  areas: string[];
+  categories: string[];
+  strong_categories: string[];
+  staff_count: number | null;
+  business_hours: string | null;
+  intro_message: string | null;
+  accept_unsellable: boolean;
+  rating: number | null;
+  reviews: ReviewOut[] | null;
+}
+
+export function getVendorPublicProfile(operatorId: string): Promise<OperatorPublicProfile> {
+  return request(`/vendors/${operatorId}`);
 }
 
 export interface InviteOut {
@@ -208,6 +367,17 @@ export class KdzApiError extends Error {
   }
 }
 
+/** fetch() 自体が失敗した場合（backend未起動・オフライン等）に投げる。HTTPエラー（KdzApiError）とは区別する。 */
+export class KdzNetworkError extends Error {
+  constructor(
+    public readonly cause?: unknown,
+    message: string = "ネットワークに接続できませんでした",
+  ) {
+    super(message);
+    this.name = "KdzNetworkError";
+  }
+}
+
 export function apiBase(): string {
   const url = process.env.NEXT_PUBLIC_API_URL;
   if (!url) throw new Error("NEXT_PUBLIC_API_URL が設定されていません。");
@@ -219,14 +389,20 @@ async function request<T>(
   init?: RequestInit & { token?: string },
 ): Promise<T> {
   const { token, ...rest } = init ?? {};
-  const res = await fetch(`${apiBase()}${path}`, {
-    ...rest,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(rest.headers ?? {}),
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${apiBase()}${path}`, {
+      ...rest,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(rest.headers ?? {}),
+      },
+    });
+  } catch (e) {
+    if (e instanceof KdzApiError) throw e;
+    throw new KdzNetworkError(e);
+  }
   if (!res.ok) {
     let message = `HTTP ${res.status}`;
     try {
@@ -238,7 +414,12 @@ async function request<T>(
     throw new KdzApiError(res.status, message);
   }
   if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+  try {
+    return (await res.json()) as T;
+  } catch (e) {
+    if (e instanceof KdzApiError) throw e;
+    throw new KdzNetworkError(e);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -259,11 +440,43 @@ export function signupOperator(payload: {
   email: string;
   password: string;
   license_number?: string;
+  agreed: boolean;
 }): Promise<AuthTokenResponse> {
   return request("/auth/operator/signup", {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+// ---------------------------------------------------------------------------
+// 業者登録申し込み（/business LP）
+// ---------------------------------------------------------------------------
+
+export interface BankAccountInput {
+  bank_name: string;
+  branch_name: string;
+  account_type: "ordinary" | "checking";
+  account_number: string;
+  account_holder: string;
+}
+
+export function submitOperatorApplication(payload: {
+  company_name: string;
+  representative_name: string;
+  registered_address: string;
+  contact_name: string;
+  email: string;
+  phone: string;
+  business_type: "corp" | "sole";
+  service_area: string;
+  categories?: string;
+  message?: string;
+  license_number: string;
+  invoice_number?: string;
+  bank_account: BankAccountInput;
+  agreed: boolean;
+}): Promise<{ application_id: string; status: string }> {
+  return request("/operator-applications", { method: "POST", body: JSON.stringify(payload) });
 }
 
 // ---------------------------------------------------------------------------
@@ -286,11 +499,17 @@ export async function uploadCasePhoto(
     token,
   });
 
-  const res = await fetch(`${apiBase()}${presign.upload_url}`, {
-    method: "PUT",
-    headers: { "Content-Type": contentType },
-    body: file,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${apiBase()}${presign.upload_url}`, {
+      method: "PUT",
+      headers: { "Content-Type": contentType },
+      body: file,
+    });
+  } catch (e) {
+    if (e instanceof KdzApiError) throw e;
+    throw new KdzNetworkError(e);
+  }
   if (!res.ok) throw new KdzApiError(res.status, "写真のアップロードに失敗しました");
   return presign;
 }
@@ -498,6 +717,34 @@ export function adminGetCellDensity(token: string): Promise<CellDensityRow[]> {
 export function formatYen(amount: number | null | undefined): string {
   if (amount == null) return "—";
   return `${amount.toLocaleString("ja-JP")}円`;
+}
+
+/** 汎用フォールバック文言（想定外エラー・非Error値の最終防波堤）。 */
+const GENERIC_FALLBACK_MESSAGE = "処理に失敗しました。時間をおいて再度お試しください。";
+/** ネットワーク到達不可時の固定文言。fallback より優先して表示する。 */
+const NETWORK_ERROR_MESSAGE =
+  "通信に失敗しました。電波状況を確認し、しばらくしてからもう一度お試しください。";
+
+/**
+ * catch(err) で受け取った例外を、ユーザーに安全に表示できる文言へ変換する。
+ * 生の Error#message（fetch失敗時の "Failed to fetch" 等）を画面にそのまま出さないための唯一の窓口。
+ *
+ * 優先順位:
+ * 1. KdzNetworkError → 固定のネットワーク文言（fallback より優先）
+ * 2. KdzApiError → backend detail（空文字・HTTP xxx のみのプレースホルダは fallback にフォールバック）
+ * 3. その他の Error（想定外） → fallback ?? 汎用文言（生の err.message は表示しない）
+ * 4. 非 Error 値 → fallback ?? 汎用文言
+ */
+export function toDisplayMessage(err: unknown, fallback?: string): string {
+  if (err instanceof KdzNetworkError) return NETWORK_ERROR_MESSAGE;
+  if (err instanceof KdzApiError) {
+    // 5xx はサーバー内部エラー文字列が detail に紛れ込むリスクがあるため画面には出さない。
+    if (err.status >= 500) return fallback ?? GENERIC_FALLBACK_MESSAGE;
+    const detail = err.message.trim();
+    const isPlaceholder = detail === "" || /^HTTP \d+$/.test(detail);
+    return isPlaceholder ? (fallback ?? GENERIC_FALLBACK_MESSAGE) : detail;
+  }
+  return fallback ?? GENERIC_FALLBACK_MESSAGE;
 }
 
 export const CASE_STATUS_LABEL: Record<CaseStatus, string> = {

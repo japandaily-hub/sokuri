@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Ic } from "@/components/kdz/Icons";
 import { AppHeader } from "@/components/kdz/AppHeader";
+import { DisclosureNotice } from "@/components/kdz/DisclosureNotice";
 
 /* ============================================================
    申し込み状況ページ（カタヅケ）
@@ -492,6 +493,9 @@ export default function ApplicationsPage() {
                   </div>
                 </div>
               </div>
+
+              {/* 連絡先開示ルールの明記（実データ配線は今後対応。現状は成約前の文言で固定） */}
+              <DisclosureNotice viewer="user" disclosed={false} awaitingApproval={false} />
 
               {/* タイムライン */}
               <div className="side-card">

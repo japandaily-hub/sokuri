@@ -15,6 +15,21 @@ from app.config import get_settings
 logger = logging.getLogger(__name__)
 
 _BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/email"
+# LINE専用ユーザー（実メール未設定）に払い出す仮メールのドメインサフィックス。
+# auth.py の line_exchange で `line-{line_user_id}@line.katazuke.internal` として発行される。
+_PLACEHOLDER_EMAIL_SUFFIX = "@line.katazuke.internal"
+
+
+def is_placeholder_email(email: str | None) -> bool:
+    """LINE専用ユーザー向けの仮メール（実メール未設定）かどうかを判定する。
+
+    仮メールは実際には受信されないため、そのまま送信経路（通知メール送信・
+    業者への contact_email 開示等）に流すと配送不能や情報として無意味な
+    開示になる。呼び出し元でこの判定を経由してスキップ/文言差し替えを行うこと。
+    """
+    if not email:
+        return False
+    return email.lower().endswith(_PLACEHOLDER_EMAIL_SUFFIX)
 
 
 async def _send(to_email: str, subject: str, html: str) -> bool:
@@ -93,5 +108,81 @@ async def send_bid_selected(to_email: str, transaction_id: str, amount: int) -> 
             f"<p>あなたの入札（<strong>{amount:,} 円</strong>）が選ばれました。</p>"
             "<p>住所詳細が開示されています。訪問日の調整を進めてください。</p>"
             f'<p><a href="{url}">落札案件の詳細を確認する</a></p>'
+        ),
+    )
+
+
+async def send_bid_lost(to_email: str, case_id: str) -> bool:
+    """落札通知（落選業者宛）。"""
+    return await _send(
+        to_email,
+        "【カタヅケ】ご入札いただいた案件について",
+        _wrap(
+            "<p>ご入札いただいた案件は、誠に恐れ入りますが今回は成約に至りませんでした。</p>"
+            "<p>またの機会がございましたらよろしくお願いいたします。</p>"
+        ),
+    )
+
+
+async def send_schedule_confirmed(to_email: str, transaction_id: str, visit_date: str) -> bool:
+    """訪問日程が確定した際の通知（業者宛）。"""
+    settings = get_settings()
+    url = f"{settings.frontend_base_url}/operator/transactions/{transaction_id}"
+    return await _send(
+        to_email,
+        "【カタヅケ】訪問日程が確定しました",
+        _wrap(
+            f"<p>訪問日程が <strong>{visit_date}</strong> に確定しました。</p>"
+            f'<p><a href="{url}">成約詳細を確認する</a></p>'
+        ),
+    )
+
+
+async def send_operator_application_received(to_email: str, company_name: str) -> bool:
+    """④ 業者事前申込の受付確認（申込者宛）。"""
+    return await _send(
+        to_email,
+        "【カタヅケ】業者登録のお申込みを受け付けました",
+        _wrap(
+            f"<p><strong>{company_name}</strong> 様</p>"
+            "<p>業者登録のお申込みを受け付けました。審査完了まで今しばらくお待ちください。</p>"
+        ),
+    )
+
+
+async def send_operator_application_admin_alert(to_email: str, company_name: str) -> bool:
+    """④ 業者事前申込の新規受付通知（admin宛）。"""
+    return await _send(
+        to_email,
+        "【カタヅケ管理】新規業者申込が届きました",
+        _wrap(f"<p>新規業者申込（<strong>{company_name}</strong>）が届きました。管理画面から確認してください。</p>"),
+    )
+
+
+async def send_operator_application_approved(to_email: str, company_name: str, invite_code: str) -> bool:
+    """⑤ 業者事前申込の承認通知（申込者宛・招待コード案内）。"""
+    settings = get_settings()
+    url = f"{settings.frontend_base_url}/operator/signup"
+    return await _send(
+        to_email,
+        "【カタヅケ】業者登録が承認されました",
+        _wrap(
+            f"<p><strong>{company_name}</strong> 様</p>"
+            "<p>業者登録の審査が完了し、承認されました。以下の招待コードで本登録を完了してください。</p>"
+            f'<p style="font-size:20px;font-weight:bold;letter-spacing:1px;">{invite_code}</p>'
+            f'<p><a href="{url}">本登録ページへ進む</a></p>'
+        ),
+    )
+
+
+async def send_operator_application_rejected(to_email: str, company_name: str, reason: str) -> bool:
+    """⑥ 業者事前申込の却下通知（申込者宛）。"""
+    return await _send(
+        to_email,
+        "【カタヅケ】業者登録のお申込みについて",
+        _wrap(
+            f"<p><strong>{company_name}</strong> 様</p>"
+            "<p>誠に恐れ入りますが、今回のお申込みは承認を見送らせていただきました。</p>"
+            f"<p>理由: {reason}</p>"
         ),
     )

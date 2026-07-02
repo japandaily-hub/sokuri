@@ -13,13 +13,14 @@ import {
   inputBase,
   useToken,
 } from "@/components/kdz/Ui";
+import { DisclosureNotice } from "@/components/kdz/DisclosureNotice";
 import {
   CASE_STATUS_LABEL,
-  KdzApiError,
   createBid,
   formatYen,
   getCaseMasked,
   photoSrc,
+  toDisplayMessage,
   type CaseMasked,
 } from "@/lib/katadzuke-api";
 
@@ -39,7 +40,7 @@ export default function OperatorCaseDetailPage() {
     try {
       setCaseData(await getCaseMasked(caseId, token));
     } catch (e) {
-      setError(e instanceof KdzApiError ? e.message : "取得に失敗しました");
+      setError(toDisplayMessage(e, "取得に失敗しました"));
     }
   }, [caseId, token]);
 
@@ -61,7 +62,7 @@ export default function OperatorCaseDetailPage() {
       await createBid(caseId, { amount: value, message: message.trim() || undefined }, token);
       await reload();
     } catch (err) {
-      setError(err instanceof KdzApiError ? err.message : "入札に失敗しました");
+      setError(toDisplayMessage(err, "入札に失敗しました"));
     } finally {
       setBusy(false);
     }
@@ -107,6 +108,11 @@ export default function OperatorCaseDetailPage() {
             </p>
           </div>
           <StatusBadge value={caseData.status} label={CASE_STATUS_LABEL[caseData.status]} />
+        </div>
+
+        <div className="mt-4">
+          {/* 連絡先開示ルールの明記（実データ配線は今後対応。現状は成約前の文言で固定） */}
+          <DisclosureNotice viewer="operator" disclosed={false} awaitingApproval={false} />
         </div>
 
         {caseData.photos.length > 0 && (

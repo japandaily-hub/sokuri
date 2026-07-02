@@ -17,7 +17,7 @@ from app.db.models.transaction import Transaction
 from app.db.models.user import User
 from app.db.session import get_session
 from app.schemas_katadzuke import BidCreateRequest, BidOut, TransactionOut
-from app.services import notify
+from app.services import notify, notify_dispatch
 
 router = APIRouter()
 
@@ -103,7 +103,9 @@ async def create_bid(
 
     if case.user_id is not None:
         owner = await session.get(User, case.user_id)
-        if owner is not None:
+        # LINE専用ユーザーの仮メール（実メール未設定）宛には送信しない。
+        # 配送不能なだけでなく、実在しないドメインへの送信試行をログに残さないため。
+        if owner is not None and not notify.is_placeholder_email(owner.email):
             background.add_task(
                 notify.send_bid_received,
                 owner.email,
@@ -149,9 +151,13 @@ async def select_bid(
         )
 
     target.status = "selected"
+    # 落選業者への通知はcommit後にプリミティブ値で行う（ORMオブジェクトを
+    # BackgroundTasksへ渡さない。commit後はセッションがdetachされうるため）。
+    losers: list[tuple[str | None, str]] = []
     for b in case.bids:
         if b.id != target.id and b.status == "pending":
             b.status = "rejected"
+            losers.append((b.operator.line_user_id, b.operator.contact_email))
     case.status = "closed"
     txn = Transaction(
         case_id=case.id,
@@ -161,13 +167,25 @@ async def select_bid(
         status="pending",
     )
     session.add(txn)
+    winner_line_user_id = target.operator.line_user_id
+    winner_contact_email = target.operator.contact_email
+    winner_amount = target.amount
+    case_id_str = str(case.id)
     await session.commit()
     await session.refresh(txn)
 
     background.add_task(
-        notify.send_bid_selected,
-        target.operator.contact_email,
+        notify_dispatch.dispatch_bid_selected,
+        winner_line_user_id,
+        winner_contact_email,
         str(txn.id),
-        target.amount,
+        winner_amount,
     )
+    for loser_line_user_id, loser_email in losers:
+        background.add_task(
+            notify_dispatch.dispatch_bid_lost,
+            loser_line_user_id,
+            loser_email,
+            case_id_str,
+        )
     return TransactionOut.model_validate(txn)

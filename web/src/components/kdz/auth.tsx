@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
+import { signIn } from "next-auth/react";
 import { KdzLogo } from "./Logo";
 
 /** 認証画面の上部バー（ロゴ + 右リンク）。 */
@@ -97,26 +98,36 @@ export function PasswordField({
   );
 }
 
-/** LINE 認証ボタン。バックエンド未実装のため、押下時は準備中トーストを出す（虚偽の遷移はしない）。 */
-export function LineAuthButton({ label = "LINEで続ける" }: { label?: string }) {
-  const [toast, setToast] = useState(false);
+/**
+ * LINE 認証ボタン。
+ * signIn("line", { callbackUrl }) を呼び出し、NextAuth の LINE OAuth フローへ遷移する。
+ * サーバー側で LINE プロバイダが未登録（環境変数未設定）の場合は NextAuth が
+ * エラーページへ遷移する（事前の利用可否チェックはあえて行わない設計）。
+ */
+export function LineAuthButton({
+  label = "LINEで続ける",
+  callbackUrl,
+}: {
+  label?: string;
+  /** ログイン成功後の遷移先。呼び出し元の既存ログインフローの遷移先と揃えること。 */
+  callbackUrl: string;
+}) {
+  const [busy, setBusy] = useState(false);
   return (
-    <>
-      <button
-        type="button"
-        className="btn-line-auth"
-        onClick={() => {
-          setToast(true);
-          window.setTimeout(() => setToast(false), 3000);
-        }}
-      >
-        <svg viewBox="0 0 24 24">
-          <path d="M12 2C6.48 2 2 6.1 2 11.1c0 4.5 3.6 8.3 8.5 9-.3.8-.4 2-.4 2s-.1.7.4.9c.5.2 1-.2 1-.2s2.7-1.8 3.8-2.5c.4.1.9.1 1.3.1C17.7 20.4 22 16.4 22 11.1 22 6.1 17.5 2 12 2z" />
-        </svg>
-        {label}
-      </button>
-      {toast ? <div className="kdz-toast">LINEログインは現在準備中です。メールでお進みください</div> : null}
-    </>
+    <button
+      type="button"
+      className="btn-line-auth"
+      disabled={busy}
+      onClick={() => {
+        setBusy(true);
+        void signIn("line", { callbackUrl });
+      }}
+    >
+      <svg viewBox="0 0 24 24">
+        <path d="M12 2C6.48 2 2 6.1 2 11.1c0 4.5 3.6 8.3 8.5 9-.3.8-.4 2-.4 2s-.1.7.4.9c.5.2 1-.2 1-.2s2.7-1.8 3.8-2.5c.4.1.9.1 1.3.1C17.7 20.4 22 16.4 22 11.1 22 6.1 17.5 2 12 2z" />
+      </svg>
+      {label}
+    </button>
   );
 }
 

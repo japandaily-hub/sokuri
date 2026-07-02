@@ -15,13 +15,13 @@ import {
   useToken,
 } from "@/components/kdz/Ui";
 import {
-  KdzApiError,
   adminBulkCreateInvites,
   adminCreateInvite,
   adminGetCellDensity,
   adminListInvites,
   adminListOperators,
   adminVerifyOperator,
+  toDisplayMessage,
   type CellDensityRow,
   type InviteBulkCreateResponse,
   type InviteOut,
@@ -63,7 +63,7 @@ export default function AdminPage() {
       setOperators(ops);
       setCellDensity(density);
     } catch (e) {
-      setError(e instanceof KdzApiError ? e.message : "取得に失敗しました");
+      setError(toDisplayMessage(e, "取得に失敗しました"));
     }
   }, [token]);
 
@@ -80,7 +80,7 @@ export default function AdminPage() {
       setInviteEmail("");
       await reload();
     } catch (e) {
-      setError(e instanceof KdzApiError ? e.message : "発行に失敗しました");
+      setError(toDisplayMessage(e, "発行に失敗しました"));
     } finally {
       setBusy(false);
     }
@@ -100,7 +100,7 @@ export default function AdminPage() {
       setBulkResult(result);
       await reload();
     } catch (e) {
-      setError(e instanceof KdzApiError ? e.message : "バルク発行に失敗しました");
+      setError(toDisplayMessage(e, "バルク発行に失敗しました"));
     } finally {
       setBusy(false);
     }
@@ -128,7 +128,7 @@ export default function AdminPage() {
       await adminVerifyOperator(op.id, op.vendor_status !== "active", token);
       await reload();
     } catch (e) {
-      setError(e instanceof KdzApiError ? e.message : "更新に失敗しました");
+      setError(toDisplayMessage(e, "更新に失敗しました"));
     } finally {
       setBusy(false);
     }

@@ -44,6 +44,15 @@ class Settings(BaseSettings):
     mail_from_name: str = "カタヅケ"
     # フロントエンドの基点 URL（メール内リンク用）
     frontend_base_url: str = "http://localhost:3000"
+    # 機微データ（振込先口座情報等）の対称鍵暗号化キー（Fernet, urlsafe base64 32byte）。
+    # 未設定時は app.core.crypto の呼び出し時にエラーで落ちる（鍵欠如を握りつぶさない）。
+    app_encryption_key: str = ""
+    # LINE Messaging API のチャネルアクセストークン（Push通知送信用）。未設定時は送信をスキップする。
+    line_channel_access_token: str = ""
+    # LINE Login チャネル ID（フロントの LINE_CLIENT_ID と同一値）。
+    # /auth/line/exchange でアクセストークンの発行元チャネルを検証（audience 検証）するために使用する。
+    # 未設定時は LINE ログイン機能自体を未構成とみなし 503 を返す（セキュリティ上、検証をスキップしない）。
+    line_client_id: str = ""
 
     @property
     def admin_emails(self) -> list[str]:

@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
-from typing import Literal
+from datetime import date, datetime, timedelta
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints, field_validator
 
 # ──────────────────────────── 認証 ────────────────────────────
 
@@ -22,17 +22,36 @@ class UserLoginRequest(BaseModel):
     password: str
 
 
+# 業者向け利用規約・プライバシーポリシーの現行バージョン。
+# クライアントからは受け取らず、同意時点でサーバーがこの値を確定させて記録する
+# （クライアント入力のバージョン文字列は改ざん・偽装され得るため信用しない）。
+CURRENT_OPERATOR_TERMS_VERSION = "2026-07-02"
+
+
 class OperatorSignupRequest(BaseModel):
-    invite_code: str | None = Field(default=None, max_length=64, description="招待コード（任意。あればactive、なければlimited登録）")
+    invite_code: str | None = Field(default=None, max_length=64, description="招待コード（任意。あればactive、なければpending登録＝要admin承認）")
     company_name: str = Field(min_length=1, max_length=255)
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
-    license_number: str | None = Field(default=None, max_length=128)
+    # 古物商許可番号は個人・法人問わず必須（カタヅケ自体は許可を取得しない）。
+    # フォーマットの厳格な正規表現検証は行わない（表記ゆれが大きく誤弾きリスクの方が実利より大きいため）。
+    license_number: str = Field(min_length=5, max_length=128)
+    agreed: bool = Field(description="利用規約・プライバシーポリシーへの同意")
 
 
 class OperatorLoginRequest(BaseModel):
     email: EmailStr
     password: str
+
+
+class LineExchangeRequest(BaseModel):
+    """LINEログイン統合 — フロントから受け取った LINE アクセストークンをバックエンドで検証する。
+
+    id_token/JWKS 検証は行わず、このトークンを使ってバックエンド自身が
+    LINE Profile API を叩いて userId を取得する MVP 方式（将来強化: OIDC id_token 検証）。
+    """
+
+    line_access_token: str = Field(min_length=1, max_length=4096)
 
 
 class UserOut(BaseModel):
@@ -56,6 +75,8 @@ class OperatorOut(BaseModel):
     rating: float | None
     is_suspended: bool
     created_at: datetime
+    agreed_terms_version: str | None = None
+    agreed_at: datetime | None = None
 
 
 class OperatorPublicOut(BaseModel):
@@ -157,6 +178,7 @@ class CaseMaskedOut(BaseModel):
     photos: list[CasePhotoOut] = []
     bid_count: int = 0
     my_bid: BidOut | None = None
+    top_bid_amount: int | None = None
 
 
 # ──────────────────────────── 入札 ────────────────────────────
@@ -201,6 +223,7 @@ class TransactionOut(BaseModel):
     final_amount: int | None
     fee_amount: int
     visit_date: date | None
+    visit_time_slot: str | None = None
     status: str
     created_at: datetime
 
@@ -215,6 +238,7 @@ class TransactionDetailOut(TransactionOut):
     awaiting_approval: bool = False
     reduction_requests: list[ReductionOut] = []
     reviews: list[ReviewOut] = []
+    unread_count: int = 0
 
 
 class TransactionCancelRequest(BaseModel):
@@ -314,6 +338,199 @@ class InviteBulkCreateResponse(BaseModel):
 
 class OperatorVerifyRequest(BaseModel):
     verified: bool = True
+
+
+# ──────────────────────────── 業者事前申込（/business） ────────────────────────────
+
+
+class BankAccountIn(BaseModel):
+    """振込先口座情報。DB保存直前に暗号化する（平文はDB・ログに残さない）。"""
+
+    bank_name: str = Field(max_length=100)
+    branch_name: str = Field(max_length=100)
+    account_type: Literal["ordinary", "checking"]
+    account_number: str = Field(max_length=20)
+    account_holder: str = Field(max_length=100)
+
+
+class OperatorApplicationCreateRequest(BaseModel):
+    company_name: str = Field(min_length=1, max_length=255)
+    representative_name: str = Field(min_length=1, max_length=255)
+    registered_address: str = Field(min_length=1, max_length=512)
+    contact_name: str = Field(min_length=1, max_length=255)
+    email: EmailStr
+    phone: str = Field(min_length=1, max_length=32)
+    business_type: Literal["corp", "sole"]
+    service_area: str = Field(max_length=32)
+    categories: str | None = Field(default=None, max_length=255)
+    message: str | None = Field(default=None, max_length=2000)
+    license_number: str = Field(min_length=5, max_length=128)
+    invoice_number: str | None = Field(default=None, max_length=20)
+    bank_account: BankAccountIn
+    agreed: bool = Field(description="利用規約・プライバシーポリシーへの同意")
+
+
+class OperatorApplicationCreateResponse(BaseModel):
+    application_id: uuid.UUID
+    status: str
+
+
+class BankAccountMaskedOut(BaseModel):
+    """admin一覧・詳細用。口座番号は下4桁マスクのみ含める。"""
+
+    bank_name: str
+    branch_name: str
+    account_type: str
+    account_number_masked: str
+    account_holder: str
+
+
+class OperatorApplicationOut(BaseModel):
+    """admin一覧・詳細用。口座情報は下4桁マスクのみ含める。"""
+
+    id: uuid.UUID
+    status: str
+    company_name: str
+    representative_name: str
+    registered_address: str
+    contact_name: str
+    contact_email: str
+    contact_phone: str
+    license_number: str
+    business_type: str | None
+    service_area: str | None
+    categories: str | None
+    message: str | None
+    invoice_number: str | None
+    bank_account: BankAccountMaskedOut | None
+    agreed_terms_version: str | None
+    agreed_at: datetime | None
+    reviewed_by: uuid.UUID | None
+    reviewed_at: datetime | None
+    reject_reason: str | None
+    operator_id: uuid.UUID | None
+    created_at: datetime
+
+
+class OperatorApplicationBankAccountRevealOut(BaseModel):
+    """admin向け: 口座情報の全桁復号結果。アクセスは呼び出し元でログに記録すること。"""
+
+    bank_name: str
+    branch_name: str
+    account_type: str
+    account_number: str
+    account_holder: str
+
+
+class OperatorApplicationRejectRequest(BaseModel):
+    reject_reason: str = Field(min_length=1, max_length=500)
+
+
+class OperatorApplicationApproveResponse(BaseModel):
+    application: OperatorApplicationOut
+    invite_code: str
+
+
+# ──────────────────────────── チャット ────────────────────────────
+
+
+class MessageCreateRequest(BaseModel):
+    body: str = Field(min_length=1, max_length=2000)
+
+
+class MessageOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    sender_type: str
+    body: str
+    kind: str
+    meta: dict | None
+    created_at: datetime
+    mine: bool = False
+
+
+# ──────────────────────────── 日程調整 ────────────────────────────
+
+
+class ScheduleProposeRequest(BaseModel):
+    slots: list[Annotated[str, StringConstraints(min_length=1, max_length=64)]] = Field(
+        min_length=1, max_length=10
+    )
+
+
+class ScheduleConfirmRequest(BaseModel):
+    visit_date: date
+    visit_time_slot: str = Field(min_length=1, max_length=32)
+    note: str | None = Field(default=None, max_length=500)
+
+    @field_validator("visit_date")
+    @classmethod
+    def _validate_visit_date(cls, v: date) -> date:
+        today = date.today()
+        if v < today:
+            raise ValueError("訪問日は本日以降を指定してください。")
+        if v > today + timedelta(days=365):
+            raise ValueError("訪問日が遠すぎます。")
+        return v
+
+
+# ──────────────────────────── 業者プロフィール ────────────────────────────
+
+
+class OperatorProfileOut(BaseModel):
+    """自社プロフィール取得（審査確定項目 + 編集可能項目の統合）。"""
+
+    operator_id: uuid.UUID
+    company_name: str
+    license_number: str | None
+    verified_at: datetime | None
+    vendor_status: str
+    rating: float | None
+    areas: list[str] = []
+    categories: list[str] = []
+    strong_categories: list[str] = []
+    staff_count: int | None = None
+    business_hours: str | None = None
+    intro_message: str | None = None
+    is_public: bool = True
+    show_stats: bool = True
+    show_reviews: bool = True
+    show_message: bool = True
+    accept_unsellable: bool = False
+
+
+class OperatorProfileUpdateRequest(BaseModel):
+    """編集可能項目のみ受け付ける。審査確定項目（会社名・許可番号等）は含めない。"""
+
+    areas: list[str] = Field(default_factory=list, max_length=50)
+    categories: list[str] = Field(default_factory=list, max_length=50)
+    strong_categories: list[str] = Field(default_factory=list, max_length=50)
+    staff_count: int | None = Field(default=None, ge=0, le=100_000)
+    business_hours: str | None = Field(default=None, max_length=255)
+    intro_message: str | None = Field(default=None, max_length=500)
+    is_public: bool = True
+    show_stats: bool = True
+    show_reviews: bool = True
+    show_message: bool = True
+    accept_unsellable: bool = False
+
+
+class OperatorPublicProfileOut(BaseModel):
+    """公開プロフィール（/vendors/{operator_id}）。show_* フラグに応じて項目を省く。"""
+
+    operator_id: uuid.UUID
+    company_name: str
+    verified_at: datetime | None
+    areas: list[str] = []
+    categories: list[str] = []
+    strong_categories: list[str] = []
+    staff_count: int | None = None
+    business_hours: str | None = None
+    intro_message: str | None = None
+    accept_unsellable: bool = False
+    rating: float | None = None
+    reviews: list[ReviewOut] | None = None
 
 
 # 前方参照の解決

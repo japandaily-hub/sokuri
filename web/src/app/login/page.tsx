@@ -61,7 +61,7 @@ function LoginForm() {
               <p className="auth-sub">入札状況や業者との交渉はログイン後に確認できます</p>
             </div>
 
-            <LineAuthButton />
+            <LineAuthButton callbackUrl={callbackUrl} />
 
             <div className="auth-divider">メールアドレスで続ける</div>
 

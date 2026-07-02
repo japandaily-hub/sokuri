@@ -13,7 +13,7 @@ import Link from "next/link";
 import { Ic } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
 import { useToken } from "@/components/kdz/Ui";
-import { createCase, uploadCasePhoto, KdzApiError } from "@/lib/katadzuke-api";
+import { createCase, uploadCasePhoto, toDisplayMessage } from "@/lib/katadzuke-api";
 import "./create.css";
 
 const STEPS = ["写真", "利用目的", "住居情報", "確認"] as const;
@@ -99,7 +99,7 @@ export default function CreateCasePage() {
       );
       router.push(`/cases/${created.id}?created=1`);
     } catch (err) {
-      setError(err instanceof KdzApiError ? err.message : "送信に失敗しました。もう一度お試しください。");
+      setError(toDisplayMessage(err, "送信に失敗しました。もう一度お試しください。"));
       setSubmitting(false);
       setProgress("");
     }

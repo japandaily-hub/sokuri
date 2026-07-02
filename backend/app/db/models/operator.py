@@ -22,8 +22,14 @@ class Operator(Base, TimestampMixin):
     cancel_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_suspended: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
     invite_code: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
-    vendor_status: Mapped[str] = mapped_column(String(20), nullable=False, default="limited", index=True)
+    vendor_status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", index=True)
     password_hash: Mapped[Optional[str]] = mapped_column(String(512))
+    agreed_terms_version: Mapped[Optional[str]] = mapped_column(String(32))
+    agreed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    # LINE Login の userId（LINE Push通知の宛先にも使用）。未連携は NULL。
+    line_user_id: Mapped[Optional[str]] = mapped_column(
+        String(64), unique=True, index=True, nullable=True
+    )
 
     bids: Mapped[List["Bid"]] = relationship(
         "Bid",

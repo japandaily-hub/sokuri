@@ -16,6 +16,7 @@ import {
   TXN_STATUS_LABEL,
   formatYen,
   listTransactions,
+  toDisplayMessage,
   type TransactionListItem,
 } from "@/lib/katadzuke-api";
 
@@ -28,7 +29,7 @@ export default function OperatorTransactionsPage() {
     if (!token) return;
     listTransactions(token)
       .then(setItems)
-      .catch((e) => setError(e instanceof Error ? e.message : "取得に失敗しました"));
+      .catch((e) => setError(toDisplayMessage(e, "取得に失敗しました")));
   }, [token]);
 
   if (loading || (!items && !error)) {

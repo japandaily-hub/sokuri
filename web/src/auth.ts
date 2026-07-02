@@ -9,10 +9,20 @@
  * - operator-credentials : 業者（email + password）→ /auth/operator/login
  *   ※ 業者の新規登録（招待コード）は /operator/signup ページから
  *     バックエンド /auth/operator/signup を直接呼んだ後に signIn する。
+ * - line                 : LINEログイン（未ログイン時の新規登録/ログインのみ対応）。
+ *   LINE_CLIENT_ID/LINE_CLIENT_SECRET が両方設定されている場合のみ有効化される
+ *   （未設定時はプロバイダを登録しないfail-safe設計）。
+ *   signIn コールバックで LINE の access_token を
+ *   バックエンド /auth/line/exchange と交換し、既存 Credentials provider と
+ *   同じ形の user オブジェクトに正規化して jwt コールバックへ渡す。
+ *   ログイン済みユーザーの後付け連携（Bearer 付きexchange）は今回スコープ外。
+ *   業者（Operator）のLINE単独新規作成はバックエンド側で行われない。
  */
 
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import LINE from "next-auth/providers/line";
+import type { Provider } from "next-auth/providers";
 
 export type AccountType = "user" | "operator";
 
@@ -54,11 +64,31 @@ async function backendLogin(
   }
 }
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  trustHost: true,
-  session: { strategy: "jwt" },
-  pages: { signIn: "/login" },
-  providers: [
+/**
+ * LINEのアクセストークンをバックエンドJWTへ交換する。
+ * 未ログイン時の新規登録/ログインのみが対象（Bearerヘッダは付けない）。
+ * @param lineAccessToken LINE OAuthで取得したアクセストークン
+ * @returns 交換成功時はバックエンドの認証レスポンス、失敗時は null
+ */
+async function backendLineExchange(
+  lineAccessToken: string,
+): Promise<BackendAuthResponse | null> {
+  try {
+    const res = await fetch(`${apiBase()}/auth/line/exchange`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ line_access_token: lineAccessToken }),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as BackendAuthResponse;
+  } catch {
+    return null;
+  }
+}
+
+/** LINE_CLIENT_ID/LINE_CLIENT_SECRET が両方設定されている場合のみプロバイダを構成する。 */
+function buildProviders(): Provider[] {
+  const providers: Provider[] = [
     Credentials({
       id: "user-credentials",
       name: "ユーザーログイン",
@@ -100,8 +130,63 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         };
       },
     }),
-  ],
+  ];
+
+  if (process.env.LINE_CLIENT_ID && process.env.LINE_CLIENT_SECRET) {
+    providers.push(
+      LINE({
+        clientId: process.env.LINE_CLIENT_ID,
+        clientSecret: process.env.LINE_CLIENT_SECRET,
+      }),
+    );
+  }
+
+  return providers;
+}
+
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  trustHost: true,
+  session: { strategy: "jwt" },
+  pages: { signIn: "/login" },
+  providers: buildProviders(),
   callbacks: {
+    async signIn({ user, account }) {
+      // LINEプロバイダ以外（Credentials等）はそのまま通す。
+      if (!account || account.provider !== "line") return true;
+
+      const lineAccessToken = account.access_token;
+      if (!lineAccessToken) return false;
+
+      const data = await backendLineExchange(lineAccessToken);
+      if (!data) return false; // 交換失敗時はログインを不成立にする（不完全なセッションを作らない）
+
+      if (data.account_type === "operator") {
+        // 契約上「LINE単独でのOperator新規作成」は行われないため、
+        // operatorが返るケースは想定外。安全側で不成立にする。
+        if (!data.operator) return false;
+        Object.assign(user, {
+          id: data.operator.id,
+          email: data.operator.contact_email,
+          name: data.operator.company_name,
+          accessToken: data.access_token,
+          accountType: "operator" as const,
+          role: "operator",
+          verified: data.operator.verified_at != null,
+        });
+        return true;
+      }
+
+      if (!data.user) return false;
+      Object.assign(user, {
+        id: data.user.id,
+        email: data.user.email,
+        name: data.user.name ?? data.user.email,
+        accessToken: data.access_token,
+        accountType: "user" as const,
+        role: data.user.role,
+      });
+      return true;
+    },
     jwt({ token, user }) {
       if (user) {
         token.accessToken = user.accessToken;

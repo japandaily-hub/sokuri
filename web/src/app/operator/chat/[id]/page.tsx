@@ -3,27 +3,37 @@
 /**
  * 業者 交渉チャット（/operator/chat/[id]）。
  * デザイン正典: docs/design_handoff_katazuke/業者チャット.html をピクセル忠実に再現。
- * これは業者(operator)側の画面。送信メッセージ（自社=グ）は青バブルで右、相手（ユーザー=山田様）は白バブルで左。
+ * これは業者(operator)側の画面。送信メッセージ（自社）は青バブルで右、相手（ユーザー）は白バブルで左。
  *
  * 動的ルート([id])。/operator は SiteChrome の BARE_PREFIXES 対象で共通クロムが付かないため、
  * ページ自身が専用ヘッダー（戻る矢印 + ロゴ + タイトル + 業者管理バッジ + 会社名 + 通知ベル）と全画面レイアウトを描く。
  *
- * クライアント化の理由（純表示では不可）:
- *  - 案件リストの選択切替（サイドバー active / 相手ヘッダー差し替え / 未読消化）
- *  - メッセージ送信 + ユーザーの自動返信デモ
- *  - 日程提案カードの候補日 追加/削除/編集 + 送信（カードを畳んでメッセージ化）
- *  - 入力ツールの📅ボタン / 右パネルの提案ボタンでカード表示トグル
- *  - id（動的ルート）の参照に useParams を使用
- * バックエンド未配線: 案件・メッセージ・日程はモック定数。送信/提案は実処理せず UI 挙動のみ（トースト）。
+ * [id] は transaction_id として扱う。サイドバー「交渉中の案件」は listTransactions（業者向け）。
+ * メッセージは listMessages のポーリング（表示中5秒間隔・document.hidden 時は停止）+ sendMessage。
+ * 日程提示は proposeSchedule に接続する。
  */
 
 import "./chat.css";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Ic } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
+import { useToken } from "@/components/kdz/Ui";
+import {
+  TXN_STATUS_LABEL,
+  getTransaction,
+  listMessages,
+  listTransactions,
+  markMessagesRead,
+  proposeSchedule,
+  sendMessage,
+  toDisplayMessage,
+  type MessageOut,
+  type TransactionDetail,
+  type TransactionListItem,
+} from "@/lib/katadzuke-api";
 
 /* ---- カレンダー線画（スプライト未収録のため inline。絵文字は使わない） ---- */
 function CalendarIc({ className }: { className?: string }) {
@@ -35,142 +45,47 @@ function CalendarIc({ className }: { className?: string }) {
   );
 }
 
-/* ---- メッセージ型（me=業者自社 / them=ユーザー） ---- */
-type ChatMsg = { mine: boolean; text: string; time: string };
+const POLL_INTERVAL_MS = 5000;
 
-type CaseStatus = "negotiating" | "scheduled" | "waiting";
-
-/* ---- 交渉中の案件（デモ）。amount は数値で保持し表示時に整形する。 ---- */
-type Cas = {
-  caseId: string;
-  status: CaseStatus;
-  statusLabel: string;
-  initial: string;
-  name: string;
-  area: string;
-  amount: number;
-  fee: number;
-  itemCount: number;
-  time: string;
-  preview: string;
-  unread: boolean;
-  statusBar: string;
-  msgs: ChatMsg[];
-};
-
-const CASES: Cas[] = [
-  {
-    caseId: "KTZ-2026-04821",
-    status: "negotiating",
-    statusLabel: "交渉中",
-    initial: "山",
-    name: "山田 花子 様",
-    area: "東京都 世田谷区",
-    amount: 72000,
-    fee: 5760,
-    itemCount: 14,
-    time: "15:42",
-    preview: "家電・ブランド品 他12点",
-    unread: false,
-    statusBar: "交渉成立済み。引き取り日程を確定してください。",
-    msgs: [
-      { mine: true, text: "家電・ブランド品を中心に高評価しております。値がつかないものも含めてまとめて回収いたします。引き取りは弊社スタッフ2名でお伺いしますので、重いものも安心してお任せください。", time: "13:11" },
-      { mine: false, text: "ご連絡ありがとうございます。金額について、もう少し上げていただくことは可能でしょうか？", time: "13:45" },
-      { mine: true, text: "ご要望ありがとうございます。社内で検討いたしました。カメラ機材の評価を見直し、¥72,000での買取であれば対応可能です。いかがでしょうか。", time: "14:20" },
-      { mine: false, text: "ありがとうございます。¥72,000でお願いします。日程はいつ頃が可能ですか？", time: "15:10" },
-    ],
-  },
-  {
-    caseId: "KTZ-2026-04756",
-    status: "scheduled",
-    statusLabel: "日程確定",
-    initial: "田",
-    name: "田中 一郎 様",
-    area: "神奈川県 横浜市",
-    amount: 45000,
-    fee: 3600,
-    itemCount: 8,
-    time: "昨日",
-    preview: "家具・インテリア 他8点",
-    unread: false,
-    statusBar: "引き取り日程が確定しています。当日はスタッフ2名でお伺いください。",
-    msgs: [
-      { mine: false, text: "家具とインテリアをまとめてお願いしたいです。引き取り可能でしょうか？", time: "10:02" },
-      { mine: true, text: "もちろん可能です。¥45,000でのお引き取りをご提案いたします。7月6日（日）13:00〜でいかがでしょうか。", time: "10:40" },
-      { mine: false, text: "その日程で大丈夫です。よろしくお願いします。", time: "11:15" },
-      { mine: true, text: "ありがとうございます。7月6日（日）13:00にお伺いします。当日は10分前を目安にご連絡いたします。", time: "11:20" },
-    ],
-  },
-  {
-    caseId: "KTZ-2026-04690",
-    status: "waiting",
-    statusLabel: "返信待ち",
-    initial: "鈴",
-    name: "鈴木 美咲 様",
-    area: "東京都 練馬区",
-    amount: 38000,
-    fee: 3040,
-    itemCount: 5,
-    time: "6/22",
-    preview: "ブランド品・時計 他5点",
-    unread: true,
-    statusBar: "お客様からのご返信をお待ちしています。",
-    msgs: [
-      { mine: true, text: "はじめまして。ブランド品・時計を中心に高く評価しております。¥38,000でのお引き取りをご提案いたします。ご検討いただけますと幸いです。", time: "6/22 18:30" },
-    ],
-  },
-];
-
-/* ---- 日程提案カードの初期候補日（デモ） ---- */
-const DEFAULT_SLOTS = [
-  "7月5日（土）10:00〜12:00",
-  "7月6日（日）13:00〜15:00",
-  "7月12日（土）10:00〜12:00",
-];
-
-/* ---- 送信に対するユーザーの自動返信（デモ） ---- */
-const AUTO_REPLIES = [
-  "ご連絡ありがとうございます。確認いたします。",
-  "承知しました。よろしくお願いいたします。",
-  "ありがとうございます。検討してご返信します。",
-];
-
-/* ---- 右パネル 出品内容のサムネ（実アセット未投入のためアイコン代替） ---- */
-const ITEM_THUMBS: { ic: "scan" | "bag" | "camera"; label: string }[] = [
-  { ic: "scan", label: "家電・PC" },
-  { ic: "bag", label: "バッグ" },
-  { ic: "camera", label: "カメラ" },
-];
-
-function pad(n: number): string {
-  return n < 10 ? `0${n}` : String(n);
+function formatTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
 }
-function nowLabel(): string {
-  const d = new Date();
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+function formatDateSep(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("ja-JP", { month: "long", day: "numeric", weekday: "short" });
 }
 function yen(n: number): string {
   return `¥${n.toLocaleString()}`;
 }
 
 export default function OperatorChatPage() {
-  // 動的ルートの id（client component なので useParams で取得）。補助表示に使う。
   const params = useParams<{ id: string }>();
-  const routeId = Array.isArray(params?.id) ? params.id[0] : params?.id;
+  const transactionId = Array.isArray(params?.id) ? params.id[0] : params?.id;
+  const router = useRouter();
+  const { token, loading: tokenLoading } = useToken();
 
-  /* ---- 選択中の案件 ---- */
-  const [activeIdx, setActiveIdx] = useState(0);
-  const [read, setRead] = useState<boolean[]>(() => CASES.map((c) => !c.unread));
+  /* ---- サイドバー: 交渉中の案件一覧（業者向け listTransactions） ---- */
+  const [transactions, setTransactions] = useState<TransactionListItem[]>([]);
+  const [sideLoading, setSideLoading] = useState(true);
 
-  /* ---- 案件ごとの送信メッセージ / 自動返信 ---- */
-  const [opMsgs, setOpMsgs] = useState<ChatMsg[][]>(() => CASES.map(() => []));
-  const [userReplies, setUserReplies] = useState<ChatMsg[][]>(() => CASES.map(() => []));
+  /* ---- 現在の成約詳細（相手ユーザー情報・合意額・案件） ---- */
+  const [detail, setDetail] = useState<TransactionDetail | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
+
+  /* ---- メッセージ ---- */
+  const [messages, setMessages] = useState<MessageOut[]>([]);
+  const [messagesError, setMessagesError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+  const lastFetchedAtRef = useRef<string | undefined>(undefined);
 
-  /* ---- 日程提案カード（案件1のみ。候補日の編集 + 送信） ---- */
-  const [slots, setSlots] = useState<string[]>(DEFAULT_SLOTS);
-  const [scheduleVisible, setScheduleVisible] = useState(true);
-  const [scheduleSent, setScheduleSent] = useState(false);
+  /* ---- 日程提案カード（候補日の編集 + 送信） ---- */
+  const [slots, setSlots] = useState<string[]>([""]);
+  const [scheduleVisible, setScheduleVisible] = useState(false);
+  const [proposing, setProposing] = useState(false);
 
   /* ---- トースト ---- */
   const [toast, setToast] = useState<string | null>(null);
@@ -187,47 +102,121 @@ export default function OperatorChatPage() {
     [],
   );
 
-  const cas = CASES[activeIdx];
+  /* ---- サイドバー: 交渉中の案件取得 ---- */
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await listTransactions(token);
+        if (!cancelled) setTransactions(list);
+      } catch (e) {
+        if (!cancelled) showToast(toDisplayMessage(e, "案件一覧の取得に失敗しました"));
+      } finally {
+        if (!cancelled) setSideLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
-  // 表示順: 案件の初期メッセージ → 各送信と対応する自動返信を交互に。
-  const renderedMsgs: ChatMsg[] = useMemo(() => {
-    const extra = opMsgs[activeIdx].flatMap((u, i) => {
-      const r = userReplies[activeIdx][i];
-      return r ? [u, r] : [u];
+  /* ---- 成約詳細取得 ---- */
+  const reloadDetail = useCallback(async () => {
+    if (!token || !transactionId) return;
+    try {
+      const d = await getTransaction(transactionId, token);
+      setDetail(d);
+      setDetailError(null);
+    } catch (e) {
+      setDetailError(toDisplayMessage(e, "成約情報の取得に失敗しました"));
+    }
+  }, [token, transactionId]);
+
+  useEffect(() => {
+    void reloadDetail();
+  }, [reloadDetail]);
+
+  /* ---- メッセージ取得（初回全件 + ポーリング差分） ---- */
+  const fetchMessages = useCallback(
+    async (initial: boolean) => {
+      if (!token || !transactionId) return;
+      try {
+        const after = initial ? undefined : lastFetchedAtRef.current;
+        const batch = await listMessages(transactionId, token, after);
+        if (batch.length > 0) {
+          lastFetchedAtRef.current = batch[batch.length - 1].created_at;
+          setMessages((prev) => (initial ? batch : [...prev, ...batch]));
+        } else if (initial) {
+          setMessages([]);
+        }
+        setMessagesError(null);
+      } catch (e) {
+        setMessagesError(toDisplayMessage(e, "メッセージの取得に失敗しました"));
+      }
+    },
+    [token, transactionId],
+  );
+
+  useEffect(() => {
+    lastFetchedAtRef.current = undefined;
+    setMessages([]);
+    void fetchMessages(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transactionId, token]);
+
+  /* ---- ポーリング（表示中のみ・document.hidden 時は停止） ---- */
+  useEffect(() => {
+    if (!token || !transactionId) return;
+    let timer: number | undefined;
+    function schedule() {
+      timer = window.setTimeout(async () => {
+        if (!document.hidden) {
+          await fetchMessages(false);
+        }
+        schedule();
+      }, POLL_INTERVAL_MS);
+    }
+    schedule();
+    return () => {
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [token, transactionId, fetchMessages]);
+
+  /* ---- 既読化 ---- */
+  useEffect(() => {
+    if (!token || !transactionId || messages.length === 0) return;
+    markMessagesRead(transactionId, token).catch(() => {
+      /* 既読更新の失敗は致命的でないため無視する */
     });
-    return [...cas.msgs, ...extra];
-  }, [activeIdx, opMsgs, userReplies, cas.msgs]);
+  }, [token, transactionId, messages.length]);
 
   /* ---- 自動スクロール ---- */
   const messagesRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = messagesRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [activeIdx, renderedMsgs.length, scheduleSent, scheduleVisible]);
+  }, [messages.length, scheduleVisible]);
 
-  function selectCase(idx: number) {
-    setActiveIdx(idx);
-    setRead((prev) => prev.map((v, i) => (i === idx ? true : v)));
+  function selectTransaction(id: string) {
+    if (id === transactionId) return;
+    router.push(`/operator/chat/${id}`);
   }
 
-  function pushUserReply(idx: number) {
-    window.setTimeout(() => {
-      const reply = AUTO_REPLIES[Math.floor(Math.random() * AUTO_REPLIES.length)];
-      setUserReplies((prev) => prev.map((arr, i) => (i === idx ? [...arr, { mine: false, text: reply, time: nowLabel() }] : arr)));
-    }, 1200);
-  }
-
-  function appendOpMsg(idx: number, text: string) {
-    setOpMsgs((prev) => prev.map((arr, i) => (i === idx ? [...arr, { mine: true, text, time: nowLabel() }] : arr)));
-  }
-
-  function sendMsg() {
+  async function handleSend() {
     const text = draft.trim();
-    if (!text) return;
-    const idx = activeIdx;
-    appendOpMsg(idx, text);
-    setDraft("");
-    pushUserReply(idx);
+    if (!text || !token || !transactionId || sending) return;
+    setSending(true);
+    try {
+      const sent = await sendMessage(transactionId, text, token);
+      setMessages((prev) => [...prev, sent]);
+      lastFetchedAtRef.current = sent.created_at;
+      setDraft("");
+    } catch (e) {
+      showToast(toDisplayMessage(e, "メッセージの送信に失敗しました"));
+    } finally {
+      setSending(false);
+    }
   }
 
   /* ---- 日程提案カード操作 ---- */
@@ -241,10 +230,6 @@ export default function OperatorChatPage() {
     setSlots((prev) => [...prev, ""]);
   }
   function toggleScheduleCard() {
-    if (activeIdx !== 0 || scheduleSent) {
-      showToast("日程提案は交渉中の案件で行えます（デモ）");
-      return;
-    }
     setScheduleVisible((v) => {
       const next = !v;
       if (next) {
@@ -255,26 +240,35 @@ export default function OperatorChatPage() {
       return next;
     });
   }
-  function sendSchedule() {
+  async function handleSendSchedule() {
     const dates = slots.map((s) => s.trim()).filter(Boolean);
     if (dates.length === 0) {
       showToast("候補日を1つ以上入力してください");
       return;
     }
-    setScheduleVisible(false);
-    setScheduleSent(true);
-    const body = `引き取り候補日：\n${dates.map((d) => `・${d}`).join("\n")}\n\nご都合の良い日程をお選びください。`;
-    appendOpMsg(0, body);
-    pushUserReply(0);
-    showToast("候補日を送信しました（デモ）");
+    if (!token || !transactionId || proposing) return;
+    setProposing(true);
+    try {
+      const msg = await proposeSchedule(transactionId, dates, token);
+      setMessages((prev) => [...prev, msg]);
+      lastFetchedAtRef.current = msg.created_at;
+      setScheduleVisible(false);
+      setSlots([""]);
+      showToast("候補日を送信しました");
+    } catch (e) {
+      showToast(toDisplayMessage(e, "候補日の送信に失敗しました"));
+    } finally {
+      setProposing(false);
+    }
   }
 
-  // 日程提案カードは案件1（交渉中）のスレッドで、表示状態かつ未送信のときのみ描画。
-  const showScheduleCard = activeIdx === 0 && scheduleVisible && !scheduleSent;
+  const peerInitial = "客";
+  const caseIdShort = detail?.case_id ? detail.case_id.slice(0, 8).toUpperCase() : "";
+  const statusLabel = detail ? TXN_STATUS_LABEL[detail.status] : "";
 
   return (
     <div className="opchat-page">
-      {/* 専用ヘッダー（戻る矢印 + ロゴ + タイトル + 業者管理バッジ + 会社名 + 通知ベル） */}
+      {/* 専用ヘッダー */}
       <header className="ch-header">
         <Link href="/operator/cases" className="ch-back" aria-label="案件一覧へ戻る">
           <Ic name="arrow" />
@@ -286,7 +280,6 @@ export default function OperatorChatPage() {
         <span className="ch-title">交渉チャット</span>
         <span className="ch-badge">業者管理画面</span>
         <div className="ch-right">
-          <span className="ch-company">グリーンリサイクル東京</span>
           <Link href="/operator" className="ch-bell" aria-label="通知・お知らせ">
             <svg className="ic" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -301,66 +294,92 @@ export default function OperatorChatPage() {
         {/* 案件リスト（左サイドバー） */}
         <nav className="case-sidebar" aria-label="交渉中の案件">
           <div className="case-sidebar-head">交渉中の案件</div>
-          {CASES.map((c, i) => (
-            <button
-              key={c.caseId}
-              type="button"
-              className={`case-item${i === activeIdx ? " active" : ""}`}
-              onClick={() => selectCase(i)}
-              aria-current={i === activeIdx ? "true" : undefined}
-            >
-              <span className={`case-status status-${c.status}`}>{c.statusLabel}</span>
-              <div className="case-id">{c.caseId}</div>
-              <div className="case-preview">{c.preview}</div>
-              <div className="case-bid-row">
-                <span className="case-bid">{yen(c.amount)}</span>
-                <span className="case-time">{c.time}</span>
-              </div>
-              {!read[i] ? <span className="case-unread" aria-label="未読あり" /> : null}
-            </button>
-          ))}
+          {sideLoading ? (
+            <div style={{ padding: 14, fontSize: 12.5, color: "var(--body-soft)" }}>読み込み中…</div>
+          ) : transactions.length === 0 ? (
+            <div style={{ padding: 14, fontSize: 12.5, color: "var(--body-soft)" }}>落札済みの案件はありません</div>
+          ) : (
+            transactions.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className={`case-item${t.id === transactionId ? " active" : ""}`}
+                onClick={() => selectTransaction(t.id)}
+                aria-current={t.id === transactionId ? "true" : undefined}
+              >
+                <span className={`case-status status-${t.status === "pending" ? "waiting" : t.status === "visiting" ? "scheduled" : "negotiating"}`}>
+                  {TXN_STATUS_LABEL[t.status]}
+                </span>
+                <div className="case-id">{t.id.slice(0, 8).toUpperCase()}</div>
+                <div className="case-preview">
+                  {t.prefecture} {t.city}
+                </div>
+                <div className="case-bid-row">
+                  <span className="case-bid">
+                    {yen(t.final_amount ?? t.initial_amount)}
+                  </span>
+                </div>
+              </button>
+            ))
+          )}
         </nav>
 
         {/* チャット本体 */}
         <div className="chat-main">
-          {/* 相手（ユーザー）ヘッダー */}
-          <div className="chat-peer-header">
-            <div className="peer-avatar">{cas.initial}</div>
-            <div className="peer-info">
-              <div className="peer-name">{cas.name}</div>
-              <div className="peer-sub">
-                {cas.area}　{cas.caseId}
-              </div>
+          {tokenLoading || (!detail && !detailError) ? (
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--body-soft)" }}>
+              読み込み中…
             </div>
-            <div className="amount-chip">
-              <div className="amount-label">合意額</div>
-              <div className="amount-val">{yen(cas.amount)}</div>
+          ) : detailError ? (
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--body-soft)" }}>
+              {detailError}
             </div>
-          </div>
-
-          {/* ステータスバー */}
-          <div className="status-bar">
-            <span className="status-dot" aria-hidden="true" />
-            {cas.statusBar}
-          </div>
-
-          {/* メッセージ */}
-          <div className="messages-area" ref={messagesRef}>
-            {renderedMsgs.map((m, i) => (
-              <div key={i} className={`msg ${m.mine ? "me" : "them"}`}>
-                <div className="msg-avatar">{m.mine ? "グ" : cas.initial}</div>
-                <div>
-                  <div className="msg-time">{m.time}</div>
-                  <div className="bubble">{m.text}</div>
+          ) : (
+            <>
+              {/* 相手（ユーザー）ヘッダー */}
+              <div className="chat-peer-header">
+                <div className="peer-avatar">{peerInitial}</div>
+                <div className="peer-info">
+                  <div className="peer-name">お客様</div>
+                  <div className="peer-sub">
+                    {detail?.case?.prefecture} {detail?.case?.city}　{caseIdShort}
+                  </div>
+                </div>
+                <div className="amount-chip">
+                  <div className="amount-label">合意額</div>
+                  <div className="amount-val">{yen(detail?.final_amount ?? detail?.initial_amount ?? 0)}</div>
                 </div>
               </div>
-            ))}
 
-            {activeIdx === 0 ? (
-              <>
-                <div className="date-sep">6月24日（火）</div>
+              {/* ステータスバー */}
+              <div className="status-bar">
+                <span className="status-dot" aria-hidden="true" />
+                {statusLabel}
+              </div>
 
-                {showScheduleCard ? (
+              {messagesError ? (
+                <div style={{ padding: "8px 20px", fontSize: 12.5, color: "#e05c5c" }}>{messagesError}</div>
+              ) : null}
+
+              {/* メッセージ */}
+              <div className="messages-area" ref={messagesRef}>
+                {messages.map((m, i) => {
+                  const showDateSep = i === 0 || formatDateSep(m.created_at) !== formatDateSep(messages[i - 1].created_at);
+                  return (
+                    <div key={m.id}>
+                      {showDateSep ? <div className="date-sep">{formatDateSep(m.created_at)}</div> : null}
+                      <div className={`msg ${m.mine ? "me" : "them"}`}>
+                        <div className="msg-avatar">{m.mine ? "自" : m.sender_type === "system" ? "運" : peerInitial}</div>
+                        <div>
+                          <div className="msg-time">{formatTime(m.created_at)}</div>
+                          <div className="bubble">{m.body}</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {scheduleVisible ? (
                   <div className="schedule-propose" id="schedule-propose">
                     <div className="sp-head">
                       <CalendarIc />
@@ -386,53 +405,55 @@ export default function OperatorChatPage() {
                     <button type="button" className="btn-add-slot" onClick={addSlot}>
                       ＋ 候補日を追加
                     </button>
-                    <button type="button" className="btn-send-schedule" onClick={sendSchedule}>
-                      候補日を送信する
+                    <button
+                      type="button"
+                      className="btn-send-schedule"
+                      onClick={() => void handleSendSchedule()}
+                      disabled={proposing}
+                    >
+                      {proposing ? "送信中…" : "候補日を送信する"}
                     </button>
                   </div>
                 ) : null}
+              </div>
 
-                <div className="msg me" style={{ marginTop: 4 }}>
-                  <div className="msg-avatar">グ</div>
-                  <div>
-                    <div className="msg-time">09:31</div>
-                    <div className="bubble">
-                      引き取り日程の候補をお送りしました。ご都合の良い日程をお選びください。当日はスタッフ2名でお伺いします。
-                    </div>
-                  </div>
+              {/* 入力エリア */}
+              <div className="input-area">
+                <div className="input-tools">
+                  <button type="button" className="tool-btn" title="日程を提案" aria-label="日程を提案" onClick={toggleScheduleCard}>
+                    <CalendarIc />
+                  </button>
                 </div>
-              </>
-            ) : null}
-          </div>
-
-          {/* 入力エリア */}
-          <div className="input-area">
-            <div className="input-tools">
-              <button type="button" className="tool-btn" title="日程を提案" aria-label="日程を提案" onClick={toggleScheduleCard}>
-                <CalendarIc />
-              </button>
-            </div>
-            <input
-              type="text"
-              className="msg-input"
-              placeholder="メッセージを入力…"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  sendMsg();
-                }
-              }}
-              aria-label="メッセージを入力"
-            />
-            <button type="button" className="btn-send" aria-label="送信" disabled={!draft.trim()} onClick={sendMsg}>
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M22 2L11 13" />
-                <path d="M22 2L15 22l-4-9-9-4 20-7z" />
-              </svg>
-            </button>
-          </div>
+                <input
+                  type="text"
+                  className="msg-input"
+                  placeholder="メッセージを入力…"
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void handleSend();
+                    }
+                  }}
+                  aria-label="メッセージを入力"
+                  disabled={sending}
+                />
+                <button
+                  type="button"
+                  className="btn-send"
+                  aria-label="送信"
+                  disabled={!draft.trim() || sending}
+                  onClick={() => void handleSend()}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M22 2L11 13" />
+                    <path d="M22 2L15 22l-4-9-9-4 20-7z" />
+                  </svg>
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
         {/* 右パネル（出品内容） */}
@@ -440,37 +461,26 @@ export default function OperatorChatPage() {
           <div className="dp-head">出品内容</div>
           <div className="dp-case-id">
             <div className="lbl">案件ID</div>
-            <div className="val">{cas.caseId}</div>
-          </div>
-          <div className="dp-items-grid">
-            {ITEM_THUMBS.map((it) => (
-              <div className="dp-item-thumb" key={it.label}>
-                <Ic name={it.ic} />
-                <div className="dp-item-label">{it.label}</div>
-              </div>
-            ))}
-            <div className="dp-item-thumb more">+{Math.max(cas.itemCount - ITEM_THUMBS.length, 0)}</div>
+            <div className="val">{caseIdShort}</div>
           </div>
           <div className="dp-info">
             <div className="dp-row">
-              <span className="lbl">点数</span>
-              <span className="val">{cas.itemCount}点</span>
-            </div>
-            <div className="dp-row">
               <span className="lbl">エリア</span>
-              <span className="val">{cas.area}</span>
+              <span className="val">
+                {detail?.case?.prefecture} {detail?.case?.city}
+              </span>
             </div>
             <div className="dp-row">
               <span className="lbl">合意額</span>
-              <span className="val blue">{yen(cas.amount)}</span>
+              <span className="val blue">{yen(detail?.final_amount ?? detail?.initial_amount ?? 0)}</span>
             </div>
             <div className="dp-row">
-              <span className="lbl">手数料(8%)</span>
-              <span className="val">{yen(cas.fee)}</span>
+              <span className="lbl">手数料</span>
+              <span className="val">{yen(detail?.fee_amount ?? 0)}</span>
             </div>
             <div className="dp-row">
               <span className="lbl">ステータス</span>
-              <span className="val green">{cas.statusLabel}</span>
+              <span className="val green">{statusLabel}</span>
             </div>
           </div>
           <button type="button" className="btn-propose" onClick={toggleScheduleCard}>
@@ -479,9 +489,6 @@ export default function OperatorChatPage() {
           </button>
         </aside>
       </div>
-
-      {/* ルートID補助（開発時の確認用・視覚上は非表示） */}
-      <span hidden data-route-id={routeId} />
 
       {toast ? (
         <div className="kdz-toast" role="status">

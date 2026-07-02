@@ -8,7 +8,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { signupUser, KdzApiError } from "@/lib/katadzuke-api";
+import { signupUser, toDisplayMessage } from "@/lib/katadzuke-api";
 import { Ic } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
 import { PasswordField, LineAuthButton } from "@/components/kdz/auth";
@@ -114,7 +114,7 @@ export default function SignupPage() {
         if (res?.error) throw new Error("登録後のログインに失敗しました。");
         goTo(4);
       } catch (err) {
-        setAuthErr(err instanceof KdzApiError || err instanceof Error ? err.message : "登録に失敗しました。");
+        setAuthErr(toDisplayMessage(err, "登録に失敗しました。"));
       } finally {
         setBusy(false);
       }
@@ -153,7 +153,7 @@ export default function SignupPage() {
               <p className="step-desc">メールアドレスとパスワードを設定してください。LINEで続けることもできます。</p>
 
               <div style={{ marginBottom: 18 }}>
-                <LineAuthButton label="LINEで無料登録" />
+                <LineAuthButton label="LINEで無料登録" callbackUrl="/create" />
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18, color: "var(--body-soft)", fontSize: 12, fontWeight: 600, letterSpacing: ".04em" }}>
                 <div style={{ flex: 1, height: 1, background: "var(--line)" }} />

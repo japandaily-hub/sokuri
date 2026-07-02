@@ -6,7 +6,7 @@ export function AuthCard({
   children,
 }: {
   title: string;
-  subtitle?: string;
+  subtitle?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (

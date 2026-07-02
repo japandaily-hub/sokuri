@@ -9,23 +9,27 @@
  * /operator は SiteChrome の BARE_PREFIXES 対象で共通クロムが付かないため、
  * このページが業者向けヘッダー（ロゴ + 業者ナビ + 業者名 + ログアウト）を自前で描く。
  *
- * クライアント化の理由（純表示では不可）:
- *  - 各フィールドの編集と変更検知（保存バーの出し分け）
- *  - 対応エリア / 取扱カテゴリのトグル選択・「得意」星付け
- *  - 公開情報のスイッチ切替
- *  - サイドバーのライブプレビュー・入力完成度の再計算
- *  - 保存/破棄・許可証アップロード（トーストでのデモ挙動）
- * バックエンド未配線: 初期値はモック定数。保存・アップロード・ログアウトは
- * 実処理せず UI 挙動（トースト「保存しました（デモ）」等）のみ。実機能の案件操作は
- * 既存 /operator/cases ・ /operator/transactions へリンク誘導する。
+ * バックエンド実配線: GET/PUT /operator/profile。
+ * 会社名・古物商許可番号・審査状況（vendor_status/verified_at）は審査確定項目のため
+ * 読み取り専用表示のみ（PUT には含めない）。編集可能項目（areas / categories /
+ * strong_categories / staff_count / business_hours / intro_message / is_public /
+ * show_stats / show_reviews / show_message / accept_unsellable）のみ保存対象。
+ * 画像アップロードは今回もスコープ外（デモ挙動のまま）。
  */
 
 import "./profile.css";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Ic, type IcName } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
+import { useToken } from "@/components/kdz/Ui";
+import {
+  getOperatorProfile,
+  toDisplayMessage,
+  updateOperatorProfile,
+  type OperatorProfile,
+} from "@/lib/katadzuke-api";
 
 /* ---- 業者ナビ（本番ルート） ---- */
 const NAV: { href: string; label: string; active?: boolean }[] = [
@@ -60,7 +64,7 @@ const CATEGORIES: { id: string; name: string; icon: IcName }[] = [
   { id: "other", name: "その他", icon: "house" },
 ];
 
-/* ---- 公開情報トグル ---- */
+/* ---- 公開情報トグル（バックエンドフィールド名にマッピング） ---- */
 type ToggleKey = "showStats" | "showReviews" | "showMessage" | "acceptUnsellable" | "publicListed";
 const TOGGLES: { key: ToggleKey; title: string; desc: string }[] = [
   { key: "publicListed", title: "プロフィールを公開する", desc: "オフにすると入札先のユーザーにプロフィールが表示されません。" },
@@ -70,36 +74,72 @@ const TOGGLES: { key: ToggleKey; title: string; desc: string }[] = [
   { key: "acceptUnsellable", title: "値のつかない物もまとめて引き取る", desc: "「まとめて回収可」のバッジが付与され、まとめ出品で選ばれやすくなります。" },
 ];
 
-/* ---- フォーム状態の型 ---- */
+/* ---- 編集可能項目のみのフォーム状態（審査確定項目は含めない） ---- */
 type ProfileState = {
-  companyName: string;
-  entityType: "法人" | "個人事業主";
   staffCount: string;
   hours: string;
   message: string;
-  licenseNumber: string;
-  licenseAuthority: string;
   areas: Record<string, boolean>;
   cats: Record<string, boolean>;
   strong: Record<string, boolean>;
   toggles: Record<ToggleKey, boolean>;
 };
 
-/* ---- 初期値（モック） ---- */
-const INITIAL: ProfileState = {
-  companyName: "グリーンリサイクル東京",
-  entityType: "法人",
-  staffCount: "2",
-  hours: "平日・土日 9:00〜19:00",
-  message:
-    "はじめまして。グリーンリサイクル東京です。東京都・神奈川県を中心に、家電・ブランド品・カメラを得意とする買取業者です。\n\nまとめ買取を専門としており、1件の訪問でできるだけ多くの品物をまとめて買い取ることを大切にしています。値がつかないものも可能な限りまとめて引き取り、お客様の手間を最小限にします。",
-  licenseNumber: "東京都公安委員会 第301012345678号",
-  licenseAuthority: "東京都公安委員会",
-  areas: { 東京都: true, 神奈川県: true },
-  cats: { kaden: true, brand: true, camera: true, watch: true, fashion: true, furniture: true, game: true, other: true },
-  strong: { kaden: true, brand: true, camera: true },
-  toggles: { publicListed: true, showStats: true, showReviews: true, showMessage: true, acceptUnsellable: true },
+const EMPTY_STATE: ProfileState = {
+  staffCount: "",
+  hours: "",
+  message: "",
+  areas: {},
+  cats: {},
+  strong: {},
+  toggles: {
+    publicListed: true,
+    showStats: true,
+    showReviews: true,
+    showMessage: true,
+    acceptUnsellable: false,
+  },
 };
+
+/** バックエンドの OperatorProfile → 編集フォーム状態へ変換。 */
+function toFormState(p: OperatorProfile): ProfileState {
+  return {
+    staffCount: p.staff_count != null ? String(p.staff_count) : "",
+    hours: p.business_hours ?? "",
+    message: p.intro_message ?? "",
+    areas: Object.fromEntries(p.areas.map((a) => [a, true])),
+    cats: Object.fromEntries(p.categories.map((c) => [c, true])),
+    strong: Object.fromEntries(p.strong_categories.map((c) => [c, true])),
+    toggles: {
+      publicListed: p.is_public,
+      showStats: p.show_stats,
+      showReviews: p.show_reviews,
+      showMessage: p.show_message,
+      acceptUnsellable: p.accept_unsellable,
+    },
+  };
+}
+
+/** 編集フォーム状態 → PUT ペイロードへ変換。 */
+function toUpdatePayload(s: ProfileState) {
+  const areas = Object.entries(s.areas).filter(([, on]) => on).map(([name]) => name);
+  const categories = Object.entries(s.cats).filter(([, on]) => on).map(([id]) => id);
+  const strongCategories = Object.entries(s.strong).filter(([, on]) => on).map(([id]) => id);
+  const staffCount = s.staffCount.trim() === "" ? null : Number(s.staffCount);
+  return {
+    areas,
+    categories,
+    strong_categories: strongCategories,
+    staff_count: staffCount != null && Number.isFinite(staffCount) ? staffCount : null,
+    business_hours: s.hours.trim() || null,
+    intro_message: s.message.trim() || null,
+    is_public: s.toggles.publicListed,
+    show_stats: s.toggles.showStats,
+    show_reviews: s.toggles.showReviews,
+    show_message: s.toggles.showMessage,
+    accept_unsellable: s.toggles.acceptUnsellable,
+  };
+}
 
 /** ディープ等価判定（プリミティブ + 1階層オブジェクト）で変更検知する。 */
 function eq(a: ProfileState, b: ProfileState): boolean {
@@ -109,7 +149,13 @@ function eq(a: ProfileState, b: ProfileState): boolean {
 const MESSAGE_MAX = 500;
 
 export default function OperatorProfilePage() {
-  const [state, setState] = useState<ProfileState>(INITIAL);
+  const { token, loading: tokenLoading } = useToken();
+
+  const [profile, setProfile] = useState<OperatorProfile | null>(null);
+  const [initialState, setInitialState] = useState<ProfileState>(EMPTY_STATE);
+  const [state, setState] = useState<ProfileState>(EMPTY_STATE);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
 
   /* ---- トースト ---- */
@@ -124,10 +170,29 @@ export default function OperatorProfilePage() {
     () => () => {
       if (toastTimer.current !== undefined) window.clearTimeout(toastTimer.current);
     },
-    []
+    [],
   );
 
-  const dirty = useMemo(() => !eq(state, INITIAL), [state]);
+  /* ---- 初回取得 ---- */
+  const load = useCallback(async () => {
+    if (!token) return;
+    try {
+      const p = await getOperatorProfile(token);
+      setProfile(p);
+      const formState = toFormState(p);
+      setInitialState(formState);
+      setState(formState);
+      setLoadError(null);
+    } catch (e) {
+      setLoadError(toDisplayMessage(e, "プロフィールの取得に失敗しました"));
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const dirty = useMemo(() => !eq(state, initialState), [state, initialState]);
 
   /* ---- 部分更新ヘルパー ---- */
   function patch<K extends keyof ProfileState>(key: K, value: ProfileState[K]) {
@@ -155,10 +220,13 @@ export default function OperatorProfilePage() {
   }
 
   /* ---- 派生値（プレビュー・完成度） ---- */
+  const companyName = profile?.company_name ?? "";
+  const licenseNumber = profile?.license_number ?? "";
+  const verified = profile?.verified_at != null;
   const selectedAreas = AREAS.filter((a) => state.areas[a.name]).map((a) => a.name);
   const selectedCats = CATEGORIES.filter((c) => state.cats[c.id]);
   const strongCats = CATEGORIES.filter((c) => state.cats[c.id] && state.strong[c.id]);
-  const avatarInitial = state.companyName.trim().charAt(0) || "業";
+  const avatarInitial = companyName.trim().charAt(0) || "業";
   const areaSummary =
     selectedAreas.length === 0
       ? "未設定"
@@ -167,25 +235,52 @@ export default function OperatorProfilePage() {
         : `${selectedAreas.slice(0, 2).join("・")} 他${selectedAreas.length - 2}件`;
 
   const checklist = [
-    { label: "会社名を入力", done: state.companyName.trim().length > 0 },
+    { label: "会社名を入力", done: companyName.trim().length > 0 },
     { label: "対応エリアを選択", done: selectedAreas.length > 0 },
     { label: "取扱カテゴリを選択", done: selectedCats.length > 0 },
-    { label: "古物商許可番号を入力", done: state.licenseNumber.trim().length > 0 },
+    { label: "古物商許可番号を確認", done: licenseNumber.trim().length > 0 },
     { label: "業者メッセージを入力", done: state.message.trim().length >= 20 },
   ];
   const completion = Math.round((checklist.filter((c) => c.done).length / checklist.length) * 100);
 
-  /* ---- 保存・破棄（デモ） ---- */
-  function onSave() {
-    if (!dirty) return;
-    // 実処理は未配線。実際の保存APIに差し替える箇所。
-    showToast("保存しました（デモ）");
-    // デモのため初期値スナップショットは更新しない（再編集で差分が再び出る）。
-    // 本配線時は INITIAL を最新値で置き換え、dirty を解消する。
+  /* ---- 保存・破棄 ---- */
+  async function onSave() {
+    if (!dirty || !token || saving) return;
+    setSaving(true);
+    try {
+      const updated = await updateOperatorProfile(toUpdatePayload(state), token);
+      setProfile(updated);
+      const formState = toFormState(updated);
+      setInitialState(formState);
+      setState(formState);
+      showToast("保存しました");
+    } catch (e) {
+      showToast(toDisplayMessage(e, "保存に失敗しました"));
+    } finally {
+      setSaving(false);
+    }
   }
   function onRevert() {
-    setState(INITIAL);
+    setState(initialState);
     showToast("変更を破棄しました");
+  }
+
+  if (tokenLoading || (!profile && !loadError)) {
+    return (
+      <div className="op-profile">
+        <div style={{ padding: 60, textAlign: "center", color: "var(--body-soft)" }}>読み込み中…</div>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="op-profile">
+        <div style={{ padding: 60, textAlign: "center", color: "var(--body-soft)" }}>
+          {loadError ?? "プロフィールが見つかりません。"}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -217,10 +312,7 @@ export default function OperatorProfilePage() {
               <span className="op-user-avatar" aria-hidden="true">
                 {avatarInitial}
               </span>
-              <span className="op-user-name">
-                {state.companyName || "業者アカウント"}
-                <small>{state.entityType}</small>
-              </span>
+              <span className="op-user-name">{companyName || "業者アカウント"}</span>
             </div>
             <Link href="/operator/login" className="op-logout">
               ログアウト
@@ -247,18 +339,21 @@ export default function OperatorProfilePage() {
             </div>
             <div className="prof-info">
               <span className="op-eyebrow">BUYER PROFILE</span>
-              <div className="prof-name">{state.companyName || "業者名未設定"}</div>
+              <div className="prof-name">{companyName || "業者名未設定"}</div>
               <div className="prof-tags">
-                <span className="prof-tag verified">
-                  <Ic name="shield" />
-                  古物商許可証確認済み
-                </span>
+                {verified ? (
+                  <span className="prof-tag verified">
+                    <Ic name="shield" />
+                    古物商許可証確認済み
+                  </span>
+                ) : (
+                  <span className="prof-tag">審査中</span>
+                )}
                 <span className="prof-tag">{areaSummary}対応</span>
-                <span className="prof-tag">2023年登録</span>
               </div>
             </div>
             <div className="prof-hero-actions">
-              <Link href="/vendors/1" className="hero-link">
+              <Link href={`/vendors/${profile.operator_id}`} className="hero-link">
                 <Ic name="zoom" />
                 公開プレビュー
               </Link>
@@ -268,22 +363,14 @@ export default function OperatorProfilePage() {
       </div>
 
       <main>
-        <div className="demo-note">
-          <div className="demo-banner">
-            <Ic name="shield" />
-            <span>
-              これは編集画面のデモです。保存・許可証アップロードはまだ本処理に接続されていません。入札可能な案件の確認・落札管理は{" "}
-              <Link href="/operator/cases" style={{ color: "#9a3412", textDecoration: "underline", fontWeight: 700 }}>
-                案件一覧
-              </Link>{" "}
-              ・{" "}
-              <Link href="/operator/transactions" style={{ color: "#9a3412", textDecoration: "underline", fontWeight: 700 }}>
-                取引
-              </Link>{" "}
-              から行えます。
-            </span>
+        {loadError ? (
+          <div className="demo-note">
+            <div className="demo-banner">
+              <Ic name="shield" />
+              <span>{loadError}</span>
+            </div>
           </div>
-        </div>
+        ) : null}
 
         <div className="prof-wrap">
           {/* ===== 左：編集フォーム ===== */}
@@ -299,28 +386,9 @@ export default function OperatorProfilePage() {
               <div className="prof-card-body">
                 <div className="form-grid">
                   <div className="field span2">
-                    <label htmlFor="companyName">
-                      会社名・屋号<span className="req">*</span>
-                    </label>
-                    <input
-                      id="companyName"
-                      type="text"
-                      value={state.companyName}
-                      onChange={(e) => patch("companyName", e.target.value)}
-                      placeholder="例：グリーンリサイクル東京"
-                    />
-                  </div>
-
-                  <div className="field">
-                    <label htmlFor="entityType">事業形態</label>
-                    <select
-                      id="entityType"
-                      value={state.entityType}
-                      onChange={(e) => patch("entityType", e.target.value as ProfileState["entityType"])}
-                    >
-                      <option value="法人">法人</option>
-                      <option value="個人事業主">個人事業主</option>
-                    </select>
+                    <label htmlFor="companyName">会社名・屋号</label>
+                    <input id="companyName" type="text" value={companyName} disabled readOnly />
+                    <p className="field-hint">審査確定項目のため編集できません。変更が必要な場合は運営へお問い合わせください。</p>
                   </div>
 
                   <div className="field">
@@ -462,40 +530,21 @@ export default function OperatorProfilePage() {
                 <h2>古物商許可</h2>
               </div>
               <div className="prof-card-body">
-                <div className="license-status ok">
+                <div className={`license-status${verified ? " ok" : ""}`}>
                   <span className="ls-ic">
                     <Ic name="check" />
                   </span>
                   <div className="ls-body">
-                    <h3>確認済み</h3>
-                    <p>運営が許可証を確認・審査済みです。番号を変更すると再審査となります。</p>
+                    <h3>{verified ? "確認済み" : "審査中"}</h3>
+                    <p>運営が許可証を確認・審査します。番号等の変更が必要な場合は運営へお問い合わせください。</p>
                   </div>
                 </div>
 
                 <div className="form-grid">
                   <div className="field span2">
-                    <label htmlFor="licenseNumber">
-                      古物商許可番号<span className="req">*</span>
-                    </label>
-                    <input
-                      id="licenseNumber"
-                      type="text"
-                      value={state.licenseNumber}
-                      onChange={(e) => patch("licenseNumber", e.target.value)}
-                      placeholder="例：東京都公安委員会 第301012345678号"
-                      inputMode="text"
-                    />
-                    <p className="field-hint">許可証に記載の公安委員会名と12桁の許可番号を入力してください。</p>
-                  </div>
-                  <div className="field span2">
-                    <label htmlFor="licenseAuthority">交付公安委員会</label>
-                    <input
-                      id="licenseAuthority"
-                      type="text"
-                      value={state.licenseAuthority}
-                      onChange={(e) => patch("licenseAuthority", e.target.value)}
-                      placeholder="例：東京都公安委員会"
-                    />
+                    <label htmlFor="licenseNumber">古物商許可番号</label>
+                    <input id="licenseNumber" type="text" value={licenseNumber} disabled readOnly />
+                    <p className="field-hint">審査確定項目のため編集できません。</p>
                   </div>
                 </div>
 
@@ -560,8 +609,8 @@ export default function OperatorProfilePage() {
                     {avatarInitial}
                   </span>
                   <div>
-                    <div className="preview-name">{state.companyName || "業者名未設定"}</div>
-                    <div className="preview-area">{areaSummary}対応 ・ {state.entityType}</div>
+                    <div className="preview-name">{companyName || "業者名未設定"}</div>
+                    <div className="preview-area">{areaSummary}対応</div>
                   </div>
                 </div>
                 {strongCats.length > 0 ? (
@@ -632,12 +681,12 @@ export default function OperatorProfilePage() {
             未保存の変更があります
           </span>
           <div className="save-bar-actions">
-            <button type="button" className="btn-revert" onClick={onRevert} disabled={!dirty}>
+            <button type="button" className="btn-revert" onClick={onRevert} disabled={!dirty || saving}>
               変更を破棄
             </button>
-            <button type="button" className="btn-save" onClick={onSave} disabled={!dirty}>
+            <button type="button" className="btn-save" onClick={() => void onSave()} disabled={!dirty || saving}>
               <Ic name="check" />
-              保存する
+              {saving ? "保存中…" : "保存する"}
             </button>
           </div>
         </div>

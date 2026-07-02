@@ -7,7 +7,13 @@
 @layer base, components, utilities;
 
 /* デザインハンドオフCSSを components レイヤーへ取り込む。
-   こうすることで Tailwind utilities が常に勝ち、既存 Tailwind ページを壊さない。 */
+   こうすることで Tailwind utilities が常に勝ち、既存 Tailwind ページを壊さない。
+   重要: この `@import "..." layer(components)` は postcss-import（postcss.config.mjs で
+   tailwindcss より前に実行）がビルド時にファイル本体を `@layer components { ... }` として
+   インライン展開し、それを Tailwind が消費して平坦化する。これにより Next.js 15.5 の
+   CSS minifier(lightningcss) へネイティブ @layer / `@import layer()` が一切渡らず、
+   `@media layer(components){...}` への誤コンパイル（:root トークン全消失）を根本回避する。
+   postcss-import を外すと css-loader 経路に戻り当該不具合が再発するため、依存必須。 */
 @import "./katazuke.css" layer(components);
 @import "./katazuke-pages.css" layer(components);
 

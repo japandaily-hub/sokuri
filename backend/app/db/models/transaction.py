@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import BigInteger, Boolean, Date, ForeignKey, Integer, String, Text, Uuid
+from sqlalchemy import BigInteger, Boolean, Date, DateTime, ForeignKey, Integer, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
@@ -38,9 +38,13 @@ class Transaction(Base, TimestampMixin):
     final_amount: Mapped[int | None] = mapped_column(BigInteger)              # 減額後確定額
     fee_amount: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)  # プラットフォーム手数料
     visit_date: Mapped[date | None] = mapped_column(Date)
+    visit_time_slot: Mapped[str | None] = mapped_column(String(32))
     status: Mapped[str] = mapped_column(
         String(32), nullable=False, default="pending", index=True
     )
+    # チャットの既読ポインタ（当事者双方）。相手が送った未読メッセージ数の算出に用いる。
+    user_last_read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    operator_last_read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # relations
     case: Mapped[Case] = relationship(back_populates="transaction")

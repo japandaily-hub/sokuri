@@ -8,7 +8,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { signupOperator, KdzApiError } from "@/lib/katadzuke-api";
+import Link from "next/link";
+import { signupOperator, toDisplayMessage } from "@/lib/katadzuke-api";
 import { AuthCard, ErrorNote, Field, inputClass, primaryButtonClass } from "@/components/AuthCard";
 
 export default function OperatorSignupPage() {
@@ -19,11 +20,16 @@ export default function OperatorSignupPage() {
   const [license, setLicense] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [agree, setAgree] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!agree) {
+      setError("利用規約・プライバシーポリシーへの同意が必要です。");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -33,6 +39,7 @@ export default function OperatorSignupPage() {
         email,
         password,
         license_number: license || undefined,
+        agreed: agree,
       });
       const res = await signIn("operator-credentials", {
         email,
@@ -43,11 +50,7 @@ export default function OperatorSignupPage() {
       router.push("/operator/cases");
       router.refresh();
     } catch (err) {
-      setError(
-        err instanceof KdzApiError || err instanceof Error
-          ? err.message
-          : "登録に失敗しました。",
-      );
+      setError(toDisplayMessage(err, "登録に失敗しました。"));
     } finally {
       setBusy(false);
     }
@@ -56,7 +59,15 @@ export default function OperatorSignupPage() {
   return (
     <AuthCard
       title="業者登録"
-      subtitle="今すぐ無料で登録し、案件の閲覧・入札ができます。招待コードをお持ちの方はフル機能で即日稼働できます。"
+      subtitle={
+        <>
+          業者登録には運営の審査があります。まだお申し込みでない方は、まず
+          <Link href="/business" className="font-semibold text-brand-700 hover:underline">
+            業者登録のお申し込み
+          </Link>
+          からご案内しています。招待コードをお持ちの方はこちらからアカウントを作成してください。
+        </>
+      }
     >
       <form onSubmit={onSubmit} className="space-y-4">
         <ErrorNote message={error} />
@@ -88,7 +99,7 @@ export default function OperatorSignupPage() {
 
         {!showInviteField ? (
           <div className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">
-            招待コードなしでも登録できます。案件の閲覧・入札が可能です（住所開示は運営承認後）。
+            招待コードなしでも登録できます。ただし、入札には運営の承認が必要です（案件の閲覧は登録後すぐに可能です）。
           </div>
         ) : null}
 
@@ -132,8 +143,28 @@ export default function OperatorSignupPage() {
             className={inputClass}
           />
         </Field>
+        <div className="flex items-start gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            id="operator-agree-terms"
+            required
+            checked={agree}
+            onChange={(e) => setAgree(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-200"
+          />
+          <label htmlFor="operator-agree-terms">
+            <a href="/terms" className="font-semibold text-brand-700 hover:underline">
+              利用規約
+            </a>
+            および
+            <a href="/privacy" className="font-semibold text-brand-700 hover:underline">
+              プライバシーポリシー
+            </a>
+            に同意します
+          </label>
+        </div>
         <button type="submit" disabled={busy} className={primaryButtonClass}>
-          {busy ? "登録中…" : "無料で登録する"}
+          {busy ? "登録中…" : "アカウントを作成する"}
         </button>
       </form>
       <p className="mt-6 text-center text-sm text-slate-500">

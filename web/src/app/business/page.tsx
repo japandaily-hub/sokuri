@@ -5,7 +5,7 @@
  * デザイン正典: docs/design_handoff_katazuke/業者向け.html を Next.js 化。
  * - 独自ヘッダー（業者ナビ + #register CTA + モバイルメニュー）。共通 SiteChrome は付かない（BARE_PREFIXES 対象）。
  * - ページ内アンカー（#merit/#flow/#requirements/#faq/#register）はグローバル scroll-behavior:smooth で滑らかにスクロール。
- * - 登録フォームは "use client" + useState で送信検証→完了表示を再現（バックエンド未配線・実送信なし）。
+ * - 登録フォームは "use client" + useState で送信検証 → POST /operator-applications → 完了表示。
  * client component のため export const metadata は置かない（SEOはレイアウト側で担保）。
  */
 
@@ -15,6 +15,7 @@ import Link from "next/link";
 import { Ic } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
 import { Reveal, FaqAccordion } from "@/components/kdz/interactions";
+import { submitOperatorApplication, toDisplayMessage } from "@/lib/katadzuke-api";
 
 /** 共通スプライトに send が無いため inline 用の紙飛行機アイコン。 */
 function SendIcon({ className }: { className?: string }) {
@@ -82,35 +83,79 @@ const FAQ_ITEMS = [
 type FormState = {
   company: string;
   rep: string;
+  repName: string;
+  registeredAddress: string;
   email: string;
   phone: string;
   bizType: string;
   area: string;
   cats: string;
   message: string;
+  licenseNumber: string;
+  invoiceNumber: string;
+  bankName: string;
+  branchName: string;
+  accountType: string;
+  accountNumber: string;
+  accountHolder: string;
   agree: boolean;
 };
 
 const EMPTY_FORM: FormState = {
   company: "",
   rep: "",
+  repName: "",
+  registeredAddress: "",
   email: "",
   phone: "",
   bizType: "",
   area: "",
   cats: "",
   message: "",
+  licenseNumber: "",
+  invoiceNumber: "",
+  bankName: "",
+  branchName: "",
+  accountType: "",
+  accountNumber: "",
+  accountHolder: "",
   agree: false,
 };
 
+/** 案件エリアの select value → バックエンド service_area 文字列（人が読める表記） */
+const AREA_LABEL: Record<string, string> = {
+  tokyo: "東京都",
+  chiba: "千葉県",
+  saitama: "埼玉県",
+  kanagawa: "神奈川県",
+  multi: "複数都県",
+};
+
 /** 必須項目（空ならエラー表示） */
-const REQUIRED_KEYS: (keyof FormState)[] = ["company", "rep", "email", "phone", "bizType", "area"];
+const REQUIRED_KEYS: (keyof FormState)[] = [
+  "company",
+  "rep",
+  "repName",
+  "registeredAddress",
+  "email",
+  "phone",
+  "bizType",
+  "area",
+  "licenseNumber",
+  "bankName",
+  "branchName",
+  "accountType",
+  "accountNumber",
+  "accountHolder",
+];
 
 export default function BusinessPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [invalid, setInvalid] = useState<Set<string>>(new Set());
   const [submitted, setSubmitted] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -123,20 +168,51 @@ export default function BusinessPage() {
     }
   };
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const next = new Set<string>();
     REQUIRED_KEYS.forEach((k) => {
       const v = form[k];
       if (typeof v === "string" && !v.trim()) next.add(k);
     });
+    if (form.licenseNumber.trim() && form.licenseNumber.trim().length < 5) next.add("licenseNumber");
     if (!form.agree) next.add("agree");
     setInvalid(next);
     if (next.size > 0) return;
-    // バックエンド未配線：実送信は行わず、完了表示に切り替える（デモ）。
-    setSubmitted(true);
-    const target = document.getElementById("register");
-    if (target) window.scrollTo({ top: target.offsetTop - 80, behavior: "smooth" });
+
+    setSubmitError(null);
+    setBusy(true);
+    try {
+      await submitOperatorApplication({
+        company_name: form.company,
+        representative_name: form.repName,
+        registered_address: form.registeredAddress,
+        contact_name: form.rep,
+        email: form.email,
+        phone: form.phone,
+        business_type: form.bizType as "corp" | "sole",
+        service_area: AREA_LABEL[form.area] ?? form.area,
+        categories: form.cats.trim() || undefined,
+        message: form.message.trim() || undefined,
+        license_number: form.licenseNumber,
+        invoice_number: form.invoiceNumber.trim() || undefined,
+        bank_account: {
+          bank_name: form.bankName,
+          branch_name: form.branchName,
+          account_type: form.accountType as "ordinary" | "checking",
+          account_number: form.accountNumber,
+          account_holder: form.accountHolder,
+        },
+        agreed: form.agree,
+      });
+      setSubmitted(true);
+      const target = document.getElementById("register");
+      if (target) window.scrollTo({ top: target.offsetTop - 80, behavior: "smooth" });
+    } catch (err) {
+      setSubmitError(toDisplayMessage(err, "送信に失敗しました。もう一度お試しください。"));
+    } finally {
+      setBusy(false);
+    }
   };
 
   const invClass = (key: string) => (invalid.has(key) ? " is-invalid" : "");
@@ -354,6 +430,37 @@ export default function BusinessPage() {
                     </div>
                   </div>
 
+                  <div className="field-row">
+                    <div className="field">
+                      <label htmlFor="rep-name">
+                        代表者名<span className="req">必須</span>
+                      </label>
+                      <input
+                        type="text"
+                        id="rep-name"
+                        name="rep-name"
+                        placeholder="代表取締役 山田 太郎"
+                        className={invClass("repName").trim()}
+                        value={form.repName}
+                        onChange={(e) => update("repName", e.target.value)}
+                      />
+                    </div>
+                    <div className="field">
+                      <label htmlFor="registered-address">
+                        法人登録住所<span className="req">必須</span>
+                      </label>
+                      <input
+                        type="text"
+                        id="registered-address"
+                        name="registered-address"
+                        placeholder="東京都千代田区〇〇1-2-3"
+                        className={invClass("registeredAddress").trim()}
+                        value={form.registeredAddress}
+                        onChange={(e) => update("registeredAddress", e.target.value)}
+                      />
+                    </div>
+                  </div>
+
                   <div className="field">
                     <label htmlFor="email">
                       メールアドレス<span className="req">必須</span>
@@ -405,6 +512,36 @@ export default function BusinessPage() {
                     </div>
                   </div>
 
+                  <div className="field-row">
+                    <div className="field">
+                      <label htmlFor="license-number">
+                        古物商許可番号<span className="req">必須</span>
+                      </label>
+                      <input
+                        type="text"
+                        id="license-number"
+                        name="license-number"
+                        placeholder="東京都公安委員会 第XXXXXXXXXX号"
+                        className={invClass("licenseNumber").trim()}
+                        value={form.licenseNumber}
+                        onChange={(e) => update("licenseNumber", e.target.value)}
+                      />
+                    </div>
+                    <div className="field">
+                      <label htmlFor="invoice-number">
+                        インボイス制度登録番号<span className="opt">任意</span>
+                      </label>
+                      <input
+                        type="text"
+                        id="invoice-number"
+                        name="invoice-number"
+                        placeholder="T1234567890123"
+                        value={form.invoiceNumber}
+                        onChange={(e) => update("invoiceNumber", e.target.value)}
+                      />
+                    </div>
+                  </div>
+
                   <div className="field">
                     <label htmlFor="area">
                       主な対応エリア<span className="req">必須</span>
@@ -426,6 +563,94 @@ export default function BusinessPage() {
                         <option value="kanagawa">神奈川県</option>
                         <option value="multi">複数都県</option>
                       </select>
+                    </div>
+                  </div>
+
+                  <div className="biz-bank-section">
+                    <h4 className="biz-bank-heading">振込先情報</h4>
+                    <p className="biz-bank-note">※お申し込み内容の確認・成約時の振込にのみ使用します</p>
+
+                    <div className="field-row">
+                      <div className="field">
+                        <label htmlFor="bank-name">
+                          銀行名<span className="req">必須</span>
+                        </label>
+                        <input
+                          type="text"
+                          id="bank-name"
+                          name="bank-name"
+                          placeholder="〇〇銀行"
+                          className={invClass("bankName").trim()}
+                          value={form.bankName}
+                          onChange={(e) => update("bankName", e.target.value)}
+                        />
+                      </div>
+                      <div className="field">
+                        <label htmlFor="branch-name">
+                          支店名<span className="req">必須</span>
+                        </label>
+                        <input
+                          type="text"
+                          id="branch-name"
+                          name="branch-name"
+                          placeholder="〇〇支店"
+                          className={invClass("branchName").trim()}
+                          value={form.branchName}
+                          onChange={(e) => update("branchName", e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="field-row">
+                      <div className="field">
+                        <label htmlFor="account-type">
+                          預金種別<span className="req">必須</span>
+                        </label>
+                        <div className="select-wrap">
+                          <select
+                            id="account-type"
+                            name="account-type"
+                            className={invClass("accountType").trim()}
+                            value={form.accountType}
+                            onChange={(e) => update("accountType", e.target.value)}
+                          >
+                            <option value="" disabled>
+                              選択してください
+                            </option>
+                            <option value="ordinary">普通</option>
+                            <option value="checking">当座</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="field">
+                        <label htmlFor="account-number">
+                          口座番号<span className="req">必須</span>
+                        </label>
+                        <input
+                          type="text"
+                          id="account-number"
+                          name="account-number"
+                          placeholder="1234567"
+                          className={invClass("accountNumber").trim()}
+                          value={form.accountNumber}
+                          onChange={(e) => update("accountNumber", e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="field">
+                      <label htmlFor="account-holder">
+                        口座名義<span className="req">必須</span>
+                      </label>
+                      <input
+                        type="text"
+                        id="account-holder"
+                        name="account-holder"
+                        placeholder="カ）〇〇"
+                        className={invClass("accountHolder").trim()}
+                        value={form.accountHolder}
+                        onChange={(e) => update("accountHolder", e.target.value)}
+                      />
                     </div>
                   </div>
 
@@ -471,10 +696,16 @@ export default function BusinessPage() {
                     </label>
                   </div>
 
+                  {submitError ? (
+                    <p className="biz-submit-error" role="alert">
+                      {submitError}
+                    </p>
+                  ) : null}
+
                   <div className="submit-area">
-                    <button type="submit" className="btn-submit">
+                    <button type="submit" className="btn-submit" disabled={busy}>
                       <SendIcon />
-                      登録を申し込む
+                      {busy ? "送信中…" : "登録を申し込む"}
                     </button>
                     <p className="submit-note">送信後、担当者より3営業日以内にご連絡します。</p>
                   </div>
@@ -484,11 +715,9 @@ export default function BusinessPage() {
                   <div className="thanks-ic">
                     <Ic name="check-circle" />
                   </div>
-                  <h3>お申し込み内容を確認しました（デモ）</h3>
+                  <h3>お申し込みを受け付けました</h3>
                   <p>
-                    ※ デモ画面です。実際の申し込み送信はまだ行われません。
-                    <br />
-                    本番では担当者より3営業日以内にご連絡し、
+                    ご入力内容を確認のうえ、担当者より3営業日以内にご連絡いたします。
                     <br />
                     審査通過後、ダッシュボードから案件への入札が始められます。
                   </p>

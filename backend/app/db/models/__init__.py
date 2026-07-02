@@ -31,7 +31,10 @@ from app.db.models.routing import RoutingRule
 # ── カタヅケ（クローズドβ） ──────────────────────────────────────
 from app.db.models.case import Case, CasePhoto
 from app.db.models.operator import Operator
+from app.db.models.operator_application import OperatorApplication
+from app.db.models.operator_profile import OperatorProfile
 from app.db.models.bid import Bid
+from app.db.models.message import Message
 from app.db.models.transaction import Cancellation, ReductionRequest, Review, Transaction
 from app.db.models.user import User
 from app.db.models.invite import Invite
@@ -56,7 +59,10 @@ __all__ = [
     "Case",
     "CasePhoto",
     "Operator",
+    "OperatorApplication",
+    "OperatorProfile",
     "Bid",
+    "Message",
     "Transaction",
     "ReductionRequest",
     "Review",
