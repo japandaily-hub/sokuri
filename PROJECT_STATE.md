@@ -28,6 +28,14 @@
 - **gate_status**: build=GREEN(41ルート) / typecheck=GREEN / **security=レビュー済(Critical/High=0, Medium 1件是正)** / **QA=レビュー済(blocker是正)** / 全33ページ=**33完了** / visualQA=ローカル(localhost:3100)でユーザー確認可
 - **🏁 デザイン実装タスク完了（/loop 停止）**。リリース前のユーザー対応項目は KATAZUKE_REDESIGN_PLAN.md 末尾「✅全33ページ完了」節を参照（架空事業者情報の差替=task_b62c0b43 / 実画像 / 新ページのバックエンド配線 / LINE認証 / デプロイ）。
 
+## 🔐 2026-07-02〜03 ウォークスルー是正＋本番セキュリティ堅牢化（/loop 自走・strategy-agents）
+- **commit `c24549e`**: ウォークスルーP0/P1是正＋LINE統合の一式（65ファイル）を保全コミット。P0-1(Failed to fetch日本語化)/P0-2(認証ガード8パス)/P1-1(license必須+vendor_status 3値)/P1-2(LINEログイン+落札落選日程通知)/P1-3(チャット・日程・プロフィール実配線)/P1-4(規約同意サーバー検証)。詳細= `docs/reviews/walkthrough_review_2026-07-02.md` とメモリ katazuke-ux-walkthrough-p0-issues。
+- **commit `06abd12`**: 既存の別課題2件をクローズ。①CORS `allow_origins=["*"]` 廃止→ALLOWED_ORIGINS設定制（危険トークン"*"/null除外・末尾スラッシュ正規化・productionフォールバックはFRONTEND_BASE_URLのみ）②本番起動ガード（APP_ENV=production×弱鍵JWT_SECRET or ワイルドカード混入→起動失敗、logger.critical付き）③create_app() DI化＋test_main.py/test_config.py新設。security/qa独立レビュー3巡でHigh2・Medium4全解消。
+- **task_bd221d4e（middleware業者検証）は by-design と裁定**: 権限ゲートはバックエンド deps.get_verified_operator（vendor_status=="active"）＋transactions._assert_party（当事者スコープ）。pending業者の/operator閲覧許可は意図した非対称（閲覧可・入札不可）。middleware.ts ヘッダコメントに明文化済み＝再指摘は誤検知。
+- **gate_status**: backend pytest=**138 passed** / web=前回green（今回webは middleware コメントのみ変更） / security=2巡通過(Critical/High 0) / QA=2巡通過(High 2→解消)
+- **残存リスク（文書化済み・低）**: APP_ENV未設定の非正規デプロイ経路ではガード不発（render.yamlは明示済み）／main.pyとconfig.pyの危険トークン判定が二重化（次回リファクタで共有ヘルパー化推奨）／ADMIN_EMAILSがrender.yamlに平文（ユーザー判断でsync:false化を推奨）。
+- **リリース前のユーザー対応項目（コード側は完了）**: ①/company・/legalの架空事業者情報→実値(task_b62c0b43) ②実画像アセット投入 ③LINEクレデンシャル設定（フロント: LINE_CLIENT_ID/SECRET・コールバックURL登録、バックエンド: LINE_CLIENT_ID/LINE_CHANNEL_ACCESS_TOKEN）④Render環境変数の確認（APP_ENV/ALLOWED_ORIGINSはrender.yaml反映済み・デプロイ時に実ログで起動確認）⑤mainマージ→デプロイ（承認操作）。
+
 ---
 
 最終更新: 2026-06-13 / **本番デプロイ&E2E全合格済み（β稼働中）。現フェーズ＝業者獲得（量・スケール）。プラン正本: 業者獲得スケールプラン_v1.md**
