@@ -192,6 +192,20 @@ async def test_operator_signup_requires_agreement_422(client: AsyncClient):
     assert r.status_code == 422
 
 
+async def test_operator_signup_missing_agreed_key_422(client: AsyncClient):
+    """agreed キー自体を省略した場合も（必須フィールド欠落として）422で拒否される。"""
+    r = await client.post(
+        "/api/v1/auth/operator/signup",
+        json={
+            "company_name": "agreedキー省略テスト業者",
+            "email": "no_agreed_key_op@example.com",
+            "password": "operatorpass1",
+            "license_number": "第123456789012号",
+        },
+    )
+    assert r.status_code == 422
+
+
 async def test_operator_signup_records_agreement(
     client: AsyncClient, db_session: AsyncSession
 ):

@@ -53,11 +53,69 @@ class Settings(BaseSettings):
     # /auth/line/exchange でアクセストークンの発行元チャネルを検証（audience 検証）するために使用する。
     # 未設定時は LINE ログイン機能自体を未構成とみなし 503 を返す（セキュリティ上、検証をスキップしない）。
     line_client_id: str = ""
+    # CORS で許可するオリジン（カンマ区切り）。未設定時は frontend_base_url とローカル開発用ポートを許可する。
+    allowed_origins_raw: str = Field(default="", alias="ALLOWED_ORIGINS")
+    # 実行環境（"development" | "production"）。本番起動時の fail-open ガードに使用する。
+    app_env: str = Field(default="development", alias="APP_ENV")
 
     @property
     def admin_emails(self) -> list[str]:
         """ADMIN_EMAILS をカンマ区切りで正規化して返す（小文字化）。"""
         return [e.strip().lower() for e in self.admin_emails_raw.split(",") if e.strip()]
+
+    @property
+    def _default_allowed_origins(self) -> list[str]:
+        """ALLOWED_ORIGINS 未設定時のフォールバック。
+
+        production では frontend_base_url のみを返す（localhost を本番の
+        暗黙許可オリジンに含めると、開発者のローカル環境から本番 API への
+        意図しないクロスオリジンアクセスを許してしまうため）。
+        development / それ以外ではローカル開発用ポートも併せて返す。
+        """
+        if self.app_env == "production":
+            return [self.frontend_base_url]
+        return [self.frontend_base_url, "http://localhost:3000", "http://localhost:3100"]
+
+    @staticmethod
+    def _is_dangerous_origin_token(token: str) -> bool:
+        """fail-open を招く危険なオリジントークンかどうかを判定する。
+
+        - ``"*"`` を含むトークン（厳密一致の ``"*"`` に加え、``https://*.evil.com``
+          のようなワイルドカードサブドメイン混入も含む）。
+        - 小文字化して ``"null"`` と一致するトークン（sandboxed iframe 等が
+          送信する ``Origin: null`` を許可すると任意サイトからの偽装を許すため）。
+        """
+        stripped = token.strip()
+        return "*" in stripped or stripped.lower() == "null"
+
+    @property
+    def allowed_origins(self) -> list[str]:
+        """ALLOWED_ORIGINS をカンマ区切りで正規化して返す。
+
+        - 各値は前後空白 trim ＋ 末尾スラッシュ除去（``rstrip("/")``）。
+          末尾スラッシュ付き設定は CORS 判定が一致せず全滅する事故があるため予防する。
+        - ``"*"`` を含むトークン、および ``"null"``（大小無視）は
+          fail-open を招くため常に除外する。除外した結果 origins が空に
+          なった場合はフォールバックへ倒す。
+        - 未設定時（空文字）は ``_default_allowed_origins`` を返す。
+        """
+        if self.allowed_origins_raw.strip():
+            origins = [
+                o.strip().rstrip("/")
+                for o in self.allowed_origins_raw.split(",")
+                if o.strip() and not self._is_dangerous_origin_token(o)
+            ]
+            if not origins:
+                origins = self._default_allowed_origins
+        else:
+            origins = self._default_allowed_origins
+        seen: set[str] = set()
+        deduped: list[str] = []
+        for origin in origins:
+            if origin not in seen:
+                seen.add(origin)
+                deduped.append(origin)
+        return deduped
 
     @field_validator("database_url", mode="after")
     @classmethod

@@ -16,11 +16,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_router
-from app.config import get_settings
+from app.config import Settings, get_settings
 from app.db.session import AsyncSessionLocal, engine
 from app.services.seed import seed_channels_and_rules
 
 logger = logging.getLogger(__name__)
+
+# 本番起動ガードで拒否する既知の弱い JWT_SECRET（デフォルト値・ドキュメント例示値）。
+# これらのまま本番運用されると署名検証が事実上無効化される（fail-open）ため起動を止める。
+_WEAK_JWT_SECRETS = {"dev-secret-change-me", "change-me-to-random-64-hex"}
 
 
 async def _run_seed() -> None:
@@ -52,8 +56,43 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await engine.dispose()
 
 
-def create_app() -> FastAPI:
-    settings = get_settings()
+def create_app(settings: Settings | None = None) -> FastAPI:
+    """FastAPI アプリケーションを構築する。
+
+    ``settings`` を明示的に注入できる（未指定時は ``get_settings()`` の
+    シングルトンを使用）。これによりテストから起動ガードや CORS 設定を
+    実プロセスの環境変数に依存せず直接検証できる。
+    """
+    settings = settings or get_settings()
+
+    if settings.app_env == "production":
+        if settings.jwt_secret in _WEAK_JWT_SECRETS or len(settings.jwt_secret) < 32:
+            logger.critical(
+                "起動中断: 本番環境（APP_ENV=production）で JWT_SECRET が"
+                "既知の弱い値、または32文字未満のまま起動しようとしました。"
+            )
+            raise RuntimeError(
+                "本番環境（APP_ENV=production）で JWT_SECRET が未設定（デフォルト値/例示値）"
+                "または短すぎる（32文字未満）まま起動しようとしました。"
+                "Render の環境変数で十分な長さのランダムな JWT_SECRET を設定してください。"
+            )
+        origin_tokens = [t.strip() for t in settings.allowed_origins_raw.split(",")]
+        if any("*" in t for t in origin_tokens):
+            logger.critical(
+                "起動中断: 本番環境（APP_ENV=production）で ALLOWED_ORIGINS に"
+                "\"*\"（全オリジン許可、またはワイルドカードサブドメイン）が"
+                "含まれたまま起動しようとしました。"
+            )
+            raise RuntimeError(
+                "本番環境（APP_ENV=production）で ALLOWED_ORIGINS に \"*\" を含むトークン"
+                "（例: \"https://*.evil.com\"）が含まれています。"
+                "許可するオリジンを明示的にカンマ区切りで指定してください。"
+            )
+    elif settings.jwt_secret in _WEAK_JWT_SECRETS or len(settings.jwt_secret) < 32:
+        logger.warning(
+            "JWT_SECRET が弱い値（デフォルト値/例示値、または32文字未満）です。"
+            "開発環境のため起動は継続しますが、本番相当の検証時は必ず強い鍵を設定してください。"
+        )
 
     app = FastAPI(
         title="カタヅケ API",
@@ -70,7 +109,7 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # TODO(Phase 6): 本番では許可オリジンを絞ること
+        allow_origins=settings.allowed_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

@@ -12,6 +12,12 @@
  * /chat/[id]・/vendors/[id]・/result 等をバックエンド配線する際は、
  * API 側でリクエスト者IDとリソース所有者IDを必ず突合すること（OWASP API1 BOLA）。
  *
+ * 業者の承認状態（vendor_status）も意図的にここでは見ない。pending（admin未承認）の
+ * 業者にも /operator 配下の「閲覧」は許可する設計（閲覧可・入札不可の非対称）で、
+ * 入札等の書き込みはバックエンド deps.get_verified_operator（vendor_status==="active"）が、
+ * 取引情報は get_current_actor＋当事者スコープが遮断する。ミドルウェアに
+ * vendor_status ゲートを足す変更は、この製品判断（2026-07-02確定）を覆すため不可。
+ *
  * 重要: 保護対象パスは USER_PROTECTED / OPERATOR_PUBLIC（実行時判定）と
  * config.matcher（Next.js の静的リテラル制約でここでしか書けない）の
  * 2箇所に重複定義されている。matcher にマッチしないパスはこの関数自体が

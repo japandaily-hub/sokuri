@@ -55,3 +55,8 @@ services:
         value: "noreply@katadzuke.jp"
       - key: FRONTEND_BASE_URL
         value: "https://sokuri.vercel.app"
+      - key: APP_ENV
+        value: production              # 本番起動ガード（JWT_SECRET未設定時に起動失敗させる）を有効化
+      - key: ALLOWED_ORIGINS
+        value: "https://sokuri.vercel.app"   # CORS許可オリジン（カンマ区切り、未設定時は"*"にしない）。
+                                              # 未設定時は FRONTEND_BASE_URL + localhost にフォールバック（config.py 参照）
