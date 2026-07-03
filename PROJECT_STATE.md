@@ -42,7 +42,9 @@
 - **ブラウザ実機で配線確認済み✅**: /login /cases /cases/[id] /chat/[id]（**UI送信→業者側到達まで実証**）/schedule、/operator/login /operator/cases /operator/transactions(+詳細=住所連絡先開示+減額フォーム) /operator/chat /operator/profile。ミドルウェア分離（業者セッションでuser専用ページ→/loginへ）も実機実証。**全巡回でconsoleエラー0**。
 - 🔴 **未配線＝ログインユーザーに架空データを表示する6ページ（次ラウンドの主対象）**: /mypage(山田花子) /applications(架空入札) /notifications(架空通知・**通知APIは未実装**) /result(「デモ表示」ラベル) /vendors/[id](**GET /vendors/{id}は実装済みなのに未配線**) /review(架空取引)。
 - ⚠️ /operator ダッシュボード: 「交渉中」ハードコード0（operator/page.tsx の「チャットAPI未実装のため」コメントが陳腐化）・「今月の成約」はcompletedのみでvisiting非計上。
-- **次アクションP1**: architect設計→上記6ページ＋ダッシュボード集計の実配線（frontend実装→security/qaレビュー→本E2E環境で再検証）。
+- **✅ 完了（2026-07-03・commit `a2675ef`）**: 上記6ページ＋ダッシュボード集計を実配線し**架空データ露出を全廃**。architect設計→frontend実装→実機E2E再検証（3欠陥発見: 虚偽完了バナー/訪問日時TZずれ/mypage分類不整合→即修正）→security/qa独立レビュー（Critical/High 0・Medium2件=e2e_local.db gitignore/評価待ち通知恒久残存→解消）→backend `TransactionListItem.has_review`追加（pytest 139全緑）。最終実証=取引完了→評価待ち通知→UI評価送信→通知消滅のフルサイクルをブラウザ実クリックで確認・コンソールエラー0。
+- **設計判断の記録**: /applications・/resultは/cases系へのリダイレクタ（正本を/cases/[id]に一本化・旧査定ファネル/analyzing→/condition→/resultは流入ゼロの孤立レガシー）。/notificationsは通知API無しのため実データ導出サマリ方式（本格通知APIはP2候補）。/reviewのタグ/公開トグルはBE未対応のためコメント末尾付与/UI装飾（POST /reviews拡張はP2候補）。
+- **P2候補（露出問題なし・任意の質向上）**: 通知専用API新設／POST /reviewsのtags・is_public対応／TransactionListItemのunread_count／CaseOutの入札締切時刻／main.py・config.pyの危険トークン判定一本化。
 
 ---
 
