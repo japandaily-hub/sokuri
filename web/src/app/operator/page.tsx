@@ -13,10 +13,13 @@
  *  - 入札成功トースト
  *  - 絞り込みセレクトの状態保持
  *
- * バックエンド配線: 案件一覧は listOpenCases()、成約済みは listTransactions()
+ * バックエンド配線: 案件一覧は listOpenCases()、成約済み/交渉中は listTransactions()
  * （既存 /operator/cases ・ /operator/transactions と同じ実装済み関数を再利用）。
  * KPI サマリーは上記2つのレスポンスからフロント側で集計する（専用APIは無い）。
- * 「交渉中」タブはチャットAPI未実装のため、当面 空状態のみ表示する。
+ * 「交渉中」= transactions のうち status が pending（訪問日調整中）または
+ * visiting（訪問予定）のもの。チャット本文の一覧表示は未実装のため、
+ * neg タブでは done タブと同じカード実装を流用して該当取引を一覧表示する
+ * （2026-07-03 実カウント化）。
  */
 
 import "./dashboard.css";
@@ -30,6 +33,7 @@ import { Spinner } from "@/components/Icon";
 import { useToken } from "@/components/kdz/Ui";
 import {
   KdzApiError,
+  TXN_STATUS_LABEL,
   createBid,
   formatYen,
   listOpenCases,
@@ -285,15 +289,34 @@ export default function OperatorDashboardPage() {
     () => (transactions ?? []).filter((t) => t.status === "completed"),
     [transactions],
   );
+  /** 「交渉中」= 訪問日調整中（pending）または訪問予定（visiting）の取引。 */
+  const negotiatingTxns = useMemo(
+    () => (transactions ?? []).filter((t) => t.status === "pending" || t.status === "visiting"),
+    [transactions],
+  );
 
   const now = new Date();
-  const thisMonthDone = doneTxns.filter((t) => {
-    const d = new Date(t.created_at);
-    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-  });
-  const thisMonthAmount = thisMonthDone.reduce(
-    (sum, t) => sum + (t.final_amount ?? t.initial_amount),
-    0,
+  /** 今月の成約件数 = visiting + completed（キャンセルは除外）。金額は completed のみ合計。 */
+  const thisMonthActive = useMemo(
+    () =>
+      (transactions ?? []).filter((t) => {
+        if (t.status !== "visiting" && t.status !== "completed") return false;
+        const d = new Date(t.created_at);
+        return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [transactions],
+  );
+  const thisMonthDoneCount = useMemo(
+    () => thisMonthActive.filter((t) => t.status === "completed").length,
+    [thisMonthActive],
+  );
+  const thisMonthAmount = useMemo(
+    () =>
+      thisMonthActive
+        .filter((t) => t.status === "completed")
+        .reduce((sum, t) => sum + (t.final_amount ?? t.initial_amount), 0),
+    [thisMonthActive],
   );
 
   function requestBid(lotId: string, value: number) {
@@ -325,7 +348,7 @@ export default function OperatorDashboardPage() {
   const TABS: { key: TabKey; icon: IcName; label: string; badge: number; gray?: boolean }[] = [
     { key: "lots", icon: "menu", label: "案件一覧", badge: lots.length },
     { key: "bids", icon: "trend", label: "入札中", badge: biddingLots.length },
-    { key: "neg", icon: "chat", label: "交渉中", badge: 0 },
+    { key: "neg", icon: "chat", label: "交渉中", badge: negotiatingTxns.length },
     { key: "done", icon: "check", label: "成約済み", badge: doneTxns.length, gray: true },
   ];
 
@@ -425,17 +448,20 @@ export default function OperatorDashboardPage() {
             <div className="sum-card">
               <div className="sum-label">交渉中</div>
               <div className="sum-val">
-                0<span>件</span>
+                {negotiatingTxns.length}
+                <span>件</span>
               </div>
-              <div className="sum-sub">準備中</div>
+              <div className="sum-sub">訪問日調整中・訪問予定</div>
             </div>
             <div className="sum-card">
               <div className="sum-label">今月の成約</div>
               <div className="sum-val">
-                {thisMonthDone.length}
+                {thisMonthActive.length}
                 <span>件</span>
               </div>
-              <div className="sum-sub">買取総額 ¥{yen(thisMonthAmount)}</div>
+              <div className="sum-sub">
+                買取総額 ¥{yen(thisMonthAmount)}（うち完了{thisMonthDoneCount}件）
+              </div>
             </div>
             <div className="sum-card">
               <div className="sum-label">案件一覧</div>
@@ -507,14 +533,41 @@ export default function OperatorDashboardPage() {
 
           {/* ---------- 交渉中タブ ---------- */}
           <div className={`tab-content${activeTab === "neg" ? " active" : ""}`}>
-            <div className="empty-state">
-              <Ic name="chat" />
-              <p>
-                交渉機能は準備中です。
-                <br />
-                落札状況は「取引」ページからご確認いただけます。
-              </p>
-            </div>
+            {negotiatingTxns.length === 0 ? (
+              <div className="empty-state">
+                <Ic name="chat" />
+                <p>
+                  現在交渉中の取引はありません。
+                  <br />
+                  落札状況は「取引」ページからご確認いただけます。
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {negotiatingTxns.map((t) => (
+                  <Link
+                    href={`/operator/transactions/${t.id}`}
+                    className="negotiation-card"
+                    key={t.id}
+                  >
+                    <div className="neg-user-ic" aria-hidden="true">
+                      <Ic name="chat" />
+                    </div>
+                    <div className="neg-info">
+                      <div className="neg-lot">{t.purpose}</div>
+                      <div className="neg-preview">
+                        {t.prefecture} {t.city}　{TXN_STATUS_LABEL[t.status]}
+                      </div>
+                    </div>
+                    <div className="neg-right">
+                      <div className="neg-amount">
+                        {formatYen(t.final_amount ?? t.initial_amount)}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* ---------- 成約済みタブ ---------- */}

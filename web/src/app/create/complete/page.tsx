@@ -168,7 +168,7 @@ export default function CreateCompletePage() {
 
           {/* ボタン */}
           <div className="done-btns">
-            <Link href="/applications" className="btn btn-primary btn-lg">
+            <Link href="/cases" className="btn btn-primary btn-lg">
               <svg className="ic" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M9 6h11M9 12h11M9 18h11" />
                 <circle cx="4" cy="6" r="1.5" fill="currentColor" />

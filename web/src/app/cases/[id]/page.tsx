@@ -361,6 +361,12 @@ export default function UserCaseDetailPage() {
                 >
                   レビューを投稿
                 </button>
+                <a
+                  href={`/review?transaction_id=${txn.id}`}
+                  className="mt-2 inline-block text-sm font-semibold text-brand-700 hover:underline"
+                >
+                  詳しく評価する →
+                </a>
               </div>
             ))}
         </Card>

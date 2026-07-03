@@ -62,6 +62,7 @@ async def list_transactions(
             selectinload(Transaction.case),
             selectinload(Transaction.bid).selectinload(Bid.operator),
             selectinload(Transaction.reduction_requests),
+            selectinload(Transaction.reviews),
         )
         .order_by(Transaction.created_at.desc())
     )
@@ -89,6 +90,7 @@ async def list_transactions(
             has_pending_reduction=any(
                 r.status == "pending" for r in t.reduction_requests
             ),
+            has_review=any(rv.reviewer_type == "user" for rv in t.reviews),
         )
         for t in txns
     ]

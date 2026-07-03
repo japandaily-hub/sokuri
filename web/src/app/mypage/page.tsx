@@ -7,211 +7,138 @@
  * ページ最上部で共通 AppHeader を描く（デザイン独自ヘッダー markup は再現しない）。
  *
  * クライアント化の理由（純表示では不可）:
- *  - タブ切替（すべて/進行中/成約済み/プロフィール）
- *  - 通知設定トグルの ON/OFF 連動
- *  - 入札受付中ロットのライブカウントダウン
+ *  - タブ切替（すべて/進行中/成約済み）
+ *  - useSession / listMyCases / listTransactions を用いた実データ取得
  *
- * バックエンド未配線: 出品一覧・サマリー値・プロフィール値はすべてモックデータ。
- * 保存/編集等の実処理は行わず UI 挙動のみで表現する。
+ * バックエンド配線: listMyCases + listTransactions からフロント側で集計する
+ * （専用の統計APIは無い）。データ源が無い項目（住所・利用開始月・フリガナ/電話・
+ * 入札締切カウントダウン・通知トグル群・プロフィールタブ）は削除した（2026-07-03）。
  */
 
 import "./mypage.css";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
+import { Spinner } from "@/components/Icon";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import { Ic } from "@/components/kdz/Icons";
+import { useToken } from "@/components/kdz/Ui";
+import {
+  formatYen,
+  listMyCases,
+  listTransactions,
+  photoSrc,
+  toDisplayMessage,
+  type CaseOut,
+  type CaseStatus,
+  type TransactionListItem,
+} from "@/lib/katadzuke-api";
 
-/* ====== 型 ====== */
-type LotStatus = "negotiating" | "bidding" | "done";
+type TabKey = "all" | "active" | "done";
 
-type LotButton = { label: string; href: string };
+/**
+ * タブ分類とサマリー集計で共有する唯一の判定ロジック。
+ * 「進行中」= closed/cancelled を除く全ステータス（draft/open/bidding）。
+ * 「成約済み」= closed（業者決定済み）または cancelled。
+ * 「入札受付中」サマリーは進行中のうち、まだ業者が決まっていない
+ * （open/bidding）かつ bid_count>0 のもののみをカウントする
+ * （closed は成約済みタブに分類されるため、入札受付中サマリーからは除外）。
+ */
+const DONE_STATUSES: CaseStatus[] = ["closed", "cancelled"];
+const isActiveCase = (c: CaseOut): boolean => !DONE_STATUSES.includes(c.status);
+const isDoneCase = (c: CaseOut): boolean => DONE_STATUSES.includes(c.status);
+const isBiddingCase = (c: CaseOut): boolean =>
+  (c.status === "open" || c.status === "bidding") && c.bid_count > 0;
 
-type Lot = {
-  id: string;
-  status: LotStatus;
-  statusLabel: string;
-  cats: string[];
-  count: number;
-  date: string;
-  topBid: number;
-  bidCount: number;
-  /** 入札受付中のみ：締切までの初期秒数（ライブカウントダウン用） */
-  initialSecs: number | null;
-  btnPrimary: LotButton | null;
-  btnSecondary: LotButton | null;
-  doneDate?: string;
-};
-
-/* ====== モックデータ（明らかにデモ。バックエンド未配線） ====== */
-const LOTS: Lot[] = [
-  {
-    id: "KTZ-2026-04821",
-    status: "negotiating",
-    statusLabel: "交渉中",
-    cats: ["家電・PC", "ブランド品", "カメラ"],
-    count: 14,
-    date: "2026年6月23日",
-    topBid: 72000,
-    bidCount: 7,
-    initialSecs: null,
-    btnPrimary: { label: "チャットを見る", href: "/chat/1" },
-    btnSecondary: { label: "状況を確認", href: "/applications" },
-  },
-  {
-    id: "KTZ-2026-05201",
-    status: "bidding",
-    statusLabel: "入札受付中",
-    cats: ["家具", "衣類・靴", "本・メディア"],
-    count: 9,
-    date: "2026年6月25日",
-    topBid: 31000,
-    bidCount: 3,
-    initialSecs: 1 * 86400 + 14 * 3600 + 22 * 60,
-    btnPrimary: { label: "入札を確認", href: "/applications" },
-    btnSecondary: null,
-  },
-  {
-    id: "KTZ-2026-04312",
-    status: "done",
-    statusLabel: "成約済み",
-    cats: ["家電・PC", "ゲーム"],
-    count: 8,
-    date: "2026年5月10日",
-    topBid: 48000,
-    bidCount: 5,
-    initialSecs: null,
-    btnPrimary: null,
-    btnSecondary: null,
-    doneDate: "2026年5月18日",
-  },
-  {
-    id: "KTZ-2026-03980",
-    status: "done",
-    statusLabel: "成約済み",
-    cats: ["ブランド品", "時計"],
-    count: 5,
-    date: "2026年4月2日",
-    topBid: 72000,
-    bidCount: 9,
-    initialSecs: null,
-    btnPrimary: null,
-    btnSecondary: null,
-    doneDate: "2026年4月8日",
-  },
-];
-
-type TabKey = "all" | "active" | "done" | "profile";
-
-const NOTIF_ITEMS = [
-  { label: "入札が届いたとき", sub: "LINE通知", defaultOn: true },
-  { label: "新着メッセージ", sub: "LINE通知", defaultOn: true },
-  { label: "入札期間終了", sub: "LINE通知", defaultOn: true },
-  { label: "サービスからのお知らせ", sub: "LINE通知", defaultOn: false },
-] as const;
-
-const PROFILE_ROWS = [
-  { lbl: "お名前", val: "山田 花子" },
-  { lbl: "フリガナ", val: "ヤマダ ハナコ" },
-  { lbl: "電話番号", val: "090-****-1234" },
-  { lbl: "住所", val: "東京都世田谷区 ****" },
-  { lbl: "登録日", val: "2026年3月15日" },
-];
-
-/* ====== ヘルパー ====== */
-function pad(n: number): string {
-  return n < 10 ? `0${n}` : String(n);
+function statusChipInfo(c: CaseOut): { label: string; cls: string } {
+  if (c.status === "cancelled") return { label: "キャンセル", cls: "done" };
+  if (c.status === "closed") return { label: "業者決定済み", cls: "negotiating" };
+  if (c.status === "bidding") return { label: "入札あり", cls: "live" };
+  if (c.status === "open") return { label: "入札受付中", cls: "live" };
+  return { label: "下書き", cls: "negotiating" };
 }
 
-function statusChipClass(s: LotStatus): string {
-  return { bidding: "live", negotiating: "negotiating", done: "done" }[s];
-}
-
-function formatRemaining(secs: number): string {
-  const d = Math.floor(secs / 86400);
-  const h = Math.floor((secs % 86400) / 3600);
-  const m = Math.floor((secs % 3600) / 60);
-  return d > 0 ? `${d}日 ${pad(h)}:${pad(m)}` : `${pad(h)}:${pad(m)}`;
-}
-
-/* ====== 出品カード ====== */
-function LotCard({ lot, liveSecs }: { lot: Lot; liveSecs: number | null }) {
-  const isDone = lot.status === "done";
+/** 出品カード（実データ版）。 */
+function LotCard({ c }: { c: CaseOut }) {
+  const { label, cls } = statusChipInfo(c);
+  const isDone = c.status === "closed" || c.status === "cancelled";
   return (
-    <div className={`lot-card ${lot.status}`}>
+    <Link href={`/cases/${c.id}`} className={`lot-card ${cls}`} style={{ textDecoration: "none" }}>
       <div className="lot-card-inner">
-        {/* サムネイル：実アセット未投入のため淡色プレースホルダの4分割枠で表現 */}
         <div className="lot-thumb" aria-hidden="true">
-          <div className="lot-thumb-img" />
-          <div className="lot-thumb-img" />
-          <div className="lot-thumb-img" />
+          {c.photos.length > 0 ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={photoSrc(c.photos[0].url)}
+              alt=""
+              style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit" }}
+            />
+          ) : (
+            <>
+              <div className="lot-thumb-img" />
+              <div className="lot-thumb-img" />
+              <div className="lot-thumb-img" />
+            </>
+          )}
         </div>
 
         <div className="lot-info">
           <div className="lot-info-top">
-            <span className="lot-id">{lot.id}</span>
-            <span className={`status-chip ${statusChipClass(lot.status)}`}>{lot.statusLabel}</span>
+            <span className="lot-id">{c.id.slice(0, 8).toUpperCase()}</span>
+            <span className={`status-chip ${cls}`}>{label}</span>
           </div>
           <div className="lot-cats">
-            {lot.cats.map((c) => (
-              <span key={c} className="lot-cat-chip">
-                {c}
-              </span>
-            ))}
+            <span className="lot-cat-chip">{c.purpose}</span>
           </div>
           <div className="lot-meta">
             <span className="lot-meta-item">
               <Ic name="box" />
-              {lot.count}点まとめ
+              {c.photos.length}枚の写真
             </span>
             <span className="lot-meta-item">
               <Ic name="clock" />
-              {lot.date}出品
+              {new Date(c.created_at).toLocaleDateString("ja-JP")}出品
             </span>
           </div>
-          {lot.initialSecs !== null && liveSecs !== null ? (
-            <div className="lot-timer live">
-              <span className="live-dot" />残り {formatRemaining(liveSecs)}
-            </div>
-          ) : lot.doneDate ? (
-            <div className="lot-timer ended">成約日：{lot.doneDate}</div>
-          ) : null}
         </div>
 
         <div className="lot-action">
           <div className="bid-info">
-            <div className="bid-label">{isDone ? "成約額" : "最高入札"}</div>
+            <div className="bid-label">入札</div>
             <div className="bid-amount">
-              ¥{lot.topBid.toLocaleString()}
-              <span>円</span>
+              {c.bid_count}
+              <span>件</span>
             </div>
-            <div className="bid-count">{lot.bidCount}件の入札</div>
+            <div className="bid-count">
+              {c.bid_count > 0 ? "入札あり" : "入札待ち"}
+            </div>
           </div>
           <div className="lot-btns">
-            {lot.btnPrimary ? (
-              <Link href={lot.btnPrimary.href} className="btn-lot primary">
-                {lot.btnPrimary.label}
-              </Link>
-            ) : null}
-            {lot.btnSecondary ? (
-              <Link href={lot.btnSecondary.href} className="btn-lot ghost">
-                {lot.btnSecondary.label}
-              </Link>
-            ) : null}
-            {!lot.btnPrimary && !lot.btnSecondary ? (
+            {c.status === "cancelled" ? (
+              <span
+                className="btn-lot"
+                style={{ background: "var(--line-soft)", color: "var(--body-soft)" }}
+              >
+                <Ic name="x" />
+                キャンセル
+              </span>
+            ) : isDone ? (
               <span className="btn-lot green">
                 <Ic name="check" />
-                完了
+                業者決定済み
               </span>
-            ) : null}
+            ) : (
+              <span className="btn-lot primary">詳細を見る</span>
+            )}
           </div>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 
-/* ====== 空状態 ====== */
+/** 空状態 */
 function EmptyState({ title, sub }: { title: string; sub?: string }) {
   return (
     <div className="empty-state">
@@ -226,88 +153,148 @@ function EmptyState({ title, sub }: { title: string; sub?: string }) {
   );
 }
 
-/* ====== 通知トグル行 ====== */
-function NotifRow({ label, sub, defaultOn }: { label: string; sub: string; defaultOn: boolean }) {
-  const [on, setOn] = useState(defaultOn);
-  return (
-    <div className="notif-row">
-      <div>
-        <div className="notif-label">{label}</div>
-        <div className="notif-sub">{sub}</div>
-      </div>
-      <button
-        type="button"
-        className={`toggle ${on ? "on" : "off"}`}
-        aria-pressed={on}
-        aria-label={`${label}の通知`}
-        onClick={() => setOn((v) => !v)}
-      />
-    </div>
-  );
-}
-
 export default function MyPage() {
+  const { data: sessionData } = useSession();
+  const { token, loading } = useToken();
   const [tab, setTab] = useState<TabKey>("all");
 
-  // 入札受付中ロットのライブカウントダウン（マウント後に開始）。
-  const biddingLot = LOTS.find((l) => l.initialSecs !== null);
-  const [liveSecs, setLiveSecs] = useState<number | null>(biddingLot?.initialSecs ?? null);
+  const [cases, setCases] = useState<CaseOut[] | null>(null);
+  const [transactions, setTransactions] = useState<TransactionListItem[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const reload = useCallback(async () => {
+    if (!token) return;
+    try {
+      setCases(await listMyCases(token));
+    } catch (e) {
+      setError(toDisplayMessage(e, "案件の取得に失敗しました"));
+    }
+    try {
+      setTransactions(await listTransactions(token));
+    } catch (e) {
+      setError((prev) => prev ?? toDisplayMessage(e, "取引の取得に失敗しました"));
+    }
+  }, [token]);
 
   useEffect(() => {
-    if (liveSecs === null) return;
-    const id = window.setInterval(() => {
-      setLiveSecs((s) => (s === null || s <= 0 ? s : s - 1));
-    }, 1000);
-    return () => window.clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    void reload();
+  }, [reload]);
 
-  const activeLots = LOTS.filter((l) => l.status !== "done");
-  const doneLots = LOTS.filter((l) => l.status === "done");
+  const userName = sessionData?.user?.name ?? "ゲスト";
+  const userInitial = userName.slice(0, 1);
 
-  const tabs: { key: TabKey; label: string; count?: number; gray?: boolean; icon?: boolean }[] = [
-    { key: "all", label: "すべて", count: LOTS.length },
+  const completedTxns = useMemo(
+    () => (transactions ?? []).filter((t) => t.status === "completed"),
+    [transactions],
+  );
+  const totalAmount = useMemo(
+    () => completedTxns.reduce((sum, t) => sum + (t.final_amount ?? t.initial_amount), 0),
+    [completedTxns],
+  );
+
+  const biddingCount = useMemo(
+    () => (cases ?? []).filter(isBiddingCase).length,
+    [cases],
+  );
+  const negotiatingCount = useMemo(
+    () => (transactions ?? []).filter((t) => t.status === "pending" || t.status === "visiting").length,
+    [transactions],
+  );
+
+  const activeLots = useMemo(() => (cases ?? []).filter(isActiveCase), [cases]);
+  const doneLots = useMemo(() => (cases ?? []).filter(isDoneCase), [cases]);
+
+  const tabs: { key: TabKey; label: string; count: number; gray?: boolean }[] = [
+    { key: "all", label: "すべて", count: (cases ?? []).length },
     { key: "active", label: "進行中", count: activeLots.length },
-    { key: "done", label: "成約済み", count: doneLots.length, gray: true },
-    { key: "profile", label: "プロフィール", icon: true },
+    { key: "done", label: "終了", count: doneLots.length, gray: true },
   ];
+
+  const isLoading = loading || (!cases && !error);
+  const sessionExpired = !loading && !token;
+
+  if (sessionExpired) {
+    return (
+      <div className="mypage-page">
+        <AppHeader unread={false} />
+        <main id="main" className="my-wrap">
+          <div
+            role="alert"
+            style={{
+              padding: "12px 16px",
+              borderRadius: "var(--radius-s)",
+              background: "#fff5f5",
+              color: "#dc2626",
+              fontSize: 13,
+              border: "1px solid #fca5a5",
+            }}
+          >
+            セッションが切れました。再ログインしてください。
+            <Link href="/login" style={{ marginLeft: 8, fontWeight: 700, textDecoration: "underline" }}>
+              ログインへ
+            </Link>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="mypage-page">
+        <AppHeader unread={false} />
+        <div className="flex min-h-[50vh] items-center justify-center">
+          <Spinner className="h-6 w-6 text-brand-600" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mypage-page">
-      <AppHeader unread />
+      <AppHeader unread={negotiatingCount > 0} />
 
       <main id="main" className="my-wrap">
+        {error ? (
+          <div
+            role="alert"
+            style={{
+              marginBottom: 20,
+              padding: "12px 16px",
+              borderRadius: "var(--radius-s)",
+              background: "#fff5f5",
+              color: "#dc2626",
+              fontSize: 13,
+              border: "1px solid #fca5a5",
+            }}
+          >
+            {error}
+          </div>
+        ) : null}
+
         {/* ユーザーカード */}
         <div className="user-card">
-          <div className="user-card-avatar">山</div>
+          <div className="user-card-avatar">{userInitial}</div>
           <div className="user-card-info">
-            <div className="user-card-name">山田 花子</div>
-            <div className="user-card-meta">
-              <span>
-                <Ic name="pin" />東京都世田谷区
-              </span>
-              <span>
-                <Ic name="clock" />2026年3月から利用
-              </span>
-            </div>
+            <div className="user-card-name">{userName}</div>
           </div>
           <div className="user-card-stats">
             <div className="stat-item">
               <div className="stat-num">
-                3<span>件</span>
+                {(cases ?? []).length}
+                <span>件</span>
               </div>
               <div className="stat-lbl">出品回数</div>
             </div>
             <div className="stat-item">
               <div className="stat-num">
-                2<span>件</span>
+                {completedTxns.length}
+                <span>件</span>
               </div>
               <div className="stat-lbl">成約済み</div>
             </div>
             <div className="stat-item">
-              <div className="stat-num">
-                ¥120<span>K</span>
-              </div>
+              <div className="stat-num">{formatYen(totalAmount)}</div>
               <div className="stat-lbl">総買取額</div>
             </div>
           </div>
@@ -315,26 +302,29 @@ export default function MyPage() {
 
         {/* サマリー帯 */}
         <div className="my-summary">
-          <Link href="/applications" className="sum-card active-card" style={{ textDecoration: "none" }}>
+          <Link href="/cases" className="sum-card active-card" style={{ textDecoration: "none" }}>
             <div className="sum-label">入札受付中</div>
             <div className="sum-val">
-              1<span>件</span>
+              {biddingCount}
+              <span>件</span>
             </div>
-            <div className="sum-sub">入札7件届いています</div>
+            <div className="sum-sub">入札が届いています</div>
           </Link>
-          <Link href="/applications" className="sum-card" style={{ textDecoration: "none" }}>
+          <Link href="/cases" className="sum-card" style={{ textDecoration: "none" }}>
             <div className="sum-label">交渉中</div>
             <div className="sum-val">
-              1<span>件</span>
+              {negotiatingCount}
+              <span>件</span>
             </div>
-            <div className="sum-sub">未読メッセージ 2件</div>
+            <div className="sum-sub">訪問日調整中を含む</div>
           </Link>
-          <Link href="/applications" className="sum-card" style={{ textDecoration: "none" }}>
+          <Link href="/cases" className="sum-card" style={{ textDecoration: "none" }}>
             <div className="sum-label">成約済み</div>
             <div className="sum-val">
-              2<span>件</span>
+              {completedTxns.length}
+              <span>件</span>
             </div>
-            <div className="sum-sub">総買取額 ¥120,000</div>
+            <div className="sum-sub">総買取額 {formatYen(totalAmount)}</div>
           </Link>
           <div className="sum-card">
             <div className="sum-label">次の出品</div>
@@ -344,6 +334,16 @@ export default function MyPage() {
             <div className="sum-sub">
               <Link href="/create">出品する</Link>
             </div>
+          </div>
+        </div>
+
+        {/* LINE通知誘導（通知トグル群の代替・1行） */}
+        <div className="user-card" style={{ marginBottom: 20, padding: "14px 20px" }}>
+          <div className="user-card-info" style={{ fontSize: 13, color: "var(--body-soft)" }}>
+            入札・メッセージの通知はLINEで受け取れます。
+            <Link href="/notifications" style={{ marginLeft: 6, fontWeight: 700 }}>
+              通知設定を見る →
+            </Link>
           </div>
         </div>
 
@@ -358,11 +358,8 @@ export default function MyPage() {
               className={`my-tab${tab === t.key ? " active" : ""}`}
               onClick={() => setTab(t.key)}
             >
-              {t.icon ? <Ic name="people" /> : null}
               {t.label}
-              {typeof t.count === "number" ? (
-                <span className={`tab-count${t.gray ? " gray" : ""}`}>{t.count}</span>
-              ) : null}
+              <span className={`tab-count${t.gray ? " gray" : ""}`}>{t.count}</span>
             </button>
           ))}
         </div>
@@ -370,9 +367,11 @@ export default function MyPage() {
         {/* すべて */}
         {tab === "all" ? (
           <div className="lot-list">
-            {LOTS.map((lot) => (
-              <LotCard key={lot.id} lot={lot} liveSecs={liveSecs} />
-            ))}
+            {(cases ?? []).length ? (
+              (cases ?? []).map((c) => <LotCard key={c.id} c={c} />)
+            ) : (
+              <EmptyState title="まだ出品がありません" sub="最初の出品をしてみましょう。" />
+            )}
           </div>
         ) : null}
 
@@ -380,7 +379,7 @@ export default function MyPage() {
         {tab === "active" ? (
           <div className="lot-list">
             {activeLots.length ? (
-              activeLots.map((lot) => <LotCard key={lot.id} lot={lot} liveSecs={liveSecs} />)
+              activeLots.map((c) => <LotCard key={c.id} c={c} />)
             ) : (
               <EmptyState title="進行中の出品はありません" sub="新しく出品してみましょう。" />
             )}
@@ -391,50 +390,10 @@ export default function MyPage() {
         {tab === "done" ? (
           <div className="lot-list">
             {doneLots.length ? (
-              doneLots.map((lot) => <LotCard key={lot.id} lot={lot} liveSecs={liveSecs} />)
+              doneLots.map((c) => <LotCard key={c.id} c={c} />)
             ) : (
               <EmptyState title="成約済みの出品はありません" />
             )}
-          </div>
-        ) : null}
-
-        {/* プロフィール */}
-        {tab === "profile" ? (
-          <div className="profile-card">
-            <div className="profile-section">
-              <div className="profile-section-title">
-                基本情報
-                <Link href="/mypage/profile" className="edit-link">
-                  編集
-                </Link>
-              </div>
-              {PROFILE_ROWS.map((r) => (
-                <div key={r.lbl} className="profile-row">
-                  <span className="profile-lbl">{r.lbl}</span>
-                  <span className="profile-val">{r.val}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="profile-section">
-              <div className="profile-section-title">通知設定</div>
-              {NOTIF_ITEMS.map((n) => (
-                <NotifRow key={n.label} label={n.label} sub={n.sub} defaultOn={n.defaultOn} />
-              ))}
-            </div>
-
-            <div className="profile-section">
-              <div className="profile-section-title">関連リンク</div>
-              <div className="profile-links">
-                <Link href="/legal">特定商取引法に基づく表記</Link>
-                <Link href="/privacy">プライバシーポリシー</Link>
-                <Link href="/terms">利用規約</Link>
-                <Link href="/contact">お問い合わせ</Link>
-                <Link href="/mypage/withdraw" className="danger">
-                  退会手続き
-                </Link>
-              </div>
-            </div>
           </div>
         ) : null}
       </main>

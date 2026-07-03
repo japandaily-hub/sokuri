@@ -218,3 +218,8 @@ temp/
 /cleanup_log.txt
 /restore_appdata_log.txt
 /e2e_log.txt
+
+# ローカルE2E用の使い捨てSQLite（backend/run_local_e2e.py が生成）
+backend/e2e_local.db
+backend/*.sqlite
+backend/*.sqlite3

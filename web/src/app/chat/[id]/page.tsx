@@ -270,7 +270,7 @@ export default function ChatPage() {
     <div className="chat-page">
       {/* 専用ヘッダー（戻る矢印 + ロゴ + タイトル + 申込ID + 通知ベル） */}
       <header className="chat-header">
-        <Link href="/applications" className="ch-back" aria-label="申し込み状況へ戻る">
+        <Link href="/cases" className="ch-back" aria-label="申し込み状況へ戻る">
           <Ic name="arrow" />
         </Link>
         <Link href="/" className="ch-logo" aria-label="カタヅケ トップへ">

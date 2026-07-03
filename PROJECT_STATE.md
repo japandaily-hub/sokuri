@@ -36,6 +36,14 @@
 - **残存リスク（文書化済み・低）**: APP_ENV未設定の非正規デプロイ経路ではガード不発（render.yamlは明示済み）／main.pyとconfig.pyの危険トークン判定が二重化（次回リファクタで共有ヘルパー化推奨）／ADMIN_EMAILSがrender.yamlに平文（ユーザー判断でsync:false化を推奨）。
 - **リリース前のユーザー対応項目（コード側は完了）**: ①/company・/legalの架空事業者情報→実値(task_b62c0b43) ②実画像アセット投入 ③LINEクレデンシャル設定（フロント: LINE_CLIENT_ID/SECRET・コールバックURL登録、バックエンド: LINE_CLIENT_ID/LINE_CHANNEL_ACCESS_TOKEN）④Render環境変数の確認（APP_ENV/ALLOWED_ORIGINSはrender.yaml反映済み・デプロイ時に実ログで起動確認）⑤mainマージ→デプロイ（承認操作）。
 
+## 🧪 2026-07-03 フルスタック実機E2E（初のバックエンド接続ウォークスルー・/loop 自走）
+- **環境**: backend=SQLite起動スクリプト `backend/run_local_e2e.py`（Docker/PostgreSQL不要・使い捨てDB e2e_local.db・conftestと同じJSONB→JSON方式）＋ web=本番ビルドを :3100（.claude/launch.json katazuke-web）。
+- **APIレベルE2E全通**: user/admin/業者signup→admin承認(pending→active)→案件→入札→落札選択→取引→チャット往復→日程提案→確定(status=visiting)→業者プロフィール。シードは scratchpad の seed_e2e*.ps1（admin=e2e-admin@example.com/業者承認はPATCH verify {verified:true}）。
+- **ブラウザ実機で配線確認済み✅**: /login /cases /cases/[id] /chat/[id]（**UI送信→業者側到達まで実証**）/schedule、/operator/login /operator/cases /operator/transactions(+詳細=住所連絡先開示+減額フォーム) /operator/chat /operator/profile。ミドルウェア分離（業者セッションでuser専用ページ→/loginへ）も実機実証。**全巡回でconsoleエラー0**。
+- 🔴 **未配線＝ログインユーザーに架空データを表示する6ページ（次ラウンドの主対象）**: /mypage(山田花子) /applications(架空入札) /notifications(架空通知・**通知APIは未実装**) /result(「デモ表示」ラベル) /vendors/[id](**GET /vendors/{id}は実装済みなのに未配線**) /review(架空取引)。
+- ⚠️ /operator ダッシュボード: 「交渉中」ハードコード0（operator/page.tsx の「チャットAPI未実装のため」コメントが陳腐化）・「今月の成約」はcompletedのみでvisiting非計上。
+- **次アクションP1**: architect設計→上記6ページ＋ダッシュボード集計の実配線（frontend実装→security/qaレビュー→本E2E環境で再検証）。
+
 ---
 
 最終更新: 2026-06-13 / **本番デプロイ&E2E全合格済み（β稼働中）。現フェーズ＝業者獲得（量・スケール）。プラン正本: 業者獲得スケールプラン_v1.md**

@@ -538,7 +538,7 @@ function SchedulePageInner() {
               LINEにも通知が届きます。
             </p>
             <div className="sch-modal-btns">
-              <Link href="/applications" className="btn btn-primary btn-lg">
+              <Link href="/cases" className="btn btn-primary btn-lg">
                 申し込み状況を確認する
                 <Ic name="arrow" className="arw" />
               </Link>

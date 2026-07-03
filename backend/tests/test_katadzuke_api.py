@@ -499,6 +499,52 @@ async def test_full_flow_bid_select_reduction_complete_review(
     assert op1["rating"] == 5.0
 
 
+async def test_transaction_list_has_review_reflects_user_review(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """GET /transactions の has_review は、成約完了直後は false、
+    ユーザーレビュー投稿後は true に切り替わる（通知の恒久残存防止用フラグ）。"""
+    admin_token = await _make_admin(client, db_session)
+    user_token = await _signup_user(client)
+    op_token, op_id = await _verified_operator(
+        client, db_session, admin_token, "op_has_review@example.com"
+    )
+    case = await _create_case(client, user_token)
+    r = await client.post(
+        f"/api/v1/cases/{case['id']}/bids",
+        json={"amount": 30000},
+        headers=_auth(op_token),
+    )
+    bid = r.json()
+    r = await client.post(
+        f"/api/v1/cases/{case['id']}/bids/{bid['id']}/select",
+        headers=_auth(user_token),
+    )
+    txn_id = r.json()["id"]
+
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/complete", headers=_auth(user_token)
+    )
+    assert r.status_code == 200
+
+    r = await client.get("/api/v1/transactions", headers=_auth(user_token))
+    assert r.status_code == 200
+    txn_item = next(t for t in r.json() if t["id"] == txn_id)
+    assert txn_item["has_review"] is False
+
+    r = await client.post(
+        "/api/v1/reviews",
+        json={"transaction_id": txn_id, "rating": 5, "comment": "とても良かったです"},
+        headers=_auth(user_token),
+    )
+    assert r.status_code == 201
+
+    r = await client.get("/api/v1/transactions", headers=_auth(user_token))
+    assert r.status_code == 200
+    txn_item = next(t for t in r.json() if t["id"] == txn_id)
+    assert txn_item["has_review"] is True
+
+
 async def test_cancel_flow_by_operator(client: AsyncClient, db_session: AsyncSession):
     admin_token = await _make_admin(client, db_session)
     user_token = await _signup_user(client)

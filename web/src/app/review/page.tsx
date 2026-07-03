@@ -2,26 +2,29 @@
 
 import "./review.css";
 
+import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { AppHeader } from "@/components/kdz/AppHeader";
+import { Spinner } from "@/components/Icon";
+import { Notice, useToken } from "@/components/kdz/Ui";
+import {
+  TXN_STATUS_LABEL,
+  createReview,
+  formatYen,
+  getTransaction,
+  toDisplayMessage,
+  type TransactionDetail,
+} from "@/lib/katadzuke-api";
 
 /* ============================================================
    取引完了・評価ページ（カタヅケ）
    デザイン正典: docs/design_handoff_katazuke/取引完了・評価.html
-   完了バナー / 取引サマリー / 5スター選択 / 評価タグ複数選択 / コメント /
-   公開トグル / 送信・スキップ。
-   バックエンド未配線：取引内容はモック定数。評価の送信/スキップは実処理せず
-   UI 挙動（送信中スピナー → 送信済み画面 + デモトースト）のみ。
+   ?transaction_id= 駆動で getTransaction を取得し、★評価+コメントを
+   createReview で送信する（2026-07-03 実配線）。
+   タグ選択UIは維持しつつ、送信は rating + comment のみ（選択タグは
+   comment 末尾に「良かった点: …」として付与する）。
    ============================================================ */
-
-/** 取引サマリー（デモ用モック）。 */
-const TXN = {
-  vendor: "グリーンリサイクル東京",
-  items: "家電・ブランド品 5点",
-  visit: "2026年6月21日（土）13:30",
-  amount: "¥58,000",
-};
 
 /** スター数 → ラベル。index 0 は未選択時のプレースホルダ用。 */
 const STAR_LABELS = ["", "がっかりした", "もう少し…", "普通", "良かった！", "最高でした！"];
@@ -38,25 +41,52 @@ const TAGS: { id: string; label: string }[] = [
 
 const MAX_COMMENT = 300;
 
-/** 送信後の完了表示パターン（送信／スキップで文言・アイコンを切替）。 */
-type Submitted =
-  | { kind: "submitted" }
-  | { kind: "skipped" }
-  | null;
+/**
+ * "YYYY-MM-DD" 形式の date 文字列を日本語表記に整形する。
+ * new Date("YYYY-MM-DD") は ISO 8601 の日付限定形式として UTC 深夜0時に解釈されるため、
+ * JST 環境では toLocaleString で前日または当日の別時刻にズレる（典型バグ）。
+ * ここでは Date化せず文字列を直接分解して組み立てる。
+ */
+function formatVisitDate(visitDate: string | null): string {
+  if (!visitDate) return "—";
+  const m = visitDate.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return visitDate;
+  const [, y, mo, d] = m;
+  return `${y}年${Number(mo)}月${Number(d)}日`;
+}
 
-export default function ReviewPage() {
+function ReviewPageInner() {
+  const search = useSearchParams();
+  const transactionId = search.get("transaction_id");
+  const { token, loading } = useToken();
+
+  const [txn, setTxn] = useState<TransactionDetail | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
   /* ---- 評価フォーム状態 ---- */
   const [star, setStar] = useState(0);
   const [hoverStar, setHoverStar] = useState(0);
   const [popStar, setPopStar] = useState<number | null>(null);
   const [tags, setTags] = useState<string[]>([]);
   const [comment, setComment] = useState("");
-  const [publish, setPublish] = useState(true);
 
-  /* ---- 送信フロー（実処理なし：UI 挙動のみ） ---- */
+  /* ---- 送信フロー ---- */
   const [busy, setBusy] = useState(false);
-  const [submitted, setSubmitted] = useState<Submitted>(null);
+  const [justSubmitted, setJustSubmitted] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+
+  const reload = useCallback(async () => {
+    if (!token || !transactionId) return;
+    try {
+      setTxn(await getTransaction(transactionId, token));
+    } catch (e) {
+      setError(toDisplayMessage(e, "取引情報の取得に失敗しました"));
+    }
+  }, [token, transactionId]);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
 
   function toggleTag(id: string) {
     setTags((prev) => (prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]));
@@ -73,23 +103,78 @@ export default function ReviewPage() {
     window.setTimeout(() => setToast(null), 2400);
   }
 
-  function submitReview() {
-    if (busy) return;
+  async function submitReview() {
+    if (busy || !token || !txn || star === 0) return;
     setBusy(true);
-    // バックエンド未配線：送信中スピナーを見せたあと送信済み画面へ切替（デモ）。
-    window.setTimeout(() => {
+    setError(null);
+    try {
+      const tagLabels = TAGS.filter((t) => tags.includes(t.id)).map((t) => t.label);
+      const commentBody = [
+        comment.trim(),
+        tagLabels.length > 0 ? `良かった点: ${tagLabels.join("、")}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+      await createReview(
+        { transaction_id: txn.id, rating: star, comment: commentBody || undefined },
+        token,
+      );
+      setJustSubmitted(true);
+      await reload();
+      showToast("評価を送信しました");
+    } catch (e) {
+      setError(toDisplayMessage(e, "評価の送信に失敗しました"));
+    } finally {
       setBusy(false);
-      setSubmitted({ kind: "submitted" });
-      showToast("評価を送信しました（デモ）");
-    }, 900);
+    }
   }
 
-  function skipReview() {
-    setSubmitted({ kind: "skipped" });
-  }
-
-  // 表示用：ホバー中はホバー値、未ホバーなら選択値で塗り分け。
   const displayStar = hoverStar || star;
+
+  if (loading || (!txn && !error && transactionId)) {
+    return (
+      <div className="review-page">
+        <AppHeader unread />
+        <div className="flex min-h-[50vh] items-center justify-center">
+          <Spinner className="h-6 w-6 text-brand-600" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!transactionId || (!txn && error)) {
+    return (
+      <div className="review-page">
+        <AppHeader unread />
+        <main>
+          <div className="review-wrap">
+            <Notice tone="error">
+              {!transactionId
+                ? "評価対象の取引が指定されていません。"
+                : (error ?? "取引情報の取得に失敗しました。")}
+            </Notice>
+            <Link href="/cases" className="btn btn-primary btn-lg btn-block" style={{ marginTop: 16 }}>
+              マイ案件一覧へ戻る
+            </Link>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (!txn) return null;
+
+  const alreadyReviewed = txn.reviews.some((r) => r.reviewer_type === "user");
+  const isCompleted = txn.status === "completed";
+  const isCancelled = txn.status === "cancelled";
+  // completed のみ評価フォームを活性化する（cases/[id] の既存インラインレビューと同じ条件）。
+  const showSubmittedScreen = isCompleted && (alreadyReviewed || justSubmitted);
+  const vendorName = txn.operator?.company_name ?? "業者";
+  const amountText = formatYen(txn.final_amount ?? txn.initial_amount);
+  const itemsText = txn.case?.purpose ?? "—";
+  const visitText = txn.visit_date
+    ? `${formatVisitDate(txn.visit_date)}${txn.visit_time_slot ? ` ${txn.visit_time_slot}` : ""}`
+    : "—";
 
   return (
     <div className="review-page">
@@ -97,48 +182,76 @@ export default function ReviewPage() {
 
       <main>
         <div className="review-wrap">
-          {/* 完了バナー */}
-          <div className="done-banner">
-            <div className="done-ic">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M5 12.5l4.5 4.5L19 7" />
-              </svg>
+          {/* 状態バナー: completed のみ「完了」表示。pending/visiting は進行中、cancelled はキャンセル表示。 */}
+          {isCompleted ? (
+            <div className="done-banner">
+              <div className="done-ic">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M5 12.5l4.5 4.5L19 7" />
+                </svg>
+              </div>
+              <div className="done-title">取引が完了しました！</div>
+              <div className="done-sub">
+                {vendorName} との取引が正常に完了しました。
+                <br />
+                ご利用ありがとうございました。
+              </div>
             </div>
-            <div className="done-title">取引が完了しました！</div>
-            <div className="done-sub">
-              {TXN.vendor} との取引が正常に完了しました。
-              <br />
-              ご利用ありがとうございました。
-            </div>
-          </div>
+          ) : isCancelled ? (
+            <Notice tone="error">この取引はキャンセルされました。</Notice>
+          ) : (
+            <Notice tone="info">
+              取引が進行中です（{TXN_STATUS_LABEL[txn.status]}）。作業完了後に業者を評価できます。
+            </Notice>
+          )}
+
+          {error ? <Notice tone="error">{error}</Notice> : null}
 
           {/* 取引サマリー */}
           <div className="txn-card">
             <div className="txn-card-title">取引内容</div>
             <div className="txn-row">
               <span className="txn-lbl">業者名</span>
-              <span className="txn-val">{TXN.vendor}</span>
+              <span className="txn-val">{vendorName}</span>
             </div>
             <div className="txn-row">
               <span className="txn-lbl">出品内容</span>
-              <span className="txn-val">{TXN.items}</span>
+              <span className="txn-val">{itemsText}</span>
             </div>
             <div className="txn-row">
               <span className="txn-lbl">訪問日時</span>
-              <span className="txn-val">{TXN.visit}</span>
+              <span className="txn-val">{visitText}</span>
             </div>
             <div className="txn-row">
               <span className="txn-lbl">受取金額</span>
-              <span className="txn-val txn-amount">{TXN.amount}</span>
+              <span className="txn-val txn-amount">{amountText}</span>
             </div>
           </div>
 
-          {/* 評価フォーム / 送信済み画面 */}
-          {submitted === null ? (
+          {/* 評価フォーム / 送信済み画面 / 未完了案内（completed 以外は評価フォームを出さない） */}
+          {!isCompleted ? (
+            <div className="rate-card">
+              <div className="rate-card-title">
+                {isCancelled ? "この取引はキャンセルされました" : "取引が進行中です"}
+              </div>
+              <div className="rate-card-sub">
+                {isCancelled
+                  ? "キャンセルされた取引は評価できません。"
+                  : "作業完了後に業者を評価できます。進捗は案件詳細からご確認いただけます。"}
+              </div>
+              <Link
+                href={`/cases/${txn.case_id}`}
+                className="btn btn-primary btn-block btn-lg"
+                style={{ marginTop: 16 }}
+              >
+                案件詳細を見る
+              </Link>
+            </div>
+          ) : !showSubmittedScreen ? (
             <div className="rate-card">
               <div className="rate-card-title">業者を評価してください</div>
               <div className="rate-card-sub">
-                評価はほかのユーザーの業者選びに役立ちます。ぜひご協力ください（任意）。
+                評価はほかのユーザーの業者選びに役立ちます。ぜひご協力ください。
               </div>
 
               {/* スター選択 */}
@@ -189,30 +302,12 @@ export default function ReviewPage() {
                 {comment.length}/{MAX_COMMENT}文字
               </div>
 
-              {/* 公開設定 */}
-              <div className="publish-row">
-                <label className="publish-toggle">
-                  <input
-                    type="checkbox"
-                    checked={publish}
-                    onChange={(e) => setPublish(e.target.checked)}
-                    aria-label="評価をほかのユーザーに公開する"
-                  />
-                  <span className="toggle-slider" />
-                </label>
-                <span className="publish-label">
-                  評価をほかのユーザーに公開する
-                  <br />
-                  <span className="publish-note">名前は「田中 美○」のように一部伏字で表示されます</span>
-                </span>
-              </div>
-
               {/* アクション */}
               <div className="submit-area">
                 <button
                   type="button"
                   className="btn btn-primary btn-block btn-lg"
-                  disabled={busy}
+                  disabled={busy || star === 0}
                   onClick={submitReview}
                 >
                   {busy ? (
@@ -223,47 +318,21 @@ export default function ReviewPage() {
                     "評価を送信する"
                   )}
                 </button>
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-block"
-                  style={{ marginTop: 10 }}
-                  disabled={busy}
-                  onClick={skipReview}
-                >
-                  スキップする
-                </button>
               </div>
             </div>
           ) : (
             <div className="submitted-screen">
               <div className="submitted-ic">
-                {submitted.kind === "submitted" ? (
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M5 12.5l4.5 4.5L19 7" />
-                  </svg>
-                ) : (
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M5 11v-1a7 7 0 0114 0v1" />
-                    <path d="M12 3v4M9 13v3M15 13v3M12 13v5" />
-                    <path d="M6 13h12l-1 7H7z" />
-                  </svg>
-                )}
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M5 12.5l4.5 4.5L19 7" />
+                </svg>
               </div>
-              {submitted.kind === "submitted" ? (
-                <>
-                  <h2>評価を送信しました！</h2>
-                  <p>
-                    ご協力ありがとうございました。
-                    <br />
-                    評価は審査後に公開されます。
-                  </p>
-                </>
-              ) : (
-                <>
-                  <h2>ありがとうございました</h2>
-                  <p>またのご利用をお待ちしています。</p>
-                </>
-              )}
+              <h2>評価を送信しました！</h2>
+              <p>
+                ご協力ありがとうございました。
+                <br />
+                評価は投稿済みです。
+              </p>
             </div>
           )}
 
@@ -287,14 +356,14 @@ export default function ReviewPage() {
                   </svg>
                 </div>
               </Link>
-              <Link href="/applications" className="next-action-btn">
+              <Link href="/cases" className="next-action-btn">
                 <div className="next-action-ic" style={{ background: "#e8faf0", color: "var(--green)" }}>
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                   </svg>
                 </div>
                 <div className="next-action-body">
-                  <strong>申し込み状況を確認</strong>
+                  <strong>案件状況を確認</strong>
                   <span>他の出品の入札状況を見る</span>
                 </div>
                 <div className="next-action-arr">
@@ -310,5 +379,22 @@ export default function ReviewPage() {
 
       {toast ? <div className="kdz-toast">{toast}</div> : null}
     </div>
+  );
+}
+
+export default function ReviewPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="review-page">
+          <AppHeader unread />
+          <div className="flex min-h-[50vh] items-center justify-center">
+            <Spinner className="h-6 w-6 text-brand-600" />
+          </div>
+        </div>
+      }
+    >
+      <ReviewPageInner />
+    </Suspense>
   );
 }

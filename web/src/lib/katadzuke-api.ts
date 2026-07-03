@@ -138,6 +138,8 @@ export interface TransactionListItem {
   city: string;
   company_name: string | null;
   has_pending_reduction: boolean;
+  /** ユーザーが既にこの取引にレビュー（reviewer_type==="user"）を投稿済みか。 */
+  has_review: boolean;
 }
 
 export interface TransactionOut {
@@ -147,7 +149,10 @@ export interface TransactionOut {
   initial_amount: number;
   final_amount: number | null;
   fee_amount: number;
+  /** "YYYY-MM-DD" 形式（date型）。ISO日時ではないため new Date() でのUTC解釈は不可（JST日付がズレる）。 */
   visit_date: string | null;
+  /** 例: "10:00-12:00"。confirmSchedule で設定される訪問時間帯。未確定時は null。 */
+  visit_time_slot: string | null;
   status: TransactionStatus;
   created_at: string;
 }

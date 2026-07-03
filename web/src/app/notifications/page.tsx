@@ -3,20 +3,31 @@
 /**
  * 通知・お知らせ一覧。
  * デザイン: docs/design_handoff_katazuke/通知・お知らせ一覧.html を React 化。
- * - フィルタタブ（すべて/入札/メッセージ/システム）切替
- * - 未読カードは左ボーダー＋色付き円（タイトル先頭ドット）
- * - 「すべて既読にする」で未読→既読化（UIのみ・バックエンド未配線）
+ * 通知専用APIが無いため、案件/取引の実データからフロント側でサマリを導出する
+ * 「案B」構成に置換した（2026-07-03）。架空 NOTIFICATIONS 定数・フィルタタブは廃止。
  *
- * バックエンド未配線: 通知データはデモ用モック定数。既読化/LINE設定は UI 挙動のみ。
+ * サマリ3行:
+ *  - 入札が届いている案件 N件（listMyCases: bid_count>0 && status!==closed/cancelled → /cases）
+ *  - 進行中の取引 N件（listTransactions: pending|visiting → /cases/{case_id}）
+ *  - 評価待ちの取引 N件（listTransactions: completed → /review?transaction_id={id}）
  */
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { Spinner } from "@/components/Icon";
 import { AppHeader } from "@/components/kdz/AppHeader";
+import { useToken } from "@/components/kdz/Ui";
+import {
+  listMyCases,
+  listTransactions,
+  toDisplayMessage,
+  type CaseOut,
+  type TransactionListItem,
+} from "@/lib/katadzuke-api";
 import "./notifications.css";
 
-/* ── 通知アイコン（デザインHTMLの symbol を inline 化。共通スプライトと線形が異なるため自前で持つ） ── */
-type NotifIconName = "bid" | "chat" | "clock" | "check" | "star" | "truck" | "info" | "bell";
+/* ── アイコン（デザインHTMLの symbol を inline 化） ── */
+type NotifIconName = "bid" | "chat" | "star" | "bell";
 
 function NotifIcon({ name }: { name: NotifIconName }) {
   switch (name) {
@@ -32,39 +43,10 @@ function NotifIcon({ name }: { name: NotifIconName }) {
           <path d="M5 5h14a2 2 0 012 2v8a2 2 0 01-2 2H9l-4 4V7a2 2 0 012-2z" />
         </svg>
       );
-    case "clock":
-      return (
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="12" cy="12" r="9" />
-          <path d="M12 7v5l3 3" />
-        </svg>
-      );
-    case "check":
-      return (
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M5 12.5l4.5 4.5L19 7" />
-        </svg>
-      );
     case "star":
       return (
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-        </svg>
-      );
-    case "truck":
-      return (
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <rect x="1" y="3" width="15" height="13" rx="1" />
-          <path d="M16 8h4l3 4v4h-7V8z" />
-          <circle cx="5.5" cy="18.5" r="2.5" />
-          <circle cx="18.5" cy="18.5" r="2.5" />
-        </svg>
-      );
-    case "info":
-      return (
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="12" cy="12" r="9" />
-          <path d="M12 8v4M12 16h.01" />
         </svg>
       );
     case "bell":
@@ -85,189 +67,100 @@ function ArrowIcon() {
   );
 }
 
-/* ── 型・モックデータ ── */
-type FilterKey = "all" | "bid" | "msg" | "sys";
-type GroupKey = "today" | "yesterday" | "older";
-type Tone = "blue" | "green" | "warn" | "gray";
-
-type Notification = {
-  id: string;
-  type: Exclude<FilterKey, "all">;
-  group: GroupKey;
-  unread: false | "blue" | "green" | "warn"; // 未読時の左ボーダー/ドット色
+type SummaryRow = {
+  key: string;
   icon: NotifIconName;
-  iconTone: Tone;
+  iconTone: "blue" | "green" | "warn";
   title: string;
   text: string;
-  time: string;
   badgeLabel: string;
-  badgeTone: Tone;
   href: string;
 };
 
-const GROUP_LABEL: Record<GroupKey, string> = {
-  today: "今日",
-  yesterday: "昨日",
-  older: "先週",
-};
-const GROUP_ORDER: GroupKey[] = ["today", "yesterday", "older"];
-
-/* デモ用モック（明らかにデモ）。バックエンド未配線。 */
-const NOTIFICATIONS: Notification[] = [
-  {
-    id: "n1",
-    type: "bid",
-    group: "today",
-    unread: "blue",
-    icon: "bid",
-    iconTone: "blue",
-    title: "最高額の入札が届きました！",
-    text: "株式会社バリュー東京 から ¥54,000 の入札が届いています。期限まで残り1日です。早めにご確認ください。",
-    time: "14分前",
-    badgeLabel: "入札",
-    badgeTone: "blue",
-    href: "/result",
-  },
-  {
-    id: "n2",
-    type: "msg",
-    group: "today",
-    unread: "green",
-    icon: "chat",
-    iconTone: "green",
-    title: "リサイクル侍 からメッセージ",
-    text: "「ご連絡ありがとうございます！時計の詳細をもう少し教えていただけますか？モデル名や購入時期など…」",
-    time: "2時間前",
-    badgeLabel: "メッセージ",
-    badgeTone: "green",
-    href: "/chat/1",
-  },
-  {
-    id: "n3",
-    type: "bid",
-    group: "today",
-    unread: "warn",
-    icon: "clock",
-    iconTone: "warn",
-    title: "入札期限まで残り24時間",
-    text: "「家電・ブランド品まとめ 5点」の入札期限が明日の14:00に迫っています。3社から入札が届いています。",
-    time: "5時間前",
-    badgeLabel: "期限通知",
-    badgeTone: "warn",
-    href: "/result",
-  },
-  {
-    id: "n4",
-    type: "bid",
-    group: "yesterday",
-    unread: false,
-    icon: "bid",
-    iconTone: "blue",
-    title: "ハウスクリア関東 から入札が届きました",
-    text: "¥41,000 の入札が届いています。ご確認ください。",
-    time: "昨日 18:20",
-    badgeLabel: "入札",
-    badgeTone: "gray",
-    href: "/result",
-  },
-  {
-    id: "n5",
-    type: "sys",
-    group: "yesterday",
-    unread: false,
-    icon: "check",
-    iconTone: "green",
-    title: "出品が審査を通過しました",
-    text: "「家電・ブランド品まとめ 5点」が審査を通過し、業者への公開が開始されました。",
-    time: "昨日 10:05",
-    badgeLabel: "システム",
-    badgeTone: "gray",
-    href: "/applications",
-  },
-  {
-    id: "n6",
-    type: "sys",
-    group: "older",
-    unread: false,
-    icon: "star",
-    iconTone: "blue",
-    title: "取引が完了しました。評価をお願いします",
-    text: "グリーンリサイクル東京 との取引が完了しました。サービス品質の向上のため、ぜひ評価をお願いします。",
-    time: "6月21日",
-    badgeLabel: "取引完了",
-    badgeTone: "gray",
-    href: "/review",
-  },
-  {
-    id: "n7",
-    type: "sys",
-    group: "older",
-    unread: false,
-    icon: "truck",
-    iconTone: "green",
-    title: "訪問日時が確定しました",
-    text: "6月21日（土）13:00〜15:00 にグリーンリサイクル東京が訪問します。",
-    time: "6月19日",
-    badgeLabel: "日程確定",
-    badgeTone: "gray",
-    href: "/schedule",
-  },
-  {
-    id: "n8",
-    type: "sys",
-    group: "older",
-    unread: false,
-    icon: "info",
-    iconTone: "gray",
-    title: "カタヅケへようこそ！",
-    text: "アカウント登録が完了しました。さっそく不用品の出品を始めてみましょう。",
-    time: "6月15日",
-    badgeLabel: "システム",
-    badgeTone: "gray",
-    href: "/",
-  },
-];
-
-const TABS: { key: FilterKey; label: string }[] = [
-  { key: "all", label: "すべて" },
-  { key: "bid", label: "入札" },
-  { key: "msg", label: "メッセージ" },
-  { key: "sys", label: "システム" },
-];
-
 export default function NotificationsPage() {
-  const [filter, setFilter] = useState<FilterKey>("all");
-  // 既読化された通知ID集合（「すべて既読」押下で全未読を投入）。バックエンド未配線。
-  const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  const { token, loading } = useToken();
+  const [cases, setCases] = useState<CaseOut[] | null>(null);
+  const [transactions, setTransactions] = useState<TransactionListItem[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // 表示中の通知（フィルタ適用後）
-  const visible = useMemo(
-    () => NOTIFICATIONS.filter((n) => filter === "all" || n.type === filter),
-    [filter],
+  const reload = useCallback(async () => {
+    if (!token) return;
+    try {
+      setCases(await listMyCases(token));
+    } catch (e) {
+      setError(toDisplayMessage(e, "案件の取得に失敗しました"));
+    }
+    try {
+      setTransactions(await listTransactions(token));
+    } catch (e) {
+      setError((prev) => prev ?? toDisplayMessage(e, "取引の取得に失敗しました"));
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  const biddingCases = useMemo(
+    () =>
+      (cases ?? []).filter(
+        (c) => c.bid_count > 0 && c.status !== "closed" && c.status !== "cancelled",
+      ),
+    [cases],
+  );
+  const negotiatingTxns = useMemo(
+    () => (transactions ?? []).filter((t) => t.status === "pending" || t.status === "visiting"),
+    [transactions],
+  );
+  const reviewWaitingTxns = useMemo(
+    () => (transactions ?? []).filter((t) => t.status === "completed" && !t.has_review),
+    [transactions],
   );
 
-  // タブごとの未読バッジ数（既読化されたものは除外）
-  const unreadCount = useMemo(() => {
-    const count = (pred: (n: Notification) => boolean) =>
-      NOTIFICATIONS.filter((n) => pred(n) && n.unread !== false && !readIds.has(n.id)).length;
-    return {
-      all: count(() => true),
-      bid: count((n) => n.type === "bid"),
-      msg: count((n) => n.type === "msg"),
-      sys: count((n) => n.type === "sys"),
-    } satisfies Record<FilterKey, number>;
-  }, [readIds]);
-
-  const allRead = unreadCount.all === 0;
-
-  function markAllRead() {
-    if (allRead) return;
-    setReadIds(new Set(NOTIFICATIONS.map((n) => n.id)));
+  const rows: SummaryRow[] = [];
+  if (biddingCases.length > 0) {
+    rows.push({
+      key: "bidding",
+      icon: "bid",
+      iconTone: "blue",
+      title: "入札が届いている案件",
+      text: `${biddingCases.length}件の案件に業者からの入札が届いています。内容をご確認ください。`,
+      badgeLabel: "入札",
+      href: "/cases",
+    });
   }
+  if (negotiatingTxns.length > 0) {
+    rows.push({
+      key: "negotiating",
+      icon: "chat",
+      iconTone: "green",
+      title: "進行中の取引",
+      text: `${negotiatingTxns.length}件の取引が訪問日調整・訪問予定として進行中です。`,
+      badgeLabel: "進行中",
+      href: negotiatingTxns.length === 1 ? `/cases/${negotiatingTxns[0].case_id}` : "/cases",
+    });
+  }
+  if (reviewWaitingTxns.length > 0) {
+    rows.push({
+      key: "review",
+      icon: "star",
+      iconTone: "warn",
+      title: "評価待ちの取引",
+      text: `${reviewWaitingTxns.length}件の取引が完了しています。業者の評価にご協力ください。`,
+      badgeLabel: "評価待ち",
+      href:
+        reviewWaitingTxns.length === 1
+          ? `/review?transaction_id=${reviewWaitingTxns[0].id}`
+          : "/mypage",
+    });
+  }
+
+  const isLoading = loading || (!cases && !transactions && !error);
+  const sessionExpired = !loading && !token;
 
   return (
     <div className="notif-page">
-      <AppHeader unread={!allRead} />
+      <AppHeader unread={rows.length > 0} />
 
       <main id="main">
         <div className="notif-wrap">
@@ -284,94 +177,88 @@ export default function NotificationsPage() {
             </button>
           </div>
 
-          {/* ツールバー（タイトル + すべて既読） */}
           <div className="notif-toolbar">
             <h1 className="notif-toolbar-title">通知・お知らせ</h1>
-            <button
-              type="button"
-              className="btn-read-all"
-              onClick={markAllRead}
-              disabled={allRead}
+          </div>
+
+          {sessionExpired ? (
+            <div
+              role="alert"
+              style={{
+                marginBottom: 20,
+                padding: "12px 16px",
+                borderRadius: "var(--radius-s)",
+                background: "#fff5f5",
+                color: "#dc2626",
+                fontSize: 13,
+                border: "1px solid #fca5a5",
+              }}
             >
-              すべて既読にする
-            </button>
-          </div>
+              セッションが切れました。再ログインしてください。
+              <Link href="/login" style={{ marginLeft: 8, fontWeight: 700, textDecoration: "underline" }}>
+                ログインへ
+              </Link>
+            </div>
+          ) : null}
 
-          {/* フィルタタブ */}
-          <div className="notif-tabs">
-            {TABS.map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                className={`notif-tab${filter === tab.key ? " active" : ""}`}
-                onClick={() => setFilter(tab.key)}
-                aria-pressed={filter === tab.key}
-              >
-                {tab.label}
-                {unreadCount[tab.key] > 0 ? (
-                  <span className="tab-badge">{unreadCount[tab.key]}</span>
-                ) : null}
-              </button>
-            ))}
-          </div>
+          {error ? (
+            <div
+              role="alert"
+              style={{
+                marginBottom: 20,
+                padding: "12px 16px",
+                borderRadius: "var(--radius-s)",
+                background: "#fff5f5",
+                color: "#dc2626",
+                fontSize: 13,
+                border: "1px solid #fca5a5",
+              }}
+            >
+              {error}
+            </div>
+          ) : null}
 
-          {/* 通知一覧（グループごと） */}
-          <div id="notif-list">
-            {GROUP_ORDER.map((group) => {
-              const items = visible.filter((n) => n.group === group);
-              if (items.length === 0) return null;
-              return (
-                <div key={group} className="notif-group">
-                  <div className="notif-group-label">{GROUP_LABEL[group]}</div>
-                  {items.map((n) => {
-                    const isRead = n.unread === false || readIds.has(n.id);
-                    const unreadClass = isRead
-                      ? "read"
-                      : n.unread === "green"
-                        ? "unread-green"
-                        : n.unread === "warn"
-                          ? "unread-warn"
-                          : "unread";
-                    return (
-                      <Link key={n.id} href={n.href} className={`notif-card ${unreadClass}`}>
-                        <div className="notif-card-inner">
-                          <div className={`notif-icon ${n.iconTone}`}>
-                            <NotifIcon name={n.icon} />
-                          </div>
-                          <div className="notif-body">
-                            <div className="notif-title">{n.title}</div>
-                            <div className="notif-text">{n.text}</div>
-                            <div className="notif-meta">
-                              <span className="notif-time">{n.time}</span>
-                              <span className={`notif-badge ${n.badgeTone}`}>{n.badgeLabel}</span>
-                            </div>
-                          </div>
-                          <div className="notif-arrow">
-                            <ArrowIcon />
+          {sessionExpired ? null : isLoading ? (
+            <div className="flex min-h-[30vh] items-center justify-center">
+              <Spinner className="h-6 w-6 text-brand-600" />
+            </div>
+          ) : (
+            <div id="notif-list">
+              {rows.length > 0 ? (
+                <div className="notif-group">
+                  {rows.map((row) => (
+                    <Link key={row.key} href={row.href} className="notif-card unread">
+                      <div className="notif-card-inner">
+                        <div className={`notif-icon ${row.iconTone}`}>
+                          <NotifIcon name={row.icon} />
+                        </div>
+                        <div className="notif-body">
+                          <div className="notif-title">{row.title}</div>
+                          <div className="notif-text">{row.text}</div>
+                          <div className="notif-meta">
+                            <span className={`notif-badge ${row.iconTone}`}>{row.badgeLabel}</span>
                           </div>
                         </div>
-                      </Link>
-                    );
-                  })}
+                        <div className="notif-arrow">
+                          <ArrowIcon />
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
                 </div>
-              );
-            })}
-
-            {/* 空状態 */}
-            {visible.length === 0 ? (
-              <div className="notif-empty">
-                <div className="notif-empty-ic">
-                  <NotifIcon name="bell" />
+              ) : (
+                <div className="notif-empty">
+                  <div className="notif-empty-ic">
+                    <NotifIcon name="bell" />
+                  </div>
+                  <h3>新しいお知らせはありません</h3>
+                  <p>
+                    入札や取引が始まるとここに表示されます。
+                  </p>
                 </div>
-                <h3>通知はありません</h3>
-                <p>
-                  このカテゴリの通知はまだありません。
-                  <br />
-                  入札や取引が始まるとここに表示されます。
-                </p>
-              </div>
-            ) : null}
-          </div>
+              )}
+            </div>
+          )}
         </div>
       </main>
     </div>

@@ -260,6 +260,9 @@ class TransactionListItem(BaseModel):
     city: str
     company_name: str | None = None
     has_pending_reduction: bool = False
+    # ユーザー側レビュー（reviewer_type=='user'）が既に投稿済みかどうか（通知の恒久残存防止用）。
+    # 業者側レビューの有無は含めない（意味は固定契約: フロントは !has_review で評価待ち通知を判定）。
+    has_review: bool = False
 
 
 # ──────────────────────────── 減額申請 ────────────────────────────
