@@ -25,36 +25,34 @@ export default function Error({
   }, [error]);
 
   return (
-    <div className="nf-page">
-      <main className="nf-main">
-        <div className="nf-card">
-          <div className="nf-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="9" />
-              <path d="M12 7.5v5M12 16h.01" />
-            </svg>
-          </div>
-          <h1 className="nf-title">ページの表示中に問題が発生しました</h1>
-          <p className="nf-sub">
-            一時的な不具合の可能性があります。お手数ですが、もう一度お試しください。
-            <br />
-            解決しない場合はトップへ戻ってからアクセスし直してください。
-          </p>
-          {error.digest ? (
-            <p style={{ fontSize: 11, fontFamily: "ui-monospace,Menlo,Consolas,monospace", color: "var(--body-soft)", marginBottom: 20 }}>
-              ref: {error.digest}
-            </p>
-          ) : null}
-          <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-            <button type="button" onClick={() => reset()} className="btn btn-primary">
-              もう一度試す
-            </button>
-            <a href="/" className="btn btn-ghost">
-              トップへ戻る
-            </a>
-          </div>
+    <main className="nf-main">
+      <div className="nf-card">
+        <div className="nf-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7.5v5M12 16h.01" />
+          </svg>
         </div>
-      </main>
-    </div>
+        <h1 className="nf-title">ページの表示中に問題が発生しました</h1>
+        <p className="nf-sub">
+          一時的な不具合の可能性があります。お手数ですが、もう一度お試しください。
+          <br />
+          解決しない場合はトップへ戻ってからアクセスし直してください。
+        </p>
+        {error.digest ? (
+          <p style={{ fontSize: 11, fontFamily: "ui-monospace,Menlo,Consolas,monospace", color: "var(--body-soft)", marginBottom: 20 }}>
+            ref: {error.digest}
+          </p>
+        ) : null}
+        <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+          <button type="button" onClick={() => reset()} className="btn btn-primary">
+            もう一度試す
+          </button>
+          <a href="/" className="btn btn-ghost">
+            トップへ戻る
+          </a>
+        </div>
+      </div>
+    </main>
   );
 }

@@ -14,7 +14,7 @@
 
 import "../../operator-shared.css";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Spinner } from "@/components/Icon";
@@ -56,6 +56,41 @@ export default function OperatorTransactionPage() {
   const [comment, setComment] = useState("");
   const [modal, setModal] = useState<ModalState>(null);
   const [cancelReason, setCancelReason] = useState("");
+
+  // モーダルを開いたトリガー要素を保持し、閉じた際にフォーカスを戻す（アクセシビリティ対応）。
+  const modalTriggerRef = useRef<HTMLButtonElement | null>(null);
+  // 減額申請フォームの送信ボタン（モーダルを開くトリガー）。
+  const reductionSubmitRef = useRef<HTMLButtonElement | null>(null);
+  // 各モーダル内で最初にフォーカスすべき操作可能要素。
+  const reductionModalFirstFieldRef = useRef<HTMLButtonElement | null>(null);
+  const cancelModalFirstFieldRef = useRef<HTMLTextAreaElement | null>(null);
+
+  function closeModal() {
+    setModal(null);
+    modalTriggerRef.current?.focus();
+  }
+
+  // モーダルopen時にモーダル内の最初の操作可能要素へフォーカスを移す。
+  useEffect(() => {
+    if (modal?.kind === "reduction") {
+      reductionModalFirstFieldRef.current?.focus();
+    } else if (modal?.kind === "cancel") {
+      cancelModalFirstFieldRef.current?.focus();
+    }
+  }, [modal?.kind]);
+
+  // Escapeキー押下でモーダルを閉じる。
+  useEffect(() => {
+    if (!modal) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        closeModal();
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modal]);
 
   const reload = useCallback(async () => {
     if (!token) return;
@@ -124,6 +159,7 @@ export default function OperatorTransactionPage() {
       return;
     }
     setError(null);
+    modalTriggerRef.current = reductionSubmitRef.current;
     setModal({ kind: "reduction", amount: value, reason: reason.trim() });
   }
 
@@ -242,7 +278,7 @@ export default function OperatorTransactionPage() {
                   />
                   <p style={{ fontSize: 11.5, color: "var(--body-soft)", marginTop: 5 }}>お客様に表示されます。</p>
                 </div>
-                <button type="submit" disabled={busy} className="btn btn-primary">
+                <button type="submit" ref={reductionSubmitRef} disabled={busy} className="btn btn-primary">
                   減額を申請する
                 </button>
               </form>
@@ -261,7 +297,8 @@ export default function OperatorTransactionPage() {
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => {
+                onClick={(e) => {
+                  modalTriggerRef.current = e.currentTarget;
                   setCancelReason("");
                   setModal({ kind: "cancel" });
                 }}
@@ -320,8 +357,8 @@ export default function OperatorTransactionPage() {
       {/* ===== 減額申請 確認モーダル（B-2: window.confirm を置換） ===== */}
       <div className={`modal-overlay${modal?.kind === "reduction" ? " show" : ""}`}>
         {modal?.kind === "reduction" && (
-          <div className="modal-card">
-            <h2 className="modal-title">減額を申請しますか？</h2>
+          <div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="reductionModalTitle">
+            <h2 className="modal-title" id="reductionModalTitle">減額を申請しますか？</h2>
             <p className="modal-sub">お客様の承認後に金額が確定します。承認されるまでは現在の金額のままです。</p>
             <div className="modal-biz">
               <div className="modal-biz-avatar" style={{ background: "var(--gold, #b9892f)" }}>
@@ -333,7 +370,7 @@ export default function OperatorTransactionPage() {
               </div>
             </div>
             <div className="modal-actions">
-              <button type="button" className="btn-modal-cancel" onClick={() => setModal(null)} disabled={busy}>
+              <button type="button" ref={reductionModalFirstFieldRef} className="btn-modal-cancel" onClick={closeModal} disabled={busy}>
                 戻る
               </button>
               <button
@@ -343,7 +380,7 @@ export default function OperatorTransactionPage() {
                 onClick={() =>
                   act(async () => {
                     await createReduction(txn.id, { requested_amount: modal.amount, reason: modal.reason }, token!);
-                    setModal(null);
+                    closeModal();
                     setRequestedAmount("");
                     setReason("");
                   })
@@ -359,14 +396,15 @@ export default function OperatorTransactionPage() {
       {/* ===== キャンセル確認モーダル（B-2: window.prompt を置換） ===== */}
       <div className={`modal-overlay${modal?.kind === "cancel" ? " show" : ""}`}>
         {modal?.kind === "cancel" && (
-          <div className="modal-card">
-            <h2 className="modal-title">本当にキャンセルしますか？</h2>
+          <div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="cancelModalTitle">
+            <h2 className="modal-title" id="cancelModalTitle">本当にキャンセルしますか？</h2>
             <p className="modal-sub">
               <strong>業者都合のキャンセルは記録され、アカウント評価に影響します。</strong>
               <br />
               理由を入力してください。
             </p>
             <textarea
+              ref={cancelModalFirstFieldRef}
               className="modal-textarea"
               placeholder="キャンセル理由（必須）"
               value={cancelReason}
@@ -374,7 +412,7 @@ export default function OperatorTransactionPage() {
               rows={3}
             />
             <div className="modal-actions">
-              <button type="button" className="btn-modal-cancel" onClick={() => setModal(null)} disabled={busy}>
+              <button type="button" className="btn-modal-cancel" onClick={closeModal} disabled={busy}>
                 戻る
               </button>
               <button
@@ -384,7 +422,7 @@ export default function OperatorTransactionPage() {
                 onClick={() =>
                   act(async () => {
                     await cancelTransaction(txn.id, cancelReason.trim(), token!);
-                    setModal(null);
+                    closeModal();
                     setCancelReason("");
                   })
                 }
