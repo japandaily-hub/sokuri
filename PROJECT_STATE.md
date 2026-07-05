@@ -1,5 +1,15 @@
 # PROJECT_STATE — カタヅケ クローズドβ
 
+## ✅ 2026-07-06 業者/admin/エラー系導線 デザイン統一パッチ適用（zip指示書・strategy-agents Leader・/loop自走）
+- **入力**: ユーザー提供zip`design_handoff_operator_flow_fixes/`（2026-07-05導線別レビューB/C/A計10件の是正コード。README.md=指示書）。
+- **適用**: 新規5+変更16=21ファイルを`web/src`へ適用（commit `1ebdcad`）。パッチが想定していた`app/cases/cases.css`が正典に未実装だったため、`operator-shared.css`に`.lot-card`/`.status-chip`/`.modal-overlay`等の実体スタイルを自己完結で追加。CSSコメント誤爆（`.modal-*/`→コメント早期終了でcssnano全体崩壊）も検出・修正。
+- **内容**: OperatorHeader共通化(B-5)・業者ログイン/登録のAuthBar統一(B-3)・案件/取引画面のkatazukeトークン移植(B-1)・キャンセル/減額のwindow.confirm→ブランドモーダル化(B-2)・通知ベル誤リンク修正(B-4、以前は`/notifications`でmiddlewareに弾かれていた)・SiteChrome BARE_PREFIXESに`/cases`・`/admin`追加(C-1)・error.tsxを404意匠に統一(A-1)・unsubscribe再スキン(A-2)・analyzing/condition孤立レガシーをredirect化(A-3)。
+- **検証フロー**: frontend(適用+tsc/build green・41ルート)→security-reviewer(Critical/High無し)∥qa-reviewer(独立tsc/build再実行込み・Medium1件検出=モーダルにaria-modal/role/フォーカス制御が皆無)→frontend是正(commit `3022a7b`)→tsc/build再green。
+- **ブラウザ実機確認**（backend=`run_local_e2e.py`:8000+web=本番ビルド:3100、e2e-op/e2e-admin seedアカウント。`.claude/launch.json`に`katazuke-backend`エントリ追加）: signup/login/dashboard/cases(空状態)/transactions一覧・詳細/admin(bare chrome確認・LINEドック等マーケchrome非表示)/unsubscribe(`.done-circle`緑確認)/analyzing→condition→create→loginリダイレクト連鎖/920px hamburger開閉、いずれもconsole・serverエラー0。**未確認(seedデータにアクティブ案件・未完了取引が無いため)**: `/operator/cases/[id]`の入札送信・`/operator/transactions/[id]`のキャンセル/減額モーダルの実クリック・`error.tsx`の強制発火表示。いずれもコードレビュー(security+qa+リーダー自身の読解)では問題なしと確認済み。
+- **フォローアップ（本パッチのスコープ外・spawn_task `task_ab009ee7`）**: `OperatorHeader`の「ログアウト」リンクがトークンを破棄せず`/operator/login`へ遷移するのみ（本パッチ以前から存在する既存不具合）。
+- **gate_status**: build=GREEN(41ルート) / typecheck=GREEN / security=レビュー済（Critical/High=0、Low3件は既存事項） / QA=レビュー済（Medium是正済、Low2件は次点） / ブラウザ実機=12項目中9項目確認・3項目はコードレビューのみ
+- **未push**（ブランチ`feat/design-handoff-katazuke`、`83e60cd`→`1ebdcad`→`3022a7b`）。無関係な既存未追跡ファイル(`.kdz-status.txt`/`kdz-commit.ps1`/`test-room.jpg`)は不変。mainマージ・デプロイ・pushはユーザー承認事項のため未実施。
+
 ## 🎨 2026-06-27〜 デザインハンドオフ実装（/loop 自走・strategy-agents Leader）
 - **ブランチ**: `feat/design-handoff-katazuke`（main=本番には未マージ。デプロイはユーザー承認操作のため自動実行しない）
 - **タスク**: 新デザインハンドオフ（`docs/design_handoff_katazuke/` 33画面・高忠実度）を `web/` にピクセル忠実実装。DoD正本=リポジトリ直下 `KATAZUKE_REDESIGN_PLAN.md`。
