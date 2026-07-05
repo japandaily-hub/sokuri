@@ -1,18 +1,24 @@
 "use client";
 
-/** 業者: 案件詳細 + 入札フォーム。住所詳細はマスクされている。 */
+/**
+ * 業者: 案件詳細 + 入札フォーム（/operator/cases/[id]）。
+ *
+ * デザインレビュー B-1 対応: 旧 Tailwind/slate 実装を廃し、ダッシュボード・共通フォーム
+ * （katazuke-pages.css の .form-card/.field/.btn）と同じ視覚言語に統一。
+ * .listing-card/.op-card/.my-bid-card 等は operator-shared.css に定義済み。
+ * OperatorHeader を追加しナビ不能だった問題も解消。
+ * 機能ロジック（getCaseMasked・createBid）は変更していない。住所詳細はマスク済み。
+ */
+
+import "../../operator-shared.css";
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import { Spinner } from "@/components/Icon";
-import {
-  Card,
-  Notice,
-  StatusBadge,
-  btnPrimary,
-  inputBase,
-  useToken,
-} from "@/components/kdz/Ui";
+import { OperatorHeader } from "@/components/kdz/OperatorHeader";
+import { Ic } from "@/components/kdz/Icons";
+import { useToken } from "@/components/kdz/Ui";
 import { DisclosureNotice } from "@/components/kdz/DisclosureNotice";
 import {
   CASE_STATUS_LABEL,
@@ -23,6 +29,12 @@ import {
   toDisplayMessage,
   type CaseMasked,
 } from "@/lib/katadzuke-api";
+
+const MY_BID_STATUS_LABEL: Record<string, string> = {
+  pending: "選定待ち",
+  selected: "落札",
+  rejected: "未選定",
+};
 
 export default function OperatorCaseDetailPage() {
   const params = useParams<{ id: string }>();
@@ -70,151 +82,165 @@ export default function OperatorCaseDetailPage() {
 
   if (loading || (!caseData && !error)) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <Spinner className="h-6 w-6 text-brand-600" />
+      <div className="case-detail-page">
+        <OperatorHeader active="cases" />
+        <div style={{ display: "flex", minHeight: "50vh", alignItems: "center", justifyContent: "center" }}>
+          <Spinner className="h-6 w-6 text-brand-600" />
+        </div>
       </div>
     );
   }
 
   if (!caseData) {
     return (
-      <div className="container-aw max-w-3xl py-10">
-        <Notice tone="error">{error ?? "案件が見つかりません。"}</Notice>
+      <div className="case-detail-page">
+        <OperatorHeader active="cases" />
+        <div className="op-wrap narrow">
+          <div className="op-alert error">{error ?? "案件が見つかりません。"}</div>
+        </div>
       </div>
     );
   }
 
-  const canBid =
-    (caseData.status === "open" || caseData.status === "bidding") && !caseData.my_bid;
+  const canBid = (caseData.status === "open" || caseData.status === "bidding") && !caseData.my_bid;
 
   return (
-    <div className="container-aw max-w-3xl space-y-6 py-10">
-      {error ? <Notice tone="error">{error}</Notice> : null}
+    <div className="case-detail-page">
+      <OperatorHeader active="cases" />
+      <main id="main">
+        <div className="op-wrap narrow">
+          {error ? <div className="op-alert error">{error}</div> : null}
 
-      <Card>
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-bold text-slate-900">{caseData.purpose}</h1>
-            <p className="mt-1 text-sm text-slate-500">
-              {caseData.prefecture} {caseData.city}
-              <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-400">
-                詳細住所は落札後に開示
-              </span>
-            </p>
-            <p className="mt-0.5 text-xs text-slate-400">
-              {caseData.housing_type ?? "—"} / {caseData.floor_plan ?? "—"} /{" "}
-              {caseData.floor_number != null ? `${caseData.floor_number}階` : "階数—"} / EV
-              {caseData.has_elevator == null ? "—" : caseData.has_elevator ? "あり" : "なし"}
-            </p>
-          </div>
-          <StatusBadge value={caseData.status} label={CASE_STATUS_LABEL[caseData.status]} />
-        </div>
-
-        <div className="mt-4">
-          {/* 連絡先開示ルールの明記（実データ配線は今後対応。現状は成約前の文言で固定） */}
-          <DisclosureNotice viewer="operator" disclosed={false} awaitingApproval={false} />
-        </div>
-
-        {caseData.photos.length > 0 && (
-          <ul className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {caseData.photos.map((p) => (
-              <li key={p.id}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={photoSrc(p.url)}
-                  alt=""
-                  className="aspect-square w-full rounded-xl border border-slate-200 object-cover"
-                />
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {caseData.ai_summary ? (
-          <div className="mt-4 rounded-xl bg-slate-50 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">AI 要約</p>
-            <p className="mt-1.5 text-sm leading-relaxed text-slate-700">{caseData.ai_summary}</p>
-          </div>
-        ) : null}
-      </Card>
-
-      {/* 入札フォーム / 自社入札状況 */}
-      {caseData.my_bid ? (
-        <Card>
-          <h2 className="font-bold text-slate-900">自社の入札</h2>
-          <p className="mt-2 text-lg font-bold text-brand-700">
-            {formatYen(caseData.my_bid.amount)}
-            <StatusBadge
-              value={caseData.my_bid.status}
-              label={
-                { pending: "選定待ち", selected: "落札", rejected: "未選定" }[
-                  caseData.my_bid.status
-                ]
-              }
-            />
-          </p>
-          {caseData.my_bid.message ? (
-            <p className="mt-2 text-sm text-slate-600">{caseData.my_bid.message}</p>
-          ) : null}
-          {caseData.my_bid.status === "selected" && caseData.my_bid.transaction_id ? (
-            <a
-              href={`/operator/transactions/${caseData.my_bid.transaction_id}`}
-              className={`${btnPrimary} mt-4`}
+          {/* ===== 案件サマリー ===== */}
+          <div className="listing-card">
+            <div className="listing-thumbs">
+              {caseData.photos.slice(0, 2).map((p) => (
+                <div className="listing-thumb" key={p.id}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={photoSrc(p.url)} alt="" />
+                </div>
+              ))}
+              {caseData.photos.length > 2 ? (
+                <div className="listing-more">+{caseData.photos.length - 2}</div>
+              ) : null}
+            </div>
+            <div className="listing-info">
+              <div className="listing-title">{caseData.purpose}</div>
+              <div className="listing-meta">
+                {caseData.prefecture} {caseData.city}（詳細住所は落札後に開示）
+              </div>
+              <div className="listing-meta">
+                {caseData.housing_type ?? "—"} / {caseData.floor_plan ?? "—"} /{" "}
+                {caseData.floor_number != null ? `${caseData.floor_number}階` : "階数—"} / EV
+                {caseData.has_elevator == null ? "—" : caseData.has_elevator ? "あり" : "なし"}
+              </div>
+            </div>
+            <div
+              className={`listing-status-badge ${
+                caseData.status === "closed" ? "badge-done" : caseData.bid_count > 0 ? "badge-active" : "badge-waiting"
+              }`}
             >
-              落札管理へ（住所詳細を確認）
-            </a>
-          ) : null}
-        </Card>
-      ) : canBid ? (
-        <Card>
-          <h2 className="font-bold text-slate-900">入札する</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            買取額と回収費用を踏まえた「お客様への提示額」を入力してください。
-            入札は 1 案件につき 1 回のみです。
-          </p>
-          <form onSubmit={submitBid} className="mt-4 space-y-4">
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-slate-700">
-                提示額（円） <span className="text-red-500">*</span>
-              </span>
-              <input
-                type="number"
-                required
-                min={1}
-                step={1000}
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className={inputBase}
-                placeholder="50000"
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-slate-700">
-                メッセージ（任意・お客様に表示されます）
-              </span>
-              <textarea
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                rows={3}
-                className={inputBase}
-                placeholder="搬出経路の確認のため、当日は2名で伺います。"
-              />
-            </label>
-            <button type="submit" disabled={busy} className={btnPrimary}>
-              {busy ? "送信中…" : "この金額で入札する"}
-            </button>
-          </form>
-        </Card>
-      ) : (
-        <Notice tone="info">この案件は入札を受け付けていません。</Notice>
-      )}
+              {CASE_STATUS_LABEL[caseData.status]}
+            </div>
+          </div>
 
-      <a
-        href="/operator/cases"
-        className="inline-block text-sm font-semibold text-brand-700 hover:underline"
-      >
-        ← 案件一覧へ
-      </a>
+          <div className="op-card">
+            <DisclosureNotice viewer="operator" disclosed={false} awaitingApproval={false} />
+          </div>
+
+          {caseData.photos.length > 0 ? (
+            <div className="op-card">
+              <h2>お預かりしている写真</h2>
+              <div className="op-photo-grid">
+                {caseData.photos.map((p) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={photoSrc(p.url)} alt="" key={p.id} />
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {caseData.ai_summary ? (
+            <div className="op-card">
+              <p className="op-ai-summary">AI要約</p>
+              <p>{caseData.ai_summary}</p>
+            </div>
+          ) : null}
+
+          {/* ===== 入札フォーム / 自社入札状況 ===== */}
+          {caseData.my_bid ? (
+            <div className="op-card my-bid-card">
+              <h2 style={{ marginBottom: 0 }}>自社の入札</h2>
+              <div className="amount">
+                <span>¥</span>
+                {formatYen(caseData.my_bid.amount).replace("円", "")}
+              </div>
+              <span className={`status-chip ${caseData.my_bid.status === "selected" ? "bidding" : caseData.my_bid.status === "rejected" ? "done" : "negotiating"}`}>
+                {MY_BID_STATUS_LABEL[caseData.my_bid.status]}
+              </span>
+              {caseData.my_bid.message ? <p className="comment">{caseData.my_bid.message}</p> : null}
+              {caseData.my_bid.status === "selected" && caseData.my_bid.transaction_id ? (
+                <Link
+                  href={`/operator/transactions/${caseData.my_bid.transaction_id}`}
+                  className="btn btn-primary"
+                  style={{ marginTop: 16, display: "inline-flex" }}
+                >
+                  落札管理へ（住所詳細を確認）
+                  <Ic name="arrow" className="arw" />
+                </Link>
+              ) : null}
+            </div>
+          ) : canBid ? (
+            <form className="form-card" onSubmit={submitBid}>
+              <h2 style={{ fontFamily: "var(--head)", fontSize: 15, fontWeight: 700, color: "var(--navy)", marginBottom: 4 }}>
+                入札する
+              </h2>
+              <p style={{ fontSize: 13, color: "var(--body-soft)", marginBottom: 18, lineHeight: 1.8 }}>
+                買取額と回収費用を踏まえた「お客様への提示額」を入力してください。入札は1案件につき1回のみです。
+              </p>
+              <div className="field">
+                <label htmlFor="bidAmount">
+                  提示額（円） <span className="req">必須</span>
+                </label>
+                <div className="yen-input-wrap">
+                  <span className="yen-prefix">¥</span>
+                  <input
+                    id="bidAmount"
+                    type="number"
+                    required
+                    min={1}
+                    step={1000}
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="50000"
+                  />
+                </div>
+              </div>
+              <div className="field">
+                <label htmlFor="bidMessage">
+                  メッセージ <span className="opt">任意・お客様に表示されます</span>
+                </label>
+                <textarea
+                  id="bidMessage"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  rows={3}
+                  placeholder="搬出経路の確認のため、当日は2名で伺います。"
+                />
+              </div>
+              <button type="submit" disabled={busy} className="btn btn-primary btn-block">
+                {busy ? "送信中…" : "この金額で入札する"}
+              </button>
+            </form>
+          ) : (
+            <div className="op-alert info">この案件は入札を受け付けていません。</div>
+          )}
+
+          <Link href="/operator/cases" style={{ display: "inline-block", marginTop: 8, fontSize: 13.5, fontWeight: 700, color: "var(--blue)" }}>
+            ← 案件一覧へ
+          </Link>
+        </div>
+      </main>
     </div>
   );
 }

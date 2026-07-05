@@ -22,7 +22,7 @@ import "./profile.css";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Ic, type IcName } from "@/components/kdz/Icons";
-import { KdzLogo } from "@/components/kdz/Logo";
+import { OperatorHeader } from "@/components/kdz/OperatorHeader";
 import { useToken } from "@/components/kdz/Ui";
 import {
   getOperatorProfile,
@@ -30,14 +30,6 @@ import {
   updateOperatorProfile,
   type OperatorProfile,
 } from "@/lib/katadzuke-api";
-
-/* ---- 業者ナビ（本番ルート） ---- */
-const NAV: { href: string; label: string; active?: boolean }[] = [
-  { href: "/operator", label: "ダッシュボード" },
-  { href: "/operator/cases", label: "案件一覧" },
-  { href: "/operator/transactions", label: "取引" },
-  { href: "/operator/profile", label: "プロフィール", active: true },
-];
 
 /* ---- 対応エリア（東京・千葉・埼玉・神奈川が稼働、他は準備中） ---- */
 const AREAS: { name: string; soon?: boolean }[] = [
@@ -101,6 +93,12 @@ const EMPTY_STATE: ProfileState = {
   },
 };
 
+/** 星文字列（塗り★ + 空☆）。デザインレビュー M-4 対応: /vendors/[id] と同じロジックを共有。 */
+function starString(rating: number): string {
+  const filled = Math.round(rating);
+  return "★".repeat(filled) + "☆".repeat(Math.max(0, 5 - filled));
+}
+
 /** バックエンドの OperatorProfile → 編集フォーム状態へ変換。 */
 function toFormState(p: OperatorProfile): ProfileState {
   return {
@@ -156,7 +154,6 @@ export default function OperatorProfilePage() {
   const [state, setState] = useState<ProfileState>(EMPTY_STATE);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [navOpen, setNavOpen] = useState(false);
 
   /* ---- トースト ---- */
   const [toast, setToast] = useState<string | null>(null);
@@ -285,50 +282,10 @@ export default function OperatorProfilePage() {
 
   return (
     <div className="op-profile">
-      {/* ===== 業者ヘッダー（operator 独自） ===== */}
-      <header className="op-header">
-        <div className="container op-header-inner">
-          <Link href="/operator" className="op-brand" aria-label="カタヅケ 業者ダッシュボードへ">
-            <KdzLogo size={20} />
-            <span className="op-brand-tag">BUYER</span>
-          </Link>
-
-          <nav className={`op-nav${navOpen ? " open" : ""}`} aria-label="業者メニュー">
-            {NAV.map((n) => (
-              <Link
-                key={n.href}
-                href={n.href}
-                className={n.active ? "active" : undefined}
-                aria-current={n.active ? "page" : undefined}
-                onClick={() => setNavOpen(false)}
-              >
-                {n.label}
-              </Link>
-            ))}
-          </nav>
-
-          <div className="op-header-right">
-            <div className="op-user">
-              <span className="op-user-avatar" aria-hidden="true">
-                {avatarInitial}
-              </span>
-              <span className="op-user-name">{companyName || "業者アカウント"}</span>
-            </div>
-            <Link href="/operator/login" className="op-logout">
-              ログアウト
-            </Link>
-            <button
-              type="button"
-              className="op-nav-toggle"
-              aria-label="メニュー"
-              aria-expanded={navOpen}
-              onClick={() => setNavOpen((v) => !v)}
-            >
-              <Ic name="menu" />
-            </button>
-          </div>
-        </div>
-      </header>
+      {/* ===== 業者ヘッダー（共通 OperatorHeader）=====
+          デザインレビュー B-5 対応: ダッシュボードと別実装だった独自ヘッダーを
+          components/kdz/OperatorHeader.tsx へ統合。 */}
+      <OperatorHeader active="profile" companyName={companyName} />
 
       {/* ===== ヒーロー ===== */}
       <div className="prof-hero">
@@ -598,6 +555,29 @@ export default function OperatorProfilePage() {
 
           {/* ===== 右：サイドバー ===== */}
           <aside className="sidebar">
+            {/* 評価サマリー（読み取り専用。デザインレビュー M-4 対応: 正典の score-row/stars を
+                読み取り専用サマリーとして復元。詳細な評価分布・口コミは /vendors/[id] に集約） */}
+            <section className="prof-card flush">
+              <div className="prof-card-head">
+                <h2>評価サマリー</h2>
+                <span className="head-sub">ユーザーからの評価</span>
+              </div>
+              <div className="prof-card-body">
+                {profile.rating != null ? (
+                  <div className="rating-summary">
+                    <div className="rating-summary-stars">{starString(profile.rating)}</div>
+                    <div className="rating-summary-num">{profile.rating.toFixed(1)}</div>
+                  </div>
+                ) : (
+                  <p className="preview-empty">まだ評価がありません。取引が完了すると表示されます。</p>
+                )}
+                <Link href={`/vendors/${profile.operator_id}`} className="rating-summary-link">
+                  口コミを見る
+                  <Ic name="arrow" />
+                </Link>
+              </div>
+            </section>
+
             {/* ライブプレビュー */}
             <section className="prof-card flush">
               <div className="prof-card-head">

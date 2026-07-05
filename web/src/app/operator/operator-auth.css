@@ -1,0 +1,51 @@
+/* ============================================================
+   業者認証（/operator/login, /operator/signup）固有スタイル
+   デザインレビュー B-3 対応: 旧 slate 系 AuthCard を廃し、ユーザー側 /login・/signup と
+   同じ auth-page/auth-card/Field（katazuke-pages.css）へ統一するための追加分のみ。
+   共通クラス（.auth-page/.auth-card/.field/.btn 等）はここで再定義しない。
+   ============================================================ */
+
+.operator-auth .buyer-tag {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: var(--blue);
+  background: var(--pale);
+  border: 1px solid #d8e2fb;
+  border-radius: 99px;
+  padding: 3px 11px;
+  margin-bottom: 10px;
+}
+
+/* 招待コード（任意・アコーディオン表示） */
+.operator-auth .invite-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--blue);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 4px;
+}
+.operator-auth .invite-toggle:hover { text-decoration: underline; }
+.operator-auth .invite-hint { font-size: 12px; color: var(--body-soft); margin-top: 6px; line-height: 1.6; }
+.operator-auth .invite-note {
+  background: var(--pale);
+  color: var(--blue);
+  border-radius: var(--radius-s);
+  padding: 10px 14px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  margin-bottom: 18px;
+}
+
+/* 利用規約同意 */
+.operator-auth .agree-row { display: flex; align-items: flex-start; gap: 10px; margin: 18px 0; }
+.operator-auth .agree-cb { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--blue); margin-top: 2px; cursor: pointer; }
+.operator-auth .agree-row label { font-size: 13px; color: var(--body); line-height: 1.75; cursor: pointer; }
+.operator-auth .agree-row a { color: var(--blue); font-weight: 600; }

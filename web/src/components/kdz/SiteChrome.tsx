@@ -26,7 +26,15 @@ const BARE_PREFIXES = [
   "/schedule",
   "/review",
   "/result",
+  // デザインレビュー H-1 対応: /cases も他のログイン後アプリ画面と同様に
+  // 独自 AppHeader を描くため、マーケ用 SiteHeader/Dock/フッターを抑止する。
+  "/cases",
+  // デザインレビュー C-1 対応: /admin も内部ツール画面としてマーケ用
+  // SiteHeader/Dock/フッター（LINEではじめる CTA）を抑止する。
+  "/admin",
 ];
+
+export { BARE_PREFIXES };
 
 export function SiteChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "/";

@@ -1,0 +1,50 @@
+/* ============================================================
+   配信停止（/unsubscribe）固有スタイル
+   デザインレビュー A-2 対応: 旧 slate 意匠を廃し、完了系画面（signup/create-complete）と
+   同じ done-circle（green）+ 共通 .form-card の語彙に統一。
+   ============================================================ */
+.unsub-page {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: clamp(48px, 8vw, 96px) 20px;
+  text-align: center;
+}
+.unsub-page .done-circle {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #d1fae5;
+  margin: 0 auto 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.unsub-page .done-circle svg {
+  width: 30px;
+  height: 30px;
+  fill: none;
+  stroke: var(--green);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.unsub-page h1 {
+  font-size: 21px;
+  margin-bottom: 14px;
+}
+.unsub-page p {
+  font-size: 14px;
+  color: var(--body-soft);
+  line-height: 1.85;
+  margin-top: 10px;
+}
+.unsub-page .unsub-footnote {
+  margin-top: 24px;
+  font-size: 12.5px;
+  color: var(--body-soft);
+}
+.unsub-page .unsub-footnote a {
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

@@ -4,6 +4,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Spinner } from "@/components/Icon";
+import { AppHeader } from "@/components/kdz/AppHeader";
 import {
   Card,
   Notice,
@@ -111,7 +112,7 @@ export default function AdminPage() {
     const header = "code,lot_name,created_at";
     const rows = result.codes.map((c) => `${c},${result.lot_name ?? ""},${now}`);
     const csv = [header, ...rows].join("\n");
-    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -148,14 +149,19 @@ export default function AdminPage() {
 
   if (loading || (!invites && !error)) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <Spinner className="h-6 w-6 text-brand-600" />
+      <div className="admin-page">
+        <AppHeader unread={false} />
+        <div className="flex min-h-[50vh] items-center justify-center">
+          <Spinner className="h-6 w-6 text-brand-600" />
+        </div>
       </div>
     );
   }
 
   return (
-    <PageShell title="管理画面" description="業者招待コードの発行・アカウント承認・セル密度を管理します。">
+    <div className="admin-page">
+      <AppHeader unread={false} />
+      <PageShell title="管理画面" description="業者招待コードの発行・アカウント承認・セル密度を管理します。">
       {error ? (
         <div className="mb-4">
           <Notice tone="error">{error}</Notice>
@@ -397,5 +403,6 @@ export default function AdminPage() {
         </Card>
       </div>
     </PageShell>
+    </div>
   );
 }

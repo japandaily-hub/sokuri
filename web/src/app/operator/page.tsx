@@ -28,7 +28,7 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Ic, type IcName } from "@/components/kdz/Icons";
-import { KdzLogo } from "@/components/kdz/Logo";
+import { OperatorHeader } from "@/components/kdz/OperatorHeader";
 import { Spinner } from "@/components/Icon";
 import { useToken } from "@/components/kdz/Ui";
 import {
@@ -352,50 +352,15 @@ export default function OperatorDashboardPage() {
     { key: "done", icon: "check", label: "成約済み", badge: doneTxns.length, gray: true },
   ];
 
-  const NAV: { href: string; label: string; icon: IcName; active?: boolean }[] = [
-    { href: "/operator", label: "ダッシュボード", icon: "menu", active: true },
-    { href: "/operator/cases", label: "案件一覧", icon: "box" },
-    { href: "/operator/transactions", label: "取引", icon: "trend" },
-    { href: "/operator/profile", label: "プロフィール", icon: "people" },
-  ];
-
-  const isLoading = loading || (!cases && !error && !pendingApproval);
+    const isLoading = loading || (!cases && !error && !pendingApproval);
 
   return (
     <div className="op-dash">
-      {/* ---------- ヘッダー（業者独自） ---------- */}
-      <header className="biz-header">
-        <Link href="/" className="biz-header-logo" aria-label="カタヅケ トップへ">
-          <KdzLogo size={20} />
-        </Link>
-        <span className="biz-header-sep" aria-hidden="true" />
-        <span className="biz-header-title">業者ダッシュボード</span>
-
-        <nav className="biz-nav" aria-label="業者メニュー">
-          {NAV.map((n) => (
-            <Link key={n.href} href={n.href} className={`biz-nav-link${n.active ? " active" : ""}`}>
-              <Ic name={n.icon} />
-              {n.label}
-            </Link>
-          ))}
-        </nav>
-
-        <div className="biz-header-right">
-          <Link href="/notifications" className="notif-btn" aria-label="通知・お知らせ">
-            <Ic name="chat" />
-            <span className="notif-dot" />
-          </Link>
-          {companyName ? (
-            <span className="biz-header-co">
-              <span className="co-dot">{companyName.slice(0, 1)}</span>
-              <span className="biz-header-co-name">{companyName}</span>
-            </span>
-          ) : null}
-          <Link href="/operator/login" className="biz-logout">
-            ログアウト
-          </Link>
-        </div>
-      </header>
+      {/* ---------- ヘッダー（業者共通・OperatorHeader） ----------
+          デザインレビュー B-4/B-5 対応: 通知ベルが /notifications（ユーザー専用）に
+          リンクされ middleware に弾かれていた問題と、プロフィール画面と別実装だった
+          ヘッダーを、共通コンポーネントへの統合で解消。 */}
+      <OperatorHeader active="dashboard" companyName={companyName} hasAttention={negotiatingTxns.length > 0} />
 
       {isLoading ? (
         <div className="flex min-h-[50vh] items-center justify-center">

@@ -13,70 +13,10 @@
   color: var(--body);
 }
 
-/* ---------- ヘッダー（業者独自） ---------- */
-.op-dash .biz-header {
-  height: 60px;
-  border-bottom: 1px solid var(--line);
-  display: flex;
-  align-items: center;
-  padding: 0 24px;
-  gap: 16px;
-  background: #fff;
-  position: sticky;
-  top: 0;
-  z-index: 50;
-}
-.op-dash .biz-header-logo { display: inline-flex; align-items: center; }
-.op-dash .biz-header-sep { width: 1px; height: 20px; background: var(--line); margin: 0 4px; }
-.op-dash .biz-header-title { font-size: 13.5px; font-weight: 700; color: var(--body-soft); }
-
-/* ナビ（ダッシュボード 案件一覧 取引 プロフィール） */
-.op-dash .biz-nav { display: flex; align-items: center; gap: 2px; margin-left: 8px; }
-.op-dash .biz-nav-link {
-  font-size: 13.5px;
-  font-weight: 700;
-  color: var(--body-soft);
-  padding: 8px 12px;
-  border-radius: 8px;
-  white-space: nowrap;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  transition: color .2s, background .2s;
-}
-.op-dash .biz-nav-link:hover { color: var(--ink); background: var(--pale); }
-.op-dash .biz-nav-link.active { color: var(--blue); background: var(--pale); }
-.op-dash .biz-nav-link .ic { width: 15px; height: 15px; stroke-width: 2; }
-
-.op-dash .biz-header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
-.op-dash .biz-header-co {
-  font-size: 13px; font-weight: 700; color: var(--ink);
-  display: flex; align-items: center; gap: 8px;
-  background: none; border: none; cursor: pointer; font-family: var(--sans);
-}
-.op-dash .biz-header-co .co-dot {
-  width: 28px; height: 28px; border-radius: 8px;
-  background: var(--navy); color: #fff;
-  font-family: var(--head); font-size: 11px; font-weight: 900;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-}
-.op-dash .notif-btn {
-  width: 36px; height: 36px; border-radius: 10px;
-  background: var(--pale); border: none; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  color: var(--blue); position: relative; transition: .2s;
-}
-.op-dash .notif-btn:hover { background: #dde6ff; }
-.op-dash .notif-btn .ic { width: 18px; height: 18px; stroke: var(--blue); stroke-width: 1.9; }
-.op-dash .notif-dot { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: #e05c5c; }
-
-.op-dash .biz-logout {
-  font-size: 12.5px; font-weight: 700; color: var(--body-soft);
-  padding: 6px 10px; border-radius: 8px; transition: color .2s, background .2s;
-  white-space: nowrap;
-}
-.op-dash .biz-logout:hover { color: var(--blue); background: var(--pale); }
+/* ---------- ヘッダー ----------
+   デザインレビュー B-5 対応: 旧 .biz-header 実装は components/kdz/OperatorHeader.tsx +
+   operator-header.css（.op-header）へ統合済み。ここでは重複定義しない。
+   ---------------------------------- */
 
 /* ---------- ページ全体 ---------- */
 .op-dash .dash-wrap { max-width: 1100px; margin: 0 auto; padding: 28px 24px 80px; }
@@ -486,8 +426,6 @@
   .op-dash .lot-card-inner { grid-template-columns: 140px 1fr; }
   .op-dash .lot-bid-area { display: none; }
   .op-dash .summary-bar { grid-template-columns: repeat(2, 1fr); }
-  .op-dash .biz-nav { display: none; }
-  .op-dash .biz-header-title { display: none; }
 }
 @media (max-width: 580px) {
   .op-dash .lot-card-inner { grid-template-columns: 1fr; }
@@ -495,5 +433,4 @@
   .op-dash .lot-photo:first-child { grid-row: auto; }
   .op-dash .summary-bar { grid-template-columns: repeat(2, 1fr); }
   .op-dash .dash-wrap { padding: 20px 16px 60px; }
-  .op-dash .biz-header-co-name { display: none; }
 }

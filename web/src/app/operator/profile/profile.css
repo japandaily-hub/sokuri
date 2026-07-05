@@ -12,127 +12,10 @@
   min-height: 100vh;
 }
 
-/* ---------- 業者ヘッダー（operator 独自・共通クロムなし） ---------- */
-.op-profile .op-header {
-  position: sticky;
-  top: 0;
-  z-index: 60;
-  background: rgba(255, 255, 255, .92);
-  backdrop-filter: saturate(160%) blur(14px);
-  border-bottom: 1px solid var(--line);
-  box-shadow: var(--shadow-s);
-}
-.op-profile .op-header-inner {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  height: 64px;
-}
-.op-profile .op-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
-}
-.op-profile .op-brand-tag {
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: .04em;
-  color: var(--blue);
-  background: var(--pale);
-  border: 1px solid #d8e2fb;
-  border-radius: 99px;
-  padding: 2px 9px;
-}
-.op-profile .op-nav {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: 8px;
-}
-.op-profile .op-nav a {
-  font-size: 13.5px;
-  font-weight: 700;
-  color: var(--body-soft);
-  padding: 8px 13px;
-  border-radius: 9px;
-  transition: color .2s, background .2s;
-}
-.op-profile .op-nav a:hover {
-  color: var(--blue);
-  background: var(--pale);
-}
-.op-profile .op-nav a.active {
-  color: var(--blue);
-  background: var(--pale);
-}
-.op-profile .op-header-right {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-.op-profile .op-user {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-.op-profile .op-user-avatar {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  background: var(--navy);
-  color: #fff;
-  display: grid;
-  place-items: center;
-  font-family: var(--head);
-  font-weight: 900;
-  font-size: 15px;
-  flex-shrink: 0;
-}
-.op-profile .op-user-name {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--ink);
-  line-height: 1.3;
-}
-.op-profile .op-user-name small {
-  display: block;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--body-soft);
-}
-.op-profile .op-logout {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--body-soft);
-  background: none;
-  border: 1.5px solid var(--line);
-  border-radius: 8px;
-  padding: 7px 13px;
-  cursor: pointer;
-  transition: border-color .2s, color .2s;
-}
-.op-profile .op-logout:hover {
-  border-color: var(--blue);
-  color: var(--blue);
-}
-.op-profile .op-nav-toggle {
-  display: none;
-  margin-left: auto;
-  width: 42px;
-  height: 42px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: #fff;
-  color: var(--navy);
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-.op-profile .op-nav-toggle .ic {
-  font-size: 22px;
-}
+/* ---------- ヘッダー ----------
+   デザインレビュー B-5 対応: 旧 .op-header 独自実装は components/kdz/OperatorHeader.tsx +
+   operator-header.css へ統合済み。ここでは重複定義しない。
+   ---------------------------------- */
 
 /* ---------- ヒーロー ---------- */
 .op-profile .prof-hero {
@@ -652,9 +535,41 @@
 .op-profile .sidebar {
   position: sticky;
   top: 84px;
+
+
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+/* 評価サマリー（デザインレビュー M-4） */
+.op-profile .rating-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.op-profile .rating-summary-stars {
+  color: #f0a030;
+  font-size: 18px;
+  letter-spacing: -1px;
+}
+.op-profile .rating-summary-num {
+  font-family: var(--head);
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--navy);
+}
+.op-profile .rating-summary-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--blue);
+}
+.op-profile .rating-summary-link svg {
+  width: 13px;
+  height: 13px;
 }
 .op-profile .prof-card.flush {
   margin-bottom: 0;
@@ -934,37 +849,6 @@
 }
 
 /* ---------- レスポンシブ ---------- */
-@media (max-width: 920px) {
-  .op-profile .op-nav,
-  .op-profile .op-user-name,
-  .op-profile .op-logout {
-    display: none;
-  }
-  .op-profile .op-nav-toggle {
-    display: flex;
-  }
-  .op-profile .op-header-right {
-    margin-left: 0;
-  }
-  .op-profile .op-nav.open {
-    display: flex;
-    position: absolute;
-    top: 64px;
-    left: 0;
-    right: 0;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 2px;
-    background: #fff;
-    border-bottom: 1px solid var(--line);
-    padding: 10px 20px 16px;
-    margin: 0;
-    box-shadow: var(--shadow-s);
-  }
-  .op-profile .op-nav.open a {
-    padding: 13px;
-  }
-}
 @media (max-width: 760px) {
   .op-profile .prof-wrap {
     grid-template-columns: 1fr;

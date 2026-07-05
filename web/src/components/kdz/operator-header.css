@@ -1,0 +1,153 @@
+/* ============================================================
+   業者向けアプリ画面 共通ヘッダー（OperatorHeader.tsx）
+   デザインレビュー B-1/B-4/B-5 対応: 旧・業者ダッシュボード(.biz-header)と
+   旧・業者プロフィール(.op-header)の2実装をここへ統合。すべて .op-header
+   配下にスコープする。トークン（--blue 等）は katazuke.css のグローバル定義を参照。
+   ============================================================ */
+
+.op-header {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  background: rgba(255, 255, 255, .92);
+  backdrop-filter: saturate(160%) blur(14px);
+  border-bottom: 1px solid var(--line);
+  box-shadow: var(--shadow-s);
+}
+.op-header .op-header-inner {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  height: 64px;
+}
+.op-header .op-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.op-header .op-brand-tag {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: var(--blue);
+  background: var(--pale);
+  border: 1px solid #d8e2fb;
+  border-radius: 99px;
+  padding: 2px 9px;
+}
+
+.op-header .op-nav { display: flex; align-items: center; gap: 4px; margin-left: 8px; }
+.op-header .op-nav a {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--body-soft);
+  padding: 8px 13px;
+  border-radius: 9px;
+  transition: color .2s, background .2s;
+}
+.op-header .op-nav a:hover { color: var(--blue); background: var(--pale); }
+.op-header .op-nav a.active { color: var(--blue); background: var(--pale); }
+
+.op-header .op-header-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+
+.op-header .op-notif {
+  position: relative;
+  color: var(--navy);
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  transition: background .2s;
+  flex-shrink: 0;
+}
+.op-header .op-notif:hover { background: var(--pale); }
+.op-header .op-notif-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #e05c5c;
+  border: 2px solid #fff;
+}
+
+.op-header .op-user { display: flex; align-items: center; gap: 9px; }
+.op-header .op-user-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--navy);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-family: var(--head);
+  font-weight: 900;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+.op-header .op-user-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.op-header .op-logout {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--body-soft);
+  background: none;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 13px;
+  cursor: pointer;
+  transition: border-color .2s, color .2s;
+  white-space: nowrap;
+}
+.op-header .op-logout:hover { border-color: var(--blue); color: var(--blue); }
+
+.op-header .op-nav-toggle {
+  display: none;
+  margin-left: auto;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--navy);
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.op-header .op-nav-toggle .ic { font-size: 22px; }
+
+@media (max-width: 920px) {
+  .op-header .op-nav,
+  .op-header .op-user-name,
+  .op-header .op-logout {
+    display: none;
+  }
+  .op-header .op-nav-toggle { display: flex; }
+  .op-header .op-header-right { margin-left: 0; }
+  .op-header .op-nav.open {
+    display: flex;
+    position: absolute;
+    top: 64px;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    background: #fff;
+    border-bottom: 1px solid var(--line);
+    padding: 10px 20px 16px;
+    margin: 0;
+    box-shadow: var(--shadow-s);
+  }
+  .op-header .op-nav.open a { padding: 13px; }
+}

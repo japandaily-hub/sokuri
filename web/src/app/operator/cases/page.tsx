@@ -1,17 +1,23 @@
 "use client";
 
-/** 業者: 入札可能な案件一覧（住所は市区町村まで）。 */
+/**
+ * 業者: 入札可能な案件一覧（/operator/cases）。
+ *
+ * デザインレビュー B-1 対応: 旧 Tailwind/slate 実装（PageShell/Card/StatusBadge）を廃し、
+ * ダッシュボード（dashboard.css）と同じ視覚言語（正典トークン・部品）に統一。
+ * .lot-card/.status-chip/.empty-state 等は operator-shared.css に定義済み。
+ * 併せて OperatorHeader を追加し、ヘッダー欠落でナビ不能だった問題を解消（B-1）。
+ * 住所は業者決定後にのみ開示（本文の挙動は変更していない）。
+ */
+
+import "../operator-shared.css";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Spinner } from "@/components/Icon";
-import {
-  Card,
-  Notice,
-  PageShell,
-  StatusBadge,
-  btnSecondary,
-  useToken,
-} from "@/components/kdz/Ui";
+import { OperatorHeader } from "@/components/kdz/OperatorHeader";
+import { Ic } from "@/components/kdz/Icons";
+import { useToken } from "@/components/kdz/Ui";
 import {
   CASE_STATUS_LABEL,
   KdzApiError,
@@ -21,6 +27,71 @@ import {
   toDisplayMessage,
   type CaseMasked,
 } from "@/lib/katadzuke-api";
+
+/** ステータス+自社入札状況 → チップ表示のマッピング。 */
+function statusChipInfo(c: CaseMasked): { label: string; cls: string } {
+  if (c.my_bid) {
+    if (c.my_bid.status === "selected") return { label: "落札", cls: "bidding" };
+    if (c.my_bid.status === "rejected") return { label: "非選定", cls: "done" };
+    return { label: "入札済み", cls: "negotiating" };
+  }
+  if (c.status === "open" || c.status === "bidding") return { label: CASE_STATUS_LABEL[c.status], cls: "live" };
+  return { label: CASE_STATUS_LABEL[c.status], cls: "done" };
+}
+
+function LotCard({ c }: { c: CaseMasked }) {
+  const { label, cls } = statusChipInfo(c);
+  return (
+    <Link href={`/operator/cases/${c.id}`} className={`lot-card ${cls}`.trim()}>
+      <div className="lot-card-inner">
+        <div className="lot-thumb" aria-hidden="true">
+          {c.photos.length > 0 ? (
+            c.photos.slice(0, 4).map((p) => (
+              <div className="lot-thumb-img" key={p.id}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photoSrc(p.url)} alt="" />
+              </div>
+            ))
+          ) : (
+            <>
+              <div className="lot-thumb-img" />
+              <div className="lot-thumb-img" />
+              <div className="lot-thumb-img" />
+              <div className="lot-thumb-img" />
+            </>
+          )}
+        </div>
+        <div className="lot-info">
+          <div className="lot-info-top">
+            <span className="lot-id">#{c.id.slice(0, 8)}</span>
+            <span className={`status-chip ${cls}`}>{label}</span>
+          </div>
+          <div className="lot-title">{c.purpose}</div>
+          <div className="lot-meta">
+            <span className="lot-meta-item">
+              <Ic name="pin" />
+              {c.prefecture} {c.city}
+            </span>
+            <span className="lot-meta-item">
+              <Ic name="clock" />
+              {new Date(c.created_at).toLocaleDateString("ja-JP")}
+            </span>
+          </div>
+          {c.my_bid ? (
+            <div className="lot-bid-count">自社入札 {formatYen(c.my_bid.amount)}</div>
+          ) : c.bid_count > 0 ? (
+            <div className="lot-bid-count" style={{ color: "var(--body-soft)" }}>
+              入札 {c.bid_count} 件（他社）
+            </div>
+          ) : null}
+        </div>
+        <div className="lot-action" aria-hidden="true">
+          <Ic name="arrow" />
+        </div>
+      </div>
+    </Link>
+  );
+}
 
 export default function OperatorCasesPage() {
   const { token, loading } = useToken();
@@ -41,79 +112,50 @@ export default function OperatorCasesPage() {
       });
   }, [token]);
 
-  if (loading || (!cases && !error && !pendingApproval)) {
-    return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <Spinner className="h-6 w-6 text-brand-600" />
-      </div>
-    );
-  }
-
   return (
-    <PageShell
-      title="案件一覧"
-      description="入札を受け付けている片付け案件です。住所は業者決定後に開示されます。"
-      actions={
-        <a href="/operator/transactions" className={btnSecondary}>
-          落札管理へ
-        </a>
-      }
-    >
-      {pendingApproval ? (
-        <Notice tone="warn">
-          アカウントは運営の承認待ちです。承認が完了すると案件を閲覧できます（通常1営業日以内）。
-        </Notice>
-      ) : null}
-      {error ? <Notice tone="error">{error}</Notice> : null}
-      {cases && cases.length === 0 ? (
-        <Card className="text-center text-sm text-slate-500">
-          現在、入札可能な案件はありません。
-        </Card>
-      ) : null}
-      <div className="grid gap-4 sm:grid-cols-2">
-        {cases?.map((c) => (
-          <a key={c.id} href={`/operator/cases/${c.id}`} className="group">
-            <Card className="h-full transition-shadow group-hover:shadow-md">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex gap-3">
-                  {c.photos[0] ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={photoSrc(c.photos[0].url)}
-                      alt=""
-                      className="h-16 w-16 shrink-0 rounded-xl border border-slate-200 object-cover"
-                    />
-                  ) : (
-                    <div className="h-16 w-16 shrink-0 rounded-xl bg-slate-100" />
-                  )}
-                  <div>
-                    <p className="font-bold text-slate-900">{c.purpose}</p>
-                    <p className="mt-0.5 text-xs text-slate-500">
-                      {c.prefecture} {c.city} / {c.housing_type ?? "—"} /{" "}
-                      {c.floor_plan ?? "—"}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-400">
-                      入札 {c.bid_count} 件 ・{" "}
-                      {new Date(c.created_at).toLocaleDateString("ja-JP")}
-                    </p>
-                  </div>
-                </div>
-                <StatusBadge value={c.status} label={CASE_STATUS_LABEL[c.status]} />
-              </div>
-              {c.ai_summary ? (
-                <p className="mt-3 line-clamp-2 text-sm leading-relaxed text-slate-600">
-                  {c.ai_summary}
-                </p>
-              ) : null}
-              {c.my_bid ? (
-                <p className="mt-3 text-sm font-semibold text-brand-700">
-                  自社入札済み: {formatYen(c.my_bid.amount)}
-                </p>
-              ) : null}
-            </Card>
-          </a>
-        ))}
-      </div>
-    </PageShell>
+    <div className="cases-page">
+      <OperatorHeader active="cases" />
+      <main id="main">
+        <div className="op-wrap">
+          <div className="op-head">
+            <div>
+              <h1>案件一覧</h1>
+              <p>入札を受け付けている片付け案件です。住所は業者決定後に開示されます。</p>
+            </div>
+            <Link href="/operator/transactions" className="btn btn-ghost">
+              落札管理へ
+              <Ic name="arrow" className="arw" />
+            </Link>
+          </div>
+
+          {pendingApproval ? (
+            <div className="op-alert warn">
+              アカウントは運営の承認待ちです。承認が完了すると案件を閲覧できます（通常1営業日以内）。
+            </div>
+          ) : null}
+          {error ? <div className="op-alert error">{error}</div> : null}
+
+          {loading || (!cases && !error && !pendingApproval) ? (
+            <div style={{ display: "flex", justifyContent: "center", padding: "60px 0" }}>
+              <Spinner className="h-6 w-6 text-brand-600" />
+            </div>
+          ) : cases && cases.length === 0 ? (
+            <div className="empty-state">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 7h16M4 12h16M4 17h10" />
+              </svg>
+              <h3>現在、入札可能な案件はありません</h3>
+              <p>新しい案件が出品されると、ここに表示されます。</p>
+            </div>
+          ) : (
+            <div className="lot-list">
+              {cases?.map((c) => (
+                <LotCard c={c} key={c.id} />
+              ))}
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
   );
 }
