@@ -60,3 +60,7 @@ services:
       - key: ALLOWED_ORIGINS
         value: "https://sokuri.vercel.app"   # CORS許可オリジン（カンマ区切り、未設定時は"*"にしない）。
                                               # 未設定時は FRONTEND_BASE_URL + localhost にフォールバック（config.py 参照）
+      - key: APP_ENCRYPTION_KEY
+        sync: false            # dashboard で手動入力（git 漏洩防止）。未設定時は機微データ暗号化(Fernet)の
+                                # 呼び出し時点でEncryptionKeyMissingErrorを送出しプロセスを止める(app/core/crypto.py)。
+                                # 生成: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
