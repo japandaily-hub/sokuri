@@ -1,5 +1,12 @@
 # PROJECT_STATE — カタヅケ クローズドβ
 
+## 🔴 2026-07-06 本番デプロイ後点検: Renderバックエンドが応答なし（未解決・ユーザー確認待ち）
+- **状況**: `feat/design-handoff-katazuke`→`main`マージ+push、Vercel(`sokuri.vercel.app`)・Render(`sokuri-backend.onrender.com`)へ初回デプロイ実施済み(いずれもuser承認下で進行)。Vercel側は`vercel inspect`で該当コミットのビルドが`Ready`(全ルート含むbuild成功、`/operator/login`等ローカルbuildと同一サイズで一致確認)。
+- **問題**: `https://sokuri-backend.onrender.com/health` が**複数回・累計10分超の試行で一度も正常応答なし**(1回目=503(420秒後)、以降3回=完全タイムアウト(60秒/150秒/45秒、TCP/TLS確立はできるがHTTPレスポンスなし)。DNS解決・TCP/TLS接続自体は正常("Established connection"まで到達)なため、ネットワーク疎通ではなくアプリ/コンテナ側の起動停滞の可能性が高い。
+- **推定原因(要Renderダッシュボードでのログ確認・[推測])**: このBlueprintは今回が初回デプロイで、Web Service(Docker/free)+Postgres(free)とも新規プロビジョニング。(a)初回Docker起動+`alembic upgrade head`(全テーブル新規作成)+freeプランDBの初回接続が重なり異常に長い、または(b) `sync:false`指定の必須env var(`GOOGLE_API_KEY`/`BREVO_API_KEY`/`APP_ENCRYPTION_KEY`)がRenderダッシュボード側で未入力のまま起動しクラッシュループしている可能性。Render CLI/API未接続のためログを直接確認できず、断定不可。
+- **次にすべきこと**: ユーザーがRenderダッシュボード(sokuri-backendサービス→Logsタブ)で実際の起動ログ・crashの有無を確認。上記3つのsync:false env varが入力済みか要確認。
+- **影響**: バックエンドが応答しない間、フロント(Vercel)の認証・データ取得系機能は全て機能しない状態(表示のみのページは影響なし)。
+
 ## ✅ 2026-07-06 業者/admin/エラー系導線 デザイン統一パッチ適用（zip指示書・strategy-agents Leader・/loop自走）
 - **入力**: ユーザー提供zip`design_handoff_operator_flow_fixes/`（2026-07-05導線別レビューB/C/A計10件の是正コード。README.md=指示書）。
 - **適用**: 新規5+変更16=21ファイルを`web/src`へ適用（commit `1ebdcad`）。パッチが想定していた`app/cases/cases.css`が正典に未実装だったため、`operator-shared.css`に`.lot-card`/`.status-chip`/`.modal-overlay`等の実体スタイルを自己完結で追加。CSSコメント誤爆（`.modal-*/`→コメント早期終了でcssnano全体崩壊）も検出・修正。
