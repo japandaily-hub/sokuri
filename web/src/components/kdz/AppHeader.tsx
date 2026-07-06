@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AppHeaderLogout } from "./AppHeaderLogout";
 import { KdzLogo } from "./Logo";
 
 /**
@@ -13,7 +14,7 @@ export function AppHeader({ unread = false }: { unread?: boolean }) {
         <Link href="/" className="logo" aria-label="カタヅケ トップへ">
           <KdzLogo size={22} />
         </Link>
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 16 }}>
+        <div style={{ marginLeft: "auto", display: "flex", flexWrap: "wrap", justifyContent: "flex-end", alignItems: "center", gap: 16 }}>
           <Link
             href="/notifications"
             aria-label="通知・お知らせ"
@@ -36,6 +37,7 @@ export function AppHeader({ unread = false }: { unread?: boolean }) {
           >
             マイページ
           </Link>
+          <AppHeaderLogout />
         </div>
       </div>
     </header>
