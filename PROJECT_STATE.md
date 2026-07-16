@@ -1,5 +1,15 @@
 # PROJECT_STATE — カタヅケ クローズドβ
 
+## ✅ 2026-07-16 [claude] 新デザイン全画面ウォークスルー+導線監査→P0導線欠落4件を含む10件是正（ローカル実機検証済）
+- **背景**: ユーザー指示「トップ以外の全画面（業者/admin/査定フロー等）をプレビュー確認し、デザイン/導線を全方向から再確認→修正→デプロイ完走」。ローカル実機（backend=run_local_e2e.py:8000 + web dev:3100、seed=4案件4状態: 入札選択待ち/入札なし/取引中(減額申請中)/完了評価済み + active/pending業者 + admin）で全41ルートを巡回。入札→落札→チャット双方向→減額申請→完了→評価投稿の全サイクルをUI実操作で検証、コンソールエラー0・モバイル375px横はみ出し0。
+- **P0是正（導線の孤児ページ解消）**: ①`/chat/[id]`・`/schedule`にユーザー側から到達する導線がゼロ→`/cases/[id]`成約パネルに「業者とチャット（未読数付き）」「訪問日程を調整する」「訪問予定表示」を追加 ②`/operator/chat/[id]`も業者側導線ゼロ→`/operator/transactions/[id]`に「お客様とチャット（日程調整）」を追加。
+- **P0級UX是正**: pending業者に通常の入札フォームが表示され、送信すると生英語「Account not yet approved.」が露出→(a)`operator/cases/[id]`でvendor_status取得(getOperatorProfile)しactive以外は承認待ち案内に差し替え (b)backend deps.pyの403 detail 3箇所を日本語化。
+- **P1是正**: ③`/cases`・`/cases/[id]`がAppHeader無し=ナビ行き止まり（SiteChrome H-1コメントの意図が未実装だった）→AppHeader追加 ④`/mypage/profile`(モック山田花子・全フォーム未配線)・`/mypage/withdraw`(偽の削除完了デモ)が本番ルートに露出→ユーザー情報更新/削除APIが実装されるまで`/mypage`へredirect化（旧実装はgit履歴参照） ⑤backend `GET /vendors/{id}`がプロフィール行未作成の業者を一律404（公開デフォルトtrueと矛盾・チャット「プロフィールを見る」が壊れる）→行なし=既定公開の仮想プロフィール扱いに修正+回帰テスト追加（suspendedは404化）。
+- **P2是正**: ⑥terms/privacy/legal/companyのtitle「…| カタヅケ | カタヅケ」二重化解消 ⑦business/faq/examples/contact/unsubscribe/login/signup/verify-email/password-reset にmetadata layout新設（client pageでtitle欠落だった9ルート） ⑧モーダル閉時がopacity:0のみで支援技術から到達可能→visibility切替をCSSに追加（operator-shared/dashboard） ⑨時限失敗テスト修正（schedule confirmの固定日2026-07-15→動的未来日）。
+- **gate_status**: backend pytest=**140 passed** / web tsc=クリーン / web build=**成功（41ルート）** / 修正は全てローカル実機で表示・動作確認済み（dev HMR環境のためスクショ不可＝CSSTransition凍結・read_page/computed styleで検証）。
+- **ユーザー判断待ち（コード未変更・報告のみ）**: (A)`/examples`の成約事例・統計値（¥68,000/7.4件/78%/2.1日等）が架空のまま実データ風に表示＝景表法（優良誤認）リスク。デモである旨の注記か実データ差し替えを推奨 (B)`/business`・トップ・ダッシュボードモーダル等の「上位3社だけが交渉」コピーは実装（ユーザーが全入札から1社選択・3社制限なし）と不一致 (C)ユーザー側`/cases/[id]`の確認がwindow.confirmのまま（業者側はB-2でブランドモーダル化済み・機能は正常）。
+- **その他**: `.claude/launch.json`の旧C:\sokuriパスを現リポジトリへ修正（3エントリ）。seedスクリプトはscratchpad（セッション限り）。admin cell-densityの案件数集計が直近作成4件中1件しか数えていない疑い（P2・未調査）。
+
 ## ✅ 2026-07-16 Renderバックエンド全断→復旧（HTTP層）: fab45c2をmainへデプロイ済み・残るはDB差し替えのみ
 - **18:38 JST 本番実証**: e77f6ab(=fab45c2 cherry-pick)デプロイ後、`/health`=200復活（7/6以来初）。`/readyz`=503 `{"db":"unreachable"}`で**DB断を外形確定**。x-render-routingヘッダも`hibernate-wake-error`（wake失敗=起動時クラッシュ）を捕獲済みで診断と完全一致。
 - **残るユーザー操作（DBのみ・下記詳細は次節）**: Renderダッシュボード→sokuri-dbのExpired確認→(データ要)有料化して救出7/26頃まで／(不要)新規無料DB作成→sokuri-backendのDATABASE_URL差し替え→再起動でalembicが新規スキーマ構築→`/readyz`が`ready`になれば全快。
