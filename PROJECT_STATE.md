@@ -1,5 +1,33 @@
 # PROJECT_STATE — カタヅケ クローズドβ
 
+## ✅ 2026-07-16 [claude] 新デザイン全画面ウォークスルー+導線監査→P0導線欠落4件を含む10件是正（ローカル実機検証済）
+- **背景**: ユーザー指示「トップ以外の全画面（業者/admin/査定フロー等）をプレビュー確認し、デザイン/導線を全方向から再確認→修正→デプロイ完走」。ローカル実機（backend=run_local_e2e.py:8000 + web dev:3100、seed=4案件4状態: 入札選択待ち/入札なし/取引中(減額申請中)/完了評価済み + active/pending業者 + admin）で全41ルートを巡回。入札→落札→チャット双方向→減額申請→完了→評価投稿の全サイクルをUI実操作で検証、コンソールエラー0・モバイル375px横はみ出し0。
+- **P0是正（導線の孤児ページ解消）**: ①`/chat/[id]`・`/schedule`にユーザー側から到達する導線がゼロ→`/cases/[id]`成約パネルに「業者とチャット（未読数付き）」「訪問日程を調整する」「訪問予定表示」を追加 ②`/operator/chat/[id]`も業者側導線ゼロ→`/operator/transactions/[id]`に「お客様とチャット（日程調整）」を追加。
+- **P0級UX是正**: pending業者に通常の入札フォームが表示され、送信すると生英語「Account not yet approved.」が露出→(a)`operator/cases/[id]`でvendor_status取得(getOperatorProfile)しactive以外は承認待ち案内に差し替え (b)backend deps.pyの403 detail 3箇所を日本語化。
+- **P1是正**: ③`/cases`・`/cases/[id]`がAppHeader無し=ナビ行き止まり（SiteChrome H-1コメントの意図が未実装だった）→AppHeader追加 ④`/mypage/profile`(モック山田花子・全フォーム未配線)・`/mypage/withdraw`(偽の削除完了デモ)が本番ルートに露出→ユーザー情報更新/削除APIが実装されるまで`/mypage`へredirect化（旧実装はgit履歴参照） ⑤backend `GET /vendors/{id}`がプロフィール行未作成の業者を一律404（公開デフォルトtrueと矛盾・チャット「プロフィールを見る」が壊れる）→行なし=既定公開の仮想プロフィール扱いに修正+回帰テスト追加（suspendedは404化）。
+- **P2是正**: ⑥terms/privacy/legal/companyのtitle「…| カタヅケ | カタヅケ」二重化解消 ⑦business/faq/examples/contact/unsubscribe/login/signup/verify-email/password-reset にmetadata layout新設（client pageでtitle欠落だった9ルート） ⑧モーダル閉時がopacity:0のみで支援技術から到達可能→visibility切替をCSSに追加（operator-shared/dashboard） ⑨時限失敗テスト修正（schedule confirmの固定日2026-07-15→動的未来日）。
+- **gate_status**: backend pytest=**140 passed** / web tsc=クリーン / web build=**成功（41ルート）** / 修正は全てローカル実機で表示・動作確認済み（dev HMR環境のためスクショ不可＝CSSTransition凍結・read_page/computed styleで検証）。
+- **ユーザー判断待ち（コード未変更・報告のみ）**: (A)`/examples`の成約事例・統計値（¥68,000/7.4件/78%/2.1日等）が架空のまま実データ風に表示＝景表法（優良誤認）リスク。デモである旨の注記か実データ差し替えを推奨 (B)`/business`・トップ・ダッシュボードモーダル等の「上位3社だけが交渉」コピーは実装（ユーザーが全入札から1社選択・3社制限なし）と不一致 (C)ユーザー側`/cases/[id]`の確認がwindow.confirmのまま（業者側はB-2でブランドモーダル化済み・機能は正常）。
+- **その他**: `.claude/launch.json`の旧C:\sokuriパスを現リポジトリへ修正（3エントリ）。seedスクリプトはscratchpad（セッション限り）。admin cell-densityの案件数集計が直近作成4件中1件しか数えていない疑い（P2・未調査）。
+
+## ✅ 2026-07-16 Renderバックエンド全断→復旧（HTTP層）: fab45c2をmainへデプロイ済み・残るはDB差し替えのみ
+- **18:38 JST 本番実証**: e77f6ab(=fab45c2 cherry-pick)デプロイ後、`/health`=200復活（7/6以来初）。`/readyz`=503 `{"db":"unreachable"}`で**DB断を外形確定**。x-render-routingヘッダも`hibernate-wake-error`（wake失敗=起動時クラッシュ）を捕獲済みで診断と完全一致。
+- **残るユーザー操作（DBのみ・下記詳細は次節）**: Renderダッシュボード→sokuri-dbのExpired確認→(データ要)有料化して救出7/26頃まで／(不要)新規無料DB作成→sokuri-backendのDATABASE_URL差し替え→再起動でalembicが新規スキーマ構築→`/readyz`が`ready`になれば全快。
+
+## 🔬 2026-07-16 Renderバックエンド無応答: 根本原因診断完了+コード側修正済み（fab45c2・デプロイ待ち）
+- **確定(確度~90%)**: 無応答の直接原因は「uvicornが一度もポートbindしていない」。start.shが`set -e`で`alembic upgrade head`成功をuvicorn起動の前提にしており、DB接続不能→alembic失敗(asyncpgデフォルト60sタイムアウト)→コンテナ即死→再起動ループ。RenderのLBは常時TLS終端するため「TCP/TLS成立・HTTP無応答」はインスタンス不在の典型症状(2026-07-16の再プローブでも継続確認: 存在しないサービス=即404に対し本件=無限ハング)。
+- **最有力トリガー(40%)**: **Render無料PostgreSQLは作成後30日で期限切れ→接続不能**(render.com/docs/free。「90日無期限」という旧render.yamlコメントは誤り)。DB作成~6/12なら期限切れ~7/12。**+14日猶予後(~7/26)にデータごと削除**。次点: Blueprint初回デプロイがsync:false変数入力待ちで未開始(20%)/DATABASE_URL未注入→localhostフォールバック(12%)/本番起動ガード発動(8%・発動時はログに「CRITICAL 起動中断:」が出る)。
+- **コード修正済み(fab45c2)**: ①start.sh=alembic失敗でもuvicorn起動(degraded) ②alembic接続タイムアウト3点セット ③実行時エンジンにもtimeout ④**/readyz新設**(=デプロイ後、/health 200+/readyz 503なら「DB断」と外形判別可能) ⑤localhostフォールバック時CRITICALログ ⑥render.yamlコメント訂正 ⑦pyproject packages find化。pytest 138緑(1 failedは既存=task_21185600)。
+- **残るユーザー操作**: (1)Renderダッシュボード→sokuri-dbページで**Expired表示と作成日**確認(期限切れなら:データ要るなら~7/26までに有料化してエクスポート/不要なら新規無料DB作成+DATABASE_URL差し替え) (2)sokuri-backend→Deploysタブで"Live"到達履歴有無(履歴ゼロ=sync:false入力待ち) (3)fab45c2をmainへ反映しRender再デプロイ(このデプロイ自体が最強の診断: /health復活+/readyzでDB状態が外から見える)。※ログ保持7日のため7/6当時のログは消失済み。
+- **⚠️30日おきに再発する**: 無料PG継続なら「期限前に再作成+URL差し替え」の運用が必要。恒久策=DB有料化($7/mo~)か外部マネージドPG(Neon/Supabase無料枠)移行。
+
+## 🔴 2026-07-06 本番デプロイ後点検: Renderバックエンドが応答なし（→2026-07-16診断完了・上記参照）
+- **状況**: `feat/design-handoff-katazuke`→`main`マージ+push、Vercel(`sokuri.vercel.app`)・Render(`sokuri-backend.onrender.com`)へ初回デプロイ実施済み(いずれもuser承認下で進行)。Vercel側は`vercel inspect`で該当コミットのビルドが`Ready`(全ルート含むbuild成功、`/operator/login`等ローカルbuildと同一サイズで一致確認)。
+- **問題**: `https://sokuri-backend.onrender.com/health` が**複数回・累計10分超の試行で一度も正常応答なし**(1回目=503(420秒後)、以降3回=完全タイムアウト(60秒/150秒/45秒、TCP/TLS確立はできるがHTTPレスポンスなし)。DNS解決・TCP/TLS接続自体は正常("Established connection"まで到達)なため、ネットワーク疎通ではなくアプリ/コンテナ側の起動停滞の可能性が高い。
+- **推定原因(要Renderダッシュボードでのログ確認・[推測])**: このBlueprintは今回が初回デプロイで、Web Service(Docker/free)+Postgres(free)とも新規プロビジョニング。(a)初回Docker起動+`alembic upgrade head`(全テーブル新規作成)+freeプランDBの初回接続が重なり異常に長い、または(b) `sync:false`指定の必須env var(`GOOGLE_API_KEY`/`BREVO_API_KEY`/`APP_ENCRYPTION_KEY`)がRenderダッシュボード側で未入力のまま起動しクラッシュループしている可能性。Render CLI/API未接続のためログを直接確認できず、断定不可。
+- **次にすべきこと**: ユーザーがRenderダッシュボード(sokuri-backendサービス→Logsタブ)で実際の起動ログ・crashの有無を確認。上記3つのsync:false env varが入力済みか要確認。
+- **影響**: バックエンドが応答しない間、フロント(Vercel)の認証・データ取得系機能は全て機能しない状態(表示のみのページは影響なし)。
+
 ## ✅ 2026-07-06 業者/admin/エラー系導線 デザイン統一パッチ適用（zip指示書・strategy-agents Leader・/loop自走）
 - **入力**: ユーザー提供zip`design_handoff_operator_flow_fixes/`（2026-07-05導線別レビューB/C/A計10件の是正コード。README.md=指示書）。
 - **適用**: 新規5+変更16=21ファイルを`web/src`へ適用（commit `1ebdcad`）。パッチが想定していた`app/cases/cases.css`が正典に未実装だったため、`operator-shared.css`に`.lot-card`/`.status-chip`/`.modal-overlay`等の実体スタイルを自己完結で追加。CSSコメント誤爆（`.modal-*/`→コメント早期終了でcssnano全体崩壊）も検出・修正。

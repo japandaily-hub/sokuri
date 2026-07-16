@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { signOut } from "next-auth/react";
 import { useState } from "react";
 import { Ic } from "./Icons";
 import { KdzLogo } from "./Logo";
@@ -90,9 +91,13 @@ export function OperatorHeader({
             </span>
           ) : null}
 
-          <Link href="/operator/login" className="op-logout">
+          <button
+            type="button"
+            className="op-logout"
+            onClick={() => signOut({ callbackUrl: "/operator/login" })}
+          >
             ログアウト
-          </Link>
+          </button>
 
           <button
             type="button"

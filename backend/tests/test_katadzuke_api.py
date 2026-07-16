@@ -1445,22 +1445,28 @@ async def test_schedule_confirm_user_only_and_status_transition(
     op_token, _ = await _verified_operator(client, db_session, admin_token, "sched_confirm_op@example.com")
     _, txn_id = await _create_transaction(client, user_token, op_token)
 
+    # visit_date は「本日以降」バリデーションがあるため、固定日ではなく動的な未来日を使う
+    # （固定日だと実行日がそれを過ぎた時点で 422 になり時限失敗する）。
+    from datetime import date, timedelta
+
+    visit_date = (date.today() + timedelta(days=7)).isoformat()
+
     r = await client.post(
         f"/api/v1/transactions/{txn_id}/schedule/confirm",
-        json={"visit_date": "2026-07-15", "visit_time_slot": "午前"},
+        json={"visit_date": visit_date, "visit_time_slot": "午前"},
         headers=_auth(op_token),
     )
     assert r.status_code == 403
 
     r = await client.post(
         f"/api/v1/transactions/{txn_id}/schedule/confirm",
-        json={"visit_date": "2026-07-15", "visit_time_slot": "午前", "note": "在宅確認済み"},
+        json={"visit_date": visit_date, "visit_time_slot": "午前", "note": "在宅確認済み"},
         headers=_auth(user_token),
     )
     assert r.status_code == 200
     data = r.json()
     assert data["status"] == "visiting"
-    assert data["visit_date"] == "2026-07-15"
+    assert data["visit_date"] == visit_date
     assert data["visit_time_slot"] == "午前"
 
     r = await client.get(f"/api/v1/transactions/{txn_id}/messages", headers=_auth(user_token))
@@ -1622,6 +1628,29 @@ async def test_vendor_public_profile_404_when_not_public(
 
     r = await client.get(f"/api/v1/vendors/{op_id}")
     assert r.status_code == 404
+
+
+async def test_vendor_public_profile_default_public_when_profile_row_missing(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """プロフィール行が未作成（業者が一度もプロフィール画面を開いていない）でも、
+    既定は公開(is_public default=True)なので 404 にしない。
+    チャットの「プロフィールを見る」導線の回帰テスト。"""
+    admin_token = await _make_admin(client, db_session)
+    _, op_id = await _verified_operator(
+        client, db_session, admin_token, "no_profile_row_op@example.com", "行未作成株式会社"
+    )
+    # GET /operator/profile（遅延作成トリガー）を呼ばないまま公開プロフィールを参照する
+    r = await client.get(f"/api/v1/vendors/{op_id}")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["company_name"] == "行未作成株式会社"
+    assert data["areas"] == []
+    # GET では行を作成しない（副作用なし）
+    from app.db.models.operator_profile import OperatorProfile
+    import uuid as _uuid
+
+    assert await db_session.get(OperatorProfile, _uuid.UUID(op_id)) is None
 
 
 # ── 最高入札額 ──

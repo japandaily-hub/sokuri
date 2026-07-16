@@ -3,7 +3,7 @@ import "./terms.css";
 import { TermsTabs } from "./TermsTabs";
 
 export const metadata: Metadata = {
-  title: "利用規約 | カタヅケ",
+  title: "利用規約",
   description:
     "カタヅケの利用規約です。ユーザー利用規約・業者利用規約について定めています。",
 };

@@ -25,6 +25,7 @@ import {
   createBid,
   formatYen,
   getCaseMasked,
+  getOperatorProfile,
   photoSrc,
   toDisplayMessage,
   type CaseMasked,
@@ -46,6 +47,7 @@ export default function OperatorCaseDetailPage() {
   const [amount, setAmount] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [vendorStatus, setVendorStatus] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     if (!token) return;
@@ -55,6 +57,15 @@ export default function OperatorCaseDetailPage() {
       setError(toDisplayMessage(e, "取得に失敗しました"));
     }
   }, [caseId, token]);
+
+  // 承認状態（vendor_status）を取得して入札フォームの表示を出し分ける。
+  // 取得失敗時は null のままフォームを表示し、サーバー側ゲートに委ねる。
+  useEffect(() => {
+    if (!token) return;
+    getOperatorProfile(token)
+      .then((p) => setVendorStatus(p.vendor_status))
+      .catch(() => setVendorStatus(null));
+  }, [token]);
 
   useEffect(() => {
     void reload();
@@ -103,6 +114,8 @@ export default function OperatorCaseDetailPage() {
   }
 
   const canBid = (caseData.status === "open" || caseData.status === "bidding") && !caseData.my_bid;
+  // 承認前（pending/limited）はサーバーが入札を403で拒否するため、フォームの代わりに案内を出す。
+  const awaitingApproval = vendorStatus !== null && vendorStatus !== "active";
 
   return (
     <div className="case-detail-page">
@@ -189,6 +202,10 @@ export default function OperatorCaseDetailPage() {
                   <Ic name="arrow" className="arw" />
                 </Link>
               ) : null}
+            </div>
+          ) : canBid && awaitingApproval ? (
+            <div className="op-alert info">
+              アカウントは承認待ちです。運営による審査完了後に入札できるようになります（案件の閲覧は承認前でも可能です）。
             </div>
           ) : canBid ? (
             <form className="form-card" onSubmit={submitBid}>

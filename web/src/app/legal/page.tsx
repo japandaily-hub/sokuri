@@ -14,7 +14,7 @@ import Link from "next/link";
 import "./legal.css";
 
 export const metadata = {
-  title: "特定商取引法に基づく表記｜カタヅケ",
+  title: "特定商取引法に基づく表記",
   description:
     "カタヅケの特定商取引法に基づく表記。運営者情報・サービス内容・料金・返品等について記載しています。",
 };

@@ -153,11 +153,25 @@ async def get_vendor_public_profile(
     session: AsyncSession = Depends(get_session),
 ) -> OperatorPublicProfileOut:
     operator = await session.get(Operator, operator_id)
-    if operator is None:
+    if operator is None or operator.is_suspended:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="業者が見つかりません。")
 
     profile = await session.get(OperatorProfile, operator_id)
-    if profile is None or not profile.is_public:
+    if profile is None:
+        # プロフィール行は業者が自分のプロフィール画面を開いた時に遅延作成される。
+        # 既定は「公開」(is_public default=True) のため、行が無いだけの業者を 404 に
+        # しない（チャットの「プロフィールを見る」導線が壊れる）。既定値の仮想
+        # プロフィールとして扱う（GET で行は作成しない。SQLAlchemy の default は
+        # flush 時適用のため、ここでは明示的に既定値を渡す）。
+        profile = OperatorProfile(
+            operator_id=operator_id,
+            is_public=True,
+            show_stats=True,
+            show_reviews=True,
+            show_message=True,
+            accept_unsellable=False,
+        )
+    if not profile.is_public:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="業者が見つかりません。")
 
     reviews_out: list[ReviewOut] | None = None

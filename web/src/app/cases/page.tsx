@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from "react";
 import { Spinner } from "@/components/Icon";
+import { AppHeader } from "@/components/kdz/AppHeader";
 import {
   Card,
   Notice,
@@ -34,14 +35,19 @@ export default function MyCasesPage() {
 
   if (loading || (!cases && !error)) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <Spinner className="h-6 w-6 text-brand-600" />
-      </div>
+      <>
+        <AppHeader />
+        <div className="flex min-h-[50vh] items-center justify-center">
+          <Spinner className="h-6 w-6 text-brand-600" />
+        </div>
+      </>
     );
   }
 
   return (
-    <PageShell
+    <>
+      <AppHeader />
+      <PageShell
       title="マイ案件"
       description="依頼した片付け案件の一覧です。"
       actions={
@@ -94,6 +100,7 @@ export default function MyCasesPage() {
           </a>
         ))}
       </div>
-    </PageShell>
+      </PageShell>
+    </>
   );
 }

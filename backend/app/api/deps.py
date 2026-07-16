@@ -70,7 +70,7 @@ async def get_current_operator(
     if operator.is_suspended:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account is suspended.",
+            detail="アカウントは停止中です。運営へお問い合わせください。",
         )
     return operator
 
@@ -88,12 +88,12 @@ async def get_verified_operator(
     if operator.vendor_status != "active":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account not yet approved.",
+            detail="アカウントは承認待ちです。運営の承認完了後に入札などの操作ができるようになります。",
         )
     if operator.is_suspended:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account is suspended.",
+            detail="アカウントは停止中です。運営へお問い合わせください。",
         )
     return operator
 
@@ -132,7 +132,7 @@ async def get_current_actor(
         if operator.is_suspended:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Account is suspended.",
+                detail="アカウントは停止中です。運営へお問い合わせください。",
             )
         return Actor(typ="operator", operator=operator)
     raise _CRED_EXC

@@ -3,7 +3,7 @@ import { Ic, type IcName } from "@/components/kdz/Icons";
 import "./company.css";
 
 export const metadata = {
-  title: "運営者情報 | カタヅケ",
+  title: "運営者情報",
   description:
     "カタヅケ（家まるごと・まとめて片付け買取プラットフォーム）の運営者情報・ミッションのご紹介です。",
 };

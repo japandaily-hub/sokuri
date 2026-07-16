@@ -355,9 +355,11 @@
   padding: 20px;
   opacity: 0;
   pointer-events: none;
-  transition: opacity .25s;
+  /* 閉時は視覚的に隠すだけでなく支援技術・フォーカスからも外す（visibilityはフェードアウト完了後に切替）。 */
+  visibility: hidden;
+  transition: opacity .25s, visibility 0s linear .25s;
 }
-.op-dash .modal-overlay.open { opacity: 1; pointer-events: all; }
+.op-dash .modal-overlay.open { opacity: 1; pointer-events: all; visibility: visible; transition: opacity .25s; }
 .op-dash .modal {
   background: #fff;
   border-radius: 20px;
