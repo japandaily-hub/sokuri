@@ -54,17 +54,12 @@ def upgrade() -> None:
     )
 
     # ── 4. UNIQUE制約を部分ユニークインデックスへ置換 ─────────────────
-    # 既存の unique 制約を削除（制約名が異なる環境用に両方試みる）
-    try:
-        op.drop_constraint("uq_operators_invite_code", "operators", type_="unique")
-    except Exception:
-        pass
-
-    # 既存インデックス（ix_operators_invite_code）が存在する場合は削除
-    try:
-        op.drop_index("ix_operators_invite_code", "operators")
-    except Exception:
-        pass
+    # 注意: PostgreSQL では失敗した文がトランザクション全体をアボートさせるため、
+    # savepoint 無しの try/except では回復できず、後続の全文が
+    # InFailedSQLTransaction で死ぬ（旧実装の地雷）。IF EXISTS は文自体が
+    # 成功するのでトランザクションを汚染しない。
+    op.execute(text("ALTER TABLE operators DROP CONSTRAINT IF EXISTS uq_operators_invite_code"))
+    op.execute(text("DROP INDEX IF EXISTS ix_operators_invite_code"))
 
     # NULL を除く invite_code のみを一意にする部分ユニークインデックス
     op.create_index(

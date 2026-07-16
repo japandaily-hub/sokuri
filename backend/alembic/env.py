@@ -47,11 +47,18 @@ def run_migrations_offline() -> None:
 
 
 def _do_run_migrations(connection: Connection) -> None:
-    """同期コネクション上でマイグレーションを実行する内部関数。"""
+    """同期コネクション上でマイグレーションを実行する内部関数。
+
+    transaction_per_migration=True でリビジョン毎にコミットする。
+    デフォルト（False）は upgrade 全体が単一トランザクションのため、
+    チェーン後半の1箇所の失敗で 0001 から全てロールバックされ
+    「テーブルが1つも無い空DB」が残る（2026-07 全断障害の増幅要因）。
+    """
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
         compare_type=True,
+        transaction_per_migration=True,
     )
     with context.begin_transaction():
         context.run_migrations()
