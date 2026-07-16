@@ -1,6 +1,17 @@
 # PROJECT_STATE — カタヅケ クローズドβ
 
-## 🔴 2026-07-06 本番デプロイ後点検: Renderバックエンドが応答なし（未解決・ユーザー確認待ち）
+## ✅ 2026-07-16 Renderバックエンド全断→復旧（HTTP層）: fab45c2をmainへデプロイ済み・残るはDB差し替えのみ
+- **18:38 JST 本番実証**: e77f6ab(=fab45c2 cherry-pick)デプロイ後、`/health`=200復活（7/6以来初）。`/readyz`=503 `{"db":"unreachable"}`で**DB断を外形確定**。x-render-routingヘッダも`hibernate-wake-error`（wake失敗=起動時クラッシュ）を捕獲済みで診断と完全一致。
+- **残るユーザー操作（DBのみ・下記詳細は次節）**: Renderダッシュボード→sokuri-dbのExpired確認→(データ要)有料化して救出7/26頃まで／(不要)新規無料DB作成→sokuri-backendのDATABASE_URL差し替え→再起動でalembicが新規スキーマ構築→`/readyz`が`ready`になれば全快。
+
+## 🔬 2026-07-16 Renderバックエンド無応答: 根本原因診断完了+コード側修正済み（fab45c2・デプロイ待ち）
+- **確定(確度~90%)**: 無応答の直接原因は「uvicornが一度もポートbindしていない」。start.shが`set -e`で`alembic upgrade head`成功をuvicorn起動の前提にしており、DB接続不能→alembic失敗(asyncpgデフォルト60sタイムアウト)→コンテナ即死→再起動ループ。RenderのLBは常時TLS終端するため「TCP/TLS成立・HTTP無応答」はインスタンス不在の典型症状(2026-07-16の再プローブでも継続確認: 存在しないサービス=即404に対し本件=無限ハング)。
+- **最有力トリガー(40%)**: **Render無料PostgreSQLは作成後30日で期限切れ→接続不能**(render.com/docs/free。「90日無期限」という旧render.yamlコメントは誤り)。DB作成~6/12なら期限切れ~7/12。**+14日猶予後(~7/26)にデータごと削除**。次点: Blueprint初回デプロイがsync:false変数入力待ちで未開始(20%)/DATABASE_URL未注入→localhostフォールバック(12%)/本番起動ガード発動(8%・発動時はログに「CRITICAL 起動中断:」が出る)。
+- **コード修正済み(fab45c2)**: ①start.sh=alembic失敗でもuvicorn起動(degraded) ②alembic接続タイムアウト3点セット ③実行時エンジンにもtimeout ④**/readyz新設**(=デプロイ後、/health 200+/readyz 503なら「DB断」と外形判別可能) ⑤localhostフォールバック時CRITICALログ ⑥render.yamlコメント訂正 ⑦pyproject packages find化。pytest 138緑(1 failedは既存=task_21185600)。
+- **残るユーザー操作**: (1)Renderダッシュボード→sokuri-dbページで**Expired表示と作成日**確認(期限切れなら:データ要るなら~7/26までに有料化してエクスポート/不要なら新規無料DB作成+DATABASE_URL差し替え) (2)sokuri-backend→Deploysタブで"Live"到達履歴有無(履歴ゼロ=sync:false入力待ち) (3)fab45c2をmainへ反映しRender再デプロイ(このデプロイ自体が最強の診断: /health復活+/readyzでDB状態が外から見える)。※ログ保持7日のため7/6当時のログは消失済み。
+- **⚠️30日おきに再発する**: 無料PG継続なら「期限前に再作成+URL差し替え」の運用が必要。恒久策=DB有料化($7/mo~)か外部マネージドPG(Neon/Supabase無料枠)移行。
+
+## 🔴 2026-07-06 本番デプロイ後点検: Renderバックエンドが応答なし（→2026-07-16診断完了・上記参照）
 - **状況**: `feat/design-handoff-katazuke`→`main`マージ+push、Vercel(`sokuri.vercel.app`)・Render(`sokuri-backend.onrender.com`)へ初回デプロイ実施済み(いずれもuser承認下で進行)。Vercel側は`vercel inspect`で該当コミットのビルドが`Ready`(全ルート含むbuild成功、`/operator/login`等ローカルbuildと同一サイズで一致確認)。
 - **問題**: `https://sokuri-backend.onrender.com/health` が**複数回・累計10分超の試行で一度も正常応答なし**(1回目=503(420秒後)、以降3回=完全タイムアウト(60秒/150秒/45秒、TCP/TLS確立はできるがHTTPレスポンスなし)。DNS解決・TCP/TLS接続自体は正常("Established connection"まで到達)なため、ネットワーク疎通ではなくアプリ/コンテナ側の起動停滞の可能性が高い。
 - **推定原因(要Renderダッシュボードでのログ確認・[推測])**: このBlueprintは今回が初回デプロイで、Web Service(Docker/free)+Postgres(free)とも新規プロビジョニング。(a)初回Docker起動+`alembic upgrade head`(全テーブル新規作成)+freeプランDBの初回接続が重なり異常に長い、または(b) `sync:false`指定の必須env var(`GOOGLE_API_KEY`/`BREVO_API_KEY`/`APP_ENCRYPTION_KEY`)がRenderダッシュボード側で未入力のまま起動しクラッシュループしている可能性。Render CLI/API未接続のためログを直接確認できず、断定不可。
