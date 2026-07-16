@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { Spinner } from "@/components/Icon";
+import { AppHeader } from "@/components/kdz/AppHeader";
 import {
   Card,
   Notice,
@@ -89,17 +90,23 @@ export default function UserCaseDetailPage() {
 
   if (loading || (!caseData && !error)) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <Spinner className="h-6 w-6 text-brand-600" />
-      </div>
+      <>
+        <AppHeader />
+        <div className="flex min-h-[50vh] items-center justify-center">
+          <Spinner className="h-6 w-6 text-brand-600" />
+        </div>
+      </>
     );
   }
 
   if (!caseData) {
     return (
-      <div className="container-aw max-w-3xl py-10">
-        <Notice tone="error">{error ?? "案件が見つかりません。"}</Notice>
-      </div>
+      <>
+        <AppHeader />
+        <div className="container-aw max-w-3xl py-10">
+          <Notice tone="error">{error ?? "案件が見つかりません。"}</Notice>
+        </div>
+      </>
     );
   }
 
@@ -107,6 +114,8 @@ export default function UserCaseDetailPage() {
   const myReview = txn?.reviews.find((r) => r.reviewer_type === "user");
 
   return (
+    <>
+    <AppHeader />
     <div className="container-aw max-w-3xl space-y-6 py-10">
       {search.get("created") ? (
         <Notice tone="success">
@@ -235,6 +244,27 @@ export default function UserCaseDetailPage() {
             </div>
             <StatusBadge value={txn.status} label={TXN_STATUS_LABEL[txn.status]} />
           </div>
+
+          {/* 業者とのやり取り導線（チャット/日程調整） */}
+          {txn.status !== "cancelled" && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              <a href={`/chat/${txn.id}`} className={btnPrimary}>
+                業者とチャット
+                {txn.unread_count > 0 ? `（未読${txn.unread_count}）` : ""}
+              </a>
+              {txn.status === "pending" && txn.visit_date == null ? (
+                <a href={`/schedule?transaction_id=${txn.id}`} className={btnSecondary}>
+                  訪問日程を調整する
+                </a>
+              ) : null}
+              {txn.visit_date ? (
+                <p className="self-center text-sm font-semibold text-slate-600">
+                  訪問予定: {txn.visit_date}
+                  {txn.visit_time_slot ? ` ${txn.visit_time_slot}` : ""}
+                </p>
+              ) : null}
+            </div>
+          )}
 
           {/* 減額申請（承認待ち） */}
           {pendingReduction && (
@@ -376,5 +406,6 @@ export default function UserCaseDetailPage() {
         ← マイ案件一覧へ
       </a>
     </div>
+    </>
   );
 }

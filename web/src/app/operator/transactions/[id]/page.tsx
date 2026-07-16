@@ -190,6 +190,17 @@ export default function OperatorTransactionPage() {
             <DisclosureNotice viewer="operator" disclosed={disclosed} awaitingApproval={txn.awaiting_approval} />
           </div>
 
+          {/* お客様とのやり取り導線（チャット・日程調整はチャット画面から行う） */}
+          {txn.status !== "cancelled" ? (
+            <Link
+              href={`/operator/chat/${txn.id}`}
+              className="btn btn-primary"
+              style={{ display: "inline-flex", alignSelf: "flex-start" }}
+            >
+              お客様とチャット（日程調整）
+            </Link>
+          ) : null}
+
           {txn.address ? (
             <div className="decided-card">
               <div className="decided-label">✓ 住所開示済み</div>

@@ -3,7 +3,7 @@ import Link from "next/link";
 import "./privacy.css";
 
 export const metadata: Metadata = {
-  title: "プライバシーポリシー｜カタヅケ",
+  title: "プライバシーポリシー",
   description:
     "カタヅケ運営事務局が、ユーザーおよび登録業者の個人情報をどのように収集・利用・保護するかを定めたプライバシーポリシーです。",
 };
