@@ -31,7 +31,7 @@ from app.schemas_katadzuke import (
     OperatorProfileOut,
     OperatorProfileUpdateRequest,
     OperatorPublicProfileOut,
-    ReviewOut,
+    PublicReviewOut,
 )
 
 logger = logging.getLogger(__name__)
@@ -174,19 +174,24 @@ async def get_vendor_public_profile(
     if not profile.is_public:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="業者が見つかりません。")
 
-    reviews_out: list[ReviewOut] | None = None
+    reviews_out: list[PublicReviewOut] | None = None
     if profile.show_reviews:
         rows = (
             await session.scalars(
                 select(Review)
                 .join(Transaction, Review.transaction_id == Transaction.id)
                 .join(Bid, Transaction.bid_id == Bid.id)
-                .where(Bid.operator_id == operator_id)
+                .where(
+                    Bid.operator_id == operator_id,
+                    # 公開するのは「顧客→業者」の評価のみ。業者が顧客について
+                    # 書いたレビュー（reviewer_type="operator"）は公開しない。
+                    Review.reviewer_type == "user",
+                )
                 .order_by(Review.created_at.desc())
                 .limit(50)
             )
         ).all()
-        reviews_out = [ReviewOut.model_validate(r) for r in rows]
+        reviews_out = [PublicReviewOut.model_validate(r) for r in rows]
 
     return OperatorPublicProfileOut(
         operator_id=operator.id,

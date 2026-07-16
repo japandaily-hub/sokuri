@@ -59,12 +59,13 @@ export default function OperatorCaseDetailPage() {
   }, [caseId, token]);
 
   // 承認状態（vendor_status）を取得して入札フォームの表示を出し分ける。
-  // 取得失敗時は null のままフォームを表示し、サーバー側ゲートに委ねる。
+  // null=取得中（フォームを出さずチラつきを防ぐ）。取得失敗時は "unknown" として
+  // フォームを表示し、サーバー側ゲート（get_verified_operator の403）に委ねる。
   useEffect(() => {
     if (!token) return;
     getOperatorProfile(token)
       .then((p) => setVendorStatus(p.vendor_status))
-      .catch(() => setVendorStatus(null));
+      .catch(() => setVendorStatus("unknown"));
   }, [token]);
 
   useEffect(() => {
@@ -115,7 +116,8 @@ export default function OperatorCaseDetailPage() {
 
   const canBid = (caseData.status === "open" || caseData.status === "bidding") && !caseData.my_bid;
   // 承認前（pending/limited）はサーバーが入札を403で拒否するため、フォームの代わりに案内を出す。
-  const awaitingApproval = vendorStatus !== null && vendorStatus !== "active";
+  const statusLoading = vendorStatus === null;
+  const awaitingApproval = !statusLoading && vendorStatus !== "active" && vendorStatus !== "unknown";
 
   return (
     <div className="case-detail-page">
@@ -202,6 +204,10 @@ export default function OperatorCaseDetailPage() {
                   <Ic name="arrow" className="arw" />
                 </Link>
               ) : null}
+            </div>
+          ) : canBid && statusLoading ? (
+            <div className="op-card" style={{ display: "flex", justifyContent: "center", padding: 24 }}>
+              <Spinner className="h-5 w-5 text-brand-600" />
             </div>
           ) : canBid && awaitingApproval ? (
             <div className="op-alert info">

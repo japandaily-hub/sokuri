@@ -323,6 +323,14 @@ export function updateOperatorProfile(
   });
 }
 
+/** 公開プロフィールのレビュー（バックエンド PublicReviewOut。内部IDは含まれない）。 */
+export interface PublicReview {
+  id: string;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+}
+
 export interface OperatorPublicProfile {
   operator_id: string;
   company_name: string;
@@ -335,7 +343,7 @@ export interface OperatorPublicProfile {
   intro_message: string | null;
   accept_unsellable: boolean;
   rating: number | null;
-  reviews: ReviewOut[] | null;
+  reviews: PublicReview[] | null;
 }
 
 export function getVendorPublicProfile(operatorId: string): Promise<OperatorPublicProfile> {

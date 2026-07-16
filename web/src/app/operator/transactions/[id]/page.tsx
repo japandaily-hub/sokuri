@@ -195,7 +195,7 @@ export default function OperatorTransactionPage() {
             <Link
               href={`/operator/chat/${txn.id}`}
               className="btn btn-primary"
-              style={{ display: "inline-flex", alignSelf: "flex-start" }}
+              style={{ display: "inline-flex" }}
             >
               お客様とチャット（日程調整）
             </Link>

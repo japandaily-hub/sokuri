@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import secrets
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import func, select, text
@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_admin
 from app.core.crypto import decrypt_json
+from app.db.models.case import Case
 from app.db.models.invite import Invite
 from app.db.models.operator import Operator
 from app.db.models.operator_application import OperatorApplication
@@ -193,15 +194,18 @@ async def get_cell_density(
     )
     active_suppliers = int(active_suppliers_count or 0)
 
+    # 生SQLの datetime('now','-30 days') は SQLite 専用関数で本番 PostgreSQL では
+    # エラーになるため、方言非依存の SQLAlchemy 式で書く。
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
     rows = await session.execute(
-        text(
-            "SELECT prefecture, purpose, COUNT(*) AS open_cases "
-            "FROM cases "
-            "WHERE status IN ('open', 'bidding') "
-            "AND created_at >= datetime('now', '-30 days') "
-            "GROUP BY prefecture, purpose "
-            "ORDER BY open_cases DESC"
+        select(
+            Case.prefecture,
+            Case.purpose,
+            func.count().label("open_cases"),
         )
+        .where(Case.status.in_(("open", "bidding")), Case.created_at >= cutoff)
+        .group_by(Case.prefecture, Case.purpose)
+        .order_by(func.count().desc())
     )
 
     result = []
