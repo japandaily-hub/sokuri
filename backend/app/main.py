@@ -14,6 +14,8 @@ from typing import AsyncGenerator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
 from app.api.v1.router import api_router
 from app.config import Settings, get_settings
@@ -76,6 +78,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "または短すぎる（32文字未満）まま起動しようとしました。"
                 "Render の環境変数で十分な長さのランダムな JWT_SECRET を設定してください。"
             )
+        if "@localhost" in settings.database_url or "@127.0.0.1" in settings.database_url:
+            # 起動は継続する（全断より degraded + 可観測性を優先）が、原因をログで即特定
+            # できるようにする。DATABASE_URL 未注入時は config.py のデフォルト
+            # (localhost) にフォールバックするため、本番でこれが出たら env 注入漏れ確定。
+            logger.critical(
+                "本番環境（APP_ENV=production）で DATABASE_URL が localhost を指しています。"
+                "Render の fromDatabase 注入が効いていない（DB 削除・リンク切れ・env 未設定）"
+                "可能性が高く、DB 依存 API は全て失敗します。/readyz で到達性を確認してください。"
+            )
         origin_tokens = [t.strip() for t in settings.allowed_origins_raw.split(",")]
         if any("*" in t for t in origin_tokens):
             logger.critical(
@@ -120,6 +131,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/health", tags=["System"], summary="ヘルスチェック")
     async def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/readyz", tags=["System"], summary="レディネスチェック（DB到達性込み）")
+    async def readyz() -> JSONResponse:
+        """liveness(/health) と分離した readiness プローブ。
+
+        DB へ実際に ``SELECT 1`` を投げて到達性を検証する（5 秒上限）。
+        マイグレーション失敗や DB 期限切れで degraded 起動した場合、
+        /health=200 のまま本エンドポイントが 503 を返すため、外形監視だけで
+        「プロセス断」と「DB 断」を切り分けられる。
+        """
+        try:
+            async with asyncio.timeout(5):
+                async with engine.connect() as conn:
+                    await conn.execute(text("SELECT 1"))
+        except Exception as exc:  # noqa: BLE001 -- 到達性判定のため例外種別は問わない
+            logger.error("readyz: DB 到達性チェック失敗 - %s", exc)
+            return JSONResponse(
+                {"status": "degraded", "db": "unreachable"}, status_code=503
+            )
+        return JSONResponse({"status": "ready", "db": "ok"})
 
     return app
 

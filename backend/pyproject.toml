@@ -33,5 +33,8 @@ target-version = "py311"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 
-[tool.setuptools]
-packages = ["app"]
+# packages=["app"] の明示列挙はサブパッケージ(app.api/app.db/app.core/app.services)を
+# site-packages にインストールしない不完全指定（現在は WORKDIR=/app の cwd が sys.path に
+# 入るため潜在化）。find 方式でサブパッケージまで確実に含める。
+[tool.setuptools.packages.find]
+include = ["app*"]
