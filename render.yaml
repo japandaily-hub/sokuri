@@ -13,7 +13,9 @@ databases:
   - name: sokuri-db
     databaseName: sokuri
     user: sokuri
-    plan: free          # 90 日無期限の Free PostgreSQL（再起動なし、永続）
+    plan: free          # ⚠️ Free PostgreSQL は【作成後30日で期限切れ→接続不能】+14日猶予後に
+                        #    データごと削除される（render.com/docs/free）。旧コメント「90日無期限」は
+                        #    誤り。本番継続には期限前に有料化 or 外部PG移行 or 定期再作成が必須。
     region: oregon
     ipAllowList: []     # 内部接続のみ（Render Web Service からの接続を許可）
 
@@ -61,6 +63,7 @@ services:
         value: "https://sokuri.vercel.app"   # CORS許可オリジン（カンマ区切り、未設定時は"*"にしない）。
                                               # 未設定時は FRONTEND_BASE_URL + localhost にフォールバック（config.py 参照）
       - key: APP_ENCRYPTION_KEY
-        sync: false            # dashboard で手動入力（git 漏洩防止）。未設定時は機微データ暗号化(Fernet)の
-                                # 呼び出し時点でEncryptionKeyMissingErrorを送出しプロセスを止める(app/core/crypto.py)。
+        sync: false            # dashboard で手動入力（git 漏洩防止）。未設定時は機微データ暗号化(Fernet)を
+                                # 使うリクエストがEncryptionKeyMissingError→500になる（プロセスは落ちない。
+                                # app/core/crypto.py はハンドラ内で送出しFastAPIが500に変換する）。
                                 # 生成: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"

@@ -25,7 +25,10 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # DB URL を app 設定から注入。
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
+# ConfigParser は "%" を補間構文として解釈するため "%%" にエスケープする
+# （パスワード等に "%" が含まれると InterpolationSyntaxError で即死するのを防ぐ。
+#   get_main_option() で読み戻す際に補間で "%" に復元される）。
+config.set_main_option("sqlalchemy.url", get_settings().database_url.replace("%", "%%"))
 
 target_metadata = Base.metadata
 
@@ -55,11 +58,25 @@ def _do_run_migrations(connection: Connection) -> None:
 
 
 async def run_migrations_online() -> None:
-    """オンラインモード。async エンジンで接続しマイグレーションを適用する。"""
+    """オンラインモード。async エンジンで接続しマイグレーションを適用する。
+
+    タイムアウトを明示し「DB 無応答 → alembic 無限ハング → uvicorn 永遠に未起動」を
+    構造的に不可能にする（接続確立 10 秒 / 各 SQL 120 秒 / ロック待ち 10 秒）。
+    asyncpg 以外のドライバ（テスト用 SQLite 等）には固有パラメータを渡さない。
+    """
+    url = config.get_main_option("sqlalchemy.url") or ""
+    connect_args: dict = {}
+    if url.startswith("postgresql+asyncpg"):
+        connect_args = {
+            "timeout": 10,
+            "command_timeout": 120,
+            "server_settings": {"lock_timeout": "10s", "statement_timeout": "120s"},
+        }
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=connect_args,
     )
     async with connectable.connect() as connection:
         await connection.run_sync(_do_run_migrations)

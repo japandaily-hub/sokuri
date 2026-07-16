@@ -10,8 +10,18 @@
 
 set -e
 
+# マイグレーション失敗でも uvicorn は必ず起動する（2026-07 全断障害の教訓）。
+# 旧設計は「alembic 失敗 → set -e で即終了 → uvicorn 未起動 → クラッシュループ」で、
+# DB 側の一時/恒久障害（無料PG期限切れ等）がサービス全断（/health 含む）に増幅されていた。
+# 起動を止めず degraded で立ち上げれば、/health は返り、Render のログも読める。
+# DB 到達性は /readyz（app/main.py）で判別する。
 echo "[start.sh] Running alembic migrations..."
-alembic upgrade head
+if alembic upgrade head; then
+  echo "[start.sh] Migrations applied."
+else
+  echo "[start.sh] WARN: alembic migration failed (exit $?). Starting uvicorn anyway (degraded)." >&2
+  echo "[start.sh] WARN: DB-dependent APIs will fail; check /readyz and DATABASE_URL / DB status." >&2
+fi
 
 echo "[start.sh] Launching uvicorn on port ${PORT:-8000}..."
 exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"
