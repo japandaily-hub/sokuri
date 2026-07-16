@@ -309,6 +309,18 @@ class ReviewOut(BaseModel):
     created_at: datetime
 
 
+class PublicReviewOut(BaseModel):
+    """無認証の公開プロフィール用レビュー。内部識別子（transaction_id）や
+    reviewer_type を含めない最小フィールドのみ公開する。"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    rating: int
+    comment: str | None
+    created_at: datetime
+
+
 # ──────────────────────────── 管理 ────────────────────────────
 
 
@@ -533,7 +545,7 @@ class OperatorPublicProfileOut(BaseModel):
     intro_message: str | None = None
     accept_unsellable: bool = False
     rating: float | None = None
-    reviews: list[ReviewOut] | None = None
+    reviews: list[PublicReviewOut] | None = None
 
 
 # 前方参照の解決

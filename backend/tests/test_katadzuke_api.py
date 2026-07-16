@@ -731,13 +731,14 @@ async def test_pending_operator_cannot_bid(client: AsyncClient, db_session: Asyn
     r = await client.get(f"/api/v1/cases/{case['id']}", headers=_auth(pending_op_token))
     assert r.status_code == 200
 
-    # 入札はブロックされる
+    # 入札はブロックされる（エラーメッセージは日本語で承認待ちである旨を伝える）
     r = await client.post(
         f"/api/v1/cases/{case['id']}/bids",
         json={"amount": 30000},
         headers=_auth(pending_op_token),
     )
     assert r.status_code == 403
+    assert "承認待ち" in r.json()["detail"]
 
 
 async def test_deapproved_operator_address_hidden(
@@ -1602,6 +1603,43 @@ async def test_vendor_public_profile_respects_show_flags(
     data = r.json()
     assert data["intro_message"] is None  # show_message=False のため省かれる
     assert data["company_name"] == "公開プロフィール株式会社"
+
+
+async def test_vendor_public_profile_reviews_user_only_and_minimal_fields(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """無認証の公開プロフィールに (a)業者が顧客について書いたレビューが混入しない
+    (b)内部識別子(transaction_id)・reviewer_type が露出しない ことの回帰テスト。"""
+    admin_token = await _make_admin(client, db_session)
+    user_token = await _signup_user(client, "pubreview_user@example.com")
+    op_token, op_id = await _verified_operator(
+        client, db_session, admin_token, "pubreview_op@example.com", "公開レビュー株式会社"
+    )
+    _, txn_id = await _create_transaction(client, user_token, op_token)
+    r = await client.post(f"/api/v1/transactions/{txn_id}/complete", headers=_auth(user_token))
+    assert r.status_code == 200
+
+    # 双方向レビュー: 顧客→業者 と 業者→顧客
+    r = await client.post(
+        "/api/v1/reviews",
+        json={"transaction_id": txn_id, "rating": 5, "comment": "丁寧でした"},
+        headers=_auth(user_token),
+    )
+    assert r.status_code in (200, 201)
+    r = await client.post(
+        "/api/v1/reviews",
+        json={"transaction_id": txn_id, "rating": 2, "comment": "顧客対応の内部メモ"},
+        headers=_auth(op_token),
+    )
+    assert r.status_code in (200, 201)
+
+    r = await client.get(f"/api/v1/vendors/{op_id}")
+    assert r.status_code == 200
+    reviews = r.json()["reviews"]
+    assert reviews is not None and len(reviews) == 1  # 顧客→業者のみ
+    assert reviews[0]["comment"] == "丁寧でした"
+    assert "transaction_id" not in reviews[0]
+    assert "reviewer_type" not in reviews[0]
 
 
 async def test_vendor_public_profile_404_when_not_public(
