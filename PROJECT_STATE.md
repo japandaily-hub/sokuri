@@ -1,5 +1,10 @@
 # PROJECT_STATE — カタヅケ クローズドβ
 
+## ✅ 2026-07-17 [claude] 本番バックエンド完全復旧を外形実証（schema=0011 head・機能プローブ全緑）
+- **経緯**: DB差し替え後も「接続OK・スキーマ不在→DB系API全500」が残存していた。/readyzをスキーマ自覚型に拡張（f240ae8: alembic_version+主要テーブル有無を返す）して外形診断→**0007で決定論的に停止**していることを特定。真因はCodexが f6dd33f で確定・修正: **alembic_versionテーブルのVARCHAR(32)に「0008_operator_applications_and_pending_status」(45文字)が収まらず版数記録が失敗**する構造欠陥（transaction_per_migrationでも当該リビジョンごとロールバック→0007から進めない）。列拡幅+Codexの/readyzトレースバック外形化(6eec362)デプロイ後、チェーンが head(0011_line_user_id) まで完走。
+- **本番実測（2026-07-17未明）**: `/readyz`={"status":"ready","db":"ok","schema":{"alembic_version":"0011_line_user_id"=expected_head, 全テーブルtrue}} / login誤クレデンシャル=**401日本語** / vendors不在ID=**404日本語**（[claude]のdeps日本語化・vendors修正も本番反映確認）。Vercel側も新タイトル群を実測済み。**フロント・バックエンドとも全快**。
+- **教訓**: 「デプロイごとに少しずつ前進」に見えたのはリビジョンID長≤32のものだけ通過していたため。リビジョンIDは32文字以内に保つか、alembic_version拡幅を初期migrationに含めるのが安全（version_table長はf6dd33fで恒久対処済み）。
+
 ## 🚀 2026-07-16 [claude] 導線監査是正一式を本番デプロイ完了（main=d8d0013）+ security/QAレビュー通過
 - **デプロイ**: 下記ウォークスルー是正（3コミット）+レビュー是正（d7d63cf）を2段でmainへマージ（639e6a0→d8d0013）。Vercel=反映確認済み（/login「ログイン | カタヅケ」・/company 二重タイトル解消・/business /faq 新title、いずれも本番HTML実測）。Render=autoDeploy:true・/health=200・/readyz=`{"db":"ok"}`（**DBはユーザーが差し替え済みで全快**。Codexの起動チェーン修正fab45c2/9622e61もmain反映済み）。
 - **security-reviewer（Medium 1→修正済d7d63cf）**: 無認証の公開プロフィール `/vendors/{id}` に (a)業者が顧客について書いたレビューが混入（reviewer_type未フィルタ） (b)内部transaction_idが露出 → 顧客→業者レビューのみ+PublicReviewOut（最小フィールド）に限定、回帰テスト追加。IDOR/クライアントゲート誤用/redirect系は問題なし判定。
