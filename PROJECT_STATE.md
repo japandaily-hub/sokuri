@@ -1,5 +1,13 @@
 # PROJECT_STATE — カタヅケ クローズドβ
 
+## 🚀 2026-07-16 [claude] 導線監査是正一式を本番デプロイ完了（main=d8d0013）+ security/QAレビュー通過
+- **デプロイ**: 下記ウォークスルー是正（3コミット）+レビュー是正（d7d63cf）を2段でmainへマージ（639e6a0→d8d0013）。Vercel=反映確認済み（/login「ログイン | カタヅケ」・/company 二重タイトル解消・/business /faq 新title、いずれも本番HTML実測）。Render=autoDeploy:true・/health=200・/readyz=`{"db":"ok"}`（**DBはユーザーが差し替え済みで全快**。Codexの起動チェーン修正fab45c2/9622e61もmain反映済み）。
+- **security-reviewer（Medium 1→修正済d7d63cf）**: 無認証の公開プロフィール `/vendors/{id}` に (a)業者が顧客について書いたレビューが混入（reviewer_type未フィルタ） (b)内部transaction_idが露出 → 顧客→業者レビューのみ+PublicReviewOut（最小フィールド）に限定、回帰テスト追加。IDOR/クライアントゲート誤用/redirect系は問題なし判定。
+- **qa-reviewer（Medium 1・Low 5→全て修正済d7d63cf）**: vendor_status取得中の入札フォームチラつき→3状態化（取得中=Spinner）。日本語403のテストアサーション追加・孤児CSS削除・layoutスタイル統一・無効style除去。
+- **追加検出（レビュー過程）**: `/admin/cell-density` の生SQL `datetime('now','-30 days')` がSQLite専用で**本番PostgreSQLでは500になる**バグ→SQLAlchemy式へ書換（d7d63cf）。※ローカルの「案件数1」表示は正しい集計だった（open/biddingのみ対象のため）。
+- **gate_status**: pytest=**141 passed** / tsc=クリーン / build=41ルート / 本番外形=Vercel4ページ+Render health/readyz実測。
+- **申し送り**: /examples架空事例(task_83692f21)・「上位3社」コピー不一致(task_7de2d145)・profile/withdraw復元用API(task_74d343ae)はタスクチップ化済み。無料PG30日期限は再発するため運用注意（[[render-free-postgres-30day-expiry]]相当の恒久策検討推奨）。
+
 ## ✅ 2026-07-16 [claude] 新デザイン全画面ウォークスルー+導線監査→P0導線欠落4件を含む10件是正（ローカル実機検証済）
 - **背景**: ユーザー指示「トップ以外の全画面（業者/admin/査定フロー等）をプレビュー確認し、デザイン/導線を全方向から再確認→修正→デプロイ完走」。ローカル実機（backend=run_local_e2e.py:8000 + web dev:3100、seed=4案件4状態: 入札選択待ち/入札なし/取引中(減額申請中)/完了評価済み + active/pending業者 + admin）で全41ルートを巡回。入札→落札→チャット双方向→減額申請→完了→評価投稿の全サイクルをUI実操作で検証、コンソールエラー0・モバイル375px横はみ出し0。
 - **P0是正（導線の孤児ページ解消）**: ①`/chat/[id]`・`/schedule`にユーザー側から到達する導線がゼロ→`/cases/[id]`成約パネルに「業者とチャット（未読数付き）」「訪問日程を調整する」「訪問予定表示」を追加 ②`/operator/chat/[id]`も業者側導線ゼロ→`/operator/transactions/[id]`に「お客様とチャット（日程調整）」を追加。
