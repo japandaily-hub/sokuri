@@ -12,6 +12,7 @@ from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import pool
+from sqlalchemy import text as sa_text
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
@@ -86,6 +87,21 @@ async def run_migrations_online() -> None:
         connect_args=connect_args,
     )
     async with connectable.connect() as connection:
+        # alembic_version.version_num はデフォルト VARCHAR(32) だが、本チェーンには
+        # 32文字超のリビジョンID（0008=46字/0009=44字/0010=37字）があり、マイグレー
+        # ション本体が成功しても自身のバージョン記録(UPDATE)が
+        # StringDataRightTruncationError で失敗→全ロールバックする（2026-07 全断障害の
+        # 真因）。先に冪等で広げる。IF EXISTS によりテーブル未作成（初回）は no-op で、
+        # 初回は alembic が 32 字で作成→0008 で一度失敗→start.sh のリトライ再実行時に
+        # ここで広がって自己回復する。
+        if url.startswith("postgresql"):
+            await connection.execute(
+                sa_text(
+                    "ALTER TABLE IF EXISTS alembic_version "
+                    "ALTER COLUMN version_num TYPE VARCHAR(255)"
+                )
+            )
+            await connection.commit()
         await connection.run_sync(_do_run_migrations)
     await connectable.dispose()
 
