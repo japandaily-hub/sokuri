@@ -132,14 +132,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def health() -> dict[str, str]:
         return {"status": "ok"}
 
-    @app.get("/readyz", tags=["System"], summary="レディネスチェック（DB到達性込み）")
+    @app.get("/readyz", tags=["System"], summary="レディネスチェック（DB到達性+スキーマ状態込み）")
     async def readyz() -> JSONResponse:
         """liveness(/health) と分離した readiness プローブ。
 
         DB へ実際に ``SELECT 1`` を投げて到達性を検証する（5 秒上限）。
-        マイグレーション失敗や DB 期限切れで degraded 起動した場合、
-        /health=200 のまま本エンドポイントが 503 を返すため、外形監視だけで
-        「プロセス断」と「DB 断」を切り分けられる。
+        さらに alembic_version の現在リビジョンと主要テーブルの有無を返し、
+        「接続はできるがマイグレーション未完了（空/部分スキーマ）」を
+        外形監視だけで特定できるようにする（Render のログを見られない
+        環境からの診断用。2026-07 全断障害で接続OK・スキーマ不在の切り分けに
+        /readyz が無力だった反省から拡張）。
         """
         try:
             async with asyncio.timeout(5):
@@ -150,7 +152,42 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return JSONResponse(
                 {"status": "degraded", "db": "unreachable"}, status_code=503
             )
-        return JSONResponse({"status": "ready", "db": "ok"})
+
+        # スキーマ状態（診断情報）。取得失敗は unknown として本体判定を阻害しない。
+        alembic_rev: str | None = None
+        tables: dict[str, bool] = {}
+        try:
+            async with asyncio.timeout(5):
+                async with engine.connect() as conn:
+
+                    def _inspect(sync_conn) -> tuple[str | None, dict[str, bool]]:  # noqa: ANN001
+                        from sqlalchemy import inspect as sa_inspect
+
+                        insp = sa_inspect(sync_conn)
+                        present = {
+                            name: insp.has_table(name)
+                            for name in ("users", "operators", "cases", "transactions")
+                        }
+                        rev = None
+                        if insp.has_table("alembic_version"):
+                            rev = sync_conn.execute(
+                                text("SELECT version_num FROM alembic_version")
+                            ).scalar()
+                        return rev, present
+
+                    alembic_rev, tables = await conn.run_sync(_inspect)
+        except Exception as exc:  # noqa: BLE001 -- 診断情報の欠落は readiness を壊さない
+            logger.error("readyz: スキーマ状態の取得失敗 - %s", exc)
+
+        schema_ok = bool(tables) and all(tables.values())
+        return JSONResponse(
+            {
+                "status": "ready" if schema_ok else "degraded",
+                "db": "ok",
+                "schema": {"alembic_version": alembic_rev, "tables": tables},
+            },
+            status_code=200 if schema_ok else 503,
+        )
 
     return app
 
