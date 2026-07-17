@@ -20,8 +20,8 @@ const FEATURES: { no: string; icon: IconName; title: string; desc: string }[] = 
   {
     no: "03",
     icon: "shield",
-    title: "連絡は上位3社だけ",
-    desc: "連絡が来るのは査定額の上位3社のみ。それ以外には自動でお断りが入り、営業電話の一斉架電はありません。",
+    title: "連絡は選んだ1社だけ",
+    desc: "連絡が来るのは、あなたが選んだ1社のみ。選ばなかった業者には自動でお断りが入り、営業電話の一斉架電はありません。",
   },
 ];
 
