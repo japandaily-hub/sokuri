@@ -188,14 +188,15 @@ async def get_transaction(
             )
             if party == "operator":
                 owner_email = await _owner_email(session, txn)
-                # LINE専用ユーザーの仮メール（実メール未設定）はそのまま業者に開示しない。
-                # 実在しないドメインの開示は業者側の連絡試行を無意味に失敗させるため、
-                # 案内文言に置き換える（LINE経由での連絡を促す）。
-                out.contact_email = (
-                    "LINEにて連絡"
-                    if notify.is_placeholder_email(owner_email)
-                    else owner_email
-                )
+                # 内部専用メールはそのまま業者に開示しない。実在しないドメインの開示は
+                # 業者側の連絡試行を無意味に失敗させ、退会トムストンは内部UUIDの漏出にもなる。
+                # 退会済み→「退会済みユーザー」、LINE専用の仮メール→LINE経由の連絡を促す。
+                if notify.is_deleted_account_email(owner_email):
+                    out.contact_email = "退会済みユーザー"
+                elif notify.is_placeholder_email(owner_email):
+                    out.contact_email = "LINEにて連絡"
+                else:
+                    out.contact_email = owner_email
             else:
                 out.contact_email = txn.bid.operator.contact_email
 

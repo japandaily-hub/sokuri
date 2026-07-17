@@ -187,12 +187,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       });
       return true;
     },
-    jwt({ token, user }) {
+    jwt({ token, user, trigger, session }) {
       if (user) {
         token.accessToken = user.accessToken;
         token.accountType = user.accountType;
         token.role = user.role;
         token.verified = user.verified ?? true;
+      }
+      // クライアントの useSession().update({...}) 経由（自セッションの書換のみ・権限昇格リスクなし）。
+      // 例: パスワード変更後の新JWT反映、プロフィール保存後のヘッダー氏名即時反映。
+      if (trigger === "update" && session) {
+        const patch = session as { accessToken?: unknown; name?: unknown };
+        if (typeof patch.accessToken === "string" && patch.accessToken) {
+          token.accessToken = patch.accessToken;
+        }
+        if (typeof patch.name === "string" && patch.name.trim()) {
+          token.name = patch.name;
+        }
       }
       return token;
     },
