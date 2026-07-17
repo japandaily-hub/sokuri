@@ -499,6 +499,57 @@ async def test_full_flow_bid_select_reduction_complete_review(
     assert op1["rating"] == 5.0
 
 
+# ──────────────────────────── 入札メッセージ: 連絡先/URLガード ────────────────────────────
+
+
+async def test_bid_message_with_phone_number_rejected_422(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """入札メッセージに電話番号が含まれる場合は422で拒否される（脱プラットフォーム勧誘対策）。"""
+    admin_token = await _make_admin(client, db_session)
+    user_token = await _signup_user(client, "guard_user@example.com")
+    op_token, _ = await _verified_operator(
+        client, db_session, admin_token, "guard_op@example.com"
+    )
+    case = await _create_case(client, user_token)
+
+    r = await client.post(
+        f"/api/v1/cases/{case['id']}/bids",
+        json={"amount": 30000, "message": "ご質問はお電話ください 090-1234-5678 まで"},
+        headers=_auth(op_token),
+    )
+    assert r.status_code == 422
+    assert "連絡先" in r.json()["detail"]
+
+    # 422時にDB副作用が残らないこと（入札レコードが作成されず、案件がopenのまま）の回帰保証。
+    r = await client.get(f"/api/v1/cases/{case['id']}/bids", headers=_auth(user_token))
+    assert r.status_code == 200
+    assert r.json() == []
+
+    r = await client.get(f"/api/v1/cases/{case['id']}", headers=_auth(user_token))
+    assert r.status_code == 200
+    assert r.json()["status"] == "open"
+
+
+async def test_bid_message_without_contact_info_accepted_201(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """連絡先やURLを含まない通常の入札メッセージは201で受け付けられる。"""
+    admin_token = await _make_admin(client, db_session)
+    user_token = await _signup_user(client, "guard_ok_user@example.com")
+    op_token, _ = await _verified_operator(
+        client, db_session, admin_token, "guard_ok_op@example.com"
+    )
+    case = await _create_case(client, user_token)
+
+    r = await client.post(
+        f"/api/v1/cases/{case['id']}/bids",
+        json={"amount": 30000, "message": "丁寧に対応いたします。よろしくお願いします。"},
+        headers=_auth(op_token),
+    )
+    assert r.status_code == 201
+
+
 async def test_transaction_list_has_review_reflects_user_review(
     client: AsyncClient, db_session: AsyncSession
 ):

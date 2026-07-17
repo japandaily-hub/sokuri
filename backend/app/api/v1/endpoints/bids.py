@@ -18,6 +18,7 @@ from app.db.models.user import User
 from app.db.session import get_session
 from app.schemas_katadzuke import BidCreateRequest, BidOut, TransactionOut
 from app.services import notify, notify_dispatch
+from app.services.message_guard import contains_contact_info
 
 router = APIRouter()
 
@@ -92,6 +93,13 @@ async def create_bid(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="この案件には既に入札済みです。",
+        )
+    # プラットフォーム外への直接連絡を誘導する電話番号/URL/メールアドレスの
+    # 埋め込みは利用規約の禁止行為のため、入札作成時に拒否する（security review Low指摘対応）。
+    if contains_contact_info(body.message):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="入札メッセージに連絡先（電話番号・メールアドレス）やURLは記載できません。",
         )
 
     bid = Bid(case_id=case.id, operator_id=operator.id, amount=body.amount, message=body.message)

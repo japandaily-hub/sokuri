@@ -1,5 +1,11 @@
 # PROJECT_STATE — カタヅケ クローズドβ
 
+## ✅ 2026-07-17 [claude] 入札メッセージに連絡先/URL検知ガード追加（脱プラットフォーム勧誘対策・security Lowフォローアップ）
+- **背景**: BidCreateRequest.message（2000字）は選定前ユーザーに表示され、電話番号/URL/メール埋込みによる規約禁止の脱プラットフォーム勧誘の片方向経路だった（07-17「上位3社」是正時のLow申し送り(2)）。
+- **実装**: 新規 `backend/app/services/message_guard.py`（純粋関数 `contains_contact_info`）を `create_bid` で呼び、検知時 422「入札メッセージに連絡先（電話番号・メールアドレス）やURLは記載できません。」（サイレント削除は不採用）。検知=NFKC正規化+Cf(ゼロ幅)除去→①電話: 区切り文字（ハイフン類/空白/./()/,、/:;・|_*）対応の候補抽出+「全連結」と「最大4グループ窓」の二段判定（10-11桁・先頭0・00始まり除外、+81=81始まり12桁も対象）②URL: https?://とwww.（裸ドメイン対象外）③メール: TLDをASCII英字2字以上に限定（「単価@1.5万円」誤検知回避）。3桁カンマ区切り金額（800,000-1,000,000円等）は事前に#置換で電話判定から除外。
+- **レビュー往復（3ラウンド）**: 初版→qa High「カンマ/スラッシュ区切りで全回避」→区切り拡張+窓判定→qa **Critical**「窓判定が金額レンジの断片を橋渡し連結し1,000,000-1,200,000円等を誤422」（実運用頻出・追加テスト自身が見逃していた）→3桁カンマ無害化+00始まり除外→**security/qa双方承認**（ReDoSなし・退行なし・逆算探索でも新規誤検知なし）。既知の制限はdocstringに明文化（カナ表記/LINE ID/裸ドメイン/3桁カンマ偽装は原理的or意図的に非検知、先頭0の10-11桁見積番号等は過剰検知許容）。
+- **gate_status**: pytest=**193 passed**（+30、単体+API 422/201+422時DB無副作用アサート）/ ruff=変更4ファイルクリーン。
+- **申し送り**: intro_message等の他フィールドへの拡大適用はチップ化済（task_a86c49cc）。**未push**: mainへローカルマージのみ（push=Vercel/Render自動デプロイはユーザー承認事項。7/17のコピー是正3cc03e8も未デプロイのまま積まれている）。
 ## ✅ 2026-07-17 [claude] 「写真と品目のみ」過小記載是正（security Low申し送りフォローアップ）— 査定段階の開示範囲コピーを実装に整合
 - **方針**: 実装が正=CaseMaskedOut（backend/app/schemas_katadzuke.py:164-181）は査定段階で purpose/prefecture/city/housing_type/floor_plan/floor_number/has_elevator/ai_summary も業者に開示。マーケ面は統一表現「写真・品目・地域（都道府県・市区町村）・住居情報などの出品内容のみ」、法的文書（terms第5条・privacy第4条note）は利用目的・住居情報内訳・AI要約まで完全列挙（スキーマと1対1一致をqa/securityが照合済）。「氏名・電話・詳細住所は成約1社にのみ開示」の核心はタスク指示どおり維持。
 - **変更**: 8ファイル11箇所・文字列リテラルのみ（page.tsx×4=FAQ/assure帯「氏名・番地は伏せたまま」/オークション手順1/trustカード、faq:55、terms第4・5条、privacy第4条note、landing/Faq:19=未importデッドコード予防、create:280確認画面、business:50構成文）。タスク指定5箇所に加えgrep発見の同種3箇所（privacy第4条・terms第4条・business:50）も是正。「写真と品目」残存4箇所（complete:98/business:44/page:32/photo-guide:87）は排他主張なしの意図的残置。docs/design_handoff_katazuke/ は対象外。
