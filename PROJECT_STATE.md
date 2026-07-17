@@ -1,6 +1,13 @@
 # PROJECT_STATE — カタヅケ クローズドβ
 
-## 🚀 2026-07-16 [claude] 導線監査是正一式を本番デプロイ完了（main=d8d0013）+ security/QAレビュー通過
+## ✅ 2026-07-17 [claude] アカウント管理3機能（プロフィール更新/PW変更/退会）実装+profile/withdraw復元実配線（worktreeブランチ 05d366d・mainマージ未実施）
+- **経緯**: task_74d343ae（redirect化していた /mypage/profile・/mypage/withdraw の復元用API）を architect設計→backend→frontend→security/qa並列レビューの規約フローで完遂。ブランチ=claude/musing-archimedes-f1622f（worktree）。**mainへのマージ・本番デプロイは未実施（ユーザー判断待ち）**。
+- **backend**: User拡張8列（family_name/given_name/カナ2列/phone/residence_area/deleted_at/password_changed_at・全nullable、name は表示用キャッシュとして「姓 名」同期）+ alembic 0012。新規 `endpoints/users.py`: GET/PUT `/users/me/profile`・PUT `/users/me/password`（成功時に新JWT返却）・DELETE `/users/me`。deps.py に失効ゲート2種（deleted_at 論理削除・iat<password_changed_at、SQLite tz-naive補正/秒切捨て比較）。JWT7日長命のため PW変更後の旧トークン即時失効は必須と判断し当初設計の[将来]を前倒し実装。
+- **退会設計（architect決定）**: 進行中取引(pending/visiting)は409ブロック（自動キャンセルしない）・未成約case(draft/open/bidding)は自動cancelled化+address_detail除去・User行はPII匿名化（email=deleted-{id}@deleted.katazuke.internal、氏名/電話/LINE連携null化）・完了取引/メッセージ/レビューは業者側記録として保持・同一email再登録可。
+- **frontend**: 2ページを git 5362359^ から復元し実配線（モック山田花子・偽装完了パネル全廃）。auth.ts jwt callback に trigger==="update" マージ追加→PW変更後 `update({accessToken})` でセッショントークン差替（忘れると全API401になる急所）・保存後 `update({name})` でヘッダー即時反映。LINE専用（has_password=false）はPW変更セクション説明化・退会はconfirmのみ。通知トグルはデータ源なしのため削除、退会画面は実件数表示+文言を実挙動に忠実化（「全データ完全削除」と言わない）。
+- **レビュー**: security=Critical/High 0（IDOR/権限昇格/SQLi/XSS/CSRF/失効ゲート網羅を確認済み判定）。qa=合格。是正済み=退会トムストンメールの業者向け露出（is_placeholder_email に @deleted.katazuke.internal 追加+「退会済みユーザー」表示）・profile頁危険ゾーン文言矛盾・空白のみ氏名（str_strip_whitespace）・カナregex制御空白・auth.ts nameガード。**未対応（別タスク化）**: 認証系レート制限（/auth/login 総当たり・task_012a348f）・LINE専用退会のstep-up認証（設計割り切りとして許容）・メッセージ本文PII残存の告知（文言側で対応済み）。
+- **gate_status**: pytest=**166 passed**（新規 test_account_api.py 25件）/ tsc=クリーン / build=成功 / **ローカルE2Eブラウザ実証**=登録→プロフィール保存（PUT200・name同期・エリア永続化）→PW変更（旧トークン失効+新トークンでリロード生存）→退会（3チェックゲート→DELETE200→完了パネル→セッションnull・再ログイン401）。
+- **申し送り**: worktreeの .claude/launch.json はworktreeパスに書換済（gitignore対象・正典側は無変更）。web/.env.local を正典からコピーして使用。ブラウザペインの computer クリックは本セッションでも誤検知多発→JS .click() が確実（既知癖の再確認）。同一Tick内でチップclick→保存clickを連続実行するとReact state未反映で旧値保存になる（検証手法側の注意）。
 - **デプロイ**: 下記ウォークスルー是正（3コミット）+レビュー是正（d7d63cf）を2段でmainへマージ（639e6a0→d8d0013）。Vercel=反映確認済み（/login「ログイン | カタヅケ」・/company 二重タイトル解消・/business /faq 新title、いずれも本番HTML実測）。Render=autoDeploy:true・/health=200・/readyz=`{"db":"ok"}`（**DBはユーザーが差し替え済みで全快**。Codexの起動チェーン修正fab45c2/9622e61もmain反映済み）。
 - **security-reviewer（Medium 1→修正済d7d63cf）**: 無認証の公開プロフィール `/vendors/{id}` に (a)業者が顧客について書いたレビューが混入（reviewer_type未フィルタ） (b)内部transaction_idが露出 → 顧客→業者レビューのみ+PublicReviewOut（最小フィールド）に限定、回帰テスト追加。IDOR/クライアントゲート誤用/redirect系は問題なし判定。
 - **qa-reviewer（Medium 1・Low 5→全て修正済d7d63cf）**: vendor_status取得中の入札フォームチラつき→3状態化（取得中=Spinner）。日本語403のテストアサーション追加・孤児CSS削除・layoutスタイル統一・無効style除去。
