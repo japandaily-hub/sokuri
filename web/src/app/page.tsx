@@ -23,7 +23,7 @@ const FAQ_ITEMS = [
   { q: "1点だけでも依頼できますか？", a: "はい。ただし、まとめて出すほど業者の買取総額が伸びやすく、値がつかない物も一緒に引き取ってもらいやすくなります。" },
   { q: "値段がつかない物はどうなりますか？", a: "業者は1点ごとではなく“まとめ全体”の金額で入札します。単体では値がつきにくい物も、まとめに含めて引き取ってもらえる場合があります。" },
   { q: "しつこい営業電話は来ますか？", a: "連絡が来るのは、あなたが選んだ1社だけ。選ぶまで連絡先は業者に開示されず、選ばなかった業者には自動でお断りが入るため、一斉架電は起こりません。" },
-  { q: "個人情報はどう扱われますか？", a: "査定段階で業者に渡るのは写真と品目のみ。お名前・電話・住所は交渉成立後に開示されます。" },
+  { q: "個人情報はどう扱われますか？", a: "査定段階で業者に渡るのは、写真・品目・地域（都道府県・市区町村）・住居情報などの出品内容のみ。お名前・電話・詳細住所は、交渉が成立した1社にのみ開示されます。" },
   { q: "利用にお金はかかりますか？", a: "出品・査定・成約まで、すべて無料です。費用は一切かかりません。" },
   { q: "訪問買取に不安があります", a: "参加するのは古物商許可を確認した登録事業者のみ。訪問買取は特定商取引法によりクーリングオフの対象です。" },
 ];
@@ -98,7 +98,7 @@ export default function HomePage() {
         <section className="assure" aria-label="サービスの安心ポイント">
           <div className="container">
             <div className="assure-item"><span className="ai"><Ic name="shield" /></span><span><b>登録事業者のみ</b><span>古物商許可を確認</span></span></div>
-            <div className="assure-item"><span className="ai"><Ic name="lock" /></span><span><b>連絡先は成立後に開示</b><span>査定は写真と品目だけ</span></span></div>
+            <div className="assure-item"><span className="ai"><Ic name="lock" /></span><span><b>連絡先は成立後に開示</b><span>氏名・番地は伏せたまま</span></span></div>
             <div className="assure-item"><span className="ai"><Ic name="phone" /></span><span><b>一斉架電なし</b><span>連絡は選んだ1社だけ</span></span></div>
             <div className="assure-item"><span className="ai"><Ic name="pin" /></span><span><b>東京・千葉・埼玉・神奈川</b><span>順次エリア拡大中</span></span></div>
           </div>
@@ -216,7 +216,7 @@ export default function HomePage() {
                 <PhImg src="/img/bid-3d.png" alt="複数の業者が、まとめた不用品に買取総額を提示して競り合うイメージ" label="bid-3d.png" icon="trend" imgStyle={{ width: "100%", height: "100%", objectFit: "contain" }} />
               </Reveal>
               <ol className="auc-steps">
-                <li><span className="an">1</span><div><h4>写真と品目だけが業者に届く</h4><p>あなたの連絡先は伏せたまま。査定に回るのは「写真」と「品目」だけです。</p></div></li>
+                <li><span className="an">1</span><div><h4>連絡先を伏せて出品内容が届く</h4><p>業者に届くのは、写真・品目・地域（都道府県・市区町村）・住居情報などの出品内容のみ。あなたのお名前・電話・詳細住所は伏せたままです。</p></div></li>
                 <li><span className="an">2</span><div><h4>登録業者が買取総額で入札</h4><p>複数の業者が、まとめ全体に対して金額を提示。競争で総額が引き上げられます。</p></div></li>
                 <li><span className="an">3</span><div><h4>連絡が来るのは選んだ1社だけ</h4><p>選ぶまで、業者はあなたに連絡できません。選ばなかった業者には自動でお断りが入り、営業電話の一斉架電はありません。</p></div></li>
                 <li><span className="an">4</span><div><h4>あなたは選んで、引き取りを待つだけ</h4><p>提示を見比べて1社を選択。成立後に連絡先を開示し、引き取り日時を決めます。</p></div></li>
@@ -284,7 +284,7 @@ export default function HomePage() {
               </Reveal>
               <Reveal as="article" className="trust-c" delay={1}>
                 <div className="tc-illus ph-wrap"><PhImg src="/img/trust-illus-2.png" alt="連絡先は交渉成立後に開示されるイメージ" label="trust-illus-2.png" icon="lock" imgStyle={{ width: "100%", height: "100%", objectFit: "contain", padding: 10 }} /></div>
-                <div className="tc-body"><span className="tc-ic"><Ic name="lock" /></span><h3>連絡先は成立後に開示</h3><p>査定段階で業者に渡るのは「写真と品目」のみ。お名前・電話・住所は、交渉が成立するまで開示されません。</p></div>
+                <div className="tc-body"><span className="tc-ic"><Ic name="lock" /></span><h3>連絡先は成立後に開示</h3><p>査定段階で業者に渡るのは、写真・品目・地域（都道府県・市区町村）・住居情報などの出品内容のみ。お名前・電話・詳細住所は、交渉が成立するまで開示されません。</p></div>
               </Reveal>
               <Reveal as="article" className="trust-c" delay={2}>
                 <div className="tc-illus ph-wrap"><PhImg src="/img/trust-illus-3.png" alt="訪問買取はクーリングオフの対象となるイメージ" label="trust-illus-3.png" icon="check-circle" imgStyle={{ width: "100%", height: "100%", objectFit: "contain", padding: 10 }} /></div>

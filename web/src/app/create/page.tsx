@@ -277,7 +277,7 @@ export default function CreateCasePage() {
               </div>
               <div className="hint-banner">
                 <Ic name="lock" className="hint-ic" />
-                <span>住所詳細・連絡先は業者決定まで開示されません。査定に回るのは写真と品目・住居情報のみです。</span>
+                <span>住所詳細・連絡先は業者決定まで開示されません。査定に回るのは写真・品目・利用目的・地域（都道府県・市区町村）・住居情報などの出品内容のみです。</span>
               </div>
             </div>
           )}
