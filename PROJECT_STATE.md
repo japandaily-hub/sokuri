@@ -1,5 +1,12 @@
 # PROJECT_STATE — カタヅケ クローズドβ
 
+## ✅ 2026-07-17 [claude] 「上位3社」コピー不一致是正（task_7de2d145）— コピーを実装に合わせ全面書き換え
+- **方針**: ユーザー選択=(a)コピー修正（AskUserQuestionで確認済）。実装が正: bids.py=全入札を所有ユーザーに提示→任意の1社を選択、transactions.py=成約後に選ばれた1社のみ連絡先開示。top-3制限・成約前チャットは実装に存在しない。新コピーの核=「連絡が来るのは、あなたが選んだ1社だけ（選ぶまで連絡先非開示・選ばなかった業者には自動お断り）」＝旧コピーより強い安心訴求で整合。
+- **変更**: web/src 14ファイル・文字列リテラルのみ21箇所（page.tsx×7 / layout.tsx SEO×3 / business/page.tsx×6（STATS「上位/3社」→「下見/0回」含む）/ operator入札モーダル / create/complete×2 / legal特商法 / examples体験談×2（bidCountと数字整合）/ faq / terms利用規約×2 / landing 4コンポーネント）。`docs/design_handoff_katazuke/` は静的設計資料のため意図的に残置。
+- **検証**: ワークツリーdev実機（node_modulesジャンクション+port3102）で8ルートのSSR HTML実測=「上位3社」0件・新コピー描画・meta description反映。qa側で tsc クリーン+next build 41ルート成功。
+- **レビュー**: security/qa並列 → **Critical/High/Medium 0**。Low申し送り: (1)「査定段階は写真と品目のみ」は過小記載（実際は都道府県・市区町村・間取り等もCaseMaskedOutで業者に開示。terms:81/page.tsx:219,287/faq:55/landing Faq:19→チップ化） (2)入札message(2000字)が選択前の業者→ユーザー片方向経路＝連絡先埋込み勧誘の抜け道、サーバー側パターン検知推奨（→チップ化） (3)landing/{ServiceIntro,Features,Faq,Comparison}は現在どのルートからも未import（デッドコード。修正済みなので将来復活しても旧文言は出ない）。
+- **未push**: mainへローカルマージのみ。push（=Vercel/Render自動デプロイ）はユーザー承認事項のため未実施。※正本チェックアウトは feat/design-handoff-katazuke（42956c8=state記録のみ、main未反映）に居る点に注意。
+
 ## 🚀 2026-07-16 [claude] 導線監査是正一式を本番デプロイ完了（main=d8d0013）+ security/QAレビュー通過
 - **デプロイ**: 下記ウォークスルー是正（3コミット）+レビュー是正（d7d63cf）を2段でmainへマージ（639e6a0→d8d0013）。Vercel=反映確認済み（/login「ログイン | カタヅケ」・/company 二重タイトル解消・/business /faq 新title、いずれも本番HTML実測）。Render=autoDeploy:true・/health=200・/readyz=`{"db":"ok"}`（**DBはユーザーが差し替え済みで全快**。Codexの起動チェーン修正fab45c2/9622e61もmain反映済み）。
 - **security-reviewer（Medium 1→修正済d7d63cf）**: 無認証の公開プロフィール `/vendors/{id}` に (a)業者が顧客について書いたレビューが混入（reviewer_type未フィルタ） (b)内部transaction_idが露出 → 顧客→業者レビューのみ+PublicReviewOut（最小フィールド）に限定、回帰テスト追加。IDOR/クライアントゲート誤用/redirect系は問題なし判定。

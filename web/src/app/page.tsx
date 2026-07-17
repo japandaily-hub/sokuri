@@ -22,7 +22,7 @@ const CATEGORIES: { icon: IcName; name: string; ex: string }[] = [
 const FAQ_ITEMS = [
   { q: "1点だけでも依頼できますか？", a: "はい。ただし、まとめて出すほど業者の買取総額が伸びやすく、値がつかない物も一緒に引き取ってもらいやすくなります。" },
   { q: "値段がつかない物はどうなりますか？", a: "業者は1点ごとではなく“まとめ全体”の金額で入札します。単体では値がつきにくい物も、まとめに含めて引き取ってもらえる場合があります。" },
-  { q: "しつこい営業電話は来ますか？", a: "連絡が来るのは査定額の上位3社のみ。他の業者には自動でお断りが入り、一斉架電は起こりません。" },
+  { q: "しつこい営業電話は来ますか？", a: "連絡が来るのは、あなたが選んだ1社だけ。選ぶまで連絡先は業者に開示されず、選ばなかった業者には自動でお断りが入るため、一斉架電は起こりません。" },
   { q: "個人情報はどう扱われますか？", a: "査定段階で業者に渡るのは写真と品目のみ。お名前・電話・住所は交渉成立後に開示されます。" },
   { q: "利用にお金はかかりますか？", a: "出品・査定・成約まで、すべて無料です。費用は一切かかりません。" },
   { q: "訪問買取に不安があります", a: "参加するのは古物商許可を確認した登録事業者のみ。訪問買取は特定商取引法によりクーリングオフの対象です。" },
@@ -31,7 +31,7 @@ const FAQ_ITEMS = [
 const STEPS: { n: string; en: string; icon: IcName; h: string; p: string; img: string }[] = [
   { n: "1", en: "SHOOT", icon: "camera", h: "まとめて撮る", p: "家じゅうの不用品を1点ずつ撮影。写真と品目をまとめて登録するだけで出品完了です。", img: "step-1.png" },
   { n: "2", en: "WAIT", icon: "scan", h: "査定が届く", p: "登録業者が、まとめ全体に買取総額で入札。あなたは待つだけで査定が集まります。", img: "step-2.png" },
-  { n: "3", en: "CHOOSE", icon: "scale", h: "上位3社と交渉", p: "金額上位の3社とだけやりとり。条件を比べて、納得の1社を選べます。", img: "step-3.png" },
+  { n: "3", en: "CHOOSE", icon: "scale", h: "査定を見比べて選ぶ", p: "届いた査定を一覧で見比べて、納得の1社を選ぶだけ。選ぶまで、業者から連絡は来ません。", img: "step-3.png" },
   { n: "4", en: "DONE", icon: "truck", h: "引き取りに来てもらう", p: "成立した業者がまとめて引き取りに。玄関先で渡すだけで、片付け完了です。", img: "step-4.png" },
 ];
 
@@ -68,14 +68,14 @@ export default function HomePage() {
                 <li><span className="tb"><Ic name="check" /></span>撮るだけ・待つだけ</li>
                 <li><span className="tb"><Ic name="check" /></span>まとめるほど高くなりやすい</li>
                 <li><span className="tb"><Ic name="check" /></span>値がつかない物も回収</li>
-                <li><span className="tb"><Ic name="check" /></span>連絡は上位3社だけ</li>
+                <li><span className="tb"><Ic name="check" /></span>連絡は選んだ1社だけ</li>
               </ul>
               <div className="hero-how">
                 <div className="hw-step"><span className="hw-n">1</span><Ic name="camera" className="hw-ic" /><span>撮る</span></div>
                 <Ic name="arrow" className="hw-arr" />
                 <div className="hw-step"><span className="hw-n">2</span><Ic name="trend" className="hw-ic" /><span>業者が競う</span></div>
                 <Ic name="arrow" className="hw-arr" />
-                <div className="hw-step"><span className="hw-n">3</span><Ic name="crown" className="hw-ic" /><span>上位3社と交渉</span></div>
+                <div className="hw-step"><span className="hw-n">3</span><Ic name="crown" className="hw-ic" /><span>見比べて選ぶ</span></div>
                 <Ic name="arrow" className="hw-arr" />
                 <div className="hw-step"><span className="hw-n">4</span><Ic name="truck" className="hw-ic" /><span>引き取り完了</span></div>
               </div>
@@ -99,7 +99,7 @@ export default function HomePage() {
           <div className="container">
             <div className="assure-item"><span className="ai"><Ic name="shield" /></span><span><b>登録事業者のみ</b><span>古物商許可を確認</span></span></div>
             <div className="assure-item"><span className="ai"><Ic name="lock" /></span><span><b>連絡先は成立後に開示</b><span>査定は写真と品目だけ</span></span></div>
-            <div className="assure-item"><span className="ai"><Ic name="phone" /></span><span><b>一斉架電なし</b><span>連絡は上位3社だけ</span></span></div>
+            <div className="assure-item"><span className="ai"><Ic name="phone" /></span><span><b>一斉架電なし</b><span>連絡は選んだ1社だけ</span></span></div>
             <div className="assure-item"><span className="ai"><Ic name="pin" /></span><span><b>東京・千葉・埼玉・神奈川</b><span>順次エリア拡大中</span></span></div>
           </div>
         </section>
@@ -218,7 +218,7 @@ export default function HomePage() {
               <ol className="auc-steps">
                 <li><span className="an">1</span><div><h4>写真と品目だけが業者に届く</h4><p>あなたの連絡先は伏せたまま。査定に回るのは「写真」と「品目」だけです。</p></div></li>
                 <li><span className="an">2</span><div><h4>登録業者が買取総額で入札</h4><p>複数の業者が、まとめ全体に対して金額を提示。競争で総額が引き上げられます。</p></div></li>
-                <li><span className="an">3</span><div><h4>連絡が来るのは上位3社だけ</h4><p>金額上位の3社とだけやりとり。それ以外は自動でお断り。営業電話の一斉架電はありません。</p></div></li>
+                <li><span className="an">3</span><div><h4>連絡が来るのは選んだ1社だけ</h4><p>選ぶまで、業者はあなたに連絡できません。選ばなかった業者には自動でお断りが入り、営業電話の一斉架電はありません。</p></div></li>
                 <li><span className="an">4</span><div><h4>あなたは選んで、引き取りを待つだけ</h4><p>提示を見比べて1社を選択。成立後に連絡先を開示し、引き取り日時を決めます。</p></div></li>
               </ol>
             </div>
@@ -357,7 +357,7 @@ export default function HomePage() {
               <span className="eyebrow">OUR MISSION</span>
               <h2>「片付けたい」を、<br />めんどうで終わらせない。</h2>
               <p>片付けが進まないのは、やる気の問題ではありません。出品の手間、営業電話の不安、何から手をつけるかの迷い——その一つひとつが、最初の一歩を重くしています。</p>
-              <p>カタヅケは、それを「まとめて撮るだけ」に変えるために生まれました。業者が競い、値がつかない物まで引き取り、連絡は上位3社だけ。あなたが背負うものを、できる限り減らします。</p>
+              <p>カタヅケは、それを「まとめて撮るだけ」に変えるために生まれました。業者が競い、値がつかない物まで引き取り、連絡は選んだ1社だけ。あなたが背負うものを、できる限り減らします。</p>
               <p>カタヅケが目指すのは、顧客と業者を結ぶ、無駄のない場所です。<strong>顧客・業者・社会の三者に喜びと安心を</strong>——それが、カタヅケの根にある考え方です。</p>
               <p className="founder-sign"><span>カタヅケ 運営事務局</span>顧客にも業者にも、社会にも。三方よしの場所をつくります。</p>
             </Reveal>

@@ -591,7 +591,7 @@ export default function OperatorDashboardPage() {
       >
         <div className="modal" role="dialog" aria-modal="true" aria-label="入札の確認">
           <h3>入札を確定しますか？</h3>
-          <p className="modal-body">以下の金額でこのまとめに入札します。上位3社に入れば交渉に進めます。</p>
+          <p className="modal-body">以下の金額でこのまとめに入札します。ユーザーに選ばれると成約・取引に進めます。</p>
           <div className="modal-amount">
             ¥{modalAmount ? yen(modalAmount) : "—"}
             <span>円</span>

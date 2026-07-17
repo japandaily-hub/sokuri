@@ -130,9 +130,9 @@ export default function CreateCompletePage() {
             <div className="next-step">
               <div className="step-num">2</div>
               <div className="step-body">
-                <div className="step-title">上位3社から連絡</div>
+                <div className="step-title">届いた査定を見比べる</div>
                 <div className="step-desc">
-                  入札上位3社のみがチャットで連絡します。それ以外は自動でお断り済みです。
+                  届いた入札を一覧で見比べて、納得の1社を選びます。選ぶまで業者から連絡は来ません。
                 </div>
                 <span className="step-tag line">LINEで通知</span>
               </div>
@@ -140,9 +140,9 @@ export default function CreateCompletePage() {
             <div className="next-step">
               <div className="step-num">3</div>
               <div className="step-body">
-                <div className="step-title">気に入った業者と交渉・成約</div>
+                <div className="step-title">1社を選んで成約</div>
                 <div className="step-desc">
-                  チャットで日程・条件を確認してから成約。成約後も費用はかかりません。
+                  選んだ業者とだけ連絡先が開示され、チャットで日程・条件を調整。成約後も費用はかかりません。
                 </div>
               </div>
             </div>
