@@ -6,6 +6,13 @@
 - **レビュー往復（3ラウンド）**: 初版→qa High「カンマ/スラッシュ区切りで全回避」→区切り拡張+窓判定→qa **Critical**「窓判定が金額レンジの断片を橋渡し連結し1,000,000-1,200,000円等を誤422」（実運用頻出・追加テスト自身が見逃していた）→3桁カンマ無害化+00始まり除外→**security/qa双方承認**（ReDoSなし・退行なし・逆算探索でも新規誤検知なし）。既知の制限はdocstringに明文化（カナ表記/LINE ID/裸ドメイン/3桁カンマ偽装は原理的or意図的に非検知、先頭0の10-11桁見積番号等は過剰検知許容）。
 - **gate_status**: pytest=**193 passed**（+30、単体+API 422/201+422時DB無副作用アサート）/ ruff=変更4ファイルクリーン。
 - **申し送り**: intro_message等の他フィールドへの拡大適用はチップ化済（task_a86c49cc）。**未push**: mainへローカルマージのみ（push=Vercel/Render自動デプロイはユーザー承認事項。7/17のコピー是正3cc03e8も未デプロイのまま積まれている）。
+## ✅ 2026-07-17 [claude] 「写真と品目のみ」過小記載是正（security Low申し送りフォローアップ）— 査定段階の開示範囲コピーを実装に整合
+- **方針**: 実装が正=CaseMaskedOut（backend/app/schemas_katadzuke.py:164-181）は査定段階で purpose/prefecture/city/housing_type/floor_plan/floor_number/has_elevator/ai_summary も業者に開示。マーケ面は統一表現「写真・品目・地域（都道府県・市区町村）・住居情報などの出品内容のみ」、法的文書（terms第5条・privacy第4条note）は利用目的・住居情報内訳・AI要約まで完全列挙（スキーマと1対1一致をqa/securityが照合済）。「氏名・電話・詳細住所は成約1社にのみ開示」の核心はタスク指示どおり維持。
+- **変更**: 8ファイル11箇所・文字列リテラルのみ（page.tsx×4=FAQ/assure帯「氏名・番地は伏せたまま」/オークション手順1/trustカード、faq:55、terms第4・5条、privacy第4条note、landing/Faq:19=未importデッドコード予防、create:280確認画面、business:50構成文）。タスク指定5箇所に加えgrep発見の同種3箇所（privacy第4条・terms第4条・business:50）も是正。「写真と品目」残存4箇所（complete:98/business:44/page:32/photo-guide:87）は排他主張なしの意図的残置。docs/design_handoff_katazuke/ は対象外。
+- **検証**: tsc クリーン / worktreeレシピ（junction+launch.json一時エントリ3102・復元済）でSSR HTML実測= / /faq /terms /privacy /business 旧文言0件・新文言描画確認。/createは認証ガード307のためソース+tsc（ヒントバナーは確認ステップ限定client）。
+- **レビュー**: security/qa並列 → qaがHigh1（create:280 直上の確認行に「利用目的」表示があるのに列挙から脱落+「のみ」排他）・Medium1（business:50 統一表現逸脱）→即修正→再レビュー**合格**。securityは「是正は正確・新規虚偽なし・AI要約の生成入力にも非開示項目混入なし（cases.py:138-143）・マージ可」。
+- **⚠️重要検出（ユーザー判断事項・コード未変更）**: 核心コピー「氏名・電話番号・詳細住所は成約業者にのみ開示」自体が**過大記載**と判明。TransactionDetailOut（schemas:231-241）は address（都道府県・市区町村・番地）+contact_email のみで氏名・電話を含まず、**Userモデルに電話番号カラム自体が無い**（user.py:26はnameのみ）。該当=terms:81/privacy:83/page.tsx:26/landing Faq:19（legal:196「成約後に必要な情報が開示されます」は抽象表現で正確）。是正方向=(a)コピーを実装に合わせる か (b)実装に氏名開示+電話収集を追加、はユーザー判断→チップ化+メモリ katazuke-transaction-disclosure-scope。privacy第2条の収集項目表の乖離（電話番号・郵便番号・数量/状態/メモは未収集）も別チップ化。
+- **未push**: mainへローカルマージのみ。push（=Vercel自動デプロイ）はユーザー承認事項のため未実施。
 
 ## ✅ 2026-07-17 [claude] 「上位3社」コピー不一致是正（task_7de2d145）— コピーを実装に合わせ全面書き換え
 - **方針**: ユーザー選択=(a)コピー修正（AskUserQuestionで確認済）。実装が正: bids.py=全入札を所有ユーザーに提示→任意の1社を選択、transactions.py=成約後に選ばれた1社のみ連絡先開示。top-3制限・成約前チャットは実装に存在しない。新コピーの核=「連絡が来るのは、あなたが選んだ1社だけ（選ぶまで連絡先非開示・選ばなかった業者には自動お断り）」＝旧コピーより強い安心訴求で整合。
