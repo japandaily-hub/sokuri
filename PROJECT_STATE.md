@@ -1,12 +1,26 @@
 # PROJECT_STATE — カタヅケ クローズドβ
 
-## ✅ 2026-07-18 [claude] 成約時開示の過大記載是正+privacy第2条収集表の実装整合（申し送り2件を推奨案aで完走・**未push**）
+## 🚀 2026-07-18 [claude] アカウント管理3機能を本番デプロイ完了（9ed9025・Render/Vercel外形+本番E2E実証）
+- **main合流**: worktreeブランチ(05d366d)→main。合流中に並行pushを3回検出し都度fetch→merge（PROJECT_STATE両エントリ保持）。**最重要検出=並行の 0012_fix_status_defaults とマイグレーション番号衝突**（両者down_revision=0011の2ヘッド→本番alembic必敗）→ 0013_user_profile_fields へ付替・ScriptDirectoryで単一ヘッド機械検証→push(9ed9025)。マージ後ツリーで pytest 218 passed / tsc クリーン。
+- **backendデプロイ実証**: /readyz のスキーマ自覚型遷移をライブ観測=①旧コード+旧スキーマ(ready/0012) → ②**degraded（DB=0013先行・コード期待=0012）** → ③新コード(ready・alembic_version=0013_user_profile_fields==expected_head)。新API `/users/me/profile` が404→**401**（ルート存在=新版稼働）。GitHub Deployments API=3環境success。
+- **本番E2E（使い捨てアカウント・退会機能自体でクリーンアップ）**: kdz-e2e-verify-20260718@example.com を本番signup→/mypage/profile が redirect でなく**実フォーム描画**（新版証明）→姓名カナ・エリア保存=本番PostgreSQLの0013カラムに永続化実証（API読み戻し一致）→/mypage/withdraw で3チェック+PW→DELETE 200→完了パネル→**セッションnull・再ログイン401**（匿名化実証）。残存は匿名トムストン1行のみ（PIIなし）。
+- **検証手法の学び**: /mypage/* は未認証curlでは認証ミドルウェアが307→/login を返すため、**無認証面から新旧ビルドを判別できない**（6分ポーリングは空振り。Location先の確認で判明）。認証必須ページのデプロイ検証= Deployments API のコミット単位success + 認証済みE2E が正。
+- **申し送り**: レート制限（task_012a348f）未着手。私の合流後も並行セッションが成約時開示是正等を積んでおり、本push（本記録コミット）にはそれらも同乗する（下記エントリ参照・いずれもレビュー通過済）。
+
+## ✅ 2026-07-18 [claude] 成約時開示の過大記載是正+privacy第2条収集表の実装整合（申し送り2件を推奨案aで完走）
 - **方針**: ユーザー指示「推奨で完走」→ 案a=コピーを実装に整合。実装の真実=成約業者に渡るのは TransactionDetailOut の address（都道府県・市区町村・番地）+contact_email のみ（LINE専用ユーザーは is_placeholder_email 判定で「LINEにて連絡」に置換）。氏名・電話は業者向けの全経路（スキーマ・通知メール・LINE Push）に不使用 → 「**お名前や電話番号は業者に渡らない**」というより強い安心訴求へ転換。
 - **変更（7ファイル・15箇所）**: ①成約時開示コピー7箇所=terms第5条/privacy第4条note/legal:196（「住所」→「詳細住所」+開示内容具体化）/page.tsx FAQ・trustカード/faq/landing Faq（デッドコード） ②privacy第2条 COLLECTED表を実収集に差し替え（ユーザー側の電話・郵便番号・数量/状態/メモ=未収集を削除。**業者申込フォームの実収集**=代表者名・担当者名・法人登録住所・電話・事業形態・対応エリア・カテゴリ・インボイス番号・**振込先口座(暗号化保存・bank_account_enc)** を明記）③レビュー指摘反映=assure帯「氏名・番地は伏せたまま」→「氏名・電話は渡りません」（番地は成約後開示のため不正確だった）・「連絡用のメールアドレス」表記統一・privacy第4条noteにLINE分岐追記・収集表の係り受け/業者パスワード明確化。
 - **統合の注意点（main合流時の意味的競合を解決）**: 並行のアカウント管理機能（05d366d）で User に phone 等8列が追加され、/mypage/profile が氏名（姓・名・フリガナ）・電話番号・お住まいのエリアを任意収集するようになっていた。開示系の断定コピーは**マージ後ツリーで再検証し真のまま**（phone/氏名は users.py の本人向け /users/me のみで使用・TransactionDetailOut 不変・退会時匿名化）。収集表には「プロフィール情報（マイページでの任意入力）」行をマージコミット内で追加して再整合。
 - **検証**: tsc クリーン（ブランチ+マージ後ツリー）/ worktreeレシピ SSR実測= / /faq /terms /privacy /legal 新文言描画・旧文言/表記ゆれ0件 / /contactフォームは未配線（fetch無し=電話収集なし）を確認。
 - **レビュー**: security/qa並列 → **Critical/High/Medium 0**（securityは反証走査で全経路の非開示を確認: 通知メール notify.py・LINE Push line_notify.py・チャットMessageOut・レビュー・減額・adminゲート下のOperatorApplicationOut。qaのMedium1=assure帯矛盾は即応済・test_line_integration.py:718で「LINEにて連絡」も裏付け）。申し送り（任意）: 開示するメールアドレス文字列自体が氏名を含み得る／チャット自由記述はユーザー自身の自己開示経路／アクセス情報行のUA等はover-listing（アナリティクス導入時に実配線と突合推奨）。
-- **⚠️未push**: 本是正はローカルmainマージのみで**本番未反映**（origin/main=c8e290b=examples是正まで反映済み）。push=Vercel/Render自動デプロイはユーザー承認事項。
+- **push状況**: 本是正はアカウント管理3機能のデプロイ記録push（上記エントリ）に同乗して本番反映。
+
+## ✅ 2026-07-18 [claude] 全断障害の申し送り2件を完走（2a7a3d1・本番0012適用実証済み）
+- **①status既定値の二重引用是正**: 0004の`server_default="'draft'"`等→裸文字列化+**0012_fix_status_defaults**新設（既存DBへSET DEFAULT+防御的UPDATE）。オフラインSQL実測で`DEFAULT 'draft'`正規化を確認（旧は`DEFAULT '''draft'''`=引用符込み7文字の壊れ既定値。cases/bids/transactions/reduction_requestsの4箇所・ORM明示値送信のため未発現だった休眠バグ）。
+- **②/readyz診断のDIAG_TOKENゲート化**: 未設定=β運用（スキーマ未達時のみ公開・URLリダクト済）、設定時は`?token=`一致必須（hmac定数時間比較）。JWTゲートは「認証系が死ぬ障害時にこそ診断が要る」ため不採用（設計判断）。render.yamlにsync:false項目追加済。
+- **検証**: pytest 141 passed / TestClientでゲート3態（無し/誤り=非表示・一致=表示）+リダクト実証 / **本番実測11:42 JST=`/readyz` ready・alembic_version=0012_fix_status_defaults==expected_head・login 401・health 200**。
+- **運用メモ**: 正式リリース時はRenderダッシュボードで**DIAG_TOKEN**にランダム値を設定（閲覧は`/readyz?token=<値>`）。
+>>>>>>> origin/main
 
 ## 🚀 2026-07-18 [claude] /examples 架空成約事例の景表法（優良誤認）是正 → mainへマージ+push（本番デプロイ・task_83692f21）
 - **方針**: 実データ集計(a)はバックエンド未配線+βで対象データなし→不可、ページ非公開(c)は主要ナビ導線で損失大→**(b)モデルケース明示を厳格化**。ただし計測実績風統計（¥68,000/7.4件/78%/2.1日）は打消し表示では治癒しない判断で**撤去**し、事実ベースのサービス条件（¥0無料・選んだ1社だけ連絡・4都県・12カテゴリ）へ差し替え。
