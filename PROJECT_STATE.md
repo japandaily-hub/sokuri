@@ -1,5 +1,13 @@
 # PROJECT_STATE — カタヅケ クローズドβ
 
+## 🚀 2026-07-18 [claude] /examples 架空成約事例の景表法（優良誤認）是正 → mainへマージ+push（本番デプロイ・task_83692f21）
+- **方針**: 実データ集計(a)はバックエンド未配線+βで対象データなし→不可、ページ非公開(c)は主要ナビ導線で損失大→**(b)モデルケース明示を厳格化**。ただし計測実績風統計（¥68,000/7.4件/78%/2.1日）は打消し表示では治癒しない判断で**撤去**し、事実ベースのサービス条件（¥0無料・選んだ1社だけ連絡・4都県・12カテゴリ）へ差し替え。
+- **変更**: examples/page.tsx（h1「実際の成約事例」→「成約イメージ（モデルケース）」・多層打消し=ヒーロー注記+全カード「モデルケース」チップ+金額ラベル「（イメージ）」+**体験談ごと引用直下の近接注記**+グリッド末尾注記）/ examples.css（注記13.5px・チップ・引用注記スタイル）/ examples/layout.tsx（title/description をモデルケース明示に）/ SiteHeader・chrome（ナビ「成約事例」→「成約イメージ」）/ business/page.tsx（数値帯の「実績」誤称→aria-label「サービスの特徴」。数値は全て事実のため維持）。
+- **レビュー**: security/qa並列 → **Critical/High 0**。共通Medium（体験談の近接打消し欠如・打消し12.5pxは主張数値比で小）→引用直下注記「※人物・セリフを含め、架空の利用イメージです」+13.5px化で対応済。**申し送り**: 打消し表示の最終的な十分性（消費者庁の打消し表示指針に照らした近接性・明瞭性）は法務観点の確認推奨。実データ蓄積後は STATS を実集計に差し替え可（examples/page.tsx 冒頭コメントに手順）。
+- **統合の注意点（重要）**: fork元が4d7cbb3（上位3社是正）より古く、新設STATSの「上位3社/連絡が来るのは査定上位のみ」が**是正一掃後の再導入**になっていた→mainマージ後に「1社/連絡が来るのは、選んだ相手だけ」へ是正（49e56f6）。並行セッションのpush（35842bc=真因修正取り込み・2a7a3d1=申し送り完走）とは fetch→merge→push HEAD:main で衝突なく合流。
+- **検証**: tsc クリーン / worktreeレシピ（junction+launch.json一時エントリ・復元済）でSSR実測=旧文言0件・全注記描画・computed style確認（12.5→13.5px反映・チップdashed 5枚+featuredバッジ）/ 本番=push（origin/main=c8e290b）後に sokuri.vercel.app/examples を外形確認（「モデルケース」描画・「実際の成約事例」「¥68,000」「上位3社」0件）。
+- **メモリ**: katazuke-keihyoho-fictional-data-policy（架空データ掲載ポリシー4原則）を保存済。
+
 ## 🚀 2026-07-18 [claude] 入札メッセージガード+7/17コピー是正2件を本番デプロイ完了（main=35842bc・3環境success確認）
 - **push前に分岐検出**: origin/main(f6dd33f=7月全断恒久修正+readyz診断+start.sh の3コミット)がローカルmain未取込で分岐していた。競合ファイルゼロを確認しマージ(35842bc)→マージ後ツリーで pytest 193 passed 再確認→push。**教訓: ローカルmainへの合流前に必ず fetch して origin/main との分岐を確認すること**（ホットフィックスが直接origin mainに載る運用があるため。今回そのままpushしていたら稼働中の障害修正を巻き戻すところだった）。
 - **デプロイ検証（コミット単位の証拠）**: GitHub Deployments API（公開リポジトリのため無認証curlで可: `api.github.com/repos/japandaily-hub/sokuri/deployments`）で3環境すべて **success**・sha=35842bc（Vercel Production 02:37:49Z / sokuuri production 02:37:38Z / Render sokuri-backend 02:37:54Z）。gh CLI はこの環境に無いが不要だった。
