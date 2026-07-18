@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     # /auth/line/exchange でアクセストークンの発行元チャネルを検証（audience 検証）するために使用する。
     # 未設定時は LINE ログイン機能自体を未構成とみなし 503 を返す（セキュリティ上、検証をスキップしない）。
     line_client_id: str = ""
+    # /readyz の詳細診断（マイグレーション失敗ログ末尾）の閲覧トークン。
+    # 未設定時（β運用）はスキーマ未達の間のみ誰でも閲覧可（接続文字列はリダクト済）。
+    # 設定すると ?token=<値> が一致するリクエストにのみ添付される（正式リリース時に設定推奨）。
+    diag_token: str = ""
     # CORS で許可するオリジン（カンマ区切り）。未設定時は frontend_base_url とローカル開発用ポートを許可する。
     allowed_origins_raw: str = Field(default="", alias="ALLOWED_ORIGINS")
     # 実行環境（"development" | "production"）。本番起動時の fail-open ガードに使用する。

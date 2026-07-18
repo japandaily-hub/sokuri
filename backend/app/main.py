@@ -133,7 +133,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {"status": "ok"}
 
     @app.get("/readyz", tags=["System"], summary="レディネスチェック（DB到達性+スキーマ状態込み）")
-    async def readyz() -> JSONResponse:
+    async def readyz(token: str | None = None) -> JSONResponse:
         """liveness(/health) と分離した readiness プローブ。
 
         DB へ実際に ``SELECT 1`` を投げて到達性を検証する（5 秒上限）。
@@ -220,7 +220,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         # スキーマ未達時のみ、start.sh が保存した直近の alembic 出力末尾を添付する
         # （Render ログを読めない環境からの根本原因特定用）。接続文字列はリダクト。
-        if not schema_ok:
+        # DIAG_TOKEN 設定時は ?token= の一致が必須（定数時間比較）。未設定時は
+        # β運用としてスキーマ未達の間のみ公開（インシデント時に認証系が死んで
+        # いても診断できることを優先する設計判断）。
+        import hmac as _hmac
+
+        diag_allowed = not settings.diag_token or (
+            token is not None and _hmac.compare_digest(token, settings.diag_token)
+        )
+        if not schema_ok and diag_allowed:
             try:
                 import re
                 from pathlib import Path
