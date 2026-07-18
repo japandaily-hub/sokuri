@@ -18,18 +18,33 @@ _BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/email"
 # LINE専用ユーザー（実メール未設定）に払い出す仮メールのドメインサフィックス。
 # auth.py の line_exchange で `line-{line_user_id}@line.katazuke.internal` として発行される。
 _PLACEHOLDER_EMAIL_SUFFIX = "@line.katazuke.internal"
+# 退会（匿名化）済みユーザーに払い出すトムストンメールのドメインサフィックス。
+# users.py の delete_my_account で `deleted-{user.id}@deleted.katazuke.internal` として発行される。
+_DELETED_EMAIL_SUFFIX = "@deleted.katazuke.internal"
 
 
 def is_placeholder_email(email: str | None) -> bool:
-    """LINE専用ユーザー向けの仮メール（実メール未設定）かどうかを判定する。
+    """実在しない内部専用メール（LINE専用ユーザーの仮メール・退会済みトムストン）かを判定する。
 
-    仮メールは実際には受信されないため、そのまま送信経路（通知メール送信・
+    これらのメールは実際には受信されないため、そのまま送信経路（通知メール送信・
     業者への contact_email 開示等）に流すと配送不能や情報として無意味な
     開示になる。呼び出し元でこの判定を経由してスキップ/文言差し替えを行うこと。
     """
     if not email:
         return False
-    return email.lower().endswith(_PLACEHOLDER_EMAIL_SUFFIX)
+    lowered = email.lower()
+    return lowered.endswith(_PLACEHOLDER_EMAIL_SUFFIX) or lowered.endswith(_DELETED_EMAIL_SUFFIX)
+
+
+def is_deleted_account_email(email: str | None) -> bool:
+    """退会（匿名化）済みユーザーのトムストンメールかどうかを判定する。
+
+    contact_email の表示分岐（「退会済みユーザー」vs「LINEにて連絡」）で
+    LINE専用ユーザーの仮メールと区別するために使う。
+    """
+    if not email:
+        return False
+    return email.lower().endswith(_DELETED_EMAIL_SUFFIX)
 
 
 async def _send(to_email: str, subject: str, html: str) -> bool:

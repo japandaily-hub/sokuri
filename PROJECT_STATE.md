@@ -1,5 +1,14 @@
 # PROJECT_STATE — カタヅケ クローズドβ
 
+## ✅ 2026-07-17 [claude] アカウント管理3機能（プロフィール更新/PW変更/退会）実装+profile/withdraw復元実配線（05d366d→main合流）
+- **経緯**: task_74d343ae（redirect化していた /mypage/profile・/mypage/withdraw の復元用API）を architect設計→backend→frontend→security/qa並列レビューの規約フローで完遂。ブランチ=claude/musing-archimedes-f1622f。**ユーザー指示「推奨で完走」により main 合流・本番デプロイ実施（結果は最新デプロイ記録参照）**。
+- **backend**: User拡張8列（family_name/given_name/カナ2列/phone/residence_area/deleted_at/password_changed_at・全nullable、name は表示用キャッシュとして「姓 名」同期）+ alembic 0012。新規 `endpoints/users.py`: GET/PUT `/users/me/profile`・PUT `/users/me/password`（成功時に新JWT返却）・DELETE `/users/me`。deps.py に失効ゲート2種（deleted_at 論理削除・iat<password_changed_at、SQLite tz-naive補正/秒切捨て比較）。JWT7日長命のため PW変更後の旧トークン即時失効は必須と判断し当初設計の[将来]を前倒し実装。
+- **退会設計（architect決定）**: 進行中取引(pending/visiting)は409ブロック（自動キャンセルしない）・未成約case(draft/open/bidding)は自動cancelled化+address_detail除去・User行はPII匿名化（email=deleted-{id}@deleted.katazuke.internal、氏名/電話/LINE連携null化）・完了取引/メッセージ/レビューは業者側記録として保持・同一email再登録可。
+- **frontend**: 2ページを git 5362359^ から復元し実配線（モック山田花子・偽装完了パネル全廃）。auth.ts jwt callback に trigger==="update" マージ追加→PW変更後 `update({accessToken})` でセッショントークン差替（忘れると全API401になる急所）・保存後 `update({name})` でヘッダー即時反映。LINE専用（has_password=false）はPW変更セクション説明化・退会はconfirmのみ。通知トグルはデータ源なしのため削除、退会画面は実件数表示+文言を実挙動に忠実化（「全データ完全削除」と言わない）。
+- **レビュー**: security=Critical/High 0（IDOR/権限昇格/SQLi/XSS/CSRF/失効ゲート網羅を確認済み判定）。qa=合格。是正済み=退会トムストンメールの業者向け露出（is_placeholder_email に @deleted.katazuke.internal 追加+「退会済みユーザー」表示）・profile頁危険ゾーン文言矛盾・空白のみ氏名（str_strip_whitespace）・カナregex制御空白・auth.ts nameガード。**未対応（別タスク化）**: 認証系レート制限（/auth/login 総当たり・task_012a348f）・LINE専用退会のstep-up認証（設計割り切りとして許容）・メッセージ本文PII残存の告知（文言側で対応済み）。
+- **gate_status**: pytest=**166 passed**（新規 test_account_api.py 25件）/ tsc=クリーン / build=成功 / **ローカルE2Eブラウザ実証**=登録→プロフィール保存（PUT200・name同期・エリア永続化）→PW変更（旧トークン失効+新トークンでリロード生存）→退会（3チェックゲート→DELETE200→完了パネル→セッションnull・再ログイン401）。
+- **申し送り**: worktreeの .claude/launch.json はworktreeパスに書換済（gitignore対象・正典側は無変更）。web/.env.local を正典からコピーして使用。ブラウザペインの computer クリックは本セッションでも誤検知多発→JS .click() が確実（既知癖の再確認）。同一Tick内でチップclick→保存clickを連続実行するとReact state未反映で旧値保存になる（検証手法側の注意）。
+
 ## ✅ 2026-07-17 [claude] 入札メッセージに連絡先/URL検知ガード追加（脱プラットフォーム勧誘対策・security Lowフォローアップ）
 - **背景**: BidCreateRequest.message（2000字）は選定前ユーザーに表示され、電話番号/URL/メール埋込みによる規約禁止の脱プラットフォーム勧誘の片方向経路だった（07-17「上位3社」是正時のLow申し送り(2)）。
 - **実装**: 新規 `backend/app/services/message_guard.py`（純粋関数 `contains_contact_info`）を `create_bid` で呼び、検知時 422「入札メッセージに連絡先（電話番号・メールアドレス）やURLは記載できません。」（サイレント削除は不採用）。検知=NFKC正規化+Cf(ゼロ幅)除去→①電話: 区切り文字（ハイフン類/空白/./()/,、/:;・|_*）対応の候補抽出+「全連結」と「最大4グループ窓」の二段判定（10-11桁・先頭0・00始まり除外、+81=81始まり12桁も対象）②URL: https?://とwww.（裸ドメイン対象外）③メール: TLDをASCII英字2字以上に限定（「単価@1.5万円」誤検知回避）。3桁カンマ区切り金額（800,000-1,000,000円等）は事前に#置換で電話判定から除外。

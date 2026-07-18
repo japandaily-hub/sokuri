@@ -21,6 +21,7 @@ from app.api.v1.endpoints.operator_profile import router as operator_profile_rou
 from app.api.v1.endpoints.reductions import router as reductions_router
 from app.api.v1.endpoints.reviews import router as reviews_router
 from app.api.v1.endpoints.transactions import router as transactions_router
+from app.api.v1.endpoints.users import router as users_router
 
 api_router = APIRouter()
 # ── カタヅケ既存 ──────────────────────────────────────────────────
@@ -34,6 +35,7 @@ api_router.include_router(case_photos_router, tags=["Photos"])
 api_router.include_router(cases_router, tags=["Cases"])
 api_router.include_router(bids_router, tags=["Bids"])
 api_router.include_router(transactions_router, tags=["Transactions"])
+api_router.include_router(users_router, tags=["account"])
 api_router.include_router(operator_profile_router, tags=["OperatorProfile"])
 api_router.include_router(reductions_router, tags=["Reductions"])
 api_router.include_router(reviews_router, tags=["Reviews"])

@@ -1,0 +1,311 @@
+/**
+ * 退会・アカウント削除（/mypage/withdraw）固有スタイル。
+ * デザイン正典: docs/design_handoff_katazuke/退会・アカウント削除.html の <style> を移植。
+ * 共通クラス（.btn / .field / .field-error / .kdz-toast 等）は katazuke.css / katazuke-pages.css 側を使い、
+ * ここでは重複定義しない。退会フォーム固有の見た目（赤系フォーカス等）は .withdraw-page 配下にスコープする。
+ */
+
+.withdraw-page {
+  background: #f4f6fb;
+  min-height: 100vh;
+}
+
+.withdraw-page .del-wrap {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 28px 20px 80px;
+}
+
+/* ステップ（確認 / 完了 の出し分け） */
+.withdraw-page .panel {
+  display: none;
+}
+.withdraw-page .panel.active {
+  display: block;
+}
+
+/* 警告バナー */
+.withdraw-page .warn-banner {
+  background: #fff3f3;
+  border: 1.5px solid #ffc0c0;
+  border-radius: 14px;
+  padding: 18px 20px;
+  margin-bottom: 20px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.withdraw-page .warn-ic {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #ffe0e0;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+}
+.withdraw-page .warn-ic svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: #cc3333;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.withdraw-page .warn-body strong {
+  display: block;
+  font-family: var(--head);
+  font-size: 15px;
+  font-weight: 700;
+  color: #cc3333;
+  margin-bottom: 4px;
+}
+.withdraw-page .warn-body span {
+  font-size: 13px;
+  color: #993333;
+  line-height: 1.75;
+}
+
+/* 削除対象リスト */
+.withdraw-page .del-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.withdraw-page .del-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.withdraw-page .del-item:last-child {
+  border-bottom: none;
+}
+.withdraw-page .del-item-ic {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  background: #ffe0e0;
+}
+.withdraw-page .del-item-ic svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: #cc3333;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.withdraw-page .del-item-body strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy);
+}
+.withdraw-page .del-item-body span {
+  font-size: 12.5px;
+  color: var(--body-soft);
+}
+
+/* フォームカード */
+.withdraw-page .form-card {
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-s);
+  border: 1px solid var(--line-soft);
+  padding: 20px;
+  margin-bottom: 14px;
+}
+.withdraw-page .form-card-title {
+  font-family: var(--head);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy);
+  margin-bottom: 14px;
+}
+
+/* 退会フォームのフィールドは赤系フォーカス（共通 .field を上書き） */
+.withdraw-page .field {
+  margin-bottom: 0;
+}
+.withdraw-page .field label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 7px;
+}
+.withdraw-page .field input {
+  background: #fafbfe;
+}
+.withdraw-page .field input:focus {
+  border-color: #e05c5c;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(220, 70, 70, 0.12);
+}
+.withdraw-page .field.has-error input {
+  border-color: #e05c5c;
+}
+
+/* 確認チェック */
+.withdraw-page .check-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.withdraw-page .check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.withdraw-page .check-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  accent-color: #e05c5c;
+  cursor: pointer;
+}
+.withdraw-page .check-row label {
+  font-size: 13.5px;
+  color: var(--body);
+  line-height: 1.7;
+  cursor: pointer;
+}
+
+/* 削除ボタン */
+.withdraw-page .btn-delete {
+  width: 100%;
+  padding: 15px;
+  border-radius: 99px;
+  border: none;
+  background: #e05c5c;
+  color: #fff;
+  font-family: var(--head);
+  font-size: 16px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.withdraw-page .btn-delete:hover:not(:disabled) {
+  background: #c94040;
+  transform: translateY(-1px);
+}
+.withdraw-page .btn-delete:disabled {
+  background: var(--line);
+  cursor: not-allowed;
+}
+.withdraw-page .btn-delete svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: #fff;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.withdraw-page .del-cancel {
+  text-align: center;
+  margin-top: 16px;
+}
+.withdraw-page .del-cancel a {
+  font-size: 13px;
+  color: var(--body-soft);
+}
+
+/* 完了画面 */
+.withdraw-page .done-screen {
+  text-align: center;
+  padding: 40px 0;
+}
+.withdraw-page .done-mark {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: #eef2fb;
+  display: grid;
+  place-items: center;
+}
+.withdraw-page .done-mark svg {
+  width: 34px;
+  height: 34px;
+  fill: none;
+  stroke: var(--blue);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.withdraw-page .done-title {
+  font-family: var(--head);
+  font-size: 22px;
+  color: var(--navy);
+  margin-bottom: 10px;
+}
+.withdraw-page .done-sub {
+  font-size: 14px;
+  color: var(--body-soft);
+  line-height: 1.85;
+  margin-bottom: 28px;
+}
+
+@media (max-width: 480px) {
+  .withdraw-page .del-wrap {
+    padding: 20px 14px 80px;
+  }
+  .withdraw-page .form-card {
+    padding: 18px 14px;
+  }
+  .withdraw-page .warn-banner {
+    padding: 14px 14px;
+    gap: 10px;
+  }
+  .withdraw-page .warn-ic {
+    width: 30px;
+    height: 30px;
+  }
+  .withdraw-page .warn-ic svg {
+    width: 17px;
+    height: 17px;
+  }
+  .withdraw-page .warn-body strong {
+    font-size: 14px;
+  }
+  .withdraw-page .del-item {
+    gap: 10px;
+    padding: 12px 0;
+  }
+  .withdraw-page .btn-delete {
+    font-size: 14px;
+    padding: 14px;
+  }
+  .withdraw-page .done-screen {
+    padding: 30px 0;
+  }
+  .withdraw-page .done-mark {
+    width: 64px;
+    height: 64px;
+  }
+  .withdraw-page .done-title {
+    font-size: 20px;
+  }
+}
+@media (max-width: 360px) {
+  .withdraw-page .check-row label {
+    font-size: 12.5px;
+  }
+  .withdraw-page .del-item-body strong {
+    font-size: 13px;
+  }
+}

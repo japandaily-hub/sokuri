@@ -462,6 +462,99 @@ export function signupOperator(payload: {
 }
 
 // ---------------------------------------------------------------------------
+// ユーザープロフィール
+// ---------------------------------------------------------------------------
+
+/** GET/PUT /users/me/profile 共通のレスポンス形。 */
+export interface UserProfile {
+  email: string;
+  family_name: string | null;
+  given_name: string | null;
+  family_name_kana: string | null;
+  given_name_kana: string | null;
+  phone: string | null;
+  residence_area: string | null;
+  /** false の場合 LINE専用アカウント（パスワード未設定）。 */
+  has_password: boolean;
+  line_linked: boolean;
+}
+
+export interface UpdateProfilePayload {
+  family_name: string;
+  given_name: string;
+  family_name_kana?: string | null;
+  given_name_kana?: string | null;
+  phone?: string | null;
+  residence_area?: string | null;
+}
+
+export interface ChangePasswordPayload {
+  current_password: string;
+  new_password: string;
+}
+
+/** access_token はパスワード変更で旧JWTが即時失効するため、必ずセッションへ反映すること。 */
+export interface ChangePasswordResponse {
+  detail: string;
+  access_token: string;
+}
+
+export interface DeleteAccountPayload {
+  /** has_password === false（LINE専用）のユーザーは省略可。 */
+  password?: string | null;
+  confirm: boolean;
+}
+
+/** お住まいのエリア（8トークン+日本語ラベル）。residence_area の単一情報源。 */
+export const RESIDENCE_AREAS = [
+  { id: "tokyo", label: "東京都" },
+  { id: "kanagawa", label: "神奈川県" },
+  { id: "saitama", label: "埼玉県" },
+  { id: "chiba", label: "千葉県" },
+  { id: "osaka", label: "大阪府" },
+  { id: "aichi", label: "愛知県" },
+  { id: "fukuoka", label: "福岡県" },
+  { id: "other", label: "その他" },
+] as const;
+
+export function getMyProfile(token: string): Promise<UserProfile> {
+  return request("/users/me/profile", { token });
+}
+
+export function updateMyProfile(
+  payload: UpdateProfilePayload,
+  token: string,
+): Promise<UserProfile> {
+  return request("/users/me/profile", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+    token,
+  });
+}
+
+export function changeMyPassword(
+  payload: ChangePasswordPayload,
+  token: string,
+): Promise<ChangePasswordResponse> {
+  return request("/users/me/password", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+    token,
+  });
+}
+
+export function deleteMyAccount(
+  payload: DeleteAccountPayload,
+  token: string,
+): Promise<{ detail: string }> {
+  return request("/users/me", {
+    method: "DELETE",
+    body: JSON.stringify(payload),
+    token,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // 業者登録申し込み（/business LP）
 // ---------------------------------------------------------------------------
 

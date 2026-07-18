@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import date, datetime, timedelta
 from typing import Annotated, Literal
@@ -96,6 +97,78 @@ class AuthTokenResponse(BaseModel):
     account_type: Literal["user", "operator"]
     user: UserOut | None = None
     operator: OperatorOut | None = None
+
+
+# ──────────────────────────── アカウント（マイページ） ────────────────────────────
+
+# カナ（全角カタカナ・長音符・半角/全角スペース）のみを許容する。
+# 半角カナ・ひらがな混入に加え、\s だとタブ・改行等の制御空白まで通るため
+# スペース2種を明示列挙する（QAレビュー指摘対応）。
+_KANA_RE = r"^[ァ-ヶー 　]*$"
+# 電話番号（数字・+・-・()・半角スペースのみ）。国内表記ゆれを広く許容する。
+_PHONE_RE = r"^[0-9+\-() ]*$"
+
+ResidenceArea = Literal[
+    "tokyo", "kanagawa", "saitama", "chiba", "osaka", "aichi", "fukuoka", "other"
+]
+
+
+class UserProfileOut(BaseModel):
+    email: str
+    family_name: str | None
+    given_name: str | None
+    family_name_kana: str | None
+    given_name_kana: str | None
+    phone: str | None
+    residence_area: str | None
+    has_password: bool
+    line_linked: bool
+
+
+class UserProfileUpdateRequest(BaseModel):
+    # str_strip_whitespace: 空白のみの姓名（" " / "　"）を strip→min_length で弾く
+    # （フロントは trim 済みだが API 直叩き対策。QAレビュー指摘対応）。
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    family_name: str = Field(min_length=1, max_length=64)
+    given_name: str = Field(min_length=1, max_length=64)
+    family_name_kana: str | None = Field(default=None, max_length=64)
+    given_name_kana: str | None = Field(default=None, max_length=64)
+    phone: str | None = Field(default=None, max_length=20)
+    residence_area: ResidenceArea | None = None
+
+    @field_validator("family_name_kana", "given_name_kana")
+    @classmethod
+    def _validate_kana(cls, v: str | None) -> str | None:
+        if v is not None and not re.match(_KANA_RE, v):
+            raise ValueError("カナは全角カタカナで入力してください。")
+        return v
+
+    @field_validator("phone")
+    @classmethod
+    def _validate_phone(cls, v: str | None) -> str | None:
+        if v is not None and not re.match(_PHONE_RE, v):
+            raise ValueError("電話番号の形式が正しくありません。")
+        return v
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class PasswordChangeResponse(BaseModel):
+    detail: str
+    access_token: str
+
+
+class AccountDeleteRequest(BaseModel):
+    password: str | None = None
+    confirm: bool
+
+
+class AccountDeleteResponse(BaseModel):
+    detail: str
 
 
 # ──────────────────────────── 写真アップロード ────────────────────────────

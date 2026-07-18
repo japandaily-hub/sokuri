@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from datetime import timezone
 
 import jwt as pyjwt
 from fastapi import Depends, HTTPException, status
@@ -33,6 +34,31 @@ def _decode(credentials: HTTPAuthorizationCredentials | None) -> dict:
         raise _CRED_EXC from exc
 
 
+def _assert_user_not_revoked(user: User, payload: dict) -> None:
+    """退会（論理削除）済み・パスワード変更後の旧トークンを 401 で失効させる。
+
+    - 論理削除ゲート: deleted_at が設定済みのアカウントの旧トークンは即時失効させる。
+    - パスワード変更失効ゲート: JWT の iat が password_changed_at より古い場合に拒否する。
+      iat は PyJWT により epoch 秒の int にエンコードされるため、比較も int 切り捨てで行い
+      同一秒内に発行された新トークンを誤って弾かないようにする。
+      SQLite は tz-naive な datetime を返すため、tzinfo が無ければ UTC を補って比較する
+      （tz なしのまま timestamp() するとローカルタイム解釈になりズレるため）。
+    """
+    if user.deleted_at is not None:
+        raise _CRED_EXC
+
+    if user.password_changed_at is None:
+        return
+    iat = payload.get("iat")
+    if iat is None:
+        return
+    changed_at = user.password_changed_at
+    if changed_at.tzinfo is None:
+        changed_at = changed_at.replace(tzinfo=timezone.utc)
+    if int(iat) < int(changed_at.timestamp()):
+        raise _CRED_EXC
+
+
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     session: AsyncSession = Depends(get_session),
@@ -43,6 +69,7 @@ async def get_current_user(
     user = await session.get(User, uuid.UUID(payload["sub"]))
     if user is None:
         raise _CRED_EXC
+    _assert_user_not_revoked(user, payload)
     return user
 
 
@@ -124,6 +151,7 @@ async def get_current_actor(
         user = await session.get(User, subject_id)
         if user is None:
             raise _CRED_EXC
+        _assert_user_not_revoked(user, payload)
         return Actor(typ="user", user=user)
     if typ == "operator":
         operator = await session.get(Operator, subject_id)
