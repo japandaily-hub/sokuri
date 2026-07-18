@@ -18,9 +18,14 @@ set -e
 # リトライ付き（最大3回・5秒間隔）: DB差し替え/プロビジョニング直後は数秒間
 # 接続を受け付けないことがあり、1発勝負だと「その後DBが復帰しても次の再起動まで
 # スキーマが空のまま degraded で走り続ける」罠になる（2026-07-16 に実際に発生）。
+# 出力は /tmp/alembic-last.log にも保存する。Render無料プランはログ保持が短く
+# CLI/API未接続だと読めないため、/readyz が(スキーマ未達時のみ・URLリダクト付きで)
+# このファイル末尾を返し、マイグレーション失敗の実トレースバックを外形観測可能にする。
+# 注: POSIX sh に pipefail が無いため tee は使わず、リダイレクト後に cat でログへ転写する。
 echo "[start.sh] Running alembic migrations..."
 attempt=1
-until alembic upgrade head; do
+until alembic upgrade head > /tmp/alembic-last.log 2>&1; do
+  cat /tmp/alembic-last.log >&2
   if [ "$attempt" -ge 3 ]; then
     echo "[start.sh] WARN: alembic migration failed after ${attempt} attempts. Starting uvicorn anyway (degraded)." >&2
     echo "[start.sh] WARN: DB-dependent APIs will fail; check /readyz and DATABASE_URL / DB status." >&2
@@ -30,6 +35,7 @@ until alembic upgrade head; do
   attempt=$((attempt+1))
   sleep 5
 done
+cat /tmp/alembic-last.log
 
 echo "[start.sh] Launching uvicorn on port ${PORT:-8000}..."
 exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"

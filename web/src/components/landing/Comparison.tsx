@@ -9,7 +9,7 @@ type Mark = "good" | "mid" | "bad";
 const ROWS: { label: string; flea: Mark; bulk: Mark; sokuri: Mark; note: string }[] = [
   { label: "出品・入力の手間", flea: "bad", bulk: "mid", sokuri: "good", note: "1点ずつ撮るだけ" },
   { label: "価格・相場の調査", flea: "bad", bulk: "mid", sokuri: "good", note: "業者が査定を提示" },
-  { label: "連絡・営業電話", flea: "mid", bulk: "bad", sokuri: "good", note: "連絡は上位3社のみ" },
+  { label: "連絡・営業電話", flea: "mid", bulk: "bad", sokuri: "good", note: "連絡は選んだ1社のみ" },
   { label: "査定額の伸びやすさ", flea: "mid", bulk: "mid", sokuri: "good", note: "業者が競うから伸びやすい" },
 ];
 
