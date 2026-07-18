@@ -166,7 +166,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                         insp = sa_inspect(sync_conn)
                         present = {
                             name: insp.has_table(name)
-                            for name in ("users", "operators", "cases", "transactions")
+                            for name in (
+                                "users",
+                                "operators",
+                                "cases",
+                                "transactions",
+                                # 0008〜0009 の生成物。バージョン停滞時に「どこまで
+                                # 物理的に作られているか」を外形から判別するため追加。
+                                "operator_applications",
+                                "messages",
+                                "operator_profiles",
+                            )
                         }
                         rev = None
                         if insp.has_table("alembic_version"):
@@ -179,15 +189,54 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except Exception as exc:  # noqa: BLE001 -- 診断情報の欠落は readiness を壊さない
             logger.error("readyz: スキーマ状態の取得失敗 - %s", exc)
 
-        schema_ok = bool(tables) and all(tables.values())
-        return JSONResponse(
-            {
-                "status": "ready" if schema_ok else "degraded",
-                "db": "ok",
-                "schema": {"alembic_version": alembic_rev, "tables": tables},
+        # 期待ヘッドは alembic のスクリプトディレクトリから実行時に解決する
+        # （ハードコードだと新規マイグレーション追加時に必ず腐る）。読めない環境
+        # （テスト・ローカル等）では None → テーブル有無ベースの判定へフォールバック。
+        head_rev: str | None = None
+        try:
+            from alembic.config import Config as _AlembicConfig
+            from alembic.script import ScriptDirectory as _ScriptDirectory
+
+            head_rev = _ScriptDirectory.from_config(
+                _AlembicConfig("alembic.ini")
+            ).get_current_head()
+        except Exception:  # noqa: BLE001 -- 診断補助のため失敗は無視
+            head_rev = None
+
+        if head_rev is not None:
+            schema_ok = alembic_rev == head_rev
+        else:
+            schema_ok = bool(tables) and all(tables.values())
+
+        payload: dict[str, object] = {
+            "status": "ready" if schema_ok else "degraded",
+            "db": "ok",
+            "schema": {
+                "alembic_version": alembic_rev,
+                "expected_head": head_rev,
+                "tables": tables,
             },
-            status_code=200 if schema_ok else 503,
-        )
+        }
+
+        # スキーマ未達時のみ、start.sh が保存した直近の alembic 出力末尾を添付する
+        # （Render ログを読めない環境からの根本原因特定用）。接続文字列はリダクト。
+        if not schema_ok:
+            try:
+                import re
+                from pathlib import Path
+
+                log_path = Path("/tmp/alembic-last.log")
+                if log_path.exists():
+                    tail_lines = log_path.read_text(errors="replace").splitlines()[-30:]
+                    redacted = [
+                        re.sub(r"postgres(?:ql)?(?:\+\w+)?://\S+", "[REDACTED_URL]", ln)
+                        for ln in tail_lines
+                    ]
+                    payload["migration_log_tail"] = redacted
+            except Exception:  # noqa: BLE001 -- 診断補助のため失敗は無視
+                pass
+
+        return JSONResponse(payload, status_code=200 if schema_ok else 503)
 
     return app
 
