@@ -62,6 +62,10 @@ services:
       - key: ALLOWED_ORIGINS
         value: "https://sokuri.vercel.app"   # CORS許可オリジン（カンマ区切り、未設定時は"*"にしない）。
                                               # 未設定時は FRONTEND_BASE_URL + localhost にフォールバック（config.py 参照）
+      - key: DIAG_TOKEN
+        sync: false            # /readyz の詳細診断(マイグレーション失敗ログ末尾)の閲覧トークン。
+                                # 未設定=β運用: スキーマ未達の間のみ誰でも閲覧可(URLリダクト済)。
+                                # 正式リリース時はランダム値を設定し ?token=<値> で閲覧する。
       - key: APP_ENCRYPTION_KEY
         sync: false            # dashboard で手動入力（git 漏洩防止）。未設定時は機微データ暗号化(Fernet)を
                                 # 使うリクエストがEncryptionKeyMissingError→500になる（プロセスは落ちない。
