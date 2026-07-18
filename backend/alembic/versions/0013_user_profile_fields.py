@@ -1,7 +1,7 @@
 """users にプロフィール項目・論理削除・パスワード変更時刻を追加する。
 
-Revision ID: 0012_user_profile_fields
-Revises: 0011_line_user_id
+Revision ID: 0013_user_profile_fields
+Revises: 0012_fix_status_defaults
 Create Date: 2026-07-17
 
 背景（マイページ プロフィール編集 / パスワード変更 / 退会機能）:
@@ -28,8 +28,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0012_user_profile_fields"
-down_revision: str | None = "0011_line_user_id"
+revision: str = "0013_user_profile_fields"
+down_revision: str | None = "0012_fix_status_defaults"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
