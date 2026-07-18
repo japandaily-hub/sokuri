@@ -8,17 +8,19 @@ Phase 4 から起動時チャネルシードを実行する（冪等）。
 from __future__ import annotations
 
 import asyncio
+import hmac
 import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.api.v1.router import api_router
 from app.config import Settings, get_settings
+from app.core.client_ip import get_xff_raw, resolve_client_ip
 from app.db.session import AsyncSessionLocal, engine
 from app.services.seed import seed_channels_and_rules
 
@@ -230,10 +232,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # DIAG_TOKEN 設定時は ?token= の一致が必須（定数時間比較）。未設定時は
         # β運用としてスキーマ未達の間のみ公開（インシデント時に認証系が死んで
         # いても診断できることを優先する設計判断）。
-        import hmac as _hmac
-
-        diag_allowed = not settings.diag_token or (
-            token is not None and _hmac.compare_digest(token, settings.diag_token)
+        # NOTE(security review M-2): hmac.compare_digest は非 ASCII/型不一致の
+        # str 同士を渡すと TypeError を送出しうる（?token=あ 等で 500 化し、かつ
+        # 「404（不一致）/500（非ASCII）/200（未設定）」の応答差が DIAG_TOKEN の
+        # 設定有無を外部に漏らすオラクルになる）。bytes 同士に揃えることで
+        # 型・長さによらず安全に比較する（モジュールレベルの ``hmac`` を使用。
+        # security review F-3: ファイル内でローカル import と混在させない）。
+        diag_allowed = not settings.diag_token or hmac.compare_digest(
+            (token or "").encode("utf-8"), settings.diag_token.encode("utf-8")
         )
         if not schema_ok and diag_allowed:
             try:
@@ -252,6 +258,58 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 pass
 
         return JSONResponse(payload, status_code=200 if schema_ok else 503)
+
+    @app.get(
+        "/api/v1/_diag/client-ip",
+        tags=["System"],
+        summary="クライアントIP解決の外形診断（TRUSTED_PROXY_HOPS実測用）",
+    )
+    async def diag_client_ip(request: Request, token: str | None = None) -> JSONResponse:
+        """認証系レート制限の IP 軸が正しく機能するために必須の外形診断。
+
+        本番で ``TRUSTED_PROXY_HOPS`` の正しさを実測するためのエンドポイント
+        （認証系レート制限 設計書 §2）。返すのは**呼び出し元自身の接続情報のみ**
+        で、他人の情報・秘密値は一切含めない。
+
+        **フィールド単位のゲート（security review M-1 対応）**: このエンドポイント
+        自体は常に到達可能にする（TRUSTED_PROXY_HOPS の実測に必要なため、
+        404 で完全に閉じない）。ただし返すフィールドは認可状態で変える:
+          - **常に返す**（無認証でも可）: ``xff_raw`` / ``xff_count`` /
+            ``resolved_ip``。これらは「実測」に必須の最小限の情報。
+          - **``DIAG_TOKEN`` が設定されていて ``?token=`` が一致した場合のみ
+            追加で返す**: ``peer``（内部プロキシ IP＝内部トポロジ）と
+            ``trusted_hops``（サーバ設定値そのもの）。``DIAG_TOKEN`` 未設定
+            （＝本番の現状のβ運用状態）では、この2項目は誰にも返さない
+            （＝サーバ設定値と内部トポロジを無認証で誰でも取得できてしまう
+            問題への対処）。
+
+        トークン比較は ``hmac.compare_digest`` に bytes を渡す（security review
+        M-2 対応。str 同士だと非 ASCII トークンで TypeError→500 になり、
+        「404/500/200」の応答差が DIAG_TOKEN の設定有無を漏らすオラクルに
+        なってしまうため）。
+        """
+        diag_authorized = bool(settings.diag_token) and hmac.compare_digest(
+            (token or "").encode("utf-8"), settings.diag_token.encode("utf-8")
+        )
+
+        # resolve_client_ip / RateLimitGuard と必ず同じ経路（get_xff_raw）で
+        # ヘッダを取得する。個別に request.headers.get() を呼ぶと、重複XFF
+        # ヘッダの扱いが乖離し診断結果が実際の判定と食い違う（security review
+        # High-2）。
+        xff_raw = get_xff_raw(request)
+        xff_count = len([p for p in xff_raw.split(",") if p.strip()]) if xff_raw else 0
+        resolved_ip = resolve_client_ip(request, settings.trusted_proxy_hops)
+
+        payload: dict[str, object] = {
+            "xff_raw": xff_raw,
+            "xff_count": xff_count,
+            "resolved_ip": resolved_ip,
+        }
+        if diag_authorized:
+            payload["peer"] = request.client.host if request.client else None
+            payload["trusted_hops"] = settings.trusted_proxy_hops
+
+        return JSONResponse(payload)
 
     return app
 

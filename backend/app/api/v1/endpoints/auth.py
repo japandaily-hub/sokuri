@@ -19,6 +19,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import Actor, get_current_actor
+from app.api.rate_limit_deps import RateLimitGuard
 from app.config import get_settings
 from app.core.security import create_access_token, decode_access_token, hash_password, verify_password
 from app.db.models.invite import Invite
@@ -72,7 +73,9 @@ _LINE_NOT_CONFIGURED = HTTPException(
 )
 async def user_signup(
     body: UserSignupRequest,
+    request: Request,
     session: AsyncSession = Depends(get_session),
+    _rl: object = Depends(RateLimitGuard("signup")),
 ) -> AuthTokenResponse:
     email = body.email.lower()
     existing = await session.scalar(select(User).where(User.email == email))
@@ -100,15 +103,31 @@ async def user_signup(
 @router.post("/auth/login", response_model=AuthTokenResponse, summary="ユーザーログイン")
 async def user_login(
     body: UserLoginRequest,
+    request: Request,
     session: AsyncSession = Depends(get_session),
+    _rl: object = Depends(RateLimitGuard("login")),
 ) -> AuthTokenResponse:
-    user = await session.scalar(select(User).where(User.email == body.email.lower()))
+    ctx = request.state.rate_limit
+    email = body.email.lower()
+    # レート制限のアカウント軸識別子は "user:"/"operator:" で名前空間分離する
+    # （security review 指摘・最優先）。user login と operator login は scope="login"
+    # で上限値・窓・文言を共有しているが、識別子を素の email のままにすると、
+    # 同一メールアドレスで user/operator 双方のアカウントが存在する場合に
+    # ストアキーの実体まで共有されてしまい、無認証の第三者が相手のメール
+    # アドレスを知るだけで（例: user 側を誤パスワードで5回叩く）相手の
+    # operator 側ログインまで巻き添えでブロックできてしまう。
+    rl_account_key = f"user:{email}"
+    ctx.check_account(rl_account_key)
+
+    user = await session.scalar(select(User).where(User.email == email))
     if (
         user is None
         or user.password_hash is None
         or not verify_password(body.password, user.password_hash)
     ):
+        ctx.record_failure(rl_account_key)
         raise _LOGIN_FAILED
+    ctx.reset_account(rl_account_key)
     token = create_access_token(user.id, "user", user.role)
     return AuthTokenResponse(
         access_token=token, account_type="user", user=UserOut.model_validate(user)
@@ -126,7 +145,9 @@ async def user_login(
 )
 async def operator_signup(
     body: OperatorSignupRequest,
+    request: Request,
     session: AsyncSession = Depends(get_session),
+    _rl: object = Depends(RateLimitGuard("signup")),
 ) -> AuthTokenResponse:
     if not body.agreed:
         raise HTTPException(
@@ -194,17 +215,30 @@ async def operator_signup(
 )
 async def operator_login(
     body: OperatorLoginRequest,
+    request: Request,
     session: AsyncSession = Depends(get_session),
+    _rl: object = Depends(RateLimitGuard("login")),
 ) -> AuthTokenResponse:
-    operator = await session.scalar(
-        select(Operator).where(Operator.contact_email == body.email.lower())
-    )
+    ctx = request.state.rate_limit
+    email = body.email.lower()
+    # "operator:" 名前空間分離の理由は user_login と同じ（security review 指摘・
+    # 最優先）。同一メールで user/operator 双方が存在する場合にストアキーの
+    # 実体まで共有されるのを防ぐ（上限値・窓・文言は user_login と同一のまま）。
+    rl_account_key = f"operator:{email}"
+    ctx.check_account(rl_account_key)
+
+    operator = await session.scalar(select(Operator).where(Operator.contact_email == email))
     if (
         operator is None
         or operator.password_hash is None
         or not verify_password(body.password, operator.password_hash)
     ):
+        ctx.record_failure(rl_account_key)
         raise _LOGIN_FAILED
+    # パスワード照合の成功をレート制限上の「成功」境界とする（アカウント軸をリセット）。
+    # 停止判定はレート制限（総当たり対策）とは別関心のビジネスルールのため、
+    # リセット後に判定する。
+    ctx.reset_account(rl_account_key)
     if operator.is_suspended:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -339,6 +373,7 @@ async def line_exchange(
     body: LineExchangeRequest,
     request: Request,
     session: AsyncSession = Depends(get_session),
+    _rl: object = Depends(RateLimitGuard("line_exchange")),
 ) -> AuthTokenResponse:
     line_user_id = await _fetch_line_user_id(body.line_access_token)
 

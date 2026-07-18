@@ -15,6 +15,11 @@ from app.db.base import Base
 # get_settings() は lru_cache されるため、Settings が最初にインスタンス化される前に
 # 環境変数を設定しておく必要がある（モジュールロード時点で設定する）。
 os.environ.setdefault("APP_ENCRYPTION_KEY", Fernet.generate_key().decode("utf-8"))
+# 認証系レート制限を既存テストでは既定で無効化する（get_settings() は lru_cache
+# されるため、Settings 初回生成より前に設定する必要がある）。レート制限自体の
+# テストは app.dependency_overrides[get_rate_limiter] でテスト専用の有効なインスタンスを
+# 注入して行うため、このグローバル設定には一切依存しない（tests/test_rate_limit_api.py）。
+os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
 
 # Override JSONB -> JSON for SQLite (JSONB is PG-specific, SQLite uses JSON)
 @compiles(JSONB, "sqlite")

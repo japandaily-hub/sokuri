@@ -11,12 +11,13 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user
+from app.api.rate_limit_deps import RateLimitGuard
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.models.case import Case
 from app.db.models.transaction import Transaction
@@ -102,13 +103,21 @@ _WRONG_CURRENT_PASSWORD = HTTPException(
 )
 async def change_my_password(
     body: PasswordChangeRequest,
+    request: Request,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
+    _rl: object = Depends(RateLimitGuard("password_change")),
 ) -> PasswordChangeResponse:
+    ctx = request.state.rate_limit
+    account_key = str(user.id)
+    ctx.check_account(account_key)
+
     if user.password_hash is None:
         raise _LINE_ONLY_PASSWORD_CHANGE
     if not verify_password(body.current_password, user.password_hash):
+        ctx.record_failure(account_key)
         raise _WRONG_CURRENT_PASSWORD
+    ctx.reset_account(account_key)
 
     user.password_hash = hash_password(body.new_password)
     user.password_changed_at = datetime.now(timezone.utc)
@@ -146,16 +155,24 @@ _NON_TERMINAL_CASE_STATUSES = ("draft", "open", "bidding")
 )
 async def delete_my_account(
     body: AccountDeleteRequest,
+    request: Request,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
+    _rl: object = Depends(RateLimitGuard("account_delete")),
 ) -> AccountDeleteResponse:
+    ctx = request.state.rate_limit
+    account_key = str(user.id)
+    ctx.check_account(account_key)
+
     if not body.confirm:
         raise _DELETE_CONFIRM_REQUIRED
 
     # LINE専用ユーザー（password_hash=None）はパスワード確認不要。
     if user.password_hash is not None:
         if not body.password or not verify_password(body.password, user.password_hash):
+            ctx.record_failure(account_key)
             raise _DELETE_WRONG_PASSWORD
+        ctx.reset_account(account_key)
 
     active_txn_count = await session.scalar(
         select(func.count())

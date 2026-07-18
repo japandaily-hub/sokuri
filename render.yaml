@@ -71,3 +71,10 @@ services:
                                 # 使うリクエストがEncryptionKeyMissingError→500になる（プロセスは落ちない。
                                 # app/core/crypto.py はハンドラ内で送出しFastAPIが500に変換する）。
                                 # 生成: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+      # ── 認証系レート制限 ──────────────────────────────────────
+      - key: RATE_LIMIT_ENABLED
+        value: "true"          # 緊急無効化スイッチ。障害時は "false" に変更して再デプロイ。
+      - key: TRUSTED_PROXY_HOPS
+        value: "1"             # X-Forwarded-For の右から何番目を信頼するか。
+                                # ⚠️ /api/v1/_diag/client-ip で実測して確定すること。
+                                # 過大にすると偽装可能、過小にすると全ユーザーが同一IP扱いになる。

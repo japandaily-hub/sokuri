@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from pydantic import Field, field_validator
+from pydantic import Field, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -66,6 +66,97 @@ class Settings(BaseSettings):
     # GUIクリックでなくレスポンスの値そのもので機械的に検証できるようにする。
     # ローカル開発等、Render 環境変数が存在しない場合は None。
     render_git_commit: str | None = None
+
+    # ── 認証系レート制限（総当たり・列挙対策） ────────────────────────
+    # 緊急無効化スイッチ。障害時（IP解決ミス等）は "false" にして再起動のみで
+    # ロールバック相当の復旧ができるようにする（本番既定は True＝セキュア・バイ・デフォルト）。
+    rate_limit_enabled: bool = True
+    # X-Forwarded-For の右から何番目を信頼するか。0 は「XFFを信頼せず
+    # request.client.host を使う」を意味する。過大にすると偽装可能、過小にすると
+    # 全ユーザーが同一IP扱いになり全断する。本番デプロイ後は /api/v1/_diag/client-ip
+    # で実測して確定すること。
+    trusted_proxy_hops: int = 1
+    # login（user/operator 共通）アカウント軸・IP軸の上限と共通窓。
+    # ※ #1〜#4 は列挙防止のため応答文言・窓長を必ず同一にする。片方だけ変更しないこと。
+    rl_login_account_max: int = 5
+    rl_login_ip_max: int = 20
+    rl_login_window_sec: int = 900
+    # パスワード変更 / 退会（軸はユーザーID）の上限と窓。
+    rl_sensitive_account_max: int = 5
+    rl_sensitive_window_sec: int = 900
+    # signup（user/operator 共通、IP軸・全リクエストカウント）の上限と窓。
+    rl_signup_ip_max: int = 10
+    rl_signup_window_sec: int = 3600
+    # LINEログイン統合（IP軸・全リクエストカウント）の上限と窓。
+    rl_line_ip_max: int = 20
+    rl_line_window_sec: int = 900
+    # InMemoryRateLimitStore のキー数ハードキャップ（メモリ枯渇防止）。
+    # 10000 → 100000 に引き上げ（security review Medium-1）。1バケット数十
+    # バイト規模のため 100000 件でも数MBで収まり、ハードキャップ到達自体を
+    # 実質的に稀な経路にする。
+    rl_max_keys: int = 100000
+
+    @field_validator("trusted_proxy_hops", mode="after")
+    @classmethod
+    def _validate_trusted_proxy_hops(cls, v: int) -> int:
+        """0〜3 の範囲を強制する（security review M-5 対応）。
+
+        0 は「XFFを信頼しない（request.client.host を使う）」の意味として許容する。
+        上限を設けず巨大な値（例: 10）を許すと、実際のプロキシ段数よりずっと
+        大きい値を誤設定した場合に ``resolve_client_ip`` の「要素数不足時は
+        parts[0] にフォールバック」経路が常用され、攻撃者が完全に制御できる
+        XFF 先頭要素が実質的な「信頼済みIP」として扱われ続けてしまう
+        （レート制限のIP軸が恒久的に無意味化する）。実運用で3段を超える
+        プロキシ多段構成は稀であるため、想定外の大値は起動時に弾く。
+        """
+        if not (0 <= v <= 3):
+            raise ValueError(
+                "TRUSTED_PROXY_HOPS は 0〜3 の整数である必要があります"
+                "（0=XFFを信頼しない）。"
+            )
+        return v
+
+    @field_validator(
+        "rl_login_account_max",
+        "rl_login_ip_max",
+        "rl_sensitive_account_max",
+        "rl_signup_ip_max",
+        "rl_line_ip_max",
+        mode="after",
+    )
+    @classmethod
+    def _validate_rl_max_positive(cls, v: int, info: ValidationInfo) -> int:
+        """各 *_MAX は1以上を強制する（0 だと即座に全リクエストが429になる）。"""
+        if v < 1:
+            raise ValueError(f"{info.field_name} は1以上の整数である必要があります。")
+        return v
+
+    @field_validator(
+        "rl_login_window_sec",
+        "rl_sensitive_window_sec",
+        "rl_signup_window_sec",
+        "rl_line_window_sec",
+        mode="after",
+    )
+    @classmethod
+    def _validate_rl_window_positive(cls, v: int, info: ValidationInfo) -> int:
+        """各 *_WINDOW_SEC は1以上を強制する（0だと固定ウィンドウが常時ゼロ幅になる）。"""
+        if v < 1:
+            raise ValueError(f"{info.field_name} は1以上の整数（秒）である必要があります。")
+        return v
+
+    @field_validator("rl_max_keys", mode="after")
+    @classmethod
+    def _validate_rl_max_keys(cls, v: int) -> int:
+        """RL_MAX_KEYS は100以上を強制する（security review F-2）。
+
+        0（や極端に小さい値）を設定すると、``InMemoryRateLimitStore`` の
+        ハードキャップ退避がほぼ毎 hit で発火し、ほぼ全キーが退避対象になって
+        レート制限が事実上無効化されてしまう。
+        """
+        if v < 100:
+            raise ValueError("RL_MAX_KEYS は100以上の整数である必要があります。")
+        return v
 
     @property
     def admin_emails(self) -> list[str]:
