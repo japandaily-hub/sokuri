@@ -171,7 +171,7 @@ const FILTERS: { label: string; tag: string }[] = [
  *  配線されるまで掲載しない。トップ/業者ページの表記と整合を保つこと）。 */
 const STATS: { num: string; unit?: string; label: string }[] = [
   { num: "¥0", label: "出品・査定・成約まで無料" },
-  { num: "上位", unit: "3社", label: "連絡が来るのは査定上位のみ" },
+  { num: "1", unit: "社", label: "連絡が来るのは、選んだ相手だけ" },
   { num: "4", unit: "都県", label: "東京・千葉・埼玉・神奈川" },
   { num: "12", unit: "カテゴリ", label: "家電からブランド品まで" },
 ];
