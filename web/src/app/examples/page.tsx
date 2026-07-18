@@ -1,10 +1,16 @@
 "use client";
 
-/** 成約事例（カードグリッド・金額/カテゴリ）。
- *  デザイン handoff: docs/design_handoff_katazuke/成約事例.html を忠実移植。
+/** 成約イメージ（カードグリッド・金額/カテゴリ）。
+ *  デザイン handoff: docs/design_handoff_katazuke/成約事例.html を移植。
  *  ヘッダー/フッターは共通 SiteChrome が付与するため、ここでは <main id="main"> の中身のみ描画する。
  *  カテゴリフィルターはクライアント側の状態で切り替える（元デザインの filterCases 相当）。
- *  事例写真（img/cat-*.png）は実アセット未投入のため PhImg のプレースホルダで表示する。 */
+ *  事例写真（img/cat-*.png）は実アセット未投入のため PhImg のプレースホルダで表示する。
+ *
+ *  【景品表示法（優良誤認）対応】掲載する事例は handoff 由来の架空データであり、実際の
+ *  取引実績ではない。よって本ページでは (1)「実際の」等の実在を示す表現を使わない
+ *  (2) 全カード・金額表示に「モデルケース／イメージ」を明示する (3) 計測実績風の統計値
+ *  （平均入札件数等）は実データ集計が配線されるまで掲載しない。実データへの差し替え時に
+ *  この注記類を外すこと。 */
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -161,11 +167,13 @@ const FILTERS: { label: string; tag: string }[] = [
   { label: "模様替え", tag: "模様替え" },
 ];
 
-const STATS: { num: string; unit: string; label: string }[] = [
-  { num: "¥68,000", unit: "〜", label: "最高入札額（直近30日）" },
-  { num: "7.4", unit: "件", label: "平均入札件数" },
-  { num: "78", unit: "%", label: "入札があった割合" },
-  { num: "2.1", unit: "日", label: "平均成約までの日数" },
+/** 数値バー。事実ベースのサービス条件のみを載せる（計測実績風の数値は実データ集計が
+ *  配線されるまで掲載しない。トップ/業者ページの表記と整合を保つこと）。 */
+const STATS: { num: string; unit?: string; label: string }[] = [
+  { num: "¥0", label: "出品・査定・成約まで無料" },
+  { num: "1", unit: "社", label: "連絡が来るのは、選んだ相手だけ" },
+  { num: "4", unit: "都県", label: "東京・千葉・埼玉・神奈川" },
+  { num: "12", unit: "カテゴリ", label: "家電からブランド品まで" },
 ];
 
 function CasePhoto({ slug }: { slug: string }) {
@@ -187,7 +195,7 @@ function FeaturedCase({ c }: { c: CaseItem }) {
     <Reveal className="featured-case">
       <div className="featured-badge">
         <Ic name="spark" />
-        注目の成約事例
+        モデルケース（利用イメージ）
       </div>
       <div className="featured-inner">
         <div className="featured-photos">
@@ -207,7 +215,7 @@ function FeaturedCase({ c }: { c: CaseItem }) {
             </div>
           </div>
           <div>
-            <div className="featured-amount-label">成約買取額</div>
+            <div className="featured-amount-label">成約買取額（イメージ）</div>
             <div className="featured-amount">
               ¥{c.amount.toLocaleString()}
               <span>円</span>
@@ -225,6 +233,7 @@ function FeaturedCase({ c }: { c: CaseItem }) {
           </div>
           <div className="case-quote">
             <p>{c.quote}</p>
+            <span className="case-quote-note">※ 人物・セリフを含め、架空の利用イメージです</span>
           </div>
         </div>
       </div>
@@ -250,7 +259,7 @@ function CaseCard({ c }: { c: CaseItem }) {
             </div>
           </div>
           <div className="case-amount-box">
-            <div className="case-amount-label">成約買取額</div>
+            <div className="case-amount-label">成約買取額（イメージ）</div>
             <div className="case-amount">
               ¥{c.amount.toLocaleString()}
               <span>円</span>
@@ -259,6 +268,7 @@ function CaseCard({ c }: { c: CaseItem }) {
           </div>
         </div>
         <div className="case-cats">
+          <span className="case-model-chip">モデルケース</span>
           <span className="case-tag-chip">{c.tag}</span>
           {c.cats.map((cat) => (
             <span className="case-cat" key={cat}>
@@ -268,6 +278,7 @@ function CaseCard({ c }: { c: CaseItem }) {
         </div>
         <div className="case-quote">
           <p>{c.quote}</p>
+          <span className="case-quote-note">※ 人物・セリフを含め、架空の利用イメージです</span>
         </div>
         <div className="case-meta">
           <span>
@@ -302,14 +313,17 @@ export default function ExamplesPage() {
       <section className="cases-hero">
         <div className="container">
           <span className="eyebrow">CASES</span>
-          <h1>実際の成約事例</h1>
+          <h1>成約イメージ（モデルケース）</h1>
           <p>
-            まとめて出品することで、どのくらいの金額になるのか。実際にカタヅケを利用したユーザーの事例をご紹介します。
+            まとめて出品すると、どのように査定が集まり、成約に至るのか。サービスの流れがイメージできるモデルケースをご紹介します。
+          </p>
+          <p className="cases-hero-note" role="note">
+            ※ 掲載している事例・人物・金額・入札数はいずれも、利用の流れを説明するための架空のモデルケースです。実際の取引実績ではなく、買取額等の成果を保証するものではありません。
           </p>
         </div>
       </section>
 
-      {/* ============ 実績バー ============ */}
+      {/* ============ サービス数値バー（事実ベースのみ） ============ */}
       <div className="stats-bar">
         <div className="container">
           <div className="stats-bar-inner">
@@ -317,7 +331,7 @@ export default function ExamplesPage() {
               <div className="stats-item" key={s.label}>
                 <div className="stats-num">
                   {s.num}
-                  <span>{s.unit}</span>
+                  {s.unit && <span>{s.unit}</span>}
                 </div>
                 <div className="stats-lbl">{s.label}</div>
               </div>
@@ -359,6 +373,10 @@ export default function ExamplesPage() {
               )
             )}
           </div>
+
+          <p className="cases-note" role="note">
+            ※ 上記はサービスの利用イメージ（モデルケース）であり、実際の取引実績ではありません。買取額・入札数・成約までの日数は品物や状況により異なります。最終的な買取額は業者の現物査定により決まります。
+          </p>
 
           {/* ============ CTA ============ */}
           <Reveal className="cases-cta">

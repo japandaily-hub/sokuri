@@ -35,7 +35,8 @@ const NAV: { href: string; label: string }[] = [
   { href: "#faq", label: "よくある質問" },
 ];
 
-/** 実績帯（明らかなデモ数値。バックエンド未配線） */
+/** 数値帯（事実ベースのサービス条件のみ。計測実績風の数値は景表法（優良誤認）回避のため
+ *  実データ集計が配線されるまで掲載しない） */
 const STATS: { num: string; unit: string; label: string }[] = [
   { num: "4", unit: "都県", label: "東京・千葉・埼玉・神奈川" },
   { num: "0", unit: "円", label: "初期費用・月額費用" },
@@ -289,8 +290,8 @@ export default function BusinessPage() {
           </div>
         </section>
 
-        {/* ============ 実績帯 ============ */}
-        <section className="biz-stats" aria-label="サービスの実績">
+        {/* ============ 数値帯（事実ベースのみ） ============ */}
+        <section className="biz-stats" aria-label="サービスの特徴">
           <div className="container">
             <div className="inner">
               {STATS.map((s) => (

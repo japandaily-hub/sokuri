@@ -22,7 +22,7 @@ export function SiteFooter() {
               <li><Link href="/#flow">使い方</Link></li>
               <li><Link href="/create">出品する</Link></li>
               <li><Link href="/photo-guide">撮影ガイド</Link></li>
-              <li><Link href="/examples">成約事例</Link></li>
+              <li><Link href="/examples">成約イメージ</Link></li>
             </ul>
           </div>
           <div>

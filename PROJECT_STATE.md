@@ -1,5 +1,11 @@
 # PROJECT_STATE — カタヅケ クローズドβ
 
+## 🚀 2026-07-18 [claude] 入札メッセージガード+7/17コピー是正2件を本番デプロイ完了（main=35842bc・3環境success確認）
+- **push前に分岐検出**: origin/main(f6dd33f=7月全断恒久修正+readyz診断+start.sh の3コミット)がローカルmain未取込で分岐していた。競合ファイルゼロを確認しマージ(35842bc)→マージ後ツリーで pytest 193 passed 再確認→push。**教訓: ローカルmainへの合流前に必ず fetch して origin/main との分岐を確認すること**（ホットフィックスが直接origin mainに載る運用があるため。今回そのままpushしていたら稼働中の障害修正を巻き戻すところだった）。
+- **デプロイ検証（コミット単位の証拠）**: GitHub Deployments API（公開リポジトリのため無認証curlで可: `api.github.com/repos/japandaily-hub/sokuri/deployments`）で3環境すべて **success**・sha=35842bc（Vercel Production 02:37:49Z / sokuuri production 02:37:38Z / Render sokuri-backend 02:37:54Z）。gh CLI はこの環境に無いが不要だった。
+- **外形実測**: トップHTML=「上位3社」0件・新コピー（「あなたが選んだ1社だけ」「写真・品目・地域」）描画確認。/health=200。/readyz=`{"status":"ready","db":"ok","alembic_version":"0011_line_user_id"=expected_head, 主要7テーブル全true}`（Render success の21秒後のプローブ＝新ビルド応答）。backendガード自体は認証必須のため無認証面に観測点が無く、Deployments API success が新版稼働の主証拠。
+- **申し送り**: /health にビルド識別子（RENDER_GIT_COMMIT等）を露出させるとデプロイ検証が単純化する（チップ化）。7/17両エントリの「未push」注記は本デプロイで解消済み。intro_message拡大適用チップ(task_a86c49cc)は未着手。
+
 ## ✅ 2026-07-17 [claude] アカウント管理3機能（プロフィール更新/PW変更/退会）実装+profile/withdraw復元実配線（05d366d→main合流）
 - **経緯**: task_74d343ae（redirect化していた /mypage/profile・/mypage/withdraw の復元用API）を architect設計→backend→frontend→security/qa並列レビューの規約フローで完遂。ブランチ=claude/musing-archimedes-f1622f。**ユーザー指示「推奨で完走」により main 合流・本番デプロイ実施（結果は最新デプロイ記録参照）**。
 - **backend**: User拡張8列（family_name/given_name/カナ2列/phone/residence_area/deleted_at/password_changed_at・全nullable、name は表示用キャッシュとして「姓 名」同期）+ alembic 0013（当初0012で作成→並行pushされた 0012_fix_status_defaults との2ヘッド衝突をマージ時に検出し0013へ付替・単一ヘッド化を機械検証済）。新規 `endpoints/users.py`: GET/PUT `/users/me/profile`・PUT `/users/me/password`（成功時に新JWT返却）・DELETE `/users/me`。deps.py に失効ゲート2種（deleted_at 論理削除・iat<password_changed_at、SQLite tz-naive補正/秒切捨て比較）。JWT7日長命のため PW変更後の旧トークン即時失効は必須と判断し当初設計の[将来]を前倒し実装。
