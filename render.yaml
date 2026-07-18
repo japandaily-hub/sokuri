@@ -75,6 +75,13 @@ services:
       - key: RATE_LIMIT_ENABLED
         value: "true"          # 緊急無効化スイッチ。障害時は "false" に変更して再デプロイ。
       - key: TRUSTED_PROXY_HOPS
-        value: "1"             # X-Forwarded-For の右から何番目を信頼するか。
-                                # ⚠️ /api/v1/_diag/client-ip で実測して確定すること。
+        value: "3"             # X-Forwarded-For の右から何番目を信頼するか。
+                                # 2026-07-18 に本番実測して確定した値。実際の連鎖は3段:
+                                #   client → Cloudflare(162.159.x/172.6x.x) → Render内部(10.x)
+                                # hops=1 だと末尾の Render 内部プライベートIPを掴み、
+                                # 全ユーザーが同一バケット＝認証全断のモードに入る
+                                # （現在は client_ip.is_private_or_loopback により
+                                #   IP軸スキップへ退避するので全断はしないが、IP軸の保護が失われる）。
+                                # 実測は /api/v1/_diag/client-ip で行い、resolved_ip が
+                                # 自分の実グローバルIPと一致することを必ず確認すること。
                                 # 過大にすると偽装可能、過小にすると全ユーザーが同一IP扱いになる。

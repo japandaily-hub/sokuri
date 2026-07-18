@@ -509,9 +509,16 @@ class TestTruncateIpForLog:
 
 class TestTrustedProxyHopsValidator:
     """QA指摘 L-3: TRUSTED_PROXY_HOPS バリデータのテスト（security review M-5 の
-    0〜3範囲チェックを含む）。"""
+    範囲チェックを含む）。
 
-    @pytest.mark.parametrize("value", [0, 1, 2, 3])
+    上限は当初3だったが、実測（2026-07-18 本番）でプロキシ連鎖が
+    client → Cloudflare → Render内部 の3段と判明し、実運用値が上限ぴったりに
+    なった。CDN構成が1段増えるだけでインシデント中にコード変更が必要になるため
+    8まで緩めている（過大設定は parts[0] フォールバック廃止により、静かな
+    バイパスではなく即座に可視な400として現れる）。
+    """
+
+    @pytest.mark.parametrize("value", [0, 1, 2, 3, 8])
     def test_values_within_range_are_accepted(self, value: int) -> None:
         from app.config import Settings
 
@@ -527,10 +534,9 @@ class TestTrustedProxyHopsValidator:
         with pytest.raises(ValidationError, match="TRUSTED_PROXY_HOPS"):
             Settings(_env_file=None, trusted_proxy_hops=value)
 
-    @pytest.mark.parametrize("value", [4, 10, 100])
+    @pytest.mark.parametrize("value", [9, 100])
     def test_values_above_upper_bound_are_rejected(self, value: int) -> None:
-        """security review M-5: 上限バリデーションがないと、誤設定で
-        parts[0]（攻撃者が完全に制御できる値）フォールバックが常用経路になる。"""
+        """桁を間違えた設定値（例: 100）は起動時に弾く。"""
         from pydantic import ValidationError
 
         from app.config import Settings
