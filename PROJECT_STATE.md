@@ -1,5 +1,11 @@
 # PROJECT_STATE — カタヅケ クローズドβ
 
+## ✅ 2026-07-18 [claude] 全断障害の申し送り2件を完走（2a7a3d1・本番0012適用実証済み）
+- **①status既定値の二重引用是正**: 0004の`server_default="'draft'"`等→裸文字列化+**0012_fix_status_defaults**新設（既存DBへSET DEFAULT+防御的UPDATE）。オフラインSQL実測で`DEFAULT 'draft'`正規化を確認（旧は`DEFAULT '''draft'''`=引用符込み7文字の壊れ既定値。cases/bids/transactions/reduction_requestsの4箇所・ORM明示値送信のため未発現だった休眠バグ）。
+- **②/readyz診断のDIAG_TOKENゲート化**: 未設定=β運用（スキーマ未達時のみ公開・URLリダクト済）、設定時は`?token=`一致必須（hmac定数時間比較）。JWTゲートは「認証系が死ぬ障害時にこそ診断が要る」ため不採用（設計判断）。render.yamlにsync:false項目追加済。
+- **検証**: pytest 141 passed / TestClientでゲート3態（無し/誤り=非表示・一致=表示）+リダクト実証 / **本番実測11:42 JST=`/readyz` ready・alembic_version=0012_fix_status_defaults==expected_head・login 401・health 200**。
+- **運用メモ**: 正式リリース時はRenderダッシュボードで**DIAG_TOKEN**にランダム値を設定（閲覧は`/readyz?token=<値>`）。
+
 ## 🚀 2026-07-18 [claude] /examples 架空成約事例の景表法（優良誤認）是正 → mainへマージ+push（本番デプロイ・task_83692f21）
 - **方針**: 実データ集計(a)はバックエンド未配線+βで対象データなし→不可、ページ非公開(c)は主要ナビ導線で損失大→**(b)モデルケース明示を厳格化**。ただし計測実績風統計（¥68,000/7.4件/78%/2.1日）は打消し表示では治癒しない判断で**撤去**し、事実ベースのサービス条件（¥0無料・選んだ1社だけ連絡・4都県・12カテゴリ）へ差し替え。
 - **変更**: examples/page.tsx（h1「実際の成約事例」→「成約イメージ（モデルケース）」・多層打消し=ヒーロー注記+全カード「モデルケース」チップ+金額ラベル「（イメージ）」+**体験談ごと引用直下の近接注記**+グリッド末尾注記）/ examples.css（注記13.5px・チップ・引用注記スタイル）/ examples/layout.tsx（title/description をモデルケース明示に）/ SiteHeader・chrome（ナビ「成約事例」→「成約イメージ」）/ business/page.tsx（数値帯の「実績」誤称→aria-label「サービスの特徴」。数値は全て事実のため維持）。
