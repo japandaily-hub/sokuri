@@ -72,8 +72,14 @@ services:
                                 # app/core/crypto.py はハンドラ内で送出しFastAPIが500に変換する）。
                                 # 生成: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
       # ── 認証系レート制限 ──────────────────────────────────────
+      # ⚠️ 2026-07-18 実測: ここに**新しいキーを追記して push しても、既に作成済みの
+      # サービスには同期されない**（Blueprint 再適用が必要）。実際に
+      # TRUSTED_PROXY_HOPS=3 を書いてデプロイしてもアプリ側は未設定のままだった。
+      # そのため本番で効かせる必要のある既定値は backend/start.sh 側で export している。
+      # 以下は「新規サービス作成時の値」と「設定の所在を示すドキュメント」を兼ねる。
+      # **緊急停止は dashboard で環境変数を設定すること**（ここを false にしても効かない）。
       - key: RATE_LIMIT_ENABLED
-        value: "true"          # 緊急無効化スイッチ。障害時は "false" に変更して再デプロイ。
+        value: "true"          # 緊急無効化スイッチ。障害時は dashboard で "false" に設定。
       - key: TRUSTED_PROXY_HOPS
         value: "3"             # X-Forwarded-For の右から何番目を信頼するか。
                                 # 2026-07-18 に本番実測して確定した値。実際の連鎖は3段:
