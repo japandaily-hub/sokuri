@@ -129,8 +129,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(api_router, prefix="/api/v1")
 
     @app.get("/health", tags=["System"], summary="ヘルスチェック")
-    async def health() -> dict[str, str]:
-        return {"status": "ok"}
+    async def health() -> dict[str, str | None]:
+        """liveness プローブ。稼働中ビルドのコミットSHA短縮形（先頭7桁）を併せて返す。
+
+        RENDER_GIT_COMMIT（Render Blueprint がデプロイ時に自動注入）が未設定の
+        環境（ローカル開発等）では commit は None。「デプロイした」をGUIではなく
+        レスポンス値そのもので機械的に検証できるようにするための識別子。
+        """
+        commit = settings.render_git_commit[:7] if settings.render_git_commit else None
+        return {"status": "ok", "commit": commit}
 
     @app.get("/readyz", tags=["System"], summary="レディネスチェック（DB到達性+スキーマ状態込み）")
     async def readyz(token: str | None = None) -> JSONResponse:

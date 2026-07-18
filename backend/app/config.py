@@ -61,6 +61,11 @@ class Settings(BaseSettings):
     allowed_origins_raw: str = Field(default="", alias="ALLOWED_ORIGINS")
     # 実行環境（"development" | "production"）。本番起動時の fail-open ガードに使用する。
     app_env: str = Field(default="development", alias="APP_ENV")
+    # Render Blueprint がデプロイ時に自動注入するコミットSHA（フル40桁）。
+    # /health の commit フィールド（先頭7桁に短縮）に使用し、「デプロイした」を
+    # GUIクリックでなくレスポンスの値そのもので機械的に検証できるようにする。
+    # ローカル開発等、Render 環境変数が存在しない場合は None。
+    render_git_commit: str | None = None
 
     @property
     def admin_emails(self) -> list[str]:

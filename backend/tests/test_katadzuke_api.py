@@ -1575,6 +1575,97 @@ async def test_operator_profile_strong_categories_must_be_subset(
     assert r.status_code == 422
 
 
+async def test_operator_profile_intro_message_with_contact_info_rejected_422(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """intro_messageに電話番号が含まれる場合は422で拒否され、DBに保存されない
+    （show_message=True時に公開プロフィールで無認証ユーザーへ表示されるため、
+    脱プラットフォーム勧誘対策としてbids.pyの入札メッセージと同様のガードを適用）。"""
+    admin_token = await _make_admin(client, db_session)
+    op_token, _ = await _verified_operator(
+        client, db_session, admin_token, "profile_guard_op@example.com"
+    )
+
+    r = await client.put(
+        "/api/v1/operator/profile",
+        json={
+            "areas": ["東京都"],
+            "categories": ["家電"],
+            "strong_categories": ["家電"],
+            "intro_message": "ご相談はお電話ください 090-1234-5678 まで",
+            "is_public": True,
+            "show_stats": True,
+            "show_reviews": True,
+            "show_message": True,
+            "accept_unsellable": False,
+        },
+        headers=_auth(op_token),
+    )
+    assert r.status_code == 422
+    assert "連絡先" in r.json()["detail"]
+
+    # DB副作用が残らないこと（再取得してもintro_messageが未設定のまま）の回帰保証。
+    r = await client.get("/api/v1/operator/profile", headers=_auth(op_token))
+    assert r.status_code == 200
+    assert r.json()["intro_message"] is None
+
+
+async def test_operator_profile_intro_message_without_contact_info_accepted(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """連絡先やURLを含まない通常のintro_messageは正常に更新できる。"""
+    admin_token = await _make_admin(client, db_session)
+    op_token, _ = await _verified_operator(
+        client, db_session, admin_token, "profile_guard_ok_op@example.com"
+    )
+
+    r = await client.put(
+        "/api/v1/operator/profile",
+        json={
+            "areas": ["東京都"],
+            "categories": ["家電"],
+            "strong_categories": ["家電"],
+            "intro_message": "丁寧に対応いたします。よろしくお願いします。",
+            "is_public": True,
+            "show_stats": True,
+            "show_reviews": True,
+            "show_message": True,
+            "accept_unsellable": False,
+        },
+        headers=_auth(op_token),
+    )
+    assert r.status_code == 200
+    assert r.json()["intro_message"] == "丁寧に対応いたします。よろしくお願いします。"
+
+
+async def test_operator_profile_update_intro_message_key_omitted_succeeds(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """intro_messageキーを省略したPUT（他は全フィールド正当値）も、
+    連絡先ガードが誤発動せず200で通ること（None入力での過剰検知回帰防止）。"""
+    admin_token = await _make_admin(client, db_session)
+    op_token, _ = await _verified_operator(
+        client, db_session, admin_token, "profile_guard_omit_op@example.com"
+    )
+
+    r = await client.put(
+        "/api/v1/operator/profile",
+        json={
+            "areas": ["東京都"],
+            "categories": ["家電"],
+            "strong_categories": ["家電"],
+            "is_public": True,
+            "show_stats": True,
+            "show_reviews": True,
+            "show_message": True,
+            "accept_unsellable": False,
+        },
+        headers=_auth(op_token),
+    )
+    assert r.status_code == 200
+    assert r.json()["intro_message"] is None
+
+
 async def test_operator_profile_update_ignores_verified_fields(
     client: AsyncClient, db_session: AsyncSession
 ):
