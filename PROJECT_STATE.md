@@ -8,6 +8,12 @@
 - **検証**: tsc クリーン / worktreeレシピ（junction+launch.json一時エントリ・復元済）でSSR実測=旧文言0件・全注記描画・computed style確認（12.5→13.5px反映・チップdashed 5枚+featuredバッジ）/ 本番=push（origin/main=c8e290b）後に sokuri.vercel.app/examples を外形確認（「モデルケース」描画・「実際の成約事例」「¥68,000」「上位3社」0件）。
 - **メモリ**: katazuke-keihyoho-fictional-data-policy（架空データ掲載ポリシー4原則）を保存済。
 
+## 🚀 2026-07-18 [claude] 入札メッセージガード+7/17コピー是正2件を本番デプロイ完了（main=35842bc・3環境success確認）
+- **push前に分岐検出**: origin/main(f6dd33f=7月全断恒久修正+readyz診断+start.sh の3コミット)がローカルmain未取込で分岐していた。競合ファイルゼロを確認しマージ(35842bc)→マージ後ツリーで pytest 193 passed 再確認→push。**教訓: ローカルmainへの合流前に必ず fetch して origin/main との分岐を確認すること**（ホットフィックスが直接origin mainに載る運用があるため。今回そのままpushしていたら稼働中の障害修正を巻き戻すところだった）。
+- **デプロイ検証（コミット単位の証拠）**: GitHub Deployments API（公開リポジトリのため無認証curlで可: `api.github.com/repos/japandaily-hub/sokuri/deployments`）で3環境すべて **success**・sha=35842bc（Vercel Production 02:37:49Z / sokuuri production 02:37:38Z / Render sokuri-backend 02:37:54Z）。gh CLI はこの環境に無いが不要だった。
+- **外形実測**: トップHTML=「上位3社」0件・新コピー（「あなたが選んだ1社だけ」「写真・品目・地域」）描画確認。/health=200。/readyz=`{"status":"ready","db":"ok","alembic_version":"0011_line_user_id"=expected_head, 主要7テーブル全true}`（Render success の21秒後のプローブ＝新ビルド応答）。backendガード自体は認証必須のため無認証面に観測点が無く、Deployments API success が新版稼働の主証拠。
+- **申し送り**: /health にビルド識別子（RENDER_GIT_COMMIT等）を露出させるとデプロイ検証が単純化する（チップ化）。7/17両エントリの「未push」注記は本デプロイで解消済み。intro_message拡大適用チップ(task_a86c49cc)は未着手。
+
 ## ✅ 2026-07-17 [claude] 入札メッセージに連絡先/URL検知ガード追加（脱プラットフォーム勧誘対策・security Lowフォローアップ）
 - **背景**: BidCreateRequest.message（2000字）は選定前ユーザーに表示され、電話番号/URL/メール埋込みによる規約禁止の脱プラットフォーム勧誘の片方向経路だった（07-17「上位3社」是正時のLow申し送り(2)）。
 - **実装**: 新規 `backend/app/services/message_guard.py`（純粋関数 `contains_contact_info`）を `create_bid` で呼び、検知時 422「入札メッセージに連絡先（電話番号・メールアドレス）やURLは記載できません。」（サイレント削除は不採用）。検知=NFKC正規化+Cf(ゼロ幅)除去→①電話: 区切り文字（ハイフン類/空白/./()/,、/:;・|_*）対応の候補抽出+「全連結」と「最大4グループ窓」の二段判定（10-11桁・先頭0・00始まり除外、+81=81始まり12桁も対象）②URL: https?://とwww.（裸ドメイン対象外）③メール: TLDをASCII英字2字以上に限定（「単価@1.5万円」誤検知回避）。3桁カンマ区切り金額（800,000-1,000,000円等）は事前に#置換で電話判定から除外。
