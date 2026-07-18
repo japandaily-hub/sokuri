@@ -23,7 +23,7 @@ const FAQ_ITEMS = [
   { q: "1点だけでも依頼できますか？", a: "はい。ただし、まとめて出すほど業者の買取総額が伸びやすく、値がつかない物も一緒に引き取ってもらいやすくなります。" },
   { q: "値段がつかない物はどうなりますか？", a: "業者は1点ごとではなく“まとめ全体”の金額で入札します。単体では値がつきにくい物も、まとめに含めて引き取ってもらえる場合があります。" },
   { q: "しつこい営業電話は来ますか？", a: "連絡が来るのは、あなたが選んだ1社だけ。選ぶまで連絡先は業者に開示されず、選ばなかった業者には自動でお断りが入るため、一斉架電は起こりません。" },
-  { q: "個人情報はどう扱われますか？", a: "査定段階で業者に渡るのは、写真・品目・地域（都道府県・市区町村）・住居情報などの出品内容のみ。お名前・電話・詳細住所は、交渉が成立した1社にのみ開示されます。" },
+  { q: "個人情報はどう扱われますか？", a: "査定段階で業者に渡るのは、写真・品目・地域（都道府県・市区町村）・住居情報などの出品内容のみ。お名前や電話番号が業者に渡ることはなく、詳細住所と連絡用のメールアドレスも交渉が成立した1社にのみ開示されます。" },
   { q: "利用にお金はかかりますか？", a: "出品・査定・成約まで、すべて無料です。費用は一切かかりません。" },
   { q: "訪問買取に不安があります", a: "参加するのは古物商許可を確認した登録事業者のみ。訪問買取は特定商取引法によりクーリングオフの対象です。" },
 ];
@@ -98,7 +98,7 @@ export default function HomePage() {
         <section className="assure" aria-label="サービスの安心ポイント">
           <div className="container">
             <div className="assure-item"><span className="ai"><Ic name="shield" /></span><span><b>登録事業者のみ</b><span>古物商許可を確認</span></span></div>
-            <div className="assure-item"><span className="ai"><Ic name="lock" /></span><span><b>連絡先は成立後に開示</b><span>氏名・番地は伏せたまま</span></span></div>
+            <div className="assure-item"><span className="ai"><Ic name="lock" /></span><span><b>連絡先は成立後に開示</b><span>氏名・電話は渡りません</span></span></div>
             <div className="assure-item"><span className="ai"><Ic name="phone" /></span><span><b>一斉架電なし</b><span>連絡は選んだ1社だけ</span></span></div>
             <div className="assure-item"><span className="ai"><Ic name="pin" /></span><span><b>東京・千葉・埼玉・神奈川</b><span>順次エリア拡大中</span></span></div>
           </div>
@@ -284,7 +284,7 @@ export default function HomePage() {
               </Reveal>
               <Reveal as="article" className="trust-c" delay={1}>
                 <div className="tc-illus ph-wrap"><PhImg src="/img/trust-illus-2.png" alt="連絡先は交渉成立後に開示されるイメージ" label="trust-illus-2.png" icon="lock" imgStyle={{ width: "100%", height: "100%", objectFit: "contain", padding: 10 }} /></div>
-                <div className="tc-body"><span className="tc-ic"><Ic name="lock" /></span><h3>連絡先は成立後に開示</h3><p>査定段階で業者に渡るのは、写真・品目・地域（都道府県・市区町村）・住居情報などの出品内容のみ。お名前・電話・詳細住所は、交渉が成立するまで開示されません。</p></div>
+                <div className="tc-body"><span className="tc-ic"><Ic name="lock" /></span><h3>連絡先は成立後に開示</h3><p>査定段階で業者に渡るのは、写真・品目・地域（都道府県・市区町村）・住居情報などの出品内容のみ。お名前や電話番号は業者に渡らず、詳細住所と連絡用のメールアドレスは交渉が成立するまで開示されません。</p></div>
               </Reveal>
               <Reveal as="article" className="trust-c" delay={2}>
                 <div className="tc-illus ph-wrap"><PhImg src="/img/trust-illus-3.png" alt="訪問買取はクーリングオフの対象となるイメージ" label="trust-illus-3.png" icon="check-circle" imgStyle={{ width: "100%", height: "100%", objectFit: "contain", padding: 10 }} /></div>

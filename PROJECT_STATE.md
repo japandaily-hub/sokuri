@@ -1,5 +1,13 @@
 # PROJECT_STATE — カタヅケ クローズドβ
 
+## ✅ 2026-07-18 [claude] 成約時開示の過大記載是正+privacy第2条収集表の実装整合（前日レビュー申し送り2件を推奨案aで完走）
+- **方針**: ユーザー指示「推奨で完走」→ 案a=コピーを実装に整合。実装の真実=成約業者に渡るのは TransactionDetailOut（schemas:231-241）の address（都道府県・市区町村・番地）+contact_email のみ（LINE専用ユーザーは is_placeholder_email 判定で「LINEにて連絡」に置換・transactions.py:188-198）。氏名は全スキーマ・通知メール・LINE Pushに不使用（backend/app 全体で user.name 参照ゼロ）、電話はUserにカラム自体なし → 「**お名前や電話番号は業者に渡らない**」というより強い安心訴求へ転換。
+- **変更（8ファイル・15箇所）**: ①成約時開示コピー7箇所=terms第5条:81/privacy第4条note/legal:196（「住所」→「詳細住所」+開示内容具体化）/page.tsx:26 FAQ・:287 trust/faq:55/landing Faq:19 ②privacy第2条 COLLECTED表全5行を実収集に差し替え（ユーザー側の電話・郵便番号・数量/状態/メモ=未収集を削除。**業者申込フォームの実収集**=代表者名・担当者名・法人登録住所・電話・事業形態・対応エリア・カテゴリ・インボイス番号・**振込先口座(暗号化して保存・operator_application.py bank_account_enc)**・client_ip を明記）③レビュー指摘反映=assure帯「氏名・番地は伏せたまま」→「氏名・電話は渡りません」（番地は成約後開示のため不正確だった）・「連絡用のメールアドレス」表記統一・privacy第4条noteにLINE分岐追記・収集表の係り受け/業者パスワード明確化。
+- **検証**: tsc クリーン / worktreeレシピ（junction+3102・復元済）SSR実測= / /faq /terms /privacy /legal 新文言描画・旧文言/表記ゆれ0件。/contactフォームは未配線（fetch無し=電話収集なし）を確認。
+- **レビュー**: security/qa並列 → **Critical/High/Medium 0**（securityは反証走査で全経路を否定確認: 通知メール notify.py・LINE Push line_notify.py・チャットMessageOut・レビュー・減額・adminゲート下のOperatorApplicationOut。qaのMedium1=assure帯矛盾は上記③で即応済・実テストtest_line_integration.py:718で「LINEにて連絡」も裏付け）。
+- **申し送り（security情報共有・任意）**: 開示するメールアドレス文字列自体が氏名を含み得る（連携用メール案内で緩和可）／チャット自由記述はユーザー自身の自己開示経路（プラットフォーム開示ではない）／アクセス情報行のUA・閲覧ページ等はover-listing（権利留保として許容・アナリティクス導入時に実配線と突合推奨）。
+- **未push**: mainへローカルマージのみ。push（=Vercel自動デプロイ）はユーザー承認事項のため未実施。
+
 ## ✅ 2026-07-17 [claude] 「写真と品目のみ」過小記載是正（security Low申し送りフォローアップ）— 査定段階の開示範囲コピーを実装に整合
 - **方針**: 実装が正=CaseMaskedOut（backend/app/schemas_katadzuke.py:164-181）は査定段階で purpose/prefecture/city/housing_type/floor_plan/floor_number/has_elevator/ai_summary も業者に開示。マーケ面は統一表現「写真・品目・地域（都道府県・市区町村）・住居情報などの出品内容のみ」、法的文書（terms第5条・privacy第4条note）は利用目的・住居情報内訳・AI要約まで完全列挙（スキーマと1対1一致をqa/securityが照合済）。「氏名・電話・詳細住所は成約1社にのみ開示」の核心はタスク指示どおり維持。
 - **変更**: 8ファイル11箇所・文字列リテラルのみ（page.tsx×4=FAQ/assure帯「氏名・番地は伏せたまま」/オークション手順1/trustカード、faq:55、terms第4・5条、privacy第4条note、landing/Faq:19=未importデッドコード予防、create:280確認画面、business:50構成文）。タスク指定5箇所に加えgrep発見の同種3箇所（privacy第4条・terms第4条・business:50）も是正。「写真と品目」残存4箇所（complete:98/business:44/page:32/photo-guide:87）は排他主張なしの意図的残置。docs/design_handoff_katazuke/ は対象外。
