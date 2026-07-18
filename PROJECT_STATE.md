@@ -1,5 +1,12 @@
 # PROJECT_STATE — カタヅケ クローズドβ
 
+## ✅ 2026-07-18 [claude] /healthビルド識別子+intro_message連絡先ガード拡大（デプロイ検証恒久化+勧誘対策の残面塞ぎ）
+- **①/health に commit フィールド**: config.py Settings に `render_git_commit`（env RENDER_GIT_COMMIT、Render自動注入）を追加し、/health が `{"status":"ok","commit":<先頭7桁|None>}` を返す。**以後のデプロイ検証は curl /health の commit 照合一発**（GitHub Deployments API は補助に降格）。既存消費者（render.yaml healthCheckPath・.tools各スクリプト）はステータスコードのみ参照で後方互換確認済み。
+- **②intro_message ガード**: 公開プロフィール（show_message=true で無認証表示）に出る intro_message の更新時に contains_contact_info を適用、検知時 422「自己紹介文に連絡先（電話番号・メールアドレス）やURLは記載できません。」（_get_or_create_profile 前で行作成すら発生しない配置）。OperatorApplication.message は全4露出経路が admin ゲート下と裏取りしガード対象外（将来 message を公開UIに出す際は要再ガード）。
+- **レビュー**: security/qa 並列 → **双方承認・Critical/High/Medium 0**。qa Low 4件中2件（env経由の実読込テスト・intro_message省略時の非発動テスト）は即日取込、残2件（既存プロフィール多フィールド巻き戻しテスト・test_api.py の /health 手製モック乖離）は非対応でも可の設計負債メモ。
+- **gate_status**: pytest=**225 passed** / ruff=変更7ファイルクリーン。
+- **申し送り（security Info）**: ガード導入**前**に保存済みの intro_message には連絡先が残り得る（新規PUTのみ阻止のため）。本番DBの operator_profiles.intro_message 一度きりスキャン/バックフィル推奨。クローズドβで件数僅少のため優先度低。
+
 ## 🚀 2026-07-18 [claude] アカウント管理3機能を本番デプロイ完了（9ed9025・Render/Vercel外形+本番E2E実証）
 - **main合流**: worktreeブランチ(05d366d)→main。合流中に並行pushを3回検出し都度fetch→merge（PROJECT_STATE両エントリ保持）。**最重要検出=並行の 0012_fix_status_defaults とマイグレーション番号衝突**（両者down_revision=0011の2ヘッド→本番alembic必敗）→ 0013_user_profile_fields へ付替・ScriptDirectoryで単一ヘッド機械検証→push(9ed9025)。マージ後ツリーで pytest 218 passed / tsc クリーン。
 - **backendデプロイ実証**: /readyz のスキーマ自覚型遷移をライブ観測=①旧コード+旧スキーマ(ready/0012) → ②**degraded（DB=0013先行・コード期待=0012）** → ③新コード(ready・alembic_version=0013_user_profile_fields==expected_head)。新API `/users/me/profile` が404→**401**（ルート存在=新版稼働）。GitHub Deployments API=3環境success。

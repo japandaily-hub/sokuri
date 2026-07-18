@@ -33,6 +33,7 @@ from app.schemas_katadzuke import (
     OperatorPublicProfileOut,
     PublicReviewOut,
 )
+from app.services.message_guard import contains_contact_info
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +123,15 @@ async def update_my_operator_profile(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="strong_categories は categories の部分集合である必要があります。",
+        )
+
+    # intro_message は公開プロフィール（show_message=True時）で無認証ユーザーにも
+    # 表示されるため、選定前ユーザーへの脱プラットフォーム勧誘経路になり得る。
+    # bids.py の入札メッセージガードと同様の趣旨で作成時に拒否する。
+    if contains_contact_info(body.intro_message):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="自己紹介文に連絡先（電話番号・メールアドレス）やURLは記載できません。",
         )
 
     profile = await _get_or_create_profile(session, operator.id)

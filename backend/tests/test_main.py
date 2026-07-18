@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import pytest
 from fastapi import FastAPI
+from httpx import ASGITransport, AsyncClient
 
 from app.config import Settings
 from app.main import create_app
@@ -81,3 +82,53 @@ def test_production_with_wildcard_mixed_into_valid_origins_raises():
     )
     with pytest.raises(RuntimeError, match="ALLOWED_ORIGINS"):
         create_app(settings)
+
+
+# ──────────────────────────── /health（デプロイ検証用ビルド識別子） ────────────────────────────
+
+
+async def test_health_returns_status_and_commit_keys():
+    """/health のレスポンスは status と commit の両キーを持つ。"""
+    settings = Settings(_env_file=None)
+    app = create_app(settings)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        r = await client.get("/health")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["status"] == "ok"
+    assert "commit" in data
+
+
+async def test_health_commit_is_none_when_render_git_commit_unset():
+    """RENDER_GIT_COMMIT 未設定（ローカル開発等）では commit は None。"""
+    settings = Settings(_env_file=None)
+    assert settings.render_git_commit is None
+    app = create_app(settings)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        r = await client.get("/health")
+    assert r.json()["commit"] is None
+
+
+async def test_health_commit_truncated_to_first_7_chars():
+    """RENDER_GIT_COMMIT 設定時は commit が先頭7桁に短縮される。"""
+    settings = Settings(_env_file=None, render_git_commit="abcdef1234567890")
+    app = create_app(settings)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        r = await client.get("/health")
+    assert r.json()["commit"] == "abcdef1"
+
+
+async def test_health_commit_reads_render_git_commit_from_env_var(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """RENDER_GIT_COMMIT 環境変数から render_git_commit が読み込まれる
+    （コンストラクタ引数を経由しない、pydantic-settings のフィールド名→環境変数名
+    自動マッピング経路の回帰確認）。/health の commit も先頭7桁に短縮されること。"""
+    monkeypatch.setenv("RENDER_GIT_COMMIT", "deadbeefcafe1234567890")
+    settings = Settings(_env_file=None)
+    assert settings.render_git_commit == "deadbeefcafe1234567890"
+
+    app = create_app(settings)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        r = await client.get("/health")
+    assert r.json()["commit"] == "deadbee"
