@@ -57,7 +57,7 @@ def upgrade() -> None:
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column("user_id", sa.Uuid(), nullable=True),   # WEEK2 で認証追加後に非 NULL 化
         sa.Column("purpose", sa.String(64), nullable=False),
-        sa.Column("status", sa.String(32), nullable=False, server_default="'draft'"),
+        sa.Column("status", sa.String(32), nullable=False, server_default="draft"),
         sa.Column("prefecture", sa.String(32), nullable=False),
         sa.Column("city", sa.String(64), nullable=False),
         sa.Column("address_detail", sa.Text(), nullable=True),
@@ -103,7 +103,7 @@ def upgrade() -> None:
         sa.Column("operator_id", sa.Uuid(), nullable=False),
         sa.Column("amount", sa.BigInteger(), nullable=False),
         sa.Column("message", sa.Text(), nullable=True),
-        sa.Column("status", sa.String(32), nullable=False, server_default="'pending'"),
+        sa.Column("status", sa.String(32), nullable=False, server_default="pending"),
         *_ts(),
         sa.PrimaryKeyConstraint("id", name="pk_bids"),
         sa.ForeignKeyConstraint(
@@ -137,7 +137,7 @@ def upgrade() -> None:
         sa.Column("final_amount", sa.BigInteger(), nullable=True),
         sa.Column("fee_amount", sa.BigInteger(), nullable=False, server_default="0"),
         sa.Column("visit_date", sa.Date(), nullable=True),
-        sa.Column("status", sa.String(32), nullable=False, server_default="'pending'"),
+        sa.Column("status", sa.String(32), nullable=False, server_default="pending"),
         *_ts(),
         sa.PrimaryKeyConstraint("id", name="pk_transactions"),
         sa.ForeignKeyConstraint(
@@ -170,7 +170,7 @@ def upgrade() -> None:
         sa.Column("original_amount", sa.BigInteger(), nullable=False),
         sa.Column("requested_amount", sa.BigInteger(), nullable=False),
         sa.Column("reason", sa.Text(), nullable=False),
-        sa.Column("status", sa.String(32), nullable=False, server_default="'pending'"),
+        sa.Column("status", sa.String(32), nullable=False, server_default="pending"),
         *_ts(),
         sa.PrimaryKeyConstraint("id", name="pk_reduction_requests"),
         sa.ForeignKeyConstraint(
