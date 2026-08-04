@@ -14,7 +14,17 @@ from types import SimpleNamespace
 import pytest
 from starlette.datastructures import Headers
 
-from app.core.client_ip import resolve_client_ip, truncate_ip_for_log
+from app.core.client_ip import (
+    is_cloudflare_range,
+    is_private_or_loopback,
+    is_special_use_address,
+    is_trusted_proxy_ip,
+    resolve_client_ip,
+    resolve_client_ip_with_reason,
+    scan_client_ip_for_diagnostics,
+    scan_client_ip_for_diagnostics_with_reason,
+    truncate_ip_for_log,
+)
 from app.core.rate_limit import (
     InMemoryRateLimitStore,
     RateLimitConfig,
@@ -376,6 +386,69 @@ class TestResolveClientIp:
         assert resolve_client_ip(req, trusted_hops=2) is None
 
 
+class TestResolveClientIpWithReason:
+    """``resolve_client_ip_with_reason``（正本・単一入口）の ``reason`` を
+    直接assertする（qa 指摘 H-1: ``resolve_client_ip`` の ``.ip`` だけでは
+    ``RateLimitGuard`` の 400/skip 分岐が正しいかを検証できない）。"""
+
+    def test_reason_ok_when_resolved(self) -> None:
+        req = _make_request(xff="9.9.9.9, 203.0.113.5")
+        resolution = resolve_client_ip_with_reason(req, trusted_hops=1)
+        assert resolution.ip == "203.0.113.5"
+        assert resolution.reason == "ok"
+
+    def test_reason_no_xff_when_header_absent_and_client_present(self) -> None:
+        req = _make_request(xff=None, client_host="198.51.100.7")
+        resolution = resolve_client_ip_with_reason(req, trusted_hops=1)
+        assert resolution.ip == "198.51.100.7"
+        assert resolution.reason == "ok"
+
+    def test_reason_no_xff_when_header_absent_and_client_absent(self) -> None:
+        """qa H-1: XFF ヘッダが無く request.client も無い場合、
+        ``reason == "no_xff"`` を直接assertする（IP軸スキップ側）。"""
+        req = _make_request(xff=None, client_host=None)
+        resolution = resolve_client_ip_with_reason(req, trusted_hops=1)
+        assert resolution.ip is None
+        assert resolution.reason == "no_xff"
+
+    def test_reason_no_xff_when_trusted_hops_zero_even_with_xff_present(self) -> None:
+        """trusted_hops<=0 は XFF があってもフェイルクローズしない（no_xff）。
+        client.host も無い場合で確認する（client.host があると ok になり
+        フェイルクローズしていないことの確認にならないため）。"""
+        req = _make_request(xff="9.9.9.9, 1.2.3.4", client_host=None)
+        resolution = resolve_client_ip_with_reason(req, trusted_hops=0)
+        assert resolution.ip is None
+        assert resolution.reason == "no_xff"
+
+    def test_reason_empty_xff_when_header_present_but_parses_empty(self) -> None:
+        """qa H-1: XFF ヘッダはあるがパース結果が空（カンマのみ）の場合、
+        ``reason == "empty_xff"`` を直接assertする（フェイルクローズ側）。"""
+        req = _make_request(xff=",,, ,")
+        resolution = resolve_client_ip_with_reason(req, trusted_hops=1)
+        assert resolution.ip is None
+        assert resolution.reason == "empty_xff"
+
+    def test_reason_invalid_when_entry_count_insufficient(self) -> None:
+        req = _make_request(xff="1.2.3.4")
+        resolution = resolve_client_ip_with_reason(req, trusted_hops=2)
+        assert resolution.ip is None
+        assert resolution.reason == "invalid"
+
+    def test_reason_invalid_when_value_fails_ip_validation(self) -> None:
+        req = _make_request(xff="not-an-ip")
+        resolution = resolve_client_ip_with_reason(req, trusted_hops=1)
+        assert resolution.ip is None
+        assert resolution.reason == "invalid"
+
+    def test_reason_ok_normalizes_ipv4_mapped_ipv6(self) -> None:
+        """security review Critical: IPv4射影IPv6は展開・正規化されて
+        ``ip`` に入る（表記揺れによるバケット分裂を防ぐ）。"""
+        req = _make_request(xff="::ffff:203.0.113.5")
+        resolution = resolve_client_ip_with_reason(req, trusted_hops=1)
+        assert resolution.ip == "203.0.113.5"
+        assert resolution.reason == "ok"
+
+
 class TestIsPrivateOrLoopback:
     """security review 指摘C の判定関数。Python 標準の ``is_private`` は
     RFC 5737 のドキュメント/テスト用レンジ（テストで広く使う「実在しない
@@ -432,6 +505,242 @@ class TestIsPrivateOrLoopback:
 
         assert is_private_or_loopback("not-an-ip") is False
 
+    def test_qa_l1_ipv4_mapped_ipv6_is_normalized_and_detected(self) -> None:
+        """qa 指摘 L-1 / security review Critical: IPv4射影IPv6
+        （``::ffff:a.b.c.d``）を展開せずに判定すると private/loopback を
+        すり抜け、TRUSTED_PROXY_HOPS 誤設定時の全断防止スキップが機能しない
+        （``_unwrap_ipv4_mapped`` 参照）。"""
+        assert is_private_or_loopback("::ffff:10.0.0.1") is True
+        assert is_private_or_loopback("::ffff:172.16.0.1") is True
+        assert is_private_or_loopback("::ffff:127.0.0.1") is True
+        # 射影展開後もプライベートでなければ False のまま。
+        assert is_private_or_loopback("::ffff:203.0.113.5") is False
+
+
+class TestIsSpecialUseAddress:
+    """新設（security review Critical）: 信頼位置に「攻撃者が誘発できない」
+    異常値（未指定/マルチキャスト/予約済み）が現れた場合の判定関数。
+    信頼位置は CF/プロキシが追記する位置であり攻撃者は値を選べないため、
+    ここでの True は構成異常のみを意味する（``RateLimitGuard`` の docstring
+    参照）。"""
+
+    @pytest.mark.parametrize(
+        "ip",
+        [
+            "0.0.0.0",  # IPv4 未指定
+            "::",  # IPv6 未指定
+            "224.0.0.1",  # IPv4 マルチキャスト
+            "ff02::1",  # IPv6 マルチキャスト
+            "240.0.0.1",  # IETF予約済み (Class E)
+        ],
+    )
+    def test_special_use_addresses_return_true(self, ip: str) -> None:
+        assert is_special_use_address(ip) is True
+
+    @pytest.mark.parametrize(
+        "ip",
+        [
+            "203.0.113.5",  # 通常のグローバルIP（テストレンジ）
+            "10.0.0.1",  # プライベート（is_private_or_loopback側の責務）
+            "127.0.0.1",  # ループバック（is_private_or_loopback側の責務）
+        ],
+    )
+    def test_ordinary_addresses_return_false(self, ip: str) -> None:
+        assert is_special_use_address(ip) is False
+
+    def test_invalid_value_returns_false(self) -> None:
+        assert is_special_use_address("not-an-ip") is False
+
+    def test_ipv4_mapped_unspecified_is_normalized_and_detected(self) -> None:
+        assert is_special_use_address("::ffff:0.0.0.0") is True
+
+
+class TestIsCloudflareRange:
+    """[判定に使用禁止・WARNING/診断専用] CFレンジ判定単体のテスト。
+    ``is_trusted_proxy_ip`` はこの関数と ``is_private_or_loopback`` の OR。"""
+
+    @pytest.mark.parametrize(
+        "ip",
+        [
+            "173.245.48.1",  # v4 レンジ先頭
+            "131.0.75.255",  # v4 最後尾レンジ内
+            "104.16.5.5",  # v4 中間レンジ
+            "162.159.0.1",  # 本番実測に近い 162.158.0.0/15 内
+            "2606:4700::1",  # v6 レンジ
+            "2c0f:f248::1",  # v6 最後尾レンジ
+        ],
+    )
+    def test_cloudflare_ranges_return_true(self, ip: str) -> None:
+        assert is_cloudflare_range(ip) is True
+
+    @pytest.mark.parametrize(
+        "ip",
+        [
+            "8.8.8.8",  # Google DNS（グローバルだが CF ではない）
+            "203.0.113.5",  # RFC5737 テストレンジ
+            "10.0.0.1",  # プライベート（CFレンジではない）
+        ],
+    )
+    def test_non_cloudflare_addresses_return_false(self, ip: str) -> None:
+        assert is_cloudflare_range(ip) is False
+
+    def test_invalid_value_returns_false(self) -> None:
+        assert is_cloudflare_range("not-an-ip") is False
+
+    def test_qa_l1_ipv4_mapped_cloudflare_range_is_detected(self) -> None:
+        """qa 指摘 L-1: ``is_trusted_proxy_ip("::ffff:172.68.10.20") is True``
+        の前提となる、CFレンジ側のIPv4射影IPv6正規化を固定化する。"""
+        assert is_cloudflare_range("::ffff:172.68.10.20") is True
+
+
+# ──────────────────────────── is_trusted_proxy_ip ────────────────────────────
+
+
+class TestIsTrustedProxyIp:
+    """[診断・ドリフト検知専用。レート制限・認可判断に使ってはならない]
+    診断専用の右端スキャン（``scan_client_ip_for_diagnostics``）が「まだ
+    プロキシ段の中にいる」と判定するための関数。private/loopback は
+    ``is_private_or_loopback`` に、Cloudflare 公開レンジ判定は
+    ``is_cloudflare_range`` に委譲する。"""
+
+    @pytest.mark.parametrize(
+        "ip",
+        [
+            "173.245.48.1",  # v4 レンジ先頭
+            "131.0.75.255",  # v4 最後尾レンジ内
+            "104.16.5.5",  # v4 中間レンジ
+            "162.159.0.1",  # 本番実測に近い 162.158.0.0/15 内
+            "2606:4700::1",  # v6 レンジ
+            "2c0f:f248::1",  # v6 最後尾レンジ
+        ],
+    )
+    def test_cloudflare_ranges_return_true(self, ip: str) -> None:
+        assert is_trusted_proxy_ip(ip) is True
+
+    @pytest.mark.parametrize(
+        "ip",
+        [
+            "8.8.8.8",  # Google DNS（グローバルだが CF ではない）
+            "203.0.113.5",  # RFC5737 テストレンジ
+        ],
+    )
+    def test_non_cloudflare_global_ranges_return_false(self, ip: str) -> None:
+        assert is_trusted_proxy_ip(ip) is False
+
+    @pytest.mark.parametrize("ip", ["10.1.2.3", "192.168.1.1", "127.0.0.1", "100.64.0.1"])
+    def test_private_or_loopback_returns_true(self, ip: str) -> None:
+        assert is_trusted_proxy_ip(ip) is True
+
+    def test_invalid_value_returns_false(self) -> None:
+        assert is_trusted_proxy_ip("not-an-ip") is False
+        assert is_trusted_proxy_ip("; DROP TABLE") is False
+
+    def test_qa_l1_ipv4_mapped_cloudflare_range_is_trusted(self) -> None:
+        """qa 指摘 L-1: ``is_trusted_proxy_ip("::ffff:172.68.10.20") is True``
+        を直接固定化する。"""
+        assert is_trusted_proxy_ip("::ffff:172.68.10.20") is True
+
+
+# ──────── scan_client_ip_for_diagnostics（診断・ドリフト検知専用） ────────
+#
+# **この関数はレート制限の判定経路からは完全に排除されている**
+# （security review Critical・撤回済み設計の教訓。app.core.client_ip モジュール
+# 冒頭の「設計判断の履歴」参照）。ここでのテストは「診断表示・ドリフト検知
+# シグナルとして正しく動くか」のみを検証する。
+
+
+class TestScanClientIpForDiagnostics:
+    """[診断・ドリフト検知専用] 段数非依存の右端スキャン方式。本番実測連鎖
+    ``client(210.157.193.243) → Cloudflare(172.68.x) → Render内部(10.193.27.131)``
+    （2026-07-20実測）を基準ケースとする。"""
+
+    def test_production_chain_returns_client_ip(self) -> None:
+        req = _make_request(xff="210.157.193.243, 172.68.10.20, 10.193.27.131")
+        assert scan_client_ip_for_diagnostics(req) == "210.157.193.243"
+
+    def test_no_xff_returns_client_host(self) -> None:
+        req = _make_request(xff=None, client_host="198.51.100.7")
+        assert scan_client_ip_for_diagnostics(req) == "198.51.100.7"
+
+    def test_worker_egress_padding_lets_attacker_spoof_this_is_why_diagnostics_only(
+        self,
+    ) -> None:
+        """security review Critical（撤回理由の再現テスト・退行防止）:
+        Cloudflare Workers の ``fetch()`` egress は Cloudflare 公開レンジ内
+        から発信されるため、攻撃者がこの egress を経由して
+        ``spoofA, <Worker のCF egress>, <本物のCFエッジ>, <10.x>`` のような
+        XFF を送ると、診断用scanは全ての CF/内部ホップを「信頼済み」と
+        誤認してスキップし、攻撃者が完全に制御できる ``spoofA`` まで遡って
+        返してしまう。**これが本関数をレート制限の判定に使えない直接の証拠**
+        であり、意図的にこの結果を固定化する
+        （``resolve_client_ip_with_reason`` はこの経路を一切通らないため、
+        実際のレート制限の判定には一切影響しない）。"""
+        spoofed = "1.2.3.4"  # 攻撃者が完全に制御できる値
+        worker_cf_egress = "172.68.10.21"  # Workers の fetch() egress（CF公開レンジ内）
+        our_cf_edge = "172.68.10.20"  # 本番の実CFエッジ
+        render_internal = "10.193.27.131"
+        req = _make_request(
+            xff=f"{spoofed}, {worker_cf_egress}, {our_cf_edge}, {render_internal}"
+        )
+        assert scan_client_ip_for_diagnostics(req) == spoofed
+
+    def test_duplicate_xff_headers_are_joined_before_scan(self) -> None:
+        req = _make_request(
+            xff=["9.9.9.9", "210.157.193.243, 172.68.10.20, 10.193.27.131"]
+        )
+        assert scan_client_ip_for_diagnostics(req) == "210.157.193.243"
+
+    def test_all_entries_trusted_returns_none(self) -> None:
+        """全要素が信頼済みプロキシ（CF + private）のみ→ None（理由:
+        "all_trusted"）。診断表示専用であり、レート制限の判定には使われない。"""
+        req = _make_request(xff="172.68.10.20, 10.193.27.131")
+        assert scan_client_ip_for_diagnostics(req) is None
+        assert scan_client_ip_for_diagnostics_with_reason(req).reason == "all_trusted"
+
+    def test_rightmost_non_trusted_invalid_value_returns_none(self) -> None:
+        """右端から見て最初の非信頼要素が不正値 → None（理由: "invalid"）。"""
+        req = _make_request(xff="210.157.193.243, 172.68.10.20, not-an-ip")
+        assert scan_client_ip_for_diagnostics(req) is None
+        assert scan_client_ip_for_diagnostics_with_reason(req).reason == "invalid"
+
+    def test_invalid_value_in_padding_does_not_block_when_unreached(self) -> None:
+        """走査は右端から始まり信頼済みプロキシを飛ばして停止するため、
+        まだ到達していない左側（padding）に不正値があっても正常に解決できる。"""
+        req = _make_request(
+            xff="not-an-ip, 210.157.193.243, 172.68.10.20, 10.193.27.131"
+        )
+        assert scan_client_ip_for_diagnostics(req) == "210.157.193.243"
+
+    def test_empty_xff_after_filtering_returns_none(self) -> None:
+        req = _make_request(xff=",,, ,")
+        assert scan_client_ip_for_diagnostics(req) is None
+        assert scan_client_ip_for_diagnostics_with_reason(req).reason == "empty_xff"
+
+    def test_qa_m1_entries_beyond_cap_are_not_reachable_by_scan(self) -> None:
+        """qa 指摘 M-1: 32件切り詰め（``_parse_and_cap_xff``）は hops 経路と
+        scan 経路で共有される単一実装のため、切り詰め後に残った範囲でのみ
+        走査が行われる。実クライアントIPが左端（32件を超えて切り捨てられる
+        位置）にあると、スキャンはそれを見つけられず、残った32件が
+        全て信頼済みなら "all_trusted" になることを固定化する。"""
+        # 実クライアントIP(203.0.113.9) + private(10.x) 40件。
+        # 分割後は計41要素 → 末尾32件のみ保持される。
+        # 41-32=9要素が左から切り捨てられ、その中に実クライアントIPが含まれる。
+        noise = ", ".join(f"10.0.0.{i}" for i in range(40))
+        req = _make_request(xff=f"203.0.113.9, {noise}")
+        resolution = scan_client_ip_for_diagnostics_with_reason(req)
+        assert resolution.ip is None
+        assert resolution.reason == "all_trusted"
+
+    def test_qa_m1_rightmost_preserved_beyond_cap(self) -> None:
+        """qa 指摘 M-1（対称ケース）: 32件を超えるノイズがあっても、末尾に
+        実クライアントIP＋CF＋内部の連鎖があれば正しく解決できる（hops側の
+        ``test_xff_entries_capped_and_rightmost_preserved`` と対称）。"""
+        noise = ", ".join(f"10.0.0.{i}" for i in range(40))
+        req = _make_request(
+            xff=f"{noise}, 210.157.193.243, 172.68.10.20, 10.193.27.131"
+        )
+        assert scan_client_ip_for_diagnostics(req) == "210.157.193.243"
+
 
 class TestThrottledWarnings:
     """QA指摘 F-4 / security review Medium-2: 「プロセス内1回きり」の警告は
@@ -479,6 +788,66 @@ class TestThrottledWarnings:
         assert sum("プライベート/ループバック" in m for m in messages) == 1
         # 生IPをログに書かない(/24丸め表記のみ)。
         assert not any("10.1.2.3" in m for m in messages)
+
+    def test_warn_special_address_skip_fires_and_is_throttled(self, caplog) -> None:
+        """新設（security review Critical）: 未指定/マルチキャスト/予約済み
+        アドレスによる IP軸スキップの警告。無言化防止。"""
+        import logging
+
+        from app.api import rate_limit_deps
+
+        rate_limit_deps._special_address_skip_throttle.reset()
+        with caplog.at_level(logging.WARNING, logger="app.api.rate_limit_deps"):
+            rate_limit_deps._warn_special_address_skip("login", "0.0.0.0")
+            rate_limit_deps._warn_special_address_skip("login", "0.0.0.0")
+        messages = [r.getMessage() for r in caplog.records]
+        assert sum("未指定/マルチキャスト/予約済み" in m for m in messages) == 1
+
+    def test_warn_cf_range_at_trust_position_fires_and_is_throttled_but_does_not_skip(
+        self, caplog
+    ) -> None:
+        """新設（security review Critical）: CFレンジは攻撃者が誘発できる
+        条件のため、警告のみでスキップしない設計であることをコメントと
+        併せて固定化する（この関数自体はスキップの可否を制御しない。
+        呼び出し側 RateLimitGuard がカウントを継続する構造になっている
+        ことは test_rate_limit_api.py の統合テストで確認する）。"""
+        import logging
+
+        from app.api import rate_limit_deps
+
+        rate_limit_deps._cf_range_at_trust_position_throttle.reset()
+        with caplog.at_level(logging.WARNING, logger="app.api.rate_limit_deps"):
+            rate_limit_deps._warn_cf_range_at_trust_position("login", "172.68.10.20")
+            rate_limit_deps._warn_cf_range_at_trust_position("login", "172.68.10.20")
+        messages = [r.getMessage() for r in caplog.records]
+        assert sum("Cloudflare公開レンジ内です" in m for m in messages) == 1
+        assert any("カウントは継続します" in m for m in messages)
+
+    def test_check_scan_drift_warns_on_mismatch_and_is_throttled(self, caplog) -> None:
+        """``_check_scan_drift`` は hops と診断用scanの結果が不一致のときのみ
+        WARNING を出し、一致していれば何も出さない。判定結果には一切
+        影響しないことをコメントで明示している（ここでは発火条件のみを
+        固定化する）。"""
+        import logging
+
+        from app.api import rate_limit_deps
+
+        rate_limit_deps._scan_drift_throttle.reset()
+        # 一致: XFF無し・client.hostのみ → hopsもscanも同じ値を返すため無発火。
+        req_match = _make_request(xff=None, client_host="198.51.100.7")
+        with caplog.at_level(logging.WARNING, logger="app.api.rate_limit_deps"):
+            rate_limit_deps._check_scan_drift("login", req_match, "198.51.100.7")
+        assert not any("不一致です" in r.getMessage() for r in caplog.records)
+
+        caplog.clear()
+        # 不一致: hopsは"172.68.10.20"（CFレンジをそのまま採用）を返す設定だが、
+        # 診断用scanは全要素信頼済みでNoneを返すため不一致になる。
+        req_mismatch = _make_request(xff="172.68.10.20", client_host="203.0.113.99")
+        with caplog.at_level(logging.WARNING, logger="app.api.rate_limit_deps"):
+            rate_limit_deps._check_scan_drift("login", req_mismatch, "172.68.10.20")
+            rate_limit_deps._check_scan_drift("login", req_mismatch, "172.68.10.20")
+        messages = [r.getMessage() for r in caplog.records]
+        assert sum("不一致です" in m for m in messages) == 1
 
     def test_throttle_fires_again_after_interval_elapses(self) -> None:
         """「1回きり」ではないことの直接証明: 偽クロックで間隔経過後は再度出る。"""
@@ -543,6 +912,18 @@ class TestTrustedProxyHopsValidator:
 
         with pytest.raises(ValidationError, match="TRUSTED_PROXY_HOPS"):
             Settings(_env_file=None, trusted_proxy_hops=value)
+
+
+class TestClientIpStrategyRemoved:
+    """CLIENT_IP_STRATEGY は撤回（scan を解決方式として採用する設計を中止）
+    したため、``Settings`` にこのフィールドが存在しないことを固定化する
+    （再導入の回帰検知）。"""
+
+    def test_settings_has_no_client_ip_strategy_field(self) -> None:
+        from app.config import Settings
+
+        settings = Settings(_env_file=None)
+        assert not hasattr(settings, "client_ip_strategy")
 
 
 class TestRateLimitFieldValidators:

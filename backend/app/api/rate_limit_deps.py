@@ -21,7 +21,14 @@ from typing import NoReturn
 from fastapi import Depends, HTTPException, Request, status
 
 from app.config import get_settings
-from app.core.client_ip import get_xff_raw, is_private_or_loopback, resolve_client_ip, truncate_ip_for_log
+from app.core.client_ip import (
+    is_cloudflare_range,
+    is_private_or_loopback,
+    is_special_use_address,
+    resolve_client_ip_with_reason,
+    scan_client_ip_for_diagnostics,
+    truncate_ip_for_log,
+)
 from app.core.log_throttle import ThrottledLogger
 from app.core.rate_limit import (
     RateLimitConfig,
@@ -42,6 +49,9 @@ logger = logging.getLogger(__name__)
 _unresolvable_xff_throttle = ThrottledLogger()
 _ip_axis_skipped_throttle = ThrottledLogger()
 _private_ip_skip_throttle = ThrottledLogger()
+_special_address_skip_throttle = ThrottledLogger()
+_cf_range_at_trust_position_throttle = ThrottledLogger()
+_scan_drift_throttle = ThrottledLogger()
 
 _INVALID_REQUEST_HEADERS = HTTPException(
     status_code=status.HTTP_400_BAD_REQUEST,
@@ -91,6 +101,95 @@ def _warn_private_ip_skip(scope: str, ip: str) -> None:
             truncate_ip_for_log(ip),
         )
     )
+
+
+def _warn_special_address_skip(scope: str, ip: str) -> None:
+    """信頼位置の IP が未指定/マルチキャスト/予約済みアドレスのため IP軸を
+    スキップした際の警告（security review 新設。``is_special_use_address``
+    参照）。
+
+    信頼位置は攻撃者が値を選べない位置（CF/プロキシが追記する）ため、
+    ここに現れる異常値は攻撃ではなくプロキシ実装・LB構成の変更を意味する。
+    ``_warn_private_ip_skip`` と同じ理由でフェイルクローズではなくスキップに
+    倒す（誤構成時でも「レート制限が緩む」だけで済み、認証全断は構造的に
+    起こりえなくなる）。生 IP はログに残さず ``truncate_ip_for_log()`` で
+    丸めた値のみ出す。
+    """
+    _special_address_skip_throttle.emit(
+        lambda: logger.warning(
+            "rate_limit: 信頼位置のIPが未指定/マルチキャスト/予約済みアドレスのため"
+            "IP軸をスキップしました（scope=%s ip_net=%s）。プロキシ/LB構成が変更された"
+            "可能性があります。/api/v1/_diag/client-ip で実測して確認してください。",
+            scope,
+            truncate_ip_for_log(ip),
+        )
+    )
+
+
+def _warn_cf_range_at_trust_position(scope: str, ip: str) -> None:
+    """信頼位置の IP が Cloudflare 公開レンジ内だった際の警告
+    （**スキップしない。カウントは継続する**）。
+
+    信頼位置が CF レンジ内＝``TRUSTED_PROXY_HOPS`` が実際の構成より小さい
+    （＝もう1段 CF ホップが挟まっている）疑いを意味する、全断の前兆となり
+    うる異常である。しかし ``is_private_or_loopback`` / ``is_special_use_address``
+    とは異なり、**この状態は攻撃者が能動的に誘発できる**（Cloudflare
+    Workers 等、CF公開レンジ内から任意にアウトバウンド接続できるサービスを
+    無料で悪用できるため）。したがってここでスキップすると、攻撃者が
+    「信頼位置に自分の CF egress IP を送り込む」だけで恒常的に IP軸を
+    無効化できてしまう（signup 等 IP軸しか持たないスコープが常時無防備に
+    なる）。
+
+    トレードオフ（**必ず両方を理解した上で判断すること**）:
+      - スキップに倒す案: 常時利用可能なバイパスを作ってしまう。不採用。
+      - **カウント継続（採用）**: 設定ドリフト時（hops が実際より小さい）は
+        信頼位置に本来のクライアントIPではなく CF ホップの IP が来るため、
+        複数の異なるクライアントが同一の CF ホップIPを共有し、IP軸が
+        誤って過剰にカウントされる（＝レート制限が厳しくなりすぎるリスク）。
+        最悪の場合、多数の正規ユーザーが同一バケットを共有し 429 が頻発する
+        全断リスクがある。ただしこれは既存の緊急停止スイッチ
+        （``RATE_LIMIT_ENABLED=false``）で 1 操作・再起動のみで即座に復旧
+        できる（設計書の想定復旧手順そのもの）。攻撃者に常時利用可能な
+        バイパスを与えるより、運用者が能動的に対処可能なリスクを選ぶ方が
+        安全側であると判断した。
+    """
+    _cf_range_at_trust_position_throttle.emit(
+        lambda: logger.warning(
+            "rate_limit: 信頼位置のIPがCloudflare公開レンジ内です（scope=%s ip_net=%s）。"
+            "TRUSTED_PROXY_HOPS が実際の構成より小さい疑いがあります（全断の前兆になり"
+            "えるため要確認）。カウントは継続します（スキップすると攻撃者がCF egress"
+            "から誘発可能なバイパスになるため）。/api/v1/_diag/client-ip で実測して"
+            "確認してください。",
+            scope,
+            truncate_ip_for_log(ip),
+        )
+    )
+
+
+def _check_scan_drift(scope: str, request: Request, hops_ip: str) -> None:
+    """診断専用の右端スキャン（``scan_client_ip_for_diagnostics``）の結果と、
+    実際に使用している hops 方式の解決結果を比較し、不一致ならスロットリング
+    付き WARNING を出す（CDN構成変更・``TRUSTED_PROXY_HOPS`` ドリフトの
+    唯一の早期自動検知シグナル）。
+
+    **この比較結果はレート制限の判定に一切影響させない。** scan は
+    security review Critical 指摘により判定経路から完全に排除されている
+    （``app.core.client_ip`` モジュール冒頭の「設計判断の履歴」参照）。ここで
+    行うのは「見るだけ」の観測であり、分岐や早期リターンを一切持たない。
+    """
+    scan_ip = scan_client_ip_for_diagnostics(request)
+    if scan_ip == hops_ip:
+        return
+    _scan_drift_throttle.emit(
+        lambda: logger.warning(
+            "rate_limit: hops方式と診断用scanの解決結果が不一致です（scope=%s）。"
+            "CDN構成変更や TRUSTED_PROXY_HOPS のドリフトの兆候である可能性があります。"
+            "/api/v1/_diag/client-ip で実測して確認してください（この不一致自体は"
+            "レート制限の判定には一切影響しません）。",
+            scope,
+        )
+    )
+
 
 # ──────────────────────────── スコープ別メッセージ・文言 ────────────────────────────
 # login の2軸（アカウント/IP）はあえて同一文言にする（設計書 §5）。文言を分けると
@@ -367,30 +466,49 @@ class RateLimitGuard:
     - 失敗のみカウント方式のスコープ（login）は、ここでは ``peek``
       （非消費の事前判定）のみを行う。実カウントはハンドラ側の
       ``ctx.record_failure()`` で行われる。
-    - IP が解決できない場合（``resolve_client_ip`` が ``None``）の扱いは
-      2通りに分岐する（security review 指摘対応。設計書 §2 時点の単純な
-      フェイルオープンから強化）:
-        - X-Forwarded-For ヘッダが**そもそも無い**、または ``request.client``
-          が ``None``（インフラ構成としてありうる状態） → 従来どおり IP軸を
-          スキップする（アカウント軸は通常どおり適用）。
-        - X-Forwarded-For ヘッダが**存在するのに**解決できなかった
-          （不正値混入等。正規クライアントでは通常起こらない） →
-          **フェイルクローズとして 400 で拒否する**。IP軸だけが無効化され
-          signup 等（IP軸しか持たないスコープ）が完全に無防備になる経路を
-          塞ぐ。
-    - **信頼位置（``parts[-trusted_hops]``）の IP がプライベート/ループバック
-      の場合、IP軸をスキップする**（security review 指摘・全断防止の要）。
-      Render のエッジ〜アプリ間にもう1段プロキシが入る等 ``TRUSTED_PROXY_HOPS``
-      が実際の構成より1段少ない場合、信頼位置には内部固定IPが来る。これを
-      そのまま IP軸のキーに使うと**全ユーザーが同一バケットを共有し、
-      数分で全世界のログインが429になる全断**を起こす。ここでスキップする
-      ことで、誤構成時でも「レート制限が緩む」だけで済み、認証全断は構造的に
-      起こりえなくなる。これはバイパスにはならない: ``trusted_hops`` が実際の
-      プロキシ段数以下である限り（＝正しい設定である限り）、信頼位置の値は
-      必ずプロキシが追記した実クライアントIPであり、インターネット経由の
-      攻撃者はこれをプライベートIPにできない。
+    - IP が解決できない場合（``resolve_client_ip_with_reason`` が返す
+      ``ClientIpResolution.ip`` が ``None``）の扱いは ``reason`` で分岐する
+      （security review 指摘対応。設計書 §2 時点の単純なフェイルオープンから
+      強化）:
+        - ``reason == "no_xff"``: X-Forwarded-For ヘッダが**そもそも無い**、
+          または ``request.client`` が ``None``（インフラ構成としてありうる
+          状態） → 従来どおり IP軸をスキップする（アカウント軸は通常どおり
+          適用）。
+        - ``reason in ("invalid", "empty_xff")``: X-Forwarded-For ヘッダが
+          **存在するのに**解決できなかった（不正値混入等。正規クライアント
+          では通常起こらない） → **フェイルクローズとして 400 で拒否する**。
+          IP軸だけが無効化され signup 等（IP軸しか持たないスコープ）が
+          完全に無防備になる経路を塞ぐ。
+    - 信頼位置（``parts[-trusted_hops]``）に解決された IP は、**攻撃者が誘発
+      できるか否か**で扱いを完全に分ける（security review Critical 是正・
+      撤回済み scan 方式からの教訓）:
+        1. **攻撃者が誘発できない条件（IP軸スキップ）**: 信頼位置は
+           CF/プロキシが実接続元として追記する位置であり、攻撃者はこの位置に
+           現れる値を選べない。したがって以下が現れた場合、それは攻撃ではなく
+           構成異常のみを意味し、スキップしても悪用経路にならない:
+             - ``is_private_or_loopback(ip)``: ``TRUSTED_PROXY_HOPS`` 誤設定で
+               内部固定IPを掴んでいる疑い。全ユーザーが同一バケットを共有する
+               全断を防ぐ（従来からの判定）。
+             - ``is_special_use_address(ip)``: 未指定(0.0.0.0/::)・マルチ
+               キャスト・IETF予約済み。プロキシ実装や LB 構成変更（unknown な
+               接続元の代替表記等）を意味する新設の判定（IPv4射影IPv6の
+               正規化バグ修正と合わせて追加。security review Critical）。
+        2. **攻撃者が誘発できる条件（WARNING のみ・カウント継続）**:
+           ``is_cloudflare_range(ip)`` が True の場合。信頼位置が CF レンジ内
+           ＝``TRUSTED_PROXY_HOPS`` が実構成より小さい疑いだが、Cloudflare
+           Workers 等から攻撃者が無料で CF egress IP を送り込めるため、ここで
+           スキップすると常時利用可能なバイパスになる。**フェイルクローズも
+           スキップもせず、従来どおりカウントを継続した上で WARNING のみ出す**
+           （トレードオフの詳細は ``_warn_cf_range_at_trust_position`` の
+           docstring 参照。緊急停止スイッチ ``RATE_LIMIT_ENABLED=false`` で
+           いつでも1操作で復旧できることが前提）。
       いずれの分岐もスロットリング（60秒に1回）で WARNING を出し、無言の
       バイパス/スキップ/全体障害の前兆を無くす（security review Medium-2）。
+    - **ドリフト検知（判定に一切影響しない）**: IP が正常に解決できた場合、
+      診断専用の ``scan_client_ip_for_diagnostics`` の結果と比較し、不一致
+      ならスロットリング付き WARNING を出す（``_check_scan_drift``）。CDN
+      構成変更・``TRUSTED_PROXY_HOPS`` ドリフトを能動的なポーリングなしで
+      検知するための唯一の早期シグナル。
     """
 
     def __init__(self, scope: str) -> None:
@@ -410,41 +528,68 @@ class RateLimitGuard:
         ip_key: str | None = None
         if spec.ip_rule is not None:
             settings = get_settings()
-            # ヘッダ取得は resolve_client_ip と必ず同じ経路（get_xff_raw）を
-            # 通す。個別実装すると乖離が生じ無言バイパスに戻る
-            # （security review High-2）。
-            xff_present = settings.trusted_proxy_hops > 0 and get_xff_raw(request) is not None
-            ip = resolve_client_ip(request, settings.trusted_proxy_hops)
+            # IP 解決は resolve_client_ip_with_reason（正本・単一入口）を
+            # 経由する。戻り値は ClientIpResolution（ip, reason）。reason で
+            # 「フェイルクローズすべき異常入力」（invalid/empty_xff）と
+            # 「IP軸を安全にスキップすべき状態」（no_xff）を区別する
+            # （ip is None だけで判定すると両者が区別できない。security
+            # review Critical 指摘）。reason は従来の xff_present 判定
+            # （trusted_proxy_hops > 0 and get_xff_raw(...) is not None）と
+            # 等価になるよう設計されており、実質的な挙動は本リファクタ前と
+            # 1bit も変わらない（app.core.client_ip.resolve_client_ip_with_reason
+            # 参照）。
+            resolution = resolve_client_ip_with_reason(request, settings.trusted_proxy_hops)
+            ip = resolution.ip
             if ip is None:
-                if xff_present:
+                if resolution.reason in ("invalid", "empty_xff"):
                     # XFF はあるのに解決できなかった＝不正値混入の疑い。
                     # ここで黙って IP軸をスキップすると signup 等（IP軸しか
                     # 持たないスコープ）が完全に無防備になるため拒否する。
                     _warn_unresolvable_xff(self._scope)
                     raise _INVALID_REQUEST_HEADERS
+                # "no_xff": XFF ヘッダ自体が無い、または request.client も
+                # 無い（インフラ構成としてありうる正常系）。
                 _warn_ip_axis_skipped(self._scope)
-            elif is_private_or_loopback(ip):
-                # 信頼位置のIPがプライベート/ループバック＝ hops 誤設定で
-                # 内部プロキシIPを掴んでいる疑い。全断を構造的に防ぐため
-                # IP軸をスキップする（アカウント軸は通常どおり適用）。
-                _warn_private_ip_skip(self._scope, ip)
             else:
-                ip_key = _hash_identity(ip)
-                key = _build_key(self._scope, "ip", ip_key)
-                verdict = (
-                    limiter.record(key, spec.ip_rule)
-                    if spec.count_all
-                    else limiter.check(key, spec.ip_rule)
-                )
-                if not verdict.allowed:
-                    _raise_429(
-                        scope=self._scope,
-                        axis="ip",
-                        rule=spec.ip_rule,
-                        verdict=verdict,
-                        key_prefix=ip_key[:12],
-                        ip_net=truncate_ip_for_log(ip),
+                # ドリフト検知（判定には一切影響させない。診断専用の scan と
+                # 比較して不一致なら WARNING のみ）。
+                _check_scan_drift(self._scope, request, ip)
+
+                if is_private_or_loopback(ip):
+                    # 攻撃者が誘発できない条件その1: 信頼位置のIPがプライベート
+                    # /ループバック＝ hops 誤設定で内部プロキシIPを掴んでいる
+                    # 疑い。全断を構造的に防ぐため IP軸をスキップする
+                    # （アカウント軸は通常どおり適用）。
+                    _warn_private_ip_skip(self._scope, ip)
+                elif is_special_use_address(ip):
+                    # 攻撃者が誘発できない条件その2: 未指定/マルチキャスト/
+                    # 予約済みアドレス（新設。security review Critical）。
+                    _warn_special_address_skip(self._scope, ip)
+                else:
+                    if is_cloudflare_range(ip):
+                        # 攻撃者が誘発できる条件: CFレンジは Cloudflare
+                        # Workers 等から無料で送り込めるため、スキップすると
+                        # 常時利用可能なバイパスになる。フェイルクローズも
+                        # スキップもせずカウントを継続し WARNING のみ出す
+                        # （_warn_cf_range_at_trust_position のトレードオフ
+                        # docstring 参照）。
+                        _warn_cf_range_at_trust_position(self._scope, ip)
+                    ip_key = _hash_identity(ip)
+                    key = _build_key(self._scope, "ip", ip_key)
+                    verdict = (
+                        limiter.record(key, spec.ip_rule)
+                        if spec.count_all
+                        else limiter.check(key, spec.ip_rule)
                     )
+                    if not verdict.allowed:
+                        _raise_429(
+                            scope=self._scope,
+                            axis="ip",
+                            rule=spec.ip_rule,
+                            verdict=verdict,
+                            key_prefix=ip_key[:12],
+                            ip_net=truncate_ip_for_log(ip),
+                        )
 
         ctx = RateLimitContext(
             limiter=limiter,

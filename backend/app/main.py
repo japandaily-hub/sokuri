@@ -20,7 +20,11 @@ from sqlalchemy import text
 
 from app.api.v1.router import api_router
 from app.config import Settings, get_settings
-from app.core.client_ip import get_xff_raw, resolve_client_ip
+from app.core.client_ip import (
+    get_xff_raw,
+    resolve_client_ip,
+    scan_client_ip_for_diagnostics_with_reason,
+)
 from app.db.session import AsyncSessionLocal, engine
 from app.services.seed import seed_channels_and_rules
 
@@ -275,13 +279,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         自体は常に到達可能にする（TRUSTED_PROXY_HOPS の実測に必要なため、
         404 で完全に閉じない）。ただし返すフィールドは認可状態で変える:
           - **常に返す**（無認証でも可）: ``xff_raw`` / ``xff_count`` /
-            ``resolved_ip``。これらは「実測」に必須の最小限の情報。
+            ``resolved_ip`` / ``cf_connecting_ip`` / ``resolved_ip_scan`` /
+            ``scan_reason`` / ``scan_matches_hops``。いずれも「呼び出し元
+            自身の接続情報」（または、それから導出される呼び出し元自身のIP
+            の解決結果）の範囲に収まるため、無認証で返してよい（既存方針を
+            踏襲）。``resolved_ip_scan`` / ``scan_reason`` は
+            ``scan_client_ip_for_diagnostics``（**診断・ドリフト検知専用。
+            レート制限の判定には一切使わない**。app.core.client_ip モジュール
+            冒頭の「設計判断の履歴」参照）の結果であり、``scan_reason`` は
+            ``ClientIpResolution.reason``
+            （"ok"/"no_xff"/"empty_xff"/"invalid"/"all_trusted"）そのもの。
           - **``DIAG_TOKEN`` が設定されていて ``?token=`` が一致した場合のみ
-            追加で返す**: ``peer``（内部プロキシ IP＝内部トポロジ）と
-            ``trusted_hops``（サーバ設定値そのもの）。``DIAG_TOKEN`` 未設定
-            （＝本番の現状のβ運用状態）では、この2項目は誰にも返さない
-            （＝サーバ設定値と内部トポロジを無認証で誰でも取得できてしまう
-            問題への対処）。
+            追加で返す**: ``peer``（内部プロキシ IP＝内部トポロジ）・
+            ``trusted_hops``（サーバ設定値）。``DIAG_TOKEN`` 未設定（＝本番の
+            現状のβ運用状態）では、この2項目は誰にも返さない（＝サーバ設定値
+            と内部トポロジを無認証で誰でも取得できてしまう問題への対処）。
 
         トークン比較は ``hmac.compare_digest`` に bytes を渡す（security review
         M-2 対応。str 同士だと非 ASCII トークンで TypeError→500 になり、
@@ -299,11 +311,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         xff_raw = get_xff_raw(request)
         xff_count = len([p for p in xff_raw.split(",") if p.strip()]) if xff_raw else 0
         resolved_ip = resolve_client_ip(request, settings.trusted_proxy_hops)
+        # 診断・CDN構成ドリフト検知専用の右端スキャン（レート制限の判定には
+        # 一切使わない。security review Critical により判定経路から排除
+        # 済み）。RateLimitGuard の _check_scan_drift と同じ関数を使うことで、
+        # 診断表示と実際のドリフト検知ロジックの乖離を防ぐ。
+        scan_resolution = scan_client_ip_for_diagnostics_with_reason(request)
+        resolved_ip_scan = scan_resolution.ip
 
         payload: dict[str, object] = {
             "xff_raw": xff_raw,
             "xff_count": xff_count,
             "resolved_ip": resolved_ip,
+            # CF が自ら「観測したクライアントIP」として付与するヘッダ。
+            # 解決ロジックの入力としては使わない（scan_client_ip_for_diagnostics
+            # の docstring を参照。CF ゾーンが自ゾーンでないため信頼できない）
+            # が、実測時の突き合わせ用の参考値として返す。
+            "cf_connecting_ip": request.headers.get("CF-Connecting-IP"),
+            "resolved_ip_scan": resolved_ip_scan,
+            # "ok"/"no_xff"/"empty_xff"/"invalid"/"all_trusted"。診断専用
+            # （app.core.client_ip.ClientIpResolution の docstring 参照）。
+            "scan_reason": scan_resolution.reason,
+            "scan_matches_hops": resolved_ip == resolved_ip_scan,
         }
         if diag_authorized:
             payload["peer"] = request.client.host if request.client else None

@@ -668,6 +668,119 @@ class TestMalformedXffFailsClosed:
         assert r.status_code == 200
 
 
+# ──────── 攻撃者が誘発できない異常値 → IP軸スキップ（新設・security Critical） ────────
+
+
+class TestSpecialUseAddressAtTrustPositionSkipsIpAxis:
+    """信頼位置（parts[-trusted_hops]）に「攻撃者が誘発できない」異常値
+    （未指定/マルチキャスト/予約済み）が現れた場合、フェイルクローズ(400)
+    ではなくIP軸スキップに倒れることを確認する。攻撃者はこの位置の値を
+    選べない（CF/プロキシが追記する位置）ため、誘発する手段自体が無く、
+    スキップしても悪用経路にならない（``is_special_use_address`` 参照）。
+    """
+
+    @pytest.mark.parametrize(
+        "special_ip",
+        [
+            "0.0.0.0",  # 未指定 (IPv4)
+            "224.0.0.1",  # マルチキャスト
+            "240.0.0.1",  # IETF予約済み (Class E)
+        ],
+    )
+    async def test_special_use_address_skips_ip_axis_but_not_400(
+        self, client: AsyncClient, db_session: AsyncSession, special_ip: str
+    ):
+        headers = {"X-Forwarded-For": special_ip}
+        # IP軸の上限(20)を超える25回、別々のアカウントで失敗させても、
+        # IP軸自体がスキップされているため 429 にも 400 にもならない。
+        for i in range(25):
+            email = f"special-{special_ip.replace('.', '-')}-{i}@example.com"
+            await _create_user(db_session, email)
+            r = await client.post(
+                "/api/v1/auth/login",
+                json={"email": email, "password": "wrong-password"},
+                headers=headers,
+            )
+            assert r.status_code == 401
+
+
+# ──────── CFレンジは攻撃者が誘発可能 → スキップせずカウント継続（WARNINGのみ） ────────
+
+
+class TestCloudflareRangeAtTrustPositionDoesNotBypassIpAxis:
+    """信頼位置が Cloudflare 公開レンジ内でも IP軸のカウントは継続する
+    ことを固定化する（security review Critical 是正・撤回済み scan 方式の
+    教訓）。スキップに倒すと、Cloudflare Workers 等から無料で取得できる
+    CF egress IP を信頼位置に送り込むだけで IP軸を恒常的に無効化できて
+    しまう（signup 等 IP軸しか持たないスコープが常時無防備になる）。ここでは
+    カウントが継続していること（＝バイパスが生まれていないこと）を、IP軸
+    上限(20)ちょうどで429になることで固定化する。
+    """
+
+    async def test_cf_range_ip_still_counted_and_eventually_429(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        cf_range_xff = {"X-Forwarded-For": "172.68.10.20"}  # Cloudflare公開レンジ内
+        for i in range(20):
+            email = f"cf-range-count-{i}@example.com"
+            await _create_user(db_session, email)
+            r = await client.post(
+                "/api/v1/auth/login",
+                json={"email": email, "password": "wrong-password"},
+                headers=cf_range_xff,
+            )
+            assert r.status_code == 401
+        await _create_user(db_session, "cf-range-count-21@example.com")
+        r = await client.post(
+            "/api/v1/auth/login",
+            json={"email": "cf-range-count-21@example.com", "password": "wrong-password"},
+            headers=cf_range_xff,
+        )
+        # スキップされていれば 401 のままのはず。カウントが継続しているため
+        # 21回目（上限20超過）で 429 になる。
+        assert r.status_code == 429
+
+    async def test_cf_range_ip_does_not_fail_closed(self, client: AsyncClient):
+        """CFレンジは "攻撃者が誘発できる条件" として WARNING のみに倒す
+        （フェイルクローズしない。400にならないことの確認）。"""
+        r = await client.post(
+            "/api/v1/auth/signup",
+            json={
+                "email": "cf-range-signup@example.com",
+                "password": "password123",
+                "name": "テスト太郎",
+            },
+            headers={"X-Forwarded-For": "172.68.10.20"},
+        )
+        assert r.status_code != 400
+        assert r.status_code == 201
+
+
+# ──────── ドリフト検知（scanとhopsの不一致）は判定結果に一切影響しない ────────
+
+
+class TestScanDriftDetectionDoesNotAffectDecision:
+    """診断専用の ``scan_client_ip_for_diagnostics`` と hops 方式の解決結果が
+    不一致（ドリフト検知が発火する状況）でも、実際のレート制限の判定結果
+    （200/401/429/400 のいずれになるか）が一切変わらないことを固定化する
+    （``_check_scan_drift`` は WARNING を出すだけで分岐を持たない）。"""
+
+    async def test_mismatch_case_login_still_behaves_normally(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        # CFレンジ単体のXFF: hops は "172.68.10.20" をそのまま採用するが、
+        # 診断用scanは信頼済みプロキシのみと判定し all_trusted(None) を返す
+        # ため、hopsとscanの結果は必ず不一致になる（ドリフト検知が発火する）。
+        # それでもログイン自体は通常どおり 401 で完結することを確認する。
+        await _create_user(db_session, "drift-mismatch@example.com")
+        r = await client.post(
+            "/api/v1/auth/login",
+            json={"email": "drift-mismatch@example.com", "password": "wrong-password"},
+            headers={"X-Forwarded-For": "172.68.10.20"},
+        )
+        assert r.status_code == 401
+
+
 # ──────────────────────────── プライベートIPはIP軸をスキップ ────────────────────────────
 
 
@@ -892,7 +1005,9 @@ class TestDiagClientIp:
         assert "trusted_hops" not in body
 
     async def test_tc39b_full_fields_with_matching_token(self):
-        """DIAG_TOKEN 設定 + 一致するトークンでは peer/trusted_hops も含む。"""
+        """DIAG_TOKEN 設定 + 一致するトークンでは peer/trusted_hops も含む。
+        ``strategy`` は CLIENT_IP_STRATEGY 撤回に伴い削除済みのため、
+        認可時でも含まれないことを確認する（qa 指摘 M-2）。"""
         settings = Settings(
             _env_file=None,
             APP_ENV="development",
@@ -913,3 +1028,55 @@ class TestDiagClientIp:
         assert body["resolved_ip"] == "203.0.113.9"
         assert body["trusted_hops"] == settings.trusted_proxy_hops
         assert "peer" in body
+        assert "strategy" not in body
+
+    async def test_qa_m2_diag_scan_fields_are_populated_and_asserted(self):
+        """qa 指摘 M-2: このエンドポイントは TRUSTED_PROXY_HOPS 実測・ドリフト
+        検知の唯一の実測器のため、``resolved_ip_scan`` / ``scan_reason`` /
+        ``scan_matches_hops`` / ``cf_connecting_ip`` をゼロカバレッジのまま
+        放置しない。本番実測連鎖（client → CF → Render内部）を模した XFF で、
+        hops方式・診断用scan方式が一致することを実際にassertする。"""
+        settings = Settings(_env_file=None, APP_ENV="development", jwt_secret="a" * 64)
+        # trusted_proxy_hops の既定値(1)に合わせ、右端が実クライアントIPになる
+        # ようヘッダを組む（hops=1 は末尾1件を採用する）。
+        app = create_app(settings)
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
+            r = await ac.get(
+                "/api/v1/_diag/client-ip",
+                headers={
+                    "X-Forwarded-For": "210.157.193.243",
+                    "CF-Connecting-IP": "210.157.193.243",
+                },
+            )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["resolved_ip"] == "210.157.193.243"
+        assert body["resolved_ip_scan"] == "210.157.193.243"
+        assert body["scan_reason"] == "ok"
+        assert body["scan_matches_hops"] is True
+        assert body["cf_connecting_ip"] == "210.157.193.243"
+
+    async def test_qa_m2_diag_scan_reason_all_trusted_and_mismatch_flagged(self):
+        """信頼済みプロキシ2段だけの XFF（実クライアントIPを含まない構成）では、
+        hops方式（既定 trusted_hops=1）は末尾の内部プロキシIPをそのまま
+        ``resolved_ip`` として返してしまう一方、診断用scanは全要素が信頼済み
+        と判定して ``all_trusted``（``resolved_ip_scan=None``）を返す。
+        両者が一致しないことで ``scan_matches_hops`` が False になり、
+        ドリフト検知シグナルとして機能することを確認する。"""
+        settings = Settings(_env_file=None, APP_ENV="development", jwt_secret="a" * 64)
+        app = create_app(settings)
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
+            r = await ac.get(
+                "/api/v1/_diag/client-ip",
+                headers={"X-Forwarded-For": "172.68.10.20, 10.193.27.131"},
+            )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["resolved_ip"] == "10.193.27.131"
+        assert body["resolved_ip_scan"] is None
+        assert body["scan_reason"] == "all_trusted"
+        assert body["scan_matches_hops"] is False

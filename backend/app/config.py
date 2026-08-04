@@ -73,8 +73,16 @@ class Settings(BaseSettings):
     rate_limit_enabled: bool = True
     # X-Forwarded-For の右から何番目を信頼するか。0 は「XFFを信頼せず
     # request.client.host を使う」を意味する。過大にすると偽装可能、過小にすると
-    # 全ユーザーが同一IP扱いになり全断する。本番デプロイ後は /api/v1/_diag/client-ip
-    # で実測して確定すること。
+    # 全ユーザーが同一IP扱いになり全断する。本番デプロイ後、および CDN 構成が
+    # 変わるたびに /api/v1/_diag/client-ip（resolved_ip / cf_connecting_ip /
+    # resolved_ip_scan・scan_reason・scan_matches_hops）で実測し直すこと。
+    # **段数非依存の右端スキャン方式（app.core.client_ip.
+    # scan_client_ip_for_diagnostics）を解決方式の代替として採用することは
+    # 検討・撤回済み**（Cloudflare Workers 等、CF公開レンジ内から任意に
+    # fetch できる egress を攻撃者が無料で入手できるため、CFレンジ内＝信頼
+    # できるという前提が成立しない。security review Critical 指摘）。
+    # 用途は診断表示とドリフト検知（RateLimitGuard が毎リクエスト自動比較し
+    # 不一致ならWARNING）のみに限定し、レート制限の判定には一切使わない。
     trusted_proxy_hops: int = 1
     # login（user/operator 共通）アカウント軸・IP軸の上限と共通窓。
     # ※ #1〜#4 は列挙防止のため応答文言・窓長を必ず同一にする。片方だけ変更しないこと。
