@@ -9,7 +9,21 @@
 - **レビューで潰した主な穴**: ①**重複XFFヘッダ**で `headers.get()` が先頭1件（=攻撃者の値）しか返さず右端保持が破れる（Starlette の実挙動を手元で実証 → `getlist()` 結合に修正） ②HMACキーに `jwt_secret` を直接流用し先頭12桁をログ出力→**ログ漏洩から JWT_SECRET のオフライン攻撃が成立**（用途ラベル付き派生鍵に変更） ③キャップ到達後に毎リクエスト1万要素ソート（CPU DoS）＋**退避が「最古＝ロックしたい被害者」優先**（sweep+ヒステリシス＋超過比率順に変更、RL_MAX_KEYS を10万へ） ④user/operator が同一メールでログインバケットを共有し**無認証5リクエストで相手をロックできるDoS**（QAが実際に再現。名前空間分離で是正） ⑤`compare_digest` が非ASCIIトークンで500（`/readyz` にも同じ問題があり同時修正） ⑥警告が「プロセス内1回きり」で**攻撃者が先回りして焼き切れる**（60秒スロットリングに統一）。
 - **RFC6598 の落とし穴**: 内部IP判定に `100.64.0.0/10`（k8s/クラウドがコンテナ間ネットワークに最も一般的に使う帯）を追加。**Python 標準の `ipaddress.is_private` はこのレンジを False と判定する**ため、標準に委ねると全断検知に失敗する。逆に標準は RFC5737 文書用レンジ（203.0.113.x 等・テストで公開IPとして多用）を True にするため、そのまま使うとテストが壊れる。両方向に外れるので明示列挙が正解。
 - **本番実証**: `/health` の commit で新版稼働を捕捉 → `/api/v1/_diag/client-ip` で IP解決4パターン検証 → **実際に 429 を発火**（5回401 → 6回目で 429 + `Retry-After: 897` + 設計どおりの日本語文言）→ **別アカウントは同一IPから正常ログイン200**（アカウント軸の分離を実証）→ ロック中アカウントは429継続 → テストアカウントは退会APIで削除。
-- **申し送り**: (1) `/api/v1/_diag/client-ip` は DIAG_TOKEN 未設定時は無認証公開（`xff_raw`/`xff_count`/`resolved_ip` のみ。`peer`/`trusted_hops` はトークン必須）。**dashboard で DIAG_TOKEN を設定すれば閉じる**ので、実測が済んだ今は設定推奨。(2) CDN構成が変わって hops が合わなくなると、増えた場合は Cloudflare の公開IPを掴んで全断（プライベート判定に掛からない）、減った場合は偽装可能になる。`CF-Connecting-IP` 優先などの構成非依存化は未対応→チップ化。(3) ログイン時のタイミングサイドチャネル（ユーザー不在時はscryptを実行しないため応答時間差で列挙可能）は本タスク対象外→チップ化。
+- **申し送り**: (1) `/api/v1/_diag/client-ip` は DIAG_TOKEN 未設定時は無認証公開（`xff_raw`/`xff_count`/`resolved_ip` のみ。`peer`/`trusted_hops` はトークン必須）。**dashboard で DIAG_TOKEN を設定すれば閉じる**ので、実測が済んだ今は設定推奨。(2) CDN構成が変わって hops が合わなくなると、増えた場合は Cloudflare の公開IPを掴んで全断（プライベート判定に掛からない）、減った場合は偽装可能になる。→ **2026-08-04 に対応。構成非依存化（`CF-Connecting-IP` 優先／CF公開レンジを信頼して右端スキャン）は調査の結果いずれも「採用不可」と確定したので、今後も実装しないこと**（詳細は下記 2026-08-04 エントリ）。(3) ログイン時のタイミングサイドチャネル（ユーザー不在時はscryptを実行しないため応答時間差で列挙可能）は本タスク対象外→チップ化。
+
+## 🚀 2026-08-04 [claude] クライアントIP解決の堅牢化を本番デプロイ完了（main=190a8a4）
+
+- **結論: 構成非依存化は「採用不可」。hops(`TRUSTED_PROXY_HOPS=3`) が引き続き正本。** 当初は「段数に依存しない方式へ」という前提で着手したが、その前提自体が本構成では成立しないことが判明したため方針を反転した。
+- **不採用の根拠（重要・再検討時はここを読むこと）**:
+  - 本番の CDN は **Render 側の Cloudflare ゾーン**であり我々のゾーンではない（`curl -I` で `Server: cloudflare` + `x-render-origin-server: uvicorn`）。したがって Transform Rule による秘密ヘッダ注入も Authenticated Origin Pulls (mTLS) も**我々には設定できず、CDN を暗号学的に認証する手段が無い**。
+  - CF 公開レンジは**共有テナント**。攻撃者は Cloudflare Workers から `fetch()` するだけで「信頼済み」判定になる egress IP を無料で入手できる。よって右端スキャン方式は、padding ありで攻撃者制御値を採用（完全偽装）、padding なしで全要素が信頼済み＝IP軸まるごとスキップ（IP軸しか持たない signup が無防備）となり、**scan は hops より弱い**。`CF-Connecting-IP` も同じ理由で信頼不可。
+- **追加した防御の線引き**: 信頼位置 `parts[-N]` は CF/Render が追記する位置なので**攻撃者は値を選べない**。したがって「攻撃者が誘発できない異常」だけスキップに倒す。
+  - 誘発**不可**→ IP軸スキップ: ①IPv4射影IPv6を正規化（`::ffff:10.0.0.1` が全断防止スキップをすり抜けていた**現行 hops 経路の実バグ修正**。表記揺れによるバケット分裂も同時に解消） ②特殊アドレス（unspecified/multicast/reserved）
+  - 誘発**可**→ WARNING のみ・カウント継続: ③CFレンジ検出。ここでスキップすると CF egress から発信する攻撃者が常時 IP軸スキップを誘発できてしまう。全断側は既存の `RATE_LIMIT_ENABLED=false`（dashboard）で1操作復旧できるため、この非対称が正しい。
+  - scan は**ドリフト検知・診断専用に降格**（判定には一切影響させない）。hops と不一致なら WARNING＝CDN構成変更の早期シグナル。
+- **本番実証**: `/health` commit が `a36b978`→`190a8a4` に切替を捕捉。`/api/v1/_diag/client-ip` で6パターン実測し全て `resolved_ip` 不変・`scan_matches_hops:true`（素／padding1個／padding3個／重複ヘッダ／不正値+射影IPv6混入／padding40個=43要素で32件上限超え）。`cf_connecting_ip` も全ケースで実クライアントIPと一致。`/readyz`=`ready/db:ok/alembic 0013 一致`。
+- **テスト**: 330 → 396 passed。security/qa 両レビュー通過（security が Critical=Workers によるCFレンジ借用を指摘 → 方針反転の直接の根拠）。
+- **申し送り**: `/api/v1/_diag/client-ip` のフィールド単位ゲートは実質無効（`trusted_hops` は無認証の `resolved_ip` から既知paddingで逆算可能、`peer` は `xff_raw` 末尾に露出）。**DIAG_TOKEN 設定 or エンドポイント全体をトークン必須化が必要**→チップ化済み。また signup/line_exchange は**IP軸しか持たない**ため IP軸の弱体化が即全損になる構造で、Turnstile 等の追加軸が本質的な解。
 
 ## 🚀 2026-07-18 [claude] /healthビルド識別子+intro_message連絡先ガード拡大を本番デプロイ完了（main=1980a20）
 - **検証（新方式の初運用）**: /health 監視ログが旧→新ビルド切替を実捕捉（00:29 `{"status":"ok"}`＝旧版 → 00:30 `{"status":"ok","commit":"1980a20"}`＝新版稼働の直接証拠）。/readyz=`ready/db:ok/alembic 0013_user_profile_fields=expected_head`。GitHub Deployments API=3環境（Vercel Production/sokuuri production/Render sokuri-backend）すべて success・sha=1980a20。**以後のデプロイ検証は「curl /health → commit照合」が正**。
