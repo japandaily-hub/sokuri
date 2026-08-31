@@ -199,6 +199,7 @@ _SCOPE_MESSAGES: dict[str, str] = {
     "login": "ログインの試行回数が上限に達しました。しばらく時間をおいて再度お試しください。",
     "password_change": "パスワード変更の試行回数が上限に達しました。しばらく時間をおいて再度お試しください。",
     "account_delete": "試行回数が上限に達しました。しばらく時間をおいて再度お試しください。",
+    "line_link_reauth": "試行回数が上限に達しました。しばらく時間をおいて再度お試しください。",
     "signup": "登録試行が集中しています。しばらく時間をおいて再度お試しください。",
     "line_exchange": "リクエストが集中しています。しばらく時間をおいて再度お試しください。",
 }
@@ -356,6 +357,12 @@ def _scope_spec(scope: str, config: RateLimitConfig) -> _ScopeSpec:
             ip_rule=None, account_rule=config.sensitive_account, count_all=False
         )
     if scope == "account_delete":
+        return _ScopeSpec(
+            ip_rule=None, account_rule=config.sensitive_account, count_all=False
+        )
+    if scope == "line_link_reauth":
+        # LINE連携用の再認証トークン発行。パスワード照合を伴う総当たり対象のため
+        # password_change / account_delete と同一のアカウント軸ルールを共有する。
         return _ScopeSpec(
             ip_rule=None, account_rule=config.sensitive_account, count_all=False
         )

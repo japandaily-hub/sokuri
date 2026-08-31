@@ -66,3 +66,29 @@ def public_url(storage_key: str) -> str:
 
 def upload_url(storage_key: str) -> str:
     return f"/api/v1/upload/{storage_key}"
+
+
+# ──────────────────────────── マジックバイト判定 ────────────────────────────
+# Content-Type ヘッダ・ファイル拡張子はクライアントが自由に詐称できるため、
+# 審査書類（許可証画像）等の機微度が高いアップロードでは実バイト列の先頭
+# シグネチャで形式を判定する（storage_key ベースの presign 方式とは別関心）。
+
+_JPEG_MAGIC = b"\xff\xd8\xff"
+_PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+_RIFF_MAGIC = b"RIFF"
+_WEBP_MAGIC = b"WEBP"
+
+
+def sniff_image_ext(data: bytes) -> str | None:
+    """実バイト列の先頭シグネチャから画像形式を判定する（jpeg/png/webpのみ許可）。
+
+    Content-Type・拡張子は一切信用しない。判定できない場合は None を返し、
+    呼び出し元で 415 Unsupported Media Type とすること。
+    """
+    if data.startswith(_JPEG_MAGIC):
+        return "jpeg"
+    if data.startswith(_PNG_MAGIC):
+        return "png"
+    if len(data) >= 12 and data[0:4] == _RIFF_MAGIC and data[8:12] == _WEBP_MAGIC:
+        return "webp"
+    return None

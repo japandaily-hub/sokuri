@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.router import api_router
 from app.core.security import create_access_token, hash_password
 from app.db.models.case import Case
+from app.db.models.operator import Operator
 from app.db.models.transaction import Transaction
 from app.db.models.user import User
 from app.db.session import get_session
@@ -370,6 +371,214 @@ async def test_change_password_unauthenticated_401(client: AsyncClient):
     r = await client.put(
         "/api/v1/users/me/password",
         json={"current_password": "a", "new_password": "newpassword1"},
+    )
+    assert r.status_code == 401
+
+
+# ──────────────────────────── LINE連携（再認証トークン・連携解除） ────────────────────────────
+
+
+async def test_reauth_token_success(client: AsyncClient):
+    token = await _signup_user(client, "reauth1@example.com", "password123")
+    r = await client.post(
+        "/api/v1/users/me/reauth-token",
+        json={"current_password": "password123"},
+        headers=_auth(token),
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["reauth_token"]
+    assert body["expires_in"] == 300
+
+
+async def test_reauth_token_wrong_password_400(client: AsyncClient):
+    """既存の change_my_password / delete_my_account と同じ規約（400）に統一する
+    （QA High-2対応。401は「トークン自体が無効」の意味で deps.py の認証ゲートが
+    使うため、パスワード不一致とは意味を区別する）。"""
+    token = await _signup_user(client, "reauth2@example.com", "password123")
+    r = await client.post(
+        "/api/v1/users/me/reauth-token",
+        json={"current_password": "wrongpassword"},
+        headers=_auth(token),
+    )
+    assert r.status_code == 400
+
+
+async def test_reauth_token_line_only_user_409(client: AsyncClient, db_session: AsyncSession):
+    user = User(
+        email="reauth_line@example.com",
+        password_hash=None,
+        name="LINEユーザー",
+        role="user",
+        line_user_id="U" + "b" * 32,
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    token = create_access_token(user.id, "user", user.role)
+
+    r = await client.post(
+        "/api/v1/users/me/reauth-token",
+        json={"current_password": "whatever1"},
+        headers=_auth(token),
+    )
+    assert r.status_code == 409
+
+
+async def test_reauth_token_unauthenticated_401(client: AsyncClient):
+    r = await client.post(
+        "/api/v1/users/me/reauth-token", json={"current_password": "a"}
+    )
+    assert r.status_code == 401
+
+
+async def test_unlink_line_success(client: AsyncClient, db_session: AsyncSession):
+    token = await _signup_user(client, "unlink1@example.com", "password123")
+    user = await db_session.scalar(select(User).where(User.email == "unlink1@example.com"))
+    user.line_user_id = "U" + "c" * 32
+    await db_session.commit()
+
+    r = await client.request(
+        "DELETE",
+        "/api/v1/users/me/line-link",
+        json={"current_password": "password123"},
+        headers=_auth(token),
+    )
+    assert r.status_code == 204
+
+    await db_session.refresh(user)
+    assert user.line_user_id is None
+
+
+async def test_unlink_line_wrong_password_400(client: AsyncClient):
+    """既存の change_my_password / delete_my_account と同じ規約（400）に統一する
+    （QA High-2対応）。"""
+    token = await _signup_user(client, "unlink2@example.com", "password123")
+    r = await client.request(
+        "DELETE",
+        "/api/v1/users/me/line-link",
+        json={"current_password": "wrongpassword"},
+        headers=_auth(token),
+    )
+    assert r.status_code == 400
+
+
+async def test_unlink_line_no_password_409(client: AsyncClient, db_session: AsyncSession):
+    user = User(
+        email="unlink_line_only@example.com",
+        password_hash=None,
+        name="LINEユーザー",
+        role="user",
+        line_user_id="U" + "d" * 32,
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    token = create_access_token(user.id, "user", user.role)
+
+    r = await client.request(
+        "DELETE",
+        "/api/v1/users/me/line-link",
+        json={"current_password": "whatever1"},
+        headers=_auth(token),
+    )
+    assert r.status_code == 409
+
+
+async def test_unlink_line_unauthenticated_401(client: AsyncClient):
+    r = await client.request(
+        "DELETE",
+        "/api/v1/users/me/line-link",
+        json={"current_password": "a"},
+    )
+    assert r.status_code == 401
+
+
+# ──────────────────────────── LINE連携（業者向け・security review H-1対応） ────────────────────────────
+# /operator/reauth-token・DELETE /operator/line-link は上記ユーザー向けエンドポイントと
+# 対称の実装（operator_profile.py）。
+
+
+async def test_operator_reauth_token_success(client: AsyncClient, db_session: AsyncSession):
+    admin_token = await _make_admin(client, db_session)
+    op_token, _ = await _verified_operator(
+        client, db_session, admin_token, "op_reauth1@example.com"
+    )
+    r = await client.post(
+        "/api/v1/operator/reauth-token",
+        json={"current_password": "operatorpass1"},
+        headers=_auth(op_token),
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["reauth_token"]
+    assert body["expires_in"] == 300
+
+
+async def test_operator_reauth_token_wrong_password_400(
+    client: AsyncClient, db_session: AsyncSession
+):
+    admin_token = await _make_admin(client, db_session)
+    op_token, _ = await _verified_operator(
+        client, db_session, admin_token, "op_reauth2@example.com"
+    )
+    r = await client.post(
+        "/api/v1/operator/reauth-token",
+        json={"current_password": "wrongpassword"},
+        headers=_auth(op_token),
+    )
+    assert r.status_code == 400
+
+
+async def test_operator_reauth_token_unauthenticated_401(client: AsyncClient):
+    r = await client.post(
+        "/api/v1/operator/reauth-token", json={"current_password": "a"}
+    )
+    assert r.status_code == 401
+
+
+async def test_unlink_operator_line_success(client: AsyncClient, db_session: AsyncSession):
+    admin_token = await _make_admin(client, db_session)
+    op_token, op_id = await _verified_operator(
+        client, db_session, admin_token, "op_unlink1@example.com"
+    )
+    operator = await db_session.get(Operator, uuid.UUID(op_id))
+    operator.line_user_id = "U" + "e" * 32
+    await db_session.commit()
+
+    r = await client.request(
+        "DELETE",
+        "/api/v1/operator/line-link",
+        json={"current_password": "operatorpass1"},
+        headers=_auth(op_token),
+    )
+    assert r.status_code == 204
+
+    await db_session.refresh(operator)
+    assert operator.line_user_id is None
+
+
+async def test_unlink_operator_line_wrong_password_400(
+    client: AsyncClient, db_session: AsyncSession
+):
+    admin_token = await _make_admin(client, db_session)
+    op_token, _ = await _verified_operator(
+        client, db_session, admin_token, "op_unlink2@example.com"
+    )
+    r = await client.request(
+        "DELETE",
+        "/api/v1/operator/line-link",
+        json={"current_password": "wrongpassword"},
+        headers=_auth(op_token),
+    )
+    assert r.status_code == 400
+
+
+async def test_unlink_operator_line_unauthenticated_401(client: AsyncClient):
+    r = await client.request(
+        "DELETE",
+        "/api/v1/operator/line-link",
+        json={"current_password": "a"},
     )
     assert r.status_code == 401
 

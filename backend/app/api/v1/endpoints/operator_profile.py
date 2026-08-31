@@ -16,22 +16,31 @@ from __future__ import annotations
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_operator
+from app.api.rate_limit_deps import RateLimitGuard
+from app.core.security import (
+    REAUTH_TOKEN_EXPIRE_MINUTES,
+    create_reauth_token,
+    verify_password,
+)
 from app.db.models.bid import Bid
 from app.db.models.operator import Operator
 from app.db.models.operator_profile import OperatorProfile
 from app.db.models.transaction import Review, Transaction
 from app.db.session import get_session
 from app.schemas_katadzuke import (
+    LineLinkUnlinkRequest,
     OperatorProfileOut,
     OperatorProfileUpdateRequest,
     OperatorPublicProfileOut,
     PublicReviewOut,
+    ReauthTokenRequest,
+    ReauthTokenResponse,
 )
 from app.services.message_guard import contains_contact_info
 
@@ -93,6 +102,7 @@ def _to_profile_out(operator: Operator, profile: OperatorProfile) -> OperatorPro
         show_reviews=profile.show_reviews,
         show_message=profile.show_message,
         accept_unsellable=profile.accept_unsellable,
+        license_image_uploaded_at=operator.license_image_uploaded_at,
     )
 
 
@@ -217,3 +227,88 @@ async def get_vendor_public_profile(
         rating=operator.rating if profile.show_stats else None,
         reviews=reviews_out,
     )
+
+
+# ──────────────────────────── LINE連携（再認証トークン・連携解除） ────────────────────────────
+# users.py の同名エンドポイント（/users/me/reauth-token・/users/me/line-link）と
+# 対称の実装。業者側にも再認証・解除手段を提供する（security review H-1対応:
+# 従来は operator 側にこれらの手段が一切無く、LINE連携後に本人が解除できない
+# ・auth/line/exchange のoperator分岐に再認証要求も無かった）。
+
+_OPERATOR_REAUTH_LINE_ONLY = HTTPException(
+    status_code=status.HTTP_409_CONFLICT,
+    detail="このアカウントはパスワード未設定のため、この操作はご利用いただけません。",
+)
+_OPERATOR_REAUTH_WRONG_PASSWORD = HTTPException(
+    status_code=status.HTTP_400_BAD_REQUEST,
+    detail="現在のパスワードが正しくありません。",
+)
+
+
+@router.post(
+    "/operator/reauth-token",
+    response_model=ReauthTokenResponse,
+    summary="LINE連携用の短命再認証トークンを発行する（purpose=line_link・5分間有効・業者向け）",
+)
+async def issue_operator_reauth_token(
+    body: ReauthTokenRequest,
+    request: Request,
+    operator: Operator = Depends(get_current_operator),
+    _rl: object = Depends(RateLimitGuard("line_link_reauth")),
+) -> ReauthTokenResponse:
+    ctx = request.state.rate_limit
+    account_key = str(operator.id)
+    ctx.check_account(account_key)
+
+    # operator は operator_signup で必ず password_hash を持つため、実際には
+    # 到達しない想定だが、user側と対称の構造を保つため念のため判定する。
+    if operator.password_hash is None:
+        raise _OPERATOR_REAUTH_LINE_ONLY
+    if not verify_password(body.current_password, operator.password_hash):
+        ctx.record_failure(account_key)
+        raise _OPERATOR_REAUTH_WRONG_PASSWORD
+    ctx.reset_account(account_key)
+
+    token = create_reauth_token(operator.id, "operator")
+    return ReauthTokenResponse(
+        reauth_token=token, expires_in=REAUTH_TOKEN_EXPIRE_MINUTES * 60
+    )
+
+
+_OPERATOR_LINE_UNLINK_NO_PASSWORD = HTTPException(
+    status_code=status.HTTP_409_CONFLICT,
+    detail="パスワード未設定のためLINE連携を解除できません（ログイン手段が失われるため）。",
+)
+_OPERATOR_LINE_UNLINK_WRONG_PASSWORD = HTTPException(
+    status_code=status.HTTP_400_BAD_REQUEST,
+    detail="現在のパスワードが正しくありません。",
+)
+
+
+@router.delete(
+    "/operator/line-link",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="LINE連携の解除（current_password必須。解除するとログイン手段が消滅するため未設定業者は409）",
+)
+async def unlink_operator_line(
+    body: LineLinkUnlinkRequest,
+    request: Request,
+    operator: Operator = Depends(get_current_operator),
+    session: AsyncSession = Depends(get_session),
+    _rl: object = Depends(RateLimitGuard("line_link_reauth")),
+) -> None:
+    ctx = request.state.rate_limit
+    account_key = str(operator.id)
+    ctx.check_account(account_key)
+
+    # パスワード未設定（実際には到達しない想定だが念のため。user側と対称）の
+    # うちは、解除するとログイン手段が完全に消滅するため解除自体を許可しない。
+    if operator.password_hash is None:
+        raise _OPERATOR_LINE_UNLINK_NO_PASSWORD
+    if not verify_password(body.current_password, operator.password_hash):
+        ctx.record_failure(account_key)
+        raise _OPERATOR_LINE_UNLINK_WRONG_PASSWORD
+    ctx.reset_account(account_key)
+
+    operator.line_user_id = None
+    await session.commit()

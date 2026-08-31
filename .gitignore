@@ -224,4 +224,8 @@ backend/e2e_local.db
 backend/*.sqlite
 backend/*.sqlite3
 
+# ローカル画像/ファイルストレージ（backend/app/services/storage.py が生成。
+# Render Free はエフェメラルだがローカル開発環境には残るため無視する）
+backend/uploads_storage/
+
 .vercel

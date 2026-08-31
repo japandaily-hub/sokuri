@@ -6,6 +6,7 @@ BREVO_API_KEY 未設定時は送信をスキップしてログのみ残す（開
 
 from __future__ import annotations
 
+import html
 import logging
 
 import httpx
@@ -105,7 +106,7 @@ async def send_bid_received(to_email: str, case_id: str, company_name: str, amou
         to_email,
         "【カタヅケ】新しい入札が届きました",
         _wrap(
-            f"<p><strong>{company_name}</strong> から "
+            f"<p><strong>{html.escape(company_name)}</strong> から "
             f"<strong>{amount:,} 円</strong> の入札が届きました。</p>"
             f'<p><a href="{url}">入札一覧を確認して業者を選ぶ</a></p>'
         ),
@@ -159,7 +160,7 @@ async def send_operator_application_received(to_email: str, company_name: str) -
         to_email,
         "【カタヅケ】業者登録のお申込みを受け付けました",
         _wrap(
-            f"<p><strong>{company_name}</strong> 様</p>"
+            f"<p><strong>{html.escape(company_name)}</strong> 様</p>"
             "<p>業者登録のお申込みを受け付けました。審査完了まで今しばらくお待ちください。</p>"
         ),
     )
@@ -170,7 +171,10 @@ async def send_operator_application_admin_alert(to_email: str, company_name: str
     return await _send(
         to_email,
         "【カタヅケ管理】新規業者申込が届きました",
-        _wrap(f"<p>新規業者申込（<strong>{company_name}</strong>）が届きました。管理画面から確認してください。</p>"),
+        _wrap(
+            f"<p>新規業者申込（<strong>{html.escape(company_name)}</strong>）"
+            "が届きました。管理画面から確認してください。</p>"
+        ),
     )
 
 
@@ -182,9 +186,9 @@ async def send_operator_application_approved(to_email: str, company_name: str, i
         to_email,
         "【カタヅケ】業者登録が承認されました",
         _wrap(
-            f"<p><strong>{company_name}</strong> 様</p>"
+            f"<p><strong>{html.escape(company_name)}</strong> 様</p>"
             "<p>業者登録の審査が完了し、承認されました。以下の招待コードで本登録を完了してください。</p>"
-            f'<p style="font-size:20px;font-weight:bold;letter-spacing:1px;">{invite_code}</p>'
+            f'<p style="font-size:20px;font-weight:bold;letter-spacing:1px;">{html.escape(invite_code)}</p>'
             f'<p><a href="{url}">本登録ページへ進む</a></p>'
         ),
     )
@@ -196,8 +200,8 @@ async def send_operator_application_rejected(to_email: str, company_name: str, r
         to_email,
         "【カタヅケ】業者登録のお申込みについて",
         _wrap(
-            f"<p><strong>{company_name}</strong> 様</p>"
+            f"<p><strong>{html.escape(company_name)}</strong> 様</p>"
             "<p>誠に恐れ入りますが、今回のお申込みは承認を見送らせていただきました。</p>"
-            f"<p>理由: {reason}</p>"
+            f"<p>理由: {html.escape(reason)}</p>"
         ),
     )

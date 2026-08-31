@@ -28,8 +28,13 @@ import {
   getOperatorProfile,
   toDisplayMessage,
   updateOperatorProfile,
+  uploadOperatorLicenseImage,
   type OperatorProfile,
 } from "@/lib/katadzuke-api";
+
+/* ---- 許可証画像アップロード（クライアント側事前検証。バックエンドの受理条件と一致させる） ---- */
+const LICENSE_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+const LICENSE_IMAGE_ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 /* ---- 対応エリア（東京・千葉・埼玉・神奈川が稼働、他は準備中） ---- */
 const AREAS: { name: string; soon?: boolean }[] = [
@@ -239,6 +244,37 @@ export default function OperatorProfilePage() {
     { label: "業者メッセージを入力", done: state.message.trim().length >= 20 },
   ];
   const completion = Math.round((checklist.filter((c) => c.done).length / checklist.length) * 100);
+
+  /* ---- 許可証画像アップロード（審査確定項目とは独立。フェーズ1はテキスト表示のみ） ---- */
+  const [licenseUploading, setLicenseUploading] = useState(false);
+  const [licenseUploadError, setLicenseUploadError] = useState<string | null>(null);
+  const licenseFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  async function onSelectLicenseFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    // 同じファイルを連続選択してもonChangeが発火するようリセットしておく。
+    e.target.value = "";
+    if (!file || !token) return;
+    if (!LICENSE_IMAGE_ALLOWED_TYPES.includes(file.type)) {
+      setLicenseUploadError("JPG・PNG・WEBP形式の画像を選択してください");
+      return;
+    }
+    if (file.size > LICENSE_IMAGE_MAX_BYTES) {
+      setLicenseUploadError("ファイルサイズは10MBまでです");
+      return;
+    }
+    setLicenseUploadError(null);
+    setLicenseUploading(true);
+    try {
+      const result = await uploadOperatorLicenseImage(file, token);
+      setProfile((prev) => (prev ? { ...prev, license_image_uploaded_at: result.uploaded_at } : prev));
+      showToast("許可証の画像をアップロードしました");
+    } catch (err) {
+      setLicenseUploadError(toDisplayMessage(err, "アップロードに失敗しました"));
+    } finally {
+      setLicenseUploading(false);
+    }
+  }
 
   /* ---- 保存・破棄 ---- */
   async function onSave() {
@@ -511,12 +547,34 @@ export default function OperatorProfilePage() {
                   </span>
                   <div className="upload-body">
                     <strong>許可証の画像</strong>
-                    <span>JPG / PNG / PDF・10MBまで。番号変更時は再アップロードが必要です。</span>
+                    <span>
+                      JPG / PNG / WEBP・10MBまで。
+                      {profile.license_image_uploaded_at
+                        ? `アップロード済み（${new Date(profile.license_image_uploaded_at).toLocaleDateString("ja-JP")}）`
+                        : "未アップロードです。"}
+                    </span>
                   </div>
-                  <button type="button" className="upload-btn" onClick={() => showToast("アップロードはデモです")}>
-                    ファイルを選択
+                  <input
+                    ref={licenseFileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    style={{ display: "none" }}
+                    onChange={(e) => void onSelectLicenseFile(e)}
+                  />
+                  <button
+                    type="button"
+                    className="upload-btn"
+                    disabled={licenseUploading}
+                    onClick={() => licenseFileInputRef.current?.click()}
+                  >
+                    {licenseUploading ? "アップロード中…" : "ファイルを選択"}
                   </button>
                 </div>
+                {licenseUploadError ? (
+                  <p className="field-error" style={{ marginTop: 6 }}>
+                    {licenseUploadError}
+                  </p>
+                ) : null}
               </div>
             </section>
 

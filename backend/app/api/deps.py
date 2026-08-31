@@ -29,12 +29,21 @@ def _decode(credentials: HTTPAuthorizationCredentials | None) -> dict:
     if credentials is None or not credentials.credentials:
         raise _CRED_EXC
     try:
-        return decode_access_token(credentials.credentials)
+        payload = decode_access_token(credentials.credentials)
     except pyjwt.PyJWTError as exc:
         raise _CRED_EXC from exc
+    # reauth_token（LINE連携付与用の短命step-upトークン）等の用途限定トークンは
+    # "purpose" クレームを持つ。通常のaccess_tokenにはこのクレームが無いため、
+    # ここで弾かないと発行から5分間、通常の認証必須エンドポイント全てで
+    # セッショントークン相当として通用してしまう（security review Medium指摘対応。
+    # core/security.py の create_reauth_token のコメントは元々この分離を前提に
+    # 書かれていたが、実際にはここでの検証が抜けていた）。
+    if payload.get("purpose") is not None:
+        raise _CRED_EXC
+    return payload
 
 
-def _assert_user_not_revoked(user: User, payload: dict) -> None:
+def assert_user_not_revoked(user: User, payload: dict) -> None:
     """退会（論理削除）済み・パスワード変更後の旧トークンを 401 で失効させる。
 
     - 論理削除ゲート: deleted_at が設定済みのアカウントの旧トークンは即時失効させる。
@@ -43,6 +52,9 @@ def _assert_user_not_revoked(user: User, payload: dict) -> None:
       同一秒内に発行された新トークンを誤って弾かないようにする。
       SQLite は tz-naive な datetime を返すため、tzinfo が無ければ UTC を補って比較する
       （tz なしのまま timestamp() するとローカルタイム解釈になりズレるため）。
+
+    ``auth.py`` の ``line_exchange``（Bearer付き連携経路）でも同一ゲートを適用するため
+    モジュール関数として公開する（旧名 ``_assert_user_not_revoked`` から改名・再利用）。
     """
     if user.deleted_at is not None:
         raise _CRED_EXC
@@ -59,6 +71,20 @@ def _assert_user_not_revoked(user: User, payload: dict) -> None:
         raise _CRED_EXC
 
 
+def assert_operator_not_suspended(operator: Operator) -> None:
+    """停止中（is_suspended）業者の旧トークンを 403 で失効させる。
+
+    ``get_current_operator`` / ``get_current_actor`` に元々インラインで書かれていた
+    判定を抽出したもの。``auth.py`` の ``line_exchange``（Bearer付き連携経路・
+    operator分岐）でも同一ゲートを適用するために再利用する。
+    """
+    if operator.is_suspended:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="アカウントは停止中です。運営へお問い合わせください。",
+        )
+
+
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     session: AsyncSession = Depends(get_session),
@@ -69,7 +95,7 @@ async def get_current_user(
     user = await session.get(User, uuid.UUID(payload["sub"]))
     if user is None:
         raise _CRED_EXC
-    _assert_user_not_revoked(user, payload)
+    assert_user_not_revoked(user, payload)
     return user
 
 
@@ -94,11 +120,7 @@ async def get_current_operator(
     operator = await session.get(Operator, uuid.UUID(payload["sub"]))
     if operator is None:
         raise _CRED_EXC
-    if operator.is_suspended:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="アカウントは停止中です。運営へお問い合わせください。",
-        )
+    assert_operator_not_suspended(operator)
     return operator
 
 
@@ -151,16 +173,12 @@ async def get_current_actor(
         user = await session.get(User, subject_id)
         if user is None:
             raise _CRED_EXC
-        _assert_user_not_revoked(user, payload)
+        assert_user_not_revoked(user, payload)
         return Actor(typ="user", user=user)
     if typ == "operator":
         operator = await session.get(Operator, subject_id)
         if operator is None:
             raise _CRED_EXC
-        if operator.is_suspended:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="アカウントは停止中です。運営へお問い合わせください。",
-            )
+        assert_operator_not_suspended(operator)
         return Actor(typ="operator", operator=operator)
     raise _CRED_EXC
