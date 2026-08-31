@@ -133,6 +133,10 @@ def _user_token(user: User) -> str:
     return create_access_token(user.id, "user", user.role)
 
 
+def _operator_token(operator: Operator) -> str:
+    return create_access_token(operator.id, "operator", "operator")
+
+
 async def _create_operator(
     db_session: AsyncSession, email: str, password: str = "operatorpass1"
 ) -> Operator:
@@ -589,6 +593,84 @@ class TestSensitiveOperations:
             headers=_auth(token_b),
         )
         assert r_b.status_code == 200
+
+
+# ──────────────────────────── LINE連携 再認証/解除（scope="line_link_reauth"） ────────────────────────────
+
+
+class TestLineLinkReauthRateLimit:
+    async def test_unlink_line_blocks_after_five_wrong_password(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """DELETE /users/me/line-link にレート制限が効くこと（security review M-1対応）。"""
+        user = await _create_user(db_session, "rl_unlink@example.com", password="correct-password10")
+        user.line_user_id = "U" + "f" * 32
+        await db_session.commit()
+        token = _user_token(user)
+        for _ in range(5):
+            r = await client.request(
+                "DELETE",
+                "/api/v1/users/me/line-link",
+                json={"current_password": "wrong"},
+                headers=_auth(token),
+            )
+            assert r.status_code == 400
+        r = await client.request(
+            "DELETE",
+            "/api/v1/users/me/line-link",
+            json={"current_password": "wrong"},
+            headers=_auth(token),
+        )
+        assert r.status_code == 429
+        assert r.json() == {"detail": _DELETE_MSG}
+
+    async def test_operator_reauth_token_blocks_after_five_wrong_password(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        operator = await _create_operator(
+            db_session, "rl_op_reauth@example.com", password="operatorpass1"
+        )
+        token = _operator_token(operator)
+        for _ in range(5):
+            r = await client.post(
+                "/api/v1/operator/reauth-token",
+                json={"current_password": "wrong"},
+                headers=_auth(token),
+            )
+            assert r.status_code == 400
+        r = await client.post(
+            "/api/v1/operator/reauth-token",
+            json={"current_password": "wrong"},
+            headers=_auth(token),
+        )
+        assert r.status_code == 429
+        assert r.json() == {"detail": _DELETE_MSG}
+
+    async def test_unlink_operator_line_blocks_after_five_wrong_password(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        operator = await _create_operator(
+            db_session, "rl_op_unlink@example.com", password="operatorpass1"
+        )
+        operator.line_user_id = "U" + "1" * 32
+        await db_session.commit()
+        token = _operator_token(operator)
+        for _ in range(5):
+            r = await client.request(
+                "DELETE",
+                "/api/v1/operator/line-link",
+                json={"current_password": "wrong"},
+                headers=_auth(token),
+            )
+            assert r.status_code == 400
+        r = await client.request(
+            "DELETE",
+            "/api/v1/operator/line-link",
+            json={"current_password": "wrong"},
+            headers=_auth(token),
+        )
+        assert r.status_code == 429
+        assert r.json() == {"detail": _DELETE_MSG}
 
 
 # ──────────────────────────── signup（全リクエストカウント） ────────────────────────────

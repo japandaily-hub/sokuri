@@ -18,7 +18,13 @@ from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user
 from app.api.rate_limit_deps import RateLimitGuard
-from app.core.security import create_access_token, hash_password, verify_password
+from app.core.security import (
+    REAUTH_TOKEN_EXPIRE_MINUTES,
+    create_access_token,
+    create_reauth_token,
+    hash_password,
+    verify_password,
+)
 from app.db.models.case import Case
 from app.db.models.transaction import Transaction
 from app.db.models.user import User
@@ -26,8 +32,11 @@ from app.db.session import get_session
 from app.schemas_katadzuke import (
     AccountDeleteRequest,
     AccountDeleteResponse,
+    LineLinkUnlinkRequest,
     PasswordChangeRequest,
     PasswordChangeResponse,
+    ReauthTokenRequest,
+    ReauthTokenResponse,
     UserProfileOut,
     UserProfileUpdateRequest,
 )
@@ -128,6 +137,86 @@ async def change_my_password(
     # クライアントが継続利用できるよう新トークンをここで発行する。
     token = create_access_token(user.id, "user", user.role)
     return PasswordChangeResponse(detail="パスワードを変更しました。", access_token=token)
+
+
+# ──────────────────────────── LINE連携（再認証トークン・連携解除） ────────────────────────────
+
+_REAUTH_LINE_ONLY = HTTPException(
+    status_code=status.HTTP_409_CONFLICT,
+    detail="このアカウントはパスワード未設定（LINEログイン専用）のため、この操作はご利用いただけません。",
+)
+_REAUTH_WRONG_PASSWORD = HTTPException(
+    status_code=status.HTTP_400_BAD_REQUEST,
+    detail="現在のパスワードが正しくありません。",
+)
+
+
+@router.post(
+    "/users/me/reauth-token",
+    response_model=ReauthTokenResponse,
+    summary="LINE連携用の短命再認証トークンを発行する（purpose=line_link・5分間有効）",
+)
+async def issue_reauth_token(
+    body: ReauthTokenRequest,
+    request: Request,
+    user: User = Depends(get_current_user),
+    _rl: object = Depends(RateLimitGuard("line_link_reauth")),
+) -> ReauthTokenResponse:
+    ctx = request.state.rate_limit
+    account_key = str(user.id)
+    ctx.check_account(account_key)
+
+    # LINE専用ユーザー（password_hash=None）はパスワードによる再認証手段が無い。
+    if user.password_hash is None:
+        raise _REAUTH_LINE_ONLY
+    if not verify_password(body.current_password, user.password_hash):
+        ctx.record_failure(account_key)
+        raise _REAUTH_WRONG_PASSWORD
+    ctx.reset_account(account_key)
+
+    token = create_reauth_token(user.id, "user")
+    return ReauthTokenResponse(
+        reauth_token=token, expires_in=REAUTH_TOKEN_EXPIRE_MINUTES * 60
+    )
+
+
+_LINE_UNLINK_NO_PASSWORD = HTTPException(
+    status_code=status.HTTP_409_CONFLICT,
+    detail="パスワード未設定のためLINE連携を解除できません（ログイン手段が失われるため）。",
+)
+_LINE_UNLINK_WRONG_PASSWORD = HTTPException(
+    status_code=status.HTTP_400_BAD_REQUEST,
+    detail="現在のパスワードが正しくありません。",
+)
+
+
+@router.delete(
+    "/users/me/line-link",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="LINE連携の解除（current_password必須。解除するとログイン手段が消滅するため未設定ユーザーは409）",
+)
+async def unlink_line(
+    body: LineLinkUnlinkRequest,
+    request: Request,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+    _rl: object = Depends(RateLimitGuard("line_link_reauth")),
+) -> None:
+    ctx = request.state.rate_limit
+    account_key = str(user.id)
+    ctx.check_account(account_key)
+
+    # LINE専用ユーザー（password_hash=None）が解除するとログイン手段が完全に
+    # 消滅するため、パスワード未設定のうちは解除自体を許可しない。
+    if user.password_hash is None:
+        raise _LINE_UNLINK_NO_PASSWORD
+    if not verify_password(body.current_password, user.password_hash):
+        ctx.record_failure(account_key)
+        raise _LINE_UNLINK_WRONG_PASSWORD
+    ctx.reset_account(account_key)
+
+    user.line_user_id = None
+    await session.commit()
 
 
 # ──────────────────────────── アカウント削除（退会） ────────────────────────────

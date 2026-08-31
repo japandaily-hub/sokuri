@@ -14,10 +14,14 @@ LINE Verify API (`GET /oauth2/v2.1/verify`) は Critical 対応（audience検証
 
 from __future__ import annotations
 
+import asyncio
+import uuid
+from datetime import datetime, timedelta, timezone
 from typing import AsyncIterator
 from unittest.mock import AsyncMock, patch
 
 import httpx
+import jwt as pyjwt
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
@@ -27,7 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.router import api_router
 from app.api.v1.endpoints import auth as auth_endpoint
 from app.config import get_settings
-from app.core.security import hash_password
+from app.core.security import create_access_token, hash_password
 from app.db.models.operator import Operator
 from app.db.models.user import User
 from app.db.session import get_session
@@ -84,6 +88,33 @@ async def _signup_user(client: AsyncClient, email: str = "line_user1@example.com
     )
     assert r.status_code == 201
     return r.json()["access_token"]
+
+
+async def _reauth_token(
+    client: AsyncClient, user_token: str, password: str = "password123"
+) -> str:
+    """パスワード設定済みユーザーがLINE連携（新規付与）に必要な再認証トークンを発行する。"""
+    r = await client.post(
+        "/api/v1/users/me/reauth-token",
+        json={"current_password": password},
+        headers=_auth(user_token),
+    )
+    assert r.status_code == 200, r.text
+    return r.json()["reauth_token"]
+
+
+async def _operator_reauth_token(
+    client: AsyncClient, op_token: str, password: str = "operatorpass1"
+) -> str:
+    """業者がLINE連携（新規付与）に必要な再認証トークンを発行する（user側と対称。
+    security review H-1対応）。"""
+    r = await client.post(
+        "/api/v1/operator/reauth-token",
+        json={"current_password": password},
+        headers=_auth(op_token),
+    )
+    assert r.status_code == 200, r.text
+    return r.json()["reauth_token"]
 
 
 async def _invite_code(client: AsyncClient, admin_token: str) -> str:
@@ -346,11 +377,12 @@ class TestLineExchange:
 
     async def test_link_existing_jwt_user_with_bearer(self, client: AsyncClient, db_session: AsyncSession):
         user_token = await _signup_user(client, "link_user@example.com")
+        reauth_token = await _reauth_token(client, user_token)
         line_user_id = "Uddfe30ff6ab11fe08f372c0ad0a16285"
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token"},
+                json={"line_access_token": "dummy-line-token", "reauth_token": reauth_token},
                 headers=_auth(user_token),
             )
         assert r.status_code == 200, r.text
@@ -364,20 +396,22 @@ class TestLineExchange:
 
         # user1 が先に連携。
         user1_token = await _signup_user(client, "conflict_user1@example.com")
+        reauth1 = await _reauth_token(client, user1_token)
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r1 = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token"},
+                json={"line_access_token": "dummy-line-token", "reauth_token": reauth1},
                 headers=_auth(user1_token),
             )
         assert r1.status_code == 200
 
         # user2 が同じ line_user_id を連携しようとすると409。
         user2_token = await _signup_user(client, "conflict_user2@example.com")
+        reauth2 = await _reauth_token(client, user2_token)
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r2 = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token"},
+                json={"line_access_token": "dummy-line-token", "reauth_token": reauth2},
                 headers=_auth(user2_token),
             )
         assert r2.status_code == 409
@@ -493,19 +527,21 @@ class TestLineCrossAccountConflict:
         line_user_id = "U126531011c10141b4046d04eb29de9a2"
 
         user_token = await _signup_user(client, "cross_user@example.com")
+        reauth_token = await _reauth_token(client, user_token)
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r1 = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token"},
+                json={"line_access_token": "dummy-line-token", "reauth_token": reauth_token},
                 headers=_auth(user_token),
             )
         assert r1.status_code == 200
 
         op_token, _ = await _verified_operator(client, admin_token, "cross_operator@example.com")
+        op_reauth_token = await _operator_reauth_token(client, op_token)
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r2 = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token"},
+                json={"line_access_token": "dummy-line-token", "reauth_token": op_reauth_token},
                 headers=_auth(op_token),
             )
         assert r2.status_code == 409
@@ -518,19 +554,21 @@ class TestLineCrossAccountConflict:
         line_user_id = "U20d045d0d8212c84bbdb1e97bfeb5d8e"
 
         op_token, _ = await _verified_operator(client, admin_token, "cross_operator2@example.com")
+        op_reauth_token = await _operator_reauth_token(client, op_token)
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r1 = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token"},
+                json={"line_access_token": "dummy-line-token", "reauth_token": op_reauth_token},
                 headers=_auth(op_token),
             )
         assert r1.status_code == 200
 
         user_token = await _signup_user(client, "cross_user2@example.com")
+        reauth_token = await _reauth_token(client, user_token)
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r2 = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token"},
+                json={"line_access_token": "dummy-line-token", "reauth_token": reauth_token},
                 headers=_auth(user_token),
             )
         assert r2.status_code == 409
@@ -543,10 +581,11 @@ class TestLineCrossAccountConflict:
         line_user_id = "U42e4a3913296a1197bbedab6b15c60e9"
 
         op_token, _ = await _verified_operator(client, admin_token, "cross_operator3@example.com")
+        op_reauth_token = await _operator_reauth_token(client, op_token)
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r1 = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token"},
+                json={"line_access_token": "dummy-line-token", "reauth_token": op_reauth_token},
                 headers=_auth(op_token),
             )
         assert r1.status_code == 200
@@ -716,3 +755,448 @@ class TestPlaceholderEmailNotLeaked:
         )
         assert r.status_code == 200, r.text
         assert r.json()["contact_email"] == "LINEにて連絡"
+
+
+# ──────────────────────────── reauth_token必須化 / 再バインド拒否 / 失効ゲート（security review対応） ────────────────────────────
+
+
+class TestLineExchangeReauthAndRebind:
+    async def _reauth_token(
+        self, client: AsyncClient, user_token: str, password: str = "password123"
+    ) -> str:
+        r = await client.post(
+            "/api/v1/users/me/reauth-token",
+            json={"current_password": password},
+            headers=_auth(user_token),
+        )
+        assert r.status_code == 200, r.text
+        return r.json()["reauth_token"]
+
+    async def test_link_without_reauth_token_returns_401(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """パスワード設定済みユーザーがreauth_tokenを付けずに初回連携を試みると401。"""
+        user_token = await _signup_user(client, "reauth_missing@example.com")
+        line_user_id = "Ue9d1e6c1c4e94e848bdafba7c2f0f001"
+        with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
+            r = await client.post(
+                "/api/v1/auth/line/exchange",
+                json={"line_access_token": "dummy-line-token"},
+                headers=_auth(user_token),
+            )
+        assert r.status_code == 401
+
+    async def test_other_users_reauth_token_rejected(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """他ユーザーが発行したreauth_tokenは sub 不一致で401拒否される。"""
+        user_token = await _signup_user(client, "reauth_owner@example.com")
+        other_token = await _signup_user(client, "reauth_other@example.com")
+        other_reauth = await self._reauth_token(client, other_token)
+
+        line_user_id = "Ue9d1e6c1c4e94e848bdafba7c2f0f002"
+        with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
+            r = await client.post(
+                "/api/v1/auth/line/exchange",
+                json={
+                    "line_access_token": "dummy-line-token",
+                    "reauth_token": other_reauth,
+                },
+                headers=_auth(user_token),
+            )
+        assert r.status_code == 401
+
+    async def test_expired_reauth_token_rejected(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        user_token = await _signup_user(client, "reauth_expired@example.com")
+        user = await db_session.scalar(
+            select(User).where(User.email == "reauth_expired@example.com")
+        )
+        settings = get_settings()
+        expired_payload = {
+            "sub": str(user.id),
+            "purpose": "line_link",
+            "iat": datetime.now(timezone.utc) - timedelta(minutes=10),
+            "exp": datetime.now(timezone.utc) - timedelta(minutes=5),
+        }
+        expired_token = pyjwt.encode(expired_payload, settings.jwt_secret, algorithm="HS256")
+
+        line_user_id = "Ue9d1e6c1c4e94e848bdafba7c2f0f003"
+        with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
+            r = await client.post(
+                "/api/v1/auth/line/exchange",
+                json={
+                    "line_access_token": "dummy-line-token",
+                    "reauth_token": expired_token,
+                },
+                headers=_auth(user_token),
+            )
+        assert r.status_code == 401
+
+    async def test_wrong_purpose_token_rejected(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """通常のaccess_token（purposeクレーム無し）はreauth_tokenとして使えない。"""
+        user_token = await _signup_user(client, "reauth_wrong_purpose@example.com")
+
+        line_user_id = "Ue9d1e6c1c4e94e848bdafba7c2f0f004"
+        with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
+            r = await client.post(
+                "/api/v1/auth/line/exchange",
+                json={
+                    "line_access_token": "dummy-line-token",
+                    # 通常のaccess_token自身をreauth_tokenとして流用しようとする攻撃を想定。
+                    "reauth_token": user_token,
+                },
+                headers=_auth(user_token),
+            )
+        assert r.status_code == 401
+
+    async def test_line_only_user_link_skips_reauth_requirement(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """LINE専用アカウント（password_hash=None）は再認証手段が無いためreauth_token無しで連携できる。"""
+        user = User(
+            email="line_only_link@line.katazuke.internal",
+            password_hash=None,
+            name=None,
+            role="user",
+            line_user_id=None,
+        )
+        db_session.add(user)
+        await db_session.commit()
+        await db_session.refresh(user)
+        token = create_access_token(user.id, "user", user.role)
+
+        line_user_id = "Ue9d1e6c1c4e94e848bdafba7c2f0f005"
+        with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
+            r = await client.post(
+                "/api/v1/auth/line/exchange",
+                json={"line_access_token": "dummy-line-token"},
+                headers=_auth(token),
+            )
+        assert r.status_code == 200, r.text
+
+    async def test_rebind_to_different_line_account_returns_409(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """既に別のLINEアカウントに連携済みのユーザーは無条件で再バインド不可（最重要指摘）。"""
+        user_token = await _signup_user(client, "rebind_user@example.com")
+        reauth1 = await self._reauth_token(client, user_token)
+        line_user_id_1 = "Ue9d1e6c1c4e94e848bdafba7c2f0f006"
+        with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id_1)):
+            r1 = await client.post(
+                "/api/v1/auth/line/exchange",
+                json={
+                    "line_access_token": "dummy-line-token",
+                    "reauth_token": reauth1,
+                },
+                headers=_auth(user_token),
+            )
+        assert r1.status_code == 200
+
+        # reauth_token を付けても、別LINEアカウントへの再バインドは常に拒否する。
+        reauth2 = await self._reauth_token(client, user_token)
+        line_user_id_2 = "Ue9d1e6c1c4e94e848bdafba7c2f0f007"
+        with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id_2)):
+            r2 = await client.post(
+                "/api/v1/auth/line/exchange",
+                json={
+                    "line_access_token": "dummy-line-token",
+                    "reauth_token": reauth2,
+                },
+                headers=_auth(user_token),
+            )
+        assert r2.status_code == 409
+
+    async def test_resend_same_line_user_id_is_idempotent(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """既に連携済みと同一のline_user_idの再送は、reauth_token無しでも成功する（冪等）。"""
+        user_token = await _signup_user(client, "idempotent_user@example.com")
+        reauth1 = await self._reauth_token(client, user_token)
+        line_user_id = "Ue9d1e6c1c4e94e848bdafba7c2f0f008"
+        with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
+            r1 = await client.post(
+                "/api/v1/auth/line/exchange",
+                json={
+                    "line_access_token": "dummy-line-token",
+                    "reauth_token": reauth1,
+                },
+                headers=_auth(user_token),
+            )
+        assert r1.status_code == 200
+
+        with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
+            r2 = await client.post(
+                "/api/v1/auth/line/exchange",
+                json={"line_access_token": "dummy-line-token"},
+                headers=_auth(user_token),
+            )
+        assert r2.status_code == 200
+
+        count = len(
+            (
+                await db_session.scalars(
+                    select(User).where(User.line_user_id == line_user_id)
+                )
+            ).all()
+        )
+        assert count == 1
+
+    async def test_deleted_account_jwt_rejected_on_line_exchange(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """退会（論理削除）済みの旧JWTは、line_exchangeのBearer経路でも401で失効する。"""
+        user_token = await _signup_user(client, "deleted_gate@example.com")
+        user = await db_session.scalar(
+            select(User).where(User.email == "deleted_gate@example.com")
+        )
+        user.deleted_at = datetime.now(timezone.utc)
+        await db_session.commit()
+
+        line_user_id = "Ue9d1e6c1c4e94e848bdafba7c2f0f009"
+        with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
+            r = await client.post(
+                "/api/v1/auth/line/exchange",
+                json={"line_access_token": "dummy-line-token"},
+                headers=_auth(user_token),
+            )
+        assert r.status_code == 401
+
+    async def test_password_changed_jwt_rejected_on_line_exchange(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """パスワード変更後の旧JWTは、line_exchangeのBearer経路でも401で失効する（iatゲート）。"""
+        user_token = await _signup_user(client, "pwchanged_gate@example.com")
+        await asyncio.sleep(1.1)
+        r = await client.put(
+            "/api/v1/users/me/password",
+            json={"current_password": "password123", "new_password": "newpassword1"},
+            headers=_auth(user_token),
+        )
+        assert r.status_code == 200, r.text
+
+        line_user_id = "Ue9d1e6c1c4e94e848bdafba7c2f0f010"
+        with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
+            r2 = await client.post(
+                "/api/v1/auth/line/exchange",
+                json={"line_access_token": "dummy-line-token"},
+                headers=_auth(user_token),
+            )
+        assert r2.status_code == 401
+
+    async def test_suspended_operator_jwt_rejected_on_line_exchange(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """停止中（is_suspended）業者の旧JWTは、line_exchangeのBearer経路でも403で失効する。"""
+        admin_token = await _make_admin(client, db_session)
+        op_token, op_id = await _verified_operator(
+            client, admin_token, "suspended_op@example.com"
+        )
+        operator = await db_session.get(Operator, uuid.UUID(op_id))
+        operator.is_suspended = True
+        await db_session.commit()
+
+        line_user_id = "Ue9d1e6c1c4e94e848bdafba7c2f0f011"
+        with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
+            r = await client.post(
+                "/api/v1/auth/line/exchange",
+                json={"line_access_token": "dummy-line-token"},
+                headers=_auth(op_token),
+            )
+        assert r.status_code == 403
+
+    async def test_operator_rebind_to_different_line_account_returns_409(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """業者側も再バインド不可（user分岐と同様のガード）。"""
+        admin_token = await _make_admin(client, db_session)
+        op_token, _ = await _verified_operator(client, admin_token, "rebind_op@example.com")
+        op_reauth_token_1 = await _operator_reauth_token(client, op_token)
+
+        line_user_id_1 = "Ue9d1e6c1c4e94e848bdafba7c2f0f012"
+        with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id_1)):
+            r1 = await client.post(
+                "/api/v1/auth/line/exchange",
+                json={"line_access_token": "dummy-line-token", "reauth_token": op_reauth_token_1},
+                headers=_auth(op_token),
+            )
+        assert r1.status_code == 200
+
+        # reauth_token を付けても、別LINEアカウントへの再バインドは常に拒否する
+        # （既に line_user_id_1 に連携済みのため、ここは再認証チェックより前段の
+        # 「再バインド禁止」ガードで拒否される。reauth_token の有無は結果に影響しない）。
+        op_reauth_token_2 = await _operator_reauth_token(client, op_token)
+        line_user_id_2 = "Ue9d1e6c1c4e94e848bdafba7c2f0f013"
+        with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id_2)):
+            r2 = await client.post(
+                "/api/v1/auth/line/exchange",
+                json={"line_access_token": "dummy-line-token", "reauth_token": op_reauth_token_2},
+                headers=_auth(op_token),
+            )
+        assert r2.status_code == 409
+
+    async def test_operator_link_without_reauth_token_returns_401(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """業者（password_hash設定済み）がreauth_tokenを付けずに初回連携を試みると401
+        （security review H-1対応。従来はoperator分岐に再認証要求が一切無かった）。"""
+        admin_token = await _make_admin(client, db_session)
+        op_token, _ = await _verified_operator(
+            client, admin_token, "op_reauth_missing@example.com"
+        )
+        line_user_id = "Ue9d1e6c1c4e94e848bdafba7c2f0f014"
+        with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
+            r = await client.post(
+                "/api/v1/auth/line/exchange",
+                json={"line_access_token": "dummy-line-token"},
+                headers=_auth(op_token),
+            )
+        assert r.status_code == 401
+
+    async def test_operator_resend_same_line_user_id_is_idempotent_without_reauth(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """業者側も、既に連携済みと同一line_user_idの再送はreauth_token無しで成功する（冪等）。"""
+        admin_token = await _make_admin(client, db_session)
+        op_token, _ = await _verified_operator(
+            client, admin_token, "op_idempotent@example.com"
+        )
+        op_reauth_token = await _operator_reauth_token(client, op_token)
+        line_user_id = "Ue9d1e6c1c4e94e848bdafba7c2f0f015"
+        with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
+            r1 = await client.post(
+                "/api/v1/auth/line/exchange",
+                json={"line_access_token": "dummy-line-token", "reauth_token": op_reauth_token},
+                headers=_auth(op_token),
+            )
+        assert r1.status_code == 200
+
+        with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
+            r2 = await client.post(
+                "/api/v1/auth/line/exchange",
+                json={"line_access_token": "dummy-line-token"},
+                headers=_auth(op_token),
+            )
+        assert r2.status_code == 200
+
+    async def test_user_reauth_token_rejected_for_operator_exchange(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """user向けに発行されたreauth_token（typ="user"）は、operator側のline_exchangeに
+        使い回せない（typ不一致で401。security review H-1対応の構造的分離）。"""
+        admin_token = await _make_admin(client, db_session)
+        op_token, _ = await _verified_operator(
+            client, admin_token, "op_typ_reject@example.com"
+        )
+        user_token = await _signup_user(client, "typ_reject_user@example.com")
+        user_reauth_token = await self._reauth_token(client, user_token)
+
+        line_user_id = "Ue9d1e6c1c4e94e848bdafba7c2f0f016"
+        with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
+            r = await client.post(
+                "/api/v1/auth/line/exchange",
+                json={
+                    "line_access_token": "dummy-line-token",
+                    "reauth_token": user_reauth_token,
+                },
+                headers=_auth(op_token),
+            )
+        assert r.status_code == 401
+
+    async def test_operator_reauth_token_rejected_for_user_exchange(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """operator向けに発行されたreauth_token（typ="operator"）は、user側のline_exchangeに
+        使い回せない（typ不一致で401。逆方向）。"""
+        admin_token = await _make_admin(client, db_session)
+        op_token, _ = await _verified_operator(
+            client, admin_token, "op_typ_reject2@example.com"
+        )
+        op_reauth_token = await _operator_reauth_token(client, op_token)
+        user_token = await _signup_user(client, "typ_reject_user2@example.com")
+
+        line_user_id = "Ue9d1e6c1c4e94e848bdafba7c2f0f017"
+        with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
+            r = await client.post(
+                "/api/v1/auth/line/exchange",
+                json={
+                    "line_access_token": "dummy-line-token",
+                    "reauth_token": op_reauth_token,
+                },
+                headers=_auth(user_token),
+            )
+        assert r.status_code == 401
+
+    async def test_reauth_token_rejected_as_bearer_on_protected_endpoint(
+        self, client: AsyncClient
+    ):
+        """reauth_token（purposeクレーム付きの用途限定トークン）は、通常の
+        Authorization: Bearer として保護エンドポイントを通過できてはならない
+        （security review Medium指摘対応: deps._decode / line_exchangeのBearer
+        抽出の両方でpurposeクレームを検証していないと、発行から5分間、通常の
+        セッショントークンとして機能してしまう）。"""
+        token = await self._reauth_token(client, await _signup_user(client, "reauth_as_bearer@example.com"))
+
+        # deps.get_current_user経由の保護エンドポイントで拒否されること。
+        r = await client.get("/api/v1/users/me/profile", headers=_auth(token))
+        assert r.status_code == 401
+
+        # line_exchangeのBearer抽出経路でも同様に拒否されること
+        # （Authorization: Bearerとしてreauth_tokenそのものを渡すケース）。
+        with patch.object(
+            httpx.AsyncClient, "get", new=_mock_line_get("Uaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa9")
+        ):
+            r2 = await client.post(
+                "/api/v1/auth/line/exchange",
+                json={"line_access_token": "dummy-line-token"},
+                headers=_auth(token),
+            )
+        assert r2.status_code == 401
+
+
+# ──────────────────────────── signupでのLINE専用プレースホルダemail拒否（費用対効果の高い追加修正） ────────────────────────────
+
+
+class TestSignupRejectsPlaceholderEmail:
+    async def test_user_signup_rejects_line_placeholder_email_422(self, client: AsyncClient):
+        r = await client.post(
+            "/api/v1/auth/signup",
+            json={
+                "email": "line-Uabc123@line.katazuke.internal",
+                "password": "password123",
+                "name": "テスト",
+            },
+        )
+        assert r.status_code == 422
+
+    async def test_user_signup_rejects_deleted_placeholder_email_422(self, client: AsyncClient):
+        r = await client.post(
+            "/api/v1/auth/signup",
+            json={
+                "email": "deleted-abc123@deleted.katazuke.internal",
+                "password": "password123",
+                "name": "テスト",
+            },
+        )
+        assert r.status_code == 422
+
+    async def test_operator_signup_rejects_line_placeholder_email_422(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        admin_token = await _make_admin(client, db_session)
+        code = await _invite_code(client, admin_token)
+        r = await client.post(
+            "/api/v1/auth/operator/signup",
+            json={
+                "invite_code": code,
+                "company_name": "テスト会社",
+                "email": "line-Uxyz789@line.katazuke.internal",
+                "password": "operatorpass1",
+                "license_number": "第123456789012号",
+                "agreed": True,
+            },
+        )
+        assert r.status_code == 422

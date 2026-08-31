@@ -31,6 +31,8 @@ export interface OperatorOut {
   rating: number | null;
   is_suspended: boolean;
   created_at: string;
+  /** 古物商許可証画像を提出済みか（admin一覧のバッジ表示・確認ボタン活性化に使用）。 */
+  has_license_image: boolean;
 }
 
 export interface OperatorPublic {
@@ -292,6 +294,8 @@ export interface OperatorProfile {
   show_reviews: boolean;
   show_message: boolean;
   accept_unsellable: boolean;
+  /** 許可証画像の最終アップロード日時。未提出の場合 null。 */
+  license_image_uploaded_at: string | null;
 }
 
 export interface OperatorProfileUpdatePayload {
@@ -321,6 +325,47 @@ export function updateOperatorProfile(
     body: JSON.stringify(payload),
     token,
   });
+}
+
+export interface OperatorLicenseImageUploadResponse {
+  uploaded_at: string;
+}
+
+/**
+ * 業者の古物商許可証画像をアップロードする（multipart/form-data）。
+ * request<T>() は Content-Type: application/json を固定注入するため multipart 送信には使えない。
+ * uploadCasePhoto と同様に生 fetch でエラーハンドリングを踏襲する。
+ * ファイル形式・サイズの事前検証は呼び出し側（operator/profile/page.tsx）で行う。
+ */
+export async function uploadOperatorLicenseImage(
+  file: File,
+  token: string,
+): Promise<OperatorLicenseImageUploadResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  let res: Response;
+  try {
+    res = await fetch(`${apiBase()}/operator/license-image`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+  } catch (e) {
+    if (e instanceof KdzApiError) throw e;
+    throw new KdzNetworkError(e);
+  }
+  if (!res.ok) {
+    let message = `HTTP ${res.status}`;
+    try {
+      const body = (await res.json()) as { detail?: unknown };
+      if (typeof body.detail === "string") message = body.detail;
+    } catch {
+      /* JSON でないレスポンスは無視 */
+    }
+    throw new KdzApiError(res.status, message);
+  }
+  return (await res.json()) as OperatorLicenseImageUploadResponse;
 }
 
 /** 公開プロフィールのレビュー（バックエンド PublicReviewOut。内部IDは含まれない）。 */
@@ -550,6 +595,44 @@ export function deleteMyAccount(
   return request("/users/me", {
     method: "DELETE",
     body: JSON.stringify(payload),
+    token,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// LINE通知連携（ログイン済みユーザーの後付け連携/解除。ログイン自体はauth.tsのLINE provider）
+// ---------------------------------------------------------------------------
+
+export interface ReauthTokenResponse {
+  reauth_token: string;
+  expires_in: number;
+}
+
+/**
+ * パスワード再確認トークンを発行する（LINE連携等、機微操作の直前に要求する短命トークン）。
+ * 400: パスワード不一致（change_my_password/delete_my_account と同じ規約） /
+ * 401: トークン自体が無効（セッション切れ） / 409: has_password===false（LINE専用アカウント）ユーザー。
+ */
+export function requestLineReauthToken(
+  currentPassword: string,
+  token: string,
+): Promise<ReauthTokenResponse> {
+  return request("/users/me/reauth-token", {
+    method: "POST",
+    body: JSON.stringify({ current_password: currentPassword }),
+    token,
+  });
+}
+
+/**
+ * LINE通知連携を解除する。
+ * 400: パスワード不一致（change_my_password/delete_my_account と同じ規約） /
+ * 401: トークン自体が無効（セッション切れ） / 409: has_password===false（LINE専用アカウント）ユーザー。
+ */
+export function unlinkLine(currentPassword: string, token: string): Promise<void> {
+  return request("/users/me/line-link", {
+    method: "DELETE",
+    body: JSON.stringify({ current_password: currentPassword }),
     token,
   });
 }
@@ -801,6 +884,37 @@ export function adminVerifyOperator(
     body: JSON.stringify({ verified }),
     token,
   });
+}
+
+/**
+ * admin が業者の古物商許可証画像を確認する（画像バイナリ）。
+ * request<T>() は JSON専用のためここでも生 fetch を使い、Blob をそのまま返す
+ * （表示側は URL.createObjectURL → 表示後 URL.revokeObjectURL でクリーンアップすること）。
+ */
+export async function adminGetOperatorLicenseImage(
+  operatorId: string,
+  token: string,
+): Promise<Blob> {
+  let res: Response;
+  try {
+    res = await fetch(`${apiBase()}/admin/operators/${operatorId}/license-image`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch (e) {
+    if (e instanceof KdzApiError) throw e;
+    throw new KdzNetworkError(e);
+  }
+  if (!res.ok) {
+    let message = `HTTP ${res.status}`;
+    try {
+      const body = (await res.json()) as { detail?: unknown };
+      if (typeof body.detail === "string") message = body.detail;
+    } catch {
+      /* JSON でないレスポンスは無視 */
+    }
+    throw new KdzApiError(res.status, message);
+  }
+  return await res.blob();
 }
 
 export interface CellDensityRow {

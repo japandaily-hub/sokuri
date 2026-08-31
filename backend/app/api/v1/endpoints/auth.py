@@ -18,10 +18,21 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import Actor, get_current_actor
+from app.api.deps import (
+    Actor,
+    assert_operator_not_suspended,
+    assert_user_not_revoked,
+    get_current_actor,
+)
 from app.api.rate_limit_deps import RateLimitGuard
 from app.config import get_settings
-from app.core.security import create_access_token, decode_access_token, hash_password, verify_password
+from app.core.security import (
+    REAUTH_PURPOSE_LINE_LINK,
+    create_access_token,
+    decode_access_token,
+    hash_password,
+    verify_password,
+)
 from app.db.models.invite import Invite
 from app.db.models.operator import Operator
 from app.db.models.user import User
@@ -37,6 +48,7 @@ from app.schemas_katadzuke import (
     UserOut,
     UserSignupRequest,
 )
+from app.services.notify import is_placeholder_email
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +90,15 @@ async def user_signup(
     _rl: object = Depends(RateLimitGuard("signup")),
 ) -> AuthTokenResponse:
     email = body.email.lower()
+    # LINE専用アカウント用の内部プレースホルダドメイン（line.katazuke.internal /
+    # deleted.katazuke.internal）での新規登録は拒否する（実在しない内部専用メールを
+    # 一般ユーザーが自称登録すると、退会済み/LINE専用アカウントとの衝突・
+    # なりすまし経路になり得るため）。
+    if is_placeholder_email(email):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="このメールアドレスは登録できません。別のメールアドレスをご利用ください。",
+        )
     existing = await session.scalar(select(User).where(User.email == email))
     if existing is not None:
         raise HTTPException(
@@ -156,6 +177,13 @@ async def operator_signup(
         )
     invite = None
     email = body.email.lower()
+    # LINE専用アカウント用の内部プレースホルダドメインでの新規登録は拒否する
+    # （user_signup と同じ理由。security review 指摘対応）。
+    if is_placeholder_email(email):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="このメールアドレスは登録できません。別のメールアドレスをご利用ください。",
+        )
     # 招待コードがある場合のみ検証・消込
     if body.invite_code:
         invite = await session.scalar(select(Invite).where(Invite.code == body.invite_code))
@@ -364,6 +392,55 @@ def _extract_bearer_token(request: Request) -> str | None:
     return token or None
 
 
+_ALREADY_LINKED_TO_OTHER_LINE = HTTPException(
+    status_code=status.HTTP_409_CONFLICT,
+    detail="このアカウントは既に別のLINEアカウントと連携済みです。"
+    "連携を解除してから再度お試しください。",
+)
+_REAUTH_REQUIRED = HTTPException(
+    status_code=status.HTTP_401_UNAUTHORIZED,
+    detail="LINE連携には再認証が必要です。現在のパスワードで再認証してください。",
+)
+_REAUTH_INVALID = HTTPException(
+    status_code=status.HTTP_401_UNAUTHORIZED,
+    detail="再認証トークンが無効、または有効期限が切れています。",
+)
+
+
+def _validate_reauth_token(
+    reauth_token: str | None,
+    expected_subject_id: uuid.UUID,
+    expected_typ: str,
+) -> None:
+    """LINE連携（新規付与）の再認証トークンを検証する。
+
+    検証項目: purpose一致（"line_link"）・typ一致（"user"/"operator"）・
+    sub（user_id/operator_id）がBearerの本人IDと一致・有効期限内
+    （decode_access_token が exp を検証し期限切れは PyJWTError で送出）。
+    typ を検証することで、user 用に発行された reauth_token を operator 側の
+    line_exchange に流用する（またはその逆）誤通過を防ぐ（アカウント種別を
+    跨いだ再認証トークンの使い回しを構造的に禁止する。security review H-1対応）。
+    パスワード未設定（LINE専用）アカウントはこの関数を呼び出さない
+    （呼び出し元 line_exchange で password_hash is None の場合はスキップする）。
+    """
+    if reauth_token is None:
+        raise _REAUTH_REQUIRED
+    try:
+        payload = decode_access_token(reauth_token)
+    except pyjwt.PyJWTError as exc:
+        raise _REAUTH_INVALID from exc
+    if payload.get("purpose") != REAUTH_PURPOSE_LINE_LINK:
+        raise _REAUTH_INVALID
+    if payload.get("typ") != expected_typ:
+        raise _REAUTH_INVALID
+    try:
+        token_subject_id = uuid.UUID(payload["sub"])
+    except (KeyError, ValueError) as exc:
+        raise _REAUTH_INVALID from exc
+    if token_subject_id != expected_subject_id:
+        raise _REAUTH_INVALID
+
+
 @router.post(
     "/auth/line/exchange",
     response_model=AuthTokenResponse,
@@ -388,6 +465,14 @@ async def line_exchange(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid credentials. Please log in again.",
             ) from exc
+        # reauth_token（purposeクレーム付きの用途限定トークン）は通常のセッション
+        # 識別（Authorization: Bearer）には使えない。deps._decode と同じガードを
+        # ここでも適用する（security review Medium指摘対応）。
+        if payload.get("purpose") is not None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid credentials. Please log in again.",
+            )
 
         typ = payload.get("typ")
         try:
@@ -405,37 +490,52 @@ async def line_exchange(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Invalid credentials. Please log in again.",
                 )
-            # 既に別ユーザーに同じ line_user_id が使われていないか事前チェック
-            # （IntegrityError にも二重で備える: レースコンディション対策）。
-            conflict = await session.scalar(
-                select(User).where(User.line_user_id == line_user_id, User.id != user.id)
-            )
-            if conflict is not None:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="このLINEアカウントは既に別のアカウントと連携されています。",
+            # 退会（論理削除）済み・パスワード変更後の旧トークンは deps.py と同一ゲートで失効させる
+            # （security review 指摘: line_exchange のBearer経路はこのゲートを経由していなかった）。
+            assert_user_not_revoked(user, payload)
+
+            # 既に別のLINEアカウントに連携済みの場合は無条件で拒否する（再バインド禁止。
+            # security review 最重要指摘）。同一 line_user_id の再送（冪等な再連携）は許可する。
+            if user.line_user_id is not None and user.line_user_id != line_user_id:
+                raise _ALREADY_LINKED_TO_OTHER_LINE
+
+            if user.line_user_id != line_user_id:
+                # 初回連携（付与）。パスワード設定済みユーザーのみ再認証トークンを要求する
+                # （LINE専用アカウントは再認証手段が無いためスキップ。security review指摘）。
+                if user.password_hash is not None:
+                    _validate_reauth_token(body.reauth_token, user.id, "user")
+
+                # 既に別ユーザーに同じ line_user_id が使われていないか事前チェック
+                # （IntegrityError にも二重で備える: レースコンディション対策）。
+                conflict = await session.scalar(
+                    select(User).where(User.line_user_id == line_user_id, User.id != user.id)
                 )
-            # User.line_user_id / Operator.line_user_id は別テーブルの独立した UNIQUE 制約
-            # のため、DB制約だけでは同一 line_user_id が User と Operator の両方に
-            # 紐づくことを防げない。アプリ層で相互チェックする（Medium-2 対応）。
-            conflict_cross = await session.scalar(
-                select(Operator).where(Operator.line_user_id == line_user_id)
-            )
-            if conflict_cross is not None:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="このLINEアカウントは既に別のアカウントと連携されています。",
+                if conflict is not None:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="このLINEアカウントは既に別のアカウントと連携されています。",
+                    )
+                # User.line_user_id / Operator.line_user_id は別テーブルの独立した UNIQUE 制約
+                # のため、DB制約だけでは同一 line_user_id が User と Operator の両方に
+                # 紐づくことを防げない。アプリ層で相互チェックする（Medium-2 対応）。
+                conflict_cross = await session.scalar(
+                    select(Operator).where(Operator.line_user_id == line_user_id)
                 )
-            user.line_user_id = line_user_id
-            try:
-                await session.commit()
-            except IntegrityError as exc:
-                await session.rollback()
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="このLINEアカウントは既に別のアカウントと連携されています。",
-                ) from exc
-            await session.refresh(user)
+                if conflict_cross is not None:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="このLINEアカウントは既に別のアカウントと連携されています。",
+                    )
+                user.line_user_id = line_user_id
+                try:
+                    await session.commit()
+                except IntegrityError as exc:
+                    await session.rollback()
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="このLINEアカウントは既に別のアカウントと連携されています。",
+                    ) from exc
+                await session.refresh(user)
             token = create_access_token(user.id, "user", user.role)
             return AuthTokenResponse(
                 access_token=token, account_type="user", user=UserOut.model_validate(user)
@@ -448,35 +548,50 @@ async def line_exchange(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Invalid credentials. Please log in again.",
                 )
-            conflict_op = await session.scalar(
-                select(Operator).where(
-                    Operator.line_user_id == line_user_id, Operator.id != operator.id
+            # 停止中業者の旧トークンは deps.py と同一ゲートで失効させる（security review指摘）。
+            assert_operator_not_suspended(operator)
+
+            # 再バインド禁止ガード（user分岐と同様。同一 line_user_id の再送は許可する）。
+            if operator.line_user_id is not None and operator.line_user_id != line_user_id:
+                raise _ALREADY_LINKED_TO_OTHER_LINE
+
+            if operator.line_user_id != line_user_id:
+                # 初回連携（付与）。パスワード設定済み業者のみ再認証トークンを要求する
+                # （user分岐と同様の理由・同一の再認証トークン検証を用いる。
+                # operator は operator_signup で必ず password_hash を持つため、
+                # 実質すべての業者が対象になる。security review H-1対応）。
+                if operator.password_hash is not None:
+                    _validate_reauth_token(body.reauth_token, operator.id, "operator")
+
+                conflict_op = await session.scalar(
+                    select(Operator).where(
+                        Operator.line_user_id == line_user_id, Operator.id != operator.id
+                    )
                 )
-            )
-            if conflict_op is not None:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="このLINEアカウントは既に別のアカウントと連携されています。",
+                if conflict_op is not None:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="このLINEアカウントは既に別のアカウントと連携されています。",
+                    )
+                # User テーブル側でも同じ line_user_id が使われていないか相互チェック（Medium-2 対応）。
+                conflict_cross = await session.scalar(
+                    select(User).where(User.line_user_id == line_user_id)
                 )
-            # User テーブル側でも同じ line_user_id が使われていないか相互チェック（Medium-2 対応）。
-            conflict_cross = await session.scalar(
-                select(User).where(User.line_user_id == line_user_id)
-            )
-            if conflict_cross is not None:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="このLINEアカウントは既に別のアカウントと連携されています。",
-                )
-            operator.line_user_id = line_user_id
-            try:
-                await session.commit()
-            except IntegrityError as exc:
-                await session.rollback()
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="このLINEアカウントは既に別のアカウントと連携されています。",
-                ) from exc
-            await session.refresh(operator)
+                if conflict_cross is not None:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="このLINEアカウントは既に別のアカウントと連携されています。",
+                    )
+                operator.line_user_id = line_user_id
+                try:
+                    await session.commit()
+                except IntegrityError as exc:
+                    await session.rollback()
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="このLINEアカウントは既に別のアカウントと連携されています。",
+                    ) from exc
+                await session.refresh(operator)
             token = create_access_token(operator.id, "operator", "operator")
             return AuthTokenResponse(
                 access_token=token,

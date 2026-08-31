@@ -50,9 +50,16 @@ class LineExchangeRequest(BaseModel):
 
     id_token/JWKS 検証は行わず、このトークンを使ってバックエンド自身が
     LINE Profile API を叩いて userId を取得する MVP 方式（将来強化: OIDC id_token 検証）。
+
+    ``reauth_token`` は、パスワード設定済みユーザーが LINE 連携を新規に「付与」する際
+    （Bearer付き経路・初回連携時のみ）に必須となる短命トークン
+    （``POST /users/me/reauth-token`` で発行。purpose="line_link"）。
+    LINE専用アカウント（password_hash が None）・未連携でない再送（冪等）・
+    Bearerなし経路では不要。
     """
 
     line_access_token: str = Field(min_length=1, max_length=4096)
+    reauth_token: str | None = Field(default=None, max_length=4096)
 
 
 class UserOut(BaseModel):
@@ -78,6 +85,9 @@ class OperatorOut(BaseModel):
     created_at: datetime
     agreed_terms_version: str | None = None
     agreed_at: datetime | None = None
+    # BLOB本体（license_image_data）は含めない。導出フラグのみ（Operatorモデルの
+    # has_license_image プロパティから from_attributes 経由で取得する）。
+    has_license_image: bool = False
 
 
 class OperatorPublicOut(BaseModel):
@@ -162,6 +172,19 @@ class PasswordChangeResponse(BaseModel):
     access_token: str
 
 
+class ReauthTokenRequest(BaseModel):
+    current_password: str
+
+
+class ReauthTokenResponse(BaseModel):
+    reauth_token: str
+    expires_in: int = 300
+
+
+class LineLinkUnlinkRequest(BaseModel):
+    current_password: str
+
+
 class AccountDeleteRequest(BaseModel):
     password: str | None = None
     confirm: bool
@@ -183,6 +206,10 @@ class PresignResponse(BaseModel):
     storage_key: str
     upload_url: str
     public_url: str
+
+
+class OperatorLicenseImageUploadResponse(BaseModel):
+    uploaded_at: datetime
 
 
 # ──────────────────────────── 案件 ────────────────────────────
@@ -586,6 +613,8 @@ class OperatorProfileOut(BaseModel):
     show_reviews: bool = True
     show_message: bool = True
     accept_unsellable: bool = False
+    # 許可証画像のアップロード有無・時刻（BLOB本体は含めない）。
+    license_image_uploaded_at: datetime | None = None
 
 
 class OperatorProfileUpdateRequest(BaseModel):

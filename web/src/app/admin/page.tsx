@@ -2,7 +2,7 @@
 
 /** 管理画面: 招待コード発行（単発/バルク）/ 業者承認 / セル密度監視（role=admin のみ）。 */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Spinner } from "@/components/Icon";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import {
@@ -19,6 +19,7 @@ import {
   adminBulkCreateInvites,
   adminCreateInvite,
   adminGetCellDensity,
+  adminGetOperatorLicenseImage,
   adminListInvites,
   adminListOperators,
   adminVerifyOperator,
@@ -51,6 +52,52 @@ export default function AdminPage() {
   const [bulkResult, setBulkResult] = useState<InviteBulkCreateResponse | null>(null);
 
   const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  /* ---- 許可証画像確認モーダル ---- */
+  const [licenseModalOperator, setLicenseModalOperator] = useState<OperatorOut | null>(null);
+  const [licenseImageUrl, setLicenseImageUrl] = useState<string | null>(null);
+  const [licenseImageLoading, setLicenseImageLoading] = useState(false);
+  const [licenseImageError, setLicenseImageError] = useState<string | null>(null);
+  // 直近でモーダルを開いた業者の id。fetch解決時にこれと不一致なら結果を捨てる
+  // （業者Aのモーダルを開いた直後に業者Bへ素早く切り替えた場合の
+  //  レース条件＝Aの遅延レスポンスがBの画面に誤表示される問題を防ぐガード）。
+  const licenseRequestOperatorIdRef = useRef<string | null>(null);
+
+  // licenseImageUrl が新しい値に切り替わる直前・アンマウント時に必ず revoke する
+  // （blob URL のメモリリーク防止を useEffect の cleanup に一元化）。
+  useEffect(() => {
+    return () => {
+      if (licenseImageUrl) URL.revokeObjectURL(licenseImageUrl);
+    };
+  }, [licenseImageUrl]);
+
+  async function openLicenseModal(op: OperatorOut) {
+    licenseRequestOperatorIdRef.current = op.id;
+    setLicenseModalOperator(op);
+    setLicenseImageUrl(null);
+    setLicenseImageError(null);
+    if (!token) return;
+    setLicenseImageLoading(true);
+    try {
+      const blob = await adminGetOperatorLicenseImage(op.id, token);
+      // fetch解決までの間に別の業者へ切り替えられていたら、この結果は表示しない。
+      if (licenseRequestOperatorIdRef.current !== op.id) return;
+      setLicenseImageUrl(URL.createObjectURL(blob));
+    } catch (e) {
+      if (licenseRequestOperatorIdRef.current !== op.id) return;
+      setLicenseImageError(toDisplayMessage(e, "許可証画像の取得に失敗しました"));
+    } finally {
+      if (licenseRequestOperatorIdRef.current === op.id) setLicenseImageLoading(false);
+    }
+  }
+
+  function closeLicenseModal() {
+    // モーダルを閉じた後に前回のfetchが解決しても、もはやどの業者の表示にも一致しないため無視させる。
+    licenseRequestOperatorIdRef.current = null;
+    setLicenseModalOperator(null);
+    setLicenseImageUrl(null);
+    setLicenseImageError(null);
+  }
 
   const reload = useCallback(async () => {
     if (!token) return;
@@ -324,16 +371,30 @@ export default function AdminPage() {
                         label={statusInfo.label}
                       />
                       {op.is_suspended ? <StatusBadge value="cancelled" label="停止中" /> : null}
+                      <StatusBadge
+                        value={op.has_license_image ? "completed" : "pending"}
+                        label={op.has_license_image ? "許可証: 提出済み" : "許可証: 未提出"}
+                      />
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => toggleVerify(op)}
-                    disabled={busy}
-                    className={op.vendor_status === "active" ? btnSecondary : btnPrimary}
-                  >
-                    {op.vendor_status === "active" ? "承認を取消" : "承認する（active化）"}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void openLicenseModal(op)}
+                      disabled={!op.has_license_image}
+                      className={btnSecondary}
+                    >
+                      許可証画像を確認
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toggleVerify(op)}
+                      disabled={busy}
+                      className={op.vendor_status === "active" ? btnSecondary : btnPrimary}
+                    >
+                      {op.vendor_status === "active" ? "承認を取消" : "承認する（active化）"}
+                    </button>
+                  </div>
                 </li>
               );
             })}
@@ -403,6 +464,51 @@ export default function AdminPage() {
         </Card>
       </div>
     </PageShell>
+
+      {/* 許可証画像確認モーダル */}
+      {licenseModalOperator ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="licenseModalTitle"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={closeLicenseModal}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-4">
+              <h2 id="licenseModalTitle" className="font-bold text-slate-900">
+                {licenseModalOperator.company_name} の古物商許可証
+              </h2>
+              <button
+                type="button"
+                onClick={closeLicenseModal}
+                aria-label="閉じる"
+                className="shrink-0 rounded-lg px-2 py-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="mt-4 flex min-h-[200px] items-center justify-center overflow-hidden rounded-lg bg-slate-50">
+              {licenseImageLoading ? (
+                <Spinner className="h-6 w-6 text-brand-600" />
+              ) : licenseImageError ? (
+                <p className="p-4 text-center text-sm text-red-600">{licenseImageError}</p>
+              ) : licenseImageUrl ? (
+                // next/image はBlob URLの最適化に対応しないため、確認用途の一時表示としてimg要素を使う。
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={licenseImageUrl}
+                  alt={`${licenseModalOperator.company_name}の古物商許可証画像`}
+                  className="max-h-[70vh] w-full object-contain"
+                />
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
