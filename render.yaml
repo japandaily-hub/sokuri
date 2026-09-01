@@ -40,6 +40,13 @@ services:
           property: connectionString   # postgres:// 形式（backend で asyncpg 化）
       - key: GOOGLE_API_KEY
         sync: false                    # dashboard で手動入力（git 漏洩防止）
+      - key: GEMINI_MODEL
+        value: "gemini-3.6-flash"      # ⚠️ Googleは旧モデルを新規ユーザー向けに定期的に
+                                        # 提供終了する(2.0→2.5→3.6と過去2回発生、404
+                                        # "no longer available to new users"で発覚)。
+                                        # 既存サービスにはこのファイルのenvVarsは同期
+                                        # されない(render-envvars-not-synced.md参照)ため、
+                                        # 再発時はRenderダッシュボードで直接値を更新すること。
       - key: PORT
         value: 8000
       - key: SQL_ECHO

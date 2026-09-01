@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://assetwise:assetwise@localhost:5432/assetwise"
     # Google AI Studio API キー（Gemini Vision 用）
     google_api_key: str = ""
+    # Gemini Vision 解析に使うモデルID。以前は vision.py にハードコードしていたが、
+    # Google側のモデル廃止（例: gemini-2.5-flash が"new usersに提供終了"となり
+    # 案件作成のAI解析が本番で全件フォールバックに落ちていた実障害）が定期的に
+    # 起こるため、コード変更・再デプロイ無しで環境変数のみで切り替えられるように
+    # 設定化する。既定値は2026-09-01時点でGoogle自身が移行先として案内し、かつ
+    # 実APIコールで動作確認済みの安定版（gemini-3.6-flash）。
+    gemini_model: str = "gemini-3.6-flash"
     # SQLAlchemy のクエリエコー
     sql_echo: bool = False
 
