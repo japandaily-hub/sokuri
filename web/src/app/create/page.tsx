@@ -176,7 +176,17 @@ export default function CreateCasePage() {
                 <p className="photo-count">{files.length} / 20 枚選択中</p>
                 <div className="photo-quality-hint">
                   <Ic name="spark" />
-                  <span><strong>コツ：</strong>部屋全体 → 気になる物のアップ、の順で撮ると物量が伝わりやすく、見積もりの精度が上がります。</span>
+                  <div className="pqh-body">
+                    <p className="pqh-lead"><strong>高評価のコツ：</strong>部屋全体 → 気になる物のアップ、に加えてこの3つを意識すると見積もり精度が上がります。</p>
+                    <ul className="pqh-checklist">
+                      <li><Ic name="scan" />全方位（正面・背面・側面・底面など）から撮る</li>
+                      <li><Ic name="zoom" />傷・汚れ・色あせ・凹みも隠さずアップで撮る</li>
+                      <li><Ic name="tag" />メーカーロゴ・型番シール・タグもアップで撮る</li>
+                    </ul>
+                    <Link href="/photo-guide" className="pqh-more">
+                      撮影のコツを詳しく見る<Ic name="arrow" />
+                    </Link>
+                  </div>
                 </div>
               </div>
             </div>
