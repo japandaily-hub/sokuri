@@ -46,6 +46,7 @@ _PASSWORD_MSG = "パスワード変更の試行回数が上限に達しました
 _DELETE_MSG = "試行回数が上限に達しました。しばらく時間をおいて再度お試しください。"
 _SIGNUP_MSG = "登録試行が集中しています。しばらく時間をおいて再度お試しください。"
 _LINE_MSG = "リクエストが集中しています。しばらく時間をおいて再度お試しください。"
+_CASE_CREATE_MSG = "案件の作成が集中しています。しばらく時間をおいて再度お試しください。"
 
 
 def _config(
@@ -60,6 +61,9 @@ def _config(
     signup_window: int = 3600,
     line_max: int = 20,
     line_window: int = 900,
+    case_create_ip_max: int = 10,
+    case_create_account_max: int = 10,
+    case_create_window: int = 3600,
 ) -> RateLimitConfig:
     return RateLimitConfig(
         enabled=enabled,
@@ -69,6 +73,8 @@ def _config(
         signup_ip=RateLimitRule(signup_max, signup_window),
         line_ip=RateLimitRule(line_max, line_window),
         max_keys=10000,
+        case_create_ip=RateLimitRule(case_create_ip_max, case_create_window),
+        case_create_account=RateLimitRule(case_create_account_max, case_create_window),
     )
 
 
@@ -982,6 +988,75 @@ class TestLineExchange:
             )
         assert r.status_code == 429
         assert r.json() == {"detail": _LINE_MSG}
+
+
+# ──────────────────────────── 案件作成（コストDoS対策・IP軸/アカウント軸とも全リクエストカウント） ────────────────────────────
+
+
+def _minimal_case_payload() -> dict:
+    """AI解析（Gemini呼び出し）を経由しない最小の案件作成ペイロード。
+
+    photos/items を空にすることで generate_case_summary が空リストに対して
+    即座にフォールバック文を返すため、Google API キー等の外部依存なしに
+    レート制限の判定（IP軸/アカウント軸のカウント）のみを検証できる。
+    """
+    return {
+        "purpose": "遺品整理",
+        "prefecture": "東京都",
+        "city": "世田谷区",
+        "photos": [],
+        "items": [],
+    }
+
+
+class TestCaseCreateRateLimit:
+    """``POST /cases`` のコストDoS対策レート制限（security review 指摘対応）。
+
+    AI解析(Gemini呼び出し)を伴うため、認証済みアカウントでも高頻度作成で
+    コストが積み上がる。IP軸・アカウント軸とも成功/失敗を問わず全リクエスト
+    をカウントする方式（signupと同様）。
+    """
+
+    async def test_account_axis_blocks_after_ten(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """ループバックIP（IP軸は自動スキップされる）の下でアカウント軸のみを検証する。"""
+        user = await _create_user(db_session, "case-create-acct@example.com")
+        token = _user_token(user)
+        for _ in range(10):
+            r = await client.post(
+                "/api/v1/cases", json=_minimal_case_payload(), headers=_auth(token)
+            )
+            assert r.status_code == 201, r.text
+        r = await client.post(
+            "/api/v1/cases", json=_minimal_case_payload(), headers=_auth(token)
+        )
+        assert r.status_code == 429
+        assert r.json() == {"detail": _CASE_CREATE_MSG}
+
+    async def test_ip_axis_blocks_after_ten_across_distinct_accounts(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """別々のアカウントでも同一IPからの作成回数が上限(10)を超えると429になる。"""
+        xff = {"X-Forwarded-For": "198.51.100.77"}
+        for i in range(10):
+            user = await _create_user(db_session, f"case-create-ip-{i}@example.com")
+            token = _user_token(user)
+            r = await client.post(
+                "/api/v1/cases",
+                json=_minimal_case_payload(),
+                headers={**_auth(token), **xff},
+            )
+            assert r.status_code == 201, r.text
+        user = await _create_user(db_session, "case-create-ip-final@example.com")
+        token = _user_token(user)
+        r = await client.post(
+            "/api/v1/cases",
+            json=_minimal_case_payload(),
+            headers={**_auth(token), **xff},
+        )
+        assert r.status_code == 429
+        assert r.json() == {"detail": _CASE_CREATE_MSG}
 
 
 # ──────────────────────────── キルスイッチ / 既存テスト非破壊 ────────────────────────────

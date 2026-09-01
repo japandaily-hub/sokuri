@@ -71,6 +71,12 @@ class RateLimitConfig:
     signup_ip: RateLimitRule
     line_ip: RateLimitRule
     max_keys: int
+    # 案件作成（IP軸・アカウント軸とも全リクエストカウント）。AI解析(Gemini呼び出し)を
+    # 伴うコストDoS対策（security review 指摘対応）。デフォルト値は既存の
+    # RateLimitConfig(...) 呼び出し箇所（テスト含む）を壊さないために設定する
+    # （既存フィールドはデフォルト無しのため、この2フィールドは末尾に追加する）。
+    case_create_ip: RateLimitRule = RateLimitRule(10, 3600)
+    case_create_account: RateLimitRule = RateLimitRule(10, 3600)
 
 
 class RateLimitStore(Protocol):

@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import BigInteger, ForeignKey, String, Text, Uuid
+from sqlalchemy import BigInteger, ForeignKey, String, Text, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
@@ -27,6 +27,14 @@ class Bid(Base, TimestampMixin):
     """
 
     __tablename__ = "bids"
+    __table_args__ = (
+        # DB側（alembic 0004）に既に存在する制約をORMメタデータ側にも反映する。
+        # これが無いと Base.metadata.create_all（テスト環境のスキーマ生成）では
+        # この制約が作られず、本番（alembic経由）とテスト環境でスキーマが乖離し、
+        # 重複入札のDB制約違反（IntegrityError）経路がテストで検証不能になる
+        # （security review 指摘対応。真の重複入札防止保証はこの制約）。
+        UniqueConstraint("case_id", "operator_id", name="uq_bids_case_operator"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     case_id: Mapped[uuid.UUID] = mapped_column(

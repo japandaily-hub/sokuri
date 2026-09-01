@@ -676,7 +676,7 @@ async def test_upload_roundtrip(client: AsyncClient, tmp_storage):
     r = await client.put(
         presign["upload_url"],
         content=b"\xff\xd8\xff\xe0fakejpegbytes",
-        headers={"Content-Type": "image/jpeg"},
+        headers={**_auth(token), "Content-Type": "image/jpeg"},
     )
     assert r.status_code == 204
 
@@ -685,11 +685,72 @@ async def test_upload_roundtrip(client: AsyncClient, tmp_storage):
     assert r.content == b"\xff\xd8\xff\xe0fakejpegbytes"
 
 
+async def test_upload_requires_authentication(client: AsyncClient, tmp_storage):
+    """PUT /upload/{storage_key} は認証必須（security review 指摘対応:
+    storage_key の推測不能性のみに依存した無認証capability URLの是正）。"""
+    token = await _signup_user(client)
+    r = await client.post(
+        "/api/v1/upload/presign",
+        json={"filename": "room.jpg", "content_type": "image/jpeg"},
+        headers=_auth(token),
+    )
+    presign = r.json()
+    r = await client.put(
+        presign["upload_url"],
+        content=b"\xff\xd8\xff\xe0fakejpegbytes",
+        headers={"Content-Type": "image/jpeg"},
+    )
+    assert r.status_code == 401
+
+
+async def test_upload_rejects_duplicate_storage_key(client: AsyncClient, tmp_storage):
+    """同一 storage_key への2回目のPUT（上書き）は409になる（security review 指摘対応）。"""
+    token = await _signup_user(client)
+    r = await client.post(
+        "/api/v1/upload/presign",
+        json={"filename": "room.jpg", "content_type": "image/jpeg"},
+        headers=_auth(token),
+    )
+    presign = r.json()
+    r = await client.put(
+        presign["upload_url"],
+        content=b"\xff\xd8\xff\xe0fakejpegbytes",
+        headers={**_auth(token), "Content-Type": "image/jpeg"},
+    )
+    assert r.status_code == 204
+
+    r = await client.put(
+        presign["upload_url"],
+        content=b"\xff\xd8\xff\xe0anotherpayload",
+        headers={**_auth(token), "Content-Type": "image/jpeg"},
+    )
+    assert r.status_code == 409
+
+
+async def test_upload_rejects_content_type_spoofing(client: AsyncClient, tmp_storage):
+    """Content-Type ヘッダを偽装しても、実バイト列が画像形式でなければ415になる
+    （sniff_image_ext によるマジックバイト判定。security review 指摘対応）。"""
+    token = await _signup_user(client)
+    r = await client.post(
+        "/api/v1/upload/presign",
+        json={"filename": "room.jpg", "content_type": "image/jpeg"},
+        headers=_auth(token),
+    )
+    presign = r.json()
+    r = await client.put(
+        presign["upload_url"],
+        content=b"not-an-image-payload",
+        headers={**_auth(token), "Content-Type": "image/jpeg"},
+    )
+    assert r.status_code == 415
+
+
 async def test_upload_rejects_invalid_key(client: AsyncClient, tmp_storage):
+    token = await _signup_user(client)
     r = await client.put(
         "/api/v1/upload/..%2F..%2Fevil.sh",
-        content=b"x",
-        headers={"Content-Type": "image/jpeg"},
+        content=b"\xff\xd8\xff\xe0fakejpegbytes",
+        headers=_auth(token),
     )
     assert r.status_code in (404, 422)
 

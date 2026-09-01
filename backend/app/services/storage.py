@@ -25,6 +25,16 @@ _EXT_BY_CONTENT_TYPE = {
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10MB
 
 
+class StorageKeyConflictError(Exception):
+    """既に存在する storage_key への上書きアップロードを示す例外。
+
+    presign が発行する storage_key は毎回新規の UUID hex のため、正規の
+    フローでは同一キーへの2回目の PUT は本来発生しない。発生した場合は
+    レースコンディション（同一キーの推測・使い回し）の可能性があるため、
+    上書きを許さず 409 Conflict として拒否する（security review 指摘対応）。
+    """
+
+
 def new_storage_key(content_type: str) -> str:
     """content_type から安全な storage_key を生成する。"""
     ext = _EXT_BY_CONTENT_TYPE.get(content_type)
@@ -34,7 +44,10 @@ def new_storage_key(content_type: str) -> str:
 
 
 def is_valid_key(storage_key: str) -> bool:
-    return bool(_KEY_RE.match(storage_key))
+    # fullmatch を使う（match + $ 終端だと末尾に改行(\n)が付与された文字列も
+    # マッチしてしまう。$ は文字列末尾の改行の直前にもマッチするため。
+    # security review 指摘対応・Low）。
+    return bool(_KEY_RE.fullmatch(storage_key))
 
 
 def _storage_root() -> Path:
@@ -48,7 +61,17 @@ def save_bytes(storage_key: str, data: bytes) -> None:
         raise ValueError("storage_key が不正です")
     if len(data) > MAX_UPLOAD_BYTES:
         raise ValueError("ファイルサイズが上限（10MB）を超えています")
-    (_storage_root() / storage_key).write_bytes(data)
+    path = _storage_root() / storage_key
+    # 既存ファイルへの上書きを禁止する（security review 指摘対応）。presign が
+    # 都度新規UUIDを発行する設計上、正規フローでは同一キーへの2回目のPUTは
+    # 発生しない。発生した場合は先行アップロード済みファイルの意図しない
+    # 差し替え（レースコンディション・キーの使い回し）の可能性があるため、
+    # 409 Conflict として拒否する（呼び出し元でHTTPExceptionへ変換すること）。
+    if path.exists():
+        raise StorageKeyConflictError(
+            "この storage_key は既にアップロード済みです。presign からやり直してください。"
+        )
+    path.write_bytes(data)
 
 
 def file_path(storage_key: str) -> Path | None:

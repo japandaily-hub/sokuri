@@ -41,12 +41,22 @@ function statusChipInfo(c: CaseMasked): { label: string; cls: string } {
 
 function LotCard({ c }: { c: CaseMasked }) {
   const { label, cls } = statusChipInfo(c);
+  // 商品アルバムがあれば「各商品の1枚目」を4枠に、無ければ従来通りフラット写真の先頭4枚にフォールバック。
+  const thumbPhotos =
+    c.items && c.items.length > 0
+      ? c.items
+          .slice()
+          .sort((a, b) => a.sort_order - b.sort_order)
+          .map((item) => item.photos[0])
+          .filter((p): p is NonNullable<typeof p> => p != null)
+          .slice(0, 4)
+      : c.photos.slice(0, 4);
   return (
     <Link href={`/operator/cases/${c.id}`} className={`lot-card ${cls}`.trim()}>
       <div className="lot-card-inner">
         <div className="lot-thumb" aria-hidden="true">
-          {c.photos.length > 0 ? (
-            c.photos.slice(0, 4).map((p) => (
+          {thumbPhotos.length > 0 ? (
+            thumbPhotos.map((p) => (
               <div className="lot-thumb-img" key={p.id}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={photoSrc(p.url)} alt="" />
@@ -76,6 +86,12 @@ function LotCard({ c }: { c: CaseMasked }) {
               <Ic name="clock" />
               {new Date(c.created_at).toLocaleDateString("ja-JP")}
             </span>
+            {c.item_count != null && c.item_count > 0 ? (
+              <span className="lot-meta-item">
+                <Ic name="box" />
+                商品 {c.item_count} 点
+              </span>
+            ) : null}
           </div>
           {c.my_bid ? (
             <div className="lot-bid-count">自社入札 {formatYen(c.my_bid.amount)}</div>

@@ -202,6 +202,7 @@ _SCOPE_MESSAGES: dict[str, str] = {
     "line_link_reauth": "試行回数が上限に達しました。しばらく時間をおいて再度お試しください。",
     "signup": "登録試行が集中しています。しばらく時間をおいて再度お試しください。",
     "line_exchange": "リクエストが集中しています。しばらく時間をおいて再度お試しください。",
+    "case_create": "案件の作成が集中しています。しばらく時間をおいて再度お試しください。",
 }
 
 
@@ -229,6 +230,12 @@ def get_rate_limiter() -> RateLimiter:
         signup_ip=RateLimitRule(settings.rl_signup_ip_max, settings.rl_signup_window_sec),
         line_ip=RateLimitRule(settings.rl_line_ip_max, settings.rl_line_window_sec),
         max_keys=settings.rl_max_keys,
+        case_create_ip=RateLimitRule(
+            settings.rl_case_create_ip_max, settings.rl_case_create_window_sec
+        ),
+        case_create_account=RateLimitRule(
+            settings.rl_case_create_account_max, settings.rl_case_create_window_sec
+        ),
     )
     return RateLimiter(config=config)
 
@@ -370,6 +377,18 @@ def _scope_spec(scope: str, config: RateLimitConfig) -> _ScopeSpec:
         return _ScopeSpec(ip_rule=config.signup_ip, account_rule=None, count_all=True)
     if scope == "line_exchange":
         return _ScopeSpec(ip_rule=config.line_ip, account_rule=None, count_all=True)
+    if scope == "case_create":
+        # 案件作成: AI解析(Gemini呼び出し)を伴うコストDoS対策のため、成功/失敗を
+        # 問わず全リクエストをIP軸・アカウント軸の両方でカウントする（signupと
+        # 同じ「全リクエストカウント」方式をアカウント軸にも拡張したもの）。
+        # IP軸はこの関数の呼び出し元（RateLimitGuard.__call__）が count_all=True
+        # により自動でカウント・判定する。アカウント軸はユーザーIDがBody解析後
+        # にしか判明しないため、ハンドラ側が明示的に ``ctx.hit_account()`` を
+        # 呼び出す（RateLimitContext 参照）。
+        return _ScopeSpec(
+            ip_rule=config.case_create_ip, account_rule=config.case_create_account,
+            count_all=True,
+        )
     raise ValueError(f"未知の rate limit scope です: {scope!r}")
 
 
@@ -436,6 +455,31 @@ class RateLimitContext:
         digest = _hash_identity(account_raw)
         self.limiter.reset(_build_key(self.scope, "acct", digest))
 
+    def hit_account(self, account_raw: str) -> None:
+        """アカウント軸を無条件でカウントし、超過なら 429 を raise する。
+
+        ``record_failure`` （失敗時のみカウントする login 等の方式）とは異なり、
+        成功/失敗を問わず毎リクエストをコストとして数える方式のスコープ
+        （例: case_create のコストDoS対策）向け。**IP軸には一切触れない**
+        （count_all 方式のスコープでは IP軸は ``RateLimitGuard.__call__`` が
+        既に ``limiter.record()`` でカウント・判定済みのため、ここでも触ると
+        二重カウントになってしまう）。
+        """
+        if self.account_rule is None:
+            return
+        digest = _hash_identity(account_raw)
+        key = _build_key(self.scope, "acct", digest)
+        verdict = self.limiter.record(key, self.account_rule)
+        if not verdict.allowed:
+            _raise_429(
+                scope=self.scope,
+                axis="account",
+                rule=self.account_rule,
+                verdict=verdict,
+                key_prefix=digest[:12],
+                ip_net=None,
+            )
+
 
 class NoopRateLimitContext:
     """``RATE_LIMIT_ENABLED=false``（キルスイッチ ON）時に使う no-op 実装。
@@ -452,6 +496,9 @@ class NoopRateLimitContext:
         return None
 
     def reset_account(self, account_raw: str) -> None:
+        return None
+
+    def hit_account(self, account_raw: str) -> None:
         return None
 
 

@@ -6,6 +6,7 @@ import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -31,6 +32,19 @@ async def _get_case(session: AsyncSession, case_id: uuid.UUID) -> Case:
             selectinload(Case.bids).selectinload(Bid.operator),
             selectinload(Case.bids).selectinload(Bid.transaction),
         )
+        # populate_existing: 本番の get_session() はリクエストごとに新規セッションを
+        # 払い出すため、identity map の汚染（同一セッション内での陳腐化）は本番では
+        # 原理上発生しない。この指定が実際に意味を持つのは、単一セッションを複数
+        # リクエストで共有するテストハーネス（test_*.py の create_test_app が
+        # get_session を単一の db_session に override するパターン）に限られる
+        # （QAレビューで訂正済み。当初「本番で重複入札チェックが破られる重大バグ」と
+        # 診断していたが誤りだった）。したがってこれは共有セッション下での防御的な
+        # 措置に過ぎず、重複入札の真の防止保証は DB のユニーク制約
+        # （``uq_bids_case_operator``、bids テーブルの (case_id, operator_id)）である。
+        # アプリ層の in-memory チェック（後述の any(...)）はDB往復を伴わないUX向上の
+        # ための早期リターンに過ぎず、同時実行下での一意性の最終防衛線ではない
+        # （create_bid の IntegrityError ハンドリング参照）。
+        .execution_options(populate_existing=True)
     )
     if case is None:
         raise HTTPException(
@@ -105,7 +119,19 @@ async def create_bid(
     bid = Bid(case_id=case.id, operator_id=operator.id, amount=body.amount, message=body.message)
     session.add(bid)
     case.status = "bidding"
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        # 上記の in-memory チェック（any(...)）はDB往復前のUX向上目的の早期
+        # リターンに過ぎず、同時実行下でのTOCTOU（2リクエストが同時に同一案件・
+        # 同一業者で入札）を防げない。真の一意性保証は DB のユニーク制約
+        # （uq_bids_case_operator）であり、違反時はここで捕捉して409へ変換する
+        # （変換しない場合、素通しで500になってしまう。security review 指摘対応）。
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="この案件には既に入札済みです。",
+        ) from exc
     await session.refresh(bid)
     bid.operator = operator
 

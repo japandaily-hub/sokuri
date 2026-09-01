@@ -3,14 +3,16 @@
 /**
  * 案件作成フロー（4 STEP・新デザイン）。
  * STEP1 写真 → STEP2 利用目的 → STEP3 住居情報 → STEP4 確認送信。
+ * STEP1 は「商品ごとに撮影→アルバムとして確定→次の商品を追加」を繰り返す albums フローと、
+ * 従来通りの「まとめて撮る」フラット撮影（loose）の 2 系統を list/shoot のモード遷移で提供する。
+ * バックエンド契約: POST /cases に items（商品アルバム, 任意）と photos（フラット, 必須）を両方送る。
  * 既存の配線を完全維持: useToken / uploadCasePhoto ループ / createCase → /cases/{id}?created=1。
- * デザインは品目カード型だが、バックエンド契約（case単位）維持のため既存フローに視覚言語のみ適用。
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Ic } from "@/components/kdz/Icons";
+import { Ic, type IcName } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
 import { useToken } from "@/components/kdz/Ui";
 import { createCase, uploadCasePhoto, toDisplayMessage } from "@/lib/katadzuke-api";
@@ -22,12 +24,44 @@ const PREFECTURES = ["東京都", "神奈川県", "埼玉県", "千葉県"] as c
 const HOUSING_TYPES = ["一戸建て", "マンション", "アパート", "その他"] as const;
 const FLOOR_PLANS = ["1R/1K", "1DK/1LDK", "2K/2DK", "2LDK", "3LDK", "4LDK以上"] as const;
 
+/** 案件全体の写真上限（items 内 + loose 合計、バックエンド契約に合わせる）。 */
+const CASE_PHOTO_LIMIT = 20;
+/** 商品1点あたりの写真上限。 */
+const ITEM_PHOTO_LIMIT = 8;
+/** 商品数の上限。 */
+const ITEM_LIMIT = 10;
+
+/** 撮影のコツチェックリスト（タップで進捗表示するのみ・APIには送らない）。 */
+const HINT_ITEMS: { key: string; icon: IcName; label: string }[] = [
+  { key: "angles", icon: "scan", label: "全方位（正面・背面・側面・底面など）から撮る" },
+  { key: "damage", icon: "zoom", label: "傷・汚れ・色あせ・凹みも隠さずアップで撮る" },
+  { key: "tag", icon: "tag", label: "メーカーロゴ・型番シール・タグもアップで撮る" },
+];
+
+type DraftPhoto = { id: string; file: File; previewUrl: string; uploadedKey?: string };
+type DraftItem = { id: string; name: string; photos: DraftPhoto[] };
+type Step1Mode = { kind: "list" } | { kind: "shoot"; itemId: string };
+
+/** 案件作成フロー内でのみ使う軽量な一意ID（サーバーには送らない）。 */
+function makeId(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
 export default function CreateCasePage() {
   const router = useRouter();
   const { token, loading } = useToken();
 
   const [step, setStep] = useState(0);
-  const [files, setFiles] = useState<File[]>([]);
+
+  // STEP1: 商品ごとのアルバム（items）+ まとめ撮影（loose）
+  const [mode, setMode] = useState<Step1Mode>({ kind: "list" });
+  const [items, setItems] = useState<DraftItem[]>([]);
+  const [loosePhotos, setLoosePhotos] = useState<DraftPhoto[]>([]);
+  const [showLooseSection, setShowLooseSection] = useState(false);
+  const [checkedHints, setCheckedHints] = useState<Set<string>>(new Set());
+  const looseInputRef = useRef<HTMLInputElement>(null);
+  const itemInputRef = useRef<HTMLInputElement>(null);
+
   const [purpose, setPurpose] = useState<string>(PURPOSES[0]);
   const [prefecture, setPrefecture] = useState<string>(PREFECTURES[0]);
   const [city, setCity] = useState("");
@@ -39,31 +73,164 @@ export default function CreateCasePage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
 
-  const previews = useMemo(
-    () => files.map((f) => ({ name: f.name, url: URL.createObjectURL(f) })),
-    [files],
-  );
-
-  // Blob URL のメモリリーク防止: previews 更新時/アンマウント時に旧URLを解放
+  // Blob URL のメモリリーク防止: 個別削除時に都度 revoke、それ以外はアンマウント時にまとめて revoke する。
+  // items/loosePhotos は ref に都度同期し、アンマウント時のクリーンアップはこの ref から読む
+  // （commit のたびに revoke される既存バグ = previews を useMemo(files) で再生成する実装を避ける）。
+  const itemsRef = useRef(items);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+  const loosePhotosRef = useRef(loosePhotos);
+  useEffect(() => {
+    loosePhotosRef.current = loosePhotos;
+  }, [loosePhotos]);
   useEffect(() => {
     return () => {
-      previews.forEach((p) => URL.revokeObjectURL(p.url));
+      itemsRef.current.forEach((it) => it.photos.forEach((p) => URL.revokeObjectURL(p.previewUrl)));
+      loosePhotosRef.current.forEach((p) => URL.revokeObjectURL(p.previewUrl));
     };
-  }, [previews]);
+  }, []);
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const selected = Array.from(e.target.files ?? []);
-    setFiles((prev) => {
-      const existing = new Set(prev.map((f) => `${f.name}:${f.size}`));
-      return [...prev, ...selected.filter((f) => !existing.has(`${f.name}:${f.size}`))].slice(0, 20);
+  const totalPhotoCount =
+    items.reduce((sum, it) => sum + it.photos.length, 0) + loosePhotos.length;
+  const totalItemCount = items.length;
+
+  const currentItemIndex = mode.kind === "shoot" ? items.findIndex((it) => it.id === mode.itemId) : -1;
+  const currentItem = currentItemIndex >= 0 ? items[currentItemIndex] : undefined;
+
+  function addNewItem() {
+    if (items.length >= ITEM_LIMIT || totalPhotoCount >= CASE_PHOTO_LIMIT) return;
+    const id = makeId();
+    setItems((prev) => [...prev, { id, name: "", photos: [] }]);
+    setMode({ kind: "shoot", itemId: id });
+  }
+
+  function editItem(itemId: string) {
+    setMode({ kind: "shoot", itemId });
+  }
+
+  function deleteItem(itemId: string) {
+    setItems((prev) => {
+      const target = prev.find((it) => it.id === itemId);
+      target?.photos.forEach((p) => URL.revokeObjectURL(p.previewUrl));
+      return prev.filter((it) => it.id !== itemId);
     });
-    if (inputRef.current) inputRef.current.value = "";
+  }
+
+  function renameItem(itemId: string, name: string) {
+    setItems((prev) => prev.map((it) => (it.id === itemId ? { ...it, name } : it)));
+  }
+
+  /** shoot モードを離れる（一覧へ戻る/完了どちらも同じ後始末）。写真0枚のまま離脱した商品は自動で消す。 */
+  function exitShoot() {
+    if (mode.kind === "shoot") {
+      const id = mode.itemId;
+      setItems((prev) => prev.filter((it) => it.id !== id || it.photos.length > 0));
+    }
+    setMode({ kind: "list" });
+  }
+
+  /** shoot モード内の「この商品を削除」（写真の有無に関わらず商品ごと削除）。 */
+  function deleteCurrentItem() {
+    if (mode.kind !== "shoot") return;
+    deleteItem(mode.itemId);
+    setMode({ kind: "list" });
+  }
+
+  function addFilesToItem(itemId: string, files: File[]) {
+    if (files.length === 0) return;
+    let dropped = false;
+    setItems((prev) => {
+      const caseTotal = prev.reduce((s, it) => s + it.photos.length, 0) + loosePhotosRef.current.length;
+      const caseRemaining = Math.max(0, CASE_PHOTO_LIMIT - caseTotal);
+      return prev.map((it) => {
+        if (it.id !== itemId) return it;
+        const existingKeys = new Set(it.photos.map((p) => `${p.file.name}:${p.file.size}`));
+        const dedupedFiles = files.filter((f) => !existingKeys.has(`${f.name}:${f.size}`));
+        const itemRemaining = Math.max(0, ITEM_PHOTO_LIMIT - it.photos.length);
+        const allowed = dedupedFiles.slice(0, Math.min(itemRemaining, caseRemaining));
+        if (allowed.length < dedupedFiles.length) dropped = true;
+        if (allowed.length === 0) return it;
+        const newPhotos: DraftPhoto[] = allowed.map((f) => ({
+          id: makeId(),
+          file: f,
+          previewUrl: URL.createObjectURL(f),
+        }));
+        return { ...it, photos: [...it.photos, ...newPhotos] };
+      });
+    });
+    if (dropped) {
+      setError(`上限（商品${ITEM_PHOTO_LIMIT}枚・案件合計${CASE_PHOTO_LIMIT}枚）のため、一部の写真は追加されませんでした。`);
+    }
+  }
+
+  function removePhotoFromItem(itemId: string, photoId: string) {
+    setItems((prev) =>
+      prev.map((it) => {
+        if (it.id !== itemId) return it;
+        const target = it.photos.find((p) => p.id === photoId);
+        if (target) URL.revokeObjectURL(target.previewUrl);
+        return { ...it, photos: it.photos.filter((p) => p.id !== photoId) };
+      }),
+    );
+  }
+
+  function handleItemFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const selected = Array.from(e.target.files ?? []);
+    if (mode.kind === "shoot") addFilesToItem(mode.itemId, selected);
+    if (itemInputRef.current) itemInputRef.current.value = "";
+  }
+
+  function addLooseFiles(files: File[]) {
+    if (files.length === 0) return;
+    const itemsTotal = itemsRef.current.reduce((s, it) => s + it.photos.length, 0);
+    let dropped = false;
+    setLoosePhotos((prev) => {
+      const caseRemaining = Math.max(0, CASE_PHOTO_LIMIT - itemsTotal - prev.length);
+      const existingKeys = new Set(prev.map((p) => `${p.file.name}:${p.file.size}`));
+      const dedupedFiles = files.filter((f) => !existingKeys.has(`${f.name}:${f.size}`));
+      const allowed = dedupedFiles.slice(0, caseRemaining);
+      if (allowed.length < dedupedFiles.length) dropped = true;
+      if (allowed.length === 0) return prev;
+      const newPhotos: DraftPhoto[] = allowed.map((f) => ({
+        id: makeId(),
+        file: f,
+        previewUrl: URL.createObjectURL(f),
+      }));
+      return [...prev, ...newPhotos];
+    });
+    if (dropped) {
+      setError(`上限（案件合計${CASE_PHOTO_LIMIT}枚）のため、一部の写真は追加されませんでした。`);
+    }
+  }
+
+  function handleLooseFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const selected = Array.from(e.target.files ?? []);
+    addLooseFiles(selected);
+    if (looseInputRef.current) looseInputRef.current.value = "";
+  }
+
+  function removeLoosePhoto(photoId: string) {
+    setLoosePhotos((prev) => {
+      const target = prev.find((p) => p.id === photoId);
+      if (target) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((p) => p.id !== photoId);
+    });
+  }
+
+  function toggleHint(itemId: string, hintKey: string) {
+    const key = `${itemId}:${hintKey}`;
+    setCheckedHints((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   }
 
   function canNext(): boolean {
-    if (step === 0) return files.length > 0;
+    if (step === 0) return totalPhotoCount > 0;
     if (step === 2) return city.trim().length > 0;
     return true;
   }
@@ -76,12 +243,45 @@ export default function CreateCasePage() {
     setSubmitting(true);
     setError(null);
     try {
-      const photos: { storage_key: string; sort_order: number }[] = [];
-      for (let i = 0; i < files.length; i++) {
-        setProgress(`写真をアップロード中… (${i + 1}/${files.length})`);
-        const presign = await uploadCasePhoto(files[i], token);
-        photos.push({ storage_key: presign.storage_key, sort_order: i });
+      const itemPayloads: { name?: string; sort_order: number; photos: { storage_key: string; sort_order: number }[] }[] = [];
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.photos.length === 0) continue;
+        const photoPayloads: { storage_key: string; sort_order: number }[] = [];
+        for (let j = 0; j < item.photos.length; j++) {
+          const photo = item.photos[j];
+          setProgress(`商品 ${i + 1}/${items.length} の写真をアップロード中… (${j + 1}/${item.photos.length})`);
+          let key = photo.uploadedKey;
+          if (!key) {
+            const presign = await uploadCasePhoto(photo.file, token);
+            key = presign.storage_key;
+            setItems((prev) =>
+              prev.map((it) =>
+                it.id === item.id
+                  ? { ...it, photos: it.photos.map((p) => (p.id === photo.id ? { ...p, uploadedKey: key } : p)) }
+                  : it,
+              ),
+            );
+          }
+          photoPayloads.push({ storage_key: key, sort_order: j });
+        }
+        itemPayloads.push({ name: item.name.trim() || undefined, sort_order: i, photos: photoPayloads });
       }
+
+      const loosePayloads: { storage_key: string; sort_order: number }[] = [];
+      for (let i = 0; i < loosePhotos.length; i++) {
+        const photo = loosePhotos[i];
+        setProgress(`まとめ撮影の写真をアップロード中… (${i + 1}/${loosePhotos.length})`);
+        let key = photo.uploadedKey;
+        if (!key) {
+          const presign = await uploadCasePhoto(photo.file, token);
+          key = presign.storage_key;
+          setLoosePhotos((prev) => prev.map((p) => (p.id === photo.id ? { ...p, uploadedKey: key } : p)));
+        }
+        loosePayloads.push({ storage_key: key, sort_order: i });
+      }
+
       setProgress("AIが案件を要約しています…");
       const created = await createCase(
         {
@@ -93,7 +293,8 @@ export default function CreateCasePage() {
           floor_plan: floorPlan,
           floor_number: floorNumber === "" ? null : Number(floorNumber),
           has_elevator: hasElevator,
-          photos,
+          items: itemPayloads.length > 0 ? itemPayloads : undefined,
+          photos: loosePayloads,
         },
         token,
       );
@@ -114,6 +315,9 @@ export default function CreateCasePage() {
       </div>
     );
   }
+
+  const isEmptyStep1 = items.length === 0 && loosePhotos.length === 0;
+  const looseVisible = showLooseSection || loosePhotos.length > 0;
 
   return (
     <div className="create-page flow-bg">
@@ -148,46 +352,193 @@ export default function CreateCasePage() {
             </div>
           )}
 
-          {/* STEP 1: 写真 */}
-          {step === 0 && (
+          {/* STEP 1: 写真（list モード） */}
+          {step === 0 && mode.kind === "list" && (
             <div>
-              <h2 className="step-title">片付けたい場所を撮影</h2>
-              <p className="step-desc">部屋全体が写るように撮影してください（最大20枚）。物量がわかるほど、正確な見積もりが届きやすくなります。</p>
+              <h2 className="step-title">片付けたい商品を撮影</h2>
+              <p className="step-desc">
+                商品ごとに撮影してアルバムにまとめると、より正確な見積もりにつながります（商品最大{ITEM_LIMIT}点・案件合計最大{CASE_PHOTO_LIMIT}枚）。
+              </p>
+
+              {isEmptyStep1 ? (
+                <button type="button" className="item-empty-cta" onClick={addNewItem}>
+                  <span className="pd-ic"><Ic name="camera" /></span>
+                  <span className="pd-title">＋ 最初の商品を撮影する</span>
+                </button>
+              ) : (
+                <>
+                  {items.length > 0 && (
+                    <div className="item-list">
+                      {items.map((it, idx) => (
+                        <div className="item-card" key={it.id}>
+                          <div className="item-card-thumb">
+                            {it.photos[0] ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={it.photos[0].previewUrl} alt="" />
+                            ) : (
+                              <Ic name="box" />
+                            )}
+                          </div>
+                          <div className="item-card-info">
+                            <p className="item-card-name">{it.name.trim() || `商品 ${idx + 1}`}</p>
+                            <p className="item-card-count">{it.photos.length} 枚</p>
+                          </div>
+                          <div className="item-card-actions">
+                            <button type="button" onClick={() => editItem(it.id)}>編集</button>
+                            <button type="button" onClick={() => deleteItem(it.id)}>削除</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="item-list-actions">
+                    <button
+                      type="button"
+                      className="btn-add-item"
+                      onClick={addNewItem}
+                      disabled={items.length >= ITEM_LIMIT || totalPhotoCount >= CASE_PHOTO_LIMIT}
+                    >
+                      <Ic name="camera" />＋ 商品を追加
+                    </button>
+                    {!looseVisible && (
+                      <button type="button" className="btn-loose-toggle" onClick={() => setShowLooseSection(true)}>
+                        まとめて撮る（商品を分けない）
+                      </button>
+                    )}
+                  </div>
+
+                  {looseVisible && (
+                    <div className="form-card">
+                      <p className="loose-section-title">まとめ撮影（商品を分けない写真）</p>
+                      <label className="photo-drop">
+                        <span className="pd-ic"><Ic name="camera" /></span>
+                        <span className="pd-title">写真を撮影・選択</span>
+                        <span className="pd-sub">JPEG / PNG / WebP</span>
+                        <input
+                          ref={looseInputRef}
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          capture="environment"
+                          multiple
+                          className="sr-only"
+                          onChange={handleLooseFileChange}
+                        />
+                      </label>
+                      {loosePhotos.length > 0 && (
+                        <div className="photo-grid">
+                          {loosePhotos.map((p) => (
+                            <div key={p.id} className="photo-thumb">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={p.previewUrl} alt={p.file.name} />
+                              <button type="button" className="photo-remove" onClick={() => removeLoosePhoto(p.id)} aria-label={`${p.file.name} を削除`}>
+                                <Ic name="x" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <p className="photo-count">案件合計 残り{Math.max(0, CASE_PHOTO_LIMIT - totalPhotoCount)}枚</p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* STEP 1: 写真（shoot モード = 商品ごとの撮影） */}
+          {step === 0 && mode.kind === "shoot" && currentItem && (
+            <div>
+              <button type="button" className="step1-back-link" onClick={exitShoot}>
+                <Ic name="arrow" style={{ transform: "rotate(180deg)" }} />← 一覧へ戻る
+              </button>
+              <h2 className="step-title">商品 {currentItemIndex + 1} の写真</h2>
+              <p className="step-desc">全方位・傷や汚れのアップを含めて撮影してください。</p>
               <div className="form-card">
+                <div className="field">
+                  <label htmlFor="itemName">
+                    商品名<span className="opt">任意</span>
+                  </label>
+                  <input
+                    id="itemName"
+                    type="text"
+                    maxLength={40}
+                    value={currentItem.name}
+                    onChange={(e) => renameItem(currentItem.id, e.target.value)}
+                    placeholder="例: 洗濯機 / ソファ / ゴルフクラブ"
+                  />
+                  <p className="item-name-warn">
+                    <Ic name="lock" />個人情報・連絡先は入力しないでください
+                  </p>
+                </div>
+
                 <label className="photo-drop">
                   <span className="pd-ic"><Ic name="camera" /></span>
                   <span className="pd-title">写真を撮影・選択</span>
-                  <span className="pd-sub">JPEG / PNG / WebP・最大20枚</span>
-                  <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" capture="environment" multiple className="sr-only" onChange={handleFileChange} />
+                  <span className="pd-sub">JPEG / PNG / WebP・最大{ITEM_PHOTO_LIMIT}枚</span>
+                  <input
+                    ref={itemInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    capture="environment"
+                    multiple
+                    className="sr-only"
+                    onChange={handleItemFileChange}
+                  />
                 </label>
-                {previews.length > 0 && (
+
+                {currentItem.photos.length > 0 && (
                   <div className="photo-grid">
-                    {previews.map((p, i) => (
-                      <div key={p.url} className="photo-thumb">
+                    {currentItem.photos.map((p) => (
+                      <div key={p.id} className="photo-thumb">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={p.url} alt={p.name} />
-                        <button type="button" className="photo-remove" onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))} aria-label={`${p.name} を削除`}>
+                        <img src={p.previewUrl} alt={p.file.name} />
+                        <button
+                          type="button"
+                          className="photo-remove"
+                          onClick={() => removePhotoFromItem(currentItem.id, p.id)}
+                          aria-label={`${p.file.name} を削除`}
+                        >
                           <Ic name="x" />
                         </button>
                       </div>
                     ))}
                   </div>
                 )}
-                <p className="photo-count">{files.length} / 20 枚選択中</p>
+                <p className="photo-count">
+                  この商品 {currentItem.photos.length}/{ITEM_PHOTO_LIMIT} 枚・案件合計 残り{Math.max(0, CASE_PHOTO_LIMIT - totalPhotoCount)}枚
+                </p>
+
                 <div className="photo-quality-hint">
                   <Ic name="spark" />
                   <div className="pqh-body">
                     <p className="pqh-lead"><strong>高評価のコツ：</strong>部屋全体 → 気になる物のアップ、に加えてこの3つを意識すると見積もり精度が上がります。</p>
                     <ul className="pqh-checklist">
-                      <li><Ic name="scan" />全方位（正面・背面・側面・底面など）から撮る</li>
-                      <li><Ic name="zoom" />傷・汚れ・色あせ・凹みも隠さずアップで撮る</li>
-                      <li><Ic name="tag" />メーカーロゴ・型番シール・タグもアップで撮る</li>
+                      {HINT_ITEMS.map((h) => {
+                        const checked = checkedHints.has(`${currentItem.id}:${h.key}`);
+                        return (
+                          <li key={h.key}>
+                            <label className="pqh-check-label">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggleHint(currentItem.id, h.key)}
+                              />
+                              <Ic name={h.icon} />{h.label}
+                            </label>
+                          </li>
+                        );
+                      })}
                     </ul>
                     <Link href="/photo-guide" className="pqh-more">
                       撮影のコツを詳しく見る<Ic name="arrow" />
                     </Link>
                   </div>
                 </div>
+
+                <button type="button" className="item-delete-link" onClick={deleteCurrentItem}>
+                  この商品を削除
+                </button>
               </div>
             </div>
           )}
@@ -275,7 +626,10 @@ export default function CreateCasePage() {
               <p className="step-desc">この内容で出品します。送信するとAIが写真を解析して案件化し、登録業者へ公開されます。</p>
               <div className="form-card">
                 {[
-                  ["写真", `${files.length} 枚`],
+                  [
+                    "商品・写真",
+                    totalItemCount > 0 ? `商品 ${totalItemCount} 点 / 写真 ${totalPhotoCount} 枚` : `写真 ${totalPhotoCount} 枚`,
+                  ],
                   ["利用目的", purpose],
                   ["エリア", `${prefecture} ${city}`],
                   ["住所詳細", addressDetail || "（未入力）"],
@@ -285,6 +639,19 @@ export default function CreateCasePage() {
                   <div key={k} className="confirm-row"><span className="lbl">{k}</span><span className="val">{v}</span></div>
                 ))}
               </div>
+              {items.length > 0 && (
+                <div className="form-card">
+                  <p className="confirm-item-list-title">商品一覧</p>
+                  <ul className="confirm-item-list">
+                    {items.map((it, idx) => (
+                      <li key={it.id}>
+                        {it.name.trim() || `商品 ${idx + 1}`}
+                        <span className="confirm-item-list-count">{it.photos.length}枚</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <div className="hint-banner">
                 <Ic name="lock" className="hint-ic" />
                 <span>住所詳細・連絡先は業者決定まで開示されません。査定に回るのは写真・品目・利用目的・地域（都道府県・市区町村）・住居情報などの出品内容のみです。</span>
@@ -297,23 +664,31 @@ export default function CreateCasePage() {
       {/* flow-footer */}
       <div className="flow-footer">
         <div className="inner">
-          {step > 0 && (
-            <button type="button" className="btn-flow-back" onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={submitting}>
-              戻る
-            </button>
-          )}
-          {step < STEPS.length - 1 ? (
-            <button type="button" className="btn-flow-next" onClick={() => canNext() && setStep((s) => s + 1)} disabled={!canNext()}>
-              次へ<Ic name="arrow" />
+          {step === 0 && mode.kind === "shoot" ? (
+            <button type="button" className="btn-flow-next" onClick={exitShoot} disabled={!currentItem || currentItem.photos.length === 0}>
+              この商品の撮影を完了<Ic name="arrow" />
             </button>
           ) : (
-            <button type="button" className="btn-flow-next" onClick={submit} disabled={submitting}>
-              {submitting ? (
-                <><span className="spinning">↻</span> {progress || "送信中…"}</>
-              ) : (
-                <>この内容で依頼する<Ic name="arrow" /></>
+            <>
+              {step > 0 && (
+                <button type="button" className="btn-flow-back" onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={submitting}>
+                  戻る
+                </button>
               )}
-            </button>
+              {step < STEPS.length - 1 ? (
+                <button type="button" className="btn-flow-next" onClick={() => canNext() && setStep((s) => s + 1)} disabled={!canNext()}>
+                  次へ<Ic name="arrow" />
+                </button>
+              ) : (
+                <button type="button" className="btn-flow-next" onClick={submit} disabled={submitting}>
+                  {submitting ? (
+                    <><span className="spinning">↻</span> {progress || "送信中…"}</>
+                  ) : (
+                    <>この内容で依頼する<Ic name="arrow" /></>
+                  )}
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>

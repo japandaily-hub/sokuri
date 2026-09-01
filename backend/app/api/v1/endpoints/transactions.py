@@ -17,14 +17,12 @@ from sqlalchemy.orm import selectinload
 
 from app.api.deps import Actor, get_current_actor
 from app.db.models.bid import Bid
-from app.db.models.case import Case
+from app.db.models.case import Case, CaseItem
 from app.db.models.message import Message
 from app.db.models.transaction import Cancellation, Transaction
 from app.db.models.user import User
 from app.db.session import get_session
 from app.schemas_katadzuke import (
-    CaseMaskedOut,
-    CasePhotoOut,
     MessageCreateRequest,
     MessageOut,
     OperatorPublicOut,
@@ -39,6 +37,7 @@ from app.schemas_katadzuke import (
     TransactionOut,
 )
 from app.services import notify, notify_dispatch
+from app.services.case_view import build_case_masked_out
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +96,12 @@ async def list_transactions(
 
 _TXN_LOAD = (
     selectinload(Transaction.case).selectinload(Case.photos),
+    # items の eager load を忘れると成約詳細（CaseMaskedOut.items）参照時に
+    # MissingGreenlet(500)になる（build_case_masked_out が case.items /
+    # item.photos を同期的に参照するため）。
+    selectinload(Transaction.case)
+    .selectinload(Case.items)
+    .selectinload(CaseItem.photos),
     selectinload(Transaction.bid).selectinload(Bid.operator),
     selectinload(Transaction.reduction_requests),
     selectinload(Transaction.reviews),
@@ -105,7 +110,12 @@ _TXN_LOAD = (
 
 async def _get_txn(session: AsyncSession, txn_id: uuid.UUID) -> Transaction:
     txn = await session.scalar(
-        select(Transaction).where(Transaction.id == txn_id).options(*_TXN_LOAD)
+        select(Transaction)
+        .where(Transaction.id == txn_id)
+        .options(*_TXN_LOAD)
+        # populate_existing: cases.py/bids.py と同じ理由（identity map 上の
+        # 既ロードインスタンス再利用による関連コレクションの陳腐化防止）。
+        .execution_options(populate_existing=True)
     )
     if txn is None:
         raise HTTPException(
@@ -152,20 +162,7 @@ async def get_transaction(
     case = txn.case
     base = TransactionOut.model_validate(txn)
     out = TransactionDetailOut(**base.model_dump())
-    out.case = CaseMaskedOut(
-        id=case.id,
-        status=case.status,
-        purpose=case.purpose,
-        prefecture=case.prefecture,
-        city=case.city,
-        housing_type=case.housing_type,
-        floor_plan=case.floor_plan,
-        floor_number=case.floor_number,
-        has_elevator=case.has_elevator,
-        ai_summary=case.ai_summary,
-        created_at=case.created_at,
-        photos=[CasePhotoOut.model_validate(p) for p in case.photos],
-    )
+    out.case = build_case_masked_out(case)
     out.operator = OperatorPublicOut.model_validate(txn.bid.operator)
     out.reduction_requests = [ReductionOut.model_validate(r) for r in txn.reduction_requests]
     out.reviews = [ReviewOut.model_validate(r) for r in txn.reviews]

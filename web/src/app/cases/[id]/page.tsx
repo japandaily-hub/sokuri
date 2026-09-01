@@ -33,6 +33,7 @@ import {
   listBids,
   photoSrc,
   selectBid,
+  toAlbums,
   toDisplayMessage,
   type BidOut,
   type CaseOut,
@@ -142,20 +143,35 @@ export default function UserCaseDetailPage() {
           <StatusBadge value={caseData.status} label={CASE_STATUS_LABEL[caseData.status]} />
         </div>
 
-        {caseData.photos.length > 0 && (
-          <ul className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5">
-            {caseData.photos.map((p) => (
-              <li key={p.id}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={photoSrc(p.url)}
-                  alt=""
-                  className="aspect-square w-full rounded-xl border border-slate-200 object-cover"
-                />
-              </li>
-            ))}
-          </ul>
-        )}
+        {toAlbums(caseData).map((album) => (
+          <div key={album.id ?? "unassigned"} className="mt-4">
+            {album.title ? (
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-bold text-slate-900">{album.title}</p>
+                {album.aiCondition ? (
+                  <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
+                    {album.aiCondition}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+            {album.aiSummary ? (
+              <p className="mt-0.5 text-xs leading-relaxed text-slate-500">{album.aiSummary}</p>
+            ) : null}
+            <ul className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-5">
+              {album.photos.map((p) => (
+                <li key={p.id}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={photoSrc(p.url)}
+                    alt=""
+                    className="aspect-square w-full rounded-xl border border-slate-200 object-cover"
+                  />
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
 
         {caseData.ai_summary ? (
           <div className="mt-4 rounded-xl bg-slate-50 p-4">

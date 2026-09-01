@@ -62,6 +62,17 @@ export interface CasePhoto {
   sort_order: number;
 }
 
+/** 商品単位のアルバム（バックエンド並行実装中のため CaseOut/CaseMasked では optional）。 */
+export interface CaseItemOut {
+  id: string;
+  name: string | null;
+  sort_order: number;
+  ai_detected_name: string | null;
+  ai_condition: string | null;
+  ai_summary: string | null;
+  photos: CasePhoto[];
+}
+
 export interface CaseCreatePayload {
   purpose: string;
   prefecture: string;
@@ -71,6 +82,12 @@ export interface CaseCreatePayload {
   floor_plan?: string | null;
   floor_number?: number | null;
   has_elevator?: boolean | null;
+  /** 商品ごとにまとめる場合の内訳。既存の photos（フラット）と併用可（合計20枚まで）。 */
+  items?: {
+    name?: string;
+    sort_order: number;
+    photos: { storage_key: string; sort_order: number }[];
+  }[];
   photos: { storage_key: string; sort_order: number }[];
 }
 
@@ -90,6 +107,10 @@ export interface CaseOut {
   created_at: string;
   photos: CasePhoto[];
   bid_count: number;
+  /** バックエンド並行実装中のため optional。未対応の間は undefined のまま届く想定。 */
+  items?: CaseItemOut[];
+  item_count?: number;
+  photo_count?: number;
 }
 
 /** 業者向け案件（住所詳細マスク） */
@@ -113,6 +134,10 @@ export interface CaseMasked {
    * 未対応の間は undefined/null のまま届く想定で、フロントは「—」等にフォールバックする。
    */
   top_bid_amount?: number | null;
+  /** バックエンド並行実装中のため optional。未対応の間は undefined のまま届く想定。 */
+  items?: CaseItemOut[];
+  item_count?: number;
+  photo_count?: number;
 }
 
 export interface BidOut {
@@ -690,9 +715,14 @@ export async function uploadCasePhoto(
 
   let res: Response;
   try {
-    res = await fetch(`${apiBase()}${presign.upload_url}`, {
+    // presign.upload_url はバックエンドが返す絶対パス(/api/v1/upload/{key})で、
+    // apiBase() 自体に既に /api/v1 が含まれるため、単純連結すると /api/v1 が
+    // 二重になり404になる(本番で実際に再現・確認済みの既存バグ)。
+    // 同ファイルの photoSrc() が public_url に対して行っている補正と同じパターンで
+    // apiBase() 側の /api/v1 を先に取り除いてから連結する。
+    res = await fetch(`${apiBase().replace(/\/api\/v1$/, "")}${presign.upload_url}`, {
       method: "PUT",
-      headers: { "Content-Type": contentType },
+      headers: { "Content-Type": contentType, Authorization: `Bearer ${token}` },
       body: file,
     });
   } catch (e) {
@@ -965,6 +995,54 @@ export function toDisplayMessage(err: unknown, fallback?: string): string {
     return isPlaceholder ? (fallback ?? GENERIC_FALLBACK_MESSAGE) : detail;
   }
   return fallback ?? GENERIC_FALLBACK_MESSAGE;
+}
+
+/**
+ * 商品ごとのアルバム（画面表示用の正規化構造）。
+ * id === null は疑似アルバム（items に属さない写真の受け皿）を表す。
+ * title === null の場合、見出しを描画せず単一グリッドとして表示すること
+ * （items 無しのレガシー案件を現行と完全に同じ見た目にするための後方互換フラグ）。
+ */
+export type CaseAlbum = {
+  id: string | null;
+  title: string | null;
+  aiDetectedName?: string | null;
+  aiCondition?: string | null;
+  aiSummary?: string | null;
+  photos: CasePhoto[];
+};
+
+/**
+ * CaseOut/CaseMasked の items + photos（フラット）から表示用アルバム配列を組み立てる。
+ * - items を sort_order 順にアルバムへ変換（タイトルは 商品名 → ai_detected_name → "商品 N" の優先順）。
+ * - c.photos のうち、どの item にも属さない写真は末尾の疑似アルバムにまとめる。
+ * - items が空/undefined の場合、疑似アルバムの title は null になる
+ *   （見出しなしの単一グリッドとして描画され、レガシー案件の見た目を維持する）。
+ */
+export function toAlbums(c: { items?: CaseItemOut[]; photos: CasePhoto[] }): CaseAlbum[] {
+  const items = [...(c.items ?? [])].sort((a, b) => a.sort_order - b.sort_order);
+
+  const albums: CaseAlbum[] = items.map((item, i) => ({
+    id: item.id,
+    title: (item.name?.trim() || item.ai_detected_name?.trim() || `商品 ${i + 1}`),
+    aiDetectedName: item.ai_detected_name,
+    aiCondition: item.ai_condition,
+    aiSummary: item.ai_summary,
+    photos: item.photos,
+  }));
+
+  const assignedPhotoIds = new Set(items.flatMap((item) => item.photos.map((p) => p.id)));
+  const unassignedPhotos = c.photos.filter((p) => !assignedPhotoIds.has(p.id));
+
+  if (unassignedPhotos.length > 0) {
+    albums.push({
+      id: null,
+      title: albums.length > 0 ? "未分類の写真" : null,
+      photos: unassignedPhotos,
+    });
+  }
+
+  return albums;
 }
 
 export const CASE_STATUS_LABEL: Record<CaseStatus, string> = {

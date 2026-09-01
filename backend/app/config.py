@@ -98,6 +98,12 @@ class Settings(BaseSettings):
     # LINEログイン統合（IP軸・全リクエストカウント）の上限と窓。
     rl_line_ip_max: int = 20
     rl_line_window_sec: int = 900
+    # 案件作成（IP軸・アカウント軸とも全リクエストカウント）の上限と窓。
+    # AI解析(Gemini呼び出し)を伴うため、認証済みアカウントでも高頻度作成で
+    # コストが積み上がる（security review 指摘対応: コストDoS）。
+    rl_case_create_ip_max: int = 10
+    rl_case_create_account_max: int = 10
+    rl_case_create_window_sec: int = 3600
     # InMemoryRateLimitStore のキー数ハードキャップ（メモリ枯渇防止）。
     # 10000 → 100000 に引き上げ（security review Medium-1）。1バケット数十
     # バイト規模のため 100000 件でも数MBで収まり、ハードキャップ到達自体を
@@ -137,6 +143,8 @@ class Settings(BaseSettings):
         "rl_sensitive_account_max",
         "rl_signup_ip_max",
         "rl_line_ip_max",
+        "rl_case_create_ip_max",
+        "rl_case_create_account_max",
         mode="after",
     )
     @classmethod
@@ -151,6 +159,7 @@ class Settings(BaseSettings):
         "rl_sensitive_window_sec",
         "rl_signup_window_sec",
         "rl_line_window_sec",
+        "rl_case_create_window_sec",
         mode="after",
     )
     @classmethod

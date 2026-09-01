@@ -27,6 +27,7 @@ import {
   getCaseMasked,
   getOperatorProfile,
   photoSrc,
+  toAlbums,
   toDisplayMessage,
   type CaseMasked,
 } from "@/lib/katadzuke-api";
@@ -163,17 +164,25 @@ export default function OperatorCaseDetailPage() {
             <DisclosureNotice viewer="operator" disclosed={false} awaitingApproval={false} />
           </div>
 
-          {caseData.photos.length > 0 ? (
-            <div className="op-card">
-              <h2>お預かりしている写真</h2>
+          {toAlbums(caseData).map((album) => (
+            <div className="op-card" key={album.id ?? "unassigned"}>
+              {album.title ? (
+                <div className="op-album-head">
+                  <h2>{album.title}</h2>
+                  {album.aiCondition ? <span className="status-chip negotiating">{album.aiCondition}</span> : null}
+                </div>
+              ) : (
+                <h2>お預かりしている写真</h2>
+              )}
+              {album.aiSummary ? <p className="op-album-summary">{album.aiSummary}</p> : null}
               <div className="op-photo-grid">
-                {caseData.photos.map((p) => (
+                {album.photos.map((p) => (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={photoSrc(p.url)} alt="" key={p.id} />
                 ))}
               </div>
             </div>
-          ) : null}
+          ))}
 
           {caseData.ai_summary ? (
             <div className="op-card">

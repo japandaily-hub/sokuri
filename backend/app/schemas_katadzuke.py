@@ -7,7 +7,20 @@ import uuid
 from datetime import date, datetime, timedelta
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
+
+from app.core.limits import MAX_ITEMS_PER_CASE, MAX_PHOTOS_PER_CASE, MAX_PHOTOS_PER_ITEM
+from app.db.models.enums import ItemCondition
+from app.services.message_guard import contains_contact_info
+from app.services.text_sanitize import normalize_and_strip_control_chars
 
 # ──────────────────────────── 認証 ────────────────────────────
 
@@ -217,7 +230,10 @@ class OperatorLicenseImageUploadResponse(BaseModel):
 
 class CasePhotoIn(BaseModel):
     storage_key: str = Field(max_length=512)
-    sort_order: int = 0
+    # 上限1000は運用上ありえない極端な値（DoS/DB肥大化目的の乱数投入等）を
+    # 弾くための緩い上限（security review 指摘対応）。表示順の実用範囲は
+    # 高々 MAX_PHOTOS_PER_ITEM/MAX_PHOTOS_PER_CASE 程度のため十分な余裕がある。
+    sort_order: int = Field(default=0, ge=0, le=1000)
 
 
 class CasePhotoOut(BaseModel):
@@ -226,6 +242,62 @@ class CasePhotoOut(BaseModel):
     id: uuid.UUID
     url: str | None
     sort_order: int
+
+
+class CaseItemIn(BaseModel):
+    """案件作成時に指定する商品（アルバム）1件分の入力。"""
+
+    name: str | None = Field(default=None, max_length=64)
+    sort_order: int = 0
+    # 0枚（写真の紐づいていない商品アルバム）は成立しないユースケースのため
+    # min_length=1 を必須にする（security review 指摘対応）。
+    # 注意: Pydantic v2 はデフォルト値を検証しない(validate_default=False既定)ため、
+    # default_factory=list を残したままでは photos キー自体を省略した場合に
+    # min_length チェックをすり抜けて空リストが採用されてしまう(実装バグとして
+    # 最終レビューで発見)。デフォルトを設けず必須フィールドにすることで、
+    # 省略時も明示的な422(missing)にする。
+    photos: list[CasePhotoIn] = Field(min_length=1, max_length=MAX_PHOTOS_PER_ITEM)
+
+    @field_validator("name")
+    @classmethod
+    def _sanitize_name(cls, v: str | None) -> str | None:
+        """商品名（ユーザー自由入力）をサーバ側で無害化する（security review 指摘対応）。
+
+        - Unicode NFKC正規化 + 制御文字・双方向制御文字の除去
+          （summary.py の _safe_attr と同じロジックを text_sanitize.py に
+          共通化して再利用する）。
+        - プラットフォーム外への直接連絡を誘導する電話番号・メールアドレス・
+          URL の埋め込みは bids.py の入札メッセージと同様に拒否する
+          （既存の contains_contact_info() を適用）。
+        """
+        if v is None:
+            return None
+        text = normalize_and_strip_control_chars(v)
+        if not text:
+            return None
+        # Field(max_length=64) はNFKC正規化"前"の文字列に対して検証されるため、
+        # 正規化によって文字数が増える文字(例: "㍿"→"株式会社"で4倍)が含まれると
+        # 正規化後に64字を超えたままDB(String(64))へ保存され、切り詰めエラーに
+        # なりうる(最終レビューで発見)。正規化後に再度上限を適用する。
+        if len(text) > 64:
+            text = text[:64]
+        if contains_contact_info(text):
+            raise ValueError(
+                "商品名に電話番号・メールアドレス・URLは記載できません。"
+            )
+        return text
+
+
+class CaseItemOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str | None
+    sort_order: int
+    ai_detected_name: str | None
+    ai_condition: ItemCondition | None
+    ai_summary: str | None
+    photos: list[CasePhotoOut] = []
 
 
 class CaseCreateRequest(BaseModel):
@@ -237,7 +309,25 @@ class CaseCreateRequest(BaseModel):
     floor_plan: str | None = Field(default=None, max_length=32)
     floor_number: int | None = Field(default=None, ge=0, le=100)
     has_elevator: bool | None = None
-    photos: list[CasePhotoIn] = Field(default_factory=list, max_length=20)
+    # 未分類写真（商品グループに属さない写真）。既存クライアント向けに維持する。
+    photos: list[CasePhotoIn] = Field(default_factory=list, max_length=MAX_PHOTOS_PER_CASE)
+    # 商品ごとにグルーピングした写真。photos と併用可能（合計枚数は model_validator で検証）。
+    items: list[CaseItemIn] = Field(default_factory=list, max_length=MAX_ITEMS_PER_CASE)
+
+    @model_validator(mode="after")
+    def _validate_total_photo_count(self) -> "CaseCreateRequest":
+        """items 配下の全 photos + 直下の photos の合計が上限を超えないことを検証する。
+
+        items[].photos は max_length=MAX_PHOTOS_PER_ITEM で個別に制限済みだが、
+        商品数 × 商品ごとの上限を単純合算すると案件全体の上限（MAX_PHOTOS_PER_CASE）を
+        超えうるため、ここで合計値を別途検証する。
+        """
+        total = len(self.photos) + sum(len(item.photos) for item in self.items)
+        if total > MAX_PHOTOS_PER_CASE:
+            raise ValueError(
+                f"写真の合計枚数が上限（{MAX_PHOTOS_PER_CASE}枚）を超えています。"
+            )
+        return self
 
 
 class CaseOut(BaseModel):
@@ -258,6 +348,9 @@ class CaseOut(BaseModel):
     ai_summary: str | None
     created_at: datetime
     photos: list[CasePhotoOut] = []
+    items: list[CaseItemOut] = []
+    item_count: int = 0
+    photo_count: int = 0
     bid_count: int = 0
 
 
@@ -276,6 +369,9 @@ class CaseMaskedOut(BaseModel):
     ai_summary: str | None
     created_at: datetime
     photos: list[CasePhotoOut] = []
+    items: list[CaseItemOut] = []
+    item_count: int = 0
+    photo_count: int = 0
     bid_count: int = 0
     my_bid: BidOut | None = None
     top_bid_amount: int | None = None

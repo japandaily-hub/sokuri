@@ -71,6 +71,11 @@
 .op-ai-summary { font-size: 11px; font-weight: 700; letter-spacing: .06em; color: var(--body-soft); margin-bottom: 6px; }
 .op-ai-summary + p { font-size: 13.5px; color: var(--body); line-height: 1.8; }
 
+/* 案件詳細: 商品アルバムカード（見出し + AIコンディションチップ + 要約） */
+.op-album-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.op-album-head h2 { margin-bottom: 0; }
+.op-album-summary { font-size: 12.5px; color: var(--body-soft); line-height: 1.7; margin: 2px 0 10px; }
+
 /* 案件詳細 / 取引詳細: 写真グリッド */
 .op-photo-grid {
   display: grid;

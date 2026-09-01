@@ -95,6 +95,11 @@ export default function MyCasesPage() {
               </div>
               <p className="mt-3 text-sm font-semibold text-brand-700">
                 入札 {c.bid_count} 件
+                {c.item_count != null && c.item_count > 0
+                  ? ` ・ 商品 ${c.item_count} 点・写真 ${c.photo_count ?? c.photos.length} 枚`
+                  : c.photo_count != null
+                    ? ` ・ 写真 ${c.photo_count} 枚`
+                    : ""}
               </p>
             </Card>
           </a>
