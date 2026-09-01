@@ -33,16 +33,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  // 未構成（環境変数欠落）は再試行しても回復しないため link_failed とは別コードで返す。
   const appBaseUrl = getAppBaseUrl();
   if (!appBaseUrl) {
-    return NextResponse.redirect(new URL("/notifications?error=link_failed", req.url));
+    console.error(
+      "[line-link/start] APP_BASE_URL（および VERCEL_PROJECT_PRODUCTION_URL）が未設定のため連携を開始できません",
+    );
+    return NextResponse.redirect(new URL("/notifications?error=line_unavailable", req.url));
   }
 
   const redirectUri = lineLinkRedirectUri(appBaseUrl);
   const state = crypto.randomBytes(32).toString("hex");
   const authorizeUrl = buildLineAuthorizeUrl(state, redirectUri);
   if (!authorizeUrl) {
-    return NextResponse.redirect(new URL("/notifications?error=link_failed", req.url));
+    console.error("[line-link/start] LINE_CLIENT_ID が未設定のため連携を開始できません");
+    return NextResponse.redirect(new URL("/notifications?error=line_unavailable", req.url));
   }
 
   const reauthToken = req.nextUrl.searchParams.get("reauth_token");

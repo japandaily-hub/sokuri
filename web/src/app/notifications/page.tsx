@@ -19,8 +19,12 @@
  *    解除: DELETE /users/me/line-link に current_password を添えて直接呼ぶ。
  *  - has_password===false（LINE専用アカウント）: モーダルを挟まず直接 /api/line/link/start へ
  *    遷移。「連携を解除」は解除の術がないためdisabled + 案内表示。
- *  - /api/line/link/callback からの遷移で ?linked=1 / ?error=already_linked|reauth_required|link_failed
+ *  - /api/line/link/callback からの遷移で
+ *    ?linked=1 / ?error=already_linked|reauth_required|line_unavailable|link_failed
  *    が付く。読み取り後は router.replace でURLからクエリを消す。
+ *    line_unavailable は環境変数の設定漏れ等（フロントの APP_BASE_URL/LINE_CLIENT_ID、
+ *    バックエンドの LINE_CLIENT_ID）による「未構成」で、再試行しても回復しないため
+ *    link_failed（一時障害）とは別文言にする（2026-09-02）。
  */
 
 import { useCallback, useEffect, useRef, useState, Suspense } from "react";
@@ -145,6 +149,11 @@ function NotificationsContent() {
       setLineNotice({ tone: "error", text: "このLINEアカウントは既に別のアカウントと連携されています。" });
     } else if (err === "reauth_required") {
       setLineNotice({ tone: "error", text: "パスワード確認の有効期限が切れました。もう一度お試しください。" });
+    } else if (err === "line_unavailable") {
+      setLineNotice({
+        tone: "error",
+        text: "LINE連携は現在ご利用いただけません（設定準備中）。ご不便をおかけしますが、しばらくお待ちください。",
+      });
     } else if (err === "link_failed") {
       setLineNotice({ tone: "error", text: "LINE連携に失敗しました。時間をおいて再度お試しください。" });
     }

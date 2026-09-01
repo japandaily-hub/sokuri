@@ -35,6 +35,17 @@ function redirectWithCookiesCleared(req: NextRequest, query: string) {
   return res;
 }
 
+/**
+ * 失敗分岐をサーバーログに残してからリダイレクトする。
+ * ユーザーに見えるのは単一の「LINE連携に失敗しました」バナーのみで、どの段階で
+ * 落ちたのかを運用側から一切追跡できなかったため（2026-09-02の不具合調査で判明）、
+ * 分岐ごとの reason を必ず記録する。code/state/トークン等の秘匿値は出力しない。
+ */
+function failWithLog(req: NextRequest, reason: string, query = "?error=link_failed") {
+  console.error("[line-link/callback] 連携失敗: reason=%s", reason);
+  return redirectWithCookiesCleared(req, query);
+}
+
 export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams;
   const lineError = params.get("error");
@@ -45,30 +56,32 @@ export async function GET(req: NextRequest) {
   const reauthToken = req.cookies.get(LINE_LINK_REAUTH_COOKIE)?.value ?? null;
 
   // LINE側でユーザーが拒否した場合等、認可コード自体が発行されないケース。
-  if (lineError || !code || !returnedState || !storedState) {
-    return redirectWithCookiesCleared(req, "?error=link_failed");
-  }
+  if (lineError) return failWithLog(req, `line_error=${lineError}`);
+  if (!code) return failWithLog(req, "no_code");
+  if (!returnedState) return failWithLog(req, "no_state_param");
+  // state cookie 欠落は「別ブラウザで開いた / cookieが5分で失効した / SameSite阻害」を示す。
+  if (!storedState) return failWithLog(req, "no_state_cookie");
 
   // CSRF対策: state不一致（cookie未保持・改ざん・別セッションからの使い回し等）は即失敗させる。
   if (!isValidState(storedState, returnedState)) {
-    return redirectWithCookiesCleared(req, "?error=link_failed");
+    return failWithLog(req, "state_mismatch");
   }
 
   const session = await auth();
   if (!session?.accessToken) {
-    return redirectWithCookiesCleared(req, "?error=link_failed");
+    return failWithLog(req, "no_session");
   }
 
   const appBaseUrl = getAppBaseUrl();
   if (!appBaseUrl) {
-    return redirectWithCookiesCleared(req, "?error=link_failed");
+    return failWithLog(req, "no_app_base_url", "?error=line_unavailable");
   }
 
   // start側と完全に同じ redirect_uri でないとLINE側のトークン交換が失敗するため、同じ組み立て関数を使う。
   const redirectUri = lineLinkRedirectUri(appBaseUrl);
   const lineAccessToken = await exchangeLineCodeForAccessToken(code, redirectUri);
   if (!lineAccessToken) {
-    return redirectWithCookiesCleared(req, "?error=link_failed");
+    return failWithLog(req, "token_exchange_failed");
   }
 
   const result = await linkLineToCurrentUser(session.accessToken, lineAccessToken, reauthToken);
@@ -79,7 +92,9 @@ export async function GET(req: NextRequest) {
       return redirectWithCookiesCleared(req, "?error=already_linked");
     case "reauth_required":
       return redirectWithCookiesCleared(req, "?error=reauth_required");
+    case "unavailable":
+      return failWithLog(req, "backend_line_not_configured", "?error=line_unavailable");
     default:
-      return redirectWithCookiesCleared(req, "?error=link_failed");
+      return failWithLog(req, "backend_exchange_failed");
   }
 }

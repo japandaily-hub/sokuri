@@ -22,12 +22,31 @@ export const LINE_LINK_REAUTH_COOKIE = "kdz_line_link_reauth";
  * アプリの公開ベースURL（末尾スラッシュなし）。
  * LINEのredirect_uriはLINE Developers Console側に事前登録した固定値と完全一致させる必要があるため、
  * リクエストのHostヘッダ（偽装可能）ではなく環境変数から組み立てる。
- * 未設定時は null を返し、呼び出し側で link_failed 扱いにする（fail-safe）。
+ *
+ * 優先順位:
+ *   1. APP_BASE_URL（正本。カスタムドメイン運用時は必ずこちらを設定する）
+ *   2. VERCEL_PROJECT_PRODUCTION_URL（Vercelのシステム環境変数。プレビュー環境でも
+ *      常に「本番ドメイン」を返す固定値で、Hostヘッダ由来ではないため偽装できない）
+ * どちらも無ければ null を返し、呼び出し側で「未構成」として扱う（fail-safe）。
+ *
+ * 2. にフォールバックした場合は警告ログを残す。APP_BASE_URL の設定漏れは
+ * 「LINE連携が無言で失敗し続ける」形でしか表面化しなかったため（2026-09-02の不具合）、
+ * サーバーログで気付けるようにする。
  */
 export function getAppBaseUrl(): string | null {
-  const url = process.env.APP_BASE_URL;
-  if (!url) return null;
-  return url.replace(/\/$/, "");
+  const explicit = process.env.APP_BASE_URL;
+  if (explicit) return explicit.replace(/\/$/, "");
+
+  const vercelProdHost = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  if (vercelProdHost) {
+    console.warn(
+      "[line-link] APP_BASE_URL が未設定のため VERCEL_PROJECT_PRODUCTION_URL にフォールバックしました。" +
+        " LINE Developers Console の Callback URL と一致しているか確認してください: host=%s",
+      vercelProdHost,
+    );
+    return `https://${vercelProdHost.replace(/\/$/, "")}`;
+  }
+  return null;
 }
 
 /** LINE連携コールバックのredirect_uri（start/callback 両方で同一値を使う必要がある）。 */
@@ -59,7 +78,10 @@ export async function exchangeLineCodeForAccessToken(
 ): Promise<string | null> {
   const clientId = process.env.LINE_CLIENT_ID;
   const clientSecret = process.env.LINE_CLIENT_SECRET;
-  if (!clientId || !clientSecret) return null;
+  if (!clientId || !clientSecret) {
+    console.error("[line-link] token交換不可: LINE_CLIENT_ID / LINE_CLIENT_SECRET が未設定です");
+    return null;
+  }
 
   try {
     const res = await fetch(LINE_TOKEN_URL, {
@@ -73,10 +95,26 @@ export async function exchangeLineCodeForAccessToken(
         client_secret: clientSecret,
       }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // LINE側のエラーは原因特定に直結する（invalid_grant=code再利用/期限切れ、
+      // invalid_request=redirect_uri不一致 等）。認可コード自体は残さない。
+      const body = await res.text().catch(() => "");
+      console.error(
+        "[line-link] LINE token交換に失敗: status=%s redirect_uri=%s body=%s",
+        res.status,
+        redirectUri,
+        body.slice(0, 500),
+      );
+      return null;
+    }
     const data = (await res.json()) as { access_token?: unknown };
-    return typeof data.access_token === "string" ? data.access_token : null;
-  } catch {
+    if (typeof data.access_token !== "string") {
+      console.error("[line-link] LINE token応答に access_token が含まれていません");
+      return null;
+    }
+    return data.access_token;
+  } catch (e) {
+    console.error("[line-link] LINE token交換で例外: %s", e);
     return null;
   }
 }
@@ -93,6 +131,8 @@ export type LineExchangeResult =
   | { outcome: "linked" }
   | { outcome: "already_linked" }
   | { outcome: "reauth_required" }
+  /** バックエンドがLINE機能を未構成として拒否（503）。再試行しても回復しない。 */
+  | { outcome: "unavailable" }
   | { outcome: "failed" };
 
 /**
@@ -120,8 +160,24 @@ export async function linkLineToCurrentUser(
     if (res.status === 200) return { outcome: "linked" };
     if (res.status === 409) return { outcome: "already_linked" };
     if (res.status === 401) return { outcome: "reauth_required" };
+    // 503 = バックエンドの LINE_CLIENT_ID 未設定（_LINE_NOT_CONFIGURED）。
+    // 「時間をおいて再試行」では永久に回復しないため、failed と区別して扱う。
+    if (res.status === 503) {
+      console.error(
+        "[line-link] バックエンドがLINE未構成のため連携を拒否（503）。" +
+          " Render の環境変数 LINE_CLIENT_ID を設定してください。",
+      );
+      return { outcome: "unavailable" };
+    }
+    const body = await res.text().catch(() => "");
+    console.error(
+      "[line-link] /auth/line/exchange が想定外の応答: status=%s body=%s",
+      res.status,
+      body.slice(0, 500),
+    );
     return { outcome: "failed" };
-  } catch {
+  } catch (e) {
+    console.error("[line-link] /auth/line/exchange の呼び出しで例外: %s", e);
     return { outcome: "failed" };
   }
 }
