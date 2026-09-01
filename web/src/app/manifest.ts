@@ -26,13 +26,13 @@ export default function manifest(): MetadataRoute.Manifest {
     categories: ["shopping", "lifestyle", "utilities"],
     icons: [
       {
-        src: "/icon",
+        src: "/icon.png",
         sizes: "32x32",
         type: "image/png",
       },
       {
-        src: "/opengraph-image",
-        sizes: "1200x630",
+        src: "/apple-icon.png",
+        sizes: "180x180",
         type: "image/png",
         purpose: "any",
       },

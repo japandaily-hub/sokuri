@@ -1,9 +1,10 @@
 /**
  * カタヅケ ロゴ（ワードマーク）。
- * ハンドオフは logo-katazuke.png を参照するが実アセット未投入のため、
- * 角丸ブランドマーク（ハウス）＋見出しフォントのワードマークで自給する。
- * 実ロゴ確定後は本コンポーネントを差し替えるだけでよい。
+ * 正規アセット logo-katazuke.png（web/public/、house型ブランドマーク+ワードマーク、
+ * 1100x307・透過PNG）を使用する。white variant はダーク背景向けに白一色反転。
  */
+const LOGO_ASPECT = 1100 / 307;
+
 export function KdzLogo({
   variant = "brand",
   size = 22,
@@ -14,39 +15,24 @@ export function KdzLogo({
   className?: string;
 }) {
   const white = variant === "white";
-  const mark = Math.round(size * 1.45);
+  // size はワードマークのテキスト相当の視覚サイズに合わせる（旧実装のフォントサイズ22=標準）。
+  const height = Math.round(size * 1.45);
+  const width = Math.round(height * LOGO_ASPECT);
   return (
-    <span className={`inline-flex items-center gap-2 ${className}`.trim()} aria-label="カタヅケ">
-      <span
-        aria-hidden="true"
+    <span className={`inline-flex items-center ${className}`.trim()} aria-label="カタヅケ">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/logo-katazuke.png"
+        alt="カタヅケ"
+        width={width}
+        height={height}
         style={{
-          width: mark,
-          height: mark,
-          borderRadius: Math.round(mark * 0.28),
-          background: white ? "rgba(255,255,255,.16)" : "var(--blue)",
-          color: "#fff",
-          display: "grid",
-          placeItems: "center",
-          flex: "none",
-          boxShadow: white ? "none" : "0 6px 14px -6px rgba(31,84,222,.6)",
+          width,
+          height,
+          display: "block",
+          filter: white ? "brightness(0) invert(1)" : "none",
         }}
-      >
-        <svg className="ic" style={{ fontSize: Math.round(size * 0.92), strokeWidth: 2 }} aria-hidden="true">
-          <use href="#i-house" />
-        </svg>
-      </span>
-      <span
-        style={{
-          fontFamily: "var(--head)",
-          fontWeight: 900,
-          fontSize: size,
-          letterSpacing: "-.01em",
-          lineHeight: 1,
-          color: white ? "#fff" : "var(--navy)",
-        }}
-      >
-        カタヅケ
-      </span>
+      />
     </span>
   );
 }
