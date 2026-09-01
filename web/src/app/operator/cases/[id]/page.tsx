@@ -240,7 +240,7 @@ export default function OperatorCaseDetailPage() {
                     id="bidAmount"
                     type="number"
                     required
-                    min={1}
+                    min={1000}
                     step={1000}
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}

@@ -23,7 +23,14 @@ os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{(_HERE / 'e2e_local.db').as_
 os.environ.setdefault("APP_ENV", "development")
 os.environ.setdefault("ADMIN_EMAILS", "e2e-admin@example.com")
 os.environ.setdefault("FRONTEND_BASE_URL", "http://localhost:3100")
-os.environ.setdefault("ALLOWED_ORIGINS", "http://localhost:3100,http://localhost:3000")
+os.environ.setdefault(
+    "ALLOWED_ORIGINS",
+    # 3100=ユーザー向け, 3101=業者向け（.claude/launch.json の katazuke-web-vendor）。
+    # 業者側を含めずに動かすと /operator/cases 等のGETがCORSプリフライトで
+    # 400→net::ERR_FAILEDとなり「通信に失敗しました」表示になる（本番はどちらも
+    # 同一オリジンsokuri.vercel.appのためこの分割は発生しない、ローカル専用の考慮）。
+    "http://localhost:3100,http://localhost:3101,http://localhost:3000",
+)
 if not os.environ.get("APP_ENCRYPTION_KEY"):
     from cryptography.fernet import Fernet
 
