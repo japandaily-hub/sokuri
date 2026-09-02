@@ -137,6 +137,33 @@ export default function UserCaseDetailPage() {
     }
   }
 
+  /** 編集内容を破棄し、AI推定値（ai_condition/ai_summary）へ戻す。商品名は変更しない。 */
+  async function resetEditItemToAi(item: CaseItemOut) {
+    if (!token || isItemBusy(item.id)) return;
+    if (!window.confirm("状態・説明の編集内容を破棄して、AIの推定値に戻しますか？")) return;
+    const key = `item:${item.id}:reset`;
+    beginOp(key);
+    setEditError(null);
+    try {
+      await updateCaseItem(
+        caseId,
+        item.id,
+        {
+          name: editName.trim() || null,
+          user_condition: null,
+          user_description: null,
+        },
+        token,
+      );
+      await reload();
+      setEditingItemId(null);
+    } catch (e) {
+      setEditError(toDisplayMessage(e, "リセットに失敗しました"));
+    } finally {
+      endOp(key);
+    }
+  }
+
   async function handleDeleteItem(item: CaseItemOut) {
     if (!token || isItemBusy(item.id)) return;
     if (!window.confirm("この商品を削除しますか？紐づく写真も削除されます。")) return;
@@ -304,9 +331,12 @@ export default function UserCaseDetailPage() {
           const item = album.id ? (caseData.items?.find((it) => it.id === album.id) ?? null) : null;
           const isEditing = item != null && editingItemId === item.id;
           const isSavingItem = item != null && busyOps.has(`item:${item.id}:save`);
+          const isResettingItem = item != null && busyOps.has(`item:${item.id}:reset`);
           const isDeletingItem = item != null && busyOps.has(`item:${item.id}:delete`);
           const isUploadingItem = item != null && busyOps.has(`item:${item.id}:upload`);
           const itemAnyBusy = item != null && isItemBusy(item.id);
+          // AI推定値そのものが無ければ「AI推定に戻す」を出しても戻す先が無いため無効化する。
+          const hasAiFallback = item != null && (item.ai_condition != null || item.ai_summary != null);
 
           return (
             <div key={album.id ?? "unassigned"} className="mt-4">
@@ -376,10 +406,10 @@ export default function UserCaseDetailPage() {
                       className={inputBase}
                     />
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      disabled={isSavingItem}
+                      disabled={isSavingItem || isResettingItem}
                       onClick={() => saveEditItem(item)}
                       className={btnPrimary}
                     >
@@ -387,12 +417,22 @@ export default function UserCaseDetailPage() {
                     </button>
                     <button
                       type="button"
-                      disabled={isSavingItem}
+                      disabled={isSavingItem || isResettingItem}
                       onClick={cancelEditItem}
                       className={btnSecondary}
                     >
                       キャンセル
                     </button>
+                    {hasAiFallback ? (
+                      <button
+                        type="button"
+                        disabled={isSavingItem || isResettingItem}
+                        onClick={() => resetEditItemToAi(item)}
+                        className="inline-flex items-center text-sm font-semibold text-slate-500 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {isResettingItem ? "リセット中…" : "AI推定に戻す"}
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               ) : null}

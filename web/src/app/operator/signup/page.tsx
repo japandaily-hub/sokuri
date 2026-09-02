@@ -25,14 +25,33 @@ export default function OperatorSignupPage() {
   const [inviteCode, setInviteCode] = useState("");
   const [company, setCompany] = useState("");
   const [license, setLicense] = useState("");
+  const [licenseError, setLicenseError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [agree, setAgree] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  /** 古物商許可番号は個人・法人問わず必須（backend OperatorSignupRequest.license_number: min_length=5）。 */
+  const LICENSE_MIN_LENGTH = 5;
+
+  function validateLicense(): boolean {
+    const trimmed = license.trim();
+    if (trimmed.length === 0) {
+      setLicenseError("古物商許可番号を入力してください。");
+      return false;
+    }
+    if (trimmed.length < LICENSE_MIN_LENGTH) {
+      setLicenseError(`古物商許可番号は${LICENSE_MIN_LENGTH}文字以上で入力してください。`);
+      return false;
+    }
+    setLicenseError(null);
+    return true;
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!validateLicense()) return;
     if (!agree) {
       setError("利用規約・プライバシーポリシーへの同意が必要です。");
       return;
@@ -45,7 +64,7 @@ export default function OperatorSignupPage() {
         company_name: company,
         email,
         password,
-        license_number: license || undefined,
+        license_number: license.trim(),
         agreed: agree,
       });
       const res = await signIn("operator-credentials", { email, password, redirect: false });
@@ -123,10 +142,17 @@ export default function OperatorSignupPage() {
                   placeholder="株式会社〇〇リユース"
                 />
               </Field>
-              <Field label="古物商許可番号" htmlFor="op-license" rightSlot={<span style={{ fontSize: 11.5, color: "var(--body-soft)" }}>任意</span>}>
+              <Field
+                label="古物商許可番号"
+                htmlFor="op-license"
+                rightSlot={<span className="req">必須</span>}
+                error={licenseError}
+              >
                 <input
                   id="op-license"
                   type="text"
+                  required
+                  minLength={LICENSE_MIN_LENGTH}
                   value={license}
                   onChange={(e) => setLicense(e.target.value)}
                   placeholder="東京都公安委員会 第XXXXXXXXXX号"

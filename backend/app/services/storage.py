@@ -85,6 +85,22 @@ def file_path(storage_key: str) -> Path | None:
     return path if path.is_file() else None
 
 
+def mask_key_for_log(storage_key: str) -> str:
+    """ログ出力用に storage_key を丸める（先頭8文字＋"..."）。
+
+    security review 指摘対応（L-2）: ``GET /files/{storage_key}`` は無認証の
+    capability URL（storage_key を知っていれば誰でも画像本体を取得できる）
+    のため、storage_key を平文でログに残すと、本来アプリケーションの認可
+    チェックを経ないと閲覧できないはずの写真へ、ログ閲覧権限者がそのまま
+    アクセスできてしまう。先頭8文字（当該32文字hexの約1/4）のみを残すことで、
+    ログ相関（同一キーの追跡）に必要な最低限の情報は保ちつつ、丸めた文字列
+    単体からの総当たり再構成コストを引き上げる。
+    """
+    if not storage_key:
+        return storage_key
+    return f"{storage_key[:8]}..."
+
+
 def delete_bytes(storage_key: str) -> None:
     """保存済みファイルを削除する（冪等・ベストエフォート）。
 
@@ -97,7 +113,10 @@ def delete_bytes(storage_key: str) -> None:
     ストレージ削除の失敗で API レスポンス自体を失敗させない設計）。
     """
     if not is_valid_key(storage_key):
-        logger.warning("storage.delete_bytes: 不正な storage_key を無視 - %s", storage_key)
+        logger.warning(
+            "storage.delete_bytes: 不正な storage_key を無視 - %s",
+            mask_key_for_log(storage_key),
+        )
         return
     path = _storage_root() / storage_key
     try:
@@ -105,7 +124,7 @@ def delete_bytes(storage_key: str) -> None:
     except OSError as exc:
         logger.warning(
             "storage.delete_bytes: ファイル削除に失敗（無視して続行） - key=%s error=%s",
-            storage_key,
+            mask_key_for_log(storage_key),
             exc,
         )
 

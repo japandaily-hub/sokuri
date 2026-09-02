@@ -360,6 +360,40 @@ async def test_update_item_422_description_too_long(client: AsyncClient):
     assert r.status_code == 422
 
 
+async def test_update_item_422_invalid_user_condition_japanese_message(
+    client: AsyncClient,
+):
+    """user_condition に不正な文字列を送ると422になり、Pydantic既定の英語文言
+    ではなく日本語メッセージが返る（QA指摘対応・Low#5/Low#6）。"""
+    token = await _signup_user(client)
+    case_id, item_id, _ = await _create_case_with_item(client, token)
+
+    r = await client.put(
+        f"/api/v1/cases/{case_id}/items/{item_id}",
+        json={"user_condition": "excellent"},  # ItemCondition に存在しない値
+        headers=_auth(token),
+    )
+    assert r.status_code == 422
+    detail = r.json()["detail"]
+    messages = [err["msg"] for err in detail]
+    assert any("new/like_new/good/fair/poor/unknown" in msg for msg in messages)
+    assert not any("valid" in msg.lower() and "enum" in msg.lower() for msg in messages)
+
+
+async def test_update_item_422_extra_field_rejected(client: AsyncClient):
+    """未知フィールドは extra="forbid" により422で拒否される
+    （security review 指摘対応・L-3: スキーマ更新漏れの静かな退行防止）。"""
+    token = await _signup_user(client)
+    case_id, item_id, _ = await _create_case_with_item(client, token)
+
+    r = await client.put(
+        f"/api/v1/cases/{case_id}/items/{item_id}",
+        json={"name": "商品", "ai_condition": "new"},  # AI推定値は編集不可のはずのフィールド
+        headers=_auth(token),
+    )
+    assert r.status_code == 422
+
+
 # ──────────────────────────── DELETE /cases/{case_id}/items/{item_id} ────────────────────────────
 
 

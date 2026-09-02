@@ -318,6 +318,12 @@ class CaseItemUpdateRequest(BaseModel):
     """商品(CaseItem)情報のユーザー編集。単純なPUT方式（exclude_unsetは使わず、
     送られたフィールドをそのまま代入する。null を明示送信すればクリアされる）。"""
 
+    # extra="forbid"（security review 指摘対応・L-3）: 将来 CaseItem にフィールドを
+    # 追加した際、本スキーマの更新を忘れても未知フィールドが黙って無視される
+    # （＝更新されるべきなのに更新されない静かな退行）ことを防ぐ。未知フィールドは
+    # 422 で明示的に拒否し、スキーマの更新漏れに気づけるようにする。
+    model_config = ConfigDict(extra="forbid")
+
     name: str | None = Field(default=None, max_length=64)
     user_condition: ItemCondition | None = None
     user_description: str | None = Field(default=None, max_length=500)
@@ -331,6 +337,21 @@ class CaseItemUpdateRequest(BaseModel):
     @classmethod
     def _sanitize_user_description(cls, v: str | None) -> str | None:
         return _sanitize_free_text(v, max_length=500, field_label="商品の説明")
+
+    @field_validator("user_condition", mode="before")
+    @classmethod
+    def _validate_user_condition(cls, v: object) -> object:
+        """不正な値の場合、Pydantic既定の英語メッセージではなく日本語メッセージ
+        に変換する（QA指摘対応・Low#5）。mode="before" で型強制（Enum変換）より
+        前に検証することで、既定の英語エラーメッセージが先に確定するのを防ぐ。
+        """
+        if v is None or isinstance(v, ItemCondition):
+            return v
+        valid_values = {c.value for c in ItemCondition}
+        if v not in valid_values:
+            allowed = "/".join(c.value for c in ItemCondition)
+            raise ValueError(f"状態は {allowed} のいずれかを指定してください。")
+        return v
 
 
 class CaseCreateRequest(BaseModel):

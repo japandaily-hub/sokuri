@@ -128,10 +128,12 @@ async def _delete_storage_if_unreferenced(session: AsyncSession, storage_key: st
         select(func.count()).select_from(CasePhoto).where(CasePhoto.storage_key == storage_key)
     )
     if remaining:
+        # security review 指摘対応（L-2）: storage_key は無認証capability
+        # （GET /files/{storage_key}）のため平文でログに残さない（丸めてログ相関のみ可能にする）。
         logger.info(
             "storage.delete_bytes をスキップ（他の写真行が同じ storage_key を参照中） - "
             "key=%s remaining=%s",
-            storage_key,
+            storage.mask_key_for_log(storage_key),
             remaining,
         )
         return
@@ -140,7 +142,7 @@ async def _delete_storage_if_unreferenced(session: AsyncSession, storage_key: st
     except Exception:  # noqa: BLE001 - ベストエフォート削除。失敗してもAPI応答自体は成功のまま返す。
         logger.warning(
             "_delete_storage_if_unreferenced: ストレージ削除に失敗（無視して続行） - key=%s",
-            storage_key,
+            storage.mask_key_for_log(storage_key),
             exc_info=True,
         )
 
