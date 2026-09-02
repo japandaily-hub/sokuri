@@ -13,6 +13,7 @@ from app.api.v1.endpoints.admin import router as admin_router
 from app.api.v1.endpoints.analyze import router as analyze_router
 from app.api.v1.endpoints.auth import router as auth_router
 from app.api.v1.endpoints.bids import router as bids_router
+from app.api.v1.endpoints.case_items import router as case_items_router
 from app.api.v1.endpoints.case_photos import router as case_photos_router
 from app.api.v1.endpoints.cases import router as cases_router
 from app.api.v1.endpoints.estimate import router as estimate_router
@@ -34,6 +35,7 @@ api_router.include_router(auth_router, tags=["Auth"])
 api_router.include_router(operator_applications_router, tags=["OperatorApplications"])
 api_router.include_router(case_photos_router, tags=["Photos"])
 api_router.include_router(cases_router, tags=["Cases"])
+api_router.include_router(case_items_router, tags=["CaseItems"])
 api_router.include_router(bids_router, tags=["Bids"])
 api_router.include_router(transactions_router, tags=["Transactions"])
 api_router.include_router(users_router, tags=["account"])

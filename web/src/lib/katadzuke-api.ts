@@ -70,7 +70,18 @@ export interface CaseItemOut {
   ai_detected_name: string | null;
   ai_condition: string | null;
   ai_summary: string | null;
+  /** ユーザーが編集した状態（未編集時は null。表示上の実効値は ai_condition にフォールバックする）。 */
+  user_condition: string | null;
+  /** ユーザーが編集した説明文（未編集時は null。表示上の実効値は ai_summary にフォールバックする）。 */
+  user_description: string | null;
   photos: CasePhoto[];
+}
+
+/** PUT /cases/{case_id}/items/{item_id} のリクエストボディ。いずれも null で未設定に戻せる。 */
+export interface CaseItemUpdatePayload {
+  name: string | null;
+  user_condition: string | null;
+  user_description: string | null;
 }
 
 export interface CaseCreatePayload {
@@ -768,6 +779,44 @@ export function getCaseMasked(caseId: string, token: string): Promise<CaseMasked
 }
 
 // ---------------------------------------------------------------------------
+// 案件の商品・写真編集（case.status が draft/open の間のみ許可。それ以外は409）
+// ---------------------------------------------------------------------------
+
+export function updateCaseItem(
+  caseId: string,
+  itemId: string,
+  payload: CaseItemUpdatePayload,
+  token: string,
+): Promise<CaseItemOut> {
+  return request(`/cases/${caseId}/items/${itemId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+    token,
+  });
+}
+
+export function deleteCaseItem(caseId: string, itemId: string, token: string): Promise<void> {
+  return request(`/cases/${caseId}/items/${itemId}`, { method: "DELETE", token });
+}
+
+export function deleteCasePhoto(caseId: string, photoId: string, token: string): Promise<void> {
+  return request(`/cases/${caseId}/photos/${photoId}`, { method: "DELETE", token });
+}
+
+export function addCaseItemPhoto(
+  caseId: string,
+  itemId: string,
+  payload: { storage_key: string; sort_order: number },
+  token: string,
+): Promise<CasePhoto> {
+  return request(`/cases/${caseId}/items/${itemId}/photos`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+    token,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // 入札
 // ---------------------------------------------------------------------------
 
@@ -1009,6 +1058,10 @@ export type CaseAlbum = {
   aiDetectedName?: string | null;
   aiCondition?: string | null;
   aiSummary?: string | null;
+  /** 表示用の実効値（user_condition ?? ai_condition）。ユーザー編集を優先して見せる。 */
+  condition?: string | null;
+  /** 表示用の実効値（user_description ?? ai_summary）。ユーザー編集を優先して見せる。 */
+  description?: string | null;
   photos: CasePhoto[];
 };
 
@@ -1028,6 +1081,8 @@ export function toAlbums(c: { items?: CaseItemOut[]; photos: CasePhoto[] }): Cas
     aiDetectedName: item.ai_detected_name,
     aiCondition: item.ai_condition,
     aiSummary: item.ai_summary,
+    condition: item.user_condition ?? item.ai_condition,
+    description: item.user_description ?? item.ai_summary,
     photos: item.photos,
   }));
 
@@ -1051,6 +1106,16 @@ export const CASE_STATUS_LABEL: Record<CaseStatus, string> = {
   bidding: "入札あり",
   closed: "業者決定済み",
   cancelled: "キャンセル",
+};
+
+/** ItemCondition（商品の状態タグ）の表示ラベル。編集フォームのセレクト選択肢もこのキー順で生成する。 */
+export const CASE_ITEM_CONDITION_LABEL: Record<string, string> = {
+  new: "新品",
+  like_new: "ほぼ新品",
+  good: "良好",
+  fair: "使用感あり",
+  poor: "傷み・破損あり",
+  unknown: "不明",
 };
 
 export const TXN_STATUS_LABEL: Record<TransactionStatus, string> = {

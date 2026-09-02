@@ -122,6 +122,11 @@ class CaseItem(Base, TimestampMixin):
     # Railway デプロイ障害が起きた記録があるため、ネイティブ ENUM 型は作らない。
     ai_condition: Mapped[ItemCondition | None] = mapped_column(pg_enum(ItemCondition))
     ai_summary: Mapped[str | None] = mapped_column(Text)
+    # ユーザーが自ら編集したコンディション/説明。ai_condition/ai_summary（AI推定値）
+    # とは別カラムで持ち、AI推定を上書き消去しない（ユーザー編集後もAI推定結果を
+    # 保持し続けるための分離。同じ pg_enum(native_enum=False) を踏襲する）。
+    user_condition: Mapped[ItemCondition | None] = mapped_column(pg_enum(ItemCondition))
+    user_description: Mapped[str | None] = mapped_column(Text)
 
     case: Mapped[Case] = relationship(back_populates="items")
     # foreign_keys を case_item_id のみに限定する: case_photos.case_id は
@@ -165,7 +170,14 @@ class CasePhoto(Base, TimestampMixin):
         Uuid, ForeignKey("cases.id", ondelete="CASCADE"), nullable=False, index=True
     )
     case_item_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
-    storage_key: Mapped[str] = mapped_column(String(512), nullable=False)
+    # UNIQUE制約（security review 指摘対応・H-1）: storage_key は「実ファイルが
+    # 存在する」ことの検証にのみ使われ、所有者チェックを一切伴わない
+    # （presign は認証済みユーザーなら誰でも新規キーを発行できる設計）。
+    # UNIQUE制約が無いと、他人の案件の storage_key（案件一覧等から収集可能）を
+    # 自分の商品に「追加」でき、その後自分の案件からその写真を「削除」すると
+    # 他人の実ファイルが物理削除されてしまう（クロステナントでの写真破壊）。
+    # 1つの実ファイルは常に高々1つの CasePhoto 行にのみ紐づく不変条件をDB制約で強制する。
+    storage_key: Mapped[str] = mapped_column(String(512), nullable=False, unique=True)
     url: Mapped[str | None] = mapped_column(String(2048))
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 

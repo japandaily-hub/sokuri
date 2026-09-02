@@ -13,6 +13,7 @@ import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -222,7 +223,18 @@ async def create_case(
         case.ai_summary = f"利用目的: {case.purpose}。写真 {total_photo_count} 枚。"
 
     session.add(case)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        # case_photos.storage_key の DB UNIQUE制約違反（security review 指摘対応・H-1、
+        # case_items.py の add_case_item_photo と同じ多層防御）。他人が既にアップロード
+        # 済みの storage_key を新規案件作成時に流用しようとした場合もここで一律拒否する
+        # （素通しで500になるのを防ぐ）。
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="指定された写真の一部は既に別の案件で使用されています。presign からやり直してください。",
+        ) from exc
     # session.refresh(case, attribute_names=["items"]) だけでは CaseItem.photos が
     # ネストしてeager loadされず、商品の写真が0枚のケースで応答シリアライズ時に
     # 未ロードのlazy loadが走りMissingGreenlet(500)になる（items内のphotosが1枚以上

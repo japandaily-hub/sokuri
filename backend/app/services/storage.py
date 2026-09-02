@@ -8,11 +8,14 @@ R2 / S3 へ移行する場合は presign_upload() の返却 URL を差し替え�
 
 from __future__ import annotations
 
+import logging
 import re
 import uuid
 from pathlib import Path
 
 from app.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 _KEY_RE = re.compile(r"^[a-f0-9]{32}\.(jpg|jpeg|png|webp)$")
 
@@ -80,6 +83,31 @@ def file_path(storage_key: str) -> Path | None:
         return None
     path = _storage_root() / storage_key
     return path if path.is_file() else None
+
+
+def delete_bytes(storage_key: str) -> None:
+    """保存済みファイルを削除する（冪等・ベストエフォート）。
+
+    不正な storage_key（``is_valid_key`` に反する形式）は無視する
+    （パストラバーサル等の危険な入力をそのまま Path 結合しないため）。
+    存在しないファイルはエラーにしない（既に削除済み・未アップロードの
+    ケースも呼び出し元がエラーハンドリングなしで安全に呼べるようにする）。
+    OSError（権限不足・I/Oエラー等）は warning ログの記録に留め、例外は
+    投げない（DB側の削除（コミット）は既に完了している前提で呼ばれるため、
+    ストレージ削除の失敗で API レスポンス自体を失敗させない設計）。
+    """
+    if not is_valid_key(storage_key):
+        logger.warning("storage.delete_bytes: 不正な storage_key を無視 - %s", storage_key)
+        return
+    path = _storage_root() / storage_key
+    try:
+        path.unlink(missing_ok=True)
+    except OSError as exc:
+        logger.warning(
+            "storage.delete_bytes: ファイル削除に失敗（無視して続行） - key=%s error=%s",
+            storage_key,
+            exc,
+        )
 
 
 def public_url(storage_key: str) -> str:

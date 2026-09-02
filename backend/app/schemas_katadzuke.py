@@ -244,6 +244,40 @@ class CasePhotoOut(BaseModel):
     sort_order: int
 
 
+def _sanitize_free_text(
+    value: str | None, *, max_length: int, field_label: str
+) -> str | None:
+    """自由入力テキスト（ユーザー入力）をサーバ側で無害化する（DRY共通関数）。
+
+    CaseItemIn.name / CaseItemUpdateRequest.name・user_description で共通して
+    使う無害化ロジック（既存の CaseItemIn._sanitize_name のロジックをここへ
+    集約し、他フィールドからも再利用できるようにする）。
+
+    - Unicode NFKC正規化 + 制御文字・双方向制御文字の除去
+      （summary.py の _safe_attr と同じロジックを text_sanitize.py に
+      共通化して再利用する）。
+    - プラットフォーム外への直接連絡を誘導する電話番号・メールアドレス・
+      URL の埋め込みは bids.py の入札メッセージと同様に拒否する
+      （既存の contains_contact_info() を適用）。
+    """
+    if value is None:
+        return None
+    text = normalize_and_strip_control_chars(value)
+    if not text:
+        return None
+    # Field(max_length=...) はNFKC正規化"前"の文字列に対して検証されるため、
+    # 正規化によって文字数が増える文字(例: "㍿"→"株式会社"で4倍)が含まれると
+    # 正規化後に上限を超えたままDBへ保存され、切り詰めエラーになりうる
+    # (CaseItemIn.name の最終レビューで発見)。正規化後に再度上限を適用する。
+    if len(text) > max_length:
+        text = text[:max_length]
+    if contains_contact_info(text):
+        raise ValueError(
+            f"{field_label}に電話番号・メールアドレス・URLは記載できません。"
+        )
+    return text
+
+
 class CaseItemIn(BaseModel):
     """案件作成時に指定する商品（アルバム）1件分の入力。"""
 
@@ -261,31 +295,7 @@ class CaseItemIn(BaseModel):
     @field_validator("name")
     @classmethod
     def _sanitize_name(cls, v: str | None) -> str | None:
-        """商品名（ユーザー自由入力）をサーバ側で無害化する（security review 指摘対応）。
-
-        - Unicode NFKC正規化 + 制御文字・双方向制御文字の除去
-          （summary.py の _safe_attr と同じロジックを text_sanitize.py に
-          共通化して再利用する）。
-        - プラットフォーム外への直接連絡を誘導する電話番号・メールアドレス・
-          URL の埋め込みは bids.py の入札メッセージと同様に拒否する
-          （既存の contains_contact_info() を適用）。
-        """
-        if v is None:
-            return None
-        text = normalize_and_strip_control_chars(v)
-        if not text:
-            return None
-        # Field(max_length=64) はNFKC正規化"前"の文字列に対して検証されるため、
-        # 正規化によって文字数が増える文字(例: "㍿"→"株式会社"で4倍)が含まれると
-        # 正規化後に64字を超えたままDB(String(64))へ保存され、切り詰めエラーに
-        # なりうる(最終レビューで発見)。正規化後に再度上限を適用する。
-        if len(text) > 64:
-            text = text[:64]
-        if contains_contact_info(text):
-            raise ValueError(
-                "商品名に電話番号・メールアドレス・URLは記載できません。"
-            )
-        return text
+        return _sanitize_free_text(v, max_length=64, field_label="商品名")
 
 
 class CaseItemOut(BaseModel):
@@ -297,7 +307,30 @@ class CaseItemOut(BaseModel):
     ai_detected_name: str | None
     ai_condition: ItemCondition | None
     ai_summary: str | None
+    # ユーザーが自ら編集したコンディション/説明（AI推定値の ai_condition/ai_summary
+    # とは別カラム。case.py の CaseItem 参照）。
+    user_condition: ItemCondition | None = None
+    user_description: str | None = None
     photos: list[CasePhotoOut] = []
+
+
+class CaseItemUpdateRequest(BaseModel):
+    """商品(CaseItem)情報のユーザー編集。単純なPUT方式（exclude_unsetは使わず、
+    送られたフィールドをそのまま代入する。null を明示送信すればクリアされる）。"""
+
+    name: str | None = Field(default=None, max_length=64)
+    user_condition: ItemCondition | None = None
+    user_description: str | None = Field(default=None, max_length=500)
+
+    @field_validator("name")
+    @classmethod
+    def _sanitize_name(cls, v: str | None) -> str | None:
+        return _sanitize_free_text(v, max_length=64, field_label="商品名")
+
+    @field_validator("user_description")
+    @classmethod
+    def _sanitize_user_description(cls, v: str | None) -> str | None:
+        return _sanitize_free_text(v, max_length=500, field_label="商品の説明")
 
 
 class CaseCreateRequest(BaseModel):

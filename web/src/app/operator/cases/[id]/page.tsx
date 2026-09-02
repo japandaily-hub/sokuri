@@ -21,6 +21,7 @@ import { Ic } from "@/components/kdz/Icons";
 import { useToken } from "@/components/kdz/Ui";
 import { DisclosureNotice } from "@/components/kdz/DisclosureNotice";
 import {
+  CASE_ITEM_CONDITION_LABEL,
   CASE_STATUS_LABEL,
   createBid,
   formatYen,
@@ -169,12 +170,16 @@ export default function OperatorCaseDetailPage() {
               {album.title ? (
                 <div className="op-album-head">
                   <h2>{album.title}</h2>
-                  {album.aiCondition ? <span className="status-chip negotiating">{album.aiCondition}</span> : null}
+                  {album.condition ? (
+                    <span className="status-chip negotiating">
+                      {CASE_ITEM_CONDITION_LABEL[album.condition] ?? album.condition}
+                    </span>
+                  ) : null}
                 </div>
               ) : (
                 <h2>お預かりしている写真</h2>
               )}
-              {album.aiSummary ? <p className="op-album-summary">{album.aiSummary}</p> : null}
+              {album.description ? <p className="op-album-summary">{album.description}</p> : null}
               <div className="op-photo-grid">
                 {album.photos.map((p) => (
                   // eslint-disable-next-line @next/next/no-img-element

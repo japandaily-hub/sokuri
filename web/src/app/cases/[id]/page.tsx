@@ -6,9 +6,9 @@
  * - 成約後: 減額申請への承認/却下、完了確定、キャンセル、レビュー投稿
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { Spinner } from "@/components/Icon";
+import { Icon, Spinner } from "@/components/Icon";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import {
   Card,
@@ -21,12 +21,16 @@ import {
   useToken,
 } from "@/components/kdz/Ui";
 import {
+  CASE_ITEM_CONDITION_LABEL,
   CASE_STATUS_LABEL,
   TXN_STATUS_LABEL,
+  addCaseItemPhoto,
   cancelTransaction,
   completeTransaction,
   createReview,
   decideReduction,
+  deleteCaseItem,
+  deleteCasePhoto,
   formatYen,
   getCase,
   getTransaction,
@@ -35,10 +39,16 @@ import {
   selectBid,
   toAlbums,
   toDisplayMessage,
+  updateCaseItem,
+  uploadCasePhoto,
   type BidOut,
+  type CaseItemOut,
   type CaseOut,
   type TransactionDetail,
 } from "@/lib/katadzuke-api";
+
+/** 編集/削除UIを許可する案件ステータス（それ以外は409になるためバックエンドと同条件でUIも隠す）。 */
+const EDITABLE_CASE_STATUSES = new Set(["draft", "open"]);
 
 export default function UserCaseDetailPage() {
   const params = useParams<{ id: string }>();
@@ -53,6 +63,153 @@ export default function UserCaseDetailPage() {
   const [busy, setBusy] = useState(false);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
+
+  // ===== 商品の編集/削除・写真の追加/削除 =====
+  // busyOps は進行中の操作キー集合。キー形式は "item:{itemId}:save" / "item:{itemId}:delete" /
+  // "item:{itemId}:upload" / "photo:{photoId}:delete"。Set にすることで、ある商品カードの操作中でも
+  // 別の商品カードのボタンは disabled にならない（商品単位の排他制御。カード内の disabled 表示と
+  // 実際の排他範囲を一致させる）。
+  const [busyOps, setBusyOps] = useState<Set<string>>(new Set());
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editCondition, setEditCondition] = useState<string>("unknown");
+  const [editDescription, setEditDescription] = useState("");
+  const [editError, setEditError] = useState<string | null>(null);
+  const [uploadTargetItemId, setUploadTargetItemId] = useState<string | null>(null);
+  const addPhotoInputRef = useRef<HTMLInputElement>(null);
+
+  const canEditCase = caseData != null && EDITABLE_CASE_STATUSES.has(caseData.status);
+
+  function beginOp(key: string) {
+    setBusyOps((prev) => new Set(prev).add(key));
+  }
+  function endOp(key: string) {
+    setBusyOps((prev) => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+  }
+  /** 指定した商品に対する編集/削除/写真アップロードのいずれかが進行中か（同一商品内の操作競合を防ぐ）。 */
+  function isItemBusy(itemId: string): boolean {
+    const prefix = `item:${itemId}:`;
+    for (const key of busyOps) {
+      if (key.startsWith(prefix)) return true;
+    }
+    return false;
+  }
+
+  function startEditItem(item: CaseItemOut) {
+    setEditingItemId(item.id);
+    setEditName(item.name ?? item.ai_detected_name ?? "");
+    setEditCondition(item.user_condition ?? item.ai_condition ?? "unknown");
+    setEditDescription(item.user_description ?? item.ai_summary ?? "");
+    setEditError(null);
+  }
+
+  function cancelEditItem() {
+    setEditingItemId(null);
+    setEditError(null);
+  }
+
+  async function saveEditItem(item: CaseItemOut) {
+    if (!token || isItemBusy(item.id)) return;
+    const key = `item:${item.id}:save`;
+    beginOp(key);
+    setEditError(null);
+    try {
+      await updateCaseItem(
+        caseId,
+        item.id,
+        {
+          name: editName.trim() || null,
+          user_condition: editCondition,
+          user_description: editDescription.trim() || null,
+        },
+        token,
+      );
+      await reload();
+      setEditingItemId(null);
+    } catch (e) {
+      setEditError(toDisplayMessage(e, "保存に失敗しました"));
+    } finally {
+      endOp(key);
+    }
+  }
+
+  async function handleDeleteItem(item: CaseItemOut) {
+    if (!token || isItemBusy(item.id)) return;
+    if (!window.confirm("この商品を削除しますか？紐づく写真も削除されます。")) return;
+    const key = `item:${item.id}:delete`;
+    beginOp(key);
+    setError(null);
+    try {
+      await deleteCaseItem(caseId, item.id, token);
+      if (editingItemId === item.id) setEditingItemId(null);
+      await reload();
+    } catch (e) {
+      setError(toDisplayMessage(e, "商品の削除に失敗しました"));
+    } finally {
+      endOp(key);
+    }
+  }
+
+  async function handleDeletePhoto(photoId: string) {
+    if (!token) return;
+    const key = `photo:${photoId}:delete`;
+    if (busyOps.has(key)) return;
+    if (!window.confirm("この写真を削除しますか？")) return;
+    beginOp(key);
+    setError(null);
+    try {
+      await deleteCasePhoto(caseId, photoId, token);
+      await reload();
+    } catch (e) {
+      setError(toDisplayMessage(e, "写真の削除に失敗しました"));
+    } finally {
+      endOp(key);
+    }
+  }
+
+  function triggerAddPhoto(itemId: string) {
+    if (isItemBusy(itemId)) return;
+    setUploadTargetItemId(itemId);
+    addPhotoInputRef.current?.click();
+  }
+
+  async function handleAddPhotoFilesSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    const itemId = uploadTargetItemId;
+    setUploadTargetItemId(null);
+    if (files.length === 0 || !itemId || !token) return;
+    const key = `item:${itemId}:upload`;
+    beginOp(key);
+    setError(null);
+    // 途中の1枚が失敗しても、それまでに保存済みの写真を「消えたように見せない」ため
+    // reload() は成否に関わらず必ず finally で実行する（QA指摘対応）。
+    let succeeded = 0;
+    try {
+      const currentItem = caseData?.items?.find((it) => it.id === itemId);
+      let nextSortOrder = currentItem?.photos.length ?? 0;
+      for (const file of files) {
+        const presign = await uploadCasePhoto(file, token);
+        await addCaseItemPhoto(caseId, itemId, { storage_key: presign.storage_key, sort_order: nextSortOrder }, token);
+        nextSortOrder += 1;
+        succeeded += 1;
+      }
+    } catch (err) {
+      const failedCount = files.length - succeeded;
+      setError(
+        files.length > 1
+          ? `${files.length}枚中${failedCount}枚の追加に失敗しました。時間をおいて再度お試しください。`
+          : toDisplayMessage(err, "写真の追加に失敗しました"),
+      );
+    } finally {
+      await reload();
+      endOp(key);
+    }
+  }
 
   const reload = useCallback(async () => {
     if (!token) return;
@@ -143,35 +300,166 @@ export default function UserCaseDetailPage() {
           <StatusBadge value={caseData.status} label={CASE_STATUS_LABEL[caseData.status]} />
         </div>
 
-        {toAlbums(caseData).map((album) => (
-          <div key={album.id ?? "unassigned"} className="mt-4">
-            {album.title ? (
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-bold text-slate-900">{album.title}</p>
-                {album.aiCondition ? (
-                  <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
-                    {album.aiCondition}
-                  </span>
+        {toAlbums(caseData).map((album) => {
+          const item = album.id ? (caseData.items?.find((it) => it.id === album.id) ?? null) : null;
+          const isEditing = item != null && editingItemId === item.id;
+          const isSavingItem = item != null && busyOps.has(`item:${item.id}:save`);
+          const isDeletingItem = item != null && busyOps.has(`item:${item.id}:delete`);
+          const isUploadingItem = item != null && busyOps.has(`item:${item.id}:upload`);
+          const itemAnyBusy = item != null && isItemBusy(item.id);
+
+          return (
+            <div key={album.id ?? "unassigned"} className="mt-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  {album.title ? (
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-bold text-slate-900">{album.title}</p>
+                      {album.condition ? (
+                        <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
+                          {CASE_ITEM_CONDITION_LABEL[album.condition] ?? album.condition}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {album.description ? (
+                    <p className="mt-0.5 text-xs leading-relaxed text-slate-500">{album.description}</p>
+                  ) : null}
+                </div>
+                {item && canEditCase && !isEditing ? (
+                  <button
+                    type="button"
+                    disabled={itemAnyBusy}
+                    onClick={() => startEditItem(item)}
+                    className={btnSecondary}
+                  >
+                    編集
+                  </button>
                 ) : null}
               </div>
-            ) : null}
-            {album.aiSummary ? (
-              <p className="mt-0.5 text-xs leading-relaxed text-slate-500">{album.aiSummary}</p>
-            ) : null}
-            <ul className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-5">
-              {album.photos.map((p) => (
-                <li key={p.id}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={photoSrc(p.url)}
-                    alt=""
-                    className="aspect-square w-full rounded-xl border border-slate-200 object-cover"
-                  />
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+
+              {isEditing && item ? (
+                <div className="mt-2 space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  {editError ? <p className="text-xs font-semibold text-red-600">{editError}</p> : null}
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-500">商品名</label>
+                    <input
+                      type="text"
+                      maxLength={40}
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      placeholder="例: 洗濯機 / ソファ"
+                      className={inputBase}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-500">状態</label>
+                    <select
+                      value={editCondition}
+                      onChange={(e) => setEditCondition(e.target.value)}
+                      className={inputBase}
+                    >
+                      {Object.entries(CASE_ITEM_CONDITION_LABEL).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-slate-500">説明</label>
+                    <textarea
+                      value={editDescription}
+                      maxLength={500}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      rows={3}
+                      className={inputBase}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={isSavingItem}
+                      onClick={() => saveEditItem(item)}
+                      className={btnPrimary}
+                    >
+                      {isSavingItem ? "保存中…" : "保存"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSavingItem}
+                      onClick={cancelEditItem}
+                      className={btnSecondary}
+                    >
+                      キャンセル
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              <ul className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-5">
+                {album.photos.map((p) => {
+                  const isDeletingPhoto = busyOps.has(`photo:${p.id}:delete`);
+                  return (
+                    <li key={p.id} className="group relative">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={photoSrc(p.url)}
+                        alt=""
+                        className="aspect-square w-full rounded-xl border border-slate-200 object-cover"
+                      />
+                      {canEditCase ? (
+                        <button
+                          type="button"
+                          aria-label="この写真を削除"
+                          disabled={isDeletingPhoto}
+                          onClick={() => handleDeletePhoto(p.id)}
+                          className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-slate-900/70 text-white opacity-0 transition-opacity focus:opacity-100 disabled:opacity-100 group-hover:opacity-100"
+                        >
+                          {isDeletingPhoto ? (
+                            <Spinner className="h-3 w-3" />
+                          ) : (
+                            <Icon name="close" className="h-3.5 w-3.5" strokeWidth={2.5} />
+                          )}
+                        </button>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+
+              {item && canEditCase ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={itemAnyBusy}
+                    onClick={() => triggerAddPhoto(item.id)}
+                    className={btnSecondary}
+                  >
+                    {isUploadingItem ? "アップロード中…" : "＋ 写真を追加"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={itemAnyBusy}
+                    onClick={() => handleDeleteItem(item)}
+                    className={btnDanger}
+                  >
+                    {isDeletingItem ? "削除中…" : "商品を削除"}
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+
+        <input
+          ref={addPhotoInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          multiple
+          className="hidden"
+          onChange={handleAddPhotoFilesSelected}
+        />
 
         {caseData.ai_summary ? (
           <div className="mt-4 rounded-xl bg-slate-50 p-4">
