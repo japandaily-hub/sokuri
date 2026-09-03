@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { Icon, Spinner } from "@/components/Icon";
 import { AppHeader } from "@/components/kdz/AppHeader";
@@ -743,20 +744,20 @@ export default function UserCaseDetailPage() {
                 >
                   レビューを投稿
                 </button>
-                <a
+                <Link
                   href={`/review?transaction_id=${txn.id}`}
                   className="mt-2 inline-block text-sm font-semibold text-brand-700 hover:underline"
                 >
                   詳しく評価する →
-                </a>
+                </Link>
               </div>
             ))}
         </Card>
       )}
 
-      <a href="/cases" className="inline-block text-sm font-semibold text-brand-700 hover:underline">
+      <Link href="/cases" className="inline-block text-sm font-semibold text-brand-700 hover:underline">
         ← マイ案件一覧へ
-      </a>
+      </Link>
     </div>
     </>
   );
