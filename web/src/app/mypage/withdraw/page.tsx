@@ -175,7 +175,7 @@ export default function WithdrawPage() {
   if (done) {
     return (
       <div className="withdraw-page">
-        <AppHeader unread={false} />
+        <AppHeader />
         <main id="main">
           <div className="del-wrap">
             <div className="panel active" id="panel-done">
@@ -207,7 +207,7 @@ export default function WithdrawPage() {
   if (sessionExpired) {
     return (
       <div className="withdraw-page">
-        <AppHeader unread={false} />
+        <AppHeader />
         <main id="main">
           <div className="del-wrap">
             <div
@@ -235,7 +235,7 @@ export default function WithdrawPage() {
   if (tokenLoading || (!profile && !profileError)) {
     return (
       <div className="withdraw-page">
-        <AppHeader unread={false} />
+        <AppHeader />
         <main id="main">
           <div className="del-wrap" style={{ textAlign: "center", padding: "60px 20px", color: "var(--body-soft)" }}>
             読み込み中…
@@ -248,7 +248,7 @@ export default function WithdrawPage() {
   if (!profile) {
     return (
       <div className="withdraw-page">
-        <AppHeader unread={false} />
+        <AppHeader />
         <main id="main">
           <div className="del-wrap">
             <div
@@ -279,7 +279,7 @@ export default function WithdrawPage() {
 
   return (
     <div className="withdraw-page">
-      <AppHeader unread={false} />
+      <AppHeader />
 
       <main id="main">
         <div className="del-wrap">

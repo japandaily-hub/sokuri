@@ -238,7 +238,7 @@ export default function ProfileEditPage() {
   if (sessionExpired) {
     return (
       <div className="profile-page">
-        <AppHeader unread={false} />
+        <AppHeader />
         <main id="main">
           <div className="profile-wrap">
             <ErrorBanner>
@@ -256,7 +256,7 @@ export default function ProfileEditPage() {
   if (tokenLoading || (!profile && !loadError)) {
     return (
       <div className="profile-page">
-        <AppHeader unread />
+        <AppHeader />
         <main id="main">
           <div className="profile-wrap" style={{ textAlign: "center", padding: "60px 20px", color: "var(--body-soft)" }}>
             読み込み中…
@@ -269,7 +269,7 @@ export default function ProfileEditPage() {
   if (!profile) {
     return (
       <div className="profile-page">
-        <AppHeader unread />
+        <AppHeader />
         <main id="main">
           <div className="profile-wrap">
             <ErrorBanner>
@@ -290,7 +290,7 @@ export default function ProfileEditPage() {
 
   return (
     <div className="profile-page">
-      <AppHeader unread />
+      <AppHeader />
 
       <main id="main">
         <div className="profile-wrap">

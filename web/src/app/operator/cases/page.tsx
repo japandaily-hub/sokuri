@@ -20,8 +20,8 @@ import { Ic } from "@/components/kdz/Icons";
 import { useToken } from "@/components/kdz/Ui";
 import {
   CASE_STATUS_LABEL,
-  KdzApiError,
   formatYen,
+  getOperatorProfile,
   listOpenCases,
   photoSrc,
   toDisplayMessage,
@@ -114,20 +114,26 @@ export default function OperatorCasesPage() {
   const { token, loading } = useToken();
   const [cases, setCases] = useState<CaseMasked[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [pendingApproval, setPendingApproval] = useState(false);
+  const [vendorStatus, setVendorStatus] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) return;
     listOpenCases(token)
       .then(setCases)
-      .catch((e) => {
-        if (e instanceof KdzApiError && e.status === 403) {
-          setPendingApproval(true);
-        } else {
-          setError(toDisplayMessage(e, "取得に失敗しました"));
-        }
-      });
+      .catch((e) => setError(toDisplayMessage(e, "取得に失敗しました")));
   }, [token]);
+
+  // 承認状態（vendor_status）を取得して審査中バナーの表示を判定する。
+  // listOpenCases は審査待ちの業者にも200を返すため、403検知では判定できない。
+  useEffect(() => {
+    if (!token) return;
+    getOperatorProfile(token)
+      .then((p) => setVendorStatus(p.vendor_status))
+      .catch(() => setVendorStatus("unknown"));
+  }, [token]);
+
+  const statusLoading = vendorStatus === null;
+  const awaitingApproval = !statusLoading && vendorStatus !== "active" && vendorStatus !== "unknown";
 
   return (
     <div className="cases-page">
@@ -145,14 +151,14 @@ export default function OperatorCasesPage() {
             </Link>
           </div>
 
-          {pendingApproval ? (
+          {awaitingApproval ? (
             <div className="op-alert warn">
-              アカウントは運営の承認待ちです。承認が完了すると案件を閲覧できます（通常1営業日以内）。
+              アカウントは承認待ちです。運営による審査完了後に入札できるようになります（案件の閲覧は承認前でも可能です）。
             </div>
           ) : null}
           {error ? <div className="op-alert error">{error}</div> : null}
 
-          {loading || (!cases && !error && !pendingApproval) ? (
+          {loading || (!cases && !error) ? (
             <div style={{ display: "flex", justifyContent: "center", padding: "60px 0" }}>
               <Spinner className="h-6 w-6 text-brand-600" />
             </div>

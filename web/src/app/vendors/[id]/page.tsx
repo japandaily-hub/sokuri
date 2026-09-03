@@ -48,7 +48,7 @@ export default function VendorDetailPage() {
   if (loading) {
     return (
       <div className="vendor-page">
-        <AppHeader unread />
+        <AppHeader />
         <div className="flex min-h-[50vh] items-center justify-center">
           <Spinner className="h-6 w-6 text-brand-600" />
         </div>
@@ -59,11 +59,11 @@ export default function VendorDetailPage() {
   if (!profile) {
     return (
       <div className="vendor-page">
-        <AppHeader unread />
+        <AppHeader />
         <main id="main">
           <div className="vendor-wrap">
             <Notice tone="error">{error ?? "業者情報が見つかりません。"}</Notice>
-            <Link href="/cases" className="vendor-back" style={{ marginTop: 16 }}>
+            <Link href="/mypage" className="vendor-back" style={{ marginTop: 16 }}>
               <svg viewBox="0 0 24 24">
                 <path d="M19 12H5M11 6l-6 6 6 6" />
               </svg>
@@ -80,12 +80,12 @@ export default function VendorDetailPage() {
 
   return (
     <div className="vendor-page">
-      <AppHeader unread />
+      <AppHeader />
 
       <main id="main">
         <div className="vendor-wrap">
           {/* 案件一覧に戻る */}
-          <Link href="/cases" className="vendor-back">
+          <Link href="/mypage" className="vendor-back">
             <svg viewBox="0 0 24 24">
               <path d="M19 12H5M11 6l-6 6 6 6" />
             </svg>

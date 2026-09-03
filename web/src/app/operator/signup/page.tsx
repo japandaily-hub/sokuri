@@ -21,7 +21,7 @@ import { AuthBar, Field } from "@/components/kdz/auth";
 
 export default function OperatorSignupPage() {
   const router = useRouter();
-  const [showInviteField, setShowInviteField] = useState(false);
+  const [showInviteField, setShowInviteField] = useState(true);
   const [inviteCode, setInviteCode] = useState("");
   const [company, setCompany] = useState("");
   const [license, setLicense] = useState("");

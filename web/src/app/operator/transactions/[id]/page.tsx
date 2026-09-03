@@ -150,8 +150,10 @@ export default function OperatorTransactionPage() {
   function openReductionModal(e: React.FormEvent) {
     e.preventDefault();
     const value = Number(requestedAmount);
-    if (!Number.isFinite(value) || value <= 0 || value >= currentAmount) {
-      setError(`減額後の金額は 1〜${currentAmount - 1} 円で入力してください。`);
+    // 下限は原則100円。成約額が100円以下の極端なケースでは入力不能にならないよう動的に下げる
+    const reductionMin = Math.min(100, Math.max(1, currentAmount - 1));
+    if (!Number.isFinite(value) || value < reductionMin || value >= currentAmount) {
+      setError(`減額後の金額は ${reductionMin}〜${currentAmount - 1} 円で入力してください。`);
       return;
     }
     if (reason.trim().length < 10) {
@@ -267,7 +269,7 @@ export default function OperatorTransactionPage() {
                       id="reductionAmount"
                       type="number"
                       required
-                      min={1}
+                      min={Math.min(100, Math.max(1, currentAmount - 1))}
                       max={currentAmount - 1}
                       value={requestedAmount}
                       onChange={(e) => setRequestedAmount(e.target.value)}

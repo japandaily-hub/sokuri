@@ -134,7 +134,7 @@ function ReviewPageInner() {
   if (loading || (!txn && !error && transactionId)) {
     return (
       <div className="review-page">
-        <AppHeader unread />
+        <AppHeader />
         <div className="flex min-h-[50vh] items-center justify-center">
           <Spinner className="h-6 w-6 text-brand-600" />
         </div>
@@ -145,7 +145,7 @@ function ReviewPageInner() {
   if (!transactionId || (!txn && error)) {
     return (
       <div className="review-page">
-        <AppHeader unread />
+        <AppHeader />
         <main id="main">
           <div className="review-wrap">
             <Notice tone="error">
@@ -153,8 +153,8 @@ function ReviewPageInner() {
                 ? "評価対象の取引が指定されていません。"
                 : (error ?? "取引情報の取得に失敗しました。")}
             </Notice>
-            <Link href="/cases" className="btn btn-primary btn-lg btn-block" style={{ marginTop: 16 }}>
-              マイ案件一覧へ戻る
+            <Link href="/mypage" className="btn btn-primary btn-lg btn-block" style={{ marginTop: 16 }}>
+              マイページへ戻る
             </Link>
           </div>
         </main>
@@ -178,7 +178,7 @@ function ReviewPageInner() {
 
   return (
     <div className="review-page">
-      <AppHeader unread />
+      <AppHeader />
 
       <main id="main">
         <div className="review-wrap">
@@ -356,7 +356,7 @@ function ReviewPageInner() {
                   </svg>
                 </div>
               </Link>
-              <Link href="/cases" className="next-action-btn">
+              <Link href="/mypage" className="next-action-btn">
                 <div className="next-action-ic" style={{ background: "#e8faf0", color: "var(--green)" }}>
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -387,7 +387,7 @@ export default function ReviewPage() {
     <Suspense
       fallback={
         <div className="review-page">
-          <AppHeader unread />
+          <AppHeader />
           <div className="flex min-h-[50vh] items-center justify-center">
             <Spinner className="h-6 w-6 text-brand-600" />
           </div>

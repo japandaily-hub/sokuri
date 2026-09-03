@@ -300,7 +300,7 @@ function NotificationsContent() {
 
   return (
     <div className="notif-page">
-      <AppHeader unread={rows.length > 0} />
+      <AppHeader />
 
       <main id="main">
         <div className="notif-wrap">

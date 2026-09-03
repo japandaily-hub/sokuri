@@ -75,14 +75,14 @@ function VerifyEmailContent() {
         </div>
 
         <h1 className="confirm-title">
-          メールアドレスを
+          ご登録
           <br />
-          確認しました。
+          ありがとうございます。
         </h1>
         <p className="confirm-sub">
-          以下のアドレスの確認が完了しました。
+          登録いただいたメールアドレスはこちらです。
           <br />
-          カタヅケのすべての機能がご利用いただけます。
+          さっそく出品を始めましょう。
         </p>
         <div className="confirm-email">{email}</div>
 
@@ -105,8 +105,8 @@ function VerifyEmailContent() {
           <div className="welcome-step">
             <div className="ws-num">3</div>
             <div className="ws-body">
-              <strong>業者を選んで現金受け取り</strong>
-              <span>気に入った業者を選べばOK。自宅で即日現金を受け取れます。</span>
+              <strong>業者を選んで引き取り</strong>
+              <span>気に入った業者を選べばOK。支払方法や日程は業者ごとに異なるため、チャットでご確認ください。</span>
             </div>
           </div>
         </div>

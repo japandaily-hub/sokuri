@@ -18,6 +18,9 @@
 
 .signup-page .hint-banner { background: var(--pale); border-radius: var(--radius-s); padding: 14px 18px; margin-bottom: 18px; font-size: 13px; color: var(--body); display: flex; gap: 10px; align-items: flex-start; line-height: 1.75; }
 .signup-page .hint-banner .hint-ic { color: var(--blue); flex-shrink: 0; margin-top: 1px; }
+.signup-page .hint-banner.warn { background: #fff8f0; border: 1px solid #fed7aa; color: #9a3412; }
+.signup-page .hint-banner.warn .hint-ic { color: #9a3412; }
+.signup-page .hint-banner.warn a { color: #9a3412; text-decoration: underline; }
 
 .signup-page .agree-row { display: flex; align-items: flex-start; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line-soft); margin-top: 4px; }
 .signup-page .agree-row:first-child { border-top: none; margin-top: 0; }

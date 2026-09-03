@@ -200,7 +200,7 @@
   flex-shrink: 0;
 }
 .shoot-step-body h4 { font-size: 14.5px; font-weight: 600; color: var(--navy); margin-bottom: 5px; }
-.shoot-step-body p { font-size: 13.5px; color: var(--body-soft); line-height: 1.75; }
+.shoot-step-body p { font-size: 13.5px; color: var(--body-soft); line-height: 1.75; max-width: 46em; }
 .shoot-step-body .tip {
   margin-top: 8px;
   font-size: 12.5px;

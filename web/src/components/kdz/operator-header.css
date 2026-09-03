@@ -50,6 +50,21 @@
 .op-header .op-nav a:hover { color: var(--blue); background: var(--pale); }
 .op-header .op-nav a.active { color: var(--blue); background: var(--pale); }
 
+/* 展開メニュー専用のログアウト項目。デスクトップ幅（.op-logout が見えている間）は
+   非表示にし、920px以下の展開メニュー内でのみ表示する（@media 側で display:flex）。 */
+.op-header .op-nav-logout {
+  display: none;
+  font-family: var(--head);
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: .12em;
+  color: var(--body-soft);
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+}
+
 .op-header .op-header-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
 
 .op-header .op-notif {
@@ -75,7 +90,7 @@
   border: 2px solid var(--white);
 }
 
-.op-header .op-user { display: flex; align-items: center; gap: 9px; }
+.op-header .op-user { display: flex; align-items: center; gap: 9px; min-width: 0; }
 .op-header .op-user-avatar {
   width: 34px;
   height: 34px;
@@ -95,6 +110,10 @@
   color: var(--ink);
   line-height: 1.3;
   white-space: nowrap;
+  min-width: 0;
+  max-width: 12em;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .op-header .op-logout {
@@ -151,4 +170,10 @@
     box-shadow: none;
   }
   .op-header .op-nav.open a { padding: 13px; }
+  .op-header .op-nav.open .op-nav-logout {
+    display: block;
+    padding: 13px;
+    margin-top: 4px;
+    border-top: 1px solid var(--line);
+  }
 }

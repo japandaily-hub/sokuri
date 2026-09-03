@@ -32,10 +32,10 @@ import { OperatorHeader } from "@/components/kdz/OperatorHeader";
 import { Spinner } from "@/components/Icon";
 import { useToken } from "@/components/kdz/Ui";
 import {
-  KdzApiError,
   TXN_STATUS_LABEL,
   createBid,
   formatYen,
+  getOperatorProfile,
   listOpenCases,
   listTransactions,
   photoSrc,
@@ -43,6 +43,12 @@ import {
   type CaseMasked,
   type TransactionListItem,
 } from "@/lib/katadzuke-api";
+
+/** 入札額の許容範囲・刻み（バックエンド le=100_000_000 と一致させる）。 */
+const BID_MIN = 1000;
+const BID_MAX = 100_000_000;
+const BID_STEP = 1000;
+const BID_RANGE_HINT = "入札額は1,000円〜1億円の範囲で1,000円単位で入力してください";
 
 /* ============================================================
    表示ユーティリティ
@@ -109,13 +115,20 @@ type TabKey = "lots" | "bids" | "neg" | "done";
 function LotCard({
   lot,
   busy,
+  canBid,
+  statusLoading,
   onBid,
 }: {
   lot: Lot;
   busy: boolean;
+  /** 業者の承認状態（vendor_status === "active"）。false の間は入札フォームを出さない。 */
+  canBid: boolean;
+  /** vendor_status 取得中（フォームのチラつき防止）。 */
+  statusLoading: boolean;
   onBid: (lotId: string, value: number) => void;
 }) {
   const [draft, setDraft] = useState("");
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const statusTag =
     lot.status === "winning" ? (
@@ -123,10 +136,6 @@ function LotCard({
     ) : lot.status === "outbid" ? (
       <span className="lot-tag red">入札順位外</span>
     ) : null;
-
-  const submitLabel = lot.myBid ? "入札額を更新する" : "入札する";
-  const submitClass = lot.myBid ? "bid-submit update" : "bid-submit";
-  const placeholder = lot.myBid ? yen(lot.myBid) : "金額を入力";
 
   return (
     <div
@@ -191,38 +200,56 @@ function LotCard({
               自社入札 <strong>¥{yen(lot.myBid)}</strong>
             </div>
           ) : null}
-          <div className="bid-form">
-            <div className="bid-input-wrap">
-              <span className="bid-yen">¥</span>
-              <input
-                className="bid-input"
-                type="number"
-                placeholder={placeholder}
-                min={1000}
-                step={1000}
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                aria-label={`${lot.id} の入札金額`}
-              />
-              <span className="bid-en">円</span>
+          {lot.myBid ? (
+            // 入札は1案件につき1回のみ（更新APIは存在しない）。フォームは出さず案内のみ表示する。
+            <div className="bid-form">
+              <p className="bid-hint">入札済み（¥{yen(lot.myBid)}）。入札は1案件につき1回のみです。</p>
             </div>
-            <button
-              type="button"
-              className={submitClass}
-              disabled={busy}
-              onClick={() => {
-                const val = parseInt(draft, 10);
-                if (!val || val < 1000) {
-                  onBid(lot.id, NaN);
-                  return;
-                }
-                onBid(lot.id, val);
-              }}
-            >
-              {busy ? "送信中…" : submitLabel}
-            </button>
-            <p className="bid-hint">成約時のみ買取額の8%が手数料</p>
-          </div>
+          ) : statusLoading ? null : !canBid ? (
+            <div className="bid-form">
+              <p className="bid-hint">審査完了後に入札できます。</p>
+            </div>
+          ) : (
+            <div className="bid-form">
+              <div className="bid-input-wrap">
+                <span className="bid-yen">¥</span>
+                <input
+                  className="bid-input"
+                  type="number"
+                  placeholder="金額を入力"
+                  min={BID_MIN}
+                  max={BID_MAX}
+                  step={BID_STEP}
+                  value={draft}
+                  onChange={(e) => {
+                    setDraft(e.target.value);
+                    if (validationError) setValidationError(null);
+                  }}
+                  aria-label={`${lot.id} の入札金額`}
+                />
+                <span className="bid-en">円</span>
+              </div>
+              <button
+                type="button"
+                className="bid-submit"
+                disabled={busy}
+                onClick={() => {
+                  const val = parseInt(draft, 10);
+                  if (!draft || Number.isNaN(val) || val < BID_MIN || val > BID_MAX || val % BID_STEP !== 0) {
+                    setValidationError(BID_RANGE_HINT);
+                    return;
+                  }
+                  setValidationError(null);
+                  onBid(lot.id, val);
+                }}
+              >
+                {busy ? "送信中…" : "入札する"}
+              </button>
+              <p className="bid-hint" style={validationError ? { color: "var(--danger)" } : undefined}>
+                {validationError ?? `成約時のみ買取額の8%が手数料（${BID_RANGE_HINT}）`}
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -242,7 +269,7 @@ export default function OperatorDashboardPage() {
   const [cases, setCases] = useState<CaseMasked[] | null>(null);
   const [transactions, setTransactions] = useState<TransactionListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [pendingApproval, setPendingApproval] = useState(false);
+  const [vendorStatus, setVendorStatus] = useState<string | null>(null);
 
   // 入札確認モーダル
   const [modalLotId, setModalLotId] = useState<string | null>(null);
@@ -260,16 +287,9 @@ export default function OperatorDashboardPage() {
   const reload = useCallback(async () => {
     if (!token) return;
     try {
-      const c = await listOpenCases(token);
-      setCases(c);
-      setPendingApproval(false);
+      setCases(await listOpenCases(token));
     } catch (e) {
-      if (e instanceof KdzApiError && e.status === 403) {
-        setPendingApproval(true);
-        setCases([]);
-      } else {
-        setError(toDisplayMessage(e, "案件の取得に失敗しました"));
-      }
+      setError(toDisplayMessage(e, "案件の取得に失敗しました"));
     }
     try {
       setTransactions(await listTransactions(token));
@@ -281,6 +301,20 @@ export default function OperatorDashboardPage() {
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  // 承認状態（vendor_status）を取得して審査中バナー・入札フォームの出し分けに使う。
+  // listOpenCases は審査待ちの業者にも200を返すため、403検知では判定できない
+  // （/operator/cases/[id] と同じパターンに統一）。
+  useEffect(() => {
+    if (!token) return;
+    getOperatorProfile(token)
+      .then((p) => setVendorStatus(p.vendor_status))
+      .catch(() => setVendorStatus("unknown"));
+  }, [token]);
+
+  const statusLoading = vendorStatus === null;
+  const awaitingApproval = !statusLoading && vendorStatus !== "active" && vendorStatus !== "unknown";
+  const canBid = !statusLoading && (vendorStatus === "active" || vendorStatus === "unknown");
 
   const lots = useMemo(() => (cases ?? []).map(toLot), [cases]);
   const biddingLots = lots.filter((l) => l.myBid != null);
@@ -352,7 +386,7 @@ export default function OperatorDashboardPage() {
     { key: "done", icon: "check", label: "成約済み", badge: doneTxns.length, gray: true },
   ];
 
-    const isLoading = loading || (!cases && !error && !pendingApproval);
+    const isLoading = loading || (!cases && !error);
 
   return (
     <div className="op-dash">
@@ -384,7 +418,7 @@ export default function OperatorDashboardPage() {
               {error}
             </div>
           ) : null}
-          {pendingApproval ? (
+          {awaitingApproval ? (
             <div
               role="status"
               style={{
@@ -396,7 +430,7 @@ export default function OperatorDashboardPage() {
                 fontSize: 13,
               }}
             >
-              アカウントは運営の承認待ちです。承認が完了すると案件を閲覧できます（通常1営業日以内）。
+              アカウントは承認待ちです。運営による審査完了後に入札できるようになります（案件の閲覧は承認前でも可能です）。
             </div>
           ) : null}
 
@@ -470,7 +504,7 @@ export default function OperatorDashboardPage() {
             ) : (
               <div className="lot-grid">
                 {lots.map((lot) => (
-                  <LotCard key={lot.id} lot={lot} busy={bidBusy} onBid={requestBid} />
+                  <LotCard key={lot.id} lot={lot} busy={bidBusy} canBid={canBid} statusLoading={statusLoading} onBid={requestBid} />
                 ))}
               </div>
             )}
@@ -481,7 +515,7 @@ export default function OperatorDashboardPage() {
             {biddingLots.length ? (
               <div className="lot-grid">
                 {biddingLots.map((lot) => (
-                  <LotCard key={lot.id} lot={lot} busy={bidBusy} onBid={requestBid} />
+                  <LotCard key={lot.id} lot={lot} busy={bidBusy} canBid={canBid} statusLoading={statusLoading} onBid={requestBid} />
                 ))}
               </div>
             ) : (

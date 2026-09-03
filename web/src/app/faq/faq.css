@@ -328,6 +328,7 @@
   padding: 0 18px 18px 56px;
   font-size: 14px;
   line-height: 1.85;
+  max-width: 54em; /* PCで1行が長くなりすぎないよう約48字で折り返す */
   color: var(--body-soft);
 }
 .faq-page .faq-a-inner a {
@@ -391,7 +392,8 @@
 /* レスポンシブ */
 @media (max-width: 760px) {
   .faq-page .faq-body {
-    grid-template-columns: 1fr;
+    /* minmax(0,1fr): 子要素の最小幅でトラックが広がり横スクロールが出るのを防ぐ */
+    grid-template-columns: minmax(0, 1fr);
   }
   .faq-page .faq-side {
     display: none;
@@ -399,5 +401,19 @@
   .faq-page .faq-main {
     padding: 24px 0;
     border-left: none;
+    min-width: 0;
+  }
+  /* 問い合わせブロック: 横並びだと375pxで右にはみ出すため縦積みにする */
+  .faq-page .faq-contact {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 20px 18px;
+  }
+  .faq-page .faq-contact-info {
+    min-width: 0;
+  }
+  .faq-page .faq-contact .btn {
+    width: 100%;
   }
 }

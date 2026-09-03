@@ -216,7 +216,7 @@ export default function MyPage() {
   if (sessionExpired) {
     return (
       <div className="mypage-page">
-        <AppHeader unread={false} />
+        <AppHeader />
         <main id="main" className="my-wrap">
           <div
             role="alert"
@@ -242,7 +242,7 @@ export default function MyPage() {
   if (isLoading) {
     return (
       <div className="mypage-page">
-        <AppHeader unread={false} />
+        <AppHeader />
         <div className="flex min-h-[50vh] items-center justify-center">
           <Spinner className="h-6 w-6 text-brand-600" />
         </div>
@@ -252,7 +252,7 @@ export default function MyPage() {
 
   return (
     <div className="mypage-page">
-      <AppHeader unread={negotiatingCount > 0} />
+      <AppHeader />
 
       <main id="main" className="my-wrap">
         {error ? (
@@ -340,9 +340,9 @@ export default function MyPage() {
         {/* LINE通知誘導（通知トグル群の代替・1行） */}
         <div className="user-card" style={{ marginBottom: 20, padding: "14px 20px" }}>
           <div className="user-card-info" style={{ fontSize: 13, color: "var(--body-soft)" }}>
-            入札・メッセージの通知はLINEで受け取れます。
+            入札・メッセージの通知はメールでお知らせします。LINE連携済みの場合はLINEにも届きます。
             <Link href="/notifications" style={{ marginLeft: 6, fontWeight: 600 }}>
-              通知設定を見る →
+              通知設定を見る（本人確認のためパスワード入力があります）→
             </Link>
           </div>
         </div>

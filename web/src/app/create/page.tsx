@@ -662,7 +662,7 @@ export default function CreateCasePage() {
                   ],
                   ["利用目的", purpose],
                   ["エリア", `${prefecture} ${city}`],
-                  ["住所詳細", addressDetail || "（未入力）"],
+                  ["住所詳細", addressDetail || "（未入力・任意）"],
                   ["住居", `${housingType} / ${floorPlan}`],
                   ["階数・EV", `${floorNumber ? `${floorNumber}階` : "—"} / EV${hasElevator ? "あり" : "なし"}`],
                 ].map(([k, v]) => (
@@ -699,15 +699,26 @@ export default function CreateCasePage() {
       <div className="flow-footer">
         <div className="inner">
           {step === 0 && mode.kind === "shoot" ? (
-            <button
-              type="button"
-              className="btn-flow-next"
-              onClick={exitShoot}
-              disabled={!currentItem || currentItem.photos.length === 0 || !checkedHints.has(`${currentItem.id}:confirm`)}
-              title={currentItem && currentItem.photos.length > 0 && !checkedHints.has(`${currentItem.id}:confirm`) ? "「商品の状態が正確に確認できる写真を撮影しました」にチェックを入れてください" : undefined}
-            >
-              この商品の撮影を完了<Ic name="arrow" />
-            </button>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+              <button
+                type="button"
+                className="btn-flow-next"
+                onClick={exitShoot}
+                disabled={!currentItem || currentItem.photos.length === 0 || !checkedHints.has(`${currentItem.id}:confirm`)}
+                title={currentItem && currentItem.photos.length > 0 && !checkedHints.has(`${currentItem.id}:confirm`) ? "「商品の状態が正確に確認できる写真を撮影しました」にチェックを入れてください" : undefined}
+              >
+                この商品の撮影を完了<Ic name="arrow" />
+              </button>
+              {currentItem && currentItem.photos.length === 0 ? (
+                <p className="field-error" style={{ margin: 0 }} role="status">
+                  写真を1枚以上追加してください
+                </p>
+              ) : currentItem && !checkedHints.has(`${currentItem.id}:confirm`) ? (
+                <p className="field-error" style={{ margin: 0 }} role="status">
+                  上の確認にチェックを入れると進めます
+                </p>
+              ) : null}
+            </div>
           ) : (
             <>
               {step > 0 && (

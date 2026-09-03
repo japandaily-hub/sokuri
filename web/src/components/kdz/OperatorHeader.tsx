@@ -61,6 +61,18 @@ export function OperatorHeader({
               {n.label}
             </Link>
           ))}
+          {/* 920px以下では .op-logout が非表示になりログアウト手段が消えるため、
+              展開メニューの末尾にも同じログアウト操作を用意する。 */}
+          <button
+            type="button"
+            className="op-nav-logout"
+            onClick={() => {
+              setNavOpen(false);
+              void signOut({ callbackUrl: "/operator/login" });
+            }}
+          >
+            ログアウト
+          </button>
         </nav>
 
         <div className="op-header-right">

@@ -68,7 +68,7 @@ export default function SchedulePage() {
     <Suspense
       fallback={
         <div className="schedule-page">
-          <AppHeader unread />
+          <AppHeader />
           <div style={{ padding: 60, textAlign: "center", color: "var(--body-soft)" }}>読み込み中…</div>
         </div>
       }
@@ -271,7 +271,7 @@ function SchedulePageInner() {
   if (tokenLoading || (loading && !loadError)) {
     return (
       <div className="schedule-page">
-        <AppHeader unread />
+        <AppHeader />
         <div style={{ padding: 60, textAlign: "center", color: "var(--body-soft)" }}>読み込み中…</div>
       </div>
     );
@@ -280,7 +280,7 @@ function SchedulePageInner() {
   if (loadError || !detail || !transactionId) {
     return (
       <div className="schedule-page">
-        <AppHeader unread />
+        <AppHeader />
         <div style={{ padding: 60, textAlign: "center", color: "var(--body-soft)" }}>
           {loadError ?? "成約情報が見つかりません。"}
         </div>
@@ -290,7 +290,7 @@ function SchedulePageInner() {
 
   return (
     <div className="schedule-page">
-      <AppHeader unread />
+      <AppHeader />
 
       {/* 進捗ステップ + チャット戻り導線 */}
       <div className="sch-progress">
@@ -507,7 +507,7 @@ function SchedulePageInner() {
 
           <div className="notice-box">
             <Ic name="clock" />
-            日程確定後はLINEで通知が届きます。変更が必要な場合はチャットで業者へご連絡ください。
+            日程確定後はメールでお知らせします。LINE連携済みの場合はLINEにも届きます。変更が必要な場合はチャットで業者へご連絡ください。
           </div>
 
           <div className="notice-box warn">
@@ -535,10 +535,10 @@ function SchedulePageInner() {
               <br />
               <strong>{selectedTime}</strong>に訪問します。
               <br />
-              LINEにも通知が届きます。
+              メールでお知らせします。LINE連携済みの場合はLINEにも届きます。
             </p>
             <div className="sch-modal-btns">
-              <Link href="/cases" className="btn btn-primary btn-lg">
+              <Link href="/mypage" className="btn btn-primary btn-lg">
                 申し込み状況を確認する
                 <Ic name="arrow" />
               </Link>

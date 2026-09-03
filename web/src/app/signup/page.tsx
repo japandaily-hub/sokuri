@@ -258,6 +258,12 @@ export default function SignupPage() {
                 <div className="confirm-row"><span className="lbl">お名前</span><span className="val">{name}</span></div>
                 <div className="confirm-row"><span className="lbl">エリア</span><span className="val">{AREA_LABEL[area] || area}</span></div>
                 <div className="confirm-row"><span className="lbl">利用目的</span><span className="val">{ROLE_LABEL[role] || role}</span></div>
+                {role === "buyer" && (
+                  <div className="hint-banner warn" style={{ marginTop: 12, marginBottom: 0 }}>
+                    <Ic name="shield" className="hint-ic" />
+                    <span>※この登録では入札はできません。業者としてのご利用は<Link href="/business" style={{ fontWeight: 600 }}>/business からの登録（審査制）</Link>が必要です。</span>
+                  </div>
+                )}
                 <div className="confirm-row"><span className="lbl">登録費用</span><span className="val" style={{ color: "var(--green)" }}>完全無料</span></div>
               </div>
 

@@ -10,7 +10,8 @@
  * このページが業者向けヘッダー（ロゴ + 業者ナビ + 業者名 + ログアウト）を自前で描く。
  *
  * バックエンド実配線: GET/PUT /operator/profile。
- * 会社名・古物商許可番号・審査状況（vendor_status/verified_at）は審査確定項目のため
+ * 会社名・古物商許可番号・審査状況（vendor_status。verified_at は招待コード登録では
+ * 更新されない旧・手動承認フィールドのため判定に使わない）は審査確定項目のため
  * 読み取り専用表示のみ（PUT には含めない）。編集可能項目（areas / categories /
  * strong_categories / staff_count / business_hours / intro_message / is_public /
  * show_stats / show_reviews / show_message / accept_unsellable）のみ保存対象。
@@ -224,7 +225,7 @@ export default function OperatorProfilePage() {
   /* ---- 派生値（プレビュー・完成度） ---- */
   const companyName = profile?.company_name ?? "";
   const licenseNumber = profile?.license_number ?? "";
-  const verified = profile?.verified_at != null;
+  const verified = profile?.vendor_status === "active";
   const selectedAreas = AREAS.filter((a) => state.areas[a.name]).map((a) => a.name);
   const selectedCats = CATEGORIES.filter((c) => state.cats[c.id]);
   const strongCats = CATEGORIES.filter((c) => state.cats[c.id] && state.strong[c.id]);
@@ -337,7 +338,7 @@ export default function OperatorProfilePage() {
                 {verified ? (
                   <span className="prof-tag verified">
                     <Ic name="shield" />
-                    古物商許可証確認済み
+                    承認済み
                   </span>
                 ) : (
                   <span className="prof-tag">審査中</span>
@@ -460,7 +461,7 @@ export default function OperatorProfilePage() {
                   })}
                 </div>
                 <p className="field-hint" style={{ marginTop: 14 }}>
-                  対応エリアの案件のみ入札対象として表示されます。エリアは順次拡大予定です（準備中の都県は近日選択可能になります）。
+                  対応エリアは依頼者に表示されます。案件一覧には全エリアの案件が表示されるため、対応可能な案件を選んで入札してください。エリアは順次拡大予定です（準備中の都県は近日選択可能になります）。
                 </p>
               </div>
             </section>
@@ -528,7 +529,7 @@ export default function OperatorProfilePage() {
                     <Ic name="check" />
                   </span>
                   <div className="ls-body">
-                    <h3>{verified ? "確認済み" : "審査中"}</h3>
+                    <h3>{verified ? "承認済み" : "審査中"}</h3>
                     <p>運営が許可証を確認・審査します。番号等の変更が必要な場合は運営へお問い合わせください。</p>
                   </div>
                 </div>

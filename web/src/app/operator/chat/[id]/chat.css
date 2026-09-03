@@ -85,6 +85,30 @@
   border-radius: 50%;
   background: var(--danger);
 }
+.opchat-page .ch-txn-link {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--body-soft);
+  padding: 8px 12px;
+  border-radius: 0;
+  white-space: nowrap;
+  transition: color .15s, background .15s;
+}
+.opchat-page .ch-txn-link:hover { color: var(--blue); background: var(--pale); }
+.opchat-page .ch-logout {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--body-soft);
+  background: none;
+  border: 1.5px solid var(--line);
+  border-radius: 0;
+  padding: 7px 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: border-color .15s, color .15s;
+}
+.opchat-page .ch-logout:hover { border-color: var(--blue); color: var(--blue); }
 
 /* メインレイアウト（左サイドバー チャット 右パネル） */
 .opchat-page .chat-layout { display: flex; flex: 1; overflow: hidden; }
@@ -513,6 +537,7 @@
   .opchat-page .case-sidebar { width: 160px; }
   .opchat-page .ch-company { display: none; }
   .opchat-page .ch-badge { display: none; }
+  .opchat-page .ch-txn-link { display: none; }
 }
 @media (max-width: 440px) {
   .opchat-page .case-sidebar { display: none; }

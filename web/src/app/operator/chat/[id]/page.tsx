@@ -17,6 +17,7 @@ import "./chat.css";
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Ic } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
@@ -287,6 +288,16 @@ export default function OperatorChatPage() {
             </svg>
             <span className="bell-dot" aria-hidden="true" />
           </Link>
+          <Link href="/operator/transactions" className="ch-txn-link">
+            落札管理へ
+          </Link>
+          <button
+            type="button"
+            className="ch-logout"
+            onClick={() => signOut({ callbackUrl: "/operator/login" })}
+          >
+            ログアウト
+          </button>
         </div>
       </header>
 
