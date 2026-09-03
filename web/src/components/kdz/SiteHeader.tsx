@@ -29,6 +29,7 @@ const DEFAULT_MOBILE: NavItem[] = [
  * - スクロールで .scrolled を付与し境界線・影を出す
  * - ハンバーガーで .menu-open をトグル（隣接 .mobile-menu が display:flex）
  * CTA は出品導線（/create）、ログインは /login に接続。
+ * モバイルメニュー内の CTA は Dock（画面下固定）と重複するため置かない。
  */
 export function SiteHeader({
   nav = DEFAULT_NAV,
@@ -94,10 +95,6 @@ export function SiteHeader({
             {n.label}
           </Link>
         ))}
-        <Link href={ctaHref} className="btn btn-line btn-block mm-cta" onClick={() => setOpen(false)}>
-          <Ic name="chat" />
-          {ctaLabel}
-        </Link>
       </div>
     </>
   );
