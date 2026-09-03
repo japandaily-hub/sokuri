@@ -10,6 +10,7 @@ import {
   Notice,
   PageShell,
   StatusBadge,
+  btnDanger,
   btnPrimary,
   btnSecondary,
   inputBase,
@@ -22,6 +23,7 @@ import {
   adminGetOperatorLicenseImage,
   adminListInvites,
   adminListOperators,
+  adminSuspendOperator,
   adminVerifyOperator,
   toDisplayMessage,
   type CellDensityRow,
@@ -206,6 +208,28 @@ export default function AdminPage() {
     }
   }
 
+  // 停止／停止解除。停止中は業者の既存トークンが全て 403 になりログインも拒否される。
+  async function toggleSuspend(op: OperatorOut) {
+    if (!token || busy) return;
+    const next = !op.is_suspended;
+    const ok = window.confirm(
+      next
+        ? `${op.company_name}のアカウントを停止します。停止中は業者の全操作とログインができなくなります。よろしいですか？`
+        : `${op.company_name}の停止を解除します。よろしいですか？`,
+    );
+    if (!ok) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await adminSuspendOperator(op.id, next, token);
+      await reload();
+    } catch (e) {
+      showError(toDisplayMessage(e, "更新に失敗しました"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   // 承認（active化）の前だけ確認ダイアログを挟む。承認取消は従来通り即時実行する。
   function handleVerifyClick(op: OperatorOut) {
     if (op.vendor_status !== "active") {
@@ -247,8 +271,13 @@ export default function AdminPage() {
       return acc;
     }, {}) ?? {};
 
-  const filteredOperators = searchedOperators?.filter(
-    (op) => statusFilter === "all" || op.vendor_status === statusFilter,
+  const suspendedCount = searchedOperators?.filter((op) => op.is_suspended).length ?? 0;
+  const filteredOperators = searchedOperators?.filter((op) =>
+    statusFilter === "all"
+      ? true
+      : statusFilter === "suspended"
+        ? op.is_suspended
+        : op.vendor_status === statusFilter,
   );
 
   if (loading || (!invites && !error)) {
@@ -392,7 +421,7 @@ export default function AdminPage() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-normal text-slate-900">業者アカウント</h2>
             <div className="flex flex-wrap gap-2">
-              {["all", "active", "limited", "pending"].map((s) => (
+              {["all", "active", "limited", "pending", "suspended"].map((s) => (
                 <button
                   key={s}
                   type="button"
@@ -403,7 +432,12 @@ export default function AdminPage() {
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                   }`}
                 >
-                  {s === "all" ? "すべて" : s} {s === "all" ? searchedOperators?.length ?? 0 : operatorStatusCounts[s] ?? 0}
+                  {s === "all" ? "すべて" : s === "suspended" ? "停止中" : s}{" "}
+                  {s === "all"
+                    ? searchedOperators?.length ?? 0
+                    : s === "suspended"
+                      ? suspendedCount
+                      : operatorStatusCounts[s] ?? 0}
                 </button>
               ))}
             </div>
@@ -456,17 +490,29 @@ export default function AdminPage() {
                       <button
                         type="button"
                         onClick={() => handleVerifyClick(op)}
-                        disabled={busy || (op.vendor_status !== "active" && !op.has_license_image)}
+                        disabled={
+                          busy || op.is_suspended || (op.vendor_status !== "active" && !op.has_license_image)
+                        }
                         className={op.vendor_status === "active" ? btnSecondary : btnPrimary}
                       >
                         {op.vendor_status === "active" ? "承認を取消" : "承認する"}
                       </button>
-                      {op.vendor_status !== "active" && !op.has_license_image ? (
+                      {op.is_suspended ? (
+                        <p className="text-xs text-red-600">停止中です。承認状態の変更は停止解除後に行ってください</p>
+                      ) : op.vendor_status !== "active" && !op.has_license_image ? (
                         <p className="text-xs text-red-600">
                           許可証画像が未提出のため承認できません
                         </p>
                       ) : null}
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => void toggleSuspend(op)}
+                      disabled={busy}
+                      className={op.is_suspended ? btnPrimary : btnDanger}
+                    >
+                      {op.is_suspended ? "停止を解除" : "停止する"}
+                    </button>
                   </div>
                 </li>
               );

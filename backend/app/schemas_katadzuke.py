@@ -611,6 +611,12 @@ class OperatorVerifyRequest(BaseModel):
     verified: bool = True
 
 
+class OperatorSuspendRequest(BaseModel):
+    """業者アカウントの停止／停止解除（admin 専用）。"""
+
+    suspended: bool
+
+
 # ──────────────────────────── 業者事前申込（/business） ────────────────────────────
 
 

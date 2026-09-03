@@ -925,7 +925,16 @@ async def test_admin_approve_sets_active(client: AsyncClient, db_session: AsyncS
     )
     assert r.status_code == 201
     op_id = r.json()["operator"]["id"]
+    op_token = r.json()["access_token"]
     assert r.json()["operator"]["vendor_status"] == "pending"
+
+    # 承認（pending → active）には許可証画像の提出が必須
+    r = await client.post(
+        "/api/v1/operator/license-image",
+        files={"file": ("license.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 256, "image/png")},
+        headers=_auth(op_token),
+    )
+    assert r.status_code == 200, r.text
 
     r = await client.patch(
         f"/api/v1/admin/operators/{op_id}/verify",

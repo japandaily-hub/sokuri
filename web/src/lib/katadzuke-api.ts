@@ -982,6 +982,19 @@ export function adminVerifyOperator(
   });
 }
 
+/** admin が業者アカウントを停止（true）／停止解除（false）する。承認状態（vendor_status）は変えない。 */
+export function adminSuspendOperator(
+  operatorId: string,
+  suspended: boolean,
+  token: string,
+): Promise<OperatorOut> {
+  return request(`/admin/operators/${operatorId}/suspend`, {
+    method: "PATCH",
+    body: JSON.stringify({ suspended }),
+    token,
+  });
+}
+
 /**
  * admin が業者の古物商許可証画像を確認する（画像バイナリ）。
  * request<T>() は JSON専用のためここでも生 fetch を使い、Blob をそのまま返す

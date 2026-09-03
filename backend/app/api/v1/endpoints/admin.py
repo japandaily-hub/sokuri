@@ -30,6 +30,7 @@ from app.schemas_katadzuke import (
     OperatorApplicationOut,
     OperatorApplicationRejectRequest,
     OperatorOut,
+    OperatorSuspendRequest,
     OperatorVerifyRequest,
 )
 from app.services import notify
@@ -172,10 +173,46 @@ async def verify_operator(
     operator = await session.get(Operator, operator_id)
     if operator is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Operator not found.")
+    # 承認（pending/limited → active）は古物商許可証画像の提出を必須にする。
+    # 招待コード登録で既に active の業者に対する verified_at の付与は対象外
+    # （状態遷移を伴わないため）。フロント（/admin）の disabled 制御と同じ規則。
+    if body.verified and operator.vendor_status != "active" and not operator.has_license_image:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="許可証画像が未提出のため承認できません。業者に許可証のアップロードを依頼してください。",
+        )
     operator.verified_at = datetime.now(timezone.utc) if body.verified else None
     operator.vendor_status = "active" if body.verified else "pending"
     await session.commit()
     await session.refresh(operator)
+    logger.info(
+        "admin_operator_verify admin=%s operator=%s verified=%s", admin.id, operator.id, body.verified
+    )
+    return OperatorOut.model_validate(operator)
+
+
+@router.patch("/admin/operators/{operator_id}/suspend", response_model=OperatorOut)
+async def suspend_operator(
+    operator_id: uuid.UUID,
+    body: OperatorSuspendRequest,
+    admin: User = Depends(get_current_admin),
+    session: AsyncSession = Depends(get_session),
+) -> OperatorOut:
+    """業者アカウントを停止（suspended=true）／停止解除（false）する。
+
+    停止中は ``assert_operator_not_suspended``（deps.py）により既存トークンでの
+    全操作が 403 になり、ログインも拒否される。解除すると即時に元の
+    vendor_status のまま復帰する（承認状態は変更しない）。
+    """
+    operator = await session.get(Operator, operator_id)
+    if operator is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Operator not found.")
+    operator.is_suspended = body.suspended
+    await session.commit()
+    await session.refresh(operator)
+    logger.info(
+        "admin_operator_suspend admin=%s operator=%s suspended=%s", admin.id, operator.id, body.suspended
+    )
     return OperatorOut.model_validate(operator)
 
 

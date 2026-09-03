@@ -4,8 +4,8 @@
 
 ## 現在フェーズ
 - **2026-09-04 3視点導線監査（依頼者／業者／運営）＋レスポンシブ是正をローカルコミット済み（未push）。** 台帳: `.agent-state/audit/`（user-journey / vendor-journey / operator-crosscut / verify-* / review-qa / round2 は戻り値のみ）。High 21件→CONFIRMED 19・PARTIAL 2、追加発見 6、第2周で回帰 3 を捕捉し全て修正。web のみ 33 ファイル。tsc 0・eslint 0 error・`next build` 成功。
-  - 意図的未対応（backend 変更が要る）: 業者停止解除 API 無し／承認 API が許可証未提出を拒否しない（フロントのみガード）／案件一覧のエリアフィルタ未実装（案内文は実態に合わせ是正済み）／katadzuke-api.ts の 422 detail 配列握り潰し（入札額は事前検証で回避）。
-  - push は保留: ローカル main に別セッションの cancel_case 実装（83ca245・03ca239）が未 push で載っており、一緒に本番へ出るため。push 可否はユーザー判断。
+  - 2026-09-04 push 済み（4a03154・3環境 success・/health commit=4a03154）。続けて backend: `PATCH /admin/operators/{id}/suspend`（停止／解除）新設と、承認 API の許可証ゲート（pending/limited→active は has_license_image 必須・409）を追加。/admin に停止／解除ボタン・「停止中」フィルタ・停止中は承認操作不可。pytest 569 件通過。
+  - 残る意図的未対応: 案件一覧のエリアフィルタ未実装（案内文は実態に合わせ是正済み）／katadzuke-api.ts の 422 detail 配列握り潰し（入札額は事前検証で回避）／停止解除で旧トークンが再有効化する（トークン世代カウンタ未実装・セキュリティ Medium）／招待コード登録は許可証未提出でも active（運用前提・要判断）。
 - 人の森整合テーマ（明朝・角丸0・影0・額装フレーム）は全41ルートへ適用済み・**push 済み・本番反映済み**。
   ただし主色はユーザー指示で **苔色 → ブルー #1447e0** へ変更済み（a492bc9）。かたちは人の森整合のまま、色相のみブルー。
 - LP図版はフォトリアル3Dレンダー29点＋クレイ調3Dアイコン24点へ差し替え済み（7ca3c4d / 3743e4e）。
