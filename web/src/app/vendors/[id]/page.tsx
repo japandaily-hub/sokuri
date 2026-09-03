@@ -60,7 +60,7 @@ export default function VendorDetailPage() {
     return (
       <div className="vendor-page">
         <AppHeader unread />
-        <main>
+        <main id="main">
           <div className="vendor-wrap">
             <Notice tone="error">{error ?? "業者情報が見つかりません。"}</Notice>
             <Link href="/cases" className="vendor-back" style={{ marginTop: 16 }}>
@@ -82,7 +82,7 @@ export default function VendorDetailPage() {
     <div className="vendor-page">
       <AppHeader unread />
 
-      <main>
+      <main id="main">
         <div className="vendor-wrap">
           {/* 案件一覧に戻る */}
           <Link href="/cases" className="vendor-back">

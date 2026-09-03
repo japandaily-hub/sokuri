@@ -56,7 +56,7 @@ function OperatorLoginForm() {
             </div>
 
             {error ? (
-              <div className="auth-error">
+              <div className="auth-error" role="alert">
                 <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: "none", stroke: "var(--danger)", strokeWidth: 2, strokeLinecap: "round", flexShrink: 0 }}>
                   <circle cx="12" cy="12" r="9" />
                   <path d="M12 8v4M12 16h.01" />

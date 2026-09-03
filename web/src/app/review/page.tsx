@@ -146,7 +146,7 @@ function ReviewPageInner() {
     return (
       <div className="review-page">
         <AppHeader unread />
-        <main>
+        <main id="main">
           <div className="review-wrap">
             <Notice tone="error">
               {!transactionId
@@ -180,7 +180,7 @@ function ReviewPageInner() {
     <div className="review-page">
       <AppHeader unread />
 
-      <main>
+      <main id="main">
         <div className="review-wrap">
           {/* 状態バナー: completed のみ「完了」表示。pending/visiting は進行中、cancelled はキャンセル表示。 */}
           {isCompleted ? (

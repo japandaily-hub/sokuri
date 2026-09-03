@@ -51,13 +51,13 @@
   --maxw-text:760px;
 
   /* --- 書体：和文は明朝（Noto Serif JP 先頭＝Windows/Android で確実に明朝） --- */
-  --serif:"Noto Serif JP","Hiragino Mincho ProN","Hiragino Mincho Pro","Yu Mincho","YuMincho","游明朝体",serif;
-  --ui:"Noto Sans JP","Hiragino Kaku Gothic ProN","Yu Gothic UI",sans-serif;
+  --serif:var(--font-serif),"Noto Serif JP","Hiragino Mincho ProN","Hiragino Mincho Pro","Yu Mincho","YuMincho","游明朝体",serif;
+  --ui:var(--font-ui),"Noto Sans JP","Hiragino Kaku Gothic ProN","Yu Gothic UI",sans-serif;
   --head:var(--serif);
   --sans:var(--serif);
   --num:var(--ui);       /* 数値はゴシック（誤読コストを下げる） */
-  --en:"Montserrat",sans-serif;
-  --en-display:"Libre Baskerville",serif;
+  --en:var(--font-en),"Montserrat",sans-serif;
+  --en-display:var(--font-en-display),"Libre Baskerville",serif;
 
   /* --- 旧名エイリアス（39本の per-page CSS 互換） --- */
   --blue:var(--primary);

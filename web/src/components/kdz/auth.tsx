@@ -89,7 +89,8 @@ export function PasswordField({
       <button
         type="button"
         className="pw-toggle"
-        aria-label="パスワードを表示/非表示"
+        aria-label={show ? "パスワードを非表示にする" : "パスワードを表示する"}
+        aria-pressed={show}
         onClick={() => setShow((s) => !s)}
       >
         <svg viewBox="0 0 24 24">{show ? EYE_OFF : EYE}</svg>

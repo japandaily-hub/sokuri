@@ -84,7 +84,7 @@ export default function CreateCompletePage() {
         </Link>
       </header>
 
-      <main className="done-main">
+      <main id="main" className="done-main">
         <div className="done-card">
           {/* 完了アイコン（描画アニメ） */}
           <div className="done-circle">

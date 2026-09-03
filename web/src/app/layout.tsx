@@ -1,10 +1,19 @@
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
+import { Noto_Serif_JP, Noto_Sans_JP, Montserrat, Libre_Baskerville } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { KdzIconSprite } from "@/components/kdz/Icons";
 import { SiteChrome } from "@/components/kdz/SiteChrome";
 import { ScrollProgress } from "@/components/kdz/interactions";
+
+/** 書体は next/font/google でビルド時に自己ホストする（外部オリジンへの実行時リクエストをゼロにし、
+ *  CSP/SRI 不在の攻撃面と訪問者IPの第三者送信を同時に消す）。CSS 側は katazuke.css の
+ *  --serif / --ui / --en / --en-display がこれらの変数を先頭で参照する。 */
+const fontSerif = Noto_Serif_JP({ subsets: ["latin"], weight: ["400", "600"], display: "swap", variable: "--font-serif" });
+const fontUi = Noto_Sans_JP({ subsets: ["latin"], weight: ["400", "500"], display: "swap", variable: "--font-ui" });
+const fontEn = Montserrat({ subsets: ["latin"], weight: ["600"], display: "swap", variable: "--font-en" });
+const fontEnDisplay = Libre_Baskerville({ subsets: ["latin"], weight: ["400"], display: "swap", variable: "--font-en-display" });
 
 /**
  * 本番公開 URL。独自ドメイン取得後に差し替え。
@@ -91,18 +100,16 @@ const WEBSITE_LD = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="ja">
+    <html lang="ja" className={`${fontSerif.variable} ${fontUi.variable} ${fontEn.variable} ${fontEnDisplay.variable}`}>
       <head>
         {/* 明朝は本文全面に効くため、CSS パース完了を待たずに書体取得を開始させる（LCP 対策） */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
       </head>
       {/* antialiased は明朝 400 で字画が痩せるため付与しない（globals.css @layer base も auto） */}
       <body className="min-h-screen">
         {/* スキップリンク（WCAG 2.4.1） */}
         <a
           href="#main"
-          className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[100] focus:rounded-md focus:bg-brand-600 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[300] focus:rounded-md focus:bg-brand-600 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
         >
           本文へスキップ
         </a>
@@ -120,13 +127,13 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           id="ld-organization"
           type="application/ld+json"
           strategy="afterInteractive"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(ORG_LD) }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(ORG_LD).replace(/</g, "\u003c") }}
         />
         <Script
           id="ld-website"
           type="application/ld+json"
           strategy="afterInteractive"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(WEBSITE_LD) }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(WEBSITE_LD).replace(/</g, "\u003c") }}
         />
       </body>
     </html>

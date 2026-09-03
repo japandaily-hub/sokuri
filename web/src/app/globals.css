@@ -1,8 +1,6 @@
-/* 人の森整合テーマの指定フォント（実行時ロード・ビルド非依存）。
-   和文明朝 = Noto Serif JP 400/600（500 は游明朝に実ウェイトが無く合成太字で滲むため読まない）、
-   入力値・数値 = Noto Sans JP 400/500、英字ラベル = Montserrat 600 / Libre Baskerville 400。
+/* 書体は layout.tsx の next/font/google で自己ホスト（--font-serif / --font-ui / --font-en / --font-en-display）。
+   外部オリジンへの実行時 @import は行わない（CSP/SRI・プライバシー対策）。
    フォールバックは katazuke.css の --serif / --ui に OS 標準書体を記載済み。 */
-@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;600&family=Noto+Sans+JP:wght@400;500&family=Montserrat:wght@600&family=Libre+Baskerville:wght@400&display=swap");
 
 /* カスケードレイヤー順を明示（base < components < utilities）。
    名前のみの @layer 文は @import より前に置ける（仕様準拠）。 */

@@ -25,7 +25,7 @@ export default function Error({
   }, [error]);
 
   return (
-    <main className="nf-main">
+    <main id="main" className="nf-main">
       <div className="nf-card">
         <div className="nf-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">

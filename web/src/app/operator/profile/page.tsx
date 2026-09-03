@@ -355,7 +355,7 @@ export default function OperatorProfilePage() {
         </div>
       </div>
 
-      <main>
+      <main id="main">
         {loadError ? (
           <div className="demo-note">
             <div className="demo-banner">
