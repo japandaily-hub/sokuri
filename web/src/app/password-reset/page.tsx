@@ -64,7 +64,7 @@ export default function PasswordResetPage() {
     return sc;
   }
   const sc = strengthScore(pw1);
-  const strengthColors = ["#e05c5c", "#f0a030", "var(--green)"];
+  const strengthColors = ["var(--danger)", "#f0a030", "var(--green)"];
   const strengthLabels = ["弱い", "普通", "強い"];
   const activeColor = strengthColors[Math.min(Math.max(sc - 1, 0), 2)];
 
@@ -275,7 +275,7 @@ export default function PasswordResetPage() {
               </svg>
             </div>
             <div className="reset-panel-title" style={{ textAlign: "center" }}>
-              パスワードを変更しました！
+              パスワードを変更しました。
             </div>
             <p className="reset-panel-sub" style={{ textAlign: "center" }}>
               新しいパスワードでログインできます。

@@ -12,9 +12,9 @@
 /* ヒーロー — トップページと同じ明るいトーン */
 .business-page .biz-hero {
   background:
-    radial-gradient(58% 52% at 84% -10%, rgba(63, 116, 255, .22) 0%, rgba(63, 116, 255, 0) 60%),
+    radial-gradient(58% 52% at 84% -10%, rgba(82,126,82, .22) 0%, rgba(82,126,82, 0) 60%),
     radial-gradient(30% 30% at -6% -8%, rgba(244, 112, 63, .13) 0%, rgba(244, 112, 63, 0) 70%),
-    linear-gradient(180deg, #f7faff 0%, #fffdfb 58%);
+    linear-gradient(180deg, var(--pale) 0%, var(--pale) 58%);
   color: var(--body);
   padding: clamp(72px, 9vw, 120px) 0 clamp(64px, 8vw, 104px);
   position: relative;
@@ -25,7 +25,7 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 80% 60% at 110% 10%, rgba(31, 84, 222, .10) 0%, transparent 60%),
+    radial-gradient(ellipse 80% 60% at 110% 10%, rgba(82,126,82, .10) 0%, transparent 60%),
     radial-gradient(ellipse 60% 50% at -10% 90%, rgba(244, 112, 63, .08) 0%, transparent 60%);
   pointer-events: none;
 }
@@ -73,11 +73,11 @@
 .business-page .stat-num {
   font-family: var(--head);
   font-size: clamp(28px, 3.5vw, 40px);
-  font-weight: 900;
+  font-weight: 400;
   color: var(--navy);
   line-height: 1;
 }
-.business-page .stat-num span { font-size: .58em; font-weight: 700; color: var(--blue); margin-left: 2px; }
+.business-page .stat-num span { font-size: .58em; font-weight: 600; color: var(--blue); margin-left: 2px; }
 .business-page .stat-label { font-size: 13px; color: var(--body-soft); margin-top: 6px; font-weight: 600; }
 
 /* メリットグリッド */
@@ -94,11 +94,11 @@
   box-shadow: var(--shadow-s);
   transition: box-shadow .25s, transform .25s;
 }
-.business-page .merit-card:hover { box-shadow: var(--shadow-m); transform: translateY(-3px); }
+.business-page .merit-card:hover { box-shadow: var(--shadow-m); }
 .business-page .merit-num {
   font-family: var(--head);
   font-size: 13px;
-  font-weight: 900;
+  font-weight: 400;
   color: var(--blue);
   letter-spacing: .1em;
   margin-bottom: 18px;
@@ -112,14 +112,14 @@
 .business-page .merit-tag {
   display: inline-block;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   padding: 3px 10px;
-  border-radius: 99px;
+  border-radius: 0;
   margin-bottom: 12px;
 }
 .business-page .merit-tag.green { background: #e6f5ee; color: var(--green); }
 .business-page .merit-tag.blue { background: var(--pale); color: var(--blue); }
-.business-page .merit-tag.gold { background: #fdf5e6; color: var(--gold); }
+.business-page .merit-tag.gold { background: var(--warm); color: var(--gold); }
 
 /* フロー（業者視点） */
 .business-page .biz-flow {
@@ -135,7 +135,7 @@
   left: calc(12.5% + 8px);
   right: calc(12.5% + 8px);
   height: 2px;
-  background: linear-gradient(90deg, var(--blue) 0%, #5b9bff 100%);
+  background: linear-gradient(90deg, var(--blue) 0%, var(--primary) 100%);
   z-index: 0;
 }
 .business-page .biz-step {
@@ -170,7 +170,7 @@
   border-radius: 50%;
   font-family: var(--head);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 400;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -196,7 +196,7 @@
 .business-page .req-ic {
   width: 44px;
   height: 44px;
-  border-radius: 12px;
+  border-radius: 0;
   background: var(--pale);
   flex-shrink: 0;
   display: flex;
@@ -233,7 +233,7 @@
 .business-page .field label .req {
   display: inline-block;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   color: #fff;
   background: var(--blue);
   padding: 1px 6px;
@@ -256,7 +256,7 @@
   font-family: var(--sans);
   font-size: 15px;
   color: var(--ink);
-  background: #fafbfe;
+  background: var(--pale);
   border: 1.5px solid var(--line);
   border-radius: var(--radius-s);
   padding: 13px 16px;
@@ -266,18 +266,18 @@
   line-height: 1.6;
 }
 .business-page .field input::placeholder,
-.business-page .field textarea::placeholder { color: #bcc3d4; }
+.business-page .field textarea::placeholder { color: var(--line); }
 .business-page .field input:focus,
 .business-page .field select:focus,
 .business-page .field textarea:focus {
   border-color: var(--blue);
   background: #fff;
-  box-shadow: 0 0 0 3px rgba(31, 84, 222, .12);
+  box-shadow: 0 0 0 3px rgba(82,126,82, .12);
 }
 .business-page .field input.is-invalid,
 .business-page .field select.is-invalid {
-  border-color: #e05c5c;
-  box-shadow: 0 0 0 3px rgba(224, 92, 92, .12);
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(215,0,53, .12);
 }
 .business-page .field textarea { resize: vertical; min-height: 120px; }
 .business-page .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -292,7 +292,7 @@
 }
 .business-page .biz-bank-heading {
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--navy);
   margin-bottom: 6px;
 }
@@ -306,7 +306,7 @@
 /* 送信エラー表示 */
 .business-page .biz-submit-error {
   font-size: 13.5px;
-  color: #e05c5c;
+  color: var(--danger);
   background: #fdf1f1;
   border: 1px solid #f3c8c8;
   border-radius: var(--radius-s);
@@ -348,7 +348,7 @@
   line-height: 1.75;
   cursor: pointer;
 }
-.business-page .check-field.is-invalid label { color: #e05c5c; }
+.business-page .check-field.is-invalid label { color: var(--danger); }
 .business-page .check-field label a { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; }
 .business-page .submit-area {
   display: flex;
@@ -363,20 +363,20 @@
   padding: 20px 36px;
   background: var(--blue);
   color: #fff;
-  border-radius: 999px;
+  border-radius: 0;
   font-family: var(--head);
-  font-weight: 900;
+  font-weight: 400;
   border: none;
   cursor: pointer;
-  box-shadow: 0 14px 26px -12px rgba(31, 84, 222, .65);
+  box-shadow: none;
   transition: .25s var(--ease);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
 }
-.business-page .btn-submit:hover { background: var(--blue-d); transform: translateY(-2px); box-shadow: 0 20px 34px -12px rgba(31, 84, 222, .75); }
-.business-page .btn-submit:disabled { opacity: .6; cursor: not-allowed; transform: none; box-shadow: 0 14px 26px -12px rgba(31, 84, 222, .65); }
+.business-page .btn-submit:hover { background: var(--blue-d); box-shadow: none; }
+.business-page .btn-submit:disabled { opacity: .6; cursor: not-allowed; transform: none; box-shadow: none; }
 .business-page .btn-submit .biz-send-ic { width: 20px; height: 20px; }
 .business-page .submit-note { font-size: 12.5px; color: var(--body-soft); text-align: center; line-height: 1.75; }
 

@@ -27,7 +27,7 @@ export function AppHeader({ unread = false }: { unread?: boolean }) {
             {unread ? (
               <span
                 aria-hidden="true"
-                style={{ position: "absolute", top: 7, right: 8, width: 9, height: 9, borderRadius: "50%", background: "#e05c5c", border: "2px solid #fff" }}
+                style={{ position: "absolute", top: 7, right: 8, width: 9, height: 9, borderRadius: "50%", background: "var(--danger)", border: "2px solid var(--white)" }}
               />
             ) : null}
           </Link>

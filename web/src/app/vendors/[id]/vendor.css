@@ -6,10 +6,10 @@
    keyframes 名はページ固有（vendor-*）にして衝突回避。
    ============================================================ */
 
-/* ページ全体ラッパ（背景＝デザイン指定 #f4f6fb） */
+/* ページ全体ラッパ（背景＝デザイン指定 var(--pale)） */
 .vendor-page {
   min-height: 100vh;
-  background: #f4f6fb;
+  background: var(--pale);
 }
 .vendor-page .vendor-wrap {
   max-width: 720px;
@@ -23,7 +23,7 @@
   align-items: center;
   gap: 5px;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--body-soft);
   text-decoration: none;
   transition: color .2s;
@@ -52,17 +52,17 @@
 }
 .vendor-page .biz-big-avatar {
   width: 80px; height: 80px;
-  border-radius: 20px;
+  border-radius: 0;
   flex-shrink: 0;
   display: grid; place-items: center;
   font-family: var(--head);
-  font-size: 32px; font-weight: 900; color: #fff;
+  font-size: 32px; font-weight: 400; color: #fff;
 }
 .vendor-page .biz-hero-info { flex: 1; min-width: 0; }
 .vendor-page .biz-hero-name {
   font-family: var(--head);
   font-size: clamp(18px, 3vw, 22px);
-  font-weight: 900;
+  font-weight: 400;
   color: var(--navy);
   line-height: 1.3;
 }
@@ -81,10 +81,10 @@
   margin-top: 8px;
 }
 .vendor-page .biz-tag {
-  font-size: 11px; font-weight: 700;
-  padding: 4px 10px; border-radius: 99px;
+  font-size: 11px; font-weight: 600;
+  padding: 4px 10px; border-radius: 0;
 }
-.vendor-page .biz-tag-green { background: rgba(31,138,91,.1); color: var(--green); }
+.vendor-page .biz-tag-green { background: rgba(82,126,82,.1); color: var(--green); }
 .vendor-page .biz-tag-blue  { background: var(--pale); color: var(--blue); }
 
 /* 評価スター */
@@ -97,7 +97,7 @@
 }
 .vendor-page .rating-num {
   font-family: var(--head);
-  font-size: 28px; font-weight: 900; color: var(--navy);
+  font-size: 28px; font-weight: 400; color: var(--navy);
 }
 .vendor-page .rating-count {
   font-size: 13px; color: var(--body-soft);
@@ -112,7 +112,7 @@
   display: flex; align-items: center; gap: 8px;
 }
 .vendor-page .rating-bar-lbl {
-  font-size: 11.5px; color: var(--body-soft); font-weight: 700;
+  font-size: 11.5px; color: var(--body-soft); font-weight: 600;
   width: 14px; text-align: right;
 }
 .vendor-page .rating-bar-track {
@@ -133,12 +133,12 @@
   margin-bottom: 20px;
 }
 .vendor-page .biz-stat {
-  background: var(--pale); border-radius: 12px;
+  background: var(--pale); border-radius: 0;
   padding: 14px 10px; text-align: center;
 }
 .vendor-page .biz-stat-val {
   font-family: var(--head);
-  font-size: 22px; font-weight: 900; color: var(--navy); line-height: 1;
+  font-size: 22px; font-weight: 400; color: var(--navy); line-height: 1;
 }
 .vendor-page .biz-stat-val small {
   font-size: 12px; color: var(--body-soft); margin-left: 2px;
@@ -150,37 +150,37 @@
 /* 専門カテゴリ見出し */
 .vendor-page .cat-heading {
   margin-bottom: 6px;
-  font-size: 12px; font-weight: 700; color: var(--body-soft);
+  font-size: 12px; font-weight: 600; color: var(--body-soft);
 }
 /* 専門カテゴリ chip */
 .vendor-page .cat-grid { display: flex; gap: 8px; flex-wrap: wrap; }
 .vendor-page .cat-chip {
   background: var(--pale); color: var(--blue);
-  font-family: var(--head); font-size: 13px; font-weight: 700;
-  padding: 8px 14px; border-radius: 10px;
-  border: 1.5px solid rgba(31,84,222,.2);
+  font-family: var(--head); font-size: 13px; font-weight: 600;
+  padding: 8px 14px; border-radius: 0;
+  border: 1.5px solid rgba(82,126,82,.2);
 }
 
 /* ── 入札ハイライト ── */
 .vendor-page .bid-highlight {
-  background: linear-gradient(135deg, #e4edff 0%, #d0e0ff 100%);
-  border: 1.5px solid rgba(31,84,222,.22);
+  background: linear-gradient(135deg, var(--line) 0%, var(--line) 100%);
+  border: 1.5px solid rgba(82,126,82,.22);
   border-radius: var(--radius);
   padding: 24px; margin-bottom: 14px;
-  box-shadow: 0 8px 24px -12px rgba(31,84,222,.25);
+  box-shadow: none;
 }
 .vendor-page .bid-highlight-top {
   display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
 }
 .vendor-page .bid-label-badge {
   background: var(--blue); color: #fff;
-  font-family: var(--head); font-size: 12px; font-weight: 700;
-  padding: 4px 12px; border-radius: 99px;
+  font-family: var(--head); font-size: 12px; font-weight: 600;
+  padding: 4px 12px; border-radius: 0;
   display: inline-flex; align-items: center; gap: 4px;
 }
 .vendor-page .bid-amount-big {
   font-family: var(--head);
-  font-size: 40px; font-weight: 900; color: var(--navy); line-height: 1;
+  font-size: 40px; font-weight: 400; color: var(--navy); line-height: 1;
 }
 .vendor-page .bid-amount-big small {
   font-size: 16px; color: var(--body-soft); margin-right: 4px;
@@ -208,7 +208,7 @@
 }
 .vendor-page .detail-card-title {
   font-family: var(--head);
-  font-size: 15px; font-weight: 700; color: var(--navy);
+  font-size: 15px; font-weight: 600; color: var(--navy);
   margin-bottom: 16px;
   display: flex; align-items: center; gap: 8px;
 }
@@ -221,8 +221,8 @@
 .vendor-page .promise-list { display: flex; flex-direction: column; gap: 12px; }
 .vendor-page .promise-item { display: flex; align-items: flex-start; gap: 12px; }
 .vendor-page .promise-ic {
-  width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0;
-  background: #e8faf0; color: var(--green);
+  width: 32px; height: 32px; border-radius: 0; flex-shrink: 0;
+  background: var(--pale); color: var(--green);
   display: grid; place-items: center;
 }
 .vendor-page .promise-ic svg {
@@ -232,7 +232,7 @@
 .vendor-page .promise-body strong {
   display: block;
   font-family: var(--head);
-  font-size: 13.5px; font-weight: 700; color: var(--navy);
+  font-size: 13.5px; font-weight: 600; color: var(--navy);
 }
 .vendor-page .promise-body span {
   font-size: 12.5px; color: var(--body-soft); line-height: 1.7;
@@ -250,12 +250,12 @@
 .vendor-page .reviewer-avatar {
   width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
   display: grid; place-items: center;
-  font-family: var(--head); font-size: 14px; font-weight: 900; color: #fff;
+  font-family: var(--head); font-size: 14px; font-weight: 400; color: #fff;
 }
 .vendor-page .reviewer-info { flex: 1; }
 .vendor-page .reviewer-name {
   font-family: var(--head);
-  font-size: 13.5px; font-weight: 700; color: var(--navy);
+  font-size: 13.5px; font-weight: 600; color: var(--navy);
 }
 .vendor-page .review-meta {
   font-size: 11.5px; color: var(--body-soft); margin-top: 2px;
@@ -271,13 +271,13 @@
 }
 .vendor-page .review-tag {
   font-size: 11px; background: var(--line-soft); color: var(--body-soft);
-  padding: 3px 9px; border-radius: 99px; font-weight: 600;
+  padding: 3px 9px; border-radius: 0; font-weight: 600;
 }
 .vendor-page .review-more {
   text-align: center; margin-top: 16px;
 }
 .vendor-page .review-more-btn {
-  font-size: 13.5px; font-weight: 700; color: var(--blue);
+  font-size: 13.5px; font-weight: 600; color: var(--blue);
   background: none; border: none; cursor: pointer;
   text-decoration: underline; text-underline-offset: 3px;
   font-family: var(--head);
@@ -286,18 +286,17 @@
 /* 対応エリア */
 .vendor-page .area-tags { display: flex; gap: 6px; flex-wrap: wrap; }
 .vendor-page .area-tag {
-  font-size: 13px; font-weight: 700; padding: 7px 14px; border-radius: 10px;
-  background: #f0f4ff; color: var(--blue); border: 1px solid rgba(31,84,222,.15);
+  font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 0;
+  background: var(--pale); color: var(--blue); border: 1px solid rgba(82,126,82,.15);
 }
 
 /* ── 固定フッターCTA ── */
 .vendor-page .biz-footer-cta {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
-  background: rgba(255,255,255,.95);
-  backdrop-filter: blur(10px);
+  background: #fff;
   border-top: 1px solid var(--line);
   padding: 14px 20px;
-  box-shadow: 0 -6px 24px -12px rgba(15,37,82,.2);
+  box-shadow: none;
 }
 .vendor-page .biz-footer-inner {
   max-width: 720px; margin: 0 auto;
@@ -307,7 +306,7 @@
 .vendor-page .biz-footer-info strong {
   display: block;
   font-family: var(--head);
-  font-size: 15px; font-weight: 900; color: var(--navy);
+  font-size: 15px; font-weight: 400; color: var(--navy);
 }
 .vendor-page .biz-footer-info span {
   font-size: 12px; color: var(--body-soft);
@@ -327,7 +326,7 @@
   .vendor-page .biz-footer-cta .btn { font-size: 13px; padding: 10px 14px; }
 }
 @media (max-width: 400px) {
-  .vendor-page .biz-big-avatar { width: 64px; height: 64px; font-size: 26px; border-radius: 16px; }
+  .vendor-page .biz-big-avatar { width: 64px; height: 64px; font-size: 26px; border-radius: 0; }
   .vendor-page .biz-hero-name { font-size: 16px; }
   .vendor-page .biz-stat-val { font-size: 18px; }
   .vendor-page .bid-amount-big { font-size: 24px; }

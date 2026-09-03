@@ -32,7 +32,7 @@
 .op-dash .dash-tab {
   padding: 10px 20px;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--body-soft);
   cursor: pointer;
   border-bottom: 2px solid transparent;
@@ -53,10 +53,10 @@
 .op-dash .dash-tab .ic { width: 15px; height: 15px; stroke-width: 2; }
 .op-dash .tab-badge {
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 600;
   background: var(--blue);
   color: #fff;
-  border-radius: 99px;
+  border-radius: 0;
   padding: 1px 7px;
   font-family: var(--head);
 }
@@ -75,8 +75,8 @@
   padding: 18px 20px;
   background: #fff;
 }
-.op-dash .sum-label { font-size: 12px; font-weight: 700; color: var(--body-soft); margin-bottom: 8px; }
-.op-dash .sum-val { font-family: var(--head); font-size: 26px; font-weight: 900; color: var(--navy); line-height: 1; }
+.op-dash .sum-label { font-size: 12px; font-weight: 600; color: var(--body-soft); margin-bottom: 8px; }
+.op-dash .sum-val { font-family: var(--ui); font-variant-numeric: tabular-nums; font-size: 26px; font-weight: 600; color: var(--navy); line-height: 1; }
 .op-dash .sum-val span { font-size: 13px; font-weight: 600; color: var(--body-soft); margin-left: 2px; }
 .op-dash .sum-sub { font-size: 11.5px; color: var(--body-soft); margin-top: 5px; }
 .op-dash .sum-card.highlight { border-color: var(--blue); background: var(--pale); }
@@ -96,7 +96,7 @@
   color: var(--ink);
   background: #fff;
   border: 1.5px solid var(--line);
-  border-radius: 8px;
+  border-radius: 0;
   padding: 8px 32px 8px 12px;
   outline: none;
   cursor: pointer;
@@ -119,9 +119,9 @@
   overflow: hidden;
   transition: border-color .2s;
 }
-.op-dash .lot-card:hover { border-color: #b8c8f0; }
-.op-dash .lot-card.winning { border-color: #86efac; }
-.op-dash .lot-card.outbid { border-color: #fca5a5; }
+.op-dash .lot-card:hover { border-color: var(--primary-l); }
+.op-dash .lot-card.winning { border-color: var(--primary-l); }
+.op-dash .lot-card.outbid { border-color: var(--danger); }
 
 .op-dash .lot-card-inner {
   display: grid;
@@ -139,13 +139,13 @@
   background: var(--line-soft);
   flex-shrink: 0;
 }
-.op-dash .lot-photo { overflow: hidden; background: #f0f2f8; }
+.op-dash .lot-photo { overflow: hidden; background: var(--pale); }
 .op-dash .lot-photo:first-child { grid-row: 1 / 3; }
 .op-dash .lot-photo .imgph {
   width: 100%; height: 100%;
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
-  gap: 4px; color: var(--body-soft); background: #f0f2f8;
+  gap: 4px; color: var(--body-soft); background: var(--pale);
 }
 .op-dash .lot-photo .imgph .ic { width: 22px; height: 22px; stroke: var(--body-soft); }
 .op-dash .lot-photo .imgph small { font-size: 9px; line-height: 1.2; text-align: center; padding: 0 4px; }
@@ -157,21 +157,21 @@
   flex-direction: column;
   gap: 2px;
 }
-.op-dash .lot-photo-more span { font-family: var(--head); font-size: 15px; font-weight: 900; color: var(--blue); }
+.op-dash .lot-photo-more span { font-family: var(--head); font-size: 15px; font-weight: 600; color: var(--blue); }
 .op-dash .lot-photo-more small { font-size: 10px; color: var(--body-soft); }
 
 /* 案件情報 */
 .op-dash .lot-info { padding: 18px 20px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .op-dash .lot-info-top { display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
-.op-dash .lot-id { font-size: 11px; font-weight: 700; color: var(--body-soft); letter-spacing: .06em; }
+.op-dash .lot-id { font-size: 11px; font-weight: 600; color: var(--body-soft); letter-spacing: .06em; }
 .op-dash .lot-tag {
-  font-size: 11px; font-weight: 700;
-  padding: 2px 9px; border-radius: 99px;
+  font-size: 11px; font-weight: 600;
+  padding: 2px 9px; border-radius: 0;
   border: 1px solid var(--line);
   color: var(--body-soft);
 }
-.op-dash .lot-tag.green { border-color: #86efac; color: var(--green); background: #f0fdf4; }
-.op-dash .lot-tag.red { border-color: #fca5a5; color: #dc2626; background: #fff5f5; }
+.op-dash .lot-tag.green { border-color: var(--primary-l); color: var(--green); background: var(--pale); }
+.op-dash .lot-tag.red { border-color: var(--danger); color: var(--danger); background: var(--pale); }
 .op-dash .lot-items-row {
   display: flex;
   gap: 6px;
@@ -180,8 +180,8 @@
 .op-dash .lot-item-chip {
   font-size: 12px;
   color: var(--ink);
-  background: #f4f6fb;
-  border-radius: 6px;
+  background: var(--pale);
+  border-radius: 0;
   padding: 3px 10px;
   font-weight: 600;
 }
@@ -194,11 +194,11 @@
   align-items: center;
   gap: 5px;
   font-size: 12.5px;
-  font-weight: 700;
+  font-weight: 600;
 }
-.op-dash .lot-timer.urgent { color: #dc2626; }
+.op-dash .lot-timer.urgent { color: var(--danger); }
 .op-dash .lot-timer.normal { color: var(--body-soft); }
-.op-dash .live-dot { width: 6px; height: 6px; border-radius: 50%; background: #4ade80; animation: opdash-blink 1.4s infinite; flex-shrink: 0; }
+.op-dash .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--primary-l); animation: opdash-blink 1.4s infinite; flex-shrink: 0; }
 @keyframes opdash-blink { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
 
 /* 入札エリア */
@@ -209,13 +209,14 @@
   flex-direction: column;
   gap: 12px;
   min-width: 220px;
-  background: #fafbfe;
+  background: var(--pale-2);
 }
 .op-dash .current-top { font-size: 12px; color: var(--body-soft); margin-bottom: 2px; }
 .op-dash .current-amount {
-  font-family: var(--head);
+  font-family: var(--ui);
+  font-variant-numeric: tabular-nums;
   font-size: 22px;
-  font-weight: 900;
+  font-weight: 600;
   color: var(--navy);
   line-height: 1;
 }
@@ -223,7 +224,7 @@
 .op-dash .my-bid-row {
   background: #fff;
   border: 1.5px solid var(--line);
-  border-radius: 8px;
+  border-radius: 0;
   padding: 10px 12px;
   font-size: 12.5px;
   color: var(--body-soft);
@@ -237,7 +238,7 @@
   align-items: center;
   background: #fff;
   border: 2px solid var(--line);
-  border-radius: 8px;
+  border-radius: 0;
   overflow: hidden;
   transition: border-color .2s;
 }
@@ -245,7 +246,7 @@
 .op-dash .bid-yen {
   padding: 0 10px;
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--body-soft);
   border-right: 1px solid var(--line-soft);
   height: 40px;
@@ -257,9 +258,10 @@
   flex: 1;
   border: none;
   outline: none;
-  font-family: var(--head);
+  font-family: var(--ui);
+  font-variant-numeric: tabular-nums;
   font-size: 18px;
-  font-weight: 900;
+  font-weight: 600;
   color: var(--navy);
   padding: 0 10px;
   height: 40px;
@@ -267,7 +269,7 @@
   min-width: 0;
   letter-spacing: .02em;
 }
-.op-dash .bid-input::placeholder { color: #bcc3d4; font-size: 14px; font-weight: 400; }
+.op-dash .bid-input::placeholder { color: var(--body-soft); font-size: 14px; font-weight: 400; }
 .op-dash .bid-en { padding: 0 10px; font-size: 13px; color: var(--body-soft); flex-shrink: 0; }
 .op-dash .bid-submit {
   width: 100%;
@@ -275,10 +277,10 @@
   background: var(--blue);
   color: #fff;
   border: none;
-  border-radius: 8px;
+  border-radius: 0;
   font-family: var(--head);
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 600;
   cursor: pointer;
   transition: .2s;
 }
@@ -305,32 +307,32 @@
   text-decoration: none;
   color: inherit;
 }
-.op-dash a.negotiation-card:hover { border-color: #b8c8f0; }
+.op-dash a.negotiation-card:hover { border-color: var(--primary-l); }
 .op-dash .neg-user-ic {
   width: 44px; height: 44px;
-  border-radius: 12px;
+  border-radius: 0;
   background: var(--pale);
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--head);
   font-size: 16px;
-  font-weight: 900;
+  font-weight: 600;
   color: var(--blue);
   flex-shrink: 0;
 }
-.op-dash .neg-user-ic.done { background: #d1fae5; color: var(--green); }
+.op-dash .neg-user-ic.done { background: var(--pale); color: var(--green); }
 .op-dash .neg-user-ic.done .ic { width: 22px; height: 22px; stroke: var(--green); stroke-width: 2.4; }
 .op-dash .neg-info { flex: 1; min-width: 0; }
-.op-dash .neg-lot { font-size: 13px; font-weight: 700; color: var(--navy); margin-bottom: 3px; }
+.op-dash .neg-lot { font-size: 13px; font-weight: 600; color: var(--navy); margin-bottom: 3px; }
 .op-dash .neg-preview { font-size: 12.5px; color: var(--body-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .op-dash .neg-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0; }
-.op-dash .neg-amount { font-family: var(--head); font-size: 18px; font-weight: 900; color: var(--navy); }
+.op-dash .neg-amount { font-family: var(--ui); font-variant-numeric: tabular-nums; font-size: 18px; font-weight: 600; color: var(--navy); }
 .op-dash .neg-time { font-size: 11.5px; color: var(--body-soft); }
 .op-dash .unread-chip {
-  font-size: 11px; font-weight: 900;
+  font-size: 11px; font-weight: 600;
   background: var(--blue); color: #fff;
-  border-radius: 99px; padding: 2px 8px;
+  border-radius: 0; padding: 2px 8px;
   font-family: var(--head);
 }
 
@@ -346,8 +348,7 @@
 /* ---------- 入札確認モーダル ---------- */
 .op-dash .modal-overlay {
   position: fixed; inset: 0;
-  background: rgba(10, 20, 50, .45);
-  backdrop-filter: blur(4px);
+  background: rgba(51,51,51,.45);
   z-index: 200;
   display: flex;
   align-items: center;
@@ -362,26 +363,27 @@
 .op-dash .modal-overlay.open { opacity: 1; pointer-events: all; visibility: visible; transition: opacity .25s; }
 .op-dash .modal {
   background: #fff;
-  border-radius: 20px;
+  border: 1px solid var(--line);
+  border-radius: 0;
   padding: 32px 28px 24px;
   max-width: 400px;
   width: 100%;
-  box-shadow: 0 24px 60px -10px rgba(10, 20, 50, .25);
+  box-shadow: none;
   transform: translateY(10px);
   transition: transform .3s;
 }
 .op-dash .modal-overlay.open .modal { transform: translateY(0); }
 .op-dash .modal h3 { font-size: 18px; color: var(--navy); margin-bottom: 8px; }
 .op-dash .modal-body { font-size: 14px; color: var(--body-soft); line-height: 1.8; margin-bottom: 20px; }
-.op-dash .modal-amount { font-family: var(--head); font-size: 32px; font-weight: 900; color: var(--navy); text-align: center; padding: 16px; background: var(--pale); border-radius: 12px; margin-bottom: 20px; }
+.op-dash .modal-amount { font-family: var(--ui); font-variant-numeric: tabular-nums; font-size: 32px; font-weight: 600; color: var(--navy); text-align: center; padding: 16px; background: var(--pale); border-radius: 0; margin-bottom: 20px; }
 .op-dash .modal-amount span { font-size: 15px; font-weight: 600; color: var(--body-soft); }
-.op-dash .modal-warn { font-size: 12.5px; color: var(--gold); background: #fdf5e6; border-radius: 8px; padding: 10px 14px; margin-bottom: 20px; line-height: 1.7; display: flex; gap: 8px; align-items: flex-start; }
+.op-dash .modal-warn { font-size: 12.5px; color: var(--gold); background: var(--warm); border-radius: 0; padding: 10px 14px; margin-bottom: 20px; line-height: 1.7; display: flex; gap: 8px; align-items: flex-start; }
 .op-dash .modal-warn .ic { width: 16px; height: 16px; stroke: var(--gold); flex-shrink: 0; margin-top: 1px; }
 .op-dash .modal-actions { display: flex; gap: 10px; }
-.op-dash .btn-cancel { flex: 1; padding: 13px; border-radius: 999px; border: 1.5px solid var(--line); background: #fff; color: var(--ink); font-family: var(--head); font-weight: 700; font-size: 14px; cursor: pointer; transition: .2s; }
+.op-dash .btn-cancel { flex: 1; padding: 13px; border-radius: 0; border: 1.5px solid var(--line); background: #fff; color: var(--ink); font-family: var(--head); font-weight: 600; font-size: 14px; cursor: pointer; transition: .2s; }
 .op-dash .btn-cancel:hover { border-color: var(--blue); color: var(--blue); }
-.op-dash .btn-confirm { flex: 1; padding: 13px; border-radius: 999px; border: none; background: var(--blue); color: #fff; font-family: var(--head); font-weight: 900; font-size: 14px; cursor: pointer; box-shadow: 0 10px 22px -8px rgba(31, 84, 222, .5); transition: .2s; }
-.op-dash .btn-confirm:hover { background: var(--blue-d); transform: translateY(-1px); }
+.op-dash .btn-confirm { flex: 1; padding: 13px; border-radius: 0; border: none; background: var(--blue); color: #fff; font-family: var(--head); font-weight: 600; font-size: 14px; cursor: pointer; box-shadow: none; transition: .2s; }
+.op-dash .btn-confirm:hover { background: var(--blue-d); }
 
 /* ---------- 入札成功トースト ---------- */
 .op-dash .toast {
@@ -391,10 +393,10 @@
   transform: translateX(-50%) translateY(80px);
   background: var(--deep);
   color: #fff;
-  border-radius: 99px;
+  border-radius: 0;
   padding: 13px 24px;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   font-family: var(--head);
   z-index: 300;
   display: flex;
@@ -405,7 +407,7 @@
   white-space: nowrap;
 }
 .op-dash .toast.show { transform: translateX(-50%) translateY(0); }
-.op-dash .toast .ic { width: 18px; height: 18px; stroke: #4ade80; stroke-width: 2.2; }
+.op-dash .toast .ic { width: 18px; height: 18px; stroke: var(--primary-l); stroke-width: 2.2; }
 
 /* ---------- フッター ---------- */
 .op-dash .biz-footer {

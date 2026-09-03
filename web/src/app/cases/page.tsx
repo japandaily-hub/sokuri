@@ -68,7 +68,7 @@ export default function MyCasesPage() {
       <div className="grid gap-4 sm:grid-cols-2">
         {cases?.map((c) => (
           <a key={c.id} href={`/cases/${c.id}`} className="group">
-            <Card className="h-full transition-shadow group-hover:shadow-md">
+            <Card className="h-full">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex gap-3">
                   {c.photos[0] ? (
@@ -76,13 +76,13 @@ export default function MyCasesPage() {
                     <img
                       src={photoSrc(c.photos[0].url)}
                       alt=""
-                      className="h-16 w-16 shrink-0 rounded-xl border border-slate-200 object-cover"
+                      className="h-16 w-16 shrink-0 rounded-none border border-slate-200 object-cover"
                     />
                   ) : (
-                    <div className="h-16 w-16 shrink-0 rounded-xl bg-slate-100" />
+                    <div className="h-16 w-16 shrink-0 rounded-none bg-slate-100" />
                   )}
                   <div>
-                    <p className="font-bold text-slate-900">{c.purpose}</p>
+                    <p className="font-normal text-slate-900">{c.purpose}</p>
                     <p className="mt-0.5 text-xs text-slate-500">
                       {c.prefecture} {c.city} / {c.floor_plan ?? "間取り未設定"}
                     </p>

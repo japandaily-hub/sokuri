@@ -275,7 +275,7 @@ export default function BusinessPage() {
               <strong style={{ color: "var(--navy)" }}>買取金額8%のみ</strong>
               。カタヅケは片付けニーズを恒久的につなぐプラットフォームを目指します。
               <br />
-              顧客も業者も無駄がなく、納得できる——だから安定する。
+              顧客も業者も無駄がなく、納得できる。だから安定する。
             </p>
             <div className="biz-hero-cta">
               <a href="#register" className="btn btn-primary btn-lg">

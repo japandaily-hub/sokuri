@@ -8,12 +8,12 @@
 .operator-auth .buyer-tag {
   display: inline-block;
   font-size: 10.5px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: .04em;
   color: var(--blue);
   background: var(--pale);
-  border: 1px solid #d8e2fb;
-  border-radius: 99px;
+  border: 1px solid var(--line);
+  border-radius: 0;
   padding: 3px 11px;
   margin-bottom: 10px;
 }
@@ -24,7 +24,7 @@
   align-items: center;
   gap: 6px;
   font-size: 13.5px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--blue);
   background: none;
   border: none;

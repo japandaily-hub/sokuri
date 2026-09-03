@@ -42,10 +42,14 @@ export function SiteChrome({ children }: { children: React.ReactNode }) {
 
   if (bare) return <>{children}</>;
 
+  // 額装フレーム（.site-frame）はヘッダーの外側に描く。
+  // ランディング(/)だけは page.tsx 側が額を複数枚に割って描くため、ここでは包まない。
+  const framed = pathname !== "/";
+
   return (
     <>
       <SiteHeader />
-      {children}
+      {framed ? <div className="site-frame">{children}</div> : children}
       <SiteFooter />
       <Dock />
     </>

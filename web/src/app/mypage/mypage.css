@@ -9,7 +9,7 @@
 
 /* ページ背景（body 直書きせずラッパに付与） */
 .mypage-page {
-  background: #f7f8fc;
+  background: var(--pale-2);
   min-height: 100vh;
 }
 
@@ -39,7 +39,7 @@
   color: #fff;
   font-family: var(--head);
   font-size: 22px;
-  font-weight: 900;
+  font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -50,7 +50,7 @@
 }
 .user-card-name {
   font-size: 18px;
-  font-weight: 900;
+  font-weight: 400;
   color: var(--navy);
   margin-bottom: 3px;
 }
@@ -84,9 +84,10 @@
   text-align: center;
 }
 .stat-num {
-  font-family: var(--head);
+  font-family: var(--ui);
+  font-variant-numeric: tabular-nums;
   font-size: 22px;
-  font-weight: 900;
+  font-weight: 600;
   color: var(--navy);
   line-height: 1;
 }
@@ -120,14 +121,15 @@
 }
 .sum-label {
   font-size: 11.5px;
-  font-weight: 700;
+  font-weight: 400;
   color: var(--body-soft);
   margin-bottom: 8px;
 }
 .sum-val {
-  font-family: var(--head);
+  font-family: var(--ui);
+  font-variant-numeric: tabular-nums;
   font-size: 24px;
-  font-weight: 900;
+  font-weight: 600;
   color: var(--navy);
   line-height: 1;
 }
@@ -147,7 +149,7 @@
 }
 .sum-sub a {
   color: var(--blue);
-  font-weight: 700;
+  font-weight: 600;
   text-decoration: none;
 }
 
@@ -164,7 +166,7 @@
 .my-tab {
   padding: 12px 20px;
   font-size: 13.5px;
-  font-weight: 700;
+  font-weight: 400;
   color: var(--body-soft);
   cursor: pointer;
   border-bottom: 2px solid transparent;
@@ -198,10 +200,11 @@
 }
 .tab-count {
   font-size: 11px;
-  font-weight: 900;
-  font-family: var(--head);
+  font-weight: 600;
+  font-family: var(--ui);
+  font-variant-numeric: tabular-nums;
   padding: 1px 7px;
-  border-radius: 99px;
+  border-radius: 0;
   background: var(--blue);
   color: #fff;
 }
@@ -252,7 +255,7 @@
 }
 .lot-thumb-img {
   overflow: hidden;
-  background: #f0f2f8;
+  background: var(--pale-2);
 }
 .lot-thumb-img img {
   width: 100%;
@@ -278,16 +281,16 @@
 }
 .lot-id {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 400;
   color: var(--body-soft);
   letter-spacing: 0.06em;
 }
 .status-chip {
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 600;
   font-family: var(--head);
   padding: 2px 9px;
-  border-radius: 99px;
+  border-radius: 0;
 }
 .status-chip.bidding {
   background: #d1fae5;
@@ -302,7 +305,7 @@
   color: var(--blue);
 }
 .status-chip.done {
-  background: #f4f6fb;
+  background: var(--pale-2);
   color: var(--body-soft);
 }
 .status-chip.ended {
@@ -319,8 +322,8 @@
   font-size: 12px;
   font-weight: 600;
   color: var(--ink);
-  background: #f4f6fb;
-  border-radius: 6px;
+  background: var(--pale-2);
+  border-radius: 0;
   padding: 2px 8px;
 }
 .lot-meta {
@@ -347,7 +350,7 @@
 }
 .lot-timer {
   font-size: 12.5px;
-  font-weight: 700;
+  font-weight: 600;
 }
 .lot-timer.live {
   color: var(--green);
@@ -385,7 +388,7 @@
   justify-content: space-between;
   gap: 10px;
   min-width: 160px;
-  background: #fafbfe;
+  background: var(--pale-2);
 }
 .bid-info {
   text-align: right;
@@ -393,13 +396,14 @@
 .bid-info .bid-label {
   font-size: 11px;
   color: var(--body-soft);
-  font-weight: 600;
+  font-weight: 400;
   margin-bottom: 3px;
 }
 .bid-info .bid-amount {
-  font-family: var(--head);
+  font-family: var(--ui);
+  font-variant-numeric: tabular-nums;
   font-size: 20px;
-  font-weight: 900;
+  font-weight: 600;
   color: var(--navy);
 }
 .bid-info .bid-amount span {
@@ -420,10 +424,10 @@
 }
 .btn-lot {
   font-size: 12.5px;
-  font-weight: 700;
+  font-weight: 600;
   font-family: var(--head);
   padding: 8px 12px;
-  border-radius: 99px;
+  border-radius: 0;
   border: none;
   cursor: pointer;
   transition: 0.2s;
@@ -514,7 +518,7 @@
 }
 .profile-section-title {
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 400;
   letter-spacing: 0.06em;
   color: var(--body-soft);
   text-transform: uppercase;
@@ -525,7 +529,7 @@
 }
 .profile-section-title .edit-link {
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--blue);
   background: none;
   border: none;
@@ -579,7 +583,7 @@
 .toggle {
   width: 44px;
   height: 24px;
-  border-radius: 99px;
+  border-radius: 0;
   background: var(--blue);
   position: relative;
   cursor: pointer;
@@ -600,7 +604,7 @@
   top: 3px;
   left: 3px;
   transition: transform 0.2s;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  box-shadow: none;
 }
 .toggle.on::after {
   transform: translateX(20px);

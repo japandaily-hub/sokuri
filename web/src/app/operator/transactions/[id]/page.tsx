@@ -204,7 +204,7 @@ export default function OperatorTransactionPage() {
           {txn.address ? (
             <div className="decided-card">
               <div className="decided-label">✓ 住所開示済み</div>
-              <div style={{ fontFamily: "var(--head)", fontWeight: 700, fontSize: 17, color: "var(--navy)" }}>
+              <div style={{ fontFamily: "var(--head)", fontWeight: 600, fontSize: 17, color: "var(--navy)" }}>
                 {txn.address.prefecture} {txn.address.city} {txn.address.address_detail ?? ""}
               </div>
               {txn.contact_email ? <p className="listing-meta" style={{ marginTop: 6 }}>お客様連絡先: {txn.contact_email}</p> : null}
@@ -240,7 +240,7 @@ export default function OperatorTransactionPage() {
                 {txn.reduction_requests.map((r) => (
                   <li key={r.id} style={{ border: "1px solid var(--line)", borderRadius: "var(--radius-s)", padding: "12px 14px" }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                      <span style={{ fontFamily: "var(--head)", fontWeight: 700, color: "var(--navy)" }}>
+                      <span style={{ fontFamily: "var(--head)", fontWeight: 600, color: "var(--navy)" }}>
                         {formatYen(r.original_amount)} → {formatYen(r.requested_amount)}
                       </span>
                       <span className={`status-chip ${REDUCTION_CHIP_CLASS[r.status]}`}>{REDUCTION_STATUS_LABEL[r.status]}</span>
@@ -314,7 +314,7 @@ export default function OperatorTransactionPage() {
                   setModal({ kind: "cancel" });
                 }}
                 className="btn"
-                style={{ border: "1.5px solid #f3c8c8", color: "#c43d3d", background: "#fff" }}
+                style={{ border: "1.5px solid var(--danger)", color: "var(--danger)", background: "#fff" }}
               >
                 この成約をキャンセルする
               </button>
@@ -359,7 +359,7 @@ export default function OperatorTransactionPage() {
             </div>
           )}
 
-          <Link href="/operator/transactions" style={{ display: "inline-block", marginTop: 8, fontSize: 13.5, fontWeight: 700, color: "var(--blue)" }}>
+          <Link href="/operator/transactions" style={{ display: "inline-block", marginTop: 8, fontSize: 13.5, fontWeight: 600, color: "var(--blue)" }}>
             ← 落札管理一覧へ
           </Link>
         </div>

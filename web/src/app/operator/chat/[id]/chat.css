@@ -14,7 +14,7 @@
 .opchat-page {
   min-height: 100vh;
   height: 100vh;
-  background: #f4f6fb;
+  background: var(--pale);
   color: var(--body);
   font-family: var(--sans);
   display: flex;
@@ -38,7 +38,7 @@
 .opchat-page .ch-back {
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -50,23 +50,23 @@
 .opchat-page .ch-back .ic { width: 20px; height: 20px; transform: scaleX(-1); }
 .opchat-page .ch-logo { display: flex; align-items: center; }
 .opchat-page .ch-divider { width: 1px; height: 20px; background: var(--line); }
-.opchat-page .ch-title { font-family: var(--head); font-size: 14px; font-weight: 700; color: var(--navy); }
+.opchat-page .ch-title { font-family: var(--head); font-size: 14px; font-weight: 600; color: var(--navy); }
 .opchat-page .ch-badge {
   font-size: 11px;
-  font-weight: 700;
-  background: #fff8e6;
+  font-weight: 600;
+  background: var(--warm);
   color: var(--gold);
-  border: 1px solid #f0d080;
+  border: 1px solid var(--gold);
   padding: 3px 10px;
-  border-radius: 99px;
+  border-radius: 0;
   white-space: nowrap;
 }
 .opchat-page .ch-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
-.opchat-page .ch-company { font-size: 13px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.opchat-page .ch-company { font-size: 13px; font-weight: 600; color: var(--ink); white-space: nowrap; }
 .opchat-page .ch-bell {
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: 0;
   background: var(--pale);
   display: flex;
   align-items: center;
@@ -83,7 +83,7 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #e05c5c;
+  background: var(--danger);
 }
 
 /* メインレイアウト（左サイドバー チャット 右パネル） */
@@ -102,7 +102,7 @@
 .opchat-page .case-sidebar-head {
   padding: 14px 14px 10px;
   font-size: 11.5px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--body-soft);
   letter-spacing: .06em;
   border-bottom: 1px solid var(--line-soft);
@@ -124,15 +124,15 @@
 .opchat-page .case-item.active { background: var(--pale); border-left: 3px solid var(--blue); }
 .opchat-page .case-status {
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   padding: 2px 7px;
-  border-radius: 99px;
+  border-radius: 0;
   display: inline-block;
   margin-bottom: 6px;
 }
-.opchat-page .status-negotiating { background: #d1fae5; color: var(--green); }
+.opchat-page .status-negotiating { background: var(--pale); color: var(--green); }
 .opchat-page .status-waiting { background: var(--pale); color: var(--blue); }
-.opchat-page .status-scheduled { background: #fff8e6; color: var(--gold); }
+.opchat-page .status-scheduled { background: var(--warm); color: var(--gold); }
 .opchat-page .case-id { font-size: 11px; color: var(--body-soft); margin-bottom: 4px; }
 .opchat-page .case-preview {
   font-size: 12.5px;
@@ -142,7 +142,7 @@
   text-overflow: ellipsis;
 }
 .opchat-page .case-bid-row { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
-.opchat-page .case-bid { font-size: 13px; font-weight: 700; color: var(--blue); }
+.opchat-page .case-bid { font-size: 13px; font-weight: 600; color: var(--blue); }
 .opchat-page .case-time { font-size: 10.5px; color: var(--body-soft); }
 .opchat-page .case-unread {
   width: 8px;
@@ -170,44 +170,44 @@
 .opchat-page .peer-avatar {
   width: 40px;
   height: 40px;
-  border-radius: 12px;
-  background: #f0f2f8;
+  border-radius: 0;
+  background: var(--pale);
   color: var(--body-soft);
   font-family: var(--head);
   font-size: 16px;
-  font-weight: 900;
+  font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
 .opchat-page .peer-info { flex: 1; min-width: 0; }
-.opchat-page .peer-name { font-size: 15px; font-weight: 900; color: var(--navy); font-family: var(--head); }
+.opchat-page .peer-name { font-size: 15px; font-weight: 600; color: var(--navy); font-family: var(--head); }
 .opchat-page .peer-sub { font-size: 12px; color: var(--body-soft); margin-top: 2px; }
 .opchat-page .amount-chip {
   background: var(--pale);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 0;
   padding: 8px 14px;
   text-align: center;
   flex-shrink: 0;
 }
-.opchat-page .amount-label { font-size: 10px; font-weight: 700; color: var(--body-soft); letter-spacing: .06em; }
-.opchat-page .amount-val { font-family: var(--head); font-size: 18px; font-weight: 900; color: var(--navy); }
+.opchat-page .amount-label { font-size: 10px; font-weight: 600; color: var(--body-soft); letter-spacing: .06em; }
+.opchat-page .amount-val { font-family: var(--ui); font-variant-numeric: tabular-nums; font-size: 18px; font-weight: 600; color: var(--navy); }
 
 /* ステータスバー */
 .opchat-page .status-bar {
-  background: #f0fff8;
-  border-bottom: 1px solid #a7f0cc;
+  background: var(--pale);
+  border-bottom: 1px solid var(--primary);
   padding: 9px 20px;
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 12.5px;
-  color: #1a6040;
+  color: var(--deep);
   flex-shrink: 0;
 }
-.opchat-page .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #06c755; flex-shrink: 0; }
+.opchat-page .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); flex-shrink: 0; }
 
 /* メッセージ */
 .opchat-page .messages-area {
@@ -223,12 +223,12 @@
 .opchat-page .msg-avatar {
   width: 32px;
   height: 32px;
-  border-radius: 10px;
-  background: #f0f2f8;
+  border-radius: 0;
+  background: var(--pale);
   color: var(--body-soft);
   font-family: var(--head);
   font-size: 13px;
-  font-weight: 900;
+  font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -238,8 +238,9 @@
 .opchat-page .bubble {
   max-width: 68%;
   padding: 12px 16px;
-  border-radius: 18px;
-  font-size: 14px;
+  border-radius: 0;
+  font-family: var(--ui);
+  font-size: 15px;
   line-height: 1.7;
   white-space: pre-wrap;
   word-break: break-word;
@@ -282,7 +283,7 @@
 }
 .opchat-page .sp-head {
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--navy);
   margin-bottom: 10px;
   display: flex;
@@ -300,7 +301,7 @@
   color: var(--ink);
   background: #fff;
   border: 1.5px solid var(--line);
-  border-radius: 8px;
+  border-radius: 0;
   padding: 8px 10px;
   outline: none;
   transition: border-color .2s;
@@ -309,11 +310,11 @@
 .opchat-page .sp-remove {
   width: 28px;
   height: 28px;
-  border-radius: 8px;
-  background: #fff0f0;
+  border-radius: 0;
+  background: rgba(215,0,53,.08);
   border: none;
   cursor: pointer;
-  color: #e05c5c;
+  color: var(--danger);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -322,7 +323,7 @@
 .opchat-page .sp-remove .ic { width: 14px; height: 14px; }
 .opchat-page .btn-add-slot {
   font-size: 12.5px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--blue);
   background: none;
   border: none;
@@ -335,13 +336,13 @@
 .opchat-page .btn-send-schedule {
   width: 100%;
   padding: 11px;
-  border-radius: 99px;
+  border-radius: 0;
   border: none;
   background: var(--blue);
   color: #fff;
   font-family: var(--head);
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 600;
   cursor: pointer;
   margin-top: 12px;
   transition: background .2s;
@@ -362,7 +363,7 @@
 .opchat-page .tool-btn {
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: 0;
   background: var(--pale);
   border: none;
   cursor: pointer;
@@ -373,13 +374,13 @@
   transition: background .2s;
   flex-shrink: 0;
 }
-.opchat-page .tool-btn:hover { background: #dde8ff; }
+.opchat-page .tool-btn:hover { background: var(--pale); }
 .opchat-page .tool-btn .ic { width: 18px; height: 18px; }
 .opchat-page .msg-input {
   flex: 1;
-  background: #f4f6fb;
+  background: var(--pale);
   border: 1.5px solid var(--line);
-  border-radius: 99px;
+  border-radius: 0;
   padding: 10px 18px;
   font-family: var(--sans);
   font-size: 14px;
@@ -388,7 +389,7 @@
   transition: border-color .2s, background .2s;
 }
 .opchat-page .msg-input:focus { border-color: var(--blue); background: #fff; }
-.opchat-page .msg-input::placeholder { color: #bcc3d4; }
+.opchat-page .msg-input::placeholder { color: var(--body-soft); }
 .opchat-page .btn-send {
   width: 40px;
   height: 40px;
@@ -428,26 +429,26 @@
 .opchat-page .dp-head {
   padding: 14px 16px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--body-soft);
   letter-spacing: .06em;
   border-bottom: 1px solid var(--line-soft);
 }
 .opchat-page .dp-case-id { padding: 12px 16px; border-bottom: 1px solid var(--line-soft); }
 .opchat-page .dp-case-id .lbl { font-size: 11px; color: var(--body-soft); font-weight: 600; margin-bottom: 4px; }
-.opchat-page .dp-case-id .val { font-size: 13px; font-weight: 700; color: var(--ink); }
+.opchat-page .dp-case-id .val { font-size: 13px; font-weight: 600; color: var(--ink); }
 .opchat-page .dp-items-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 2px;
   background: var(--line-soft);
   margin: 12px 16px;
-  border-radius: 10px;
+  border-radius: 0;
   overflow: hidden;
 }
 .opchat-page .dp-item-thumb {
   aspect-ratio: 1;
-  background: #f0f2f8;
+  background: var(--pale);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -459,7 +460,7 @@
   background: var(--pale);
   color: var(--blue);
   font-size: 16px;
-  font-weight: 900;
+  font-weight: 600;
   font-family: var(--head);
 }
 .opchat-page .dp-item-label {
@@ -467,7 +468,7 @@
   bottom: 0;
   left: 0;
   right: 0;
-  background: linear-gradient(transparent, rgba(15, 37, 82, .6));
+  background: linear-gradient(transparent, rgba(47,74,48,.6));
   color: #fff;
   font-size: 9px;
   font-weight: 600;
@@ -484,19 +485,19 @@
 }
 .opchat-page .dp-row:last-child { border-bottom: none; }
 .opchat-page .dp-row .lbl { color: var(--body-soft); }
-.opchat-page .dp-row .val { font-weight: 700; color: var(--ink); font-size: 12.5px; }
+.opchat-page .dp-row .val { font-weight: 600; color: var(--ink); font-size: 12.5px; }
 .opchat-page .dp-row .val.green { color: var(--green); }
 .opchat-page .dp-row .val.blue { color: var(--blue); }
 .opchat-page .btn-propose {
   margin: 0 16px 16px;
   padding: 11px;
-  border-radius: 99px;
+  border-radius: 0;
   border: none;
   background: var(--deep);
   color: #fff;
   font-family: var(--head);
   font-size: 13.5px;
-  font-weight: 900;
+  font-weight: 600;
   cursor: pointer;
   transition: background .2s;
   display: flex;

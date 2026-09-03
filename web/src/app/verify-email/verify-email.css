@@ -9,7 +9,7 @@
 /* ── ページラッパ（背景・中央寄せ） ── */
 .verify-page {
   min-height: 100vh;
-  background: linear-gradient(160deg, #f0f4ff 0%, #f4f6fb 60%);
+  background: linear-gradient(160deg, var(--pale) 0%, var(--pale) 60%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -38,7 +38,7 @@
   left: 0;
   right: 0;
   height: 5px;
-  background: linear-gradient(90deg, var(--blue), #6fa3ff);
+  background: linear-gradient(90deg, var(--blue), var(--primary-l));
 }
 
 /* ── アイコン ── */
@@ -51,8 +51,8 @@
   width: 90px;
   height: 90px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #e8f0ff, var(--pale));
-  border: 3px solid rgba(31, 84, 222, .2);
+  background: linear-gradient(135deg, var(--pale), var(--pale));
+  border: 3px solid rgba(82,126,82, .2);
   display: grid;
   place-items: center;
   margin: 0 auto;
@@ -86,7 +86,7 @@
 .confirm-title {
   font-family: var(--head);
   font-size: 24px;
-  font-weight: 900;
+  font-weight: 400;
   color: var(--navy);
   margin-bottom: 10px;
   line-height: 1.3;
@@ -103,17 +103,17 @@
   color: var(--blue);
   font-family: var(--head);
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   padding: 8px 18px;
-  border-radius: 99px;
-  border: 1px solid rgba(31, 84, 222, .2);
+  border-radius: 0;
+  border: 1px solid rgba(82,126,82, .2);
   margin-bottom: 28px;
 }
 
 /* ── ステップ ── */
 .welcome-steps {
-  background: #f8faff;
-  border-radius: 14px;
+  background: var(--pale);
+  border-radius: 0;
   padding: 18px 20px;
   margin-bottom: 24px;
   text-align: left;
@@ -138,7 +138,7 @@
   color: #fff;
   font-family: var(--head);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 400;
   display: grid;
   place-items: center;
 }
@@ -146,7 +146,7 @@
   display: block;
   font-family: var(--head);
   font-size: 13.5px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--navy);
 }
 .ws-body span {
@@ -171,7 +171,7 @@
 }
 .confirm-bottom a {
   color: var(--blue);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 @media (max-width: 480px) {

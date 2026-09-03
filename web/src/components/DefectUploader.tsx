@@ -60,8 +60,8 @@ export default function DefectUploader({ assessmentId }: DefectUploaderProps) {
   // --- 完了状態 ---
   if (status === "success") {
     return (
-      <div className="flex items-center gap-3 rounded-2xl border border-accent-200 bg-accent-50 p-4">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent-100 text-accent-600">
+      <div className="flex items-center gap-3 rounded-none border border-accent-200 bg-accent-50 p-4">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-none bg-accent-100 text-accent-600">
           <Icon name="check" className="h-5 w-5" strokeWidth={2.75} />
         </span>
         <p className="text-sm font-semibold text-accent-700">
@@ -72,14 +72,14 @@ export default function DefectUploader({ assessmentId }: DefectUploaderProps) {
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+    <div className="flex flex-col gap-3 rounded-none border border-amber-200 bg-amber-50 p-4">
       {/* 案内バナー */}
       <div className="flex items-start gap-2.5">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-none bg-amber-100 text-amber-600">
           <Icon name="alert" className="h-5 w-5" />
         </span>
         <div>
-          <p className="text-sm font-bold text-amber-900">瑕疵の証拠写真が必要です</p>
+          <p className="text-sm font-semibold text-amber-900">瑕疵の証拠写真が必要です</p>
           <p className="mt-0.5 text-xs leading-relaxed text-amber-700">
             正確な査定のため、傷や汚れの写真をアップロードしてください。
           </p>
@@ -87,7 +87,7 @@ export default function DefectUploader({ assessmentId }: DefectUploaderProps) {
       </div>
 
       {/* ファイル選択 */}
-      <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-amber-300 bg-white px-4 py-3 text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-50">
+      <label className="flex cursor-pointer items-center justify-center gap-2 rounded-none border-2 border-dashed border-amber-300 bg-white px-4 py-3 text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-50">
         <Icon name="image" className="h-4 w-4" />
         写真を選択
         <input
@@ -106,7 +106,7 @@ export default function DefectUploader({ assessmentId }: DefectUploaderProps) {
           {files.map((file, i) => (
             <li
               key={`${file.name}:${file.size}`}
-              className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2"
+              className="flex items-center justify-between gap-2 rounded-none border border-slate-200 bg-white px-3 py-2"
             >
               <div className="flex min-w-0 items-center gap-2">
                 <Icon name="image" className="h-4 w-4 shrink-0 text-slate-400" />
@@ -138,7 +138,7 @@ export default function DefectUploader({ assessmentId }: DefectUploaderProps) {
         type="button"
         disabled={files.length === 0 || status === "uploading"}
         onClick={handleUpload}
-        className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition-colors hover:bg-amber-600 active:bg-amber-700 focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+        className="inline-flex items-center justify-center gap-2 rounded-none bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-600 active:bg-amber-700 focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300"
       >
         {status === "uploading" ? (
           <>

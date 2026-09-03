@@ -1,289 +1,293 @@
 /* ============================================================
-   カタヅケ — メインスタイル（White × Cobalt / あたたかさとつながり）
-   ブランド: #1447e0 / 家まるごと・まとめて片付け買取
+   カタヅケ — メインスタイル（人の森整合テーマ / 苔緑 × 明朝 × 直角）
+   ブランド: #527e52 / 家まるごと・まとめて片付け買取
+   正典: docs/design_hitonomori_alignment/SPEC-4-decisions.md §4.1 / §4.2
    NOTE: globals.css から `@import "./katazuke.css" layer(components)` で取り込み、
    components レイヤーに内包する。これにより Tailwind の utilities（mt-4等）が常に
    上書きでき、既存 Tailwind ページの余白も壊さない。.container は corePlugins で無効化済み。
    ============================================================ */
 :root{
-  /* --- コバルト（主役） --- */
-  --blue:#1447e0;        /* ブランド。真のコバルト寄りで彩度を一段上げる */
-  --blue-d:#0f37b4;      /* hover */
-  --blue-l:#3f74ff;      /* 光彩・グラデーションの明側 */
-  --deep:#122a6b;        /* 沈めたコバルト。ダーク面の地 */
+  /* --- 主色（苔緑） --- */
+  --primary:#527e52;
+  --primary-d:#3f6640;
+  --primary-l:#7fa37f;
+  --deep:#2f4a30;
+  --lime:#c9d128;        /* 英字キャプション・現在地 */
 
-  /* --- ウォームニュートラル（親しみの源） --- */
-  --navy:#241f1c;        /* 見出し = ウォームニアブラック */
-  --ink:#2f2924;         /* 本文濃 */
-  --body:#5e5750;        /* 本文 */
-  --body-soft:#8d857c;   /* 補助 */
-  --line:#ebe5dd;        /* 罫線（暖色ヘアライン） */
-  --line-soft:#f4f0ea;
+  /* --- 文字 --- */
+  --navy:#333;
+  --ink:#333;
+  --body:#4a4a4a;
+  --body-soft:#6b6b6b;   /* 白と 5.3:1。小さい補助テキストはすべてこれ */
+  --head-gray:#959595;   /* 24px 以上の見出し専用（本文に流用しない） */
 
-  /* --- 面 --- */
+  /* --- 罫線・面 --- */
+  --line:#d9e0d6;
+  --line-soft:#ecf1ec;
   --white:#fff;
-  --pale:#f0f5ff;        /* 淡コバルト面（アイコンタイル・バッジ地） */
-  --pale-2:#f4f7ff;      /* セクション交互背景 */
-  --warm:#fff5ee;        /* 淡ウォーム面（人・気持ちの文脈） */
+  --pale:#eff3ef;        /* フォームパネル・強調面 */
+  --pale-2:#f6f8f4;      /* セクション交互背景 */
+  --warm:#fdf5d9;
+  --mint:#daf4eb;
+  --sky:#e1f5fd;
+  --marker:#d4efb3;      /* マーカー下線 */
 
   /* --- アクセント --- */
-  --apricot:#f4703f;     /* 人の手触り。強調・下線・小さな差し色に限定 */
-  --green:#0e8a5a;       /* 安心・無料 */
-  --gold:#b9892f;
+  --apricot:#f3981d;
+  --green:#527e52;
+  --gold:#e5a323;
+  --danger:#d70035;
 
-  /* --- かたち：角丸を大きく、影は拡散させる --- */
-  --radius:24px;
-  --radius-s:16px;
-  --shadow-s:0 1px 2px rgba(36,31,28,.045), 0 6px 18px -10px rgba(36,31,28,.14);
-  --shadow-m:0 2px 6px rgba(36,31,28,.04), 0 22px 46px -24px rgba(20,71,224,.30);
-  --shadow-l:0 30px 72px -34px rgba(20,71,224,.40), 0 10px 26px -18px rgba(36,31,28,.20);
-  --glow:0 18px 40px -16px rgba(20,71,224,.45);
+  /* --- かたち：角丸ゼロ・影ゼロ。区切りはヘアラインと余白 --- */
+  --radius:0px;
+  --radius-s:0px;
+  --shadow-s:none;
+  --shadow-m:none;
+  --shadow-l:none;
+  --glow:none;
+  --frame:1px solid #333;
   --ease:cubic-bezier(.22,.61,.36,1);
   --maxw:1140px;
+  --maxw-text:760px;
 
-  /* --- 書体：見出しは丸ゴシックで親しみを、数値は角ゴシックで信頼感を --- */
-  --head:"Zen Maru Gothic","Zen Kaku Gothic New","Hiragino Maru Gothic ProN","Hiragino Kaku Gothic ProN","Yu Gothic UI",sans-serif;
-  --num:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic UI",sans-serif;
-  --sans:"Noto Sans JP","Hiragino Kaku Gothic ProN","Yu Gothic UI",sans-serif;
+  /* --- 書体：和文は明朝（Noto Serif JP 先頭＝Windows/Android で確実に明朝） --- */
+  --serif:"Noto Serif JP","Hiragino Mincho ProN","Hiragino Mincho Pro","Yu Mincho","YuMincho","游明朝体",serif;
+  --ui:"Noto Sans JP","Hiragino Kaku Gothic ProN","Yu Gothic UI",sans-serif;
+  --head:var(--serif);
+  --sans:var(--serif);
+  --num:var(--ui);       /* 数値はゴシック（誤読コストを下げる） */
+  --en:"Montserrat",sans-serif;
+  --en-display:"Libre Baskerville",serif;
+
+  /* --- 旧名エイリアス（39本の per-page CSS 互換） --- */
+  --blue:var(--primary);
+  --blue-d:var(--primary-d);
+  --blue-l:var(--primary-l);
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;}
-body{font-family:var(--sans);color:var(--body);background:#fffdfb;
-  line-height:1.85;font-weight:400;letter-spacing:.01em;
-  text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased;}
+/* 明朝 400 はサブピクセル描画を切ると字画が痩せるため antialiased を使わない */
+body{font-family:var(--sans);color:var(--body);background:#fff;
+  font-size:16px;line-height:2;font-weight:400;letter-spacing:.03em;
+  text-rendering:optimizeLegibility;-webkit-font-smoothing:auto;-moz-osx-font-smoothing:auto;}
 img{display:block;max-width:100%;}
 a{color:inherit;text-decoration:none;}
-h1,h2,h3,h4,h5{font-family:var(--head);color:var(--navy);font-weight:700;
-  line-height:1.45;letter-spacing:-.005em;text-wrap:balance;}
-strong{font-weight:700;color:var(--ink);}
-::selection{background:rgba(20,71,224,.16);color:var(--navy);}
-:focus-visible{outline-color:var(--blue);}
+h1,h2,h3,h4,h5{font-family:var(--head);color:var(--ink);font-weight:400;
+  line-height:1.6;letter-spacing:.04em;text-wrap:balance;}
+strong{font-weight:600;color:var(--ink);}
+::selection{background:rgba(82,126,82,.16);color:var(--ink);}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0;}
 .container{width:100%;max-width:var(--maxw);margin-inline:auto;padding-inline:24px;}
-.ic{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:1.9;
+.ic{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:1.5;
   stroke-linecap:round;stroke-linejoin:round;display:inline-block;vertical-align:-.13em;}
 
+/* 入力値・数値はゴシック（明朝だと 1/l/I・0/O の判別が落ちる） */
+.field input,.field textarea,.field select,.select-wrap select,select,
+td .val,.confirm-row .val,.money,.fee-row .fv,.tabular-nums,[class*="tabular"]{
+  font-family:var(--ui);font-variant-numeric:tabular-nums;letter-spacing:0;}
+
+/* 散文ブロックだけ両端揃え（カード本文の字間が崩れるため PC 幅に限定） */
+@media(min-width:768px){
+  .section-head .sub,.media-copy .sub,.founder-copy p{text-align:justify;}
+}
+
+/* ---------- 額装フレーム（人の森の「一枚の紙」の作法） ---------- */
+/* overflow は絶対に書かない。内側の position:sticky が全ページで死ぬため */
+.site-frame{margin:20px;border:var(--frame);min-height:calc(100dvh - 40px);}
+.site-frame + .site-frame{margin-top:0;}
+@media(max-width:859px){
+  .site-frame{margin:0;border:0;min-height:0;}
+}
+
+/* ---------- 縦書きセクション見出し（実要素・PC のみ） ---------- */
+section:has(> .vt){position:relative;}
+.vt{display:none;}
+@media(min-width:1280px){
+  .vt{display:block;position:absolute;top:clamp(64px,8vw,108px);
+    right:max(8px, calc((100vw - var(--maxw))/2 - 46px));
+    writing-mode:vertical-rl;text-orientation:mixed;
+    font-family:var(--head);font-size:34px;font-weight:400;line-height:1.35;
+    letter-spacing:.12em;color:#333;}
+  .vt::first-letter{color:var(--primary);}
+  .vt .n{text-combine-upright:all;}
+}
+
+/* ---------- マーカー強調（引用符の代替） ---------- */
+.mk{font-weight:400;background:linear-gradient(transparent 68%,var(--marker) 68%);}
+.hl{color:var(--primary);background:linear-gradient(transparent 70%,var(--marker) 70%);}
+
+/* ---------- ロゴ（二段ワードマーク） ---------- */
+.kdz-wm{display:inline-flex;flex-direction:column;line-height:1;color:#333;}
+.kdz-wm-ja{font-family:var(--head);font-weight:400;font-size:var(--wm,22px);letter-spacing:.14em;}
+.kdz-wm-en{font-family:var(--en);font-weight:600;font-size:calc(var(--wm,22px)*.4);
+  letter-spacing:.18em;color:var(--primary);margin-top:4px;}
+.kdz-wm.white{color:#fff;}
+.kdz-wm.white .kdz-wm-en{color:var(--lime);}
+
+/* ---------- 必須 / 任意バッジ ---------- */
+.req{display:inline-block;background:var(--primary);color:#fff;padding:2px 10px;
+  font-family:var(--ui);font-size:12px;font-weight:500;line-height:1.5;
+  border-radius:0;vertical-align:middle;}
+.opt{display:inline-block;background:#808080;color:#fff;padding:2px 10px;
+  font-family:var(--ui);font-size:12px;font-weight:500;line-height:1.5;
+  border-radius:0;vertical-align:middle;}
+
 /* ---------- セクション枠 ---------- */
-.section{padding:clamp(64px,8vw,108px) 0;}
-.section.tight{padding:clamp(48px,6vw,76px) 0;}
-.eyebrow{display:inline-flex;align-items:center;gap:8px;font-family:var(--head);
-  font-weight:700;font-size:12px;letter-spacing:.10em;color:var(--blue);
-  background:var(--pale);border-radius:999px;padding:7px 15px;}
-.eyebrow::before{display:none;}
-.section-head{max-width:760px;margin:0 auto clamp(36px,4.5vw,56px);text-align:center;}
+/* 人の森はセクション上下 128px 級の余白でリズムを作るため上限を引き上げる */
+.section{padding:clamp(72px,9vw,128px) 0;}
+.section.tight{padding:clamp(48px,6vw,80px) 0;}
+.eyebrow{display:inline-flex;align-items:center;gap:10px;font-family:var(--head);
+  font-weight:400;font-size:13px;letter-spacing:.12em;color:var(--primary);
+  background:none;border-radius:0;padding:0;}
+.eyebrow::before{content:"";display:block;width:24px;height:1px;background:var(--primary);}
+.section-head{max-width:var(--maxw-text);margin:0 auto clamp(36px,4.5vw,56px);text-align:center;}
 .section-head .eyebrow{justify-content:center;}
-.section-head h2{font-size:clamp(26px,3.5vw,40px);margin-top:18px;color:var(--navy);line-height:1.42;}
-.section-head .sub{font-size:clamp(15px,1.5vw,17px);color:var(--body);margin-top:16px;
-  line-height:1.9;}
-.section-head h2 .hl{color:var(--blue);}
+.section-head h2{font-size:clamp(24px,3vw,34px);margin-top:18px;color:var(--ink);line-height:1.6;}
+.section-head h2::first-letter{color:var(--primary);}
+.section-head h2::after{content:"";display:block;width:48px;height:1px;
+  background:var(--primary);margin:18px auto 0;}
+.section-head .sub{font-size:16px;color:var(--body);margin-top:16px;line-height:2;}
 
 /* ---------- ボタン ---------- */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;
-  font-family:var(--head);font-weight:700;font-size:16px;line-height:1;cursor:pointer;
-  border:none;border-radius:999px;padding:18px 32px;transition:.25s var(--ease);
-  white-space:nowrap;letter-spacing:.01em;}
-.btn .ic{font-size:19px;stroke-width:2.1;}
-.btn-primary{background:var(--blue);color:#fff;box-shadow:var(--glow);}
-.btn-primary:hover{background:var(--blue-d);transform:translateY(-2px);
-  box-shadow:0 24px 50px -18px rgba(20,71,224,.55);}
-.btn-line{background:#06c755;color:#fff;box-shadow:0 18px 40px -16px rgba(6,199,85,.5);}
-.btn-line:hover{background:#05b34c;transform:translateY(-2px);}
-.btn-ghost{background:#fff;color:var(--navy);border:1.5px solid var(--line);}
-.btn-ghost:hover{border-color:var(--blue);color:var(--blue);background:var(--pale);}
-.btn-lg{font-size:17px;padding:19px 36px;}
+  font-family:var(--head);font-weight:600;font-size:16px;line-height:1;cursor:pointer;
+  border:none;border-radius:0;padding:16px 40px;transition:opacity .25s var(--ease);
+  white-space:nowrap;letter-spacing:.1em;}
+.btn .ic{font-size:18px;stroke-width:1.5;}
+.btn:hover{opacity:.8;}
+.btn:active{opacity:.65;}
+.btn-primary{background:var(--primary);color:#fff;}
+/* LINE 緑は他社ブランド色。ホバーでも色を変えない（白地白文字バグの解消も兼ねる） */
+.btn-line,.btn-line:hover,.final .btn-line:hover{background:#06c755;color:#fff;box-shadow:none;}
+/* LINE 緑と苔緑を隣接させないため、ゴーストは黒枠 */
+.btn-ghost{background:#fff;color:#333;border:1px solid #333;}
+.btn-lg{font-size:16px;padding:18px 44px;}
 .btn-block{width:100%;}
-.btn .arw{transition:transform .25s var(--ease);}
-.btn:hover .arw{transform:translateX(4px);}
 
 /* ---------- ヘッダー ---------- */
-.header{position:sticky;top:0;z-index:60;background:rgba(255,253,251,.82);
-  backdrop-filter:saturate(160%) blur(14px);border-bottom:1px solid transparent;
-  transition:border-color .3s,box-shadow .3s;}
-.header.scrolled{border-color:var(--line);box-shadow:var(--shadow-s);}
-.header .inner{display:flex;align-items:center;gap:20px;height:76px;}
-.logo-img{height:54px;width:auto;}
-.header nav{display:flex;align-items:center;gap:26px;margin-left:auto;}
-.header nav a{font-size:14px;font-weight:500;color:var(--ink);transition:color .2s;}
-.header nav a:hover{color:var(--blue);}
-.header .h-cta{margin-left:4px;padding:12px 22px;font-size:14.5px;}
+/* SiteChrome では .site-frame の外側に描くため top:0 のままで額と重ならない */
+.header{position:sticky;top:0;z-index:60;background:#fff;
+  border-bottom:1px solid var(--line);backdrop-filter:none;}
+.header.scrolled{border-color:var(--line);box-shadow:none;}
+.header .inner{display:flex;align-items:center;gap:24px;height:72px;}
+.logo-img{height:44px;width:auto;}
+.header nav{display:flex;align-items:center;gap:28px;margin-left:auto;}
+.header nav a{font-family:var(--head);font-size:14px;font-weight:400;
+  letter-spacing:.12em;color:var(--ink);transition:color .2s;}
+.header nav a:hover{color:var(--primary);}
+.header .h-cta{margin-left:4px;padding:12px 22px;font-size:14px;letter-spacing:.08em;}
 .hamburger{display:none;margin-left:auto;width:44px;height:44px;border:1px solid var(--line);
-  border-radius:11px;background:#fff;color:var(--navy);align-items:center;justify-content:center;cursor:pointer;}
+  border-radius:0;background:#fff;color:var(--ink);align-items:center;justify-content:center;cursor:pointer;}
 .hamburger .ic{font-size:22px;}
 .mobile-menu{display:none;flex-direction:column;gap:2px;padding:10px 24px 22px;
   background:#fff;border-bottom:1px solid var(--line);}
-.mobile-menu a{padding:13px 6px;font-weight:600;color:var(--ink);border-bottom:1px solid var(--line-soft);}
+.mobile-menu a{padding:13px 6px;font-family:var(--head);font-weight:400;
+  letter-spacing:.08em;color:var(--ink);border-bottom:1px solid var(--line-soft);}
 .mobile-menu a.mm-cta{margin-top:12px;border:none;}
 
-/* ---------- スクロール進捗 ---------- */
-.scroll-progress{position:fixed;top:0;left:0;height:3px;width:0;
-  background:linear-gradient(90deg,var(--blue),var(--blue-l));z-index:80;transition:width .1s;}
+/* ---------- スクロール進捗（PC は額の外に描かれるため出さない） ---------- */
+.scroll-progress{position:fixed;top:0;left:0;height:2px;width:0;
+  background:var(--primary);z-index:80;transition:width .1s;}
+@media(min-width:860px){.scroll-progress{display:none;}}
 
 /* ============================================================
-   HERO — 光と弧で「つながり」を描く
+   HERO — 白地に若草の blob。写真は直角＋緑罫＋破線コネクタ
    ============================================================ */
-.hero{position:relative;overflow:hidden;
-  background:
-    radial-gradient(58% 52% at 84% -10%, rgba(63,116,255,.22) 0%, rgba(63,116,255,0) 60%),
-    radial-gradient(30% 30% at -6% -8%, rgba(244,112,63,.13) 0%, rgba(244,112,63,0) 70%),
-    linear-gradient(180deg, #f7faff 0%, #fffdfb 58%);
+.hero{position:relative;overflow:hidden;background:#fff;
   padding:clamp(40px,5vw,72px) 0 clamp(56px,7vw,96px);}
+.hero-blob{position:absolute;right:-12vw;top:-30vh;width:70vw;height:120vh;
+  background:#eef4de;border-radius:42% 58% 55% 45%/48% 42% 58% 52%;
+  z-index:0;pointer-events:none;}
 .hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(32px,5vw,64px);align-items:center;}
-/* 重なり合う2つの弧 = 人と業者がつながる図。写真の上を横切らない位置に逃がす */
-.hero::before,
-.hero::after {
-  content: "";
-  position: absolute;
-  border-radius: 50%;
-  pointer-events: none;
-  z-index: 0;
-}
-.hero::before {
-  width: 660px; height: 660px; right: -210px; top: -320px;
-  border: 1.5px solid rgba(20,71,224,.16);
-}
-.hero::after {
-  width: 470px; height: 470px; right: 130px; top: -300px;
-  border: 1.5px solid rgba(244,112,63,.22);
-}
-/* コピー・写真は弧より前面に */
+/* コピー・写真は blob より前面に */
 .hero-copy,
-.hero-figure { position: relative; z-index: 1; }
-/* 1カラムになる幅では弧が本文を横切って可読性を落とすため落とす */
-@media (max-width: 980px) {
-  .hero::before,
-  .hero::after { display: none; }
-}
-.hero-eyebrow{display:inline-flex;align-items:center;gap:9px;background:#fff;border:1px solid var(--line);
-  border-radius:999px;padding:8px 16px 8px 12px;font-size:13px;font-weight:700;color:var(--navy);
-  box-shadow:0 6px 18px -10px rgba(36,31,28,.18);}
-.hero-eyebrow .dot{width:8px;height:8px;border-radius:50%;background:var(--green);
-  box-shadow:0 0 0 4px rgba(31,138,91,.18);}
-.hero h1{font-size:clamp(32px,5.2vw,58px);line-height:1.34;color:var(--navy);margin-top:20px;
-  font-weight:700;letter-spacing:-.01em;}
-.hero h1 .hl{color:var(--blue);position:relative;white-space:nowrap;
-  background:linear-gradient(transparent 78%, rgba(20,71,224,.20) 78%, rgba(20,71,224,.20) 93%, transparent 93%);
-  padding-inline:2px;}
+.hero-figure{position:relative;z-index:1;}
+.hero-eyebrow{display:inline-flex;align-items:center;gap:9px;background:#fff;
+  border:1px solid var(--line);border-radius:0;padding:8px 16px 8px 12px;
+  font-size:13px;font-weight:400;color:var(--ink);}
+.hero-eyebrow .dot{width:8px;height:8px;border-radius:50%;background:var(--primary);}
+.hero h1{font-size:clamp(30px,4.6vw,50px);line-height:1.6;color:var(--ink);margin-top:20px;
+  font-weight:400;letter-spacing:.04em;}
+.hero h1::first-letter{color:var(--primary);}
+.hero h1 .hl{position:relative;white-space:nowrap;padding-inline:2px;}
 .hero h1 .hl::after{display:none;}
-.hero-sub{font-size:clamp(15.5px,1.7vw,18.5px);color:var(--body);margin-top:22px;max-width:30em;line-height:1.9;}
+.hero-sub{font-size:16px;color:var(--body);margin-top:22px;max-width:30em;line-height:2;}
 .hero-cta{display:flex;flex-wrap:wrap;gap:14px;margin-top:30px;}
 .hero-trust{display:flex;flex-wrap:wrap;gap:10px 22px;margin-top:26px;}
-.hero-trust li{list-style:none;display:flex;align-items:center;gap:9px;font-size:13.5px;font-weight:600;color:var(--ink);}
-.hero-trust .tb{width:22px;height:22px;border-radius:50%;background:rgba(14,138,90,.12);color:var(--green);
-  display:grid;place-items:center;flex:none;}
-.hero-trust .tb .ic{font-size:13px;stroke-width:2.6;}
+.hero-trust li{list-style:none;display:flex;align-items:center;gap:9px;font-size:14px;color:var(--ink);}
+.hero-trust .tb{width:22px;height:22px;border-radius:0;border:1px solid var(--primary);
+  background:#fff;color:var(--primary);display:grid;place-items:center;flex:none;}
+.hero-trust .tb .ic{font-size:12px;stroke-width:1.8;}
 
-/* ヒーロー写真 */
+/* ヒーロー写真：円形にしない（四隅の情報を落とさないため） */
 .hero-figure{position:relative;}
-.hero-photo{position:relative;border-radius:28px;overflow:hidden;aspect-ratio:4/3;
-  background:var(--pale);box-shadow:var(--shadow-l);border:6px solid #fff;}
-.hero-photo img{width:100%;height:100%;object-fit:cover;}
-/* AI解析のスキャン線を重ねて「革新」を一点だけ効かせる */
-.hero-photo::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 32%;
-  z-index: 2;
-  pointer-events: none;
-  background: linear-gradient(180deg, rgba(63,116,255,0) 0%, rgba(63,116,255,.20) 72%, rgba(63,116,255,.85) 100%);
-  animation: kdzScan 4.2s cubic-bezier(.45,0,.55,1) infinite;
-  mix-blend-mode: screen;
-}
-@keyframes kdzScan {
-  0%   { transform: translateY(-40%); opacity: 0; }
-  12%  { opacity: 1; }
-  88%  { opacity: 1; }
-  100% { transform: translateY(310%); opacity: 0; }
-}
-/* 「AI解析中」バッジ。写真の上に浮かせて、待つだけで進むことを一目で示す */
-.hero-figure::after {
-  content: "AI解析中";
-  position: absolute;
-  left: 18px;
-  top: 18px;
-  z-index: 3;
-  font-family: var(--head);
-  font-weight: 700;
-  font-size: 12px;
-  color: var(--blue);
-  background: rgba(255,255,255,.94);
-  border-radius: 999px;
-  padding: 7px 14px 7px 28px;
-  box-shadow: 0 8px 20px -10px rgba(20,71,224,.5);
-  backdrop-filter: blur(6px);
-}
-.hero-figure::before {
-  content: "";
-  position: absolute;
-  left: 30px;
-  top: 32px;
-  z-index: 4;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--blue);
-  animation: kdzPulse 1.6s ease-in-out infinite;
-}
-@keyframes kdzPulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(20,71,224,.45); }
-  50%      { opacity: .65; box-shadow: 0 0 0 6px rgba(20,71,224,0); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .hero-photo::after { animation: none; opacity: 0; }
-  .hero-figure::before { animation: none; }
-}
+.hero-photo{position:relative;border-radius:0;aspect-ratio:3/4;overflow:visible;
+  background:var(--pale);border:0;box-shadow:none;}
+.hero-photo img{width:100%;height:100%;object-fit:cover;object-position:center 35%;}
+/* 緑リングを 6px ずらす（人の森の円形リングの直角版） */
+.hero-photo::before{content:"";position:absolute;inset:-6px -6px 6px 6px;
+  border:1px solid var(--primary);pointer-events:none;}
+/* 破線コネクタ */
+.hero-photo::after{content:"";position:absolute;top:50%;left:-46px;width:38px;
+  border-top:1px dashed #333;}
+/* 「AI解析中」バッジ。静止・直角・白地緑文字（待つだけで進むことを残す） */
+.hero-figure::after{content:"AI解析中";position:absolute;left:18px;top:18px;z-index:3;
+  font-family:var(--head);font-weight:600;font-size:12px;letter-spacing:.08em;
+  color:var(--primary);background:#fff;border:1px solid var(--primary);
+  border-radius:0;padding:6px 14px;}
 .hero-badge{position:absolute;display:flex;align-items:center;gap:10px;background:#fff;
-  border-radius:14px;padding:12px 15px;box-shadow:var(--shadow-m);font-size:13px;font-weight:700;color:var(--navy);}
-.hero-badge .bi{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;flex:none;color:#fff;}
+  border:1px solid var(--line);border-radius:0;padding:12px 15px;
+  font-size:13px;font-weight:400;color:var(--ink);}
+.hero-badge .bi{width:34px;height:34px;border-radius:0;display:grid;place-items:center;flex:none;color:#fff;}
 .hero-badge .bi .ic{font-size:18px;}
-.hero-badge small{display:block;font-size:11px;color:var(--body-soft);font-weight:600;}
+.hero-badge small{display:block;font-size:11.5px;color:var(--body-soft);font-weight:400;}
 .hero-badge.b-live{bottom:18px;left:-16px;}
-.hero-badge.b-live .bi{background:var(--blue);}
+.hero-badge.b-live .bi{background:var(--primary);}
 .hero-badge.b-bid{bottom:80px;right:-14px;}
-.hero-badge.b-bid .bi{background:var(--green);}
+.hero-badge.b-bid .bi{background:var(--deep);}
 @media(max-width:340px){.hero-badge{display:none;}}
 
-/* 4ステップ帯: 白カード + コバルトのコネクタで「流れ」を可視化 */
+/* 4ステップ帯: ヘアラインの箱 + Libre Baskerville の番号 */
 .hero-how{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
-  background:#fff;border:1px solid var(--line);border-radius:20px;padding:14px 20px;
-  box-shadow:var(--shadow-s);margin:22px 0 6px;}
+  background:#fff;border:1px solid var(--line);border-radius:0;padding:14px 20px;
+  box-shadow:none;margin:22px 0 6px;}
 .hw-step{display:flex;align-items:center;gap:7px;font-family:var(--head);
-  font-size:13px;font-weight:700;color:var(--navy);}
-.hw-n{width:20px;height:20px;border-radius:50%;background:var(--blue);color:#fff;
-  font-size:11px;font-weight:900;display:grid;place-items:center;flex:none;
-  box-shadow:0 4px 10px -4px rgba(20,71,224,.6);font-family:var(--num);font-variant-numeric:tabular-nums;}
-.hw-ic{color:var(--blue);font-size:15px;}
-.hw-arr{color:var(--blue);opacity:.42;font-size:15px;stroke-width:2;}
+  font-size:13px;font-weight:400;color:var(--ink);}
+.hw-n{width:auto;height:auto;border-radius:0;background:none;color:var(--primary);
+  font-family:var(--en-display);font-size:14px;font-weight:400;display:grid;place-items:center;flex:none;
+  font-variant-numeric:tabular-nums;}
+.hw-ic{color:var(--primary);font-size:15px;}
+.hw-arr{color:var(--primary);opacity:.42;font-size:15px;stroke-width:1.5;}
 @media(max-width:480px){.hw-arr{display:none;}.hero-how{gap:10px;}}
 
-/* 帯：信頼の根拠 — 濃紺ベタ → 淡コバルト。ページ全体の重さを抜く */
-.assure{background:var(--pale);color:var(--ink);border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+/* 帯：信頼の根拠 — 白地に上下ヘアライン */
+.assure{background:#fff;color:var(--ink);border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
 .assure .container{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;
   padding-block:28px;}
 .assure-item{display:flex;align-items:center;gap:12px;}
-.assure-item .ai{width:40px;height:40px;border-radius:14px;background:#fff;
-  display:grid;place-items:center;flex:none;color:var(--blue);box-shadow:0 6px 16px -10px rgba(20,71,224,.5);}
-.assure-item .ai .ic{font-size:21px;}
-.assure-item b{display:block;font-family:var(--head);font-weight:700;font-size:14.5px;color:var(--navy);line-height:1.4;}
-.assure-item span{font-size:11.5px;color:var(--body-soft);}
+.assure-item .ai{width:40px;height:40px;border-radius:0;background:#fff;
+  border:1px solid var(--primary);display:grid;place-items:center;flex:none;color:var(--primary);}
+.assure-item .ai .ic{font-size:20px;}
+.assure-item b{display:block;font-family:var(--head);font-weight:600;font-size:15px;color:var(--ink);line-height:1.6;}
+.assure-item span{font-size:12px;color:var(--body-soft);}
 @media(max-width:860px){.assure .container{grid-template-columns:repeat(2,1fr);gap:16px 18px;}}
 
 /* ============================================================
-   共感（悩み）
+   共感（悩み）— 枠も面も持たない。区切りは余白のみ
    ============================================================ */
-.empathy{background:var(--pale-2);}
-.emp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;}
-.emp-card{background:#fff;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;
-  box-shadow:var(--shadow-s);transition:transform .3s var(--ease),box-shadow .3s var(--ease);}
-.emp-card:hover{transform:translateY(-6px);box-shadow:var(--shadow-m);}
+.empathy{background:#fff;}
+.emp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(28px,3.4vw,40px);}
+.emp-card{background:transparent;border:0;border-radius:0;box-shadow:none;overflow:hidden;}
 .emp-photo{aspect-ratio:4/3;background:var(--pale);overflow:hidden;}
-.emp-photo img{width:100%;height:100%;object-fit:cover;}
-.emp-body{padding:20px 22px 24px;}
-.emp-body h3{font-size:18px;color:var(--navy);}
-.emp-body p{font-size:14px;color:var(--body);margin-top:9px;line-height:1.85;}
+.emp-photo img{width:100%;height:100%;object-fit:cover;transition:opacity .3s var(--ease);}
+.emp-card:hover .emp-photo img{opacity:.85;}
+.emp-card:hover h3{color:var(--primary);}
+.emp-body{padding:18px 0 0;}
+.emp-body h3{font-size:20px;color:var(--ink);transition:color .25s;}
+.emp-body p{font-size:15px;color:var(--body);margin-top:9px;line-height:1.9;}
 .empathy .turn{text-align:center;margin-top:clamp(34px,4vw,52px);}
-.empathy .turn p{font-size:clamp(17px,2vw,22px);font-family:var(--head);font-weight:700;color:var(--navy);}
-.empathy .turn .accent{color:var(--blue);}
+.empathy .turn p{font-size:clamp(18px,2vw,22px);font-family:var(--head);font-weight:400;color:var(--ink);}
+.empathy .turn .accent{color:var(--primary);}
 
 /* ============================================================
    汎用カードグリッド見出し共通 / セクション交互背景
@@ -295,62 +299,67 @@ strong{font-weight:700;color:var(--ink);}
    BUNDLE（まとめて出すほど有利）— 核
    ============================================================ */
 .bundle .bundle-lead{display:grid;grid-template-columns:1fr 1fr;gap:clamp(30px,4vw,56px);align-items:center;margin-bottom:clamp(40px,5vw,64px);}
-.bundle-figure{position:relative;border-radius:26px;overflow:hidden;aspect-ratio:5/4;background:var(--pale);box-shadow:var(--shadow-l);}
+.bundle-figure{position:relative;border-radius:0;overflow:hidden;aspect-ratio:5/4;background:var(--pale);box-shadow:none;}
 .bundle-figure img{width:100%;height:100%;object-fit:contain;}
 .bundle-copy .eyebrow{margin-bottom:14px;}
-.bundle-copy h2{font-size:clamp(25px,3.2vw,38px);color:var(--navy);}
-.bundle-copy .lead{font-size:clamp(15px,1.6vw,17.5px);color:var(--body);margin-top:18px;line-height:1.95;}
-.bundle-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;align-items:stretch;}
-.bundle-c{position:relative;background:#fff;border:1px solid var(--line);border-radius:var(--radius);
-  padding:30px 26px;box-shadow:var(--shadow-s);transition:transform .3s var(--ease),box-shadow .3s var(--ease);}
-.bundle-c:hover{transform:translateY(-6px);box-shadow:var(--shadow-m);}
-.bundle-c .bc-ic{width:58px;height:58px;border-radius:18px;background:var(--pale);color:var(--blue);
+.bundle-copy h2{font-size:clamp(25px,3.2vw,38px);color:var(--ink);}
+.bundle-copy h2::first-letter{color:var(--primary);}
+.bundle-copy .lead{font-size:16px;color:var(--body);margin-top:18px;line-height:2;}
+.bundle-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(28px,3.4vw,40px);align-items:stretch;}
+.bundle-c{position:relative;background:transparent;border:0;border-radius:0;
+  padding:28px 26px;box-shadow:none;}
+.bundle-c .bc-ic{width:56px;height:56px;border-radius:0;background:#fff;
+  border:1px solid var(--primary);color:var(--primary);
   display:grid;place-items:center;margin-bottom:16px;}
-.bundle-c .bc-ic .ic{font-size:27px;}
-.bundle-c h3{font-size:18px;color:var(--navy);line-height:1.42;}
-.bundle-c p{font-size:14px;color:var(--body);line-height:1.85;margin-top:11px;}
-.bundle-c.key{border:1.5px solid var(--blue);box-shadow:0 26px 52px -22px rgba(20,71,224,.42);}
-.bundle-c.key .bc-ic{background:var(--blue);color:#fff;}
-.bundle-c .bc-badge{position:absolute;top:-13px;left:24px;background:var(--blue);color:#fff;
-  font-size:11.5px;font-weight:700;font-family:var(--head);padding:6px 13px;border-radius:999px;
-  letter-spacing:.03em;box-shadow:0 10px 20px -8px rgba(20,71,224,.6);}
-.bundle-note{font-size:12.5px;color:var(--body-soft);text-align:center;margin-top:26px;}
+.bundle-c .bc-ic .ic{font-size:26px;}
+.bundle-c h3{font-size:19px;color:var(--ink);line-height:1.6;}
+.bundle-c p{font-size:15px;color:var(--body);line-height:1.9;margin-top:11px;}
+/* 強調1枚は枠色ではなく面＋左の緑縦バー（人の森「本社」小見出しの作法） */
+.bundle-c.key{background:var(--pale);border-left:3px solid var(--primary);box-shadow:none;}
+.bundle-c.key .bc-ic{background:var(--primary);border-color:var(--primary);color:#fff;}
+.bundle-c .bc-badge{position:absolute;top:0;left:0;background:var(--primary);color:#fff;
+  font-size:11.5px;font-weight:600;font-family:var(--head);padding:6px 13px;border-radius:0;
+  letter-spacing:.08em;box-shadow:none;}
+.bundle-note{font-size:13px;color:var(--body-soft);text-align:center;margin-top:26px;}
 
 /* ============================================================
    AUCTION（業者が競う仕組み）
    ============================================================ */
 .auction{background:#fff;color:var(--ink);overflow:hidden;border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
-.auction .section-head h2{color:var(--navy);}
-.auction .section-head .sub{color:var(--body-soft);}
-.auction .eyebrow{color:var(--blue);}
+.auction .section-head h2{color:var(--ink);}
+.auction .section-head .sub{color:var(--body);}
+.auction .eyebrow{color:var(--primary);}
 .auc-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:clamp(32px,4vw,60px);align-items:center;}
-.auc-figure{border-radius:26px;overflow:hidden;background:var(--pale);box-shadow:var(--shadow-l);aspect-ratio:16/10;}
+.auc-figure{border-radius:0;overflow:hidden;background:var(--pale);box-shadow:none;aspect-ratio:16/10;}
 .auc-figure img{width:100%;height:100%;object-fit:contain;}
 .auc-steps{list-style:none;display:flex;flex-direction:column;gap:18px;}
 .auc-steps li{display:flex;gap:16px;}
-.auc-steps .an{width:38px;height:38px;border-radius:14px;background:var(--pale);color:var(--blue);
-  font-family:var(--num);font-weight:900;font-size:17px;display:grid;place-items:center;flex:none;
-  font-variant-numeric:tabular-nums;}
-.auc-steps h4{color:var(--navy);font-size:16.5px;}
-.auc-steps p{color:var(--body);font-size:13.5px;margin-top:5px;line-height:1.8;}
-.auc-note{margin-top:26px;font-size:12.5px;color:var(--body-soft);}
+.auc-steps .an{width:auto;min-width:30px;height:auto;border-radius:0;background:none;color:var(--primary);
+  font-family:var(--en-display);font-weight:400;font-size:22px;display:block;flex:none;
+  font-variant-numeric:tabular-nums;line-height:1.4;}
+.auc-steps h4{color:var(--ink);font-size:17px;}
+.auc-steps p{color:var(--body);font-size:15px;margin-top:5px;line-height:1.9;}
+.auc-note{margin-top:26px;font-size:13px;color:var(--body-soft);}
 
 /* ============================================================
    STEPS（使い方4ステップ）
    ============================================================ */
-.steps-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;}
-.step{position:relative;background:#fff;border:1px solid var(--line);border-radius:var(--radius);
-  overflow:hidden;box-shadow:var(--shadow-s);transition:transform .3s var(--ease),box-shadow .3s var(--ease);}
-.step:hover{transform:translateY(-6px);box-shadow:var(--shadow-m);}
+.steps-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(28px,3.4vw,40px);}
+.step{position:relative;background:transparent;border:0;border-radius:0;
+  overflow:hidden;box-shadow:none;}
 .step-photo{aspect-ratio:4/3;background:var(--pale);overflow:hidden;}
-.step-photo img{width:100%;height:100%;object-fit:cover;}
-.step-body{padding:20px 20px 24px;}
-.step-n{display:inline-flex;align-items:center;gap:8px;font-family:var(--head);font-weight:900;
-  font-size:13px;color:var(--blue);letter-spacing:.08em;}
-.step-n .num{width:26px;height:26px;border-radius:50%;background:var(--pale);display:grid;place-items:center;font-size:14px;
-  font-family:var(--num);font-variant-numeric:tabular-nums;}
-.step-body h3{font-size:16.5px;margin-top:12px;color:var(--navy);}
-.step-body p{font-size:13.5px;color:var(--body);margin-top:8px;line-height:1.8;}
+.step-photo img{width:100%;height:100%;object-fit:cover;transition:opacity .3s var(--ease);}
+.step:hover .step-photo img{opacity:.85;}
+.step:hover h3{color:var(--primary);}
+.step-body{padding:18px 0 0;}
+.step-n{display:inline-flex;align-items:center;gap:8px;font-family:var(--en-display);font-weight:400;
+  font-size:13px;color:var(--primary);letter-spacing:.08em;}
+.step-n .num{width:auto;height:auto;border-radius:0;background:none;display:inline-block;font-size:22px;
+  font-family:var(--en-display);font-variant-numeric:tabular-nums;}
+/* DOM の数字は変えずに「01」の二桁表記にする */
+.step-n .num::before{content:"0";}
+.step-body h3{font-size:18px;margin-top:12px;color:var(--ink);transition:color .25s;}
+.step-body p{font-size:15px;color:var(--body);margin-top:8px;line-height:1.9;}
 /* ステップ写真（127×130 ≈ 1:1）は正方形コンテナで全体を表示 */
 #flow .step-photo { aspect-ratio: 1/1; }
 /* Trustイラスト（206×125 ≈ 16.5:10）はほぼ16/10で収まるためそのまま */
@@ -362,179 +371,190 @@ strong{font-weight:700;color:var(--ink);}
    ============================================================ */
 .media-split{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,4vw,60px);align-items:center;}
 .media-split.rev .media-figure{order:2;}
-.media-figure{border-radius:26px;overflow:hidden;aspect-ratio:4/3;background:var(--pale);box-shadow:var(--shadow-l);}
+.media-figure{border-radius:0;overflow:hidden;aspect-ratio:4/3;background:var(--pale);box-shadow:none;}
 .media-figure img{width:100%;height:100%;object-fit:cover;}
 .media-copy .eyebrow{margin-bottom:14px;}
-.media-copy h2{font-size:clamp(24px,3vw,34px);color:var(--navy);}
-.media-copy .sub{font-size:clamp(15px,1.5vw,16.5px);color:var(--body);margin-top:16px;line-height:1.95;}
+.media-copy h2{font-size:clamp(24px,3vw,34px);color:var(--ink);}
+.media-copy h2::first-letter{color:var(--primary);}
+.media-copy .sub{font-size:16px;color:var(--body);margin-top:16px;line-height:2;}
 .mlist{list-style:none;margin-top:22px;display:flex;flex-direction:column;gap:13px;}
-.mlist li{display:flex;gap:12px;font-size:14.5px;color:var(--ink);align-items:flex-start;}
-.mlist .ck{width:24px;height:24px;border-radius:50%;background:rgba(31,138,91,.12);color:var(--green);
-  display:grid;place-items:center;flex:none;margin-top:1px;}
-.mlist .ck .ic{font-size:13px;stroke-width:2.6;}
+.mlist li{display:flex;gap:12px;font-size:15px;color:var(--ink);align-items:flex-start;}
+.mlist .ck{width:22px;height:22px;border-radius:0;border:1px solid var(--primary);
+  background:#fff;color:var(--primary);display:grid;place-items:center;flex:none;margin-top:3px;}
+.mlist .ck .ic{font-size:12px;stroke-width:1.8;}
 
 /* ============================================================
    利用シーン
    ============================================================ */
-.scenes-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;}
-.scene-card{background:#fff;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;
-  box-shadow:var(--shadow-s);transition:transform .3s var(--ease),box-shadow .3s var(--ease);}
-.scene-card:hover{transform:translateY(-6px);box-shadow:var(--shadow-m);}
+.scenes-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(28px,3.4vw,40px);}
+.scene-card{background:transparent;border:0;border-radius:0;overflow:hidden;box-shadow:none;}
 .scene-img{aspect-ratio:3/4;background:var(--pale);overflow:hidden;}
-.scene-img img{width:100%;height:100%;object-fit:cover;}
-.scene-body{padding:18px 20px 22px;}
-.scene-tag{display:inline-flex;align-items:center;gap:7px;font-family:var(--head);font-weight:700;
-  font-size:12px;padding:5px 12px;border-radius:999px;color:var(--blue);background:var(--pale);}
+.scene-img img{width:100%;height:100%;object-fit:cover;transition:opacity .3s var(--ease);}
+.scene-card:hover .scene-img img{opacity:.85;}
+.scene-card:hover h3{color:var(--primary);}
+.scene-body{padding:18px 0 0;}
+.scene-tag{display:inline-flex;align-items:center;gap:7px;font-family:var(--head);font-weight:400;
+  font-size:12px;letter-spacing:.06em;padding:4px 12px;border-radius:0;
+  color:var(--primary);background:#fff;border:1px solid var(--primary);}
 .scene-tag .ic{font-size:14px;}
-.scene-body h3{font-size:16px;margin-top:12px;color:var(--navy);}
-.scene-body p{font-size:13px;color:var(--body);margin-top:8px;line-height:1.78;}
+.scene-body h3{font-size:18px;margin-top:12px;color:var(--ink);transition:color .25s;}
+.scene-body p{font-size:15px;color:var(--body);margin-top:8px;line-height:1.9;}
 @media(max-width:980px){.scenes-grid{grid-template-columns:repeat(2,1fr);}}
 
 /* ============================================================
    TRUST（安心・信頼）
    ============================================================ */
-.trust-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;}
-.trust-c{background:#fff;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;
-  box-shadow:var(--shadow-s);transition:transform .3s var(--ease),box-shadow .3s var(--ease);}
-.trust-c:hover{transform:translateY(-6px);box-shadow:var(--shadow-m);}
+.trust-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(28px,3.4vw,40px);}
+.trust-c{background:transparent;border:0;border-radius:0;overflow:hidden;box-shadow:none;}
 .tc-illus{aspect-ratio:16/10;background:var(--pale);overflow:hidden;display:grid;place-items:center;}
-.tc-illus img{width:100%;height:100%;object-fit:contain;padding:10px;}
-.tc-body{padding:22px 24px 26px;}
-.tc-ic{display:inline-grid;place-items:center;width:42px;height:42px;border-radius:14px;background:var(--pale);color:var(--blue);margin-bottom:12px;}
-.tc-ic .ic{font-size:22px;}
-.tc-body h3{font-size:17px;color:var(--navy);}
-.tc-body p{font-size:13.5px;color:var(--body);margin-top:10px;line-height:1.85;}
+.tc-illus img{width:100%;height:100%;object-fit:contain;padding:10px;transition:opacity .3s var(--ease);}
+.trust-c:hover .tc-illus img{opacity:.85;}
+.trust-c:hover h3{color:var(--primary);}
+.tc-body{padding:20px 0 0;}
+.tc-ic{display:inline-grid;place-items:center;width:42px;height:42px;border-radius:0;
+  background:#fff;border:1px solid var(--primary);color:var(--primary);margin-bottom:12px;}
+.tc-ic .ic{font-size:21px;}
+.tc-body h3{font-size:19px;color:var(--ink);transition:color .25s;}
+.tc-body p{font-size:15px;color:var(--body);margin-top:10px;line-height:1.9;}
 
 /* ============================================================
-   料金（透明性） — 「無料」を最も気持ちよく見せる
+   料金（透明性） — 「無料」はマーカーで強度を作る
    ============================================================ */
-.fee-card{max-width:760px;margin-inline:auto;background:#fff;border:1px solid var(--line);
-  border-radius:26px;box-shadow:var(--shadow-m);overflow:hidden;}
-.fee-head{background:var(--warm);padding:26px 30px;border-bottom:1px solid var(--line);text-align:center;}
-.fee-head h3{font-size:21px;color:var(--navy);}
-.fee-head p{font-size:13.5px;color:var(--body-soft);margin-top:6px;}
+.fee-card{max-width:var(--maxw-text);margin-inline:auto;background:#fff;border:1px solid var(--line);
+  border-radius:0;box-shadow:none;overflow:hidden;}
+.fee-head{background:var(--pale);padding:26px 30px;border-bottom:1px solid var(--line);text-align:center;}
+.fee-head h3{font-size:22px;color:var(--ink);}
+.fee-head p{font-size:14px;color:var(--body-soft);margin-top:6px;}
 .fee-rows{padding:10px 30px 26px;}
 .fee-row{display:flex;justify-content:space-between;align-items:center;gap:16px;
   padding:17px 0;border-bottom:1px solid var(--line-soft);}
 .fee-row:last-child{border-bottom:none;}
 .fee-row .fl{font-size:15px;font-weight:600;color:var(--ink);}
 .fee-row .fl small{display:block;font-size:12px;font-weight:400;color:var(--body-soft);margin-top:3px;}
-.fee-row .fv{font-family:var(--num);font-weight:900;font-size:20px;color:var(--green);white-space:nowrap;
-  font-variant-numeric:tabular-nums;}
+.fee-row .fv{font-family:var(--ui);font-weight:600;font-size:20px;color:var(--primary);white-space:nowrap;
+  font-variant-numeric:tabular-nums;background:linear-gradient(transparent 68%,var(--marker) 68%);}
 .fee-row .fv.zero::after{content:"無料";}
 
-/* ---------- 業者向け導線バナー — 沈めたコバルトで面を締める ---------- */
-.biz-banner{background:linear-gradient(135deg, var(--deep) 0%, #0d1f52 100%);padding:clamp(48px,6vw,72px) 0;}
+/* ---------- 業者向け導線バナー — 淡い緑面 + 上下ヘアライン ---------- */
+.biz-banner{background:var(--pale);border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  padding:clamp(48px,6vw,72px) 0;}
 .biz-banner-inner{display:flex;align-items:center;gap:clamp(24px,4vw,56px);flex-wrap:wrap;}
 .biz-banner-copy{flex:1;min-width:260px;}
-.biz-banner-copy .eyebrow{color:rgba(255,255,255,.6);background:rgba(255,255,255,.12);}
-.biz-banner-copy h2{font-size:clamp(22px,2.8vw,32px);color:#fff;margin-top:14px;line-height:1.35;}
-.biz-banner-copy p{font-size:14.5px;color:rgba(255,255,255,.65);margin-top:12px;line-height:1.85;}
+.biz-banner-copy .eyebrow{color:var(--primary);background:none;}
+.biz-banner-copy h2{font-size:clamp(22px,2.8vw,32px);color:var(--ink);margin-top:14px;line-height:1.6;}
+.biz-banner-copy h2::first-letter{color:var(--primary);}
+.biz-banner-copy p{font-size:15px;color:var(--body);margin-top:12px;line-height:1.9;}
 .biz-banner-tags{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;}
-.biz-tag{font-size:12.5px;font-weight:700;color:#fff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:99px;padding:5px 14px;}
+.biz-tag{font-size:12.5px;font-weight:400;color:var(--primary);background:#fff;
+  border:1px solid var(--primary);border-radius:0;padding:5px 14px;}
 .biz-banner-cta{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:12px;}
-.btn-white{background:#fff;color:var(--deep);box-shadow:0 14px 26px -12px rgba(0,0,0,.3);}
-.btn-white:hover{background:var(--pale);transform:translateY(-2px);}
+/* クラス名は据え置き。人の森整合版では緑地白文字の直角ボタン */
+.btn-white{background:var(--primary);color:#fff;box-shadow:none;}
 @media(max-width:640px){.biz-banner-inner{flex-direction:column;align-items:flex-start;}.biz-banner-cta{width:100%;}.biz-banner-cta .btn{width:100%;}}
 
 /* ============================================================
-   対応カテゴリ
+   対応カテゴリ — 枠は写真だけが持つ
    ============================================================ */
 .cats-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:16px;}
-.cat{background:#fff;border:1px solid var(--line);border-radius:18px;overflow:hidden;
-  box-shadow:var(--shadow-s);transition:transform .25s var(--ease),box-shadow .25s var(--ease);}
-.cat:hover{transform:translateY(-4px);box-shadow:var(--shadow-m);}
-.cat-img{aspect-ratio:1/1;background:var(--pale);overflow:hidden;}
-.cat-img img{width:100%;height:100%;object-fit:contain;padding:6px;}
-.cat-body{padding:12px 12px 14px;text-align:center;}
-.cat-body .cl{font-family:var(--head);font-weight:700;font-size:13px;color:var(--navy);line-height:1.4;}
-.cat-body .cs{font-size:10.5px;color:var(--body-soft);margin-top:3px;}
+.cat{background:transparent;border:0;border-radius:0;overflow:hidden;box-shadow:none;}
+.cat-img{aspect-ratio:1/1;background:var(--pale);border:1px solid var(--line);overflow:hidden;}
+.cat-img img{width:100%;height:100%;object-fit:contain;padding:6px;transition:opacity .25s var(--ease);}
+.cat:hover .cat-img img{opacity:.85;}
+.cat:hover .cl{color:var(--primary);}
+.cat-body{padding:12px 2px 0;text-align:center;}
+.cat-body .cl{font-family:var(--head);font-weight:400;font-size:14px;color:var(--ink);line-height:1.6;transition:color .25s;}
+.cat-body .cs{font-size:11.5px;color:var(--body-soft);margin-top:3px;}
 @media(max-width:980px){.cats-grid{grid-template-columns:repeat(4,1fr);}}
 @media(max-width:560px){.cats-grid{grid-template-columns:repeat(3,1fr);gap:12px;}}
-.cats-note{display:flex;gap:16px;align-items:flex-start;max-width:760px;margin:clamp(30px,4vw,44px) auto 0;
-  background:var(--warm);border:1px solid #f2e2d6;border-radius:22px;padding:22px 26px;}
-.cats-note .cn-ic{width:44px;height:44px;border-radius:14px;background:var(--apricot);color:#fff;
-  display:grid;place-items:center;flex:none;}
-.cats-note .cn-ic .ic{font-size:23px;}
-.cats-note h4{font-size:16px;color:var(--navy);}
-.cats-note p{font-size:13.5px;color:var(--body);margin-top:7px;line-height:1.82;}
+.cats-note{display:flex;gap:16px;align-items:flex-start;max-width:var(--maxw-text);margin:clamp(30px,4vw,44px) auto 0;
+  background:var(--pale);border:1px solid var(--line);border-radius:0;padding:22px 26px;}
+.cats-note .cn-ic{width:44px;height:44px;border-radius:0;background:#fff;
+  border:1px solid var(--primary);color:var(--primary);display:grid;place-items:center;flex:none;}
+.cats-note .cn-ic .ic{font-size:22px;}
+.cats-note h4{font-size:17px;color:var(--ink);}
+.cats-note p{font-size:15px;color:var(--body);margin-top:7px;line-height:1.9;}
 
 /* ============================================================
    運営者メッセージ
    ============================================================ */
 .founder-grid{display:grid;grid-template-columns:.8fr 1.2fr;gap:clamp(30px,4vw,56px);align-items:center;}
-.founder-photo{border-radius:26px;overflow:hidden;aspect-ratio:3/4;background:var(--pale);box-shadow:var(--shadow-l);position:relative;}
+/* figcaption を内包するため円形マスクは文字を欠く。直角＋緑罫で作法を継承する */
+.founder-photo{border-radius:0;overflow:hidden;aspect-ratio:3/4;background:var(--pale);box-shadow:none;position:relative;}
 .founder-photo img{width:100%;height:100%;object-fit:cover;}
 .founder-photo figcaption{position:absolute;left:0;right:0;bottom:0;padding:18px 18px 14px;
-  background:linear-gradient(transparent,rgba(15,37,82,.82));color:#fff;font-family:var(--head);
-  font-weight:700;font-size:13.5px;}
+  background:linear-gradient(transparent,rgba(51,51,51,.82));color:#fff;font-family:var(--head);
+  font-weight:600;font-size:14px;}
 .founder-copy .eyebrow{margin-bottom:14px;}
-.founder-copy h2{font-size:clamp(22px,2.7vw,32px);color:var(--navy);}
-.founder-copy p{font-size:14.5px;color:var(--body);margin-top:16px;line-height:1.95;}
-.founder-sign{margin-top:20px;font-family:var(--head);font-weight:700;color:var(--navy);font-size:14px;}
+.founder-copy h2{font-size:clamp(22px,2.7vw,32px);color:var(--ink);}
+.founder-copy h2::first-letter{color:var(--primary);}
+.founder-copy p{font-size:16px;color:var(--body);margin-top:16px;line-height:2;}
+.founder-sign{margin-top:20px;font-family:var(--head);font-weight:600;color:var(--ink);font-size:15px;}
 .founder-sign span{display:block;font-size:12px;color:var(--body-soft);font-weight:400;margin-bottom:2px;}
 
 /* ============================================================
-   FAQ
+   FAQ — 上下ヘアラインで区切るリスト
    ============================================================ */
-.faq-list{max-width:820px;margin-inline:auto;display:flex;flex-direction:column;gap:12px;}
-.faq-item{border:1px solid var(--line);border-radius:18px;background:#fff;overflow:hidden;transition:border-color .25s,box-shadow .25s;}
-.faq-item.open{border-color:var(--blue);box-shadow:var(--shadow-s);}
-.faq-q{width:100%;display:flex;align-items:center;gap:14px;padding:20px 22px;text-align:left;
-  background:none;border:none;cursor:pointer;font-family:var(--head);font-weight:700;font-size:15.5px;color:var(--navy);}
-.faq-q .qmark{width:26px;height:26px;border-radius:9px;background:var(--pale);color:var(--blue);
-  font-weight:900;display:grid;place-items:center;flex:none;font-size:14px;
-  font-family:var(--num);font-variant-numeric:tabular-nums;}
+.faq-list{max-width:820px;margin-inline:auto;display:flex;flex-direction:column;gap:0;
+  border-top:1px solid var(--line);}
+.faq-item{border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;overflow:hidden;}
+.faq-item.open{box-shadow:none;}
+.faq-item.open .faq-q{color:var(--primary);}
+.faq-q{width:100%;display:flex;align-items:center;gap:14px;padding:20px 4px;text-align:left;
+  background:none;border:none;cursor:pointer;font-family:var(--head);font-weight:400;font-size:16px;color:var(--ink);
+  transition:color .25s;}
+.faq-q .qmark{width:auto;height:auto;border-radius:0;background:none;color:var(--primary);
+  font-family:var(--en-display);font-weight:400;display:block;flex:none;font-size:18px;}
 .faq-q .chev{margin-left:auto;color:var(--body-soft);transition:transform .3s;font-size:18px;}
-.faq-item.open .chev{transform:rotate(180deg);color:var(--blue);}
+.faq-item.open .chev{transform:rotate(180deg);color:var(--primary);}
 .faq-a{max-height:0;overflow:hidden;transition:max-height .35s var(--ease);}
-.faq-a-inner{padding:0 22px 22px 62px;font-size:14px;color:var(--body);line-height:1.9;}
+.faq-a-inner{padding:0 4px 22px 36px;font-size:15px;color:var(--body);line-height:1.9;}
 
 /* ============================================================
-   最終CTA — 光で包み、人の顔を主役に
+   最終CTA — 白地に若草の blob。人の顔を主役に
    ============================================================ */
-.final{background:
-    radial-gradient(58% 60% at 50% 118%, rgba(63,116,255,.22) 0%, rgba(63,116,255,0) 68%),
-    radial-gradient(40% 46% at 12% -10%, rgba(244,112,63,.12) 0%, rgba(244,112,63,0) 70%),
-    #fffdfb;
-  color:var(--ink);text-align:center;overflow:hidden;position:relative;
+.final{background:#fff;color:var(--ink);text-align:center;overflow:hidden;position:relative;
   border-top:1px solid var(--line);}
+.final::before{content:"";position:absolute;left:-18vw;bottom:-40vh;width:60vw;height:100vh;
+  background:#eef4de;border-radius:48% 52% 45% 55%/52% 48% 52% 48%;z-index:0;pointer-events:none;}
 .final .container{position:relative;z-index:2;}
 .cta-staff{display:flex;justify-content:center;margin-bottom:22px;}
-.cta-staff img{width:60px;height:60px;border-radius:50%;object-fit:cover;border:3px solid #fff;
-  margin-left:-14px;box-shadow:0 10px 24px -12px rgba(20,71,224,.5);background:var(--pale);}
+.cta-staff img{width:60px;height:60px;border-radius:50%;object-fit:cover;border:2px solid #fff;
+  margin-left:-14px;box-shadow:none;background:var(--pale);}
 .cta-staff img:first-child{margin-left:0;}
-.final h2{color:var(--navy);font-size:clamp(26px,3.6vw,42px);}
-.final p{font-size:clamp(15px,1.6vw,17.5px);color:var(--body);margin-top:16px;max-width:34em;margin-inline:auto;line-height:1.9;}
+.final h2{color:var(--ink);font-size:clamp(26px,3.6vw,42px);}
+.final h2::first-letter{color:var(--primary);}
+.final p{font-size:16px;color:var(--body);margin-top:16px;max-width:34em;margin-inline:auto;line-height:2;}
 .final .final-cta{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-top:30px;}
-.final .btn-line{background:#06c755;color:#fff;}
-.final .btn-line:hover{background:#f0fff6;}
-.final .btn-ghost{background:#fff;color:var(--navy);border-color:var(--line);}
-.final .final-note{margin-top:22px;font-size:12.5px;color:var(--body-soft);}
+.final .btn-ghost{background:#fff;color:#333;border:1px solid #333;}
+.final .final-note{margin-top:22px;font-size:13px;color:var(--body-soft);}
 
 /* ============================================================
-   フッター
+   フッター — 白地・上ヘアライン（導線は不変）
    ============================================================ */
-.footer{background:#101f4a;color:#a9b7d6;padding:clamp(48px,6vw,72px) 0 36px;font-size:13px;}
+.footer{background:#fff;color:var(--body-soft);border-top:1px solid var(--line);
+  padding:clamp(48px,6vw,72px) 0 36px;font-size:12px;}
 .footer-grid{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:32px;}
-.footer-logo img{height:40px;filter:brightness(0) invert(1);opacity:.9;}
+.footer-logo img{height:40px;filter:none;opacity:1;}
 .founder-logo{display:block;width:56px;margin-bottom:20px;}
 .final-logo{display:block;width:64px;margin:0 auto 24px;}
-.footer .about{margin-top:16px;line-height:1.85;max-width:30em;color:#8294b6;font-size:12.5px;}
-.footer h5{color:#fff;font-family:var(--head);font-weight:700;font-size:14px;margin-bottom:14px;}
+.footer .about{margin-top:16px;line-height:1.9;max-width:30em;color:var(--body-soft);font-size:12.5px;}
+/* 英字ラベルは Montserrat、和文見出しは明朝へ落ちる（Montserrat は和文グリフを持たない） */
+.footer h5{color:var(--primary);font-family:"Montserrat",var(--head);font-weight:600;
+  text-transform:uppercase;font-size:13px;letter-spacing:.14em;margin-bottom:14px;}
 .footer ul{list-style:none;display:flex;flex-direction:column;gap:9px;}
-.footer ul a{color:#9fb0cf;transition:color .2s;}
-.footer ul a:hover{color:#fff;}
-.footer-bottom{margin-top:40px;padding-top:24px;border-top:1px solid rgba(255,255,255,.08);
-  display:flex;flex-wrap:wrap;gap:10px 24px;justify-content:space-between;color:#6f81a4;font-size:12px;}
+.footer ul a{color:var(--body-soft);transition:color .2s;}
+.footer ul a:hover{color:var(--primary);}
+.footer-bottom{margin-top:40px;padding-top:24px;border-top:1px solid var(--line);
+  display:flex;flex-wrap:wrap;gap:10px 24px;justify-content:center;text-align:center;
+  color:var(--body-soft);font-size:12px;}
 @media(max-width:860px){.footer-grid{grid-template-columns:1fr 1fr;gap:28px;}}
 
 /* ============================================================
    追従CTA（モバイル）
    ============================================================ */
 .dock{position:fixed;left:0;right:0;bottom:0;z-index:55;display:none;gap:10px;padding:12px 16px
-  calc(12px + env(safe-area-inset-bottom));background:rgba(255,253,251,.94);
-  backdrop-filter:blur(12px);border-top:1px solid var(--line);box-shadow:0 -8px 24px -16px rgba(15,37,82,.4);}
+  calc(12px + env(safe-area-inset-bottom));background:#fff;
+  backdrop-filter:none;border-top:1px solid var(--line);box-shadow:none;}
 .dock .btn{flex:1;padding:15px;font-size:15px;}
 
 /* ============================================================
@@ -542,19 +562,19 @@ strong{font-weight:700;color:var(--ink);}
    ============================================================ */
 .section-cta{padding:0 0 clamp(28px,3.5vw,44px);}
 .scta-inner{display:flex;align-items:center;justify-content:space-between;gap:24px;
-  background:linear-gradient(120deg, var(--pale) 0%, var(--warm) 100%);border:1px solid var(--line);border-radius:24px;
+  background:var(--pale);border:1px solid var(--line);border-radius:0;
   padding:26px 36px;}
-.scta-text strong{display:block;font-family:var(--head);font-weight:700;
-  font-size:17px;color:var(--navy);}
+.scta-text strong{display:block;font-family:var(--head);font-weight:600;
+  font-size:17px;color:var(--ink);}
 .scta-text span{display:block;font-size:13px;color:var(--body-soft);margin-top:4px;}
 @media(max-width:640px){
   .scta-inner{flex-direction:column;text-align:center;padding:22px 20px;}
 }
 
 /* ============================================================
-   スクロール演出
+   スクロール演出 — フェードのみ（人の森は移動を伴わない）
    ============================================================ */
-.rv{opacity:0;transform:translateY(22px);transition:opacity .7s var(--ease),transform .7s var(--ease);}
+.rv{opacity:0;transform:none;transition:opacity .7s var(--ease);}
 .rv.in{opacity:1;transform:none;}
 .rv[data-d="1"]{transition-delay:.08s;}
 .rv[data-d="2"]{transition-delay:.16s;}
@@ -567,9 +587,9 @@ strong{font-weight:700;color:var(--ink);}
 img[data-ph]{position:relative;}
 .ph-wrap{position:relative;}
 .imgph{position:absolute;inset:0;display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center;
-  background:repeating-linear-gradient(135deg,#f2f6ff 0 14px,#e9f0ff 14px 28px);color:#9fb1d6;text-align:center;padding:14px;}
+  background:repeating-linear-gradient(135deg,#f6f8f4 0 14px,#eff3ef 14px 28px);color:var(--body-soft);text-align:center;padding:14px;}
 .imgph .ic{font-size:30px;opacity:.7;}
-.imgph small{font-size:11px;font-weight:600;letter-spacing:.02em;line-height:1.4;}
+.imgph small{font-size:11px;font-weight:400;letter-spacing:.02em;line-height:1.6;}
 
 /* ============================================================
    レスポンシブ
@@ -593,4 +613,5 @@ img[data-ph]{position:relative;}
   .container{padding-inline:18px;}
   .steps-grid,.scenes-grid{grid-template-columns:1fr;max-width:420px;margin-inline:auto;}
   .hero-cta .btn{width:100%;}
+  .hero-photo::after{display:none;}
 }

@@ -34,7 +34,7 @@ const LINKS: {
     title: "出品してみる",
     desc: "不用品を出品して業者に入札してもらう",
     icon: "box",
-    bg: "#e8faf0",
+    bg: "var(--pale)",
     color: "var(--green)",
   },
 ];
@@ -72,7 +72,7 @@ export default function NotFound() {
 
           {/* よくある質問: Icons.tsx に該当アイコンが無いため疑問符サークルをインラインSVGで再現 */}
           <Link href="/faq" className="nf-link">
-            <div className="nf-link-ic" style={{ background: "#f6eeff", color: "#6c3495" }}>
+            <div className="nf-link-ic" style={{ background: "var(--pale-2)", color: "var(--gold)" }}>
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <circle cx="12" cy="12" r="9" />
                 <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01" />

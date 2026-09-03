@@ -38,7 +38,7 @@ export function PageShell({
     <div className="container-aw py-10">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
+          <h1 className="text-2xl font-normal text-slate-900">{title}</h1>
           {description ? (
             <p className="mt-1.5 text-sm text-slate-500">{description}</p>
           ) : null}
@@ -59,7 +59,7 @@ export function Card({
 }) {
   return (
     <div
-      className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${className}`}
+      className={`rounded-none border border-slate-200 bg-white p-5 ${className}`}
     >
       {children}
     </div>
@@ -80,7 +80,7 @@ export function Notice({
     success: "border-emerald-200 bg-emerald-50 text-emerald-800",
   }[tone];
   return (
-    <div className={`rounded-xl border px-4 py-3 text-sm leading-relaxed ${styles}`}>
+    <div className={`rounded-none border px-4 py-3 text-sm leading-relaxed ${styles}`}>
       {children}
     </div>
   );
@@ -109,7 +109,7 @@ export function StatusBadge({
 }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
+      className={`inline-flex items-center rounded-none px-2.5 py-1 text-xs font-semibold ${
         BADGE_STYLES[value] ?? "bg-slate-100 text-slate-600"
       }`}
     >
@@ -119,13 +119,13 @@ export function StatusBadge({
 }
 
 export const btnPrimary =
-  "inline-flex items-center justify-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex items-center justify-center gap-1.5 rounded-none bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50";
 export const btnSecondary =
-  "inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex items-center justify-center gap-1.5 rounded-none border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50";
 export const btnDanger =
-  "inline-flex items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex items-center justify-center gap-1.5 rounded-none border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50";
 export const inputBase =
-  "w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200";
+  "w-full rounded-none border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200";
 
 /** Stepper.tsx のパターンを N ステップに一般化した進捗インジケーター。 */
 export function KdzStepper({
@@ -147,13 +147,13 @@ export function KdzStepper({
             <div className="flex w-full items-center">
               <span
                 className={[
-                  "h-[3px] flex-1 rounded-full",
+                  "h-[3px] flex-1 rounded-none",
                   isFirst ? "opacity-0" : index <= current ? "bg-brand-600" : "bg-slate-200",
                 ].join(" ")}
               />
               <span
                 className={[
-                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors",
+                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors",
                   isDone && "bg-brand-600 text-white",
                   isActive && "bg-brand-600 text-white ring-4 ring-brand-100",
                   !isDone && !isActive && "border-2 border-slate-300 bg-white text-slate-400",
@@ -166,7 +166,7 @@ export function KdzStepper({
               </span>
               <span
                 className={[
-                  "h-[3px] flex-1 rounded-full",
+                  "h-[3px] flex-1 rounded-none",
                   isLast ? "opacity-0" : index < current ? "bg-brand-600" : "bg-slate-200",
                 ].join(" ")}
               />

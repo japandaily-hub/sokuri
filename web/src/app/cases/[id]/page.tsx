@@ -268,6 +268,8 @@ export default function UserCaseDetailPage() {
       await reload();
     } catch (e) {
       setError(toDisplayMessage(e, "操作に失敗しました"));
+      // 409（他の操作と競合）等で失敗した場合も、画面が古い状態のまま残らないよう最新化する。
+      await reload();
     } finally {
       setBusy(false);
     }
@@ -295,6 +297,9 @@ export default function UserCaseDetailPage() {
     );
   }
 
+  // 取り下げ済み等の非アクティブな入札は依頼者側に完全非表示にする（再入札不可の設計に合わせ、
+  // 「決める」対象になり得ない入札を一覧・件数・空状態のいずれからも除外する）。
+  const activeBids = bids.filter((b) => b.status === "pending");
   const pendingReduction = txn?.reduction_requests.find((r) => r.status === "pending");
   const myReview = txn?.reviews.find((r) => r.reviewer_type === "user");
 
@@ -313,7 +318,7 @@ export default function UserCaseDetailPage() {
       <Card>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-xl font-bold text-slate-900">{caseData.purpose}</h1>
+            <h1 className="text-xl font-normal text-slate-900">{caseData.purpose}</h1>
             <p className="mt-1 text-sm text-slate-500">
               {caseData.prefecture} {caseData.city}
               {caseData.address_detail ? ` ${caseData.address_detail}` : ""}
@@ -344,9 +349,9 @@ export default function UserCaseDetailPage() {
                 <div className="min-w-0 flex-1">
                   {album.title ? (
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-bold text-slate-900">{album.title}</p>
+                      <p className="text-sm font-normal text-slate-900">{album.title}</p>
                       {album.condition ? (
-                        <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
+                        <span className="rounded-none bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
                           {CASE_ITEM_CONDITION_LABEL[album.condition] ?? album.condition}
                         </span>
                       ) : null}
@@ -369,7 +374,7 @@ export default function UserCaseDetailPage() {
               </div>
 
               {isEditing && item ? (
-                <div className="mt-2 space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="mt-2 space-y-3 rounded-none border border-slate-200 bg-slate-50 p-4">
                   {editError ? <p className="text-xs font-semibold text-red-600">{editError}</p> : null}
                   <div>
                     <label className="mb-1 block text-xs font-semibold text-slate-500">商品名</label>
@@ -446,7 +451,7 @@ export default function UserCaseDetailPage() {
                       <img
                         src={photoSrc(p.url)}
                         alt=""
-                        className="aspect-square w-full rounded-xl border border-slate-200 object-cover"
+                        className="aspect-square w-full rounded-none border border-slate-200 object-cover"
                       />
                       {canEditCase ? (
                         <button
@@ -502,7 +507,7 @@ export default function UserCaseDetailPage() {
         />
 
         {caseData.ai_summary ? (
-          <div className="mt-4 rounded-xl bg-slate-50 p-4">
+          <div className="mt-4 rounded-none bg-slate-50 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
               AI 要約（業者に提示されます）
             </p>
@@ -516,20 +521,20 @@ export default function UserCaseDetailPage() {
       {/* ===== 入札一覧 ===== */}
       {!txn && caseData.status !== "cancelled" && (
         <Card>
-          <h2 className="font-bold text-slate-900">入札一覧（{bids.length} 件）</h2>
-          {bids.length === 0 ? (
+          <h2 className="font-normal text-slate-900">入札一覧（{activeBids.length} 件）</h2>
+          {activeBids.length === 0 ? (
             <p className="mt-3 text-sm text-slate-500">
               まだ入札がありません。入札が届くとメールでお知らせします。
             </p>
           ) : (
             <ul className="mt-4 space-y-3">
-              {bids.map((b) => (
+              {activeBids.map((b) => (
                 <li
                   key={b.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-4"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-none border border-slate-200 p-4"
                 >
                   <div>
-                    <p className="font-bold text-slate-900">
+                    <p className="font-normal text-slate-900">
                       {b.operator?.company_name ?? "業者"}
                       {b.operator?.rating != null ? (
                         <span className="ml-2 text-xs font-semibold text-amber-600">
@@ -537,7 +542,7 @@ export default function UserCaseDetailPage() {
                         </span>
                       ) : null}
                     </p>
-                    <p className="mt-0.5 text-lg font-bold text-brand-700">
+                    <p className="mt-0.5 text-lg font-semibold text-brand-700 tabular-nums">
                       {formatYen(b.amount)}
                     </p>
                     {b.message ? (
@@ -546,19 +551,22 @@ export default function UserCaseDetailPage() {
                       </p>
                     ) : null}
                   </div>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() =>
-                      act(
-                        () => selectBid(caseId, b.id, token!),
-                        `${b.operator?.company_name ?? "この業者"}（${formatYen(b.amount)}）に決定しますか？\n決定後、業者へ住所詳細が開示されます。`,
-                      )
-                    }
-                    className={btnPrimary}
-                  >
-                    この業者に決める
-                  </button>
+                  {/* 一覧は activeBids（pending のみ）だが、多層防御として描画直前にも再確認する。 */}
+                  {b.status === "pending" ? (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        act(
+                          () => selectBid(caseId, b.id, token!),
+                          `${b.operator?.company_name ?? "この業者"}（${formatYen(b.amount)}）に決定しますか？\n決定後、業者へ住所詳細が開示されます。`,
+                        )
+                      }
+                      className={btnPrimary}
+                    >
+                      この業者に決める
+                    </button>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -571,7 +579,7 @@ export default function UserCaseDetailPage() {
         <Card>
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="font-bold text-slate-900">
+              <h2 className="font-normal text-slate-900">
                 成約: {txn.operator?.company_name ?? "業者"}
               </h2>
               <p className="mt-1 text-sm text-slate-500">
@@ -612,13 +620,13 @@ export default function UserCaseDetailPage() {
 
           {/* 減額申請（承認待ち） */}
           {pendingReduction && (
-            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
-              <p className="text-sm font-bold text-amber-900">業者から減額申請が届いています</p>
+            <div className="mt-4 rounded-none border border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm font-semibold text-amber-900">業者から減額申請が届いています</p>
               <p className="mt-1 text-sm text-amber-800">
                 {formatYen(pendingReduction.original_amount)} →{" "}
                 <strong>{formatYen(pendingReduction.requested_amount)}</strong>
               </p>
-              <p className="mt-2 rounded-lg bg-white/70 p-3 text-sm leading-relaxed text-slate-700">
+              <p className="mt-2 rounded-none bg-white/70 p-3 text-sm leading-relaxed text-slate-700">
                 理由: {pendingReduction.reason}
               </p>
               <div className="mt-3 flex gap-2">
@@ -694,8 +702,8 @@ export default function UserCaseDetailPage() {
                 レビュー投稿済み（★{myReview.rating}）ありがとうございました。
               </Notice>
             ) : (
-              <div className="mt-4 rounded-xl border border-slate-200 p-4">
-                <p className="font-bold text-slate-900">業者を評価する</p>
+              <div className="mt-4 rounded-none border border-slate-200 p-4">
+                <p className="font-normal text-slate-900">業者を評価する</p>
                 <div className="mt-2 flex gap-1">
                   {[1, 2, 3, 4, 5].map((n) => (
                     <button

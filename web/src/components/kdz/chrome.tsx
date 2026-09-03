@@ -9,8 +9,9 @@ export function SiteFooter() {
       <div className="container">
         <div className="footer-grid">
           <div>
+            {/* フッターは白地のため反転しない（ワードマークはそのままの緑＋墨） */}
             <Link href="/" className="logo footer-logo" aria-label="カタヅケ">
-              <KdzLogo variant="white" size={22} />
+              <KdzLogo size={22} />
             </Link>
             <p className="about">
               家まるごと、まとめて片付け買取。業者が買取総額で競い合う、営業電話に追われない不用品買取マッチング。東京・千葉・埼玉・神奈川対応。

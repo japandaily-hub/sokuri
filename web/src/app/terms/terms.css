@@ -14,7 +14,7 @@
 
 .legal-tabs { display: flex; gap: 0; border-bottom: 2px solid var(--line); margin-bottom: 0; }
 .legal-tab {
-  padding: 14px 28px; font-size: 14px; font-weight: 700; color: var(--body-soft); cursor: pointer;
+  padding: 14px 28px; font-size: 14px; font-weight: 600; color: var(--body-soft); cursor: pointer;
   border-bottom: 3px solid transparent; margin-bottom: -2px; transition: color .2s;
   font-family: var(--head); background: none; border-top: none; border-left: none; border-right: none;
 }
@@ -38,12 +38,12 @@
 .legal-body ul, .legal-body ol { padding-left: 20px; margin-bottom: 14px; }
 .legal-body li { font-size: 14.5px; color: var(--body); line-height: 1.85; margin-bottom: 5px; }
 .legal-body .note {
-  background: #fff8e6; border-left: 3px solid var(--gold); padding: 14px 18px;
-  border-radius: 0 8px 8px 0; font-size: 13.5px; color: var(--body); margin: 20px 0; line-height: 1.8;
+  background: var(--warm); border-left: 3px solid var(--gold); padding: 14px 18px;
+  border-radius: 0; font-size: 13.5px; color: var(--body); margin: 20px 0; line-height: 1.8;
 }
 .legal-body .important {
-  background: #fff0f0; border-left: 3px solid #e05c5c; padding: 14px 18px;
-  border-radius: 0 8px 8px 0; font-size: 13.5px; color: var(--body); margin: 20px 0; line-height: 1.8;
+  background: #fff0f0; border-left: 3px solid var(--danger); padding: 14px 18px;
+  border-radius: 0; font-size: 13.5px; color: var(--body); margin: 20px 0; line-height: 1.8;
 }
 
 .tab-wrap { background: #fff; border-bottom: 1px solid var(--line); position: sticky; top: 76px; z-index: 40; }
@@ -51,6 +51,6 @@
 
 .back-link {
   display: inline-flex; align-items: center; gap: 6px;
-  font-size: 13.5px; font-weight: 700; color: var(--blue); margin-bottom: 32px;
+  font-size: 13.5px; font-weight: 600; color: var(--blue); margin-bottom: 32px;
 }
 .back-link:hover { text-decoration: underline; }

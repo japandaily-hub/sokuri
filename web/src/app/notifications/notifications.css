@@ -5,7 +5,7 @@
    ここでは .notif-page スコープ配下の固有クラスのみ定義する。
    ============================================================ */
 
-.notif-page { background: #f4f6fb; min-height: 100vh; }
+.notif-page { background: var(--pale-2); min-height: 100vh; }
 
 /* ── ラッパー ── */
 .notif-page .notif-wrap { max-width: 600px; margin: 0 auto; padding: 24px 20px 80px; }
@@ -16,10 +16,10 @@
   gap: 12px; margin-bottom: 16px;
 }
 .notif-page .notif-toolbar-title {
-  font-family: var(--head); font-size: 18px; font-weight: 900; color: var(--navy);
+  font-family: var(--head); font-size: 18px; font-weight: 400; color: var(--navy);
 }
 .notif-page .btn-read-all {
-  font-size: 12.5px; font-weight: 700; color: var(--blue);
+  font-size: 12.5px; font-weight: 600; color: var(--blue);
   background: none; border: none; cursor: pointer; padding: 0;
 }
 .notif-page .btn-read-all:hover { text-decoration: underline; }
@@ -30,32 +30,32 @@
   display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap;
 }
 .notif-page .notif-tab {
-  padding: 7px 16px; border-radius: 99px;
+  padding: 7px 16px; border-radius: 0;
   border: 1.5px solid var(--line); background: #fff;
-  font-family: var(--head); font-size: 13px; font-weight: 700; color: var(--body-soft);
+  font-family: var(--head); font-size: 13px; font-weight: 400; color: var(--body-soft);
   cursor: pointer; transition: .2s; white-space: nowrap;
 }
 .notif-page .notif-tab.active { border-color: var(--blue); background: var(--pale); color: var(--blue); }
 .notif-page .notif-tab .tab-badge {
   display: inline-block; background: var(--blue); color: #fff;
-  font-size: 10px; font-weight: 900; padding: 1px 6px; border-radius: 99px;
+  font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 0;
   margin-left: 4px; vertical-align: middle;
 }
 
 /* ── 通知カード ── */
 .notif-page .notif-group { margin-bottom: 20px; }
 .notif-page .notif-group-label {
-  font-size: 11.5px; font-weight: 700; color: var(--body-soft);
+  font-size: 11.5px; font-weight: 400; color: var(--body-soft);
   letter-spacing: .06em; margin-bottom: 8px; padding-left: 2px;
 }
 .notif-page .notif-card {
-  background: #fff; border-radius: 14px;
-  border: 1.5px solid var(--line-soft); box-shadow: var(--shadow-s);
+  background: #fff; border-radius: 0;
+  border: 1.5px solid var(--line-soft); box-shadow: none;
   margin-bottom: 8px; overflow: hidden;
   transition: box-shadow .2s, border-color .2s, transform .2s;
   text-decoration: none; display: block; cursor: pointer;
 }
-.notif-page .notif-card:hover { transform: translateY(-1px); box-shadow: var(--shadow-m); }
+.notif-page .notif-card:hover { box-shadow: none; }
 .notif-page .notif-card.unread { border-left: 4px solid var(--blue); }
 .notif-page .notif-card.unread-green { border-left: 4px solid var(--green); }
 .notif-page .notif-card.unread-warn { border-left: 4px solid #f0a030; }
@@ -63,7 +63,7 @@
   display: flex; align-items: flex-start; gap: 14px; padding: 16px 18px;
 }
 .notif-page .notif-icon {
-  width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+  width: 44px; height: 44px; border-radius: 0; flex-shrink: 0;
   display: grid; place-items: center;
 }
 .notif-page .notif-icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -73,10 +73,10 @@
 .notif-page .notif-icon.gray  { background: var(--line-soft); color: var(--body-soft); }
 .notif-page .notif-body { flex: 1; min-width: 0; }
 .notif-page .notif-title {
-  font-family: var(--head); font-size: 14.5px; font-weight: 700;
+  font-family: var(--head); font-size: 14.5px; font-weight: 600;
   color: var(--navy); line-height: 1.4; margin-bottom: 4px;
 }
-.notif-page .notif-card.read .notif-title { color: var(--body-soft); font-weight: 600; }
+.notif-page .notif-card.read .notif-title { color: var(--body-soft); font-weight: 400; }
 .notif-page .notif-text {
   font-size: 13px; color: var(--body-soft); line-height: 1.7;
   overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
@@ -87,7 +87,7 @@
 }
 .notif-page .notif-time { font-size: 11.5px; color: var(--body-soft); font-weight: 600; }
 .notif-page .notif-badge {
-  font-size: 10.5px; font-weight: 700; padding: 3px 9px; border-radius: 99px;
+  font-size: 10.5px; font-weight: 600; padding: 3px 9px; border-radius: 0;
   white-space: nowrap;
 }
 .notif-page .notif-badge.blue  { background: var(--pale);    color: var(--blue); }
@@ -127,15 +127,15 @@
 
 /* 設定バナー */
 .notif-page .notif-settings-banner {
-  background: var(--pale); border-radius: 14px; border: 1px solid rgba(31,84,222,.15);
+  background: var(--pale); border-radius: 0; border: 1px solid rgba(82,126,82,.15);
   padding: 14px 18px; display: flex; align-items: center; gap: 12px; margin-bottom: 20px;
 }
 .notif-page .notif-settings-banner > svg { width: 22px; height: 22px; fill: none; stroke: var(--blue); stroke-width: 1.8; stroke-linecap: round; flex-shrink: 0; }
 .notif-page .notif-settings-text { flex: 1; font-size: 13px; color: var(--body); line-height: 1.7; }
-.notif-page .notif-settings-text strong { color: var(--navy); font-weight: 700; }
+.notif-page .notif-settings-text strong { color: var(--navy); font-weight: 600; }
 .notif-page .btn-notif-setting {
-  font-size: 12.5px; font-weight: 700; color: var(--blue);
-  background: none; border: 1.5px solid var(--blue); border-radius: 99px;
+  font-size: 12.5px; font-weight: 600; color: var(--blue);
+  background: none; border: 1.5px solid var(--blue); border-radius: 0;
   padding: 7px 14px; cursor: pointer; transition: .2s; white-space: nowrap;
 }
 .notif-page .btn-notif-setting:hover { background: var(--blue); color: #fff; }
@@ -154,8 +154,7 @@
 .notif-page .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(10, 20, 50, .45);
-  backdrop-filter: blur(4px);
+  background: rgba(51, 51, 51, .45);
   z-index: 200;
   display: flex;
   align-items: center;
@@ -169,11 +168,12 @@
 .notif-page .modal-overlay.show { opacity: 1; pointer-events: all; visibility: visible; transition: opacity .25s; }
 .notif-page .modal-card {
   background: #fff;
-  border-radius: 20px;
+  border-radius: 0;
+  border: 1px solid var(--line);
   padding: 32px 28px 24px;
   max-width: 420px;
   width: 100%;
-  box-shadow: 0 24px 60px -10px rgba(10, 20, 50, .25);
+  box-shadow: none;
   transform: translateY(10px);
   transition: transform .3s;
 }
@@ -184,12 +184,12 @@
 .notif-page .btn-modal-cancel {
   flex: 1;
   padding: 13px;
-  border-radius: 999px;
+  border-radius: 0;
   border: 1.5px solid var(--line);
   background: #fff;
   color: var(--ink);
   font-family: var(--head);
-  font-weight: 700;
+  font-weight: 600;
   font-size: 14px;
   cursor: pointer;
   transition: .2s;
@@ -199,25 +199,25 @@
 .notif-page .btn-modal-confirm {
   flex: 1;
   padding: 13px;
-  border-radius: 999px;
+  border-radius: 0;
   border: none;
   background: var(--blue);
   color: #fff;
   font-family: var(--head);
-  font-weight: 900;
+  font-weight: 600;
   font-size: 14px;
   cursor: pointer;
-  box-shadow: 0 10px 22px -8px rgba(31, 84, 222, .5);
+  box-shadow: none;
   transition: .2s;
 }
-.notif-page .btn-modal-confirm:hover { background: var(--blue-d); transform: translateY(-1px); }
+.notif-page .btn-modal-confirm:hover { background: var(--blue-d); }
 .notif-page .btn-modal-confirm:disabled { opacity: .6; cursor: default; transform: none; box-shadow: none; }
-.notif-page .btn-modal-confirm.danger { background: #dc2626; box-shadow: 0 10px 22px -8px rgba(220, 38, 38, .5); }
+.notif-page .btn-modal-confirm.danger { background: #dc2626; box-shadow: none; }
 .notif-page .btn-modal-confirm.danger:hover { background: #b91c1c; }
 
 @media (max-width: 480px) {
   .notif-page .notif-card-inner { padding: 14px 12px; gap: 10px; }
-  .notif-page .notif-icon { width: 38px; height: 38px; border-radius: 10px; }
+  .notif-page .notif-icon { width: 38px; height: 38px; border-radius: 0; }
   .notif-page .notif-wrap { padding: 16px 14px 80px; }
   .notif-page .notif-tabs { gap: 5px; }
   .notif-page .notif-tab { padding: 6px 12px; font-size: 12px; }

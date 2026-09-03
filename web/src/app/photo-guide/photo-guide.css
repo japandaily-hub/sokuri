@@ -7,9 +7,9 @@
 /* ヒーロー — トップページと同じ明るいトーン */
 .guide-hero {
   background:
-    radial-gradient(58% 52% at 84% -10%, rgba(63, 116, 255, .22) 0%, rgba(63, 116, 255, 0) 60%),
+    radial-gradient(58% 52% at 84% -10%, rgba(82,126,82, .22) 0%, rgba(82,126,82, 0) 60%),
     radial-gradient(30% 30% at -6% -8%, rgba(244, 112, 63, .13) 0%, rgba(244, 112, 63, 0) 70%),
-    linear-gradient(180deg, #f7faff 0%, #fffdfb 58%);
+    linear-gradient(180deg, var(--pale) 0%, var(--pale) 58%);
   padding: clamp(56px, 8vw, 96px) 0 clamp(44px, 6vw, 72px);
   position: relative;
   overflow: hidden;
@@ -18,7 +18,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse 70% 60% at 110% 10%, rgba(31, 84, 222, .10) 0%, transparent 60%);
+  background: radial-gradient(ellipse 70% 60% at 110% 10%, rgba(82,126,82, .10) 0%, transparent 60%);
 }
 .guide-hero .container { position: relative; z-index: 1; }
 /* 明るいヒーロー背景上でチップの輪郭が沈みやすいため、トップページの .hero-eyebrow と
@@ -62,7 +62,7 @@
   align-items: center;
   gap: 10px;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--navy);
 }
 .merit-chip .ic { width: 20px; height: 20px; color: var(--blue); stroke-width: 2; flex-shrink: 0; }
@@ -77,12 +77,12 @@
 }
 .guide-section-num {
   width: 44px; height: 44px;
-  border-radius: 12px;
+  border-radius: 0;
   background: var(--blue);
   color: #fff;
   font-family: var(--head);
   font-size: 18px;
-  font-weight: 900;
+  font-weight: 400;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -103,7 +103,7 @@
   overflow: hidden;
   border: 1.5px solid var(--line);
 }
-.compare-card.good { border-color: #86efac; }
+.compare-card.good { border-color: var(--primary-l); }
 .compare-card.bad { border-color: #fca5a5; }
 .compare-photo {
   aspect-ratio: 4/3;
@@ -114,8 +114,8 @@
   position: relative;
   overflow: hidden;
 }
-.compare-photo.good-bg { background: linear-gradient(135deg, #e8f5e9 0%, #f0f7ff 100%); }
-.compare-photo.bad-bg { background: linear-gradient(135deg, #fff5f5 0%, #fdf5e6 100%); }
+.compare-photo.good-bg { background: linear-gradient(135deg, var(--pale) 0%, var(--pale) 100%); }
+.compare-photo.bad-bg { background: linear-gradient(135deg, #fff5f5 0%, var(--warm) 100%); }
 .compare-photo-illus {
   width: 100%;
   height: 100%;
@@ -133,14 +133,14 @@
 }
 .compare-label-badge {
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 400;
   padding: 3px 10px;
-  border-radius: 99px;
+  border-radius: 0;
   flex-shrink: 0;
   margin-top: 2px;
 }
-.good .compare-label-badge { background: #d1fae5; color: #166534; }
-.bad .compare-label-badge { background: #fee2e2; color: #991b1b; }
+.good .compare-label-badge { background: var(--pale); color: var(--primary-d); }
+.bad .compare-label-badge { background: #fee2e2; color: var(--danger); }
 .compare-label p { font-size: 13.5px; color: var(--ink); line-height: 1.6; }
 
 /* ポイントカード */
@@ -159,7 +159,7 @@
 }
 .point-ic {
   width: 36px; height: 36px;
-  border-radius: 10px;
+  border-radius: 0;
   background: var(--pale);
   flex-shrink: 0;
   display: flex;
@@ -168,7 +168,7 @@
   color: var(--blue);
 }
 .point-ic .ic { width: 18px; height: 18px; stroke-width: 2; }
-.point-body h4 { font-size: 14px; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
+.point-body h4 { font-size: 14px; font-weight: 600; color: var(--navy); margin-bottom: 4px; }
 .point-body p { font-size: 13px; color: var(--body-soft); line-height: 1.7; }
 
 /* ステップ */
@@ -182,7 +182,7 @@
   gap: 16px;
   align-items: flex-start;
   padding: 18px 20px;
-  background: #fafbfe;
+  background: var(--pale);
   border: 1.5px solid var(--line);
   border-radius: var(--radius-s);
 }
@@ -193,20 +193,20 @@
   color: #fff;
   font-family: var(--head);
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 400;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
-.shoot-step-body h4 { font-size: 14.5px; font-weight: 700; color: var(--navy); margin-bottom: 5px; }
+.shoot-step-body h4 { font-size: 14.5px; font-weight: 600; color: var(--navy); margin-bottom: 5px; }
 .shoot-step-body p { font-size: 13.5px; color: var(--body-soft); line-height: 1.75; }
 .shoot-step-body .tip {
   margin-top: 8px;
   font-size: 12.5px;
   color: var(--blue);
   background: var(--pale);
-  border-radius: 6px;
+  border-radius: 0;
   padding: 6px 10px;
   display: inline-flex;
   align-items: center;
@@ -230,13 +230,13 @@
   align-items: center;
   gap: 8px;
   font-size: 13.5px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--navy);
   margin-bottom: 10px;
 }
 .cat-guide-card .cat-name .cat-ic {
   width: 28px; height: 28px;
-  border-radius: 8px;
+  border-radius: 0;
   background: var(--pale);
   color: var(--blue);
   display: flex;

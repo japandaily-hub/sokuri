@@ -71,10 +71,10 @@ export default function ConditionCard({
       aria-checked={selected}
       onClick={() => onSelect(condition)}
       className={[
-        "w-full rounded-xl border-2 p-4 text-left transition-all duration-150",
+        "w-full rounded-none border-2 p-4 text-left transition-all duration-150",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2",
         selected
-          ? "border-brand-600 bg-brand-50 shadow-card"
+          ? "border-brand-600 bg-brand-50"
           : "border-slate-200 bg-white hover:border-brand-300 hover:bg-slate-50",
       ].join(" ")}
     >
@@ -99,7 +99,7 @@ export default function ConditionCard({
         {/* 係数バッジ */}
         <span
           className={[
-            "shrink-0 rounded-full px-2.5 py-1 text-xs font-bold tabular-nums transition-colors",
+            "shrink-0 rounded-none px-2.5 py-1 text-xs font-semibold tabular-nums transition-colors",
             selected ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-500",
           ].join(" ")}
         >

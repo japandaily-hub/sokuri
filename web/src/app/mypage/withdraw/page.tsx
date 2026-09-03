@@ -157,17 +157,17 @@ export default function WithdrawPage() {
   const deleteItems: { icon: "user" | "list" | "chat"; title: string; desc: string }[] = [
     {
       icon: "user",
-      title: "アカウント情報 — 削除されます",
+      title: "アカウント情報：削除されます",
       desc: "名前・メールアドレス・電話番号・LINE連携",
     },
     {
       icon: "list",
-      title: "出品データ — キャンセル・住所情報削除",
+      title: "出品データ：キャンセル・住所情報削除",
       desc: `${countsDesc}（未成約の出品は自動キャンセルされます）`,
     },
     {
       icon: "chat",
-      title: "取引・メッセージ履歴 — 業者側の記録として保持",
+      title: "取引・メッセージ履歴：業者側の記録として保持",
       desc: "成約済みのお取引の記録（住所・メッセージ内容を含む）は、取引相手の業者の取引記録として保持されます",
     },
   ];
@@ -215,10 +215,10 @@ export default function WithdrawPage() {
               style={{
                 padding: "12px 16px",
                 borderRadius: "var(--radius-s)",
-                background: "#fff5f5",
-                color: "#dc2626",
+                background: "rgba(215,0,53,.06)",
+                color: "var(--danger)",
                 fontSize: 13,
-                border: "1px solid #fca5a5",
+                border: "1px solid rgba(215,0,53,.35)",
               }}
             >
               セッションが切れました。再ログインしてください。
@@ -256,10 +256,10 @@ export default function WithdrawPage() {
               style={{
                 padding: "12px 16px",
                 borderRadius: "var(--radius-s)",
-                background: "#fff5f5",
-                color: "#dc2626",
+                background: "rgba(215,0,53,.06)",
+                color: "var(--danger)",
                 fontSize: 13,
-                border: "1px solid #fca5a5",
+                border: "1px solid rgba(215,0,53,.35)",
               }}
             >
               {profileError ?? "情報の取得に失敗しました"}
@@ -307,10 +307,10 @@ export default function WithdrawPage() {
                   marginBottom: 14,
                   padding: "12px 16px",
                   borderRadius: "var(--radius-s)",
-                  background: "#fff5f5",
-                  color: "#dc2626",
+                  background: "rgba(215,0,53,.06)",
+                  color: "var(--danger)",
                   fontSize: 13,
-                  border: "1px solid #fca5a5",
+                  border: "1px solid rgba(215,0,53,.35)",
                 }}
               >
                 {deleteError}

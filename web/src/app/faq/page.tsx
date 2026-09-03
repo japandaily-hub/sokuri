@@ -4,6 +4,7 @@
  *  検索・カテゴリフィルタ・アコーディオン開閉を伴うためクライアントコンポーネント。
  *  ヘッダー/フッターは共通 SiteChrome が付与するため、ここでは <main id="main"> の中身のみを描画する。 */
 
+import "./faq.css";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Ic, type IcName } from "@/components/kdz/Icons";

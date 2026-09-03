@@ -361,7 +361,7 @@ export default function ChatPage() {
               </div>
 
               {messagesError ? (
-                <div style={{ padding: "8px 20px", fontSize: 12.5, color: "#e05c5c" }}>{messagesError}</div>
+                <div style={{ padding: "8px 20px", fontSize: 12.5, color: "var(--danger)" }}>{messagesError}</div>
               ) : null}
 
               {/* メッセージ */}

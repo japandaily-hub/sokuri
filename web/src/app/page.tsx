@@ -21,7 +21,7 @@ const CATEGORIES: { icon: IcName; name: string; ex: string }[] = [
 
 const FAQ_ITEMS = [
   { q: "1点だけでも依頼できますか？", a: "はい。ただし、まとめて出すほど業者の買取総額が伸びやすく、値がつかない物も一緒に引き取ってもらいやすくなります。" },
-  { q: "値段がつかない物はどうなりますか？", a: "業者は1点ごとではなく“まとめ全体”の金額で入札します。単体では値がつきにくい物も、まとめに含めて引き取ってもらえる場合があります。" },
+  { q: "値段がつかない物はどうなりますか？", a: <>業者は1点ごとではなく<span className="mk">まとめ全体の金額で入札</span>します。単体では値がつきにくい物も、まとめに含めて引き取ってもらえる場合があります。</> },
   { q: "しつこい営業電話は来ますか？", a: "連絡が来るのは、あなたが選んだ1社だけ。選ぶまで連絡先は業者に開示されず、選ばなかった業者には自動でお断りが入るため、一斉架電は起こりません。" },
   { q: "個人情報はどう扱われますか？", a: "査定段階で業者に渡るのは、写真・品目・地域（都道府県・市区町村）・住居情報などの出品内容のみ。お名前や電話番号が業者に渡ることはなく、詳細住所と連絡用のメールアドレスも交渉が成立した1社にのみ開示されます。" },
   { q: "利用にお金はかかりますか？", a: "出品・査定・成約まで、すべて無料です。費用は一切かかりません。" },
@@ -48,8 +48,10 @@ export default function HomePage() {
   return (
     <>
       <main id="main">
+        <div className="site-frame">
         {/* ============ HERO ============ */}
         <section className="hero" id="top">
+          <div className="hero-blob" aria-hidden="true" />
           <div className="container hero-grid">
             <div className="hero-copy">
               <span className="hero-eyebrow">
@@ -62,7 +64,7 @@ export default function HomePage() {
                 <span className="hl">動けない</span>あなたへ。
               </h1>
               <p className="hero-sub">
-                家じゅうの不用品を、<strong>まとめて撮って待つだけ</strong>。登録業者が“買取総額”で競い合い、値がつかない物もまとめて引き取ります。営業電話に追われることはありません。
+                家じゅうの不用品を、<strong>まとめて撮って待つだけ</strong>。登録業者が<span className="mk">買取総額</span>で競い合い、値がつかない物もまとめて引き取ります。営業電話に追われることはありません。
               </p>
               <ul className="hero-trust">
                 <li><span className="tb"><Ic name="check" /></span>撮るだけ・待つだけ</li>
@@ -109,7 +111,7 @@ export default function HomePage() {
           <div className="container">
             <div className="section-head">
               <span className="eyebrow">よくある不安</span>
-              <h2>片付け、こんな“めんどう”で<br className="sp-br" />止まっていませんか</h2>
+              <h2>片付け、こんな<span className="mk">めんどう</span>で<br className="sp-br" />止まっていませんか</h2>
               <p className="sub">「家じゅうを片付けたい」気持ちはあるのに、最初の一歩でつまずく。多くの方が、同じところで止まっています。</p>
             </div>
             <div className="emp-grid">
@@ -129,7 +131,9 @@ export default function HomePage() {
             <div className="turn"><p>カタヅケなら、その「めんどう」を<span className="accent">まとめて撮るだけ</span>に変えます。</p></div>
           </div>
         </section>
+        </div>
 
+        <div className="site-frame">
         {/* ============ STEPS（使い方） ============ */}
         <section className="section steps" id="flow">
           <div className="container">
@@ -170,6 +174,7 @@ export default function HomePage() {
 
         {/* ============ BUNDLE ============ */}
         <section className="section bundle" id="bundle">
+          <span className="vt" aria-hidden="true">まとめて出すほど、有利になる。</span>
           <div className="container">
             <div className="bundle-lead">
               <Reveal className="bundle-figure ph-wrap">
@@ -177,8 +182,8 @@ export default function HomePage() {
               </Reveal>
               <Reveal className="bundle-copy" delay={1}>
                 <span className="eyebrow">まとめ売り</span>
-                <h2>まとめて出すほど、<span style={{ color: "var(--blue)" }}>有利</span>になる。</h2>
-                <p className="lead">カタヅケは“家まるごと”の片付け向け。1点ずつではなく、たまった不用品をまとめて査定に出すほど、買取総額が伸びやすく、値がつかない物まで一緒に手放せます。</p>
+                <h2>まとめて出すほど、<span style={{ color: "var(--primary)" }}>有利</span>になる。</h2>
+                <p className="lead">カタヅケは<span className="mk">家まるごと</span>の片付け向け。1点ずつではなく、たまった不用品をまとめて査定に出すほど、買取総額が伸びやすく、値がつかない物まで一緒に手放せます。</p>
               </Reveal>
             </div>
             <div className="bundle-grid">
@@ -191,7 +196,7 @@ export default function HomePage() {
                 <span className="bc-badge">ここがポイント</span>
                 <span className="bc-ic"><Ic name="bag" /></span>
                 <h3>値がつかない物も、まとめて回収</h3>
-                <p>業者は1点ごとではなく<strong>“まとめ全体”の金額で入札</strong>します。だから単体では値がつきにくい物も、まとめに含めて引き取り。「これは売れないかも」も、一緒に手放せます。</p>
+                <p>業者は1点ごとではなく<strong className="mk">まとめ全体の金額で入札</strong>します。だから単体では値がつきにくい物も、まとめに含めて引き取り。「これは売れないかも」も、一緒に手放せます。</p>
               </Reveal>
               <Reveal as="article" className="bundle-c" delay={2}>
                 <span className="bc-ic"><Ic name="camera" /></span>
@@ -205,10 +210,11 @@ export default function HomePage() {
 
         {/* ============ AUCTION ============ */}
         <section className="section auction" id="auction">
+          <span className="vt" aria-hidden="true">業者が買取総額で競うから、高くなりやすい。</span>
           <div className="container">
             <div className="section-head">
               <span className="eyebrow">入札のしくみ</span>
-              <h2>業者が“買取総額”で競うから、<br className="sp-br" />高くなりやすい。</h2>
+              <h2>業者が<span className="mk">買取総額</span>で競うから、<br className="sp-br" />高くなりやすい。</h2>
               <p className="sub">あなたが出したのは写真だけ。あとは登録業者どうしが、あなたの品物まとめに買取総額で入札し合います。</p>
             </div>
             <div className="auc-grid">
@@ -251,7 +257,7 @@ export default function HomePage() {
           <div className="container">
             <div className="section-head">
               <span className="eyebrow">こんな時に</span>
-              <h2>“家まるごと”の片付けに</h2>
+              <h2><span className="mk">家まるごと</span>の片付けに</h2>
               <p className="sub">まとまった量を手放したいときほど、カタヅケが力を発揮します。</p>
             </div>
             <div className="scenes-grid">
@@ -268,7 +274,9 @@ export default function HomePage() {
             </div>
           </div>
         </section>
+        </div>
 
+        <div className="site-frame">
         {/* ============ TRUST ============ */}
         <section className="section" id="trust">
           <div className="container">
@@ -326,7 +334,7 @@ export default function HomePage() {
               {CATEGORIES.map((c) => (
                 <Link href="/create" className="cat" key={c.name}>
                   <div className="cat-img" style={{ display: "grid", placeItems: "center" }}>
-                    <Ic name={c.icon} style={{ fontSize: 32, color: "var(--blue)", strokeWidth: 1.8 }} />
+                    <Ic name={c.icon} style={{ fontSize: 32, color: "var(--primary)", strokeWidth: 1.8 }} />
                   </div>
                   <div className="cat-body">
                     <div className="cl">{c.name}</div>
@@ -339,7 +347,7 @@ export default function HomePage() {
               <span className="cn-ic"><Ic name="bag" /></span>
               <div className="cn-body">
                 <h4>「売れないかも」と思う物も、まずは撮ってまとめて。</h4>
-                <p>点数がそろうと<strong>“まとめて一括買取”</strong>の対象になりやすく、単体では値がつきにくい物も一緒に引き取れる場合があります。引き取りが難しい物は、手放す導線をご案内します。</p>
+                <p>点数がそろうと<strong className="mk">まとめて一括買取</strong>の対象になりやすく、単体では値がつきにくい物も一緒に引き取れる場合があります。引き取りが難しい物は、手放す導線をご案内します。</p>
               </div>
             </Reveal>
           </div>
@@ -356,9 +364,9 @@ export default function HomePage() {
               <span className="mb-4 inline-block"><KdzLogo size={20} /></span>
               <span className="eyebrow">私たちについて</span>
               <h2>「片付けたい」を、<br />めんどうで終わらせない。</h2>
-              <p>片付けが進まないのは、やる気の問題ではありません。出品の手間、営業電話の不安、何から手をつけるかの迷い——その一つひとつが、最初の一歩を重くしています。</p>
+              <p>片付けが進まないのは、やる気の問題ではありません。出品の手間、営業電話の不安、何から手をつけるかの迷い。その一つひとつが、最初の一歩を重くしています。</p>
               <p>カタヅケは、それを「まとめて撮るだけ」に変えるために生まれました。業者が競い、値がつかない物まで引き取り、連絡は選んだ1社だけ。あなたが背負うものを、できる限り減らします。</p>
-              <p>カタヅケが目指すのは、顧客と業者を結ぶ、無駄のない場所です。<strong>顧客・業者・社会の三者に喜びと安心を</strong>——それが、カタヅケの根にある考え方です。</p>
+              <p>カタヅケが目指すのは、顧客と業者を結ぶ、無駄のない場所です。<strong>顧客・業者・社会の三者に喜びと安心を</strong>。それが、カタヅケの根にある考え方です。</p>
               <p className="founder-sign"><span>カタヅケ 運営事務局</span>顧客にも業者にも、社会にも。三方よしの場所をつくります。</p>
             </Reveal>
           </div>
@@ -390,30 +398,31 @@ export default function HomePage() {
             <p className="final-note">※ 最終的な買取額は業者の現物査定により決まります。</p>
           </div>
         </section>
-      </main>
 
-      {/* ============ 業者向け導線 ============ */}
-      <section className="biz-banner">
-        <div className="container">
-          <div className="biz-banner-inner">
-            <div className="biz-banner-copy">
-              <span className="eyebrow">買取業者の方へ</span>
-              <h2>買取業者の方へ。<br />カタヅケに参加しませんか。</h2>
-              <p>顧客と業者、双方に無駄がない。だから長く続く。<br />まとめ出品への入札で、効率的な仕入れルートを開拓できます。</p>
-              <div className="biz-banner-tags">
-                <span className="biz-tag">初期費用・月額費用 無料</span>
-                <span className="biz-tag">成約時8%のみ</span>
-                <span className="biz-tag">下見なし・一斉架電なし</span>
-                <span className="biz-tag">古物商許可が必要</span>
+        {/* ============ 業者向け導線 ============ */}
+        <section className="biz-banner">
+          <div className="container">
+            <div className="biz-banner-inner">
+              <div className="biz-banner-copy">
+                <span className="eyebrow">買取業者の方へ</span>
+                <h2>買取業者の方へ。<br />カタヅケに参加しませんか。</h2>
+                <p>顧客と業者、双方に無駄がない。だから長く続く。<br />まとめ出品への入札で、効率的な仕入れルートを開拓できます。</p>
+                <div className="biz-banner-tags">
+                  <span className="biz-tag">初期費用・月額費用 無料</span>
+                  <span className="biz-tag">成約時8%のみ</span>
+                  <span className="biz-tag">下見なし・一斉架電なし</span>
+                  <span className="biz-tag">古物商許可が必要</span>
+                </div>
+              </div>
+              <div className="biz-banner-cta">
+                <Link href="/business" className="btn btn-white btn-lg">業者登録の詳細を見る<Ic name="arrow" className="arw" /></Link>
+                <span style={{ fontSize: 12, color: "var(--body-soft)" }}>審査制・登録無料</span>
               </div>
             </div>
-            <div className="biz-banner-cta">
-              <Link href="/business" className="btn btn-white btn-lg">業者登録の詳細を見る<Ic name="arrow" className="arw" /></Link>
-              <span style={{ fontSize: 12, color: "rgba(255,255,255,.45)" }}>審査制・登録無料</span>
-            </div>
           </div>
+        </section>
         </div>
-      </section>
+      </main>
     </>
   );
 }

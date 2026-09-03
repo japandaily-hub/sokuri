@@ -40,7 +40,7 @@ function pwScore(v: string): number {
 function PwStrength({ value }: { value: string }) {
   if (!value) return null;
   const score = pwScore(value);
-  const colors = ["#e05c5c", "#f0a030", "#1f8a5b"];
+  const colors = ["var(--danger)", "#f0a030", "var(--primary)"];
   const labels = ["弱い", "普通", "強い"];
   const idx = Math.min(Math.max(score - 1, 0), 2);
   return (
@@ -246,7 +246,7 @@ export default function SignupPage() {
 
               {authErr && (
                 <div className="auth-error" style={{ marginBottom: 16 }}>
-                  <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: "none", stroke: "#cc3333", strokeWidth: 2, strokeLinecap: "round", flexShrink: 0 }}>
+                  <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: "none", stroke: "var(--danger)", strokeWidth: 2, strokeLinecap: "round", flexShrink: 0 }}>
                     <circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" />
                   </svg>
                   {authErr}
@@ -283,7 +283,7 @@ export default function SignupPage() {
           {step === 4 && (
             <div className="done-screen">
               <div className="done-circle"><Ic name="check-circle" /></div>
-              <h2>登録が完了しました！</h2>
+              <h2>登録が完了しました。</h2>
               <p>カタヅケへようこそ。<br />さっそく不用品を撮って、<br />業者からの見積もりを受け取りましょう。</p>
               <div className="done-actions">
                 <Link href="/create" className="btn btn-primary btn-lg">

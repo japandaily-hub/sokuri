@@ -1,10 +1,9 @@
 /**
- * カタヅケ ロゴ（ワードマーク）。
- * 正規アセット logo-katazuke.png（web/public/、house型ブランドマーク+ワードマーク、
- * 1100x307・透過PNG）を使用する。white variant はダーク背景向けに白一色反転。
+ * カタヅケ ロゴ（二段の文字ワードマーク）。
+ * 人の森整合テーマでは紺+黄の PNG が最大の混色源になるため、和文明朝＋極小英字の
+ * ワードマーク（CSS: .kdz-wm / katazuke.css）で描く。白抜きは variant="white"。
+ * size は和文の font-size(px)。英字はその 0.4 倍で追従する。
  */
-const LOGO_ASPECT = 1100 / 307;
-
 export function KdzLogo({
   variant = "brand",
   size = 22,
@@ -15,24 +14,16 @@ export function KdzLogo({
   className?: string;
 }) {
   const white = variant === "white";
-  // size はワードマークのテキスト相当の視覚サイズに合わせる（旧実装のフォントサイズ22=標準）。
-  const height = Math.round(size * 1.45);
-  const width = Math.round(height * LOGO_ASPECT);
   return (
-    <span className={`inline-flex items-center ${className}`.trim()} aria-label="カタヅケ">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/logo-katazuke.png"
-        alt="カタヅケ"
-        width={width}
-        height={height}
-        style={{
-          width,
-          height,
-          display: "block",
-          filter: white ? "brightness(0) invert(1)" : "none",
-        }}
-      />
+    <span
+      className={`kdz-wm${white ? " white" : ""}${className ? ` ${className}` : ""}`}
+      style={{ "--wm": `${size}px` } as React.CSSProperties}
+    >
+      <span className="kdz-wm-ja">カタヅケ</span>
+      {/* 英字は装飾。SR が「カタヅケ KATAZUKE」と二重に読むのを避ける */}
+      <span className="kdz-wm-en" aria-hidden="true">
+        KATAZUKE
+      </span>
     </span>
   );
 }

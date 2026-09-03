@@ -223,10 +223,10 @@ export default function MyPage() {
             style={{
               padding: "12px 16px",
               borderRadius: "var(--radius-s)",
-              background: "#fff5f5",
-              color: "#dc2626",
+              background: "rgba(215,0,53,.06)",
+              color: "var(--danger)",
               fontSize: 13,
-              border: "1px solid #fca5a5",
+              border: "1px solid rgba(215,0,53,.35)",
             }}
           >
             セッションが切れました。再ログインしてください。
@@ -262,10 +262,10 @@ export default function MyPage() {
               marginBottom: 20,
               padding: "12px 16px",
               borderRadius: "var(--radius-s)",
-              background: "#fff5f5",
-              color: "#dc2626",
+              background: "rgba(215,0,53,.06)",
+              color: "var(--danger)",
               fontSize: 13,
-              border: "1px solid #fca5a5",
+              border: "1px solid rgba(215,0,53,.35)",
             }}
           >
             {error}

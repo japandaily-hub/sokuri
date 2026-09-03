@@ -27,7 +27,7 @@ import {
    ============================================================ */
 
 /** スター数 → ラベル。index 0 は未選択時のプレースホルダ用。 */
-const STAR_LABELS = ["", "がっかりした", "もう少し…", "普通", "良かった！", "最高でした！"];
+const STAR_LABELS = ["", "がっかりした", "もう少し…", "普通", "良かった", "最高でした"];
 
 /** 良かった点タグ（複数選択可）。 */
 const TAGS: { id: string; label: string }[] = [
@@ -190,7 +190,7 @@ function ReviewPageInner() {
                   <path d="M5 12.5l4.5 4.5L19 7" />
                 </svg>
               </div>
-              <div className="done-title">取引が完了しました！</div>
+              <div className="done-title">取引が完了しました。</div>
               <div className="done-sub">
                 {vendorName} との取引が正常に完了しました。
                 <br />
@@ -327,7 +327,7 @@ function ReviewPageInner() {
                   <path d="M5 12.5l4.5 4.5L19 7" />
                 </svg>
               </div>
-              <h2>評価を送信しました！</h2>
+              <h2>評価を送信しました。</h2>
               <p>
                 ご協力ありがとうございました。
                 <br />

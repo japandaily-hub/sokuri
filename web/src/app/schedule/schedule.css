@@ -5,10 +5,10 @@
    keyframes はページ固有名（sch-）で衝突回避。
    ============================================================ */
 
-/* ページ全体ラッパ（背景＝デザイン指定 #f7f8fc） */
+/* ページ全体ラッパ（背景＝デザイン指定 var(--pale-2)） */
 .schedule-page {
   min-height: 100vh;
-  background: #f7f8fc;
+  background: var(--pale-2);
 }
 
 /* 進捗ステップ + チャット戻り導線の帯 */
@@ -34,7 +34,7 @@
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 400;
   color: var(--body-soft);
 }
 .schedule-page .sch-step.done { color: var(--green); }
@@ -45,8 +45,9 @@
   border-radius: 50%;
   border: 2px solid var(--line);
   font-size: 12px;
-  font-weight: 900;
-  font-family: var(--head);
+  font-weight: 600;
+  font-family: var(--ui);
+  font-variant-numeric: tabular-nums;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -75,7 +76,7 @@
   position: absolute;
   right: 0;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--blue);
   display: flex;
   align-items: center;
@@ -110,7 +111,7 @@
 .schedule-page .biz-avatar {
   width: 44px;
   height: 44px;
-  border-radius: 10px;
+  border-radius: 0;
   background: var(--pale);
   display: flex;
   align-items: center;
@@ -118,10 +119,10 @@
   flex-shrink: 0;
   font-family: var(--head);
   font-size: 16px;
-  font-weight: 900;
+  font-weight: 600;
   color: var(--blue);
 }
-.schedule-page .biz-name { font-size: 15px; font-weight: 900; color: var(--navy); }
+.schedule-page .biz-name { font-size: 15px; font-weight: 400; color: var(--navy); }
 .schedule-page .biz-sub {
   font-size: 12.5px;
   color: var(--body-soft);
@@ -139,7 +140,7 @@
 .schedule-page .biz-amount .amount {
   font-family: var(--head);
   font-size: 22px;
-  font-weight: 900;
+  font-weight: 600;
   color: var(--navy);
 }
 .schedule-page .biz-amount .amount span { font-size: 12px; color: var(--body-soft); }
@@ -158,7 +159,7 @@
   padding: 16px 20px 12px;
   border-bottom: 1px solid var(--line-soft);
 }
-.schedule-page .cal-month { font-family: var(--head); font-size: 17px; font-weight: 900; color: var(--navy); }
+.schedule-page .cal-month { font-family: var(--head); font-size: 17px; font-weight: 400; color: var(--navy); }
 .schedule-page .cal-nav { display: flex; gap: 4px; }
 .schedule-page .cal-nav-btn {
   width: 32px;
@@ -193,7 +194,7 @@
 .schedule-page .cal-dow {
   text-align: center;
   font-size: 11.5px;
-  font-weight: 700;
+  font-weight: 400;
   color: var(--body-soft);
   padding: 4px 0;
 }
@@ -219,7 +220,8 @@
   transition: .15s;
   border: 2px solid transparent;
   background: none;
-  font-family: var(--sans);
+  font-family: var(--ui);
+  font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
 .schedule-page .cal-day.empty { cursor: default; pointer-events: none; }
@@ -228,8 +230,8 @@
 .schedule-page .cal-day.past { color: var(--line); cursor: default; pointer-events: none; }
 .schedule-page .cal-day.sun { color: #ef4444; }
 .schedule-page .cal-day.sat { color: #3b82f6; }
-.schedule-page .cal-day.today { font-weight: 900; color: var(--blue); }
-.schedule-page .cal-day.available { background: #f0fdf4; color: var(--green); font-weight: 900; }
+.schedule-page .cal-day.today { font-weight: 600; color: var(--blue); }
+.schedule-page .cal-day.available { background: #f0fdf4; color: var(--green); font-weight: 600; }
 .schedule-page .cal-day.available::after {
   content: "";
   position: absolute;
@@ -264,7 +266,7 @@
 }
 .schedule-page .time-card-title {
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 400;
   color: var(--navy);
   margin-bottom: 14px;
   font-family: var(--head);
@@ -284,7 +286,7 @@
   border-radius: var(--radius-s);
   text-align: center;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink);
   cursor: pointer;
   transition: .15s;
@@ -293,7 +295,7 @@
 }
 .schedule-page .time-slot:hover:not(.disabled) { border-color: var(--blue); color: var(--blue); }
 .schedule-page .time-slot.selected { background: var(--blue); border-color: var(--blue); color: #fff; }
-.schedule-page .time-slot.disabled { color: var(--line); cursor: default; background: #fafafa; }
+.schedule-page .time-slot.disabled { color: var(--line); cursor: default; background: var(--pale-2); }
 .schedule-page .time-slot .ts-label { font-size: 11px; color: inherit; opacity: .75; margin-top: 2px; }
 
 /* 備考 */
@@ -306,7 +308,7 @@
 }
 .schedule-page .note-card label {
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 400;
   color: var(--navy);
   display: flex;
   align-items: center;
@@ -345,7 +347,7 @@
 }
 .schedule-page .confirm-title {
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 400;
   color: var(--navy);
   margin-bottom: 16px;
   font-family: var(--head);
@@ -363,7 +365,7 @@
 }
 .schedule-page .confirm-row:last-of-type { border-bottom: none; }
 .schedule-page .confirm-lbl { color: var(--body-soft); font-weight: 600; width: 80px; flex-shrink: 0; }
-.schedule-page .confirm-val { color: var(--ink); font-weight: 700; }
+.schedule-page .confirm-val { color: var(--ink); font-weight: 600; }
 .schedule-page .confirm-val.pending { color: var(--line); font-weight: 600; font-style: italic; }
 
 .schedule-page .confirm-btn {
@@ -372,10 +374,10 @@
   background: var(--blue);
   color: #fff;
   font-size: 15px;
-  font-weight: 900;
+  font-weight: 600;
   font-family: var(--head);
   border: none;
-  border-radius: 99px;
+  border-radius: 0;
   cursor: pointer;
   margin-top: 16px;
   transition: .2s;
@@ -384,7 +386,7 @@
   justify-content: center;
   gap: 8px;
 }
-.schedule-page .confirm-btn:hover:not(:disabled) { background: var(--blue-d); transform: translateY(-1px); }
+.schedule-page .confirm-btn:hover:not(:disabled) { background: var(--blue-d); }
 .schedule-page .confirm-btn:disabled { background: var(--line); cursor: not-allowed; transform: none; }
 .schedule-page .confirm-btn .ic { font-size: 16px; stroke-width: 2.5; }
 

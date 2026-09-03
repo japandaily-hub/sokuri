@@ -116,9 +116,13 @@ UIの新規設計・改善・レビューは `.claude/agents/ui-designer.md`（�
 
 ---
 
-## 9. v2 テーマ「White × Cobalt / あたたかさとつながり」— 本採用済み（2026-09-03）
+## 9. v2 テーマ「White × Cobalt / あたたかさとつながり」— **廃止（履歴）**
 
-方向性を **「White × Cobalt / あたたかさとつながり」** へ振った試作を、全41ルートの正典として本採用した。
+> **廃止（2026-09-03）。** 本節は履歴として残す。現行の正典は **§10「人の森整合テーマ」**。
+> 本節に出てくる色値（`#1447e0` `#241f1c` `#ebe5dd` 等）・書体（Zen Maru / Zen Kaku）・角丸・影は
+> **もう使わない**。新規実装で参照しないこと。
+
+方向性を **「White × Cobalt / あたたかさとつながり」** へ振った試作を、全41ルートの正典として本採用していた。
 Refero Styles の DESIGN.md（Notion = warm paper／Superr = cream + matte／Authkit = frosted light）から
 **暖色ニュートラル・ヘアライン・大角丸・拡散する光** の4原則だけを採用し、色相はコバルトへ置換している。
 
@@ -148,3 +152,96 @@ Refero Styles の DESIGN.md（Notion = warm paper／Superr = cream + matte／Aut
 
 ### 残タスク
 - アイブロウの英字ラベル（YOUR WORRIES / PRICING / FOR BUYERS）の和文化 — 全ルートで実施済み。
+
+---
+
+## 10. 人の森整合テーマ（2026-09-03 本採用）
+
+現行の正典。`src/app/katazuke.css :root` が実体で、`tailwind.config.ts` はその写し。
+仕様の一次資料は `docs/design_hitonomori_alignment/SPEC.md` §1 と `SPEC-4-decisions.md`（確定事項）。
+**情報・導線・機能・コピーの意味は不変。変えたのは書体・色・かたち・余白・記号の作法だけ。**
+
+### 10.1 トークン
+
+| 役割 | 変数 | 値 | 備考 |
+| :-- | :-- | :-- | :-- |
+| 主色（苔緑） | `--primary` | `#527e52` | 白と 4.70:1（AA 合格）。ボタン地・見出し頭文字・必須バッジ |
+| 主色 濃/淡 | `--primary-d` / `--primary-l` | `#3f6640` / `#7fa37f` | `--primary-d` は白と 6.6:1 |
+| 沈めた緑 | `--deep` | `#2f4a30` | ダーク面・トースト |
+| 差し色（ライム） | `--lime` | `#c9d128` | 英字キャプション・現在地・白抜きロゴの英字 |
+| マーカー | `--marker` | `#d4efb3` | 強調の下線（`linear-gradient(transparent 68%, … 68%)`） |
+| 文字 | `--navy` / `--ink` / `--body` | `#333` / `#333` / `#4a4a4a` | |
+| 補助文字 | `--body-soft` | `#6b6b6b` | 白と 5.3:1。**小さい補助テキストは必ずこれ** |
+| 見出しグレー | `--head-gray` | `#959595` | 白と 3.0:1。**24px 以上の見出し専用**。本文に流用しない |
+| 罫線・面 | `--line` / `--line-soft` / `--pale` / `--pale-2` | `#d9e0d6` / `#ecf1ec` / `#eff3ef` / `#f6f8f4` | |
+| 面（文脈色） | `--warm` / `--mint` / `--sky` | `#fdf5d9` / `#daf4eb` / `#e1f5fd` | |
+| 状態色 | `--gold` / `--danger` | `#e5a323` / `#d70035` | 注意 / 危険。進行は `--primary`、中立は `--body-soft` |
+| かたち | `--radius` / `--radius-s` / `--shadow-*` / `--glow` | `0px` / `0px` / `none` | **角丸ゼロ・影ゼロ** |
+| 額装 | `--frame` | `1px solid #333` | `.site-frame` |
+| 幅 | `--maxw` / `--maxw-text` | `1140px` / `760px` | |
+| 旧名エイリアス | `--blue` / `--blue-d` / `--blue-l` | `var(--primary)` 系 | 39本の per-page CSS 互換のため残す |
+
+### 10.2 書体
+
+| 用途 | 変数 | スタック |
+| :-- | :-- | :-- |
+| 見出し・地の文 | `--serif` = `--head` = `--sans` | `"Noto Serif JP","Hiragino Mincho ProN","Hiragino Mincho Pro","Yu Mincho","YuMincho","游明朝体",serif` |
+| 入力値・数値・小ラベル | `--ui` = `--num` | `"Noto Sans JP","Hiragino Kaku Gothic ProN","Yu Gothic UI",sans-serif` |
+| 英字ラベル | `--en` | `"Montserrat",sans-serif`（600 / uppercase） |
+| 英字ディスプレイ（番号・Q） | `--en-display` | `"Libre Baskerville",serif` |
+
+- **Noto Serif JP を先頭に置く。** Android には明朝が1書体も入っておらず、webfont が当たらないと再設計が一切見えない。
+- **明朝で使うウェイトは 400 と 600 のみ。500 は禁止**（游明朝に実ウェイトが無く、合成太字で字画が滲む）。
+- `-webkit-font-smoothing:auto` / `-moz-osx-font-smoothing:auto`。**`antialiased` は付けない**（明朝 400 が痩せる）。
+- 本文: マーケ面 16px / 2.0、app 地の文 15px / 1.75、表セル・確認行 14px / 1.6、チャット吹き出し 15px / 1.7。
+- 字送り: 本文 `.03em` / 見出し `.04em` / ボタン `.1em`。
+- **入力値・数値をゴシックにする根拠**: 住所・メール・電話・金額を明朝 400 で出すと `1/l/I`・`0/O`・全角半角の
+  判別が落ち、入力ミスの発見コストが上がる。ラベル・説明・見出しは明朝のままなので面の印象は変わらない
+  （書体の印象を担うのは見出し・面・かたちであり、入力値の寄与は小さい）。
+
+### 10.3 かたちの作法
+
+- 角丸ゼロ・影ゼロ・`backdrop-filter` なし。区切りは 1px のヘアラインと余白。
+- 円形が許されるのは **アバター（`.cta-staff`）とドット**だけ。ピル（999/99/9999px）は 0 へ。
+- カードは枠も面も持たない（`.emp-card` `.step` `.scene-card` `.trust-c` `.bundle-c`）。枠を持つのは
+  `.cat-img`（写真）とフォームパネルだけ。強調1枚は `--pale` 面 + 左 3px の緑バー。
+- リズムは罫線で作る: `.section-head h2::after`（1px×48px 緑）、`h2::first-letter{color:var(--primary)}`。
+- ホバーは `opacity` のみ（`.btn:hover{opacity:.8}` / 画像 `.85`）。持ち上がり・グロー・スキャンは使わない。
+- Reveal（`.rv`）は fade のみ。`translateY` は使わない。
+- 額装フレーム `.site-frame`: `margin:20px; border:var(--frame); min-height:calc(100dvh - 40px)`。
+  **`overflow` を書かない**（内側の `position:sticky` が全ページで死ぬ）。860px 未満では枠を出さない。
+- 縦書き見出し `.vt` は**実要素 + `aria-hidden`**（擬似要素の `content` は SR が二重読みする）。
+  `min-width:1280px` のみ・`#bundle` と `#auction` の2箇所だけ。
+
+### 10.4 共通クラス
+
+| クラス | 用途 |
+| :-- | :-- |
+| `.site-frame` | 額装フレーム。`SiteChrome` が `/` 以外で `children` を包む |
+| `.vt` | 右端の縦書き見出し（PC のみ・2セクション限定） |
+| `.mk` | 引用符の代わりの緑マーカー強調。`.hl` はマーカー + 緑文字 |
+| `.kdz-wm` / `.kdz-wm-ja` / `.kdz-wm-en` | 二段ワードマーク。`--wm` で和文サイズを渡す。`.white` で白抜き |
+| `.hero-blob` | ヒーロー右上の若草 blob（`.hero` 直下先頭に1つ） |
+| `.req` / `.opt` | 必須（緑地白文字）/ 任意（グレー地白文字）の直角バッジ |
+
+### 10.5 アクセシビリティ
+
+- `:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0}`。
+  **リングは消さない**（1px の枠色変化だけでは WCAG 2.2 Focus Appearance の周長要件を満たさない）。
+- 本文 `#4a4a4a`/白 = 8.6:1、補助 `#6b6b6b`/白 = 5.3:1、緑ボタン白文字 = 4.70:1。
+- **LINE ブランド色 `#06c755` は AA 対象外の文書化例外。** 白抜き文字とのコントラストは 2.29:1 だが、
+  LINE のブランド規約が白抜きを指定しているため据え置く。条件: **単独導線にしない**（必ず別 CTA を併置し、
+  LINE アイコンと「LINE」の語を残す）。`.btn-line-auth` の角丸 99px も公式ボタン仕様として据え置く。
+
+### 10.6 言葉の作法（意味は不変・記号のみ）
+
+- 引用符 `“ ”` は使わない。強調語は `.mk`、会話・言葉の引用は「」。1段落に鉤括弧を3組並べない。
+- 本文のダッシュ `——` `—` は「、」「。」で切る。metadata / title の ` — ` は `｜`。
+- `！` は使わない（`。`）。欠損値フォールバックの `"—"` とコードコメントは据え置き。
+- 変更記録は `docs/design_hitonomori_alignment/WORDING_CHANGES_*.md`。
+
+### 10.7 やらないこと
+
+- 人の森のロゴ・写真・イラスト・blob 画像等の**アセット流用**（色値・書体・作法だけを参照する）。
+- 「人の森」の社名・グループ表記のカタヅケ側への追加。
+- 情報設計・ルート・導線・機能・文章の意味の変更。

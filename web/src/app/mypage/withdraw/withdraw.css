@@ -6,7 +6,7 @@
  */
 
 .withdraw-page {
-  background: #f4f6fb;
+  background: var(--pale-2);
   min-height: 100vh;
 }
 
@@ -28,7 +28,7 @@
 .withdraw-page .warn-banner {
   background: #fff3f3;
   border: 1.5px solid #ffc0c0;
-  border-radius: 14px;
+  border-radius: 0;
   padding: 18px 20px;
   margin-bottom: 20px;
   display: flex;
@@ -38,7 +38,7 @@
 .withdraw-page .warn-ic {
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: 0;
   background: #ffe0e0;
   flex-shrink: 0;
   display: grid;
@@ -57,7 +57,7 @@
   display: block;
   font-family: var(--head);
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 400;
   color: #cc3333;
   margin-bottom: 4px;
 }
@@ -86,7 +86,7 @@
 .withdraw-page .del-item-ic {
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: 0;
   flex-shrink: 0;
   display: grid;
   place-items: center;
@@ -104,7 +104,7 @@
 .withdraw-page .del-item-body strong {
   display: block;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 400;
   color: var(--navy);
 }
 .withdraw-page .del-item-body span {
@@ -116,7 +116,7 @@
 .withdraw-page .form-card {
   background: #fff;
   border-radius: var(--radius);
-  box-shadow: var(--shadow-s);
+  box-shadow: none;
   border: 1px solid var(--line-soft);
   padding: 20px;
   margin-bottom: 14px;
@@ -124,7 +124,7 @@
 .withdraw-page .form-card-title {
   font-family: var(--head);
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 400;
   color: var(--navy);
   margin-bottom: 14px;
 }
@@ -136,17 +136,17 @@
 .withdraw-page .field label {
   display: block;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 400;
   color: var(--ink);
   margin-bottom: 7px;
 }
 .withdraw-page .field input {
-  background: #fafbfe;
+  background: var(--pale-2);
 }
 .withdraw-page .field input:focus {
   border-color: #e05c5c;
   background: #fff;
-  box-shadow: 0 0 0 3px rgba(220, 70, 70, 0.12);
+  box-shadow: none;
 }
 .withdraw-page .field.has-error input {
   border-color: #e05c5c;
@@ -183,13 +183,13 @@
 .withdraw-page .btn-delete {
   width: 100%;
   padding: 15px;
-  border-radius: 99px;
+  border-radius: 0;
   border: none;
   background: #e05c5c;
   color: #fff;
   font-family: var(--head);
   font-size: 16px;
-  font-weight: 900;
+  font-weight: 600;
   cursor: pointer;
   transition: 0.2s;
   display: flex;
@@ -199,7 +199,7 @@
 }
 .withdraw-page .btn-delete:hover:not(:disabled) {
   background: #c94040;
-  transform: translateY(-1px);
+
 }
 .withdraw-page .btn-delete:disabled {
   background: var(--line);

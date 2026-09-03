@@ -1,6 +1,8 @@
-/* デザインハンドオフ指定フォント（実行時ロード・ビルド非依存）。
-   フォールバックは katazuke.css の --head / --sans に OS 標準ゴシックを記載済み。 */
-@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@500;700;900&family=Zen+Maru+Gothic:wght@500;700;900&display=swap");
+/* 人の森整合テーマの指定フォント（実行時ロード・ビルド非依存）。
+   和文明朝 = Noto Serif JP 400/600（500 は游明朝に実ウェイトが無く合成太字で滲むため読まない）、
+   入力値・数値 = Noto Sans JP 400/500、英字ラベル = Montserrat 600 / Libre Baskerville 400。
+   フォールバックは katazuke.css の --serif / --ui に OS 標準書体を記載済み。 */
+@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;600&family=Noto+Sans+JP:wght@400;500&family=Montserrat:wght@600&family=Libre+Baskerville:wght@400&display=swap");
 
 /* カスケードレイヤー順を明示（base < components < utilities）。
    名前のみの @layer 文は @import より前に置ける（仕様準拠）。 */
@@ -31,11 +33,12 @@
   }
 
   body {
-    /* 日本語の約物を詰めて見出しの締まりを出す（フィンテック調の精緻さ） */
+    /* 日本語の約物を詰めて見出しの締まりを出す */
     font-feature-settings: "palt" 1;
     text-rendering: optimizeLegibility;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+    /* 明朝 400 は antialiased だと macOS でサブピクセル描画が切れて字画が痩せる */
+    -webkit-font-smoothing: auto;
+    -moz-osx-font-smoothing: auto;
   }
 
   /* 数字は等幅寄りに揃え、価格表示のブレを防ぐ */
@@ -44,15 +47,16 @@
   }
 
   ::selection {
-    background-color: var(--blue);
+    background-color: var(--primary);
     color: #ffffff;
   }
 
-  /* キーボード操作時のフォーカスを必ず可視化（アクセシビリティ） */
+  /* キーボード操作時のフォーカスを必ず可視化（アクセシビリティ）。
+     1px の枠色変化だけでは WCAG 2.2 Focus Appearance を満たさないためリングは消さない。 */
   :focus-visible {
-    outline: 2px solid var(--blue);
+    outline: 2px solid var(--primary);
     outline-offset: 2px;
-    border-radius: 4px;
+    border-radius: 0;
   }
 }
 
@@ -65,27 +69,27 @@
     @apply mx-auto w-full max-w-container px-5 sm:px-6 lg:px-8;
   }
 
-  /* ヒーロー背景: 左上のブランド光彩＋右上の微かなエメラルドで深度を出す */
+  /* ヒーロー背景: 右上から流れ込む淡い若草。白地を主役にして光彩は残さない */
   .hero-surface {
     background-image:
       radial-gradient(
         52% 46% at 16% -2%,
-        rgba(31, 84, 222, 0.18) 0%,
-        rgba(31, 84, 222, 0) 70%
+        rgba(82, 126, 82, 0.10) 0%,
+        rgba(82, 126, 82, 0) 70%
       ),
       radial-gradient(
         38% 34% at 90% 10%,
-        rgba(16, 185, 129, 0.07) 0%,
-        rgba(16, 185, 129, 0) 70%
+        rgba(201, 209, 40, 0.10) 0%,
+        rgba(201, 209, 40, 0) 70%
       ),
-      linear-gradient(180deg, #e9f0fd 0%, #ffffff 72%);
+      linear-gradient(180deg, #f6f8f4 0%, #ffffff 72%);
   }
 
   /* 微細なグリッド。情報密度のある面に「設計された」印象を与える */
   .bg-grid-faint {
     background-image:
-      linear-gradient(to right, rgba(31, 84, 222, 0.05) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(31, 84, 222, 0.05) 1px, transparent 1px);
+      linear-gradient(to right, rgba(82, 126, 82, 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(82, 126, 82, 0.05) 1px, transparent 1px);
     background-size: 38px 38px;
   }
 
@@ -142,7 +146,7 @@
    ============================================================ */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 transparent;
+  scrollbar-color: #cfd6cc transparent;
 }
 
 *::-webkit-scrollbar {
@@ -151,14 +155,14 @@
 }
 
 *::-webkit-scrollbar-thumb {
-  background-color: #cbd5e1;
-  border-radius: 9999px;
+  background-color: #cfd6cc;
+  border-radius: 0;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background-color: #94a3b8;
+  background-color: #9aa79a;
 }
 
 /* アニメーションを抑制したいユーザーの設定を尊重する */

@@ -11,7 +11,7 @@
 .faq-page .faq-hero {
   padding: clamp(56px, 7vw, 88px) 0 clamp(36px, 5vw, 60px);
   border-bottom: 1px solid var(--line-soft);
-  background: radial-gradient(120% 80% at 10% 120%, #eaf0ff 0%, rgba(234, 240, 255, 0) 55%), #fff;
+  background: radial-gradient(120% 80% at 10% 120%, var(--pale) 0%, transparent 55%), #fff;
 }
 .faq-page .faq-hero h1 {
   font-size: clamp(26px, 4vw, 42px);
@@ -35,7 +35,7 @@
   width: 100%;
   padding: 14px 48px 14px 18px;
   border: 1.5px solid var(--line);
-  border-radius: 99px;
+  border-radius: 0;
   font-size: 15px;
   font-family: var(--sans);
   color: var(--ink);
@@ -45,7 +45,7 @@
 }
 .faq-page .faq-search:focus {
   border-color: var(--blue);
-  box-shadow: 0 0 0 3px rgba(31, 84, 222, .1);
+  box-shadow: 0 0 0 3px rgba(82,126,82, .1);
 }
 .faq-page .faq-search-icon {
   position: absolute;
@@ -106,9 +106,9 @@
 }
 .faq-page .cat-chip {
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   padding: 7px 16px;
-  border-radius: 99px;
+  border-radius: 0;
   border: 1.5px solid var(--line);
   background: #fff;
   color: var(--body-soft);
@@ -147,7 +147,7 @@
 }
 .faq-page .faq-side-title {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: .1em;
   color: var(--body-soft);
   text-transform: uppercase;
@@ -182,7 +182,7 @@
 .faq-page .faq-side-link.active {
   background: var(--pale);
   color: var(--blue);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .faq-page .faq-main {
@@ -205,7 +205,7 @@
 .faq-page .faq-section-icon {
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: 0;
   background: var(--pale);
   display: flex;
   align-items: center;
@@ -219,7 +219,7 @@
 }
 .faq-page .faq-section-title {
   font-size: 17px;
-  font-weight: 900;
+  font-weight: 400;
   color: var(--navy);
   font-family: var(--head);
 }
@@ -229,7 +229,7 @@
   font-weight: 600;
   background: var(--line-soft);
   padding: 2px 8px;
-  border-radius: 99px;
+  border-radius: 0;
   margin-left: auto;
 }
 
@@ -249,7 +249,7 @@
   background: #fff;
 }
 .faq-page .faq-item:hover {
-  border-color: #c8d8f8;
+  border-color: var(--primary-l);
 }
 .faq-page .faq-item.open {
   border-color: var(--blue);
@@ -268,7 +268,7 @@
   text-align: left;
   font-family: var(--sans);
   font-size: 14.5px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink);
   transition: background .15s;
 }
@@ -288,7 +288,7 @@
   background: var(--blue);
   color: #fff;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 400;
   font-family: var(--head);
   display: flex;
   align-items: center;
@@ -335,7 +335,7 @@
   color: var(--blue);
 }
 .faq-page .faq-a-inner mark {
-  background: #fff3c4;
+  background: var(--marker);
   border-radius: 2px;
   padding: 0 1px;
 }
@@ -370,7 +370,7 @@
   align-items: center;
   gap: 20px;
   margin-top: 48px;
-  background: #fafbfe;
+  background: var(--pale);
 }
 .faq-page .faq-contact > .ic {
   font-size: 32px;

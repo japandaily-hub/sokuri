@@ -497,7 +497,7 @@ function SchedulePageInner() {
               </span>
             </div>
             {submitError ? (
-              <p style={{ marginTop: 10, fontSize: 12.5, color: "#e05c5c" }}>{submitError}</p>
+              <p style={{ marginTop: 10, fontSize: 12.5, color: "var(--danger)" }}>{submitError}</p>
             ) : null}
             <button type="button" className="confirm-btn" disabled={!canConfirm} onClick={() => void handleConfirm()}>
               <Ic name="check" />

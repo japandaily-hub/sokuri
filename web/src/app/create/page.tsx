@@ -345,7 +345,7 @@ export default function CreateCasePage() {
         <div className="flow-wrap">
           {error && (
             <div className="auth-error" style={{ marginBottom: 16 }}>
-              <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: "none", stroke: "#cc3333", strokeWidth: 2, strokeLinecap: "round", flexShrink: 0 }}>
+              <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: "none", stroke: "var(--danger)", strokeWidth: 2, strokeLinecap: "round", flexShrink: 0 }}>
                 <circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" />
               </svg>
               {error}

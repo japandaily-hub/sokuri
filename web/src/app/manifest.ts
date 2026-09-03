@@ -13,14 +13,14 @@ import type { MetadataRoute } from "next";
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "カタヅケ — 部屋ごと撮るだけAI片付け査定",
+    name: "カタヅケ｜部屋ごと撮るだけAI片付け査定",
     short_name: "カタヅケ",
     description:
       "部屋ごと撮るだけ。AIが片付け・不用品を案件化し、リユース業者の見積もりが届くマッチングサービス。",
     start_url: "/",
     display: "standalone",
-    background_color: "#f8fafc",
-    theme_color: "#1447e0",
+    background_color: "#ffffff",
+    theme_color: "#527e52",
     lang: "ja",
     orientation: "portrait",
     categories: ["shopping", "lifestyle", "utilities"],

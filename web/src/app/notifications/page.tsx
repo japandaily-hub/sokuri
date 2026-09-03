@@ -363,10 +363,10 @@ function NotificationsContent() {
                 marginBottom: 20,
                 padding: "12px 16px",
                 borderRadius: "var(--radius-s)",
-                background: lineNotice.tone === "success" ? "#e8faf0" : "#fff5f5",
-                color: lineNotice.tone === "success" ? "var(--green)" : "#dc2626",
+                background: lineNotice.tone === "success" ? "#e8faf0" : "rgba(215,0,53,.06)",
+                color: lineNotice.tone === "success" ? "var(--green)" : "var(--danger)",
                 fontSize: 13,
-                border: `1px solid ${lineNotice.tone === "success" ? "#86efac" : "#fca5a5"}`,
+                border: `1px solid ${lineNotice.tone === "success" ? "#86efac" : "rgba(215,0,53,.35)"}`,
               }}
             >
               {lineNotice.text}
@@ -380,10 +380,10 @@ function NotificationsContent() {
                 marginBottom: 20,
                 padding: "12px 16px",
                 borderRadius: "var(--radius-s)",
-                background: "#fff5f5",
-                color: "#dc2626",
+                background: "rgba(215,0,53,.06)",
+                color: "var(--danger)",
                 fontSize: 13,
-                border: "1px solid #fca5a5",
+                border: "1px solid rgba(215,0,53,.35)",
               }}
             >
               セッションが切れました。再ログインしてください。
@@ -400,10 +400,10 @@ function NotificationsContent() {
                 marginBottom: 20,
                 padding: "12px 16px",
                 borderRadius: "var(--radius-s)",
-                background: "#fff5f5",
-                color: "#dc2626",
+                background: "rgba(215,0,53,.06)",
+                color: "var(--danger)",
                 fontSize: 13,
-                border: "1px solid #fca5a5",
+                border: "1px solid rgba(215,0,53,.35)",
               }}
             >
               {error}

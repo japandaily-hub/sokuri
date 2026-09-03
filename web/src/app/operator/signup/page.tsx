@@ -89,7 +89,7 @@ export default function OperatorSignupPage() {
               <h1 className="auth-title">業者登録</h1>
               <p className="auth-sub">
                 業者登録には運営の審査があります。まだお申し込みでない方は、まず
-                <Link href="/business" style={{ color: "var(--blue)", fontWeight: 700 }}>
+                <Link href="/business" style={{ color: "var(--blue)", fontWeight: 600 }}>
                   業者登録のお申し込み
                 </Link>
                 からご案内しています。招待コードをお持ちの方はこちらからアカウントを作成してください。
@@ -98,7 +98,7 @@ export default function OperatorSignupPage() {
 
             {error ? (
               <div className="auth-error">
-                <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: "none", stroke: "#cc3333", strokeWidth: 2, strokeLinecap: "round", flexShrink: 0 }}>
+                <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: "none", stroke: "var(--danger)", strokeWidth: 2, strokeLinecap: "round", flexShrink: 0 }}>
                   <circle cx="12" cy="12" r="9" />
                   <path d="M12 8v4M12 16h.01" />
                 </svg>

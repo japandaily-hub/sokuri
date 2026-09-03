@@ -31,7 +31,7 @@ export function Stepper({ current }: StepperProps) {
               {/* 左の連結線 */}
               <span
                 className={[
-                  "h-[3px] flex-1 rounded-full",
+                  "h-[3px] flex-1 rounded-none",
                   isFirst ? "opacity-0" : index <= current ? "bg-brand-600" : "bg-slate-200",
                 ].join(" ")}
               />
@@ -39,7 +39,7 @@ export function Stepper({ current }: StepperProps) {
               {/* ステップ番号 / 完了マーク */}
               <span
                 className={[
-                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors",
+                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors",
                   isDone && "bg-brand-600 text-white",
                   isActive && "bg-brand-600 text-white ring-4 ring-brand-100",
                   !isDone && !isActive && "border-2 border-slate-300 bg-white text-slate-400",
@@ -54,7 +54,7 @@ export function Stepper({ current }: StepperProps) {
               {/* 右の連結線 */}
               <span
                 className={[
-                  "h-[3px] flex-1 rounded-full",
+                  "h-[3px] flex-1 rounded-none",
                   isLast ? "opacity-0" : index < current ? "bg-brand-600" : "bg-slate-200",
                 ].join(" ")}
               />

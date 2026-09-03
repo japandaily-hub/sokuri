@@ -48,7 +48,7 @@
   background: var(--pale);
   padding: 11px 14px;
   text-align: left;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--navy);
   border: 1px solid var(--line);
 }
@@ -60,10 +60,10 @@
   vertical-align: top;
 }
 .legal-body .note {
-  background: #fff8e6;
+  background: var(--warm);
   border-left: 3px solid var(--gold);
   padding: 14px 18px;
-  border-radius: 0 8px 8px 0;
+  border-radius: 0;
   font-size: 13.5px;
   color: var(--body);
   margin: 20px 0;
@@ -77,7 +77,7 @@
   align-items: center;
   gap: 6px;
   font-size: 13.5px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--blue);
   margin-bottom: 32px;
 }

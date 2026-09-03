@@ -13,7 +13,7 @@ import { useSearchParams } from "next/navigation";
 import { Ic } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
 
-const CONFETTI_COLORS = ["#1447e0", "#6fa3ff", "#f0a030", "#1f8a5b", "#e05c5c", "#9b59b6"];
+const CONFETTI_COLORS = ["#527e52", "#c9d128", "#e5a323", "#7fa37f", "#f3981d", "#d4efb3"];
 
 type ConfettiDot = {
   background: string;
@@ -77,7 +77,7 @@ function VerifyEmailContent() {
         <h1 className="confirm-title">
           メールアドレスを
           <br />
-          確認しました！
+          確認しました。
         </h1>
         <p className="confirm-sub">
           以下のアドレスの確認が完了しました。

@@ -218,7 +218,7 @@ export default function AdminPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         {/* 招待コード（単発） */}
         <Card>
-          <h2 className="font-bold text-slate-900">業者招待コード（単発）</h2>
+          <h2 className="font-normal text-slate-900">業者招待コード（単発）</h2>
           <div className="mt-3 flex gap-2">
             <input
               type="email"
@@ -240,7 +240,7 @@ export default function AdminPage() {
             {invites?.map((inv) => (
               <li key={inv.id} className="flex items-center justify-between gap-2 py-2.5">
                 <div>
-                  <p className="font-mono text-sm font-bold text-slate-900">{inv.code}</p>
+                  <p className="font-mono text-sm font-semibold text-slate-900">{inv.code}</p>
                   <p className="text-xs text-slate-400">
                     {inv.email ?? "宛先未指定"}
                     {inv.lot_name ? ` ・ lot: ${inv.lot_name}` : ""}
@@ -274,7 +274,7 @@ export default function AdminPage() {
 
         {/* バルク発行 */}
         <Card>
-          <h2 className="font-bold text-slate-900">バルク発行</h2>
+          <h2 className="font-normal text-slate-900">バルク発行</h2>
           <div className="mt-3 space-y-2">
             <div className="flex gap-2">
               <div className="flex flex-col gap-1">
@@ -309,8 +309,8 @@ export default function AdminPage() {
             </button>
           </div>
           {bulkResult ? (
-            <div className="mt-4 rounded-lg bg-green-50 p-3">
-              <p className="text-sm font-bold text-green-800">
+            <div className="mt-4 rounded-none bg-green-50 p-3">
+              <p className="text-sm font-semibold text-green-800">
                 {bulkResult.count}件発行完了
                 {bulkResult.lot_name ? `（ロット: ${bulkResult.lot_name}）` : ""}
               </p>
@@ -333,14 +333,14 @@ export default function AdminPage() {
       <div className="mt-6">
         <Card>
           <div className="flex items-center justify-between">
-            <h2 className="font-bold text-slate-900">業者アカウント</h2>
+            <h2 className="font-normal text-slate-900">業者アカウント</h2>
             <div className="flex gap-2">
               {["all", "active", "limited", "pending"].map((s) => (
                 <button
                   key={s}
                   type="button"
                   onClick={() => setStatusFilter(s)}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                  className={`rounded-none px-3 py-1.5 text-xs font-medium transition-colors ${
                     statusFilter === s
                       ? "bg-brand-600 text-white"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -360,7 +360,7 @@ export default function AdminPage() {
               return (
                 <li key={op.id} className="flex items-center justify-between gap-2 py-2.5">
                   <div>
-                    <p className="text-sm font-bold text-slate-900">{op.company_name}</p>
+                    <p className="text-sm font-semibold text-slate-900">{op.company_name}</p>
                     <p className="text-xs text-slate-400">
                       {op.contact_email}
                       {op.license_number ? ` ・ ${op.license_number}` : ""}
@@ -408,7 +408,7 @@ export default function AdminPage() {
       {/* セル密度監視 */}
       <div className="mt-6">
         <Card>
-          <h2 className="font-bold text-slate-900">セル密度監視（需給バランス）</h2>
+          <h2 className="font-normal text-slate-900">セル密度監視（需給バランス）</h2>
           <p className="mt-1 text-xs text-slate-500">
             都道府県×目的別の直近30日案件数 / アクティブ業者数。1.5超は赤表示（需要過多）。
           </p>
@@ -440,11 +440,11 @@ export default function AdminPage() {
                       </td>
                       <td className="py-2 text-center">
                         {row.status === "dense" ? (
-                          <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">
+                          <span className="rounded-none border border-red-300 bg-transparent px-2 py-0.5 text-xs font-semibold text-red-700">
                             需要過多
                           </span>
                         ) : (
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
+                          <span className="rounded-none border border-slate-300 bg-transparent px-2 py-0.5 text-xs text-slate-500">
                             通常
                           </span>
                         )}
@@ -475,23 +475,23 @@ export default function AdminPage() {
           onClick={closeLicenseModal}
         >
           <div
-            className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl"
+            className="w-full max-w-lg rounded-none border border-slate-200 bg-white p-5"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between gap-4">
-              <h2 id="licenseModalTitle" className="font-bold text-slate-900">
+              <h2 id="licenseModalTitle" className="font-normal text-slate-900">
                 {licenseModalOperator.company_name} の古物商許可証
               </h2>
               <button
                 type="button"
                 onClick={closeLicenseModal}
                 aria-label="閉じる"
-                className="shrink-0 rounded-lg px-2 py-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                className="shrink-0 rounded-none px-2 py-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
               >
                 ✕
               </button>
             </div>
-            <div className="mt-4 flex min-h-[200px] items-center justify-center overflow-hidden rounded-lg bg-slate-50">
+            <div className="mt-4 flex min-h-[200px] items-center justify-center overflow-hidden rounded-none bg-slate-50">
               {licenseImageLoading ? (
                 <Spinner className="h-6 w-6 text-brand-600" />
               ) : licenseImageError ? (

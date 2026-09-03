@@ -177,7 +177,7 @@ export function Spinner({ className }: { className?: string }) {
 export function BrandMark({ className }: { className?: string }) {
   return (
     <span
-      className={`inline-flex items-center justify-center rounded-[10px] bg-gradient-to-br from-brand-500 to-brand-800 shadow-xs ${
+      className={`inline-flex items-center justify-center rounded-none bg-gradient-to-br from-brand-500 to-brand-800 ${
         className ?? "h-9 w-9"
       }`}
     >

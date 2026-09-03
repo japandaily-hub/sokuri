@@ -3,9 +3,9 @@ import type { Config } from "tailwindcss";
 /**
  * カタヅケ デザインシステム — Tailwind トークン定義
  *
- * 方向性: 「White × Cobalt / あたたかさとつながり」。基幹は彩度を上げたコバルト #1447e0。
- * デザインハンドオフ（katazuke-main.css）の正典トークンを Tailwind に橋渡しし、
- * ユーティリティ（text-navy / bg-pale / shadow-m / rounded-kdz / font-head）でも
+ * 方向性: 「人の森整合テーマ / 苔緑 × 明朝 × 直角」。基幹は苔色グリーン #527e52。
+ * 正典トークン（src/app/katazuke.css :root / SPEC-4-decisions.md §4.1）を Tailwind に
+ * 橋渡しし、ユーティリティ（text-navy / bg-pale / rounded-kdz / font-head）でも
  * 同じ値に到達できるようにする。ピクセル忠実な実体は src/app/katazuke.css。
  */
 const config: Config = {
@@ -13,19 +13,19 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        /** 基幹ブランドカラー: 彩度を一段上げたコバルト（brand-600 = ハンドオフ --blue） */
+        /** 基幹ブランドカラー: 苔色グリーン（brand-600 = 正典 --primary） */
         brand: {
-          50: "#eef4ff",
-          100: "#d9e6ff",
-          200: "#bcd4ff",
-          300: "#8eb6ff",
-          400: "#598ffb",
-          500: "#336bf2",
-          600: "#1447e0", // primary action（ハンドオフ --blue）
-          700: "#0f37b4", // hover（ハンドオフ --blue-d）
-          800: "#1d3c92",
-          900: "#1d3677",
-          950: "#141f48",
+          50: "#eff3ef", // --pale
+          100: "#d4efb3", // --marker（マーカー下線の若草）
+          200: "#c3d7c3",
+          300: "#a3bda3",
+          400: "#7fa37f", // --primary-l
+          500: "#649264",
+          600: "#527e52", // primary action（正典 --primary）
+          700: "#3f6640", // hover（正典 --primary-d）
+          800: "#37573a",
+          900: "#2f4a30", // --deep
+          950: "#1f3320",
         },
         /** 補助カラー: 価値・成功・前向きシグナル（エメラルド） */
         accent: {
@@ -38,63 +38,68 @@ const config: Config = {
           600: "#059669",
           700: "#047857",
         },
-        /** ハンドオフ正典トークン（katazuke.css :root と一致） */
+        /** 正典トークン（katazuke.css :root と一致。旧名 blue/blued はエイリアス） */
         kdz: {
-          blue: "#1447e0",
-          blued: "#0f37b4",
-          navy: "#241f1c",
-          ink: "#2f2924",
-          body: "#5e5750",
-          bodysoft: "#8d857c",
-          line: "#ebe5dd",
-          linesoft: "#f4f0ea",
-          pale: "#f0f5ff",
-          green: "#0e8a5a",
-          gold: "#b9892f",
-          line2: "#06c755", // LINE ブランドグリーン
+          blue: "#527e52",
+          blued: "#3f6640",
+          navy: "#333333",
+          ink: "#333333",
+          body: "#4a4a4a",
+          bodysoft: "#6b6b6b",
+          headgray: "#959595", // 24px 以上の見出し専用
+          line: "#d9e0d6",
+          linesoft: "#ecf1ec",
+          pale: "#eff3ef",
+          green: "#527e52",
+          lime: "#c9d128",
+          marker: "#d4efb3",
+          gold: "#e5a323",
+          danger: "#d70035",
+          line2: "#06c755", // LINE ブランドグリーン（AA 対象外の文書化例外）
         },
         /** よく使う面・文字色のショートハンド */
-        navy: "#241f1c",
-        ink: "#2f2924",
-        pale: "#f0f5ff",
+        navy: "#333333",
+        ink: "#333333",
+        pale: "#eff3ef",
       },
       fontFamily: {
-        head: ['"Zen Maru Gothic"', '"Zen Kaku Gothic New"', '"Hiragino Kaku Gothic ProN"', '"Yu Gothic UI"', "sans-serif"],
+        /** 見出し・地の文は明朝（Noto Serif JP 先頭 = 全 OS で同じ明朝が出ること優先） */
+        head: ['"Noto Serif JP"', '"Hiragino Mincho ProN"', '"Hiragino Mincho Pro"', '"Yu Mincho"', "YuMincho", '"游明朝体"', "serif"],
         sans: [
-          '"Noto Sans JP"',
-          "-apple-system",
-          "BlinkMacSystemFont",
-          "Segoe UI",
-          '"Hiragino Kaku Gothic ProN"',
-          '"Hiragino Sans"',
-          "Meiryo",
-          '"Yu Gothic UI"',
-          "Roboto",
-          "Arial",
-          "sans-serif",
+          '"Noto Serif JP"',
+          '"Hiragino Mincho ProN"',
+          '"Hiragino Mincho Pro"',
+          '"Yu Mincho"',
+          "YuMincho",
+          '"游明朝体"',
+          "serif",
         ],
+        /** 入力値・数値・小さな UI ラベル用ゴシック（誤読コストを下げる） */
+        ui: ['"Noto Sans JP"', '"Hiragino Kaku Gothic ProN"', '"Yu Gothic UI"', "sans-serif"],
+        /** 英字ラベル / 英字ディスプレイ */
+        en: ['"Montserrat"', "sans-serif"],
+        "en-display": ['"Libre Baskerville"', "serif"],
       },
+      /** 影ゼロの作法。立体感は使わず、ヘアラインと余白で区切る */
       boxShadow: {
-        xs: "0 1px 2px 0 rgb(20 31 72 / 0.06)",
-        card: "0 1px 2px 0 rgb(20 31 72 / 0.04), 0 6px 18px -6px rgb(20 31 72 / 0.10)",
-        "card-hover":
-          "0 2px 4px 0 rgb(20 31 72 / 0.05), 0 14px 32px -10px rgb(20 31 72 / 0.18)",
-        elevated:
-          "0 10px 30px -8px rgb(20 31 72 / 0.18), 0 28px 56px -20px rgb(20 31 72 / 0.20)",
-        cta: "0 10px 24px -8px rgb(20 71 224 / 0.45)",
-        /** ハンドオフ正典シャドウ（--shadow-s / m / l） */
-        "kdz-s": "0 1px 2px rgba(36,31,28,.045), 0 6px 18px -10px rgba(36,31,28,.14)",
-        "kdz-m": "0 2px 6px rgba(36,31,28,.04), 0 22px 46px -24px rgba(20,71,224,.30)",
-        "kdz-l": "0 30px 72px -34px rgba(20,71,224,.40), 0 10px 26px -18px rgba(36,31,28,.20)",
+        xs: "none",
+        card: "none",
+        "card-hover": "none",
+        elevated: "none",
+        cta: "none",
+        "kdz-s": "none",
+        "kdz-m": "none",
+        "kdz-l": "none",
       },
       borderRadius: {
-        "4xl": "1.75rem",
-        kdz: "24px",
-        "kdz-s": "16px",
+        "4xl": "0px",
+        kdz: "0px",
+        "kdz-s": "0px",
       },
       maxWidth: {
         container: "72rem",
         kdz: "1140px",
+        "kdz-text": "760px",
       },
       transitionTimingFunction: {
         kdz: "cubic-bezier(.22,.61,.36,1)",

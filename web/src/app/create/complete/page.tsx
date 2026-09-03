@@ -93,7 +93,7 @@ export default function CreateCompletePage() {
             </svg>
           </div>
 
-          <h1 className="done-title">出品が完了しました！</h1>
+          <h1 className="done-title">出品が完了しました。</h1>
           <p className="done-sub">
             写真と品目を業者に公開しました。
             <br />

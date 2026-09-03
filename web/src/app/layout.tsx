@@ -18,11 +18,11 @@ const SITE_URL = "https://sokuri.vercel.app";
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "カタヅケ — 家まるごと、まとめて片付け買取。撮るだけ・待つだけ",
+    default: "カタヅケ｜家まるごと、まとめて片付け買取。撮るだけ・待つだけ",
     template: "%s | カタヅケ",
   },
   description:
-    "家じゅうの不用品を、まとめて撮って待つだけ。登録業者が“買取総額”で競い合い、連絡が来るのはあなたが選んだ1社だけ。値がつかない物もまとめて回収。営業電話に追われない、家まるごとの片付け買取マッチング。",
+    "家じゅうの不用品を、まとめて撮って待つだけ。登録業者が買取総額で競い合い、連絡が来るのはあなたが選んだ1社だけ。値がつかない物もまとめて回収。営業電話に追われない、家まるごとの片付け買取マッチング。",
   keywords: [
     "片付け 買取",
     "不用品 買取",
@@ -41,14 +41,14 @@ export const metadata: Metadata = {
     locale: "ja_JP",
     url: SITE_URL,
     siteName: "カタヅケ",
-    title: "カタヅケ — 家まるごと、まとめて片付け買取",
+    title: "カタヅケ｜家まるごと、まとめて片付け買取",
     description:
       "まとめて撮って待つだけ。業者が買取総額で競い合います。連絡は選んだ1社だけ。値がつかない物もまとめて回収。",
-    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "カタヅケ — 家まるごと片付け買取" }],
+    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "カタヅケ｜家まるごと片付け買取" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "カタヅケ — 家まるごと、まとめて片付け買取",
+    title: "カタヅケ｜家まるごと、まとめて片付け買取",
     description: "まとめて撮って待つだけ。業者が買取総額で競い合います。連絡は選んだ1社だけ。",
     images: ["/opengraph-image"],
   },
@@ -63,7 +63,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#1447e0",
+  themeColor: "#527e52",
 };
 
 /** 構造化データ: Organization + WebSite（全ページ共通） */
@@ -92,7 +92,13 @@ const WEBSITE_LD = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ja">
-      <body className="min-h-screen antialiased">
+      <head>
+        {/* 明朝は本文全面に効くため、CSS パース完了を待たずに書体取得を開始させる（LCP 対策） */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+      </head>
+      {/* antialiased は明朝 400 で字画が痩せるため付与しない（globals.css @layer base も auto） */}
+      <body className="min-h-screen">
         {/* スキップリンク（WCAG 2.4.1） */}
         <a
           href="#main"

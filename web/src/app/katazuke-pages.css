@@ -1,10 +1,11 @@
 /* ============================================================
    カタヅケ — ページ/クラスタ共通スタイル（ハンドオフ各HTMLの <style> を集約）
    globals.css から @import ... layer(components) で取り込む。
+   人の森整合テーマ（SPEC-4-decisions.md §4.2 のフォーム作法）に準拠。
    ============================================================ */
 
 /* ---------- 認証・フォーム共通（ログイン/新規登録/PWリセット等） ---------- */
-.auth-page { background: #f4f6fb; min-height: 100vh; }
+.auth-page { background: var(--pale); min-height: 100vh; }
 
 .auth-bar {
   background: #fff;
@@ -15,25 +16,27 @@
   align-items: center;
   justify-content: space-between;
 }
-.auth-bar-link { font-size: 13px; font-weight: 600; color: var(--body-soft); transition: color .2s; }
-.auth-bar-link:hover { color: var(--blue); }
+.auth-bar-link { font-size: 13px; color: var(--body-soft); transition: color .2s; }
+.auth-bar-link:hover { color: var(--primary); }
 
 .auth-wrap { max-width: 440px; margin: 0 auto; padding: 40px 20px 80px; }
 
 .auth-card {
   background: #fff;
-  border-radius: var(--radius);
-  box-shadow: 0 4px 32px -8px rgba(15,37,82,.16), 0 1px 4px rgba(15,37,82,.06);
+  border-radius: 0;
+  box-shadow: none;
   padding: 36px 32px 32px;
-  border: 1px solid var(--line-soft);
+  border: 1px solid var(--line);
 }
 .auth-head { margin-bottom: 28px; }
-.auth-title { font-family: var(--head); font-size: 24px; font-weight: 900; color: var(--navy); line-height: 1.25; }
-.auth-sub { font-size: 13.5px; color: var(--body-soft); line-height: 1.75; margin-top: 8px; }
+.auth-title { font-family: var(--head); font-size: 24px; font-weight: 400; color: var(--ink); line-height: 1.5; }
+.auth-title::first-letter { color: var(--primary); }
+/* app 面の地の文は 15px / 1.75（2.0 だと1画面が伸びて送信ボタンが折り返し下に落ちる） */
+.auth-sub { font-size: 15px; color: var(--body-soft); line-height: 1.75; margin-top: 8px; }
 
 .auth-divider {
   display: flex; align-items: center; gap: 12px; margin: 20px 0;
-  color: var(--body-soft); font-size: 12px; font-weight: 600; letter-spacing: .04em;
+  color: var(--body-soft); font-size: 12px; letter-spacing: .08em;
 }
 .auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 
@@ -41,21 +44,21 @@
 .field { margin-bottom: 18px; }
 .field:last-child { margin-bottom: 0; }
 .field-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px; }
-.field label, .field .field-lbl { display: block; font-size: 13.5px; font-weight: 700; color: var(--ink); margin-bottom: 7px; }
+.field label, .field .field-lbl { display: block; font-family: var(--head); font-size: 14px; font-weight: 600; color: var(--ink); margin-bottom: 7px; }
 .field-top label, .field-top .field-lbl { margin-bottom: 0; }
-.forget-link { font-size: 12px; color: var(--blue); font-weight: 600; cursor: pointer; background: none; border: none; }
+.forget-link { font-size: 12px; color: var(--primary); cursor: pointer; background: none; border: none; }
 .forget-link:hover { text-decoration: underline; }
 .field input, .field textarea, .field select {
-  width: 100%; font-family: var(--sans); font-size: 15px; color: var(--ink);
-  background: #fafbfe; border: 1.5px solid var(--line); border-radius: var(--radius-s);
-  padding: 12px 14px; outline: none; transition: border-color .2s, box-shadow .2s;
+  width: 100%; font-size: 15px; color: var(--ink);
+  background: #fff; border: 1px solid #ddd; border-radius: 0;
+  padding: 12px 14px; outline: none; transition: border-color .2s;
 }
-.field input::placeholder { color: #bcc3d4; }
+.field input::placeholder { color: #999; }
 .field input:focus, .field textarea:focus, .field select:focus {
-  border-color: var(--blue); background: #fff; box-shadow: 0 0 0 3px rgba(31,84,222,.12);
+  border-color: var(--primary); background: #fff;
 }
-.field.has-error input, .field.has-error textarea { border-color: #e05c5c; }
-.field-error { font-size: 12px; color: #e05c5c; margin-top: 5px; }
+.field.has-error input, .field.has-error textarea { border-color: var(--danger); }
+.field-error { font-size: 12px; color: var(--danger); margin-top: 5px; }
 
 /* パスワード表示切替 */
 .pw-wrap { position: relative; }
@@ -64,53 +67,55 @@
   background: none; border: none; cursor: pointer; color: var(--body-soft);
   padding: 4px; line-height: 1; transition: color .2s;
 }
-.pw-toggle:hover { color: var(--navy); }
-.pw-toggle svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; display: block; }
+.pw-toggle:hover { color: var(--ink); }
+.pw-toggle svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; display: block; }
 .pw-wrap input { padding-right: 44px; }
 
 /* エラーバナー */
 .auth-error {
-  background: #fff3f3; border: 1px solid #ffc0c0; border-radius: 10px;
-  padding: 11px 14px; font-size: 13px; color: #cc3333; margin-bottom: 18px;
-  display: flex; align-items: center; gap: 8px; line-height: 1.5;
+  background: #fff; border: 1px solid var(--danger); border-radius: 0;
+  padding: 11px 14px; font-size: 14px; color: var(--danger); margin-bottom: 18px;
+  display: flex; align-items: center; gap: 8px; line-height: 1.6;
 }
 
 /* 信頼行 */
 .trust-row { display: flex; gap: 18px; margin-top: 22px; justify-content: center; flex-wrap: wrap; }
-.trust-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--body-soft); font-weight: 600; }
-.trust-item svg { width: 13px; height: 13px; fill: none; stroke: var(--green); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.trust-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--body-soft); }
+.trust-item svg { width: 13px; height: 13px; fill: none; stroke: var(--primary); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 /* 新規登録/ログイン誘導 */
-.auth-switch { text-align: center; margin-top: 24px; font-size: 13.5px; color: var(--body-soft); line-height: 1.8; }
-.auth-switch a { color: var(--blue); font-weight: 700; }
+.auth-switch { text-align: center; margin-top: 24px; font-size: 14px; color: var(--body-soft); line-height: 1.75; }
+.auth-switch a { color: var(--primary); font-weight: 600; }
 .auth-switch a:hover { text-decoration: underline; }
 
-/* LINE ボタン（認証） */
+/* LINE ボタン（認証）
+   角丸 99px は据え置く。LINE ログインボタンは公式のボタン仕様に従う領域で、
+   形状変更は規約リスク側に倒れるため（他社ブランドの規約 > 自社の見た目の統一）。 */
 .btn-line-auth {
   width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;
   background: #06c755; color: #fff; border: none; border-radius: 99px; padding: 16px 20px;
-  font-family: var(--head); font-size: 15.5px; font-weight: 700; cursor: pointer;
-  box-shadow: 0 10px 22px -8px rgba(6,199,85,.55); transition: background .2s, transform .2s, box-shadow .2s;
+  font-family: var(--head); font-size: 16px; font-weight: 600; letter-spacing: .08em; cursor: pointer;
+  box-shadow: none; transition: opacity .25s;
 }
-.btn-line-auth:hover { background: #05b34c; transform: translateY(-2px); box-shadow: 0 14px 28px -8px rgba(6,199,85,.6); }
-.btn-line-auth:disabled { opacity: .7; cursor: default; transform: none; }
+.btn-line-auth:hover { background: #06c755; opacity: .8; }
+.btn-line-auth:disabled { opacity: .7; cursor: default; }
 .btn-line-auth svg { width: 20px; height: 20px; fill: #fff; flex-shrink: 0; }
 
 /* トースト通知 */
 .kdz-toast {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-  background: var(--deep); color: #fff; font-family: var(--head); font-size: 14px; font-weight: 700;
-  padding: 14px 22px; border-radius: 99px; z-index: 200; box-shadow: 0 8px 24px -8px rgba(15,37,82,.5);
+  background: var(--deep); color: #fff; font-family: var(--head); font-size: 15px; font-weight: 600;
+  padding: 14px 22px; border-radius: 0; z-index: 200; box-shadow: none;
 }
 
 /* モーダル（共通） */
 .kdz-overlay {
-  position: fixed; inset: 0; background: rgba(15,37,82,.45); backdrop-filter: blur(4px);
+  position: fixed; inset: 0; background: rgba(51,51,51,.45); backdrop-filter: none;
   z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px;
 }
-.kdz-modal { background: #fff; border-radius: var(--radius); max-width: 400px; width: 100%; padding: 32px 28px; box-shadow: var(--shadow-l); }
-.kdz-modal h2 { font-family: var(--head); font-size: 20px; color: var(--navy); margin-bottom: 8px; }
-.kdz-modal .modal-sub { font-size: 13.5px; color: var(--body-soft); line-height: 1.75; margin-bottom: 22px; }
+.kdz-modal { background: #fff; border: 1px solid var(--line); border-radius: 0; max-width: 400px; width: 100%; padding: 32px 28px; box-shadow: none; }
+.kdz-modal h2 { font-family: var(--head); font-size: 21px; font-weight: 400; color: var(--ink); margin-bottom: 8px; }
+.kdz-modal .modal-sub { font-size: 15px; color: var(--body-soft); line-height: 1.75; margin-bottom: 22px; }
 
 /* ローディングスピナー */
 @keyframes kdz-spin { to { transform: rotate(360deg); } }
@@ -121,57 +126,59 @@
   .auth-wrap { padding-top: 20px; padding-left: 14px; padding-right: 14px; }
   .auth-title { font-size: 21px; }
   .trust-row { gap: 10px; }
-  .btn-line-auth { font-size: 14px; padding: 14px 18px; }
+  .btn-line-auth { font-size: 15px; padding: 14px 18px; }
 }
 
 /* ---------- フロー共通（新規登録 / 出品登録 で共有: flow-header / footer / form-card） ---------- */
-.flow-bg { background: #f4f6fb; min-height: 100vh; }
+.flow-bg { background: var(--pale); min-height: 100vh; }
 
-.flow-header { position: sticky; top: 0; z-index: 60; background: #fff; border-bottom: 1px solid var(--line); box-shadow: var(--shadow-s); }
+.flow-header { position: sticky; top: 0; z-index: 60; background: #fff; border-bottom: 1px solid var(--line); box-shadow: none; }
 .flow-header-inner { max-width: 600px; margin: 0 auto; padding: 14px 20px; display: flex; align-items: center; gap: 16px; }
 .flow-steps { flex: 1; display: flex; gap: 0; align-items: center; }
 .flow-step { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; position: relative; }
-.flow-step + .flow-step::before { content: ""; position: absolute; left: -50%; top: 12px; width: 100%; height: 2px; background: var(--line); z-index: 0; transition: background .4s; }
-.flow-step.done + .flow-step::before, .flow-step.active + .flow-step::before { background: var(--blue); }
-.fs-dot { width: 24px; height: 24px; border-radius: 50%; background: var(--line); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 900; color: var(--body-soft); font-family: var(--head); position: relative; z-index: 1; transition: background .3s, color .3s, box-shadow .3s; }
-.flow-step.done .fs-dot { background: var(--blue); color: #fff; }
-.flow-step.active .fs-dot { background: var(--blue); color: #fff; box-shadow: 0 0 0 4px rgba(31,84,222,.18); }
-.fs-label { font-size: 10px; font-weight: 600; color: var(--body-soft); white-space: nowrap; }
-.flow-step.active .fs-label { color: var(--blue); font-weight: 700; }
+.flow-step + .flow-step::before { content: ""; position: absolute; left: -50%; top: 12px; width: 100%; height: 1px; background: var(--line); z-index: 0; transition: background .4s; }
+.flow-step.done + .flow-step::before, .flow-step.active + .flow-step::before { background: var(--primary); }
+.fs-dot { width: 24px; height: 24px; border-radius: 0; border: 1px solid var(--line); background: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500; color: var(--body-soft); font-family: var(--ui); position: relative; z-index: 1; transition: background .3s, color .3s, border-color .3s; }
+.flow-step.done .fs-dot { background: var(--primary); border-color: var(--primary); color: #fff; }
+.flow-step.active .fs-dot { background: var(--primary); border-color: var(--primary); color: #fff; }
+.fs-label { font-size: 10px; color: var(--body-soft); white-space: nowrap; }
+.flow-step.active .fs-label { color: var(--primary); }
 .flow-step.done .fs-label { color: var(--ink); }
 
 .flow-wrap { max-width: 600px; margin: 0 auto; padding: 28px 20px 100px; }
-.step-title { font-family: var(--head); font-size: clamp(20px,3vw,26px); font-weight: 900; color: var(--navy); margin-bottom: 8px; line-height: 1.35; }
-.step-desc { font-size: 14px; color: var(--body-soft); line-height: 1.8; margin-bottom: 24px; }
+.step-title { font-family: var(--head); font-size: clamp(20px,3vw,26px); font-weight: 400; color: var(--ink); margin-bottom: 8px; line-height: 1.5; }
+.step-title::first-letter { color: var(--primary); }
+.step-desc { font-size: 15px; color: var(--body); line-height: 1.75; margin-bottom: 24px; }
 
-.form-card { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow-s); padding: 26px 24px; margin-bottom: 16px; }
+.form-card { background: #fff; border: 1px solid var(--line); border-radius: 0; box-shadow: none; padding: 26px 24px; margin-bottom: 16px; }
 /* .field-top .req/.opt: Field コンポーネント（components/kdz/auth.tsx）の rightSlot に
    直接 .req/.opt バッジを渡すケース（label 文字列に埋め込めないため）。ラベル内埋め込み版
-   （.field label .req/.opt）と見た目を統一する。 */
-.field label .req, .field-top .req { font-size: 10.5px; font-weight: 700; color: #fff; background: var(--blue); padding: 1px 6px; border-radius: 4px; margin-left: 5px; vertical-align: middle; }
-.field label .opt, .field-top .opt { font-size: 10.5px; font-weight: 600; color: var(--body-soft); background: var(--line-soft); padding: 1px 6px; border-radius: 4px; margin-left: 5px; vertical-align: middle; }
+   （.field label .req/.opt）と見た目を統一する。値は katazuke.css の .req/.opt と同一。 */
+.field label .req, .field-top .req { font-family: var(--ui); font-size: 12px; font-weight: 500; color: #fff; background: var(--primary); padding: 2px 10px; border-radius: 0; margin-left: 6px; vertical-align: middle; }
+.field label .opt, .field-top .opt { font-family: var(--ui); font-size: 12px; font-weight: 500; color: #fff; background: #808080; padding: 2px 10px; border-radius: 0; margin-left: 6px; vertical-align: middle; }
 
 .select-wrap { position: relative; }
 .select-wrap::after { content: ""; position: absolute; right: 14px; top: 50%; transform: translateY(-50%); width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid var(--body-soft); pointer-events: none; }
-.select-wrap select { width: 100%; font-family: var(--sans); font-size: 15px; color: var(--ink); background: #fafbfe; border: 1.5px solid var(--line); border-radius: var(--radius-s); padding: 12px 36px 12px 14px; outline: none; appearance: none; cursor: pointer; }
-.select-wrap select:focus { border-color: var(--blue); background: #fff; box-shadow: 0 0 0 3px rgba(31,84,222,.12); }
+.select-wrap select { width: 100%; font-size: 15px; color: var(--ink); background: #fff; border: 1px solid #ddd; border-radius: 0; padding: 12px 36px 12px 14px; outline: none; appearance: none; cursor: pointer; }
+.select-wrap select:focus { border-color: var(--primary); background: #fff; }
 
 .pw-strength { margin-top: 8px; display: flex; gap: 5px; align-items: center; }
-.pw-strength-bar { flex: 1; height: 4px; border-radius: 2px; background: var(--line); transition: background .3s; }
-.pw-strength-label { font-size: 11px; font-weight: 700; color: var(--body-soft); min-width: 36px; text-align: right; }
+.pw-strength-bar { flex: 1; height: 4px; border-radius: 0; background: var(--line); transition: background .3s; }
+.pw-strength-label { font-size: 11px; color: var(--body-soft); min-width: 36px; text-align: right; }
 
-.flow-footer { position: fixed; bottom: 0; left: 0; right: 0; z-index: 50; background: #fff; border-top: 1px solid var(--line); box-shadow: 0 -4px 20px -8px rgba(15,37,82,.15); }
+.flow-footer { position: fixed; bottom: 0; left: 0; right: 0; z-index: 50; background: #fff; border-top: 1px solid var(--line); box-shadow: none; }
 .flow-footer .inner { max-width: 600px; margin: 0 auto; padding: 14px 20px; display: flex; gap: 12px; justify-content: flex-end; align-items: center; }
-.btn-flow-back { padding: 13px 22px; border-radius: 99px; border: 1.5px solid var(--line); background: #fff; color: var(--navy); font-family: var(--head); font-size: 14px; font-weight: 700; cursor: pointer; transition: .2s; }
-.btn-flow-back:hover { border-color: var(--blue); color: var(--blue); }
-.btn-flow-next { padding: 13px 28px; border-radius: 99px; border: none; background: var(--blue); color: #fff; font-family: var(--head); font-size: 15px; font-weight: 900; cursor: pointer; box-shadow: 0 8px 20px -8px rgba(31,84,222,.6); transition: .2s; display: flex; align-items: center; gap: 8px; }
-.btn-flow-next:hover { background: var(--blue-d); transform: translateY(-1px); }
-.btn-flow-next:disabled { background: var(--line); box-shadow: none; cursor: not-allowed; transform: none; }
+.btn-flow-back { padding: 14px 24px; border-radius: 0; border: 1px solid #333; background: #fff; color: #333; font-family: var(--head); font-size: 15px; font-weight: 600; letter-spacing: .08em; cursor: pointer; transition: opacity .25s; }
+.btn-flow-back:hover { opacity: .8; }
+.btn-flow-next { padding: 14px 30px; border-radius: 0; border: none; background: var(--primary); color: #fff; font-family: var(--head); font-size: 15px; font-weight: 600; letter-spacing: .08em; cursor: pointer; box-shadow: none; transition: opacity .25s; display: flex; align-items: center; gap: 8px; }
+.btn-flow-next:hover { opacity: .8; }
+.btn-flow-next:disabled { background: var(--line-soft); color: var(--body-soft); box-shadow: none; cursor: not-allowed; opacity: 1; }
 
-.confirm-row { display: flex; justify-content: space-between; font-size: 14px; padding: 12px 0; border-bottom: 1px solid var(--line-soft); align-items: baseline; gap: 16px; }
+/* 確認行は 14px / 1.6（行の対応が読めなくなるため行間を広げない） */
+.confirm-row { display: flex; justify-content: space-between; font-size: 14px; line-height: 1.6; padding: 12px 0; border-bottom: 1px solid var(--line-soft); align-items: baseline; gap: 16px; }
 .confirm-row:last-child { border-bottom: none; }
 .confirm-row .lbl { color: var(--body-soft); font-size: 13px; flex-shrink: 0; }
-.confirm-row .val { font-weight: 700; color: var(--ink); text-align: right; }
+.confirm-row .val { font-weight: 600; color: var(--ink); text-align: right; }
 
 @media (max-width: 480px) {
   .flow-wrap { padding: 18px 14px 90px; }

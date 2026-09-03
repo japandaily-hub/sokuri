@@ -4,7 +4,7 @@ import type { SVGProps } from "react";
  * カタヅケ デザインハンドオフの SVG アイコンスプライト。
  * デザイン（katazuke-main.css / 各HTML）が `<svg class="ic"><use href="#i-xxx"/></svg>`
  * を前提とするため、symbol 定義をそのまま移植し layout で一度だけ描画する。
- * 線画スタイル（stroke / 1.9px）は .ic クラス（katazuke.css）が付与する。
+ * 線画スタイル（stroke / 1.5px）は .ic クラス（katazuke.css）が付与する。
  */
 export function KdzIconSprite() {
   return (

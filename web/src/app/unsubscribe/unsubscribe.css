@@ -13,7 +13,7 @@
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: #d1fae5;
+  background: var(--pale);
   margin: 0 auto 22px;
   display: flex;
   align-items: center;
