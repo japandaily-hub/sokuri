@@ -1,40 +1,40 @@
 /* ============================================================
-   カタヅケ — メインスタイル（人の森整合テーマ / 苔緑 × 明朝 × 直角）
-   ブランド: #527e52 / 家まるごと・まとめて片付け買取
+   カタヅケ — メインスタイル（人の森整合テーマ / ブルー × 明朝 × 直角）
+   ブランド: #1447e0 / 家まるごと・まとめて片付け買取
    正典: docs/design_hitonomori_alignment/SPEC-4-decisions.md §4.1 / §4.2
    NOTE: globals.css から `@import "./katazuke.css" layer(components)` で取り込み、
    components レイヤーに内包する。これにより Tailwind の utilities（mt-4等）が常に
    上書きでき、既存 Tailwind ページの余白も壊さない。.container は corePlugins で無効化済み。
    ============================================================ */
 :root{
-  /* --- 主色（苔緑） --- */
-  --primary:#527e52;
-  --primary-d:#3f6640;
-  --primary-l:#7fa37f;
-  --deep:#2f4a30;
-  --lime:#c9d128;        /* 英字キャプション・現在地 */
+  /* --- 主色（ブルー） --- */
+  --primary:#1447e0;
+  --primary-d:#0f37b4;
+  --primary-l:#5f86ee;   /* 非文字コントラスト3:1以上（境界線・アイコン等の判読性を担保） */
+  --deep:#14235c;
+  --lime:#8fb4ff;        /* 英字キャプション・現在地（白ロゴ上の視認用） */
 
   /* --- 文字 --- */
-  --navy:#333;
-  --ink:#333;
-  --body:#4a4a4a;
-  --body-soft:#6b6b6b;   /* 白と 5.3:1。小さい補助テキストはすべてこれ */
+  --navy:#20242e;
+  --ink:#20242e;
+  --body:#454e59;
+  --body-soft:#63707b;   /* 白と 5.3:1。小さい補助テキストはすべてこれ */
   --head-gray:#959595;   /* 24px 以上の見出し専用（本文に流用しない） */
 
   /* --- 罫線・面 --- */
-  --line:#d9e0d6;
-  --line-soft:#ecf1ec;
+  --line:#dce3ea;
+  --line-soft:#eef1f6;
   --white:#fff;
-  --pale:#eff3ef;        /* フォームパネル・強調面 */
-  --pale-2:#f6f8f4;      /* セクション交互背景 */
+  --pale:#eef3ff;        /* フォームパネル・強調面 */
+  --pale-2:#f4f7fc;      /* セクション交互背景 */
   --warm:#fdf5d9;
   --mint:#daf4eb;
   --sky:#e1f5fd;
-  --marker:#d4efb3;      /* マーカー下線 */
+  --marker:#d7e6ff;      /* マーカー下線 */
 
   /* --- アクセント --- */
   --apricot:#f3981d;
-  --green:#527e52;
+  --green:#15803d;       /* 成功/完了などの意味色。主色（青）とは別系統に固定 */
   --gold:#e5a323;
   --danger:#d70035;
 
@@ -196,7 +196,7 @@ section:has(> .vt){position:relative;}
 .hero{position:relative;overflow:hidden;background:#fff;
   padding:clamp(40px,5vw,72px) 0 clamp(56px,7vw,96px);}
 .hero-blob{position:absolute;right:-12vw;top:-30vh;width:70vw;height:120vh;
-  background:#eef4de;border-radius:42% 58% 55% 45%/48% 42% 58% 52%;
+  background:#e8effc;border-radius:42% 58% 55% 45%/48% 42% 58% 52%;
   z-index:0;pointer-events:none;}
 .hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(32px,5vw,64px);align-items:center;}
 /* コピー・写真は blob より前面に */
@@ -515,7 +515,7 @@ section:has(> .vt){position:relative;}
 .final{background:#fff;color:var(--ink);text-align:center;overflow:hidden;position:relative;
   border-top:1px solid var(--line);}
 .final::before{content:"";position:absolute;left:-18vw;bottom:-40vh;width:60vw;height:100vh;
-  background:#eef4de;border-radius:48% 52% 45% 55%/52% 48% 52% 48%;z-index:0;pointer-events:none;}
+  background:#e8effc;border-radius:48% 52% 45% 55%/52% 48% 52% 48%;z-index:0;pointer-events:none;}
 .final .container{position:relative;z-index:2;}
 .cta-staff{display:flex;justify-content:center;margin-bottom:22px;}
 .cta-staff img{width:60px;height:60px;border-radius:50%;object-fit:cover;border:2px solid #fff;

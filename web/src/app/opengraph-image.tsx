@@ -57,7 +57,7 @@ export default function OgImage() {
               fontSize: "19px",
               fontWeight: 600,
               letterSpacing: "0.18em",
-              color: "#527e52",
+              color: "#1447e0",
             }}
           >
             KATAZUKE
@@ -65,7 +65,7 @@ export default function OgImage() {
         </div>
 
         {/* 旧OGのピル「AI査定 × リユース」を直角・緑細枠チップとして保持（文言不変） */}
-        <div style={{ display: "flex", position: "absolute", top: "72px", right: "80px", border: "1px solid #527e52", color: "#527e52", fontSize: "22px", fontWeight: 400, padding: "8px 20px", letterSpacing: "0.08em" }}>
+        <div style={{ display: "flex", position: "absolute", top: "72px", right: "80px", border: "1px solid #1447e0", color: "#1447e0", fontSize: "22px", fontWeight: 400, padding: "8px 20px", letterSpacing: "0.08em" }}>
           AI査定 × リユース
         </div>
 
@@ -96,7 +96,7 @@ export default function OgImage() {
               fontWeight: 400,
               lineHeight: 1.4,
               letterSpacing: "0.04em",
-              color: "#527e52",
+              color: "#1447e0",
             }}
           >
             片付けと買取が、まとめて片づく。
@@ -106,7 +106,7 @@ export default function OgImage() {
               display: "flex",
               width: "96px",
               height: "1px",
-              background: "#527e52",
+              background: "#1447e0",
             }}
           />
         </div>
@@ -116,7 +116,7 @@ export default function OgImage() {
           style={{
             display: "flex",
             gap: "16px",
-            color: "#527e52",
+            color: "#1447e0",
             fontSize: "24px",
             fontWeight: 400,
           }}
@@ -125,7 +125,7 @@ export default function OgImage() {
             style={{
               display: "flex",
               padding: "10px 22px",
-              border: "1px solid #527e52",
+              border: "1px solid #1447e0",
               background: "#ffffff",
             }}
           >
@@ -135,7 +135,7 @@ export default function OgImage() {
             style={{
               display: "flex",
               padding: "10px 22px",
-              border: "1px solid #527e52",
+              border: "1px solid #1447e0",
               background: "#ffffff",
             }}
           >
@@ -145,7 +145,7 @@ export default function OgImage() {
             style={{
               display: "flex",
               padding: "10px 22px",
-              border: "1px solid #527e52",
+              border: "1px solid #1447e0",
               background: "#ffffff",
             }}
           >
@@ -155,7 +155,7 @@ export default function OgImage() {
             style={{
               display: "flex",
               padding: "10px 22px",
-              border: "1px solid #527e52",
+              border: "1px solid #1447e0",
               background: "#ffffff",
             }}
           >

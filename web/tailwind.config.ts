@@ -3,7 +3,7 @@ import type { Config } from "tailwindcss";
 /**
  * カタヅケ デザインシステム — Tailwind トークン定義
  *
- * 方向性: 「人の森整合テーマ / 苔緑 × 明朝 × 直角」。基幹は苔色グリーン #527e52。
+ * 方向性: 「人の森整合テーマ / ブルー × 明朝 × 直角」。基幹はコバルトブルー #1447e0。
  * 正典トークン（src/app/katazuke.css :root / SPEC-4-decisions.md §4.1）を Tailwind に
  * 橋渡しし、ユーティリティ（text-navy / bg-pale / rounded-kdz / font-head）でも
  * 同じ値に到達できるようにする。ピクセル忠実な実体は src/app/katazuke.css。
@@ -18,52 +18,52 @@ const config: Config = {
       colors: {
         /** 基幹ブランドカラー: 苔色グリーン（brand-600 = 正典 --primary） */
         brand: {
-          50: "#eff3ef", // --pale
-          100: "#d4efb3", // --marker（マーカー下線の若草）
-          200: "#c3d7c3",
-          300: "#a3bda3",
-          400: "#7fa37f", // --primary-l
-          500: "#649264",
-          600: "#527e52", // primary action（正典 --primary）
-          700: "#3f6640", // hover（正典 --primary-d）
-          800: "#37573a",
-          900: "#2f4a30", // --deep
-          950: "#1f3320",
+          50: "#eef3ff", // --pale
+          100: "#d7e6ff", // --marker（マーカー下線）
+          200: "#b9cffa",
+          300: "#9ab4f5",
+          400: "#5f86ee", // --primary-l
+          500: "#3868e8",
+          600: "#1447e0", // primary action（正典 --primary）
+          700: "#0f37b4", // hover（正典 --primary-d）
+          800: "#132c86",
+          900: "#14235c", // --deep
+          950: "#0c1533",
         },
-        /** 補助カラー: 価値・成功・前向きシグナル（エメラルド） */
+        /** 補助カラー: 成功・完了・前向きシグナル（主色=青とは別系統の緑に固定） */
         accent: {
-          50: "#eff3ef",
-          100: "#e4ece4",
-          200: "#d4efb3",
-          300: "#a9c7a9",
-          400: "#7fa37f",
-          500: "#527e52",
-          600: "#527e52",
-          700: "#3f6640",
+          50: "#ecfdf3",
+          100: "#d1fae1",
+          200: "#a6f0c6",
+          300: "#6fdca4",
+          400: "#3cbf7f",
+          500: "#22a366",
+          600: "#15803d",
+          700: "#116832",
         },
         /** 正典トークン（katazuke.css :root と一致。旧名 blue/blued はエイリアス） */
         kdz: {
-          blue: "#527e52",
-          blued: "#3f6640",
-          navy: "#333333",
-          ink: "#333333",
-          body: "#4a4a4a",
-          bodysoft: "#6b6b6b",
+          blue: "#1447e0",
+          blued: "#0f37b4",
+          navy: "#20242e",
+          ink: "#20242e",
+          body: "#454e59",
+          bodysoft: "#63707b",
           headgray: "#959595", // 24px 以上の見出し専用
-          line: "#d9e0d6",
-          linesoft: "#ecf1ec",
-          pale: "#eff3ef",
-          green: "#527e52",
-          lime: "#c9d128",
-          marker: "#d4efb3",
+          line: "#dce3ea",
+          linesoft: "#eef1f6",
+          pale: "#eef3ff",
+          green: "#15803d", // 成功/完了などの意味色（主色=青とは別系統）
+          lime: "#8fb4ff",
+          marker: "#d7e6ff",
           gold: "#e5a323",
           danger: "#d70035",
           line2: "#06c755", // LINE ブランドグリーン（AA 対象外の文書化例外）
         },
         /** よく使う面・文字色のショートハンド */
-        navy: "#333333",
-        ink: "#333333",
-        pale: "#eff3ef",
+        navy: "#20242e",
+        ink: "#20242e",
+        pale: "#eef3ff",
       },
       fontFamily: {
         /** 見出し・地の文は明朝（Noto Serif JP 先頭 = 全 OS で同じ明朝が出ること優先） */

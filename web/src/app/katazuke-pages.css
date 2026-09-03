@@ -7,7 +7,7 @@
 /* ---------- 認証・フォーム共通（ログイン/新規登録/PWリセット等） ---------- */
 /* 認証画面: 人の森の作法＝白地に淡い若草の blob。カードは 1px ヘアラインで区切る（面は使わない） */
 .auth-page { background: #fff; min-height: 100vh; position: relative; overflow: hidden; }
-.auth-page::before { content: ""; position: absolute; right: -18vw; top: -34vh; width: 62vw; height: 110vh; background: #eef4de;
+.auth-page::before { content: ""; position: absolute; right: -18vw; top: -34vh; width: 62vw; height: 110vh; background: #e8effc;
   border-radius: 42% 58% 55% 45% / 48% 42% 58% 52%; pointer-events: none; z-index: 0; }
 .auth-page > * { position: relative; z-index: 1; }
 
