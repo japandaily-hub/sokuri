@@ -3,10 +3,10 @@
 /** ユーザーログイン（新デザイン）。admin も同じフォーム（role で /admin へ誘導）。
  *  認証は既存の NextAuth Credentials（user-credentials → backend JWT）を維持。 */
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signIn } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
 import { AuthBar, Field, PasswordField, LineAuthButton, TrustRow } from "@/components/kdz/auth";
 import { safeInternalPath } from "@/lib/safe-path";
 
@@ -17,6 +17,12 @@ function LoginForm() {
   const params = useSearchParams();
   // オープンリダイレクト対策: サイト内パスのみ許可
   const callbackUrl = safeInternalPath(params.get("callbackUrl"), "/cases");
+  const toCreate = callbackUrl.startsWith("/create");
+  const { status } = useSession();
+  // ログイン済みなら（LINEではじめる 等から来た場合）そのまま目的地へ
+  useEffect(() => {
+    if (status === "authenticated") router.replace(callbackUrl);
+  }, [status, callbackUrl, router]);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -58,7 +64,7 @@ function LoginForm() {
           <div className="auth-card">
             <div className="auth-head">
               <h1 className="auth-title">ログイン</h1>
-              <p className="auth-sub">入札状況や業者との交渉はログイン後に確認できます</p>
+              <p className="auth-sub">{toCreate ? "出品（撮影）に進む前にログインしてください。LINEなら1タップで登録できます。" : "入札状況や業者との交渉はログイン後に確認できます"}</p>
             </div>
 
             <LineAuthButton callbackUrl={callbackUrl} />

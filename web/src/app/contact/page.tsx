@@ -86,7 +86,7 @@ export default function ContactPage() {
                 査定・出品のご依頼はLINEから。友だち追加するだけで、すぐに出品をはじめられます。
               </p>
             </div>
-            <Link href="/create" className="btn btn-line btn-lg">
+            <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-line btn-lg">
               <Ic name="chat" />
               LINEではじめる
               <Ic name="arrow" className="arw" />

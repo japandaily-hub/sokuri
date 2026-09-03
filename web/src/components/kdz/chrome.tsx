@@ -57,7 +57,7 @@ export function SiteFooter() {
 }
 
 /** モバイル追従CTA（デザイン .dock）。860px 以下で表示。 */
-export function Dock({ href = "/create", label = "LINEではじめる" }: { href?: string; label?: string }) {
+export function Dock({ href = "/login?callbackUrl=%2Fcreate", label = "LINEではじめる" }: { href?: string; label?: string }) {
   return (
     <div className="dock">
       <Link href={href} className="btn btn-line">

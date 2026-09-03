@@ -51,6 +51,11 @@ export default function CreateCasePage() {
   const router = useRouter();
   const { token, loading } = useToken();
 
+  // 導線: 未ログインで撮影を始めさせない（送信時に初めてログインを求めると撮影が無駄になる）。
+  useEffect(() => {
+    if (!loading && !token) router.replace("/login?callbackUrl=%2Fcreate");
+  }, [loading, token, router]);
+
   const [step, setStep] = useState(0);
 
   // STEP1: 商品ごとのアルバム（items）+ まとめ撮影（loose）

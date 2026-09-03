@@ -33,7 +33,7 @@ const DEFAULT_MOBILE: NavItem[] = [
 export function SiteHeader({
   nav = DEFAULT_NAV,
   mobileNav = DEFAULT_MOBILE,
-  ctaHref = "/create",
+  ctaHref = "/login?callbackUrl=%2Fcreate",
   ctaLabel = "LINEではじめる",
 }: {
   nav?: NavItem[];

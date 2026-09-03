@@ -86,7 +86,7 @@ export default function HomePage() {
                 {/* eslint-enable @next/next/no-img-element */}
               </div>
               <div className="hero-cta">
-                <Link href="/create" className="btn btn-line btn-lg">
+                <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-line btn-lg">
                   <Ic name="chat" />LINEで無料ではじめる<Ic name="arrow" className="arw" />
                 </Link>
                 <Link href="/#auction" className="btn btn-ghost btn-lg">仕組みを確認する</Link>
@@ -171,7 +171,7 @@ export default function HomePage() {
                 <strong>まず1枚、撮るだけ。今日から始められます。</strong>
                 <span>登録・査定・お断りまですべて無料</span>
               </div>
-              <Link href="/create" className="btn btn-line btn-lg">
+              <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-line btn-lg">
                 <Ic name="chat" />LINEで無料ではじめる<Ic name="arrow" className="arw" />
               </Link>
             </Reveal>
@@ -405,7 +405,7 @@ export default function HomePage() {
             <h2>今日、その「片付けたい」を動かす</h2>
             <p>まずは1枚、撮ってみることから。LINEで友だち追加すれば、すぐに出品をはじめられます。登録・査定は無料です。</p>
             <div className="final-cta">
-              <Link href="/create" className="btn btn-line btn-lg"><Ic name="chat" />LINEではじめる<Ic name="arrow" className="arw" /></Link>
+              <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-line btn-lg"><Ic name="chat" />LINEではじめる<Ic name="arrow" className="arw" /></Link>
               <Link href="/#bundle" className="btn btn-ghost btn-lg">もう一度、仕組みを見る</Link>
             </div>
             <p className="final-note">※ 最終的な買取額は業者の現物査定により決まります。</p>
