@@ -30,7 +30,7 @@ const FAQ_ITEMS = [
 
 const STEPS: { n: string; en: string; icon: IcName; h: string; p: string; img: string }[] = [
   { n: "1", en: "SHOOT", icon: "camera", h: "まとめて撮る", p: "家じゅうの不用品を1点ずつ撮影。写真と品目をまとめて登録するだけで出品完了です。", img: "step-1.png" },
-  { n: "2", en: "WAIT", icon: "scan", h: "査定が届く", p: "登録業者が、まとめ全体に買取総額で入札。あなたは待つだけで査定が集まります。", img: "step-2.png" },
+  { n: "2", en: "WAIT", icon: "scan", h: "査定が届く", p: "買取業者があなたの出品した商品に入札。あなたは待つだけで査定が集まります。", img: "step-2.png" },
   { n: "3", en: "CHOOSE", icon: "scale", h: "査定を見比べて選ぶ", p: "届いた査定を一覧で見比べて、納得の1社を選ぶだけ。選ぶまで、業者から連絡は来ません。", img: "step-3.png" },
   { n: "4", en: "DONE", icon: "truck", h: "引き取りに来てもらう", p: "成立した業者がまとめて引き取りに。玄関先で渡すだけで、片付け完了です。", img: "step-4.png" },
 ];
