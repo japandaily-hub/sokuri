@@ -31,7 +31,7 @@ const ITEM_PHOTO_LIMIT = 8;
 /** 商品数の上限。 */
 const ITEM_LIMIT = 10;
 
-/** 撮影のコツチェックリスト（タップで進捗表示するのみ・APIには送らない）。 */
+/** 撮影のコツ（表示のみ）。撮影完了の前提となる確認レ点は `${itemId}:confirm` キーで checkedHints に持つ（APIには送らない）。 */
 const HINT_ITEMS: { key: string; icon: IcName; label: string }[] = [
   { key: "angles", icon: "scan", label: "全方位（正面・背面・側面・底面など）から撮る" },
   { key: "damage", icon: "zoom", label: "傷・汚れ・色あせ・凹みも隠さずアップで撮る" },
@@ -543,27 +543,26 @@ export default function CreateCasePage() {
                 <div className="photo-quality-hint">
                   <Ic name="spark" />
                   <div className="pqh-body">
-                    <p className="pqh-lead"><strong>高評価のコツ：</strong>部屋全体 → 気になる物のアップ、に加えてこの3つを意識すると見積もり精度が上がります。</p>
+                    <p className="pqh-lead"><strong>高評価のコツ：</strong>この3つを意識すると見積もり精度が上がります。</p>
                     <ul className="pqh-checklist">
-                      {HINT_ITEMS.map((h) => {
-                        const checked = checkedHints.has(`${currentItem.id}:${h.key}`);
-                        return (
-                          <li key={h.key}>
-                            <label className="pqh-check-label">
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={() => toggleHint(currentItem.id, h.key)}
-                              />
-                              <Ic name={h.icon} />{h.label}
-                            </label>
-                          </li>
-                        );
-                      })}
+                      {HINT_ITEMS.map((h) => (
+                        <li key={h.key}>
+                          <Ic name={h.icon} />{h.label}
+                        </li>
+                      ))}
                     </ul>
-                    <Link href="/photo-guide" className="pqh-more">
+                    <Link href="/photo-guide" className="pqh-more" target="_blank" rel="noopener noreferrer">
                       撮影のコツを詳しく見る<Ic name="arrow" />
                     </Link>
+                    {/* 撮影完了の前提となる確認（レ点なしでは「この商品の撮影を完了」を押せない） */}
+                    <label className="pqh-confirm">
+                      <input
+                        type="checkbox"
+                        checked={checkedHints.has(`${currentItem.id}:confirm`)}
+                        onChange={() => toggleHint(currentItem.id, "confirm")}
+                      />
+                      <span>商品の状態が正確に確認できる写真を撮影しました</span>
+                    </label>
                   </div>
                 </div>
 
@@ -700,7 +699,13 @@ export default function CreateCasePage() {
       <div className="flow-footer">
         <div className="inner">
           {step === 0 && mode.kind === "shoot" ? (
-            <button type="button" className="btn-flow-next" onClick={exitShoot} disabled={!currentItem || currentItem.photos.length === 0}>
+            <button
+              type="button"
+              className="btn-flow-next"
+              onClick={exitShoot}
+              disabled={!currentItem || currentItem.photos.length === 0 || !checkedHints.has(`${currentItem.id}:confirm`)}
+              title={currentItem && currentItem.photos.length > 0 && !checkedHints.has(`${currentItem.id}:confirm`) ? "「商品の状態が正確に確認できる写真を撮影しました」にチェックを入れてください" : undefined}
+            >
               この商品の撮影を完了<Ic name="arrow" />
             </button>
           ) : (

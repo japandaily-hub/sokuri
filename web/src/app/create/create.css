@@ -141,6 +141,13 @@
 
 .create-page .pqh-check-label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .create-page .pqh-check-label input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--gold); cursor: pointer; flex-shrink: 0; }
+/* 撮影完了の前提となる確認レ点（コツ枠の下に区切って配置） */
+.create-page .pqh-confirm {
+  display: flex; align-items: flex-start; gap: 10px; margin-top: 12px; padding: 12px 12px;
+  background: #fff; border: 1px solid var(--primary); cursor: pointer;
+  font-family: var(--head); font-size: 14px; font-weight: 600; color: var(--ink); line-height: 1.6;
+}
+.create-page .pqh-confirm input[type="checkbox"] { width: 20px; height: 20px; margin-top: 1px; accent-color: var(--primary); cursor: pointer; flex-shrink: 0; }
 
 /* STEP4 確認: 商品一覧 */
 .create-page .confirm-item-list-title { font-family: var(--head); font-size: 13px; font-weight: 400; color: var(--navy); margin-bottom: 8px; }
