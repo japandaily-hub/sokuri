@@ -113,7 +113,7 @@ function VerifyEmailContent() {
 
         <Link href="/create" className="btn btn-primary btn-block btn-lg">
           さっそく出品してみる
-          <Ic name="arrow" className="arw" />
+          <Ic name="arrow" />
         </Link>
         <Link href="/" className="btn btn-ghost btn-block" style={{ marginTop: 10 }}>
           トップページへ

@@ -141,7 +141,7 @@ export default function OperatorCasesPage() {
             </div>
             <Link href="/operator/transactions" className="btn btn-ghost">
               落札管理へ
-              <Ic name="arrow" className="arw" />
+              <Ic name="arrow" />
             </Link>
           </div>
 

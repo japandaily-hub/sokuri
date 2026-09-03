@@ -381,7 +381,6 @@
   font-family: var(--ui);
   font-size: 14px;
   color: var(--ink);
-  outline: none;
   transition: border-color .2s, background .2s;
 }
 .chat-page .msg-input:focus { border-color: var(--blue); background: #fff; }

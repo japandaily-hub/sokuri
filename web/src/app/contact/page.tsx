@@ -89,7 +89,7 @@ export default function ContactPage() {
             <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-line btn-lg">
               <Ic name="chat" />
               LINEではじめる
-              <Ic name="arrow" className="arw" />
+              <Ic name="arrow" />
             </Link>
           </div>
 

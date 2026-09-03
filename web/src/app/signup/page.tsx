@@ -287,7 +287,7 @@ export default function SignupPage() {
               <p>カタヅケへようこそ。<br />さっそく不用品を撮って、<br />業者からの見積もりを受け取りましょう。</p>
               <div className="done-actions">
                 <Link href="/create" className="btn btn-primary btn-lg">
-                  さっそく出品してみる<Ic name="arrow" className="arw" />
+                  さっそく出品してみる<Ic name="arrow" />
                 </Link>
                 <Link href="/" className="btn btn-ghost btn-lg">トップへ戻る</Link>
               </div>

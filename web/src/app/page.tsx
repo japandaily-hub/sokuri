@@ -83,7 +83,7 @@ export default function HomePage() {
               </div>
               <div className="hero-cta">
                 <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-line btn-lg">
-                  <Ic name="chat" />LINEで無料ではじめる<Ic name="arrow" className="arw" />
+                  <Ic name="chat" />LINEで無料ではじめる<Ic name="arrow" />
                 </Link>
                 <Link href="/#auction" className="btn btn-ghost btn-lg">仕組みを確認する</Link>
               </div>
@@ -168,7 +168,7 @@ export default function HomePage() {
                 <span>登録・査定・お断りまですべて無料</span>
               </div>
               <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-line btn-lg">
-                <Ic name="chat" />LINEで無料ではじめる<Ic name="arrow" className="arw" />
+                <Ic name="chat" />LINEで無料ではじめる<Ic name="arrow" />
               </Link>
             </Reveal>
           </div>
@@ -390,7 +390,7 @@ export default function HomePage() {
             </div>
             <FaqAccordion items={FAQ_ITEMS} />
             <div style={{ textAlign: "center", marginTop: 32 }}>
-              <Link href="/faq" className="btn btn-ghost btn-lg">すべてのQ&amp;Aを見る<Ic name="arrow" className="arw" /></Link>
+              <Link href="/faq" className="btn btn-ghost btn-lg">すべてのQ&amp;Aを見る<Ic name="arrow" /></Link>
             </div>
           </div>
         </section>
@@ -401,7 +401,7 @@ export default function HomePage() {
             <h2>今日、その「片付けたい」を動かす</h2>
             <p>まずは1枚、撮ってみることから。LINEで友だち追加すれば、すぐに出品をはじめられます。登録・査定は無料です。</p>
             <div className="final-cta">
-              <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-line btn-lg"><Ic name="chat" />LINEではじめる<Ic name="arrow" className="arw" /></Link>
+              <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-line btn-lg"><Ic name="chat" />LINEではじめる<Ic name="arrow" /></Link>
               <Link href="/#bundle" className="btn btn-ghost btn-lg">もう一度、仕組みを見る</Link>
             </div>
             <p className="final-note">※ 最終的な買取額は業者の現物査定により決まります。</p>
@@ -424,7 +424,7 @@ export default function HomePage() {
                 </div>
               </div>
               <div className="biz-banner-cta">
-                <Link href="/business" className="btn btn-white btn-lg">業者登録の詳細を見る<Ic name="arrow" className="arw" /></Link>
+                <Link href="/business" className="btn btn-white btn-lg">業者登録の詳細を見る<Ic name="arrow" /></Link>
                 <span style={{ fontSize: 12, color: "var(--body-soft)" }}>審査制・登録無料</span>
               </div>
             </div>

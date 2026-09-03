@@ -281,7 +281,7 @@ export default function BusinessPage() {
               <a href="#register" className="btn btn-primary btn-lg">
                 <SendIcon />
                 業者登録を申し込む
-                <Ic name="arrow" className="arw" />
+                <Ic name="arrow" />
               </a>
               <a href="#merit" className="btn btn-ghost btn-lg">
                 参加メリットを見る
@@ -724,7 +724,7 @@ export default function BusinessPage() {
                   </p>
                   <Link href="/operator/login" className="btn btn-primary btn-lg" style={{ marginBottom: 10 }}>
                     業者ログインへ
-                    <Ic name="arrow" className="arw" />
+                    <Ic name="arrow" />
                   </Link>
                   <Link href="/" className="btn btn-ghost btn-lg">
                     トップページへ戻る

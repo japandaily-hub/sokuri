@@ -41,7 +41,6 @@
   color: var(--ink);
   background: #fff;
   transition: border-color .2s, box-shadow .2s;
-  outline: none;
 }
 .faq-page .faq-search:focus {
   border-color: var(--blue);

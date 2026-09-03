@@ -390,7 +390,7 @@ export default function ExamplesPage() {
               <div className="cases-cta-actions">
                 <Link href="/create" className="btn btn-primary btn-lg">
                   無料で出品してみる
-                  <Ic name="arrow" className="arw" />
+                  <Ic name="arrow" />
                 </Link>
                 <Link href="/photo-guide" className="btn btn-ghost btn-lg">
                   撮影ガイドを見る

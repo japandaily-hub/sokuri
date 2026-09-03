@@ -416,7 +416,7 @@ export default function FaqPage() {
                     style={{ marginTop: 12, display: "inline-flex" }}
                   >
                     お問い合わせフォームへ
-                    <Ic name="arrow" className="arw" />
+                    <Ic name="arrow" />
                   </Link>
                 </div>
               </div>

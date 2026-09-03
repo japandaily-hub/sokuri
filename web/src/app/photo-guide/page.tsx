@@ -94,7 +94,7 @@ export default function PhotoGuidePage() {
           <div className="cta-wrap">
             <Link href="/create" className="btn btn-primary btn-lg">
               さっそく出品する
-              <Ic name="arrow" className="arw" />
+              <Ic name="arrow" />
             </Link>
           </div>
         </div>
@@ -271,7 +271,7 @@ export default function PhotoGuidePage() {
               <div className="btn-wrap">
                 <Link href="/create" className="btn btn-primary btn-lg">
                   出品をはじめる
-                  <Ic name="arrow" className="arw" />
+                  <Ic name="arrow" />
                 </Link>
                 <Link href="/" className="btn btn-ghost btn-lg">
                   サービスの詳細を見る

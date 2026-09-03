@@ -56,7 +56,7 @@ export default function OperatorTransactionsPage() {
             </div>
             <Link href="/operator/cases" className="btn btn-ghost">
               案件一覧へ
-              <Ic name="arrow" className="arw" />
+              <Ic name="arrow" />
             </Link>
           </div>
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 import "./not-found.css";
 
 /**
@@ -48,9 +49,9 @@ export default function Error({
           <button type="button" onClick={() => reset()} className="btn btn-primary">
             もう一度試す
           </button>
-          <a href="/" className="btn btn-ghost">
+          <Link href="/" className="btn btn-ghost">
             トップへ戻る
-          </a>
+          </Link>
         </div>
       </div>
     </main>

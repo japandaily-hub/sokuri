@@ -147,7 +147,7 @@ function EmptyState({ title, sub }: { title: string; sub?: string }) {
       {sub ? <p>{sub}</p> : null}
       <Link href="/create" className="btn btn-primary btn-lg">
         出品をはじめる
-        <Ic name="arrow" className="arw" />
+        <Ic name="arrow" />
       </Link>
     </div>
   );

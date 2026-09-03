@@ -327,7 +327,6 @@
   font-family: var(--sans);
   color: var(--ink);
   resize: vertical;
-  outline: none;
   transition: border-color .2s;
   line-height: 1.7;
 }

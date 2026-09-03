@@ -540,7 +540,7 @@ function SchedulePageInner() {
             <div className="sch-modal-btns">
               <Link href="/cases" className="btn btn-primary btn-lg">
                 申し込み状況を確認する
-                <Ic name="arrow" className="arw" />
+                <Ic name="arrow" />
               </Link>
               <Link href="/mypage" className="btn btn-ghost btn-lg">
                 マイページへ

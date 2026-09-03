@@ -12,6 +12,7 @@
 import "./unsubscribe.css";
 
 import { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 function UnsubscribeContent() {
@@ -45,9 +46,9 @@ function UnsubscribeContent() {
         <p>すでに送信処理中のメールは届く場合がございます。あらかじめご了承ください。</p>
         <p style={{ fontSize: 12.5 }}>停止処理の完了までに数営業日かかる場合がございます。</p>
         <div style={{ marginTop: 28 }}>
-          <a href="/" className="btn btn-primary">
+          <Link href="/" className="btn btn-primary">
             トップへ戻る
-          </a>
+          </Link>
         </div>
       </div>
       <p className="unsub-footnote">

@@ -76,7 +76,7 @@ h1,h2,h3,h4,h5{font-family:var(--head);color:var(--ink);font-weight:400;
   line-height:1.6;letter-spacing:.04em;text-wrap:balance;}
 strong{font-weight:600;color:var(--ink);}
 ::selection{background:rgba(82,126,82,.16);color:var(--ink);}
-:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:0;}
+/* :focus-visible は globals.css の @layer base に集約（重複定義を排除。挙動は同一） */
 .container{width:100%;max-width:var(--maxw);margin-inline:auto;padding-inline:24px;}
 .ic{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:1.5;
   stroke-linecap:round;stroke-linejoin:round;display:inline-block;vertical-align:-.13em;}
