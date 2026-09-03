@@ -33,6 +33,22 @@ class Settings(BaseSettings):
     # 設定化する。既定値は2026-09-01時点でGoogle自身が移行先として案内し、かつ
     # 実APIコールで動作確認済みの安定版（gemini-3.6-flash）。
     gemini_model: str = "gemini-3.6-flash"
+    # プロセス全体で共有する Gemini 呼び出しの同時実行数上限（環境変数
+    # GEMINI_MAX_CONCURRENT_CALLS）。既存の asyncio.Semaphore(3)（summary.py の
+    # _MAX_CONCURRENT_ITEM_ANALYSIS）は1リクエスト内のローカル変数に過ぎず、
+    # 複数ユーザーが同時アクセスした場合の「プロセス全体での」Gemini同時呼び出し
+    # 数には上限が無い（無料枠のレート制限に一気に到達しうる）。本設定は
+    # vision.py 側のモジュールレベル Semaphore の生成元として使用し、
+    # analyze.py 経由・summary.py 経由の両方の呼び出しを同一の上限で束ねる。
+    # Render Free（単一 uvicorn ワーカー）を前提に、体感速度と輻輳回避の
+    # バランスから既定値 4 とする。
+    gemini_max_concurrent_calls: int = 4
+    # Gemini 呼び出しが 429（レート制限）/5xx（サーバ側一時障害）を返した場合の
+    # リトライ回数上限（環境変数 GEMINI_MAX_RETRIES）。400 系の恒久的クライアント
+    # エラー（不正な画像形式等）はリトライしても回復しないため対象外（vision.py
+    # 側で code により振り分ける）。既定値 2 は「合計最大3回試行（初回+2回）」で
+    # 一時的な輻輳を吸収しつつ、ユーザー待機時間が際限なく伸びないバランス。
+    gemini_max_retries: int = 2
     # SQLAlchemy のクエリエコー
     sql_echo: bool = False
 
@@ -187,6 +203,37 @@ class Settings(BaseSettings):
         """
         if v < 100:
             raise ValueError("RL_MAX_KEYS は100以上の整数である必要があります。")
+        return v
+
+    @field_validator("gemini_max_concurrent_calls", mode="after")
+    @classmethod
+    def _validate_gemini_max_concurrent_calls(cls, v: int) -> int:
+        """GEMINI_MAX_CONCURRENT_CALLS は1〜32を強制する（security review Medium-2）。
+
+        0 を設定すると ``asyncio.Semaphore(0)`` となり全 permit が即座に枯渇し、
+        AI解析（/analyze・/cases の両経路）が無言で機能停止（全リクエストが
+        Semaphore待ちのままタイムアウト）してしまう。上限32は Render Free の
+        単一プロセス構成でGemini無料枠のレート制限を明らかに超える値を
+        誤って設定するミスを起動時に弾くための安全弁。
+        """
+        if not (1 <= v <= 32):
+            raise ValueError(
+                "GEMINI_MAX_CONCURRENT_CALLS は1〜32の整数である必要があります。"
+            )
+        return v
+
+    @field_validator("gemini_max_retries", mode="after")
+    @classmethod
+    def _validate_gemini_max_retries(cls, v: int) -> int:
+        """GEMINI_MAX_RETRIES は0〜5を強制する（security review Medium-2）。
+
+        0 は「リトライしない（即座にエラーを伝播する）」として許容する。
+        上限を設けないと、極端に大きい値を設定した場合に指数バックオフの
+        試行回数が際限なく増え、1リクエストのユーザー待機時間が非現実的に
+        伸びてしまう（バックオフ秒数自体も vision.py 側で別途クリップする）。
+        """
+        if not (0 <= v <= 5):
+            raise ValueError("GEMINI_MAX_RETRIES は0〜5の整数である必要があります。")
         return v
 
     @property

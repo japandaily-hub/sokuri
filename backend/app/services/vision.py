@@ -10,17 +10,23 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
+import logging
+import random
 import uuid
 from typing import Annotated, Any, Literal
 
 from google import genai
 from google.genai import types
+from google.genai.errors import APIError
 from pydantic import BaseModel, Field
 
 from app.config import get_settings
 from app.db.models.enums import CategoryTier, ItemCondition
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # 内部 DTO
@@ -141,6 +147,105 @@ _SYSTEM_PROMPT = """
 # app.config.Settings.gemini_model 参照）。
 
 
+# ---------------------------------------------------------------------------
+# プロセス全体の同時実行制御 + リトライ
+# ---------------------------------------------------------------------------
+
+# モジュールレベルのシングルトン。get_settings() はキャッシュされるが、
+# asyncio.Semaphore はイベントループに束縛されるため import 時点（イベント
+# ループ未起動の可能性がある）ではなく初回呼び出し時に遅延生成する。
+_gemini_semaphore: asyncio.Semaphore | None = None
+
+
+def _get_gemini_semaphore() -> asyncio.Semaphore:
+    """プロセス全体で共有する Gemini 呼び出し用 Semaphore を返す（遅延初期化）。
+
+    summary.py 側の asyncio.Semaphore(_MAX_CONCURRENT_ITEM_ANALYSIS) は
+    1リクエスト内のローカル変数であり、複数ユーザーが同時にアクセスした場合の
+    「プロセス全体での」Gemini 同時呼び出し数には上限が無かった（Render Free の
+    単一 uvicorn ワーカー構成で輻輳・無料枠レート制限への到達が起こりうる）。
+    本 Semaphore は analyze.py 経由（/analyze）・summary.py 経由（/cases）の
+    両呼び出し元を同一プロセス内で束ね、Gemini への同時リクエスト数を
+    settings.gemini_max_concurrent_calls に制限する。
+    """
+    global _gemini_semaphore
+    if _gemini_semaphore is None:
+        settings = get_settings()
+        _gemini_semaphore = asyncio.Semaphore(settings.gemini_max_concurrent_calls)
+    return _gemini_semaphore
+
+
+# バックオフ待機秒数の上限（指数バックオフの青天井を防ぐ）。
+# config.py 側で gemini_max_retries を 0-5 に制約しても、上限が無いと
+# 2**attempt がリトライ回数の設定次第で際限なく伸びうるため、ここでも
+# 明示的にクリップする（多層防御）。
+_MAX_BACKOFF_SEC = 8.0
+
+
+async def _generate_content_with_retry(
+    client: genai.Client,
+    *,
+    model: str,
+    contents: list[Any],
+    config: types.GenerateContentConfig,
+) -> Any:
+    """429/5xx のみ指数バックオフ+ジッタでリトライして ``generate_content`` を呼び出す。
+
+    重要: Semaphore は「Gemini API 呼び出しそのもの」だけを囲み、バックオフの
+    ``asyncio.sleep`` は Semaphore の外側で行う（＝リトライ試行ごとに permit を
+    取得・解放し、待機中は他リクエストに permit を譲る）。
+    以前の実装は ``async with semaphore:`` の内側でリトライループ全体（sleep含む）
+    を回しており、429ストーム時に1リクエストが (通信時間+バックオフ合計) の
+    長時間 permit を占有し続け、permit 数が少ない（既定4）ため後続リクエストが
+    Gemini を1回も呼べないまま summary.py 側のタイムアウト
+    （``_ANALYZE_IMAGE_TIMEOUT_SEC``）で強制フォールバックに落ちる
+    head-of-line blocking を招いていた（security review Medium-1 指摘）。
+
+    - 429（レート制限）/ 500-599（サーバ側一時障害）: リトライ対象。
+    - それ以外の APIError（400 等の恒久的クライアントエラー）・ValueError 等:
+      回復見込みが無いため即座に再送出する（リトライで時間を浪費しない）。
+    - リトライ上限（settings.gemini_max_retries）到達時は、最後に捕捉した
+      例外をそのまま再送出する（呼び出し元の analyze.py の 503 マッピング・
+      summary.py の try/except フォールバックが無改修で機能する必要がある）。
+    """
+    settings = get_settings()
+    semaphore = _get_gemini_semaphore()
+    max_retries = settings.gemini_max_retries
+
+    attempt = 0
+    while True:
+        try:
+            # permit は API 呼び出し1回分のみ保持する（sleep はこの外側）。
+            async with semaphore:
+                return await client.aio.models.generate_content(
+                    model=model, contents=contents, config=config
+                )
+        except APIError as exc:
+            # exc.code は通常 int だが、SDK側の将来変更等で欠落した場合に
+            # TypeError で丸ごと落とさないよう getattr で安全化する
+            # （security review Low-1 指摘）。取得できない場合はリトライ対象外
+            # として即座に再送出する（安全側＝過剰リトライしない方に倒す）。
+            code = getattr(exc, "code", None)
+            is_retryable = isinstance(code, int) and (code == 429 or 500 <= code < 600)
+            if not is_retryable or attempt >= max_retries:
+                raise
+            # 指数バックオフ（1s, 2s, 4s, 8s, 8s, ...）+ ジッタ（0〜0.5秒の乱数）で
+            # 複数リクエストが同時に再送されるサンダリングハードを避ける。
+            # _MAX_BACKOFF_SEC でクリップし、リトライ回数設定が大きい場合でも
+            # 1回の待機が際限なく伸びないようにする（security review Medium-2）。
+            wait_sec = min(2 ** attempt, _MAX_BACKOFF_SEC) + random.uniform(0, 0.5)
+            attempt += 1
+            logger.warning(
+                "Gemini API呼び出しをリトライします: attempt=%d/%d code=%s wait_sec=%.2f",
+                attempt,
+                max_retries,
+                code,
+                wait_sec,
+            )
+            # permit を保持しないままバックオフ待機する（Medium-1 対応の核心）。
+            await asyncio.sleep(wait_sec)
+
+
 async def analyze_image(base_image: str) -> VisionResult:
     """画像を Gemini Vision で解析し :class:`VisionResult` を返す。
 
@@ -175,7 +280,11 @@ async def analyze_image(base_image: str) -> VisionResult:
             "base_image は 'data:image/...' の base64 文字列または 'https://' の URL である必要があります。"
         )
 
-    response = await client.aio.models.generate_content(
+    # プロセス全体の同時実行数制限（Semaphore）+ 429/5xx リトライを経由して
+    # 呼び出す（輻輳対策。詳細は _generate_content_with_retry / _get_gemini_semaphore
+    # のdocstring参照）。
+    response = await _generate_content_with_retry(
+        client,
         model=settings.gemini_model,
         contents=[
             image_part,
