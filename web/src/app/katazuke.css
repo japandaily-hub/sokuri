@@ -176,6 +176,17 @@ section:has(> .vt){position:relative;}
   letter-spacing:.12em;color:var(--ink);transition:color .2s;}
 .header nav a:hover{color:var(--primary);}
 .header .h-cta{margin-left:4px;padding:12px 22px;font-size:14px;letter-spacing:.08em;}
+/* ログイン後アプリ画面のヘッダー右側（通知ベル・マイページ・ログアウト）。折返し・はみ出し禁止 */
+.header .logo{flex-shrink:0;}
+.kdz-wm-ja{white-space:nowrap;}
+.app-actions{margin-left:auto;display:flex;flex-wrap:nowrap;justify-content:flex-end;align-items:center;gap:16px;white-space:nowrap;}
+@media(max-width:600px){
+  .header .inner{gap:10px;height:60px;}
+  .header .logo .kdz-wm{--wm:18px;}
+  .app-actions{gap:8px;}
+  .app-actions a,.app-actions button{font-size:13px;}
+  .app-actions > a[aria-label]{width:36px;height:36px;}
+}
 .hamburger{display:none;margin-left:auto;width:44px;height:44px;border:1px solid var(--line);
   border-radius:0;background:#fff;color:var(--ink);align-items:center;justify-content:center;cursor:pointer;}
 .hamburger .ic{font-size:22px;}

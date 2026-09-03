@@ -14,7 +14,7 @@ export function AppHeader({ unread = false }: { unread?: boolean }) {
         <Link href="/" className="logo" aria-label="カタヅケ トップへ">
           <KdzLogo size={22} />
         </Link>
-        <div style={{ marginLeft: "auto", display: "flex", flexWrap: "wrap", justifyContent: "flex-end", alignItems: "center", gap: 16 }}>
+        <div className="app-actions">
           <Link
             href="/notifications"
             aria-label="通知・お知らせ"
