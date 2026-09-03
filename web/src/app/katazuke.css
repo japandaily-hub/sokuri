@@ -241,11 +241,6 @@ section:has(> .vt){position:relative;}
 /* 破線コネクタ */
 .hero-photo::after{content:"";position:absolute;top:50%;left:-46px;width:38px;
   border-top:1px dashed #333;}
-/* 「AI解析中」バッジ。静止・直角・白地緑文字（待つだけで進むことを残す） */
-.hero-figure::after{content:"AI解析中";position:absolute;left:18px;top:18px;z-index:3;
-  font-family:var(--head);font-weight:600;font-size:12px;letter-spacing:.08em;
-  color:var(--primary);background:#fff;border:1px solid var(--primary);
-  border-radius:0;padding:6px 14px;}
 .hero-badge{position:absolute;display:flex;align-items:center;gap:10px;background:#fff;
   border:1px solid var(--line);border-radius:0;padding:12px 15px;
   font-size:13px;font-weight:400;color:var(--ink);}
