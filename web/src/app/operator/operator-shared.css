@@ -100,24 +100,6 @@
 .my-bid-card .amount span { font-size: 15px; margin-right: 2px; color: var(--body-soft); }
 .my-bid-card p.comment { font-size: 13.5px; color: var(--body); line-height: 1.8; margin: 10px 0; text-align: left; background: var(--line-soft); border-radius: 0; padding: 12px 14px; }
 
-/* 案件詳細: 自社入札の取り下げボタン（.btn-modal-cancel と同系統の控えめな注意喚起トーン） */
-.btn-withdraw {
-  margin-top: 16px;
-  width: 100%;
-  padding: 13px;
-  border-radius: 0;
-  border: 1.5px solid var(--line);
-  background: #fff;
-  color: var(--gold);
-  font-family: var(--head);
-  font-weight: 600;
-  font-size: 14px;
-  cursor: pointer;
-  transition: .2s;
-}
-.btn-withdraw:hover { border-color: var(--gold); background: var(--warm); }
-.btn-withdraw:disabled { opacity: .6; cursor: default; }
-
 /* 入札フォーム: 金額入力（¥ プレフィックス付き） */
 .yen-input-wrap {
   display: flex;
@@ -143,7 +125,6 @@
 .yen-input-wrap input {
   flex: 1;
   border: none;
-  outline: none;
   background: transparent;
   font-family: var(--ui); font-variant-numeric: tabular-nums;
   font-size: 18px;
@@ -370,7 +351,7 @@
   min-height: 84px;
   transition: border-color .2s;
 }
-.modal-textarea:focus { outline: none; border-color: var(--blue); }
+.modal-textarea:focus { border-color: var(--blue); }
 
 /* ---------- 減額申請・キャンセル確認モーダル（B-2: window.confirm/prompt を置換） ---------- */
 .modal-overlay {

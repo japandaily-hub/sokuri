@@ -12,24 +12,27 @@ import logging
 import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import Actor, get_current_actor, get_current_user
 from app.api.rate_limit_deps import RateLimitGuard
-from app.db.models.bid import BID_STATUS_WITHDRAWN, Bid
+from app.db.models.bid import BID_STATUS_PENDING, BID_STATUS_REJECTED, BID_STATUS_WITHDRAWN, Bid
 from app.db.models.case import Case, CaseItem, CasePhoto
+from app.db.models.transaction import Cancellation
 from app.db.models.user import User
 from app.db.session import get_session
 from app.schemas_katadzuke import (
     BidOut,
+    CaseCancelRequest,
     CaseCreateRequest,
     CaseMaskedOut,
     CaseOut,
 )
-from app.services import notify, storage
+from app.services import notify, notify_dispatch, storage
+from app.services.case_lock import lock_case_row
 from app.services.case_view import build_case_masked_out
 from app.services.summary import (
     ItemAnalysisInput,
@@ -46,7 +49,8 @@ router = APIRouter()
 def _to_case_out(case: Case) -> CaseOut:
     out = CaseOut.model_validate(case)
     # 取り下げ済み入札は依頼者側に完全非表示にする方針のため件数からも除外する
-    # （設計確定済み。bids.py の withdraw エンドポイント参照）。
+    # （業者の入札取り下げ機能は廃止済みだが、過去データの withdrawn 行との
+    # 表示整合のためフィルタは残す。tests/test_bid_withdrawn_legacy.py 参照）。
     out.bid_count = sum(1 for b in case.bids if b.status != BID_STATUS_WITHDRAWN)
     out.item_count = len(case.items)
     out.photo_count = len(case.photos)
@@ -311,3 +315,146 @@ async def get_case(
     assert actor.operator is not None
     # 一覧同様、閲覧は vendor_status を問わず許可する（入札は別ゲートでブロック）。
     return _to_masked_out(case, actor.operator.id)
+
+
+@router.post(
+    "/cases/{case_id}/cancel",
+    response_model=CaseOut,
+    summary="出品を取り下げる（依頼者本人のみ・open/bidding のみ）",
+)
+async def cancel_case(
+    case_id: uuid.UUID,
+    body: CaseCancelRequest,
+    background: BackgroundTasks,
+    request: Request,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+    _rl: object = Depends(RateLimitGuard("case_cancel")),
+) -> CaseOut:
+    # Case行の排他ロック取得・pending入札の一括却下・監査レコード書き込みを
+    # 伴うコストDoS対策（旧 bid_withdraw と同じ operator_id 相当の軸で、
+    # ここでは user_id 軸をカウントする。security review 指摘対応）。
+    request.state.rate_limit.hit_account(str(user.id))
+
+    # 所有権の事前照会（軽量・ロック無し）。認可判定（案件の所有権確認）より
+    # 前にCase行の排他ロックを取得すると、他人のcase_idを大量に送りつける
+    # だけで正規の出品取り下げ・選択処理を待たせるロック争奪DoSを誘発できて
+    # しまうため、ロック取得前に所有権を確認する（bids.py の select_bid と
+    # 同じパターン。security review 2周目 Medium指摘対応）。
+    owner_id = await session.scalar(select(Case.user_id).where(Case.id == case_id))
+    if owner_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="案件が見つかりません。"
+        )
+    if owner_id != user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="この案件への権限がありません。"
+        )
+
+    # select（落札）との競合を防ぐため、所有権確認後にCase行をロックする
+    # （TOCTOU対策。bids.py の lock_case_row を共有利用する）。
+    await lock_case_row(session, case_id)
+    case = await _get_case(session, case_id)
+    if case.user_id != user.id:
+        # 上記の所有権事前照会とCase行ロックの間の競合に対する多層防御
+        # （通常は到達しない）。
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="この案件への権限がありません。"
+        )
+
+    if case.status == "draft":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="この案件はまだ出品されていません。",
+        )
+    if case.status == "closed":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="成約済みの案件は取引のキャンセルから手続きしてください。",
+        )
+    if case.status == "cancelled":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="この案件は既に取り下げ済みです。",
+        )
+    if case.status not in ("open", "bidding"):
+        # 将来 status の値が拡張された場合の多層防御（到達しない想定）。
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="この案件は取り下げできない状態です。",
+        )
+
+    # 却下対象（元pending）業者への通知プリミティブ値は、bidsを更新する前
+    # （in-memory状態がまだpendingのまま）に収集する（select_bid のlosersループ
+    # と同じパターン。ORMオブジェクトをBackgroundTasksへ渡さない。commit後は
+    # セッションがdetachされうるため）。依頼者本人への通知は不要
+    # （自身の操作のため）。
+    #
+    # 注意: 下記の一括UPDATE（update(Bid)...）はSQLAlchemyのORM Update構文
+    # のデフォルト同期方式（synchronize_session='auto'）により、この時点で
+    # 既にセッションのidentity map上のBidオブジェクト（case.bidsが参照する
+    # ものと同一）の.statusをその場で書き換えてしまう。そのため losers の
+    # 収集は必ず一括UPDATEの**前**に行うこと（後に回すと全滅する）。
+    losers: list[tuple[str | None, str]] = [
+        (b.operator.line_user_id, b.operator.contact_email)
+        for b in case.bids
+        if b.status == BID_STATUS_PENDING
+    ]
+
+    # pending入札を条件付きUPDATEで一括却下する（select_bidの条件付きUPDATEと
+    # 同じ堅牢化パターン。Case行ロックにより通常は排他されるが、多層防御として
+    # Bid単位でも状態をWHERE句で再検証してから更新する）。
+    await session.execute(
+        update(Bid)
+        .where(Bid.case_id == case.id, Bid.status == BID_STATUS_PENDING)
+        .values(status=BID_STATUS_REJECTED)
+    )
+
+    # 条件付きUPDATE（status=open/biddingであることをWHERE句で再検証してから
+    # 更新する）。select_bid・create_bid と同じ多層防御パターン。
+    result = await session.execute(
+        update(Case)
+        .where(Case.id == case.id, Case.status.in_(("open", "bidding")))
+        .values(status="cancelled")
+    )
+    if result.rowcount != 1:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="案件の状態が変わったため取り下げできませんでした。",
+        )
+    case.status = "cancelled"
+
+    session.add(
+        Cancellation(
+            case_id=case.id,
+            transaction_id=None,
+            cancelled_by="user",
+            reason=body.reason,
+        )
+    )
+
+    case_id_str = str(case.id)
+
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        # Case行ロック＋条件付きUPDATEにより通常は到達しないが、変換しないと
+        # 素通しで500になるため保険として捕捉する（create_bid/select_bid と
+        # 同じ多層防御パターン）。
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="案件の状態が変わったため取り下げできませんでした。",
+        ) from exc
+
+    case = await _get_case(session, case.id)
+
+    for loser_line_user_id, loser_email in losers:
+        background.add_task(
+            notify_dispatch.dispatch_bid_lost,
+            loser_line_user_id,
+            loser_email,
+            case_id_str,
+        )
+    return _to_case_out(case)

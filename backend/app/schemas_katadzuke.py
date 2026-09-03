@@ -384,6 +384,12 @@ class CaseCreateRequest(BaseModel):
         return self
 
 
+class CaseCancelRequest(BaseModel):
+    """出品取り下げ（ユーザー向け）。TransactionCancelRequest と同型。"""
+
+    reason: str | None = Field(default=None, max_length=2000)
+
+
 class CaseOut(BaseModel):
     """案件（所有ユーザー向け・住所詳細を含む）。"""
 

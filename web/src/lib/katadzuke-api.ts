@@ -844,19 +844,6 @@ export function selectBid(
   return request(`/cases/${caseId}/bids/${bidId}/select`, { method: "POST", token });
 }
 
-/**
- * 業者による入札の取り下げ。取り下げ後の再入札は不可（backend が 409 で拒否する）。
- * 404: bid が存在しない/他社の bid / 403: operator でない /
- * 409: bid が selected/rejected/withdrawn 済み、案件が入札受付中でない、または競合。
- */
-export function withdrawBid(
-  caseId: string,
-  bidId: string,
-  token: string,
-): Promise<BidOut> {
-  return request(`/cases/${caseId}/bids/${bidId}/withdraw`, { method: "POST", token });
-}
-
 // ---------------------------------------------------------------------------
 // 成約
 // ---------------------------------------------------------------------------
@@ -885,6 +872,23 @@ export function cancelTransaction(
   token: string,
 ): Promise<TransactionOut> {
   return request(`/transactions/${transactionId}/cancel`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+    token,
+  });
+}
+
+/**
+ * 出品を取り下げる（依頼者本人のみ）。open/bidding の案件を cancelled にし、
+ * 付いている入札はすべて rejected になる。
+ * 409: draft / 成約済み（取引キャンセルへ誘導）/ 取り下げ済み / 状態競合。
+ */
+export function cancelCase(
+  caseId: string,
+  reason: string | null,
+  token: string,
+): Promise<CaseOut> {
+  return request(`/cases/${caseId}/cancel`, {
     method: "POST",
     body: JSON.stringify({ reason }),
     token,

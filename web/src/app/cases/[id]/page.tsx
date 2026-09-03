@@ -26,6 +26,7 @@ import {
   CASE_STATUS_LABEL,
   TXN_STATUS_LABEL,
   addCaseItemPhoto,
+  cancelCase,
   cancelTransaction,
   completeTransaction,
   createReview,
@@ -50,6 +51,9 @@ import {
 
 /** 編集/削除UIを許可する案件ステータス（それ以外は409になるためバックエンドと同条件でUIも隠す）。 */
 const EDITABLE_CASE_STATUSES = new Set(["draft", "open"]);
+
+/** 出品取り下げを許可する案件ステータス（backend の cancel_case と同条件）。 */
+const CANCELLABLE_CASE_STATUSES = new Set(["open", "bidding"]);
 
 export default function UserCaseDetailPage() {
   const params = useParams<{ id: string }>();
@@ -80,6 +84,8 @@ export default function UserCaseDetailPage() {
   const addPhotoInputRef = useRef<HTMLInputElement>(null);
 
   const canEditCase = caseData != null && EDITABLE_CASE_STATUSES.has(caseData.status);
+  const canCancelCase =
+    caseData != null && !txn && CANCELLABLE_CASE_STATUSES.has(caseData.status);
 
   function beginOp(key: string) {
     setBusyOps((prev) => new Set(prev).add(key));
@@ -572,6 +578,30 @@ export default function UserCaseDetailPage() {
               ))}
             </ul>
           )}
+          {canCancelCase ? (
+            <>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  if (!token) return;
+                  // prompt の「キャンセル」（null）は取り下げ自体の中止。空文字は理由なしで続行。
+                  const reason = window.prompt("取り下げ理由（任意）");
+                  if (reason === null) return;
+                  void act(
+                    () => cancelCase(caseId, reason === "" ? null : reason, token),
+                    "出品を取り下げますか？付いている入札はすべて無効になり、元に戻せません。",
+                  );
+                }}
+                className={`mt-4 ${btnDanger}`}
+              >
+                出品を取り下げる
+              </button>
+              <p className="mt-2 text-xs text-slate-400">
+                ※ 業者決定後の取消は取引画面の「キャンセル」から行えます。
+              </p>
+            </>
+          ) : null}
         </Card>
       )}
 

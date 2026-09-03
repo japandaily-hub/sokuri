@@ -40,7 +40,8 @@ class Case(Base, TimestampMixin):
 
     ``status`` の遷移:
       draft → open → bidding → closed
-                             └→ cancelled
+                    └→ cancelled（open/bidding からユーザーが出品取り下げ。
+                                  cases.py の cancel_case 参照）
     """
 
     __tablename__ = "cases"

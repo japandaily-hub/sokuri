@@ -4,21 +4,19 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
-from sqlalchemy import func, select, update
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import Actor, get_current_actor, get_current_user, get_verified_operator
-from app.api.rate_limit_deps import RateLimitGuard
 from app.db.models.bid import (
     BID_STATUS_PENDING,
     BID_STATUS_REJECTED,
     BID_STATUS_SELECTED,
     BID_STATUS_WITHDRAWN,
     Bid,
-    BidWithdrawal,
 )
 from app.db.models.case import Case
 from app.db.models.operator import Operator
@@ -27,21 +25,10 @@ from app.db.models.user import User
 from app.db.session import get_session
 from app.schemas_katadzuke import BidCreateRequest, BidOut, TransactionOut
 from app.services import notify, notify_dispatch
+from app.services.case_lock import lock_case_row
 from app.services.message_guard import contains_contact_info
 
 router = APIRouter()
-
-
-async def _lock_case_row(session: AsyncSession, case_id: uuid.UUID) -> None:
-    """親Case行をロックする（TOCTOU対策）。
-
-    select（落札）と withdraw（取り下げ）はいずれも同一案件・同一入札の並行更新
-    （落札処理中に取り下げられる／取り下げ処理中に選択される、等）を伴う。
-    処理冒頭でCase行を明示ロックし、片方の処理が完了するまでもう片方を
-    待機させることで、この競合を防ぐ（設計指示に基づく実装）。ロック取得のみが
-    目的のため取得列は主キーのみに絞る。
-    """
-    await session.execute(select(Case.id).where(Case.id == case_id).with_for_update())
 
 
 async def _get_case(session: AsyncSession, case_id: uuid.UUID) -> Case:
@@ -124,11 +111,11 @@ async def create_bid(
     operator: Operator = Depends(get_verified_operator),
     session: AsyncSession = Depends(get_session),
 ) -> BidOut:
-    # withdraw/select との競合（取り下げ・選択の処理中に古い case.status を
+    # cancel_case/select との競合（出品取り下げ・選択の処理中に古い case.status を
     # 読んでしまい、後勝ちで不整合な値を上書きする）を防ぐため、案件取得前に
     # Case行をロックする（TOCTOU対策。create_bid のみこのロック規約に未参加
     # だった。security review 指摘対応）。
-    await _lock_case_row(session, case_id)
+    await lock_case_row(session, case_id)
     case = await _get_case(session, case_id)
     if case.status not in ("open", "bidding"):
         raise HTTPException(
@@ -205,8 +192,8 @@ async def select_bid(
 ) -> TransactionOut:
     # 所有権の事前照会（軽量・ロック無し）。認可判定（案件の所有権確認）より
     # 前にCase行の排他ロックを取得すると、他人のcase_idを大量に送りつける
-    # だけで正規の取り下げ・選択処理を待たせるロック争奪DoSを誘発できて
-    # しまうため、ロック取得前に所有権を確認する（withdraw_bidと同じ
+    # だけで正規の出品取り下げ・選択処理を待たせるロック争奪DoSを誘発できて
+    # しまうため、ロック取得前に所有権を確認する（cancel_caseと同じ
     # パターン。security review 2周目 Medium指摘対応）。
     owner_id = await session.scalar(select(Case.user_id).where(Case.id == case_id))
     if owner_id is None:
@@ -230,9 +217,9 @@ async def select_bid(
             status_code=status.HTTP_404_NOT_FOUND, detail="入札が見つかりません。"
         )
 
-    # withdraw との競合（取り下げ処理中に選択される／その逆）を防ぐため、
-    # 所有権・存在確認後にCase行をロックする（TOCTOU対策）。
-    await _lock_case_row(session, case_id)
+    # cancel_case（出品取り下げ）との競合（取り下げ処理中に選択される／
+    # その逆）を防ぐため、所有権・存在確認後にCase行をロックする（TOCTOU対策）。
+    await lock_case_row(session, case_id)
     case = await _get_case(session, case_id)
     if case.user_id != user.id:
         # 上記の所有権事前照会とCase行ロックの間の競合に対する多層防御
@@ -259,8 +246,8 @@ async def select_bid(
         )
 
     # 条件付きUPDATE（status=pendingであることをWHERE句で再検証してから更新）。
-    # 直接代入によるUPDATEでは、withdraw側が同時に同じ行を pending→withdrawn へ
-    # 更新した場合に「取り下げたのに選定されてしまう」事故が起こり得る
+    # 直接代入によるUPDATEでは、cancel_case側が同時に同じ行を pending→rejected へ
+    # 更新した場合に「出品が取り下げられたのに選定されてしまう」事故が起こり得る
     # （設計指示に基づく堅牢化。Case行ロックにより通常は排他されるが、
     # 多層防御としてBid単位でも再検証する）。
     result = await session.execute(
@@ -323,172 +310,3 @@ async def select_bid(
         )
     return TransactionOut.model_validate(txn)
 
-
-@router.post(
-    "/cases/{case_id}/bids/{bid_id}/withdraw",
-    response_model=BidOut,
-    status_code=status.HTTP_200_OK,
-    summary="入札を取り下げる（業者本人のみ・再入札不可）",
-)
-async def withdraw_bid(
-    case_id: uuid.UUID,
-    bid_id: uuid.UUID,
-    background: BackgroundTasks,
-    request: Request,
-    actor: Actor = Depends(get_current_actor),
-    session: AsyncSession = Depends(get_session),
-    _rl: object = Depends(RateLimitGuard("bid_withdraw")),
-) -> BidOut:
-    # get_verified_operator ではなく get_current_actor を使う（vendor_status
-    # 降格後も取り下げは許可すべき de-escalating 操作のため。設計指示に基づく）。
-    if actor.typ != "operator":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="業者アカウントのみ操作できます。"
-        )
-    assert actor.operator is not None
-    operator = actor.operator
-
-    # Case行の排他ロック取得・監査レコード書き込みを伴うコストDoS対策
-    # （security review 指摘対応）。case_create と同じ「全リクエストを
-    # 無条件でカウント」方式で operator_id 軸のみをカウントする。
-    request.state.rate_limit.hit_account(str(operator.id))
-
-    # 所有権の事前照会（軽量・ロック無し）。認可判定（bidの所有権確認）より
-    # 前にCase行の排他ロックを取得すると、他社のbid_idを大量に送りつける
-    # だけで正規の取り下げ・選択処理を待たせるロック争奪DoSを誘発できて
-    # しまうため、ロック取得前に所有権を確認する（security review 指摘対応）。
-    owned_bid_id = await session.scalar(
-        select(Bid.id).where(
-            Bid.id == bid_id, Bid.case_id == case_id, Bid.operator_id == operator.id
-        )
-    )
-    if owned_bid_id is None:
-        # 案件自体が存在しない場合（case_id不正）と、bidが見つからない場合
-        # （他社のbid_id等）のいずれも同一メッセージ・404にする。メッセージを
-        # 分けると case_id の存在有無を攻撃者に漏らしてしまうため（設計指示に
-        # 基づく。403にしないのも同じ理由）。
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="入札が見つかりません。"
-        )
-
-    # select（落札）との競合を防ぐため、所有権確認後にCase行をロックする
-    # （TOCTOU対策）。
-    await _lock_case_row(session, case_id)
-    try:
-        case = await _get_case(session, case_id)
-    except HTTPException as exc:
-        if exc.status_code == status.HTTP_404_NOT_FOUND:
-            # 直前の所有権確認で存在を確認済みのため通常は到達しないが、
-            # 万一の競合でもメッセージを「入札が見つかりません。」に統一する
-            # （上記と同じ理由。_get_case 自体の挙動・メッセージは他エンドポイント
-            # と共有のため変更しない）。
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="入札が見つかりません。"
-            ) from exc
-        raise
-
-    target: Bid | None = next(
-        (b for b in case.bids if b.id == bid_id and b.operator_id == operator.id),
-        None,
-    )
-    if target is None:
-        # 上記の所有権事前照会とCase行ロックの間の競合に対する多層防御
-        # （通常は到達しない）。
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="入札が見つかりません。"
-        )
-    if target.status == BID_STATUS_SELECTED:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="落札済みの入札は取り下げできません。成約のキャンセルから手続きしてください。",
-        )
-    if target.status in (BID_STATUS_REJECTED, BID_STATUS_WITHDRAWN):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="この入札は取り下げできません。"
-        )
-    if case.status not in ("open", "bidding"):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="この案件は入札を受け付けていません。",
-        )
-
-    # 条件付きUPDATE（status=pendingであることをWHERE句で再検証してから更新）。
-    # Case行ロックにより通常は排他されるが、多層防御としてBid単位でも再検証する
-    # （select_bid の同種堅牢化と対になる。設計指示に基づく）。
-    result = await session.execute(
-        update(Bid)
-        .where(
-            Bid.id == target.id,
-            Bid.operator_id == operator.id,
-            Bid.status == BID_STATUS_PENDING,
-        )
-        .values(status=BID_STATUS_WITHDRAWN)
-    )
-    if result.rowcount != 1:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="この入札は取り下げできません。"
-        )
-    target.status = BID_STATUS_WITHDRAWN
-
-    # 取り下げの監査証跡を1件作成する（security review 指摘対応）。
-    # 回数制限・閾値アラート等の業務ロジックはこのスコープに含めない
-    # （数値基準を推測で決めることになるため。設計指示に基づく。永続化のみ）。
-    # company_name/amount は非正規化スナップショット（bid_withdrawals のFKは
-    # ON DELETE RESTRICTだが、将来の運用変更でも取り下げ時点の事実関係を
-    # 再構成できるようにするための多層防御。security review 2周目 Medium指摘対応）。
-    session.add(
-        BidWithdrawal(
-            bid_id=target.id,
-            case_id=case.id,
-            operator_id=operator.id,
-            company_name=operator.company_name,
-            amount=target.amount,
-        )
-    )
-
-    # 残pending件数をCase行ロック下で再取得し、0件ならcase.statusをopenへ戻す
-    # （biddingのまま放置すると、依頼者側の一覧から「入札受付中」なのに
-    # 表示される入札が0件という不整合な状態になるため）。
-    remaining_pending = await session.scalar(
-        select(func.count())
-        .select_from(Bid)
-        .where(Bid.case_id == case.id, Bid.status == BID_STATUS_PENDING)
-    )
-    if remaining_pending == 0 and case.status == "bidding":
-        case.status = "open"
-
-    # 通知はcommit後にプリミティブ値で行う（ORMオブジェクトをBackgroundTasksへ
-    # 渡さない。commit後はセッションがdetachされうるため。既存の select_bid と
-    # 同じパターン）。依頼者の取得・メール判定はcommit前に済ませておく。
-    owner_email: str | None = None
-    if case.user_id is not None:
-        owner = await session.get(User, case.user_id)
-        if owner is not None and not notify.is_placeholder_email(owner.email):
-            owner_email = owner.email
-    company_name = operator.company_name
-    case_id_str = str(case.id)
-
-    try:
-        await session.commit()
-    except IntegrityError as exc:
-        # bid_withdrawals の一意制約（uq_bid_withdrawals_bid_id）/ FK RESTRICT 違反を
-        # 409へ変換する（create_bid / select_bid と同じ多層防御パターン）。
-        # Case行ロック＋条件付きUPDATEにより通常は到達しないが、変換しないと
-        # 素通しで500になりDB制約名が露出するため保険として捕捉する
-        # （security review 指摘対応）。
-        await session.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="この入札は既に取り下げ済みか、取り下げできない状態です。",
-        ) from exc
-    await session.refresh(target)
-    target.operator = operator
-
-    if owner_email is not None:
-        background.add_task(
-            notify.send_bid_withdrawn,
-            owner_email,
-            case_id_str,
-            company_name,
-        )
-    return _bid_out(target)

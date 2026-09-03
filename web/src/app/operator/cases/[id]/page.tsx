@@ -31,7 +31,6 @@ import {
   photoSrc,
   toAlbums,
   toDisplayMessage,
-  withdrawBid,
   type BidStatus,
   type CaseMasked,
 } from "@/lib/katadzuke-api";
@@ -94,29 +93,6 @@ export default function OperatorCaseDetailPage() {
       await reload();
     } catch (err) {
       setError(toDisplayMessage(err, "入札に失敗しました"));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function withdraw() {
-    if (!token || busy || !caseData?.my_bid) return;
-    if (
-      !window.confirm(
-        "入札を取り下げますか？取り下げた入札は元に戻せず、同じ案件へ再入札はできません。",
-      )
-    ) {
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      await withdrawBid(caseId, caseData.my_bid.id, token);
-      await reload();
-    } catch (err) {
-      // 409（依頼者が同時に選定確定した等）を含め、失敗時も画面を最新状態に収束させる。
-      setError(toDisplayMessage(err, "取り下げに失敗しました"));
-      await reload();
     } finally {
       setBusy(false);
     }
@@ -243,14 +219,8 @@ export default function OperatorCaseDetailPage() {
                   style={{ marginTop: 16, display: "inline-flex" }}
                 >
                   落札管理へ（住所詳細を確認）
-                  <Ic name="arrow" className="arw" />
+                  <Ic name="arrow" />
                 </Link>
-              ) : null}
-              {caseData.my_bid.status === "pending" &&
-              (caseData.status === "open" || caseData.status === "bidding") ? (
-                <button type="button" className="btn-withdraw" disabled={busy} onClick={withdraw}>
-                  {busy ? "処理中…" : "入札を取り下げる"}
-                </button>
               ) : null}
             </div>
           ) : canBid && statusLoading ? (

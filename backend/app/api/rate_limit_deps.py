@@ -203,7 +203,7 @@ _SCOPE_MESSAGES: dict[str, str] = {
     "signup": "登録試行が集中しています。しばらく時間をおいて再度お試しください。",
     "line_exchange": "リクエストが集中しています。しばらく時間をおいて再度お試しください。",
     "case_create": "案件の作成が集中しています。しばらく時間をおいて再度お試しください。",
-    "bid_withdraw": "入札の取り下げの試行回数が上限に達しました。しばらく時間をおいて再度お試しください。",
+    "case_cancel": "出品の取り下げの試行回数が上限に達しました。しばらく時間をおいて再度お試しください。",
 }
 
 
@@ -390,13 +390,13 @@ def _scope_spec(scope: str, config: RateLimitConfig) -> _ScopeSpec:
             ip_rule=config.case_create_ip, account_rule=config.case_create_account,
             count_all=True,
         )
-    if scope == "bid_withdraw":
-        # 入札取り下げ: Case行の排他ロック取得・監査レコード書き込みを伴う
-        # コストDoS対策（security review 指摘対応）。認証済み業者のみが
-        # 呼べるエンドポイントのため IP 軸は持たず、operator_id 軸のみで
-        # 全リクエストをカウントする（新規の数値設定は追加せず、既存の
-        # sensitive_account ルール — password_change/account_delete と
-        # 同一 — を流用する。設計指示に基づく）。
+    if scope == "case_cancel":
+        # 出品取り下げ: Case行の排他ロック取得・pending入札の一括却下・監査
+        # レコード書き込みを伴うコストDoS対策（旧 bid_withdraw と同型。設計指示に
+        # 基づく）。認証済みユーザーのみが呼べるエンドポイントのため IP 軸は
+        # 持たず、user_id 軸のみで全リクエストをカウントする（新規の数値設定は
+        # 追加せず、既存の sensitive_account ルール — password_change/
+        # account_delete と同一 — を流用する）。
         return _ScopeSpec(ip_rule=None, account_rule=config.sensitive_account, count_all=False)
     raise ValueError(f"未知の rate limit scope です: {scope!r}")
 
