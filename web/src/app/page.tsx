@@ -54,10 +54,6 @@ export default function HomePage() {
           <div className="hero-blob" aria-hidden="true" />
           <div className="container hero-grid">
             <div className="hero-copy">
-              <span className="hero-eyebrow">
-                <span className="dot" />
-                家まるごと、まとめて片付け買取
-              </span>
               <h1>
                 片付けたい。でも、
                 <br />
