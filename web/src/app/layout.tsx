@@ -101,15 +101,12 @@ const WEBSITE_LD = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ja" className={`${fontSerif.variable} ${fontUi.variable} ${fontEn.variable} ${fontEnDisplay.variable}`}>
-      <head>
-        {/* 明朝は本文全面に効くため、CSS パース完了を待たずに書体取得を開始させる（LCP 対策） */}
-      </head>
       {/* antialiased は明朝 400 で字画が痩せるため付与しない（globals.css @layer base も auto） */}
       <body className="min-h-screen">
         {/* スキップリンク（WCAG 2.4.1） */}
         <a
           href="#main"
-          className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[300] focus:rounded-md focus:bg-brand-600 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[300] focus:rounded-none focus:bg-brand-600 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
         >
           本文へスキップ
         </a>

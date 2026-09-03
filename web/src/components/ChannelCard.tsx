@@ -27,7 +27,7 @@ export default function ChannelCard({ channel }: ChannelCardProps) {
         <div className="flex items-center gap-2.5">
           <span
             className={[
-              "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums",
+              "flex h-7 w-7 shrink-0 items-center justify-center rounded-none text-xs font-semibold tabular-nums",
               isTop ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-500",
             ].join(" ")}
           >

@@ -11,6 +11,9 @@ import type { Config } from "tailwindcss";
 const config: Config = {
   content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
   theme: {
+    /** 人の森整合: Tailwind 既定の角丸・影を全段 0/none に固定（full は円形アバター用に据え置き） */
+    borderRadius: { none: "0px", sm: "0px", DEFAULT: "0px", md: "0px", lg: "0px", xl: "0px", "2xl": "0px", "3xl": "0px", "4xl": "0px", kdz: "0px", "kdz-s": "0px", full: "9999px" },
+    boxShadow: { none: "none", sm: "none", DEFAULT: "none", md: "none", lg: "none", xl: "none", "2xl": "none", inner: "none", xs: "none", card: "none", "card-hover": "none", elevated: "none", cta: "none", "kdz-s": "none", "kdz-m": "none", "kdz-l": "none" },
     extend: {
       colors: {
         /** 基幹ブランドカラー: 苔色グリーン（brand-600 = 正典 --primary） */
@@ -29,14 +32,14 @@ const config: Config = {
         },
         /** 補助カラー: 価値・成功・前向きシグナル（エメラルド） */
         accent: {
-          50: "#ecfdf5",
-          100: "#d1fae5",
-          200: "#a7f3d0",
-          300: "#6ee7b7",
-          400: "#34d399",
-          500: "#10b981",
-          600: "#059669",
-          700: "#047857",
+          50: "#eff3ef",
+          100: "#e4ece4",
+          200: "#d4efb3",
+          300: "#a9c7a9",
+          400: "#7fa37f",
+          500: "#527e52",
+          600: "#527e52",
+          700: "#3f6640",
         },
         /** 正典トークン（katazuke.css :root と一致。旧名 blue/blued はエイリアス） */
         kdz: {

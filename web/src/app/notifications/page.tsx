@@ -387,7 +387,7 @@ function NotificationsContent() {
               }}
             >
               セッションが切れました。再ログインしてください。
-              <Link href="/login" style={{ marginLeft: 8, fontWeight: 700, textDecoration: "underline" }}>
+              <Link href="/login" style={{ marginLeft: 8, fontWeight: 600, textDecoration: "underline" }}>
                 ログインへ
               </Link>
             </div>

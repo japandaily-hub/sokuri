@@ -140,7 +140,7 @@ export default function VendorDetailPage() {
                       key={c}
                       style={
                         profile.strong_categories.includes(c)
-                          ? { fontWeight: 700 }
+                          ? { fontWeight: 600 }
                           : undefined
                       }
                     >

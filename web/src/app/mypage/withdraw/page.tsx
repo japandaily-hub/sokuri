@@ -222,7 +222,7 @@ export default function WithdrawPage() {
               }}
             >
               セッションが切れました。再ログインしてください。
-              <Link href="/login" style={{ marginLeft: 8, fontWeight: 700, textDecoration: "underline" }}>
+              <Link href="/login" style={{ marginLeft: 8, fontWeight: 600, textDecoration: "underline" }}>
                 ログインへ
               </Link>
             </div>
@@ -266,7 +266,7 @@ export default function WithdrawPage() {
               <button
                 type="button"
                 onClick={() => void load()}
-                style={{ marginLeft: 8, fontWeight: 700, textDecoration: "underline", background: "none", border: "none", color: "inherit", cursor: "pointer" }}
+                style={{ marginLeft: 8, fontWeight: 600, textDecoration: "underline", background: "none", border: "none", color: "inherit", cursor: "pointer" }}
               >
                 再読み込み
               </button>
@@ -314,7 +314,7 @@ export default function WithdrawPage() {
                 }}
               >
                 {deleteError}
-                <Link href="/mypage" style={{ marginLeft: 8, fontWeight: 700, textDecoration: "underline" }}>
+                <Link href="/mypage" style={{ marginLeft: 8, fontWeight: 600, textDecoration: "underline" }}>
                   マイページへ戻る
                 </Link>
               </div>

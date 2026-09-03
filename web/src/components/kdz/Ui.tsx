@@ -153,7 +153,7 @@ export function KdzStepper({
               />
               <span
                 className={[
-                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors",
+                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-none text-xs font-semibold transition-colors",
                   isDone && "bg-brand-600 text-white",
                   isActive && "bg-brand-600 text-white ring-4 ring-brand-100",
                   !isDone && !isActive && "border-2 border-slate-300 bg-white text-slate-400",

@@ -243,7 +243,7 @@ export default function ProfileEditPage() {
           <div className="profile-wrap">
             <ErrorBanner>
               セッションが切れました。再ログインしてください。
-              <Link href="/login" style={{ marginLeft: 8, fontWeight: 700, textDecoration: "underline" }}>
+              <Link href="/login" style={{ marginLeft: 8, fontWeight: 600, textDecoration: "underline" }}>
                 ログインへ
               </Link>
             </ErrorBanner>
@@ -277,7 +277,7 @@ export default function ProfileEditPage() {
               <button
                 type="button"
                 onClick={() => void load()}
-                style={{ marginLeft: 8, fontWeight: 700, textDecoration: "underline", background: "none", border: "none", color: "inherit", cursor: "pointer" }}
+                style={{ marginLeft: 8, fontWeight: 600, textDecoration: "underline", background: "none", border: "none", color: "inherit", cursor: "pointer" }}
               >
                 再読み込み
               </button>

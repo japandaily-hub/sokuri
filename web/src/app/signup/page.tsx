@@ -181,7 +181,7 @@ export default function SignupPage() {
               </div>
 
               <p style={{ fontSize: 12.5, color: "var(--body-soft)", textAlign: "center", lineHeight: 1.75 }}>
-                すでにアカウントをお持ちの方は<Link href="/login" style={{ color: "var(--blue)", fontWeight: 700 }}>ログイン →</Link>
+                すでにアカウントをお持ちの方は<Link href="/login" style={{ color: "var(--blue)", fontWeight: 600 }}>ログイン →</Link>
               </p>
             </div>
           )}
@@ -230,7 +230,7 @@ export default function SignupPage() {
                   {role === "buyer" && (
                     <div className="hint-banner" style={{ marginTop: 12, marginBottom: 0 }}>
                       <Ic name="shield" className="hint-ic" />
-                      <span>業者としての参加は<Link href="/business" style={{ color: "var(--blue)", fontWeight: 700 }}>業者登録（審査制）</Link>からも可能です。</span>
+                      <span>業者としての参加は<Link href="/business" style={{ color: "var(--blue)", fontWeight: 600 }}>業者登録（審査制）</Link>からも可能です。</span>
                     </div>
                   )}
                 </div>

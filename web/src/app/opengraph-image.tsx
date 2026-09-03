@@ -64,6 +64,11 @@ export default function OgImage() {
           </div>
         </div>
 
+        {/* 旧OGのピル「AI査定 × リユース」を直角・緑細枠チップとして保持（文言不変） */}
+        <div style={{ display: "flex", alignSelf: "flex-start", border: "1px solid #527e52", color: "#527e52", fontSize: "22px", fontWeight: 400, padding: "8px 20px", letterSpacing: "0.08em" }}>
+          AI査定 × リユース
+        </div>
+
         {/* Middle: headline */}
         <div
           style={{

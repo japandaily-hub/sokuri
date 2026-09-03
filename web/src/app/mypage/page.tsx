@@ -230,7 +230,7 @@ export default function MyPage() {
             }}
           >
             セッションが切れました。再ログインしてください。
-            <Link href="/login" style={{ marginLeft: 8, fontWeight: 700, textDecoration: "underline" }}>
+            <Link href="/login" style={{ marginLeft: 8, fontWeight: 600, textDecoration: "underline" }}>
               ログインへ
             </Link>
           </div>
@@ -341,7 +341,7 @@ export default function MyPage() {
         <div className="user-card" style={{ marginBottom: 20, padding: "14px 20px" }}>
           <div className="user-card-info" style={{ fontSize: 13, color: "var(--body-soft)" }}>
             入札・メッセージの通知はLINEで受け取れます。
-            <Link href="/notifications" style={{ marginLeft: 6, fontWeight: 700 }}>
+            <Link href="/notifications" style={{ marginLeft: 6, fontWeight: 600 }}>
               通知設定を見る →
             </Link>
           </div>
