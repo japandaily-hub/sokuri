@@ -50,6 +50,39 @@
 .create-page .item-empty-cta .pd-ic { width: 54px; height: 54px; border-radius: 0; background: var(--pale); color: var(--blue); display: grid; place-items: center; }
 .create-page .item-empty-cta .pd-ic .ic { font-size: 27px; }
 
+/* STEP1: 撮影の流れと査定のコツ（人の森作法: 白地・ヘアライン・直角・明朝） */
+.create-page .shoot-guide {
+  margin-top: 24px; padding: 20px 18px 16px; background: #fff;
+  border: 1px solid var(--line); border-radius: 0;
+}
+.create-page .shoot-guide .sg-title {
+  font-family: var(--head); font-weight: 400; font-size: 16px; color: var(--ink);
+  border-left: 2px solid var(--primary); padding-left: 10px; line-height: 1.4; margin: 0 0 12px;
+}
+.create-page .shoot-guide .sg-title + .sg-title { margin-top: 20px; }
+.create-page .sg-flow { list-style: none; margin: 0 0 4px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.create-page .sg-flow li { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; color: var(--body); line-height: 1.7; }
+.create-page .sg-n {
+  flex-shrink: 0; width: 22px; height: 22px; display: grid; place-items: center; margin-top: 1px;
+  font-family: var(--en-display); font-size: 13px; color: #fff; background: var(--primary);
+}
+.create-page .sg-tips { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.create-page .sg-tips li {
+  display: flex; flex-direction: column; gap: 2px; padding: 10px 0; border-top: 1px solid var(--line-soft);
+}
+.create-page .sg-tips li:first-child { border-top: 0; padding-top: 0; }
+.create-page .sg-tips b { font-family: var(--head); font-weight: 600; font-size: 14.5px; color: var(--ink); }
+.create-page .sg-tips b::before { content: "✓"; color: var(--primary); margin-right: 8px; font-weight: 400; }
+.create-page .sg-tips span { font-size: 13.5px; color: var(--body); line-height: 1.75; }
+.create-page .sg-more { margin: 14px 0 0; font-size: 12.5px; color: var(--body-soft); line-height: 1.7; }
+.create-page .sg-more a { color: var(--primary); text-decoration: underline; text-underline-offset: 3px; }
+/* shoot モード（商品ごとの撮影）の短い注意書き */
+.create-page .shoot-hint {
+  margin: 0 0 12px; padding: 10px 12px; background: var(--pale); border-left: 2px solid var(--primary);
+  font-size: 13px; color: var(--body); line-height: 1.7;
+}
+.create-page .shoot-hint b { color: var(--ink); font-weight: 600; }
+
 .create-page .item-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
 .create-page .item-card {
   display: flex; align-items: center; gap: 14px;

@@ -448,6 +448,29 @@ export default function CreateCasePage() {
                   )}
                 </>
               )}
+
+              {/* 撮影の案内と査定のコツ（文言は /photo-guide と同じ根拠に揃える） */}
+              <section className="shoot-guide" aria-labelledby="shoot-guide-title">
+                <h3 id="shoot-guide-title" className="sg-title">撮影の流れ</h3>
+                <ol className="sg-flow">
+                  <li><span className="sg-n">1</span><span>「最初の商品を撮影する」を押し、商品ごとにアルバムを作る</span></li>
+                  <li><span className="sg-n">2</span><span>全体 → 気になる部分のアップ → ロゴ・型番 の順に数枚撮る</span></li>
+                  <li><span className="sg-n">3</span><span>「＋ 商品を追加」で次の商品へ。全部そろったら「次へ」</span></li>
+                </ol>
+                <h3 className="sg-title">査定額が上がる5つのコツ</h3>
+                <ul className="sg-tips">
+                  <li><b>明るい場所で撮る</b><span>窓際や照明の下で。フラッシュより自然光のほうがきれいに映り、業者が状態を判断しやすくなります。</span></li>
+                  <li><b>全体と細部の両方を</b><span>引きの全体写真＋気になる部分のアップ。この組み合わせが最も評価されます。</span></li>
+                  <li><b>ロゴ・型番・タグは接写</b><span>メーカーロゴや型番シールが読めると、業者が価格を調べやすく高い入札につながります。</span></li>
+                  <li><b>傷・汚れは隠さず撮る</b><span>状態が正確に伝わるほど業者は安心して入札でき、引き取り時のトラブルも防げます。</span></li>
+                  <li><b>付属品・電源ON状態も</b><span>箱・リモコン・充電器・説明書があれば一緒に。家電は電源が入った状態の写真があると買取額が変わります。</span></li>
+                </ul>
+                <p className="sg-more">
+                  カテゴリ別のチェックリストは
+                  <a href="/photo-guide" target="_blank" rel="noopener noreferrer">撮影ガイド</a>
+                  へ（別タブで開きます。撮影中の内容は消えません）。
+                </p>
+              </section>
             </div>
           )}
 
@@ -459,6 +482,9 @@ export default function CreateCasePage() {
               </button>
               <h2 className="step-title">商品 {currentItemIndex + 1} の写真</h2>
               <p className="step-desc">全方位・傷や汚れのアップを含めて撮影してください。</p>
+              <p className="shoot-hint">
+                <b>撮る順番:</b> ①明るい場所で全体 → ②傷・汚れのアップ → ③ロゴ・型番・タグ → ④付属品（箱・リモコン・充電器）。家電は電源が入った状態も1枚。
+              </p>
               <div className="form-card">
                 <div className="field">
                   <label htmlFor="itemName">
