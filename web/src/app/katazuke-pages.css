@@ -5,7 +5,11 @@
    ============================================================ */
 
 /* ---------- 認証・フォーム共通（ログイン/新規登録/PWリセット等） ---------- */
-.auth-page { background: var(--pale); min-height: 100vh; }
+/* 認証画面: 人の森の作法＝白地に淡い若草の blob。カードは 1px ヘアラインで区切る（面は使わない） */
+.auth-page { background: #fff; min-height: 100vh; position: relative; overflow: hidden; }
+.auth-page::before { content: ""; position: absolute; right: -18vw; top: -34vh; width: 62vw; height: 110vh; background: #eef4de;
+  border-radius: 42% 58% 55% 45% / 48% 42% 58% 52%; pointer-events: none; z-index: 0; }
+.auth-page > * { position: relative; z-index: 1; }
 
 .auth-bar {
   background: #fff;
@@ -94,6 +98,7 @@
 .btn-line-auth {
   width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;
   background: #06c755; color: #fff; border: none; border-radius: 99px; padding: 16px 20px;
+  max-width: 360px; margin-left: auto; margin-right: auto; /* 巨大ピルが版面の重心を支配しないよう幅を抑える（形状はLINE公式に準拠） */
   font-family: var(--head); font-size: 16px; font-weight: 600; letter-spacing: .08em; cursor: pointer;
   box-shadow: none; transition: opacity .25s;
 }
