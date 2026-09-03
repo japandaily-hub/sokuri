@@ -362,7 +362,7 @@ export default function CreateCasePage() {
             <div>
               <h2 className="step-title">片付けたい商品を撮影</h2>
               <p className="step-desc">
-                商品ごとに撮影してアルバムにまとめると、より正確な見積もりにつながります（商品最大{ITEM_LIMIT}点・案件合計最大{CASE_PHOTO_LIMIT}枚）。
+                商品を1点ずつ撮影し、撮った商品をまとめて1つのアルバムにします。業者はこのアルバム全体に買取総額で入札するので、商品ごとに写真がそろっているほど正確な見積もりにつながります（商品最大{ITEM_LIMIT}点・案件合計最大{CASE_PHOTO_LIMIT}枚）。
               </p>
 
               {isEmptyStep1 ? (
@@ -453,9 +453,9 @@ export default function CreateCasePage() {
               <section className="shoot-guide" aria-labelledby="shoot-guide-title">
                 <h3 id="shoot-guide-title" className="sg-title">撮影の流れ</h3>
                 <ol className="sg-flow">
-                  <li><span className="sg-n">1</span><span>「最初の商品を撮影する」を押し、商品ごとにアルバムを作る</span></li>
-                  <li><span className="sg-n">2</span><span>全体 → 気になる部分のアップ → ロゴ・型番 の順に数枚撮る</span></li>
-                  <li><span className="sg-n">3</span><span>「＋ 商品を追加」で次の商品へ。全部そろったら「次へ」</span></li>
+                  <li><span className="sg-n">1</span><span>「最初の商品を撮影する」を押し、1つの商品を数枚撮る（全体 → 気になる部分のアップ → ロゴ・型番）</span></li>
+                  <li><span className="sg-n">2</span><span>「＋ 商品を追加」で次の商品も同じように撮る。撮った商品はすべて1つのアルバム（まとめ）に入ります</span></li>
+                  <li><span className="sg-n">3</span><span>全部そろったら「次へ」。業者は商品1点ずつではなく、このアルバム全体に買取総額で入札します</span></li>
                 </ol>
                 <h3 className="sg-title">査定額が上がる5つのコツ</h3>
                 <ul className="sg-tips">
