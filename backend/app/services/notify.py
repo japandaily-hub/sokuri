@@ -113,6 +113,21 @@ async def send_bid_received(to_email: str, case_id: str, company_name: str, amou
     )
 
 
+async def send_bid_withdrawn(to_email: str, case_id: str, company_name: str) -> bool:
+    """入札取り下げ通知（ユーザー宛）。"""
+    settings = get_settings()
+    url = f"{settings.frontend_base_url}/cases/{case_id}"
+    return await _send(
+        to_email,
+        "【カタヅケ】入札が取り下げられました",
+        _wrap(
+            f"<p><strong>{html.escape(company_name)}</strong> からの入札が"
+            "取り下げられました。</p>"
+            f'<p><a href="{url}">入札一覧を確認する</a></p>'
+        ),
+    )
+
+
 async def send_bid_selected(to_email: str, transaction_id: str, amount: int) -> bool:
     """③ 落札通知（業者宛）。"""
     settings = get_settings()

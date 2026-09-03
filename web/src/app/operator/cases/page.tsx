@@ -33,6 +33,7 @@ function statusChipInfo(c: CaseMasked): { label: string; cls: string } {
   if (c.my_bid) {
     if (c.my_bid.status === "selected") return { label: "落札", cls: "bidding" };
     if (c.my_bid.status === "rejected") return { label: "非選定", cls: "done" };
+    if (c.my_bid.status === "withdrawn") return { label: "取り下げ済み", cls: "done" };
     return { label: "入札済み", cls: "negotiating" };
   }
   if (c.status === "open" || c.status === "bidding") return { label: CASE_STATUS_LABEL[c.status], cls: "live" };
@@ -93,7 +94,7 @@ function LotCard({ c }: { c: CaseMasked }) {
               </span>
             ) : null}
           </div>
-          {c.my_bid ? (
+          {c.my_bid && c.my_bid.status !== "withdrawn" ? (
             <div className="lot-bid-count">自社入札 {formatYen(c.my_bid.amount)}</div>
           ) : c.bid_count > 0 ? (
             <div className="lot-bid-count" style={{ color: "var(--body-soft)" }}>

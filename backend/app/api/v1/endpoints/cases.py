@@ -19,7 +19,7 @@ from sqlalchemy.orm import selectinload
 
 from app.api.deps import Actor, get_current_actor, get_current_user
 from app.api.rate_limit_deps import RateLimitGuard
-from app.db.models.bid import Bid
+from app.db.models.bid import BID_STATUS_WITHDRAWN, Bid
 from app.db.models.case import Case, CaseItem, CasePhoto
 from app.db.models.user import User
 from app.db.session import get_session
@@ -45,7 +45,9 @@ router = APIRouter()
 
 def _to_case_out(case: Case) -> CaseOut:
     out = CaseOut.model_validate(case)
-    out.bid_count = len(case.bids)
+    # 取り下げ済み入札は依頼者側に完全非表示にする方針のため件数からも除外する
+    # （設計確定済み。bids.py の withdraw エンドポイント参照）。
+    out.bid_count = sum(1 for b in case.bids if b.status != BID_STATUS_WITHDRAWN)
     out.item_count = len(case.items)
     out.photo_count = len(case.photos)
     return out
@@ -61,11 +63,15 @@ def _to_masked_out(case: Case, my_operator_id: uuid.UUID | None = None) -> CaseM
                 if bid.status == "selected" and bid.transaction is not None:
                     my_bid.transaction_id = bid.transaction.id
                 break
-    out.bid_count = len(case.bids)
+    # 取り下げ済み入札は依頼者・業者いずれの集計からも除外する（_to_case_out と同じ理由）。
+    out.bid_count = sum(1 for b in case.bids if b.status != BID_STATUS_WITHDRAWN)
     out.my_bid = my_bid
-    # 最高入札額（自社入札を含む全業者の最高額）。入札が無ければ None。
+    # 最高入札額（自社入札を含む全業者の最高額。取り下げ済みは除く）。入札が無ければ None。
     # 秘匿しない方針（確定済み製品判断）のため全業者に開示する。
-    out.top_bid_amount = max((bid.amount for bid in case.bids), default=None)
+    out.top_bid_amount = max(
+        (bid.amount for bid in case.bids if bid.status != BID_STATUS_WITHDRAWN),
+        default=None,
+    )
     return out
 
 

@@ -33,7 +33,7 @@ from app.db.models.case import Case, CaseItem, CasePhoto
 from app.db.models.operator import Operator
 from app.db.models.operator_application import OperatorApplication
 from app.db.models.operator_profile import OperatorProfile
-from app.db.models.bid import Bid
+from app.db.models.bid import Bid, BidWithdrawal
 from app.db.models.message import Message
 from app.db.models.transaction import Cancellation, ReductionRequest, Review, Transaction
 from app.db.models.user import User
@@ -63,6 +63,7 @@ __all__ = [
     "OperatorApplication",
     "OperatorProfile",
     "Bid",
+    "BidWithdrawal",
     "Message",
     "Transaction",
     "ReductionRequest",

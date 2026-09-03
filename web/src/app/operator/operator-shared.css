@@ -47,9 +47,11 @@
 .op-card h2 {
   font-family: var(--head);
   font-size: 14.5px;
-  font-weight: 700;
+  font-weight: 400;
   color: var(--navy);
   margin-bottom: 4px;
+  border-left: 2px solid var(--primary);
+  padding-left: 12px;
 }
 
 /* 通知バナー（審査待ち・エラー等） */
@@ -60,15 +62,15 @@
   line-height: 1.75;
   margin-bottom: 16px;
 }
-.op-alert.warn { background: #fff8e6; color: #9a6200; border: 1px solid #f0d080; }
-.op-alert.error { background: #fdf1f1; color: #c43d3d; border: 1px solid #f3c8c8; }
-.op-alert.info { background: var(--pale); color: var(--body); border: 1px solid #d8e2fb; }
+.op-alert.warn { background: var(--warm); color: var(--gold); border: 1px solid var(--gold); }
+.op-alert.error { background: rgba(215,0,53,.08); color: var(--danger); border: 1px solid var(--danger); }
+.op-alert.info { background: var(--pale); color: var(--body); border: 1px solid var(--line); }
 
 /* 減額申請中などの注意チップ（cases.css の .status-chip に無い amber バリアント） */
-.status-chip.warn { background: #fff8e6; color: #9a6200; }
+.status-chip.warn { background: var(--warm); color: var(--gold); border: 1px solid var(--gold); }
 
 /* 案件詳細: AI要約 */
-.op-ai-summary { font-size: 11px; font-weight: 700; letter-spacing: .06em; color: var(--body-soft); margin-bottom: 6px; }
+.op-ai-summary { font-size: 11px; font-weight: 600; letter-spacing: .06em; color: var(--body-soft); margin-bottom: 6px; }
 .op-ai-summary + p { font-size: 13.5px; color: var(--body); line-height: 1.8; }
 
 /* 案件詳細: 商品アルバムカード（見出し + AIコンディションチップ + 要約） */
@@ -87,16 +89,34 @@
   width: 100%;
   aspect-ratio: 1;
   object-fit: cover;
-  border-radius: 10px;
+  border-radius: 0;
   border: 1px solid var(--line);
   background: var(--line-soft);
 }
 
 /* 案件詳細: 自社入札状況カード */
 .my-bid-card { text-align: center; }
-.my-bid-card .amount { font-family: var(--head); font-size: 32px; font-weight: 900; color: var(--navy); margin: 10px 0 4px; }
+.my-bid-card .amount { font-family: var(--ui); font-variant-numeric: tabular-nums; font-size: 32px; font-weight: 600; color: var(--navy); margin: 10px 0 4px; }
 .my-bid-card .amount span { font-size: 15px; margin-right: 2px; color: var(--body-soft); }
-.my-bid-card p.comment { font-size: 13.5px; color: var(--body); line-height: 1.8; margin: 10px 0; text-align: left; background: var(--line-soft); border-radius: 10px; padding: 12px 14px; }
+.my-bid-card p.comment { font-size: 13.5px; color: var(--body); line-height: 1.8; margin: 10px 0; text-align: left; background: var(--line-soft); border-radius: 0; padding: 12px 14px; }
+
+/* 案件詳細: 自社入札の取り下げボタン（.btn-modal-cancel と同系統の控えめな注意喚起トーン） */
+.btn-withdraw {
+  margin-top: 16px;
+  width: 100%;
+  padding: 13px;
+  border-radius: 0;
+  border: 1.5px solid var(--line);
+  background: #fff;
+  color: var(--gold);
+  font-family: var(--head);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: .2s;
+}
+.btn-withdraw:hover { border-color: var(--gold); background: var(--warm); }
+.btn-withdraw:disabled { opacity: .6; cursor: default; }
 
 /* 入札フォーム: 金額入力（¥ プレフィックス付き） */
 .yen-input-wrap {
@@ -104,16 +124,16 @@
   align-items: center;
   border: 1.5px solid var(--line);
   border-radius: var(--radius-s);
-  background: #fafbfe;
+  background: var(--pale-2);
   overflow: hidden;
   transition: border-color .2s, box-shadow .2s;
 }
-.yen-input-wrap:focus-within { border-color: var(--blue); background: #fff; box-shadow: 0 0 0 3px rgba(31,84,222,.12); }
+.yen-input-wrap:focus-within { border-color: var(--blue); background: #fff; }
 .yen-input-wrap .yen-prefix {
   padding: 0 14px;
   font-family: var(--head);
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--body-soft);
   border-right: 1px solid var(--line);
   align-self: stretch;
@@ -125,9 +145,9 @@
   border: none;
   outline: none;
   background: transparent;
-  font-family: var(--head);
+  font-family: var(--ui); font-variant-numeric: tabular-nums;
   font-size: 18px;
-  font-weight: 900;
+  font-weight: 600;
   color: var(--navy);
   padding: 12px 14px;
   min-width: 0;
@@ -148,9 +168,9 @@
   text-decoration: none;
   transition: border-color .2s;
 }
-.txn-row:hover { border-color: #b8c8f0; }
+.txn-row:hover { border-color: var(--primary-l); }
 .txn-row-info { min-width: 0; }
-.txn-row-title { font-family: var(--head); font-size: 15px; font-weight: 700; color: var(--navy); }
+.txn-row-title { font-family: var(--head); font-size: 15px; font-weight: 600; color: var(--navy); }
 .txn-row-meta { font-size: 12.5px; color: var(--body-soft); margin-top: 4px; }
 .txn-row-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 
@@ -162,16 +182,16 @@
 /* ---------- ステータスチップ（案件一覧・取引一覧・減額申請の共通部品） ---------- */
 .status-chip {
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 600;
   font-family: var(--head);
   padding: 2px 9px;
-  border-radius: 99px;
+  border-radius: 0;
   white-space: nowrap;
 }
-.status-chip.bidding { background: #d1fae5; color: var(--green); }
-.status-chip.live { background: #dbeafe; color: #1d4ed8; }
-.status-chip.negotiating { background: var(--pale); color: var(--blue); }
-.status-chip.done { background: #f4f6fb; color: var(--body-soft); }
+.status-chip.bidding { background: var(--pale); color: var(--primary); border: 1px solid var(--primary); }
+.status-chip.live { background: var(--pale); color: var(--primary); border: 1px solid var(--primary); }
+.status-chip.negotiating { background: var(--pale); color: var(--primary); border: 1px solid var(--primary); }
+.status-chip.done { background: var(--pale); color: var(--body-soft); border: 1px solid var(--body-soft); }
 
 /* ---------- 空状態（案件一覧・取引一覧） ---------- */
 .empty-state {
@@ -209,9 +229,9 @@
   text-decoration: none;
   color: inherit;
 }
-.lot-card:hover { border-color: #b8c8f0; }
-.lot-card.live { border-color: #93c5fd; }
-.lot-card.bidding { border-color: #86efac; }
+.lot-card:hover { border-color: var(--primary-l); }
+.lot-card.live { border-color: var(--primary-l); }
+.lot-card.bidding { border-color: var(--primary-l); }
 .lot-card.negotiating { border-color: var(--blue); }
 .lot-card.done { opacity: .85; }
 
@@ -224,18 +244,18 @@
   gap: 2px;
   background: var(--line-soft);
 }
-.lot-thumb-img { overflow: hidden; background: #f0f2f8; }
+.lot-thumb-img { overflow: hidden; background: var(--pale); }
 .lot-thumb-img img { width: 100%; height: 100%; object-fit: cover; }
 .lot-thumb-img:first-child { grid-row: 1 / 3; }
 
 .lot-info { padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .lot-info-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.lot-id { font-size: 11px; font-weight: 700; color: var(--body-soft); letter-spacing: .06em; }
-.lot-title { font-family: var(--head); font-size: 15px; font-weight: 700; color: var(--navy); }
+.lot-id { font-size: 11px; font-weight: 600; color: var(--body-soft); letter-spacing: .06em; }
+.lot-title { font-family: var(--head); font-size: 15px; font-weight: 600; color: var(--navy); }
 .lot-meta { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 2px; }
 .lot-meta-item { font-size: 12.5px; color: var(--body-soft); display: flex; align-items: center; gap: 5px; }
 .lot-meta-item .ic { width: 13px; height: 13px; stroke: var(--body-soft); stroke-width: 1.9; flex-shrink: 0; }
-.lot-bid-count { font-size: 12.5px; font-weight: 700; color: var(--blue); margin-top: 2px; }
+.lot-bid-count { font-size: 12.5px; font-weight: 600; color: var(--blue); margin-top: 2px; }
 
 .lot-action {
   border-left: 1px solid var(--line-soft);
@@ -244,7 +264,7 @@
   align-items: center;
   justify-content: center;
   min-width: 56px;
-  background: #fafbfe;
+  background: var(--pale-2);
   color: var(--body-soft);
 }
 .lot-action .ic { width: 18px; height: 18px; stroke-width: 2; }
@@ -270,7 +290,7 @@
 .listing-thumb {
   width: 56px;
   height: 56px;
-  border-radius: 10px;
+  border-radius: 0;
   overflow: hidden;
   border: 1px solid var(--line);
   background: var(--line-soft);
@@ -279,11 +299,11 @@
 .listing-more {
   width: 56px;
   height: 56px;
-  border-radius: 10px;
+  border-radius: 0;
   background: var(--pale);
   color: var(--blue);
   font-family: var(--head);
-  font-weight: 900;
+  font-weight: 600;
   font-size: 13px;
   display: flex;
   align-items: center;
@@ -291,29 +311,29 @@
   flex-shrink: 0;
 }
 .listing-info { flex: 1; min-width: 200px; }
-.listing-title { font-family: var(--head); font-size: 16px; font-weight: 700; color: var(--navy); }
+.listing-title { font-family: var(--head); font-size: 16px; font-weight: 600; color: var(--navy); }
 .listing-meta { font-size: 12.5px; color: var(--body-soft); margin-top: 4px; line-height: 1.6; }
 .listing-status-badge {
   font-size: 11.5px;
-  font-weight: 900;
+  font-weight: 600;
   font-family: var(--head);
   padding: 4px 12px;
-  border-radius: 99px;
+  border-radius: 0;
   flex-shrink: 0;
 }
-.listing-status-badge.badge-waiting { background: var(--pale); color: var(--blue); }
-.listing-status-badge.badge-active { background: #d1fae5; color: var(--green); }
-.listing-status-badge.badge-done { background: #f4f6fb; color: var(--body-soft); }
+.listing-status-badge.badge-waiting { background: var(--pale); color: var(--gold); border: 1px solid var(--gold); }
+.listing-status-badge.badge-active { background: var(--pale); color: var(--primary); border: 1px solid var(--primary); }
+.listing-status-badge.badge-done { background: var(--pale); color: var(--body-soft); border: 1px solid var(--body-soft); }
 
 /* ---------- 取引詳細: 住所開示済みカード（decided-card） ---------- */
 .decided-card {
-  background: #d1fae5;
-  border: 1px solid #86efac;
+  background: var(--pale);
+  border: 1px solid var(--primary);
   border-radius: var(--radius-s);
   padding: 16px 18px;
   margin-bottom: 16px;
 }
-.decided-label { font-size: 11.5px; font-weight: 900; color: #166534; letter-spacing: .04em; margin-bottom: 6px; }
+.decided-label { font-size: 11.5px; font-weight: 600; color: var(--deep); letter-spacing: .04em; margin-bottom: 6px; }
 
 /* ---------- 取引詳細: レビューカード（review-card） ---------- */
 .review-card {
@@ -324,7 +344,7 @@
   padding: 20px 22px;
   margin-bottom: 16px;
 }
-.review-card h4 { font-family: var(--head); font-size: 14.5px; font-weight: 700; color: var(--navy); }
+.review-card h4 { font-family: var(--head); font-size: 14.5px; font-weight: 400; color: var(--navy); border-left: 2px solid var(--primary); padding-left: 12px; }
 .review-stars-input { display: flex; gap: 4px; }
 .review-stars-input button {
   background: none;
@@ -336,7 +356,7 @@
   padding: 2px;
   transition: color .15s, transform .15s;
 }
-.review-stars-input button.on { color: #f0b429; }
+.review-stars-input button.on { color: var(--gold); }
 .review-stars-input button:hover { transform: scale(1.1); }
 .modal-textarea {
   width: 100%;
@@ -356,8 +376,7 @@
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(10, 20, 50, .45);
-  backdrop-filter: blur(4px);
+  background: rgba(51,51,51,.45);
   z-index: 200;
   display: flex;
   align-items: center;
@@ -372,11 +391,11 @@
 .modal-overlay.show { opacity: 1; pointer-events: all; visibility: visible; transition: opacity .25s; }
 .modal-card {
   background: #fff;
-  border-radius: 20px;
+  border-radius: 0;
   padding: 32px 28px 24px;
   max-width: 420px;
   width: 100%;
-  box-shadow: 0 24px 60px -10px rgba(10, 20, 50, .25);
+  box-shadow: none;
   transform: translateY(10px);
   transition: transform .3s;
 }
@@ -388,34 +407,34 @@
   align-items: center;
   gap: 12px;
   background: var(--line-soft);
-  border-radius: 12px;
+  border-radius: 0;
   padding: 14px 16px;
   margin-bottom: 20px;
 }
 .modal-biz-avatar {
   width: 40px;
   height: 40px;
-  border-radius: 10px;
+  border-radius: 0;
   color: #fff;
   font-family: var(--head);
-  font-weight: 900;
+  font-weight: 600;
   font-size: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
-.modal-biz-name { font-family: var(--head); font-weight: 700; font-size: 14.5px; color: var(--navy); }
+.modal-biz-name { font-family: var(--head); font-weight: 600; font-size: 14.5px; color: var(--navy); }
 .modal-actions { display: flex; gap: 10px; }
 .btn-modal-cancel {
   flex: 1;
   padding: 13px;
-  border-radius: 999px;
+  border-radius: 0;
   border: 1.5px solid var(--line);
   background: #fff;
   color: var(--ink);
   font-family: var(--head);
-  font-weight: 700;
+  font-weight: 600;
   font-size: 14px;
   cursor: pointer;
   transition: .2s;
@@ -425,18 +444,18 @@
 .btn-modal-confirm {
   flex: 1;
   padding: 13px;
-  border-radius: 999px;
+  border-radius: 0;
   border: none;
   background: var(--blue);
   color: #fff;
   font-family: var(--head);
-  font-weight: 900;
+  font-weight: 600;
   font-size: 14px;
   cursor: pointer;
-  box-shadow: 0 10px 22px -8px rgba(31, 84, 222, .5);
+  box-shadow: none;
   transition: .2s;
 }
-.btn-modal-confirm:hover { background: var(--blue-d); transform: translateY(-1px); }
+.btn-modal-confirm:hover { background: var(--blue-d); }
 .btn-modal-confirm:disabled { opacity: .6; cursor: default; transform: none; box-shadow: none; }
-.btn-modal-confirm.danger { background: #dc2626; box-shadow: 0 10px 22px -8px rgba(220, 38, 38, .5); }
-.btn-modal-confirm.danger:hover { background: #b91c1c; }
+.btn-modal-confirm.danger { background: var(--danger); box-shadow: none; }
+.btn-modal-confirm.danger:hover { opacity: .85; }

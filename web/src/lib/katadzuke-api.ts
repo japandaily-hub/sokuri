@@ -10,7 +10,7 @@
 // ---------------------------------------------------------------------------
 
 export type CaseStatus = "draft" | "open" | "bidding" | "closed" | "cancelled";
-export type BidStatus = "pending" | "selected" | "rejected";
+export type BidStatus = "pending" | "selected" | "rejected" | "withdrawn";
 export type TransactionStatus = "pending" | "visiting" | "completed" | "cancelled";
 export type ReductionStatus = "pending" | "approved" | "rejected";
 
@@ -844,6 +844,19 @@ export function selectBid(
   return request(`/cases/${caseId}/bids/${bidId}/select`, { method: "POST", token });
 }
 
+/**
+ * 業者による入札の取り下げ。取り下げ後の再入札は不可（backend が 409 で拒否する）。
+ * 404: bid が存在しない/他社の bid / 403: operator でない /
+ * 409: bid が selected/rejected/withdrawn 済み、案件が入札受付中でない、または競合。
+ */
+export function withdrawBid(
+  caseId: string,
+  bidId: string,
+  token: string,
+): Promise<BidOut> {
+  return request(`/cases/${caseId}/bids/${bidId}/withdraw`, { method: "POST", token });
+}
+
 // ---------------------------------------------------------------------------
 // 成約
 // ---------------------------------------------------------------------------
@@ -1106,6 +1119,18 @@ export const CASE_STATUS_LABEL: Record<CaseStatus, string> = {
   bidding: "入札あり",
   closed: "業者決定済み",
   cancelled: "キャンセル",
+};
+
+/**
+ * BidStatus の表示ラベル（旧 operator/cases/[id]/page.tsx の MY_BID_STATUS_LABEL を移設）。
+ * Record<BidStatus, string> にすることで、将来のステータス追加時に網羅漏れが
+ * コンパイルエラーになる（呼び出し側での表示漏れを防ぐ）。
+ */
+export const BID_STATUS_LABEL: Record<BidStatus, string> = {
+  pending: "選定待ち",
+  selected: "落札",
+  rejected: "未選定",
+  withdrawn: "取り下げ済み",
 };
 
 /** ItemCondition（商品の状態タグ）の表示ラベル。編集フォームのセレクト選択肢もこのキー順で生成する。 */

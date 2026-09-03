@@ -21,6 +21,7 @@ import { Ic } from "@/components/kdz/Icons";
 import { useToken } from "@/components/kdz/Ui";
 import { DisclosureNotice } from "@/components/kdz/DisclosureNotice";
 import {
+  BID_STATUS_LABEL,
   CASE_ITEM_CONDITION_LABEL,
   CASE_STATUS_LABEL,
   createBid,
@@ -30,13 +31,17 @@ import {
   photoSrc,
   toAlbums,
   toDisplayMessage,
+  withdrawBid,
+  type BidStatus,
   type CaseMasked,
 } from "@/lib/katadzuke-api";
 
-const MY_BID_STATUS_LABEL: Record<string, string> = {
-  pending: "選定待ち",
-  selected: "落札",
-  rejected: "未選定",
+/** 自社入札ステータスのチップCSSクラス（operator-shared.css の .status-chip バリアント）。 */
+const BID_STATUS_CHIP_CLASS: Record<BidStatus, string> = {
+  selected: "bidding",
+  rejected: "done",
+  withdrawn: "done",
+  pending: "negotiating",
 };
 
 export default function OperatorCaseDetailPage() {
@@ -89,6 +94,29 @@ export default function OperatorCaseDetailPage() {
       await reload();
     } catch (err) {
       setError(toDisplayMessage(err, "入札に失敗しました"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function withdraw() {
+    if (!token || busy || !caseData?.my_bid) return;
+    if (
+      !window.confirm(
+        "入札を取り下げますか？取り下げた入札は元に戻せず、同じ案件へ再入札はできません。",
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await withdrawBid(caseId, caseData.my_bid.id, token);
+      await reload();
+    } catch (err) {
+      // 409（依頼者が同時に選定確定した等）を含め、失敗時も画面を最新状態に収束させる。
+      setError(toDisplayMessage(err, "取り下げに失敗しました"));
+      await reload();
     } finally {
       setBusy(false);
     }
@@ -204,8 +232,8 @@ export default function OperatorCaseDetailPage() {
                 <span>¥</span>
                 {formatYen(caseData.my_bid.amount).replace("円", "")}
               </div>
-              <span className={`status-chip ${caseData.my_bid.status === "selected" ? "bidding" : caseData.my_bid.status === "rejected" ? "done" : "negotiating"}`}>
-                {MY_BID_STATUS_LABEL[caseData.my_bid.status]}
+              <span className={`status-chip ${BID_STATUS_CHIP_CLASS[caseData.my_bid.status]}`}>
+                {BID_STATUS_LABEL[caseData.my_bid.status]}
               </span>
               {caseData.my_bid.message ? <p className="comment">{caseData.my_bid.message}</p> : null}
               {caseData.my_bid.status === "selected" && caseData.my_bid.transaction_id ? (
@@ -218,6 +246,12 @@ export default function OperatorCaseDetailPage() {
                   <Ic name="arrow" className="arw" />
                 </Link>
               ) : null}
+              {caseData.my_bid.status === "pending" &&
+              (caseData.status === "open" || caseData.status === "bidding") ? (
+                <button type="button" className="btn-withdraw" disabled={busy} onClick={withdraw}>
+                  {busy ? "処理中…" : "入札を取り下げる"}
+                </button>
+              ) : null}
             </div>
           ) : canBid && statusLoading ? (
             <div className="op-card" style={{ display: "flex", justifyContent: "center", padding: 24 }}>
@@ -229,7 +263,7 @@ export default function OperatorCaseDetailPage() {
             </div>
           ) : canBid ? (
             <form className="form-card" onSubmit={submitBid}>
-              <h2 style={{ fontFamily: "var(--head)", fontSize: 15, fontWeight: 700, color: "var(--navy)", marginBottom: 4 }}>
+              <h2 style={{ fontFamily: "var(--head)", fontSize: 15, fontWeight: 400, color: "var(--navy)", marginBottom: 4, borderLeft: "2px solid var(--primary)", paddingLeft: 12 }}>
                 入札する
               </h2>
               <p style={{ fontSize: 13, color: "var(--body-soft)", marginBottom: 18, lineHeight: 1.8 }}>
@@ -273,7 +307,7 @@ export default function OperatorCaseDetailPage() {
             <div className="op-alert info">この案件は入札を受け付けていません。</div>
           )}
 
-          <Link href="/operator/cases" style={{ display: "inline-block", marginTop: 8, fontSize: 13.5, fontWeight: 700, color: "var(--blue)" }}>
+          <Link href="/operator/cases" style={{ display: "inline-block", marginTop: 8, fontSize: 13.5, fontWeight: 600, color: "var(--blue)" }}>
             ← 案件一覧へ
           </Link>
         </div>
