@@ -3,20 +3,20 @@ import { Ic, type IcName } from "@/components/kdz/Icons";
 import { Reveal, PhImg, FaqAccordion } from "@/components/kdz/interactions";
 import { KdzLogo } from "@/components/kdz/Logo";
 
-/** 対応カテゴリ（実画像未投入のためアイコンタイルで表現） */
-const CATEGORIES: { icon: IcName; name: string; ex: string }[] = [
-  { icon: "sun", name: "生活家電", ex: "冷蔵庫・洗濯機ほか" },
-  { icon: "bag", name: "ブランド品", ex: "バッグ・財布" },
-  { icon: "sofa", name: "家具", ex: "ソファ・収納" },
-  { icon: "camera", name: "カメラ・PC", ex: "一眼・ノートPC" },
-  { icon: "clock", name: "時計・宝飾", ex: "腕時計・アクセ" },
-  { icon: "box", name: "ゲーム・玩具", ex: "ゲーム機・フィギュア" },
-  { icon: "tag", name: "ファッション", ex: "衣類・靴・小物" },
-  { icon: "spark", name: "楽器・趣味", ex: "ギター・道具" },
-  { icon: "crop", name: "食器・骨董", ex: "食器・茶道具" },
-  { icon: "trend", name: "スポーツ", ex: "ゴルフ・アウトドア" },
-  { icon: "scale", name: "工具・DIY", ex: "電動工具ほか" },
-  { icon: "house", name: "その他いろいろ", ex: "まずは撮ってみる" },
+/** 対応カテゴリ（3Dアイコンで表現） */
+const CATEGORIES: { img: string; name: string; ex: string }[] = [
+  { img: "cat-kaden", name: "生活家電", ex: "冷蔵庫・洗濯機ほか" },
+  { img: "cat-brand", name: "ブランド品", ex: "バッグ・財布" },
+  { img: "cat-furniture", name: "家具", ex: "ソファ・収納" },
+  { img: "cat-camera", name: "カメラ・PC", ex: "一眼・ノートPC" },
+  { img: "cat-watch", name: "時計・宝飾", ex: "腕時計・アクセ" },
+  { img: "cat-game", name: "ゲーム・玩具", ex: "ゲーム機・フィギュア" },
+  { img: "cat-fashion", name: "ファッション", ex: "衣類・靴・小物" },
+  { img: "cat-music", name: "楽器・趣味", ex: "ギター・道具" },
+  { img: "cat-tableware", name: "食器・骨董", ex: "食器・茶道具" },
+  { img: "cat-sport", name: "スポーツ", ex: "ゴルフ・アウトドア" },
+  { img: "cat-tools", name: "工具・DIY", ex: "電動工具ほか" },
+  { img: "cat-other", name: "その他いろいろ", ex: "まずは撮ってみる" },
 ];
 
 const FAQ_ITEMS = [
@@ -67,19 +67,23 @@ export default function HomePage() {
                 家じゅうの不用品を、<strong>まとめて撮って待つだけ</strong>。登録業者が<span className="mk">買取総額</span>で競い合い、値がつかない物もまとめて引き取ります。営業電話に追われることはありません。
               </p>
               <ul className="hero-trust">
-                <li><span className="tb"><Ic name="check" /></span>撮るだけ・待つだけ</li>
-                <li><span className="tb"><Ic name="check" /></span>まとめるほど高くなりやすい</li>
-                <li><span className="tb"><Ic name="check" /></span>値がつかない物も回収</li>
-                <li><span className="tb"><Ic name="check" /></span>連絡は選んだ1社だけ</li>
+                {/* eslint-disable @next/next/no-img-element */}
+                <li><span className="tb"><img src="/img/icon3d/check.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span>撮るだけ・待つだけ</li>
+                <li><span className="tb"><img src="/img/icon3d/check.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span>まとめるほど高くなりやすい</li>
+                <li><span className="tb"><img src="/img/icon3d/check.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span>値がつかない物も回収</li>
+                <li><span className="tb"><img src="/img/icon3d/check.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span>連絡は選んだ1社だけ</li>
+                {/* eslint-enable @next/next/no-img-element */}
               </ul>
               <div className="hero-how">
-                <div className="hw-step"><span className="hw-n">1</span><Ic name="camera" className="hw-ic" /><span>撮る</span></div>
+                {/* eslint-disable @next/next/no-img-element */}
+                <div className="hw-step"><span className="hw-n">1</span><img src="/img/icon3d/how-camera.webp" alt="" width={512} height={512} loading="lazy" decoding="async" className="hw-ic" /><span>撮る</span></div>
                 <Ic name="arrow" className="hw-arr" />
-                <div className="hw-step"><span className="hw-n">2</span><Ic name="trend" className="hw-ic" /><span>業者が競う</span></div>
+                <div className="hw-step"><span className="hw-n">2</span><img src="/img/icon3d/how-trend.webp" alt="" width={512} height={512} loading="lazy" decoding="async" className="hw-ic" /><span>業者が競う</span></div>
                 <Ic name="arrow" className="hw-arr" />
-                <div className="hw-step"><span className="hw-n">3</span><Ic name="crown" className="hw-ic" /><span>見比べて選ぶ</span></div>
+                <div className="hw-step"><span className="hw-n">3</span><img src="/img/icon3d/how-crown.webp" alt="" width={512} height={512} loading="lazy" decoding="async" className="hw-ic" /><span>見比べて選ぶ</span></div>
                 <Ic name="arrow" className="hw-arr" />
-                <div className="hw-step"><span className="hw-n">4</span><Ic name="truck" className="hw-ic" /><span>引き取り完了</span></div>
+                <div className="hw-step"><span className="hw-n">4</span><img src="/img/icon3d/how-truck.webp" alt="" width={512} height={512} loading="lazy" decoding="async" className="hw-ic" /><span>引き取り完了</span></div>
+                {/* eslint-enable @next/next/no-img-element */}
               </div>
               <div className="hero-cta">
                 <Link href="/create" className="btn btn-line btn-lg">
@@ -99,10 +103,12 @@ export default function HomePage() {
         {/* ============ 信頼の根拠（帯） ============ */}
         <section className="assure" aria-label="サービスの安心ポイント">
           <div className="container">
-            <div className="assure-item"><span className="ai"><Ic name="shield" /></span><span><b>登録事業者のみ</b><span>古物商許可を確認</span></span></div>
-            <div className="assure-item"><span className="ai"><Ic name="lock" /></span><span><b>連絡先は成立後に開示</b><span>氏名・電話は渡りません</span></span></div>
-            <div className="assure-item"><span className="ai"><Ic name="phone" /></span><span><b>一斉架電なし</b><span>連絡は選んだ1社だけ</span></span></div>
-            <div className="assure-item"><span className="ai"><Ic name="pin" /></span><span><b>東京・千葉・埼玉・神奈川</b><span>順次エリア拡大中</span></span></div>
+            {/* eslint-disable @next/next/no-img-element */}
+            <div className="assure-item"><span className="ai"><img src="/img/icon3d/assure-shield.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span><span><b>登録事業者のみ</b><span>古物商許可を確認</span></span></div>
+            <div className="assure-item"><span className="ai"><img src="/img/icon3d/assure-lock.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span><span><b>連絡先は成立後に開示</b><span>氏名・電話は渡りません</span></span></div>
+            <div className="assure-item"><span className="ai"><img src="/img/icon3d/assure-phone.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span><span><b>一斉架電なし</b><span>連絡は選んだ1社だけ</span></span></div>
+            <div className="assure-item"><span className="ai"><img src="/img/icon3d/assure-pin.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span><span><b>東京・千葉・埼玉・神奈川</b><span>順次エリア拡大中</span></span></div>
+            {/* eslint-enable @next/next/no-img-element */}
           </div>
         </section>
 
@@ -188,18 +194,21 @@ export default function HomePage() {
             </div>
             <div className="bundle-grid">
               <Reveal as="article" className="bundle-c">
-                <span className="bc-ic"><Ic name="up" /></span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <span className="bc-ic"><img src="/img/icon3d/bundle-up.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span>
                 <h3>数が多いほど、総額が伸びやすい</h3>
                 <p>業者は「まとめ買い」を望むため、点数が増えるほど買取総額の条件が良くなりやすい。1点ずつ売るより、まとめたほうがお得です。</p>
               </Reveal>
               <Reveal as="article" className="bundle-c key" delay={1}>
                 <span className="bc-badge">ここがポイント</span>
-                <span className="bc-ic"><Ic name="bag" /></span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <span className="bc-ic"><img src="/img/icon3d/bundle-bag.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span>
                 <h3>値がつかない物も、まとめて回収</h3>
                 <p>業者は1点ごとではなく<strong className="mk">まとめ全体の金額で入札</strong>します。だから単体では値がつきにくい物も、まとめに含めて引き取り。「これは売れないかも」も、一緒に手放せます。</p>
               </Reveal>
               <Reveal as="article" className="bundle-c" delay={2}>
-                <span className="bc-ic"><Ic name="camera" /></span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <span className="bc-ic"><img src="/img/icon3d/bundle-camera.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span>
                 <h3>仕分け・分別は不要</h3>
                 <p>ジャンルが混ざっていてもOK。家じゅうの「どうしよう」を、思いついた物から撮ってまとめるだけ。あとは業者がまとめて査定します。</p>
               </Reveal>
@@ -243,10 +252,12 @@ export default function HomePage() {
               <h2>業者が直接、引き取りに来ます</h2>
               <p className="sub">梱包も発送も、あなたはしなくていい。選んだ業者がまとめて引き取りに来ます。やりとりするのは、交渉が成立した相手とだけです。</p>
               <ul className="mlist">
-                <li><span className="ck"><Ic name="check" /></span>梱包も発送も不要。玄関先で引き渡すだけ。</li>
-                <li><span className="ck"><Ic name="check" /></span>連絡先が業者に渡るのは、交渉成立後。</li>
-                <li><span className="ck"><Ic name="check" /></span>訪問日時は、あなたの都合で選べます。</li>
-                <li><span className="ck"><Ic name="check" /></span>大型家具や大量の品も、まとめて相談OK。</li>
+                {/* eslint-disable @next/next/no-img-element */}
+                <li><span className="ck"><img src="/img/icon3d/check.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span>梱包も発送も不要。玄関先で引き渡すだけ。</li>
+                <li><span className="ck"><img src="/img/icon3d/check.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span>連絡先が業者に渡るのは、交渉成立後。</li>
+                <li><span className="ck"><img src="/img/icon3d/check.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span>訪問日時は、あなたの都合で選べます。</li>
+                <li><span className="ck"><img src="/img/icon3d/check.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span>大型家具や大量の品も、まとめて相談OK。</li>
+                {/* eslint-enable @next/next/no-img-element */}
               </ul>
             </Reveal>
           </div>
@@ -265,7 +276,7 @@ export default function HomePage() {
                 <Reveal as="article" className="scene-card" delay={delayOf(i)} key={s.tag}>
                   <div className="scene-img ph-wrap"><PhImg src={`/img/${s.img}`} alt={s.h} label={s.img} icon={s.icon} imgStyle={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>
                   <div className="scene-body">
-                    <span className="scene-tag"><Ic name={s.tagIcon} />{s.tag}</span>
+                    <span className="scene-tag">{s.tag}</span>
                     <h3>{s.h}</h3>
                     <p>{s.p}</p>
                   </div>
@@ -288,15 +299,15 @@ export default function HomePage() {
             <div className="trust-grid">
               <Reveal as="article" className="trust-c">
                 <div className="tc-illus ph-wrap"><PhImg src="/img/trust-illus-1.png" alt="登録事業者を審査・確認するイメージ" label="trust-illus-1.png" icon="shield" imgStyle={{ width: "100%", height: "100%", objectFit: "contain", padding: 10 }} /></div>
-                <div className="tc-body"><span className="tc-ic"><Ic name="shield" /></span><h3>登録制の事業者のみ</h3><p>査定に参加するのは登録された買取事業者だけ。古物営業に必要な古物商許可を、登録時・取引前に確認します。</p></div>
+                <div className="tc-body"><h3>登録制の事業者のみ</h3><p>査定に参加するのは登録された買取事業者だけ。古物営業に必要な古物商許可を、登録時・取引前に確認します。</p></div>
               </Reveal>
               <Reveal as="article" className="trust-c" delay={1}>
                 <div className="tc-illus ph-wrap"><PhImg src="/img/trust-illus-2.png" alt="連絡先は交渉成立後に開示されるイメージ" label="trust-illus-2.png" icon="lock" imgStyle={{ width: "100%", height: "100%", objectFit: "contain", padding: 10 }} /></div>
-                <div className="tc-body"><span className="tc-ic"><Ic name="lock" /></span><h3>連絡先は成立後に開示</h3><p>査定段階で業者に渡るのは、写真・品目・地域（都道府県・市区町村）・住居情報などの出品内容のみ。お名前や電話番号は業者に渡らず、詳細住所と連絡用のメールアドレスは交渉が成立するまで開示されません。</p></div>
+                <div className="tc-body"><h3>連絡先は成立後に開示</h3><p>査定段階で業者に渡るのは、写真・品目・地域（都道府県・市区町村）・住居情報などの出品内容のみ。お名前や電話番号は業者に渡らず、詳細住所と連絡用のメールアドレスは交渉が成立するまで開示されません。</p></div>
               </Reveal>
               <Reveal as="article" className="trust-c" delay={2}>
                 <div className="tc-illus ph-wrap"><PhImg src="/img/trust-illus-3.png" alt="訪問買取はクーリングオフの対象となるイメージ" label="trust-illus-3.png" icon="check-circle" imgStyle={{ width: "100%", height: "100%", objectFit: "contain", padding: 10 }} /></div>
-                <div className="tc-body"><span className="tc-ic"><Ic name="check-circle" /></span><h3>訪問買取はクーリングオフ対象</h3><p>訪問による買取には特定商取引法が適用され、法定書面の交付や8日間のクーリングオフ等の保護を受けられます。</p></div>
+                <div className="tc-body"><h3>訪問買取はクーリングオフ対象</h3><p>訪問による買取には特定商取引法が適用され、法定書面の交付や8日間のクーリングオフ等の保護を受けられます。</p></div>
               </Reveal>
             </div>
           </div>
@@ -333,8 +344,9 @@ export default function HomePage() {
             <div className="cats-grid">
               {CATEGORIES.map((c) => (
                 <Link href="/create" className="cat" key={c.name}>
-                  <div className="cat-img" style={{ display: "grid", placeItems: "center" }}>
-                    <Ic name={c.icon} style={{ fontSize: 32, color: "var(--primary)", strokeWidth: 1.8 }} />
+                  <div className="cat-img">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={`/img/icon3d/${c.img}.webp`} alt="" width={512} height={512} loading="lazy" decoding="async" />
                   </div>
                   <div className="cat-body">
                     <div className="cl">{c.name}</div>
@@ -344,7 +356,8 @@ export default function HomePage() {
               ))}
             </div>
             <Reveal className="cats-note">
-              <span className="cn-ic"><Ic name="bag" /></span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <span className="cn-ic"><img src="/img/icon3d/bundle-bag.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span>
               <div className="cn-body">
                 <h4>「売れないかも」と思う物も、まずは撮ってまとめて。</h4>
                 <p>点数がそろうと<strong className="mk">まとめて一括買取</strong>の対象になりやすく、単体では値がつきにくい物も一緒に引き取れる場合があります。引き取りが難しい物は、手放す導線をご案内します。</p>

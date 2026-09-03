@@ -215,9 +215,9 @@ section:has(> .vt){position:relative;}
 .hero-cta{display:flex;flex-wrap:wrap;gap:14px;margin-top:30px;}
 .hero-trust{display:flex;flex-wrap:wrap;gap:10px 22px;margin-top:26px;}
 .hero-trust li{list-style:none;display:flex;align-items:center;gap:9px;font-size:14px;color:var(--ink);}
-.hero-trust .tb{width:22px;height:22px;border-radius:0;border:1px solid var(--primary);
-  background:#fff;color:var(--primary);display:grid;place-items:center;flex:none;}
-.hero-trust .tb .ic{font-size:12px;stroke-width:1.8;}
+.hero-trust .tb{width:22px;height:22px;border-radius:0;border:0;
+  background:transparent;color:var(--primary);display:grid;place-items:center;flex:none;}
+.hero-trust .tb img{width:100%;height:100%;object-fit:cover;}
 
 /* ヒーロー写真：円形にしない（四隅の情報を落とさないため） */
 .hero-figure{position:relative;}
@@ -256,7 +256,7 @@ section:has(> .vt){position:relative;}
 .hw-n{width:auto;height:auto;border-radius:0;background:none;color:var(--primary);
   font-family:var(--en-display);font-size:14px;font-weight:400;display:grid;place-items:center;flex:none;
   font-variant-numeric:tabular-nums;}
-.hw-ic{color:var(--primary);font-size:15px;}
+.hw-ic{width:22px;height:22px;object-fit:cover;}
 .hw-arr{color:var(--primary);opacity:.42;font-size:15px;stroke-width:1.5;}
 @media(max-width:480px){.hw-arr{display:none;}.hero-how{gap:10px;}}
 
@@ -265,9 +265,9 @@ section:has(> .vt){position:relative;}
 .assure .container{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;
   padding-block:28px;}
 .assure-item{display:flex;align-items:center;gap:12px;}
-.assure-item .ai{width:40px;height:40px;border-radius:0;background:#fff;
+.assure-item .ai{width:40px;height:40px;border-radius:0;background:var(--pale);
   border:1px solid var(--primary);display:grid;place-items:center;flex:none;color:var(--primary);}
-.assure-item .ai .ic{font-size:20px;}
+.assure-item .ai img{width:100%;height:100%;object-fit:cover;}
 .assure-item b{display:block;font-family:var(--head);font-weight:600;font-size:15px;color:var(--ink);line-height:1.6;}
 .assure-item span{font-size:12px;color:var(--body-soft);}
 @media(max-width:860px){.assure .container{grid-template-columns:repeat(2,1fr);gap:16px 18px;}}
@@ -308,15 +308,15 @@ section:has(> .vt){position:relative;}
 .bundle-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(28px,3.4vw,40px);align-items:stretch;}
 .bundle-c{position:relative;background:transparent;border:0;border-radius:0;
   padding:28px 26px;box-shadow:none;}
-.bundle-c .bc-ic{width:56px;height:56px;border-radius:0;background:#fff;
+.bundle-c .bc-ic{width:56px;height:56px;border-radius:0;background:var(--pale);
   border:1px solid var(--primary);color:var(--primary);
   display:grid;place-items:center;margin-bottom:16px;}
-.bundle-c .bc-ic .ic{font-size:26px;}
+.bundle-c .bc-ic img{width:100%;height:100%;object-fit:cover;}
 .bundle-c h3{font-size:19px;color:var(--ink);line-height:1.6;}
 .bundle-c p{font-size:15px;color:var(--body);line-height:1.9;margin-top:11px;}
 /* 強調1枚は枠色ではなく面＋左の緑縦バー（人の森「本社」小見出しの作法） */
 .bundle-c.key{background:var(--pale);border-left:3px solid var(--primary);box-shadow:none;}
-.bundle-c.key .bc-ic{background:var(--primary);border-color:var(--primary);color:#fff;}
+.bundle-c.key .bc-ic{background:var(--pale);border-color:var(--primary);color:var(--primary);}
 .bundle-c .bc-badge{position:absolute;top:0;left:0;background:var(--primary);color:#fff;
   font-size:11.5px;font-weight:600;font-family:var(--head);padding:6px 13px;border-radius:0;
   letter-spacing:.08em;box-shadow:none;}
@@ -379,9 +379,9 @@ section:has(> .vt){position:relative;}
 .media-copy .sub{font-size:16px;color:var(--body);margin-top:16px;line-height:2;}
 .mlist{list-style:none;margin-top:22px;display:flex;flex-direction:column;gap:13px;}
 .mlist li{display:flex;gap:12px;font-size:15px;color:var(--ink);align-items:flex-start;}
-.mlist .ck{width:22px;height:22px;border-radius:0;border:1px solid var(--primary);
-  background:#fff;color:var(--primary);display:grid;place-items:center;flex:none;margin-top:3px;}
-.mlist .ck .ic{font-size:12px;stroke-width:1.8;}
+.mlist .ck{width:22px;height:22px;border-radius:0;border:0;
+  background:transparent;color:var(--primary);display:grid;place-items:center;flex:none;margin-top:3px;}
+.mlist .ck img{width:100%;height:100%;object-fit:cover;}
 
 /* ============================================================
    利用シーン
@@ -411,10 +411,7 @@ section:has(> .vt){position:relative;}
 .trust-c:hover .tc-illus img{opacity:.85;}
 .trust-c:hover h3{color:var(--primary);}
 .tc-body{padding:20px 0 0;}
-.tc-ic{display:inline-grid;place-items:center;width:42px;height:42px;border-radius:0;
-  background:#fff;border:1px solid var(--primary);color:var(--primary);margin-bottom:12px;}
-.tc-ic .ic{font-size:21px;}
-.tc-body h3{font-size:19px;color:var(--ink);transition:color .25s;}
+.tc-body h3{font-size:19px;color:var(--ink);margin-top:2px;transition:color .25s;}
 .tc-body p{font-size:15px;color:var(--body);margin-top:10px;line-height:1.9;}
 
 /* ============================================================
@@ -458,7 +455,7 @@ section:has(> .vt){position:relative;}
 .cats-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:16px;}
 .cat{background:transparent;border:0;border-radius:0;overflow:hidden;box-shadow:none;}
 .cat-img{aspect-ratio:1/1;background:var(--pale);border:1px solid var(--line);overflow:hidden;}
-.cat-img img{width:100%;height:100%;object-fit:contain;padding:6px;transition:opacity .25s var(--ease);}
+.cat-img img{width:100%;height:100%;object-fit:contain;padding:0;transition:opacity .25s var(--ease);}
 .cat:hover .cat-img img{opacity:.85;}
 .cat:hover .cl{color:var(--primary);}
 .cat-body{padding:12px 2px 0;text-align:center;}
@@ -470,7 +467,7 @@ section:has(> .vt){position:relative;}
   background:var(--pale);border:1px solid var(--line);border-radius:0;padding:22px 26px;}
 .cats-note .cn-ic{width:44px;height:44px;border-radius:0;background:#fff;
   border:1px solid var(--primary);color:var(--primary);display:grid;place-items:center;flex:none;}
-.cats-note .cn-ic .ic{font-size:22px;}
+.cats-note .cn-ic img{width:100%;height:100%;object-fit:cover;}
 .cats-note h4{font-size:17px;color:var(--ink);}
 .cats-note p{font-size:15px;color:var(--body);margin-top:7px;line-height:1.9;}
 
