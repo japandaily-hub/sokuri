@@ -6,12 +6,11 @@
 - 人の森整合テーマ（明朝・角丸0・影0・額装フレーム）は全41ルートへ適用済み・**push 済み・本番反映済み**。
   ただし主色はユーザー指示で **苔色 → ブルー #1447e0** へ変更済み（a492bc9）。かたちは人の森整合のまま、色相のみブルー。
 - LP図版はフォトリアル3Dレンダー29点＋クレイ調3Dアイコン24点へ差し替え済み（7ca3c4d / 3743e4e）。
-- **入札取り下げ（withdraw）機能を main にローカルコミット済み（1a81251）・未 push**。
-  push = Render で alembic 0018〜0020 が走る（bids CHECK制約更新・bid_withdrawals 新設）。
+- **入札取り下げ（withdraw）機能は push 済み・本番稼働確認済み（2026-09-03 22:48 JST 頃）**。
+  /health commit=ab37163、/readyz alembic_version=0020_bid_withdrawal_fk_restrict=expected_head。3環境（Vercel / sokuuri / Render）とも ab37163 で success。
 
 ## 現行ハッシュ
-- origin/main = c72a7db（ヘッダーのモバイル崩れ修正）
-- main = 1a81251（withdraw 機能）→ origin より 1 コミット先行
+- origin/main = main = ab37163（withdraw 機能 + PROJECT_STATE 更新）。分岐なし。
 
 ## gate_status（withdraw 機能）
 - backend pytest: 564 passed（withdraw 26件含む）。web `tsc --noEmit` エラー0。
@@ -25,8 +24,8 @@
 - なし（push はユーザー判断）。
 
 ## 次アクション
-- P1: `git push origin main` の承認 → Render のデプロイログで alembic 0018〜0020 成功を確認 → /readyz → 本番で業者ログイン後の案件詳細に取り下げボタンが出ること、/operator/transactions の見た目を目視。
-- P1': push 後、Render DB でアプリロールから bid_withdrawals の UPDATE/DELETE を REVOKE（セキュリティ M-2）。
+- P1: 本番で業者ログイン後の案件詳細に取り下げボタンが出ること、/operator/transactions の見た目を目視（デプロイ自体は確認済み）。
+- P1': Render DB でアプリロールから bid_withdrawals の UPDATE/DELETE を REVOKE（セキュリティ M-2・ユーザーのダッシュボード作業）。
 - P2: 画像素材の色方針の再確認。主色がブルーになったため PROJECT_STATE 旧版の「青系素材を苔色へ再生成」は前提が崩れている。現状の青×白素材は主色と整合しており、このまま維持で良いかユーザー確認。
 - P3: 正式ロゴの受領（ブルー版）→ `KdzLogo` ワードマーク差し替え。
 - P4: QA Low 6 件（`.arw` デッドクラス・未使用コンポーネント退避・ESLint flat config・フォーカスグロー統一）。
