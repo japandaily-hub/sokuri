@@ -240,7 +240,7 @@ export default function FaqPage() {
       {/* ヒーロー */}
       <section className="faq-hero">
         <div className="container">
-          <span className="eyebrow">FAQ</span>
+          <span className="eyebrow">よくある質問</span>
           <h1>よくある質問</h1>
           <p>
             ご利用前の疑問にまとめてお答えします。解決しない場合は

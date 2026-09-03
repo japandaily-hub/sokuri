@@ -216,7 +216,7 @@
   gap: 12px;
   flex-shrink: 0;
 }
-.chat-page .action-bar-ic { display: flex; color: #b9892f; flex-shrink: 0; }
+.chat-page .action-bar-ic { display: flex; color: var(--gold); flex-shrink: 0; }
 .chat-page .action-bar-ic .ic { width: 18px; height: 18px; }
 .chat-page .action-bar-text { font-size: 13px; color: var(--ink); flex: 1; }
 .chat-page .action-bar-text strong { color: #7a5700; }
@@ -276,7 +276,7 @@
   justify-content: center;
   flex-shrink: 0;
 }
-.chat-page .msg.me .msg-avatar { background: var(--navy); color: #fff; }
+.chat-page .msg.me .msg-avatar { background: var(--deep); color: #fff; }
 .chat-page .bubble {
   max-width: 68%;
   padding: 12px 16px;

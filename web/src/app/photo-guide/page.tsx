@@ -82,7 +82,7 @@ export default function PhotoGuidePage() {
       {/* ============ ヒーロー ============ */}
       <section className="guide-hero">
         <div className="container">
-          <span className="eyebrow">PHOTO GUIDE</span>
+          <span className="eyebrow">撮影ガイド</span>
           <h1>
             撮るほど、
             <br />
@@ -92,7 +92,7 @@ export default function PhotoGuidePage() {
             カタヅケでは写真と品目情報が業者の入札根拠になります。上手に撮ると評価が上がり、より高い買取額が届きやすくなります。
           </p>
           <div className="cta-wrap">
-            <Link href="/create" className="btn btn-white btn-lg">
+            <Link href="/create" className="btn btn-primary btn-lg">
               さっそく出品する
               <Ic name="arrow" className="arw" />
             </Link>
@@ -269,15 +269,11 @@ export default function PhotoGuidePage() {
                 出品・査定・お断りまで、ユーザーの費用は一切無料です。
               </p>
               <div className="btn-wrap">
-                <Link href="/create" className="btn btn-white btn-lg">
+                <Link href="/create" className="btn btn-primary btn-lg">
                   出品をはじめる
                   <Ic name="arrow" className="arw" />
                 </Link>
-                <Link
-                  href="/"
-                  className="btn btn-ghost btn-lg"
-                  style={{ color: "rgba(255,255,255,.7)", borderColor: "rgba(255,255,255,.3)", background: "transparent" }}
-                >
+                <Link href="/" className="btn btn-ghost btn-lg">
                   サービスの詳細を見る
                 </Link>
               </div>

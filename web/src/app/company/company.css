@@ -5,10 +5,13 @@
    .numbers-grid / .team-* / .values-* / .about-cta のみを定義する。
    ============================================================ */
 
-/* ---------- ヒーロー（紺グラデの導入帯） ---------- */
+/* ---------- ヒーロー（トップページと同じ明るいトーン） ---------- */
 .about-hero {
-  background: linear-gradient(135deg, #0f2552, #1f54de);
-  color: #fff;
+  background:
+    radial-gradient(58% 52% at 84% -10%, rgba(63, 116, 255, .22) 0%, rgba(63, 116, 255, 0) 60%),
+    radial-gradient(30% 30% at -6% -8%, rgba(244, 112, 63, .13) 0%, rgba(244, 112, 63, 0) 70%),
+    linear-gradient(180deg, #f7faff 0%, #fffdfb 58%);
+  color: var(--body);
   padding: 64px 24px 56px;
   text-align: center;
 }
@@ -17,12 +20,12 @@
   font-size: clamp(26px, 4vw, 40px);
   font-weight: 900;
   line-height: 1.3;
-  color: #fff;
+  color: var(--navy);
   margin-bottom: 14px;
 }
 .about-hero p {
   font-size: 16px;
-  color: rgba(255, 255, 255, .75);
+  color: var(--body);
   max-width: 560px;
   margin: 0 auto;
   line-height: 1.85;
@@ -234,22 +237,22 @@
 
 /* ---------- CTA ---------- */
 .about-cta {
-  background: var(--navy);
+  background: linear-gradient(120deg, var(--pale) 0%, var(--warm) 100%);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 40px 32px;
   text-align: center;
-  color: #fff;
 }
 .about-cta h3 {
   font-family: var(--head);
   font-size: 22px;
   font-weight: 900;
-  color: #fff;
+  color: var(--navy);
   margin-bottom: 10px;
 }
 .about-cta p {
   font-size: 14.5px;
-  color: rgba(255, 255, 255, .7);
+  color: var(--body-soft);
   margin-bottom: 24px;
   line-height: 1.8;
 }
@@ -258,16 +261,6 @@
   gap: 12px;
   justify-content: center;
   flex-wrap: wrap;
-}
-.about-cta-btns .btn-white { background: #fff; color: var(--navy); }
-.about-cta-btns .btn-outline-white {
-  border: 1.5px solid rgba(255, 255, 255, .4);
-  color: #fff;
-  background: transparent;
-}
-.about-cta-btns .btn-outline-white:hover {
-  border-color: #fff;
-  background: rgba(255, 255, 255, .08);
 }
 
 /* ---------- レスポンシブ ---------- */

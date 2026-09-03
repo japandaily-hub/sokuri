@@ -13,7 +13,7 @@ import { useSearchParams } from "next/navigation";
 import { Ic } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
 
-const CONFETTI_COLORS = ["#1f54de", "#6fa3ff", "#f0a030", "#1f8a5b", "#e05c5c", "#9b59b6"];
+const CONFETTI_COLORS = ["#1447e0", "#6fa3ff", "#f0a030", "#1f8a5b", "#e05c5c", "#9b59b6"];
 
 type ConfettiDot = {
   background: string;

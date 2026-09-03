@@ -28,7 +28,7 @@
 
 .create-page .photo-quality-hint { background: linear-gradient(135deg, #fff8e6, #fdf3d0); border: 1px solid #f0d080; border-radius: 10px; padding: 10px 14px; margin-top: 14px; font-size: 12.5px; color: #7a5700; line-height: 1.7; display: flex; gap: 8px; align-items: flex-start; }
 .create-page .photo-quality-hint strong { color: #5a3e00; }
-.create-page .photo-quality-hint .ic { color: #b9892f; flex-shrink: 0; margin-top: 1px; }
+.create-page .photo-quality-hint .ic { color: var(--gold); flex-shrink: 0; margin-top: 1px; }
 .create-page .photo-quality-hint .pqh-body { flex: 1; min-width: 0; }
 .create-page .photo-quality-hint .pqh-lead { margin: 0 0 8px; }
 .create-page .photo-quality-hint .pqh-checklist { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
@@ -99,7 +99,7 @@
   display: flex; align-items: center; gap: 6px; font-size: 12px; color: #9a6200;
   background: #fff8e6; border: 1px solid #f0d080; border-radius: 8px; padding: 8px 12px; margin-top: 8px;
 }
-.create-page .item-name-warn .ic { color: #b9892f; font-size: 13px; flex-shrink: 0; }
+.create-page .item-name-warn .ic { color: var(--gold); font-size: 13px; flex-shrink: 0; }
 .create-page .item-delete-link {
   display: block; margin-top: 16px; border: none; background: none; font-size: 13px;
   font-weight: 700; color: var(--body-soft); text-decoration: underline; cursor: pointer;
@@ -107,7 +107,7 @@
 .create-page .item-delete-link:hover { color: #cc3333; }
 
 .create-page .pqh-check-label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
-.create-page .pqh-check-label input[type="checkbox"] { width: 16px; height: 16px; accent-color: #b9892f; cursor: pointer; flex-shrink: 0; }
+.create-page .pqh-check-label input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--gold); cursor: pointer; flex-shrink: 0; }
 
 /* STEP4 確認: 商品一覧 */
 .create-page .confirm-item-list-title { font-family: var(--head); font-size: 13px; font-weight: 700; color: var(--navy); margin-bottom: 8px; }

@@ -65,7 +65,7 @@ export default function ContactPage() {
       {/* ============ ページヒーロー ============ */}
       <section className="page-hero">
         <div className="container">
-          <span className="eyebrow">CONTACT</span>
+          <span className="eyebrow">お問い合わせ</span>
           <h1>お問い合わせ</h1>
           <p>
             サービスに関するご質問・ご要望など、

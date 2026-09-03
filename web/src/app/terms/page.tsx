@@ -13,7 +13,7 @@ export default function TermsPage() {
     <main id="main">
       <section className="legal-hero">
         <div className="container">
-          <span className="eyebrow">TERMS OF SERVICE</span>
+          <span className="eyebrow">利用規約</span>
           <h1>利用規約</h1>
           <p className="updated">制定・施行：2026年4月1日　最終改定：2026年6月25日</p>
         </div>

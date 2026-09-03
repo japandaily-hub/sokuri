@@ -9,10 +9,13 @@
 /* ページラッパ（背景は白ベースのまま、最小高さを確保） */
 .business-page { min-height: 100vh; }
 
-/* ヒーロー — ネイビー背景 */
+/* ヒーロー — トップページと同じ明るいトーン */
 .business-page .biz-hero {
-  background: var(--navy);
-  color: #fff;
+  background:
+    radial-gradient(58% 52% at 84% -10%, rgba(63, 116, 255, .22) 0%, rgba(63, 116, 255, 0) 60%),
+    radial-gradient(30% 30% at -6% -8%, rgba(244, 112, 63, .13) 0%, rgba(244, 112, 63, 0) 70%),
+    linear-gradient(180deg, #f7faff 0%, #fffdfb 58%);
+  color: var(--body);
   padding: clamp(72px, 9vw, 120px) 0 clamp(64px, 8vw, 104px);
   position: relative;
   overflow: hidden;
@@ -22,24 +25,25 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 80% 60% at 110% 10%, rgba(31, 84, 222, .45) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 50% at -10% 90%, rgba(31, 84, 222, .25) 0%, transparent 60%);
+    radial-gradient(ellipse 80% 60% at 110% 10%, rgba(31, 84, 222, .10) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at -10% 90%, rgba(244, 112, 63, .08) 0%, transparent 60%);
   pointer-events: none;
 }
 .business-page .biz-hero .container { position: relative; z-index: 1; }
-.business-page .biz-hero .eyebrow { color: rgba(255, 255, 255, .7); }
-.business-page .biz-hero .eyebrow::before { background: rgba(255, 255, 255, .5); }
+/* 明るいヒーロー背景上でチップの輪郭が沈みやすいため、トップページの .hero-eyebrow と
+   同じ体感（白地+境界線+影）を与える */
+.business-page .biz-hero .eyebrow { background: #fff; border: 1px solid var(--line); box-shadow: var(--shadow-s); }
 .business-page .biz-hero h1 {
   font-size: clamp(30px, 4.5vw, 54px);
-  color: #fff;
+  color: var(--navy);
   margin-top: 18px;
   line-height: 1.28;
   text-wrap: balance;
 }
-.business-page .biz-hero h1 .hl { color: #5b9bff; }
+.business-page .biz-hero h1 .hl { color: var(--blue); }
 .business-page .biz-hero .hero-sub {
   font-size: clamp(15px, 1.6vw, 18px);
-  color: rgba(255, 255, 255, .78);
+  color: var(--body);
   margin-top: 22px;
   max-width: 560px;
   line-height: 1.9;
@@ -51,12 +55,6 @@
   gap: 14px;
   margin-top: 36px;
 }
-.business-page .btn-outline-white {
-  background: transparent;
-  color: #fff;
-  border: 1.5px solid rgba(255, 255, 255, .4);
-}
-.business-page .btn-outline-white:hover { border-color: rgba(255, 255, 255, .8); background: rgba(255, 255, 255, .08); }
 
 /* 帯：数字実績 */
 .business-page .biz-stats {

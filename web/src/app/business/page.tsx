@@ -264,7 +264,7 @@ export default function BusinessPage() {
         {/* ============ HERO ============ */}
         <section className="biz-hero">
           <div className="container">
-            <span className="eyebrow">FOR BUYERS</span>
+            <span className="eyebrow">買取業者の方へ</span>
             <h1>
               まとめ買取の仕入れルートを、
               <br />
@@ -272,18 +272,18 @@ export default function BusinessPage() {
             </h1>
             <p className="hero-sub">
               個人が家じゅうの不用品をまとめて出品。業者は写真だけで買取総額を入札し、選ばれた1社がユーザーと取引します。下見なし・一斉架電なし・まとめて効率的な仕入れ。費用は成約時の
-              <strong style={{ color: "#fff" }}>買取金額8%のみ</strong>
+              <strong style={{ color: "var(--navy)" }}>買取金額8%のみ</strong>
               。カタヅケは片付けニーズを恒久的につなぐプラットフォームを目指します。
               <br />
               顧客も業者も無駄がなく、納得できる——だから安定する。
             </p>
             <div className="biz-hero-cta">
-              <a href="#register" className="btn btn-white btn-lg">
+              <a href="#register" className="btn btn-primary btn-lg">
                 <SendIcon />
                 業者登録を申し込む
                 <Ic name="arrow" className="arw" />
               </a>
-              <a href="#merit" className="btn btn-outline-white btn-lg">
+              <a href="#merit" className="btn btn-ghost btn-lg">
                 参加メリットを見る
               </a>
             </div>
@@ -311,7 +311,7 @@ export default function BusinessPage() {
         <section className="section" id="merit">
           <div className="container">
             <div className="section-head">
-              <span className="eyebrow">MERIT</span>
+              <span className="eyebrow">カタヅケの強み</span>
               <h2>カタヅケで仕入れる、3つの理由</h2>
               <p className="sub">家まるごとのまとめ出品だからこそ、業者にとって効率的な仕入れルートになります。</p>
             </div>
@@ -332,7 +332,7 @@ export default function BusinessPage() {
         <section className="section bg-pale" id="flow">
           <div className="container">
             <div className="section-head">
-              <span className="eyebrow">HOW IT WORKS</span>
+              <span className="eyebrow">入札の流れ</span>
               <h2>入札から成約までの流れ</h2>
               <p className="sub">登録後はシンプルな4ステップ。下見なし、一斉架電なしで効率的に進められます。</p>
             </div>
@@ -355,7 +355,7 @@ export default function BusinessPage() {
         <section className="section" id="requirements">
           <div className="container">
             <div className="section-head">
-              <span className="eyebrow">REQUIREMENTS</span>
+              <span className="eyebrow">ご利用条件</span>
               <h2>参加に必要な要件</h2>
               <p className="sub">ユーザーの安心のため、登録時に以下を確認させていただきます。</p>
             </div>
@@ -379,7 +379,7 @@ export default function BusinessPage() {
         <section className="section bg-pale" id="faq">
           <div className="container">
             <div className="section-head">
-              <span className="eyebrow">FAQ</span>
+              <span className="eyebrow">よくある質問</span>
               <h2>業者向けよくある質問</h2>
             </div>
             <div style={{ maxWidth: 760, margin: "0 auto" }}>
@@ -392,7 +392,7 @@ export default function BusinessPage() {
         <section className="section" id="register">
           <div className="container">
             <div className="section-head">
-              <span className="eyebrow">APPLY</span>
+              <span className="eyebrow">お申し込み</span>
               <h2>業者登録を申し込む</h2>
               <p className="sub">内容を確認のうえ、担当者よりご連絡いたします。</p>
             </div>

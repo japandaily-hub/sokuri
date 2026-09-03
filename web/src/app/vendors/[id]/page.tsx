@@ -95,7 +95,7 @@ export default function VendorDetailPage() {
           {/* ヒーロー */}
           <div className="biz-hero">
             <div className="biz-hero-head">
-              <div className="biz-big-avatar" style={{ background: "#1f54de" }}>
+              <div className="biz-big-avatar" style={{ background: "#1447e0" }}>
                 {initial}
               </div>
               <div className="biz-hero-info">

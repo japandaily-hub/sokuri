@@ -49,7 +49,9 @@
 
 /* サービス数値バー */
 .stats-bar {
-  background: var(--navy);
+  background: var(--pale);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
   padding: 28px 0;
 }
 .stats-bar-inner {
@@ -64,11 +66,11 @@
   font-family: var(--head);
   font-size: clamp(28px, 3.5vw, 42px);
   font-weight: 900;
-  color: #fff;
+  color: var(--navy);
   line-height: 1;
 }
-.stats-num span { font-size: .55em; color: rgba(255, 255, 255, .6); font-weight: 700; margin-left: 2px; }
-.stats-lbl { font-size: 13px; color: rgba(255, 255, 255, .55); margin-top: 6px; font-weight: 600; }
+.stats-num span { font-size: .55em; color: var(--blue); font-weight: 700; margin-left: 2px; }
+.stats-lbl { font-size: 13px; color: var(--body-soft); margin-top: 6px; font-weight: 600; }
 
 /* フィルター */
 .filter-bar {
@@ -294,7 +296,8 @@
 
 /* CTA */
 .cases-cta {
-  background: var(--navy);
+  background: linear-gradient(120deg, var(--pale) 0%, var(--warm) 100%);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: clamp(32px, 4vw, 52px);
   text-align: center;
@@ -302,19 +305,10 @@
   overflow: hidden;
   margin-top: 48px;
 }
-.cases-cta::before {
-  content: "";
-  position: absolute; inset: 0;
-  background: radial-gradient(ellipse 70% 60% at 100% 0%, rgba(31, 84, 222, .5) 0%, transparent 65%);
-}
 .cases-cta-inner { position: relative; z-index: 1; }
-.cases-cta h2 { font-size: clamp(20px, 2.5vw, 28px); color: #fff; margin-bottom: 10px; }
-.cases-cta p { font-size: 15px; color: rgba(255, 255, 255, .65); margin-bottom: 24px; line-height: 1.8; }
+.cases-cta h2 { font-size: clamp(20px, 2.5vw, 28px); color: var(--navy); margin-bottom: 10px; }
+.cases-cta p { font-size: 15px; color: var(--body-soft); margin-bottom: 24px; line-height: 1.8; }
 .cases-cta-actions { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
-.btn-white { background: #fff; color: var(--navy); font-weight: 900; box-shadow: 0 10px 24px -8px rgba(0, 0, 0, .3); }
-.btn-white:hover { background: #eef3ff; transform: translateY(-2px); }
-.cases-cta .btn-ghost { color: rgba(255, 255, 255, .7); border-color: rgba(255, 255, 255, .3); background: transparent; }
-.cases-cta .btn-ghost:hover { color: #fff; border-color: rgba(255, 255, 255, .6); }
 
 /* レスポンシブ */
 @media (max-width: 720px) {

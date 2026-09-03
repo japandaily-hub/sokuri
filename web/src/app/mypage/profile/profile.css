@@ -333,7 +333,7 @@
   bottom: 80px;
   left: 50%;
   transform: translateX(-50%);
-  background: var(--navy);
+  background: var(--deep);
   color: #fff;
   font-family: var(--head);
   font-size: 14px;

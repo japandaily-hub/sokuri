@@ -79,7 +79,7 @@
   width: 34px;
   height: 34px;
   border-radius: 10px;
-  background: var(--navy);
+  background: var(--deep);
   color: #fff;
   display: grid;
   place-items: center;

@@ -124,7 +124,7 @@
   color: var(--blue);
 }
 .faq-page .cat-chip.active {
-  background: var(--navy);
+  background: var(--deep);
   border-color: var(--navy);
   color: #fff;
 }

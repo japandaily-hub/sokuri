@@ -108,7 +108,7 @@ export default function HomePage() {
         <section className="section empathy">
           <div className="container">
             <div className="section-head">
-              <span className="eyebrow">YOUR WORRIES</span>
+              <span className="eyebrow">よくある不安</span>
               <h2>片付け、こんな“めんどう”で<br className="sp-br" />止まっていませんか</h2>
               <p className="sub">「家じゅうを片付けたい」気持ちはあるのに、最初の一歩でつまずく。多くの方が、同じところで止まっています。</p>
             </div>
@@ -134,7 +134,7 @@ export default function HomePage() {
         <section className="section steps" id="flow">
           <div className="container">
             <div className="section-head">
-              <span className="eyebrow">HOW IT WORKS</span>
+              <span className="eyebrow">ご利用の流れ</span>
               <h2>あなたがするのは、<br className="sp-br" />「撮る」と「選ぶ」だけ</h2>
               <p className="sub">たった4ステップ。梱包も発送も、価格交渉も要りません。</p>
             </div>
@@ -176,7 +176,7 @@ export default function HomePage() {
                 <PhImg src="/img/bundle-3d.png" alt="さまざまな不用品がひとつの箱にまとまり、まとめて1つの価格がつくイメージ" label="bundle-3d.png" icon="box" imgStyle={{ width: "100%", height: "100%", objectFit: "contain" }} />
               </Reveal>
               <Reveal className="bundle-copy" delay={1}>
-                <span className="eyebrow">BUNDLE &amp; SELL</span>
+                <span className="eyebrow">まとめ売り</span>
                 <h2>まとめて出すほど、<span style={{ color: "var(--blue)" }}>有利</span>になる。</h2>
                 <p className="lead">カタヅケは“家まるごと”の片付け向け。1点ずつではなく、たまった不用品をまとめて査定に出すほど、買取総額が伸びやすく、値がつかない物まで一緒に手放せます。</p>
               </Reveal>
@@ -207,7 +207,7 @@ export default function HomePage() {
         <section className="section auction" id="auction">
           <div className="container">
             <div className="section-head">
-              <span className="eyebrow">HOW THE AUCTION WORKS</span>
+              <span className="eyebrow">入札のしくみ</span>
               <h2>業者が“買取総額”で競うから、<br className="sp-br" />高くなりやすい。</h2>
               <p className="sub">あなたが出したのは写真だけ。あとは登録業者どうしが、あなたの品物まとめに買取総額で入札し合います。</p>
             </div>
@@ -233,7 +233,7 @@ export default function HomePage() {
               <PhImg src="/img/handover-new.png" alt="玄関先で、業者スタッフがまとめた品物を受け取る様子" label="handover-new.png" icon="truck" imgStyle={{ width: "100%", height: "100%", objectFit: "cover" }} />
             </Reveal>
             <Reveal className="media-copy" delay={1}>
-              <span className="eyebrow">HANDOVER</span>
+              <span className="eyebrow">引き渡しの流れ</span>
               <h2>業者が直接、引き取りに来ます</h2>
               <p className="sub">梱包も発送も、あなたはしなくていい。選んだ業者がまとめて引き取りに来ます。やりとりするのは、交渉が成立した相手とだけです。</p>
               <ul className="mlist">
@@ -250,7 +250,7 @@ export default function HomePage() {
         <section className="section bg-pale">
           <div className="container">
             <div className="section-head">
-              <span className="eyebrow">USE CASES</span>
+              <span className="eyebrow">こんな時に</span>
               <h2>“家まるごと”の片付けに</h2>
               <p className="sub">まとまった量を手放したいときほど、カタヅケが力を発揮します。</p>
             </div>
@@ -273,7 +273,7 @@ export default function HomePage() {
         <section className="section" id="trust">
           <div className="container">
             <div className="section-head">
-              <span className="eyebrow">SAFE &amp; SECURE</span>
+              <span className="eyebrow">安心の仕組み</span>
               <h2>はじめてでも、安心して任せられる</h2>
               <p className="sub">「知らない業者は不安」を解消するために。カタヅケは、参加する業者とあなたの情報の扱いに、きちんと線を引いています。</p>
             </div>
@@ -298,7 +298,7 @@ export default function HomePage() {
         <section className="section bg-pale" id="fee">
           <div className="container">
             <div className="section-head">
-              <span className="eyebrow">PRICING</span>
+              <span className="eyebrow">料金について</span>
               <h2>費用は、一切かかりません</h2>
               <p className="sub">出品・査定・成約まで、すべて無料です。</p>
             </div>
@@ -318,7 +318,7 @@ export default function HomePage() {
         <section className="section" id="cats">
           <div className="container">
             <div className="section-head">
-              <span className="eyebrow">CATEGORIES</span>
+              <span className="eyebrow">対応カテゴリ</span>
               <h2>こんな物が対象です</h2>
               <p className="sub">「これって売れる？」のほとんどに対応。迷ったら、まずは撮ってまとめてみてください。</p>
             </div>
@@ -354,7 +354,7 @@ export default function HomePage() {
             </Reveal>
             <Reveal className="founder-copy" delay={1}>
               <span className="mb-4 inline-block"><KdzLogo size={20} /></span>
-              <span className="eyebrow">OUR MISSION</span>
+              <span className="eyebrow">私たちについて</span>
               <h2>「片付けたい」を、<br />めんどうで終わらせない。</h2>
               <p>片付けが進まないのは、やる気の問題ではありません。出品の手間、営業電話の不安、何から手をつけるかの迷い——その一つひとつが、最初の一歩を重くしています。</p>
               <p>カタヅケは、それを「まとめて撮るだけ」に変えるために生まれました。業者が競い、値がつかない物まで引き取り、連絡は選んだ1社だけ。あなたが背負うものを、できる限り減らします。</p>
@@ -368,7 +368,7 @@ export default function HomePage() {
         <section className="section bg-pale" id="faq">
           <div className="container">
             <div className="section-head">
-              <span className="eyebrow">FAQ</span>
+              <span className="eyebrow">よくある質問</span>
               <h2>よくある質問</h2>
             </div>
             <FaqAccordion items={FAQ_ITEMS} />
@@ -397,7 +397,7 @@ export default function HomePage() {
         <div className="container">
           <div className="biz-banner-inner">
             <div className="biz-banner-copy">
-              <span className="eyebrow">FOR BUYERS</span>
+              <span className="eyebrow">買取業者の方へ</span>
               <h2>買取業者の方へ。<br />カタヅケに参加しませんか。</h2>
               <p>顧客と業者、双方に無駄がない。だから長く続く。<br />まとめ出品への入札で、効率的な仕入れルートを開拓できます。</p>
               <div className="biz-banner-tags">

@@ -99,7 +99,7 @@
 /* トースト通知 */
 .kdz-toast {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-  background: var(--navy); color: #fff; font-family: var(--head); font-size: 14px; font-weight: 700;
+  background: var(--deep); color: #fff; font-family: var(--head); font-size: 14px; font-weight: 700;
   padding: 14px 22px; border-radius: 99px; z-index: 200; box-shadow: 0 8px 24px -8px rgba(15,37,82,.5);
 }
 

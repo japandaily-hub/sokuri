@@ -158,8 +158,8 @@
   text-align: left;
 }
 .done-page .next-steps-title {
-  background: var(--navy);
-  color: #fff;
+  background: var(--pale);
+  color: var(--navy);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: .08em;

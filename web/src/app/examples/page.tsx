@@ -312,7 +312,7 @@ export default function ExamplesPage() {
       {/* ============ ヒーロー ============ */}
       <section className="cases-hero">
         <div className="container">
-          <span className="eyebrow">CASES</span>
+          <span className="eyebrow">成約事例</span>
           <h1>成約イメージ（モデルケース）</h1>
           <p>
             まとめて出品すると、どのように査定が集まり、成約に至るのか。サービスの流れがイメージできるモデルケースをご紹介します。
@@ -388,7 +388,7 @@ export default function ExamplesPage() {
                 出品・査定・お断りまで、ユーザーの費用は一切無料です。
               </p>
               <div className="cases-cta-actions">
-                <Link href="/create" className="btn btn-white btn-lg">
+                <Link href="/create" className="btn btn-primary btn-lg">
                   無料で出品してみる
                   <Ic name="arrow" className="arw" />
                 </Link>

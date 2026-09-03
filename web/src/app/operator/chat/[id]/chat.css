@@ -456,7 +456,7 @@
 }
 .opchat-page .dp-item-thumb .ic { width: 30px; height: 30px; }
 .opchat-page .dp-item-thumb.more {
-  background: #eef3ff;
+  background: var(--pale);
   color: var(--blue);
   font-size: 16px;
   font-weight: 900;
@@ -492,7 +492,7 @@
   padding: 11px;
   border-radius: 99px;
   border: none;
-  background: var(--navy);
+  background: var(--deep);
   color: #fff;
   font-family: var(--head);
   font-size: 13.5px;

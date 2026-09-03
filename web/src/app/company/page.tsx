@@ -111,10 +111,10 @@ export default function CompanyPage() {
           <h3>一緒に、片付けをもっと良くしませんか？</h3>
           <p>採用情報・業者登録・提携のお問い合わせはこちらから</p>
           <div className="about-cta-btns">
-            <Link href="/create" className="btn btn-white btn-lg">
+            <Link href="/create" className="btn btn-primary btn-lg">
               出品してみる
             </Link>
-            <Link href="/contact" className="btn btn-outline-white btn-lg">
+            <Link href="/contact" className="btn btn-ghost btn-lg">
               お問い合わせ
             </Link>
           </div>
