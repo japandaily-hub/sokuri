@@ -1,0 +1,39 @@
+{
+  "style_common": "Ultra-realistic product photograph, indistinguishable from a real studio photo. Soft diffused daylight from the upper left, gentle natural contact shadow, shallow depth of field, premium minimal e-commerce lifestyle aesthetic. Seamless pale blue-white studio backdrop (#eef3ff) with no visible horizon line. Materials: real-world textures (brushed metal, leather, fabric, ceramic, wood) in white, light grey and natural tones, with ONE tasteful cobalt blue (#1447e0) accent element. Generic unbranded designs, no logos, no text, no watermark, no people, no cartoon or clay look, no outlines. Centered composition with generous margin.",
+  "images": [
+    { "file": "cat-kaden.webp", "label": "カテゴリ:家電", "size": [640, 640], "prompt": "A single white refrigerator and a white front-load drum washing machine, standing side by side, modern home appliances." },
+    { "file": "cat-brand.webp", "label": "カテゴリ:ブランド品", "size": [640, 640], "prompt": "A plain unbranded leather handbag and a matching leather long wallet placed together, no logos or branding, luxury minimalist design." },
+    { "file": "cat-furniture.webp", "label": "カテゴリ:家具", "size": [640, 640], "prompt": "A light grey fabric two-seat sofa with one cobalt blue accent cushion on it." },
+    { "file": "cat-camera.webp", "label": "カテゴリ:カメラ/PC", "size": [640, 640], "prompt": "A mirrorless interchangeable-lens camera and a slim silver laptop computer placed together." },
+    { "file": "cat-watch.webp", "label": "カテゴリ:時計/アクセサリー", "size": [640, 640], "prompt": "A silver wristwatch and a simple plain silver ring placed together, elegant jewelry items." },
+    { "file": "cat-game.webp", "label": "カテゴリ:ゲーム/おもちゃ", "size": [640, 640], "prompt": "A white video game controller and a set of wooden building block toys placed together." },
+    { "file": "cat-fashion.webp", "label": "カテゴリ:ファッション", "size": [640, 640], "prompt": "A neatly folded white dress shirt stacked beside a pair of clean white sneakers." },
+    { "file": "cat-music.webp", "label": "カテゴリ:楽器", "size": [640, 640], "prompt": "A single acoustic guitar standing upright, natural wood finish." },
+    { "file": "cat-tableware.webp", "label": "カテゴリ:食器", "size": [640, 640], "prompt": "A neat stack of white porcelain rice bowls and plates, with a cobalt blue ceramic teapot placed beside them." },
+    { "file": "cat-sport.webp", "label": "カテゴリ:スポーツ", "size": [640, 640], "prompt": "A golf bag with clubs and a tennis racket standing together." },
+    { "file": "cat-tools.webp", "label": "カテゴリ:工具", "size": [640, 640], "prompt": "A cordless power drill and a metal toolbox placed together." },
+    { "file": "cat-other.webp", "label": "カテゴリ:その他", "size": [640, 640], "prompt": "An open cardboard box containing an assortment of miscellaneous everyday household items." },
+
+    { "file": "assure-shield.webp", "label": "安心の帯:保証", "size": [320, 320], "prompt": "A single cobalt blue enamel shield-shaped badge object floating alone, macro product photograph, simple sculptural form, nothing else in frame." },
+    { "file": "assure-lock.webp", "label": "安心の帯:個人情報保護", "size": [320, 320], "prompt": "A single brass and cobalt blue padlock object floating alone, macro product photograph, nothing else in frame." },
+    { "file": "assure-phone.webp", "label": "安心の帯:営業電話なし", "size": [320, 320], "prompt": "A single classic white corded telephone handset resting face-down on a small cradle, suggesting the phone has stopped ringing, macro product photograph, no text, nothing else in frame." },
+    { "file": "assure-pin.webp", "label": "安心の帯:全国対応", "size": [320, 320], "prompt": "A single cobalt blue map location pin object, sculptural teardrop form, floating alone, macro product photograph, nothing else in frame." },
+
+    { "file": "bundle-up.webp", "label": "まとめ売り:査定アップ", "size": [480, 480], "prompt": "A wooden upward-pointing arrow object standing beside a small wooden block bar chart of increasing height, symbolizing rising value." },
+    { "file": "bundle-bag.webp", "label": "まとめ売り:まとめて出品", "size": [480, 480], "prompt": "A natural canvas tote bag neatly packed with an assortment of folded clothing and small household items, bundled together for resale, no people." },
+    { "file": "bundle-camera.webp", "label": "まとめ売り:かんたん撮影", "size": [480, 480], "prompt": "Close-up of a person's hands holding a smartphone, photographing small household items arranged on a wooden table, only hands and phone visible, face not shown." },
+
+    { "file": "how-camera.webp", "label": "ヒーロー手順:撮影する", "size": [320, 320], "prompt": "A single small compact point-and-shoot camera floating alone, macro product photograph, nothing else in frame." },
+    { "file": "how-trend.webp", "label": "ヒーロー手順:査定が集まる", "size": [320, 320], "prompt": "A small wooden bar chart object showing an upward rising trend, macro product photograph, nothing else in frame." },
+    { "file": "how-crown.webp", "label": "ヒーロー手順:最高額を選ぶ", "size": [320, 320], "prompt": "A single small metallic crown object floating alone, macro product photograph, nothing else in frame." },
+    { "file": "how-truck.webp", "label": "ヒーロー手順:引き取り", "size": [320, 320], "prompt": "A single small white delivery truck miniature model floating alone, macro product photograph, nothing else in frame." },
+
+    { "file": "check.webp", "label": "チェックマーク", "size": [240, 240], "prompt": "A single green enamel checkmark pin badge object floating alone, macro product photograph, nothing else in frame." },
+
+    { "file": "bundle-3d.webp", "label": "トップ説明イラスト:まとめて査定", "size": [1536, 864], "prompt": "An open cardboard box neatly packed with home appliances, dishware, books, and a folded bag arranged tidily inside it, with a single cobalt blue blank price tag hanging from the box edge, no people. All wooden and leather surfaces must be completely plain with natural grain only, absolutely no engraved, embossed, stamped, printed or carved marks, symbols, or text of any kind on any object.", "note": "regenerated once: v1 had faint embossed text on a wooden cutting board; v2 clean" },
+    { "file": "bid-3d.webp", "label": "トップ説明イラスト:業者が競り合う", "size": [1536, 864], "prompt": "A bundled cardboard box of household items sitting on a table, surrounded by four blank white price tag cards arranged around it on the table, suggesting a competitive bidding scene, no people." },
+    { "file": "trust-illus-1.webp", "label": "安心3点:業者審査", "size": [1024, 768], "prompt": "A clipboard holding a checklist document with a magnifying glass resting beside it, and a small cobalt blue certified verification badge nearby, symbolizing vendor screening and inspection, no people." },
+    { "file": "trust-illus-2.webp", "label": "安心3点:連絡先非開示", "size": [1024, 768], "prompt": "A padlock standing beside a sealed white envelope, symbolizing that contact details remain private until a deal is finalized, no people." },
+    { "file": "trust-illus-3.webp", "label": "安心3点:クーリングオフ", "size": [1024, 768], "prompt": "A small desktop calendar with a cobalt blue pin marker on one date, beside a signed paper document with a pen resting on it, symbolizing a cooling-off cancellation period, no people." }
+  ]
+}
