@@ -12,7 +12,7 @@
 
 import "../operator-shared.css";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Spinner } from "@/components/Icon";
 import { OperatorHeader } from "@/components/kdz/OperatorHeader";
@@ -27,6 +27,7 @@ import {
   toDisplayMessage,
   type CaseMasked,
 } from "@/lib/katadzuke-api";
+import { caseItemsLabel } from "@/lib/case-labels";
 
 /** ステータス+自社入札状況 → チップ表示のマッピング。 */
 function statusChipInfo(c: CaseMasked): { label: string; cls: string } {
@@ -74,7 +75,7 @@ function LotCard({ c }: { c: CaseMasked }) {
         </div>
         <div className="lot-info">
           <div className="lot-info-top">
-            <span className="lot-id">#{c.id.slice(0, 8)}</span>
+            <span className="lot-id lot-items" title={`案件ID ${c.id.slice(0, 8)}`}>{caseItemsLabel(c) ?? `#${c.id.slice(0, 8)}`}</span>
             <span className={`status-chip ${cls}`}>{label}</span>
           </div>
           <div className="lot-title">{c.purpose}</div>
@@ -135,6 +136,23 @@ export default function OperatorCasesPage() {
   const statusLoading = vendorStatus === null;
   const awaitingApproval = !statusLoading && vendorStatus !== "active" && vendorStatus !== "unknown";
 
+  // 絞り込み（クライアント側）: 都道府県 / 未入札のみ。件数が増えた時に目的の案件へ辿り着きやすくする。
+  const [prefFilter, setPrefFilter] = useState<string>("all");
+  const [onlyUnbid, setOnlyUnbid] = useState(false);
+  const prefectures = useMemo(
+    () => Array.from(new Set((cases ?? []).map((c) => c.prefecture))).sort(new Intl.Collator("ja").compare),
+    [cases],
+  );
+  const visibleCases = useMemo(
+    () =>
+      (cases ?? []).filter(
+        (c) =>
+          (prefFilter === "all" || c.prefecture === prefFilter) &&
+          (!onlyUnbid || !c.my_bid || c.my_bid.status === "withdrawn"),
+      ),
+    [cases, prefFilter, onlyUnbid],
+  );
+
   return (
     <div className="cases-page">
       <OperatorHeader active="cases" />
@@ -146,7 +164,7 @@ export default function OperatorCasesPage() {
               <p>入札を受け付けている片付け案件です。住所は業者決定後に開示されます。</p>
             </div>
             <Link href="/operator/transactions" className="btn btn-ghost">
-              落札管理へ
+              取引一覧へ
               <Ic name="arrow" />
             </Link>
           </div>
@@ -157,6 +175,27 @@ export default function OperatorCasesPage() {
             </div>
           ) : null}
           {error ? <div className="op-alert error">{error}</div> : null}
+
+          {cases && cases.length > 0 ? (
+            <div className="lot-filters" role="group" aria-label="案件の絞り込み">
+              <label className="lot-filter">
+                <span>エリア</span>
+                <select value={prefFilter} onChange={(e) => setPrefFilter(e.target.value)}>
+                  <option value="all">すべて（{cases.length}件）</option>
+                  {prefectures.map((p) => (
+                    <option key={p} value={p}>
+                      {p}（{cases.filter((c) => c.prefecture === p).length}件）
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="lot-filter lot-filter-check">
+                <input type="checkbox" checked={onlyUnbid} onChange={(e) => setOnlyUnbid(e.target.checked)} />
+                <span>未入札の案件のみ</span>
+              </label>
+              <span className="lot-filter-count">{visibleCases.length}件を表示</span>
+            </div>
+          ) : null}
 
           {loading || (!cases && !error) ? (
             <div style={{ display: "flex", justifyContent: "center", padding: "60px 0" }}>
@@ -172,9 +211,12 @@ export default function OperatorCasesPage() {
             </div>
           ) : (
             <div className="lot-list">
-              {cases?.map((c) => (
+              {visibleCases.map((c) => (
                 <LotCard c={c} key={c.id} />
               ))}
+              {visibleCases.length === 0 ? (
+                <p className="lot-filter-empty">条件に合う案件はありません。絞り込みを変更してください。</p>
+              ) : null}
             </div>
           )}
         </div>

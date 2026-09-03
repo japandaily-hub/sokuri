@@ -362,7 +362,7 @@ export default function OperatorTransactionPage() {
           )}
 
           <Link href="/operator/transactions" style={{ display: "inline-block", marginTop: 8, fontSize: 13.5, fontWeight: 600, color: "var(--blue)" }}>
-            ← 落札管理一覧へ
+            ← 取引一覧へ
           </Link>
         </div>
       </main>

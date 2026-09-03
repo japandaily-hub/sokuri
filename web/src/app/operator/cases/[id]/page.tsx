@@ -51,6 +51,7 @@ export default function OperatorCaseDetailPage() {
   const [caseData, setCaseData] = useState<CaseMasked | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
+  const [bidDone, setBidDone] = useState(false);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [vendorStatus, setVendorStatus] = useState<string | null>(null);
@@ -90,6 +91,7 @@ export default function OperatorCaseDetailPage() {
     setError(null);
     try {
       await createBid(caseId, { amount: value, message: message.trim() || undefined }, token);
+      setBidDone(true);
       await reload();
     } catch (err) {
       setError(toDisplayMessage(err, "入札に失敗しました"));
@@ -201,6 +203,11 @@ export default function OperatorCaseDetailPage() {
           ) : null}
 
           {/* ===== 入札フォーム / 自社入札状況 ===== */}
+          {bidDone ? (
+            <div className="op-alert success" role="status">
+              入札を受け付けました。お客様が業者を選ぶまでお待ちください（結果はメールでお知らせします）。
+            </div>
+          ) : null}
           {caseData.my_bid ? (
             <div className="op-card my-bid-card">
               <h2 style={{ marginBottom: 0 }}>自社の入札</h2>
@@ -218,7 +225,7 @@ export default function OperatorCaseDetailPage() {
                   className="btn btn-primary"
                   style={{ marginTop: 16, display: "inline-flex" }}
                 >
-                  落札管理へ（住所詳細を確認）
+                  取引詳細へ（住所詳細を確認）
                   <Ic name="arrow" />
                 </Link>
               ) : null}

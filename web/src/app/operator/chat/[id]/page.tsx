@@ -62,6 +62,14 @@ function yen(n: number): string {
   return `¥${n.toLocaleString()}`;
 }
 
+/** 候補日の入力例。静的な日付だと季節外れになるため、翌々日の日付から生成する（クライアントで算出）。 */
+function makeSlotExample(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 2);
+  const wd = ["日", "月", "火", "水", "木", "金", "土"][d.getDay()];
+  return `${d.getMonth() + 1}月${d.getDate()}日（${wd}）10:00〜12:00`;
+}
+
 export default function OperatorChatPage() {
   const params = useParams<{ id: string }>();
   const transactionId = Array.isArray(params?.id) ? params.id[0] : params?.id;
@@ -85,6 +93,8 @@ export default function OperatorChatPage() {
 
   /* ---- 日程提案カード（候補日の編集 + 送信） ---- */
   const [slots, setSlots] = useState<string[]>([""]);
+  const [slotExample, setSlotExample] = useState("10月1日（水）10:00〜12:00");
+  useEffect(() => setSlotExample(makeSlotExample()), []);
   const [scheduleVisible, setScheduleVisible] = useState(false);
   const [proposing, setProposing] = useState(false);
 
@@ -289,7 +299,7 @@ export default function OperatorChatPage() {
             <span className="bell-dot" aria-hidden="true" />
           </Link>
           <Link href="/operator/transactions" className="ch-txn-link">
-            落札管理へ
+            取引一覧へ
           </Link>
           <button
             type="button"
@@ -374,6 +384,13 @@ export default function OperatorChatPage() {
 
               {/* メッセージ */}
               <div className="messages-area" ref={messagesRef}>
+                {messages.length === 0 ? (
+                  <div className="ch-empty">
+                    まだメッセージはありません。
+                    <br />
+                    まずは「引き取り日程を提案」からお客様に候補日を送りましょう。
+                  </div>
+                ) : null}
                 {messages.map((m, i) => {
                   const showDateSep = i === 0 || formatDateSep(m.created_at) !== formatDateSep(messages[i - 1].created_at);
                   return (
@@ -384,6 +401,15 @@ export default function OperatorChatPage() {
                         <div>
                           <div className="msg-time">{formatTime(m.created_at)}</div>
                           <div className="bubble">{m.body}</div>
+                          {m.kind === "schedule_proposal" && Array.isArray(m.meta?.slots) ? (
+                            <ul className="msg-slots" aria-label="提示した候補日">
+                              {(m.meta?.slots as unknown[])
+                                .filter((s): s is string => typeof s === "string")
+                                .map((slot, si) => (
+                                  <li key={`${si}-${slot}`}>{slot}</li>
+                                ))}
+                            </ul>
+                          ) : null}
                         </div>
                       </div>
                     </div>
@@ -403,7 +429,7 @@ export default function OperatorChatPage() {
                             type="text"
                             className="sp-date-input"
                             value={slot}
-                            placeholder="日程を入力（例：7月13日（日）10:00〜12:00）"
+                            placeholder={`日程を入力（例：${slotExample}）`}
                             onChange={(e) => updateSlot(i, e.target.value)}
                             aria-label={`候補日 ${i + 1}`}
                           />
@@ -487,7 +513,11 @@ export default function OperatorChatPage() {
             </div>
             <div className="dp-row">
               <span className="lbl">手数料</span>
-              <span className="val">{yen(detail?.fee_amount ?? 0)}</span>
+              <span className="val">
+                {detail?.status === "completed"
+                  ? yen(detail.fee_amount)
+                  : `${yen(Math.round((detail?.final_amount ?? detail?.initial_amount ?? 0) * 0.08))}（予定・完了時確定）`}
+              </span>
             </div>
             <div className="dp-row">
               <span className="lbl">ステータス</span>

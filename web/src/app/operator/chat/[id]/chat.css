@@ -50,7 +50,12 @@
 .opchat-page .ch-back .ic { width: 20px; height: 20px; transform: scaleX(-1); }
 .opchat-page .ch-logo { display: flex; align-items: center; }
 .opchat-page .ch-divider { width: 1px; height: 20px; background: var(--line); }
-.opchat-page .ch-title { font-family: var(--head); font-size: 14px; font-weight: 600; color: var(--navy); }
+.opchat-page .ch-title {
+  font-family: var(--head); font-size: 14px; font-weight: 600; color: var(--navy);
+  /* 狭い幅で1文字ずつ縦に折れないよう、省略記号で1行に収める */
+  min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.opchat-page .ch-logo { flex-shrink: 0; }
 .opchat-page .ch-badge {
   font-size: 11px;
   font-weight: 600;
@@ -541,4 +546,18 @@
 }
 @media (max-width: 440px) {
   .opchat-page .case-sidebar { display: none; }
+  .opchat-page .ch-header { gap: 8px; padding: 0 10px; }
+  .opchat-page .ch-divider { display: none; }
+}
+
+/* メッセージが1件もない時の案内 */
+.opchat-page .ch-empty {
+  margin: auto 16px;
+  padding: 18px 20px;
+  background: #fff;
+  border: 1px dashed var(--line);
+  color: var(--body-soft);
+  font-size: 13.5px;
+  line-height: 1.8;
+  text-align: center;
 }

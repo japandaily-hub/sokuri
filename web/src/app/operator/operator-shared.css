@@ -62,6 +62,7 @@
   line-height: 1.75;
   margin-bottom: 16px;
 }
+.op-alert.success { background: #eef7f0; color: #1f5c33; border-color: #b9dcc3; }
 .op-alert.warn { background: var(--warm); color: var(--gold); border: 1px solid var(--gold); }
 .op-alert.error { background: rgba(215,0,53,.08); color: var(--danger); border: 1px solid var(--danger); }
 .op-alert.info { background: var(--pale); color: var(--body); border: 1px solid var(--line); }
@@ -440,3 +441,36 @@
 .btn-modal-confirm:disabled { opacity: .6; cursor: default; transform: none; box-shadow: none; }
 .btn-modal-confirm.danger { background: var(--danger); box-shadow: none; }
 .btn-modal-confirm.danger:hover { opacity: .85; }
+
+/* 案件一覧の絞り込み行（/operator/cases） */
+.lot-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  background: #fff;
+  border: 1px solid var(--line);
+  font-size: 13px;
+}
+.lot-filters .lot-filter { display: inline-flex; align-items: center; gap: 8px; color: var(--body); }
+.lot-filters .lot-filter select {
+  font: inherit;
+  font-family: var(--body-font, inherit);
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: #fff;
+  color: var(--ink);
+  max-width: 100%;
+}
+.lot-filters .lot-filter-check input { width: 16px; height: 16px; accent-color: var(--primary); }
+.lot-filters .lot-filter-count { margin-left: auto; color: var(--body-soft); }
+.lot-filter-empty { padding: 28px 0; text-align: center; color: var(--body-soft); font-size: 13.5px; }
+@media (max-width: 480px) {
+  .lot-filters .lot-filter-count { margin-left: 0; width: 100%; }
+}
+
+/* 品目要約（案件IDの代わりに出す見出し補助）。ID用の小さな等幅風スタイルを上書きする */
+.lot-id.lot-items { font-size: 13px; letter-spacing: 0; color: var(--ink); font-weight: 600; text-transform: none; }

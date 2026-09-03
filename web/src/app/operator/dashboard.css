@@ -436,3 +436,8 @@
   .op-dash .summary-bar { grid-template-columns: repeat(2, 1fr); }
   .op-dash .dash-wrap { padding: 20px 16px 60px; }
 }
+
+/* 600px以上ではタブを折り返し、横スクロールバーを出さない（狭幅はスクロール維持） */
+@media (min-width: 600px) {
+  .op-dash .dash-tabs { flex-wrap: wrap; overflow-x: visible; }
+}

@@ -51,7 +51,7 @@ export default function OperatorTransactionsPage() {
         <div className="op-wrap">
           <div className="op-head">
             <div>
-              <h1>落札管理</h1>
+              <h1>取引一覧</h1>
               <p>落札した案件の進行状況です。</p>
             </div>
             <Link href="/operator/cases" className="btn btn-ghost">

@@ -5,6 +5,8 @@
 ## 現在フェーズ
 - **2026-09-04 3視点導線監査（依頼者／業者／運営）＋レスポンシブ是正をローカルコミット済み（未push）。** 台帳: `.agent-state/audit/`（user-journey / vendor-journey / operator-crosscut / verify-* / review-qa / round2 は戻り値のみ）。High 21件→CONFIRMED 19・PARTIAL 2、追加発見 6、第2周で回帰 3 を捕捉し全て修正。web のみ 33 ファイル。tsc 0・eslint 0 error・`next build` 成功。
   - 2026-09-04 push 済み（4a03154・3環境 success・/health commit=4a03154）。続けて backend: `PATCH /admin/operators/{id}/suspend`（停止／解除）新設と、承認 API の許可証ゲート（pending/limited→active は has_license_image 必須・409）を追加。/admin に停止／解除ボタン・「停止中」フィルタ・停止中は承認操作不可。pytest 569 件通過。
+  - 2026-09-04 業者目線の実機PDCA 3周（ローカル: run_local_e2e.py + seed_local_e2e.py、ブラウザペインで業者A/入札/日程提案/減額申請/プロフィール保存/ログアウトを実操作）。修正: 業者ルート全てにタブ名（layout.tsx）／「落札管理」→「取引」表記統一／チャットのモバイルヘッダー潰れ・空状態案内・手数料予定額・候補日リスト表示・日付例の動的化／ダッシュボードの集計ラベル・ヒント2行化・タブ折返し・品目要約見出し／案件詳細の入札完了通知／案件一覧の品目要約とエリア・未入札絞り込み。
+    - 検証環境の再現手順: `cd backend && .venv/Scripts/python.exe run_local_e2e.py`（8000）→ `.venv/Scripts/python.exe seed_local_e2e.py`（テスト口座は同ファイル冒頭）→ web は port 3000（ALLOWED_ORIGINS の都合で 3000/3100/3101 のみ）。ブラウザペインでは form_input/type が React の制御 input に効かないことがあるので、ネイティブ setter + input イベントで値を入れ requestSubmit する。
   - 残る意図的未対応: 案件一覧のエリアフィルタ未実装（案内文は実態に合わせ是正済み）／katadzuke-api.ts の 422 detail 配列握り潰し（入札額は事前検証で回避）／停止解除で旧トークンが再有効化する（トークン世代カウンタ未実装・セキュリティ Medium）／招待コード登録は許可証未提出でも active（運用前提・要判断）。
 - 人の森整合テーマ（明朝・角丸0・影0・額装フレーム）は全41ルートへ適用済み・**push 済み・本番反映済み**。
   ただし主色はユーザー指示で **苔色 → ブルー #1447e0** へ変更済み（a492bc9）。かたちは人の森整合のまま、色相のみブルー。

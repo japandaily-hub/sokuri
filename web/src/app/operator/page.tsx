@@ -43,6 +43,7 @@ import {
   type CaseMasked,
   type TransactionListItem,
 } from "@/lib/katadzuke-api";
+import { caseItemsLabel } from "@/lib/case-labels";
 
 /** 入札額の許容範囲・刻み（バックエンド le=100_000_000 と一致させる）。 */
 const BID_MIN = 1000;
@@ -84,6 +85,8 @@ type Lot = {
   bidCount: number;
   status: LotStatus;
   photoUrl: string | null;
+  /** 品目の要約（例:「ソファ、テーブル ほか1点」）。無ければ案件IDの先頭8桁で代替。 */
+  itemsLabel: string;
 };
 
 function toLot(c: CaseMasked): Lot {
@@ -103,6 +106,7 @@ function toLot(c: CaseMasked): Lot {
     bidCount: c.bid_count,
     status,
     photoUrl: c.photos[0]?.url ?? null,
+    itemsLabel: caseItemsLabel(c) ?? c.id.slice(0, 8),
   };
 }
 
@@ -169,7 +173,7 @@ function LotCard({
         {/* 案件情報 */}
         <div className="lot-info">
           <div className="lot-info-top">
-            <span className="lot-id">{lot.id.slice(0, 8)}</span>
+            <span className="lot-id lot-items" title={`案件ID ${lot.id.slice(0, 8)}`}>{lot.itemsLabel}</span>
             {statusTag}
           </div>
           <div className="lot-items-row">
@@ -246,7 +250,13 @@ function LotCard({
                 {busy ? "送信中…" : "入札する"}
               </button>
               <p className="bid-hint" style={validationError ? { color: "var(--danger)" } : undefined}>
-                {validationError ?? `成約時のみ買取額の8%が手数料（${BID_RANGE_HINT}）`}
+                {validationError ?? (
+                  <>
+                    成約時のみ買取額の8%が手数料
+                    <br />
+                    <span style={{ fontSize: "11.5px" }}>{BID_RANGE_HINT}</span>
+                  </>
+                )}
               </p>
             </div>
           )}
@@ -468,7 +478,7 @@ export default function OperatorDashboardPage() {
                 {lots.length}
                 <span>件</span>
               </div>
-              <div className="sum-sub">現在入札可能</div>
+              <div className="sum-sub">公開中（入札済みを含む）</div>
             </div>
           </div>
 
