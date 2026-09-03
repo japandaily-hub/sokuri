@@ -1,32 +1,43 @@
 # PROJECT_STATE — カタヅケ（ソクウリ）
 
-更新: 2026-09-03（Claude）
+更新: 2026-09-03（Claude・夜）
 
 ## 現在フェーズ
-人の森サイト整合テーマ（明朝・苔色 #527e52・角丸0・影0・額装フレーム）を web 全41ルートへ適用済み。**main にローカルコミット済み・未 push**（push = Vercel 自動デプロイのためユーザー承認待ち）。
+- 人の森整合テーマ（明朝・角丸0・影0・額装フレーム）は全41ルートへ適用済み・**push 済み・本番反映済み**。
+  ただし主色はユーザー指示で **苔色 → ブルー #1447e0** へ変更済み（a492bc9）。かたちは人の森整合のまま、色相のみブルー。
+- LP図版はフォトリアル3Dレンダー29点＋クレイ調3Dアイコン24点へ差し替え済み（7ca3c4d / 3743e4e）。
+- **入札取り下げ（withdraw）機能を main にローカルコミット済み（1a81251）・未 push**。
+  push = Render で alembic 0018〜0020 が走る（bids CHECK制約更新・bid_withdrawals 新設）。
 
 ## 現行ハッシュ
-main = 本ファイルと同時にコミットした最新（`git log --oneline -6` の [claude] 一連: c5462fd 本採用 → 6a0f062 フォント自己ホスト+a11y → b572685 QA指摘 → 35f8963 OGチップ → 認証画面調整）。
+- origin/main = c72a7db（ヘッダーのモバイル崩れ修正）
+- main = 1a81251（withdraw 機能）→ origin より 1 コミット先行
 
-## gate_status
-- ビルド: `npm run build` 成功（隔離 worktree で実行、全ルート生成）。`tsc --noEmit` エラー0。
-- セキュリティレビュー: High 2 / Medium 2 / Low 3 → **全件対応済み**（CSP ヘッダー自体は未導入・外部オリジン依存は解消）。
-- QA レビュー: High 2 / Medium 5 / Low 6 → High/Medium 対応済み（装飾アニメーションは reduced-motion 尊重で据え置き）、Low 6 件は次回整理。
-- デザイン独立審査: 2.5 → 2.7 / 4（合格ライン 3）。残要因は青系素材（写真/3D）と認証画面の版面（後者は対応済み・未再審査）。
+## gate_status（withdraw 機能）
+- backend pytest: 564 passed（withdraw 26件含む）。web `tsc --noEmit` エラー0。
+- セキュリティレビュー: Critical/High 0。Medium 2 → M-1（commit の IntegrityError→409）対応済み。
+  M-2（bid_withdrawals への UPDATE/DELETE を DB ロール権限で REVOKE）は **運用タスクとして未対応**（Render の DB ダッシュボード作業。コードでは対応不可）。
+- QA レビュー: Critical/High 0。Medium 2 → M-2（bid_id 一意制約）対応済み。
+  M-1（operator-shared.css が /operator/transactions 系にも波及）は差分目視で「テーマ整合のみ」と判断、実機スクショ未実施。
+- alembic: 単一ヘッド（0020_bid_withdrawal_fk_restrict）。
 
 ## 未解決ブロッカー
 - なし（push はユーザー判断）。
 
 ## 次アクション
-- P1: ユーザーが `git push origin main` を承認 → Vercel デプロイ → 本番 `/faq` `/` `/login` の目視確認（`document.fonts` に Noto Serif JP が載ること）。
-- P2: 青系画像素材（`public/img/step-*.png` `bundle-3d.png` 等）を苔色・生成り系で再生成（gpt-image スキル）。DESIGN_SYSTEM.md §10 に素材ガイドライン（青禁止・彩度上限）を追記。
-- P3: 正式ロゴの緑版をユーザーから受領し `KdzLogo` の文字ワードマークを差し替え（または文字ワードマークを確定）。
+- P1: `git push origin main` の承認 → Render のデプロイログで alembic 0018〜0020 成功を確認 → /readyz → 本番で業者ログイン後の案件詳細に取り下げボタンが出ること、/operator/transactions の見た目を目視。
+- P1': push 後、Render DB でアプリロールから bid_withdrawals の UPDATE/DELETE を REVOKE（セキュリティ M-2）。
+- P2: 画像素材の色方針の再確認。主色がブルーになったため PROJECT_STATE 旧版の「青系素材を苔色へ再生成」は前提が崩れている。現状の青×白素材は主色と整合しており、このまま維持で良いかユーザー確認。
+- P3: 正式ロゴの受領（ブルー版）→ `KdzLogo` ワードマーク差し替え。
 - P4: QA Low 6 件（`.arw` デッドクラス・未使用コンポーネント退避・ESLint flat config・フォーカスグロー統一）。
+- P5: bid_withdraw のレート制限が sensitive_account（5回/15分）流用。業者が短時間に多数取り下げる運用が出たら専用値を新設。
 
 ## 決定ログ
 | 日時 | 何を | なぜ | 結果 |
 | :-- | :-- | :-- | :-- |
 | 2026-09-03 | 書体を next/font/google で自己ホスト | セキュリティ High（CSP不在で外部CSS読込／訪問者IPの第三者送信） | 外部リクエスト0を実機確認 |
-| 2026-09-03 | Codex 並行作業（入札取り下げ: katadzuke-api.ts / operator/cases/* / operator-shared.css / backend alembic 0018）を自分のコミットから除外 | AGENTS.md 同時編集禁止・帰属追跡 | Codex 側が [codex] でコミットする想定。operator-shared.css と operator/cases/* の再デザイン分もそこに同居 |
+| 2026-09-03 | 主色を苔色からブルー #1447e0 へ | ユーザー指示 | 成功色 --green は別系統緑で独立。LINE緑は据え置き |
+| 2026-09-03 | Codex 実装の withdraw 機能を Claude 側でレビュー・補強して [claude] コミット | Codex セッションが未コミットのまま終了。AGENTS.md 3 に従い意味単位でコミット | 一意制約・IntegrityError変換・テスト1件追加 |
+| 2026-09-03 | withdrawn 後の再入札は不可（uq_bids_case_operator） | 設計確定済み（取り下げは終端状態） | テストで担保 |
 | 2026-09-03 | 検証を worktree `.claude/worktrees/kdz-verify`（port 3102）へ隔離 | Codex の `next build` が正本 web/.next を消し dev サーバーが 500 化 | 全ルート検証・本番ビルド成功 |
 | 2026-09-03 | ヒーロー写真は円形にしない／LINE緑据え置き／入力値はゴシック | デザイナー査読（CRITIQUE.md）の18件を採用 | SPEC-4-decisions.md に確定 |
