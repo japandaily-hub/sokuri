@@ -25,7 +25,7 @@ from app.db.models.user import User
 from app.db.session import get_session
 from app.schemas_katadzuke import BidCreateRequest, BidOut, TransactionOut
 from app.services import notify_dispatch
-from app.services.case_lock import lock_case_row
+from app.services.case_lock import lock_case_row, lock_operator_row
 from app.services.message_guard import contains_contact_info
 
 router = APIRouter()
@@ -272,10 +272,16 @@ async def select_bid(
             detail="この業者は現在選択できません。運営にお問い合わせください。",
         )
     # 退会済み（deleted_at 非null）業者も選択不可（r8-review H-1）。
-    # operator_profile.delete_my_operator_account 側の「入札rejected化→再判定」の
-    # 順序変更により通常この分岐には到達しない想定だが、Case行ロックを経由しない
-    # 将来の経路（管理者操作等）が増えても安全なよう多層防御として判定する。
-    if target.operator.deleted_at is not None:
+    # ここは退会（operator_profile.delete_my_operator_account）との**直列化点**
+    # でもある: Operator行を FOR UPDATE で掴んでから ``deleted_at`` を同一
+    # トランザクション内で再読込する。退会側が先にこの行を掴んでいれば本文の
+    # ロック取得がブロックされ、解放後に読む値は必ずコミット済みになる（＝退会
+    # commit 後の落札は必ず409）。逆順なら退会側が本成約を検出して409になる。
+    # ロック順序は Case（上の lock_case_row）→ Operator。退会側はCase行を掴まない
+    # ため循環は生じない。identity map 上の ``target.operator`` は共有セッションの
+    # テストハーネスで陳腐化しうるため、判定には必ずこの再読込値を使う。
+    operator_deleted_at = await lock_operator_row(session, target.operator_id)
+    if operator_deleted_at is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="この業者は退会済みのため選択できません。運営にお問い合わせください。",

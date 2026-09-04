@@ -798,7 +798,11 @@ export default function UserCaseDetailPage() {
             <StatusBadge value={txn.status} label={TXN_STATUS_LABEL[txn.status]} />
           </div>
 
-          {txn.operator_suspended ? (
+          {txn.operator_deleted ? (
+            <div className="mt-3 rounded-none border border-red-200 bg-red-50 p-3 text-sm leading-relaxed text-red-700" role="alert">
+              この業者は退会したため、この取引は進められません。キャンセルして新しく出品してください
+            </div>
+          ) : txn.operator_suspended ? (
             <div className="mt-3 rounded-none border border-red-200 bg-red-50 p-3 text-sm leading-relaxed text-red-700" role="alert">
               この業者は現在利用停止中です。運営（
               <Link href="/contact" className="underline">
@@ -826,8 +830,9 @@ export default function UserCaseDetailPage() {
             </div>
           ) : null}
 
-          {/* 業者とのやり取り導線（チャット/日程調整） */}
-          {txn.status !== "cancelled" && (
+          {/* 業者とのやり取り導線（チャット/日程調整）。r8-fix-frontend5 対応:
+              業者退会時はチャット送信・日程調整に進めないため導線ごと非表示にする。 */}
+          {txn.status !== "cancelled" && !txn.operator_deleted && (
             <div className="mt-4 flex flex-wrap gap-2">
               <a href={`/chat/${txn.id}`} className={btnPrimary}>
                 業者とチャット
@@ -932,24 +937,28 @@ export default function UserCaseDetailPage() {
           {/* 完了・キャンセル */}
           {(txn.status === "pending" || txn.status === "visiting") && (
             <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={busy || Boolean(pendingReduction)}
-                onClick={() =>
-                  setConfirmState({
-                    title: "作業完了を確定しますか？",
-                    message: "作業の完了を確定しますか？確定後はレビューを投稿できます。",
-                    confirmLabel: "確定する",
-                    onConfirm: () => {
-                      setConfirmState(null);
-                      void act(() => completeTransaction(txn.id, token!));
-                    },
-                  })
-                }
-                className={btnPrimary}
-              >
-                作業完了を確定する
-              </button>
+              {/* r8-fix-frontend5 対応: 業者退会時は完了確定に進めないため非表示にし、
+                  キャンセルボタンのみ残す。 */}
+              {!txn.operator_deleted ? (
+                <button
+                  type="button"
+                  disabled={busy || Boolean(pendingReduction)}
+                  onClick={() =>
+                    setConfirmState({
+                      title: "作業完了を確定しますか？",
+                      message: "作業の完了を確定しますか？確定後はレビューを投稿できます。",
+                      confirmLabel: "確定する",
+                      onConfirm: () => {
+                        setConfirmState(null);
+                        void act(() => completeTransaction(txn.id, token!));
+                      },
+                    })
+                  }
+                  className={btnPrimary}
+                >
+                  作業完了を確定する
+                </button>
+              ) : null}
               <button
                 type="button"
                 disabled={busy}

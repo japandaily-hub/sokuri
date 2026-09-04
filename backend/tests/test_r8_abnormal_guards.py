@@ -21,7 +21,14 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.rate_limit_deps import get_rate_limiter
 from app.api.v1.router import api_router
+from app.core.rate_limit import (
+    InMemoryRateLimitStore,
+    RateLimitConfig,
+    RateLimitRule,
+    RateLimiter,
+)
 from app.core.security import hash_password
 from app.db.models.bid import Bid
 from app.db.models.operator import Operator
@@ -638,3 +645,194 @@ async def test_select_bid_rejects_deleted_operator(client: AsyncClient, db_sessi
     r = await client.get(f"/api/v1/cases/{case['id']}/bids", headers=_auth(user_token))
     assert r.status_code == 200, r.text
     assert next(b for b in r.json() if b["id"] == bid["id"])["operator_suspended"] is True
+
+
+async def test_select_bid_after_withdraw_commit_returns_409(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """退会が **commit された後**に走る落札は必ず409（r8-verify-fix H-1 残窓）。
+
+    退会と落札の競合窓（退会側の一括rejected化〜commit の間）で新規INSERTされた
+    入札は、退会側の行ロックの対象外だった。現在は双方が Operator 行を
+    ``SELECT ... FOR UPDATE``（services/case_lock.lock_operator_row）で掴むため、
+    退会commit後にロックを取る落札側は必ずコミット済みの ``deleted_at`` を読む。
+    ここではその窓で入り込んだ pending 入札を「退会後に status を pending へ戻す」
+    ことで再現し、select_bid が ORM の identity map ではなく**再読込した値**で
+    409 を返すことを固定する（SQLiteでは FOR UPDATE が no-op のため、実際の
+    直列化そのものは PostgreSQL 本番でのみ有効。r8-review 未解決2）。
+    """
+    admin_token = await _make_admin(client, db_session)
+    user_token, _ = await _signup_user(client)
+    op_token, op_id = await _verified_operator(client, admin_token, "r8op13@example.com")
+    case = await _create_case(client, user_token)
+    bid = await _bid(client, op_token, case["id"])
+
+    r = await client.request(
+        "DELETE",
+        "/api/v1/operator/me",
+        json={"password": "operatorpass1"},
+        headers=_auth(op_token),
+    )
+    assert r.status_code == 204, r.text
+
+    # 競合窓で入った新規入札の再現（退会側の一括UPDATEに掴まれなかった行）。
+    raced_bid = await db_session.get(Bid, uuid.UUID(bid["id"]))
+    raced_bid.status = "pending"
+    await db_session.commit()
+
+    r = await client.post(
+        f"/api/v1/cases/{case['id']}/bids/{bid['id']}/select", headers=_auth(user_token)
+    )
+    assert r.status_code == 409, r.text
+    assert "退会済み" in r.json()["detail"]
+
+    # 成約は1件も作られていない（退会済み業者の進行中取引が生まれない）。
+    txn_count = await db_session.scalar(
+        select(func.count()).select_from(Transaction).join(Bid, Transaction.bid_id == Bid.id).where(
+            Bid.operator_id == uuid.UUID(op_id)
+        )
+    )
+    assert txn_count == 0
+
+
+async def test_operator_withdraw_rate_limited_returns_429(db_session: AsyncSession):
+    """誤パスワード連打で scope=account_delete のアカウント軸が429を返す（r8-verify-fix）。
+
+    ``RateLimitGuard("account_delete")`` は ip_rule=None / count_all=False のため、
+    ハンドラが ``ctx.check_account()`` / ``record_failure()`` を呼ばない限り**何も
+    しない**（これが H-4 の原因そのもの）。呼び忘れの再発を捕まえるため、429 到達を
+    実証する。conftest の既定（RATE_LIMIT_ENABLED=false）に依存せず、
+    test_user_profile_ext.py と同じパターンでテスト専用の RateLimiter を注入する。
+    """
+    test_app = create_test_app(db_session)
+    limiter = RateLimiter(
+        config=RateLimitConfig(
+            enabled=True,
+            login_account=RateLimitRule(5, 900),
+            login_ip=RateLimitRule(20, 900),
+            sensitive_account=RateLimitRule(1, 900),
+            signup_ip=RateLimitRule(10, 3600),
+            line_ip=RateLimitRule(20, 900),
+            max_keys=10000,
+        ),
+        store=InMemoryRateLimitStore(),
+    )
+    test_app.dependency_overrides[get_rate_limiter] = lambda: limiter
+
+    async with AsyncClient(
+        transport=ASGITransport(app=test_app), base_url="http://test"
+    ) as rl_client:
+        admin_token = await _make_admin(rl_client, db_session)
+        op_token, op_id = await _verified_operator(
+            rl_client, admin_token, "r8op14@example.com"
+        )
+
+        r1 = await rl_client.request(
+            "DELETE",
+            "/api/v1/operator/me",
+            json={"password": "wrong-password"},
+            headers=_auth(op_token),
+        )
+        assert r1.status_code == 403, r1.text
+
+        # 上限（sensitive_account=1）超過。正しいパスワードでも 429 が先に返る
+        # （＝総当たりでの退会強行を止められる）。
+        r2 = await rl_client.request(
+            "DELETE",
+            "/api/v1/operator/me",
+            json={"password": "operatorpass1"},
+            headers=_auth(op_token),
+        )
+        assert r2.status_code == 429, r2.text
+        assert "Retry-After" in r2.headers
+
+        operator = await db_session.get(Operator, uuid.UUID(op_id))
+        await db_session.refresh(operator)
+        assert operator.deleted_at is None
+
+
+# ──────────────── r8-review Medium の回帰 ────────────────
+
+
+async def test_admin_cancel_records_executing_admin(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """強制終了の実行者（admin.id）が cancellations に残る（r8-review M-1）。
+
+    API 応答には含めない（当事者に運営個人を開示しない）ことも併せて固定する。
+    """
+    admin_token = await _make_admin(client, db_session)
+    user_token, _ = await _signup_user(client)
+    op_token, _ = await _verified_operator(client, admin_token, "r8op15@example.com")
+    _, txn_id = await _create_transaction(client, user_token, op_token)
+
+    r = await client.patch(
+        f"/api/v1/admin/transactions/{txn_id}/cancel",
+        json={"reason": "当事者双方が長期無応答のため運営判断で終了"},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 200, r.text
+
+    admin_id = await db_session.scalar(
+        select(User.id).where(User.email == "r8admin@katadzuke.jp")
+    )
+    cancellation = await db_session.scalar(
+        select(Cancellation).where(Cancellation.transaction_id == uuid.UUID(txn_id))
+    )
+    assert cancellation is not None
+    assert cancellation.cancelled_by == "admin"
+    assert cancellation.cancelled_by_admin_id == admin_id
+
+    r = await client.get(f"/api/v1/transactions/{txn_id}", headers=_auth(user_token))
+    assert r.status_code == 200, r.text
+    assert "cancelled_by_admin_id" not in r.json()["cancellation"]
+
+
+async def test_transaction_detail_exposes_operator_deleted(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """退会済み業者の成約は依頼者側に operator_deleted=true で伝わる（r8-review M-5）。
+
+    停止（operator_suspended）と違い退会は復帰しないため、web が「待つ」ではなく
+    「キャンセルして出し直す」導線を出せるよう独立した旗にしている。
+    """
+    admin_token = await _make_admin(client, db_session)
+    user_token, _ = await _signup_user(client)
+    op_token, op_id = await _verified_operator(client, admin_token, "r8op16@example.com")
+    _, txn_id = await _create_transaction(client, user_token, op_token)
+
+    r = await client.get(f"/api/v1/transactions/{txn_id}", headers=_auth(user_token))
+    assert r.status_code == 200, r.text
+    assert r.json()["operator_deleted"] is False
+    assert r.json()["operator_suspended"] is False
+
+    operator = await db_session.get(Operator, uuid.UUID(op_id))
+    operator.deleted_at = datetime.now(timezone.utc)
+    await db_session.commit()
+
+    r = await client.get(f"/api/v1/transactions/{txn_id}", headers=_auth(user_token))
+    assert r.status_code == 200, r.text
+    assert r.json()["operator_deleted"] is True
+    # 停止とは独立（退会しただけで停止扱いにはしない）。
+    assert r.json()["operator_suspended"] is False
+
+
+async def test_reduction_unknown_transaction_returns_404(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """減額申請の行ロック追加（r8-review M-6）後も、存在しない成約は404のまま。
+
+    ``lock_transaction_rows`` を認可判定より前に呼ぶ順序変更で、404 が 500 や
+    403 に化けないことを固定する（上限判定そのものは
+    test_reduction_request_limited_to_two_per_transaction が担保）。
+    """
+    admin_token = await _make_admin(client, db_session)
+    op_token, _ = await _verified_operator(client, admin_token, "r8op17@example.com")
+
+    r = await client.post(
+        f"/api/v1/transactions/{uuid.uuid4()}/reduction",
+        json={"requested_amount": 10000, "reason": "追加作業が不要になったため"},
+        headers=_auth(op_token),
+    )
+    assert r.status_code == 404, r.text
+    assert r.json()["detail"] == "成約情報が見つかりません。"

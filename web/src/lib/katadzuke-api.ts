@@ -287,6 +287,8 @@ export interface TransactionDetail extends TransactionOut {
   user_suspended: boolean;
   /** キャンセル済みの場合のみ非null。誰が・なぜ・いつキャンセルしたか。r8-fix-frontend2 H2 対応。 */
   cancellation: TransactionCancellation | null;
+  /** 落札業者が退会済みか（依頼者・業者双方の画面で取引継続不可の判定に使う）。r8-fix-frontend5 対応。 */
+  operator_deleted: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -1444,13 +1446,21 @@ export async function uploadCasePhoto(
   // r8-fix-frontend2 H4 是正: 非対応形式（HEIC 等）を "image/jpeg" と偽って送ると
   // backend のマジックバイト判定で必ず 415 になり、原因不明の失敗として再試行を招く。
   // 送信前にクライアント側で弾き、対応形式・上限サイズを明示する。
-  if (!ALLOWED_PHOTO_TYPES.has(file.type)) {
+  // r8-review M-3: file.type が空文字（拡張子なし／未知拡張子の JPEG を一部の
+  // Android ピッカー・Linux Chrome で選んだ場合）は「非対応形式」ではなく
+  // 「ブラウザが判定できなかった」だけ。ここで弾くと従来成功していた正当な写真が
+  // 必ず失敗する回帰になるため、従来どおり image/jpeg として送り、最終判断は
+  // backend のマジックバイト判定（services/storage.sniff_image_ext）に委ねる。
+  if (file.type !== "" && !ALLOWED_PHOTO_TYPES.has(file.type)) {
     throw new KdzApiError(422, "対応形式は JPEG / PNG / WebP です。別の形式（HEIC等）の場合は変換してからお試しください。");
   }
   if (file.size > MAX_PHOTO_UPLOAD_BYTES) {
     throw new KdzApiError(422, "ファイルサイズが上限（10MB）を超えています。");
   }
-  const contentType = file.type as "image/jpeg" | "image/png" | "image/webp";
+  const contentType = (file.type === "" ? "image/jpeg" : file.type) as
+    | "image/jpeg"
+    | "image/png"
+    | "image/webp";
 
   const presign = await request<PresignResponse>("/upload/presign", {
     method: "POST",

@@ -363,6 +363,11 @@ async def get_transaction(
     # 「相手が無応答」の理由が分からないまま待たされる。依頼者に停止の事実だけを
     # 伝える（停止事由は開示しない）。r6-flow H-2 対応。
     out.operator_suspended = bool(txn.bid.operator.is_suspended)
+    # 退会（deleted_at 非null）は停止と違い復帰しない。依頼者が「無応答の理由」を
+    # 知り、キャンセル等の次の手を打てるよう独立した旗で伝える（r8-review M-5）。
+    # 住所未開示のまま退会された場合、contact_email の「退会済み業者」分岐には
+    # 到達しないため、この旗が唯一の手掛かりになる。
+    out.operator_deleted = txn.bid.operator.deleted_at is not None
     # 逆方向（依頼者の停止）も業者に伝える。停止中の依頼者は日程確定・完了確定
     # （ユーザー専用操作）ができず取引が固定されるため、業者が待ち続ける理由を
     # 知れるようにする。停止事由は開示しない。r8-M4 対応。

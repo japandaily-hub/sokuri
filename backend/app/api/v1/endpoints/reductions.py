@@ -27,6 +27,7 @@ from app.schemas_katadzuke import (
     ReductionOut,
 )
 from app.services import notify_dispatch
+from app.services.case_lock import lock_transaction_rows
 
 router = APIRouter()
 
@@ -44,7 +45,14 @@ _TXN_LOAD = (
 
 async def _get_txn(session: AsyncSession, txn_id: uuid.UUID) -> Transaction:
     txn = await session.scalar(
-        select(Transaction).where(Transaction.id == txn_id).options(*_TXN_LOAD)
+        select(Transaction)
+        .where(Transaction.id == txn_id)
+        .options(*_TXN_LOAD)
+        # 行ロック取得後に読み直す経路（create_reduction）があるため、identity map の
+        # 陳腐化した reduction_requests を掴まないよう常に再読込する（r8-review M-6）。
+        # 本番はリクエストごとに新規セッションのため実質no-opだが、単一セッションを
+        # 共有するテストハーネスでは必須（bids._get_case と同じ理由・同じ作法）。
+        .execution_options(populate_existing=True)
     )
     if txn is None:
         raise HTTPException(
@@ -66,6 +74,18 @@ async def create_reduction(
     operator: Operator = Depends(get_current_operator),
     session: AsyncSession = Depends(get_session),
 ) -> ReductionOut:
+    # 上限判定（下記 _MAX_REDUCTION_REQUESTS）と pending 判定は read→check→write が
+    # 非原子で、2件目が pending のまま「依頼者の却下」と「業者の再申請」が同時着弾
+    # すると、uq_reduction_requests_pending（pending 2行のみを禁じる）を素通りして
+    # 3件目が入りうる（r8-review M-6）。当事者経路と同一のロック規約
+    # （Case → Transaction）に参加し、ロック後に読み直してから判定する。
+    # 認可判定より前にロックを取るが、対象は「自分が当事者でない成約」でも
+    # transaction_id を知る必要があり、かつ保持は本リクエスト内の数ms（admin の
+    # 強制終了・transactions.cancel と同じ作法）のためロック争奪DoSの実効性は無い。
+    if await lock_transaction_rows(session, transaction_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="成約情報が見つかりません。"
+        )
     txn = await _get_txn(session, transaction_id)
     if txn.bid.operator_id != operator.id:
         raise HTTPException(

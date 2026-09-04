@@ -781,6 +781,9 @@ async def admin_cancel_transaction(
             case_id=txn.case_id,
             transaction_id=txn.id,
             cancelled_by="admin",
+            # 実行者を DB に残す（r8-review M-1。アプリログだけでは
+            # ローテーションで消え、運営が複数人になると追跡不能になる）。
+            cancelled_by_admin_id=admin.id,
             reason=body.reason,
         )
     )

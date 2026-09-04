@@ -277,6 +277,8 @@ export default function ChatPage() {
   // r8-fix-frontend2 H3 是正: キャンセル済み・完了済みの取引ではチャットの続行操作
   // （送信・日程提案の確定）を無効化し、事実に即した終了表示に切り替える。
   const isClosed = detail?.status === "cancelled" || detail?.status === "completed";
+  // r8-fix-frontend5 対応: 落札業者が退会済みの場合、送信・日程確定に進めないよう無効化する。
+  const operatorDeleted = detail?.operator_deleted === true;
 
   return (
     <div className="chat-page">
@@ -368,7 +370,23 @@ export default function ChatPage() {
 
               {/* r8-fix-frontend2 H3 是正: キャンセル済み・完了済みの取引では、通常のLINE通知
                   バナーの代わりに終了案内を出す（送信欄・候補日確定は無効化される）。 */}
-              {isClosed ? (
+              {operatorDeleted ? (
+                <div
+                  style={{
+                    margin: "0 20px 12px",
+                    borderRadius: 0,
+                    border: "1px solid var(--danger)",
+                    background: "rgba(215,0,53,0.06)",
+                    padding: 12,
+                    fontSize: 13,
+                    lineHeight: 1.6,
+                    color: "var(--danger)",
+                  }}
+                  role="alert"
+                >
+                  この業者は退会したため、この取引は進められません。キャンセルして新しく出品してください
+                </div>
+              ) : isClosed ? (
                 <div className="line-banner" role="status">
                   <span className="line-dot" aria-hidden="true" />
                   この取引は終了しています（{detail ? TXN_STATUS_LABEL[detail.status] : ""}）。新しいメッセージは送信できません。
@@ -426,15 +444,17 @@ export default function ChatPage() {
                             type="button"
                             className="btn-schedule"
                             onClick={() => handleConfirmSchedule(m, slots)}
-                            disabled={confirmingMsgId === m.id || detail?.status !== "pending"}
+                            disabled={confirmingMsgId === m.id || detail?.status !== "pending" || operatorDeleted}
                           >
-                            {isClosed && detail
-                              ? TXN_STATUS_LABEL[detail.status]
-                              : detail?.status !== "pending"
-                                ? "日程確定済み"
-                                : confirmingMsgId === m.id
-                                  ? "確定中…"
-                                  : `${slots[pick] ?? ""} を選ぶ`}
+                            {operatorDeleted
+                              ? "業者退会のため確定できません"
+                              : isClosed && detail
+                                ? TXN_STATUS_LABEL[detail.status]
+                                : detail?.status !== "pending"
+                                  ? "日程確定済み"
+                                  : confirmingMsgId === m.id
+                                    ? "確定中…"
+                                    : `${slots[pick] ?? ""} を選ぶ`}
                           </button>
                         </div>
                       </div>
@@ -455,8 +475,12 @@ export default function ChatPage() {
                 })}
               </div>
 
-              {/* 入力エリア（終了済み取引では非表示にし、終了案内のみ出す） */}
-              {isClosed ? (
+              {/* 入力エリア（終了済み取引・業者退会時は非表示にし、案内のみ出す） */}
+              {operatorDeleted ? (
+                <div className="input-area" style={{ color: "var(--body-soft)", fontSize: 13, padding: "12px 20px" }}>
+                  この業者は退会したため送信できません
+                </div>
+              ) : isClosed ? (
                 <div className="input-area" style={{ color: "var(--body-soft)", fontSize: 13, padding: "12px 20px" }}>
                   この取引は終了しています
                 </div>

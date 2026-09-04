@@ -172,6 +172,14 @@ class Cancellation(Base, TimestampMixin):
         index=True,
     )
     cancelled_by: Mapped[str] = mapped_column(String(32), nullable=False)  # 'user'|'operator'|'admin'
+    # 強制終了を実行した運営アカウント（cancelled_by='admin' のときのみ非NULL）。
+    # 不可逆かつ当事者双方へ通知が飛ぶ操作の実行者がアプリログのローテーションで
+    # 消えると、運営が複数人になった時点で追跡不能になる（r8-review M-1）。
+    # API 応答には含めない（当事者に運営個人を開示しない）。運営アカウント自体が
+    # 削除された場合は SET NULL で行を残す（既存の case_id/transaction_id と同方針）。
+    cancelled_by_admin_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     reason: Mapped[str | None] = mapped_column(Text)
 
     # relations

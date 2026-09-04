@@ -566,15 +566,9 @@ class CaseItemUpdateRequest(BaseModel):
 #: 案件の利用目的として受け付ける値。web の選択肢（片付け整理／遺品整理／引っ越し／その他）に加え、
 #: 既存テスト・ローカル E2E シード（seed_local_e2e.py）で使われてきた値を後方互換のため含める。
 #: 未知の値は 422（Pydantic のバリデーションエラー）とする。
-CASE_PURPOSE_VALUES: tuple[str, ...] = (
-    "片付け整理",
-    "遺品整理",
-    "引っ越し",
-    "その他",
-    "不用品処分",
-    "断捨離",
-)
-
+#: 集合が必要な場合は ``typing.get_args(CasePurpose)`` を使うこと（r8-review M-4:
+#: 同じ6値を tuple と Literal で二重管理していたため、片方だけ更新されるドリフトを
+#: 確実に生んでいた。定数側を削除し Literal を単一の正本にした）。
 CasePurpose = Literal[
     "片付け整理",
     "遺品整理",
@@ -763,6 +757,13 @@ class TransactionDetailOut(TransactionOut):
     # 完了確定ができず取引が pending のまま固定されるため、業者が「無応答の理由」を
     # 知れるようにする。停止事由は開示しない）。r8-M4 対応。
     user_suspended: bool = False
+    # 落札業者が退会済みか（依頼者側にのみ意味がある）。r8-review M-5 対応。
+    # 停止（operator_suspended）と違い**復帰しない**ため、依頼者側の導線は
+    # 「待つ」ではなく「キャンセルして出し直す／運営に相談する」になる。両者を
+    # 1つの旗に畳むと web が正しい案内を出せないため独立したフィールドにする
+    # （入札一覧 BidOut は operator_suspended への流用のまま。選択不可という
+    # 単一の意味しか要らないため）。
+    operator_deleted: bool = False
     # status が cancelled の場合のみ非 None（それ以外は None）。r8-H2 対応。
     cancellation: TransactionCancellationOut | None = None
 

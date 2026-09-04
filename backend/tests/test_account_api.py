@@ -392,9 +392,10 @@ async def test_reauth_token_success(client: AsyncClient):
 
 
 async def test_reauth_token_wrong_password_400(client: AsyncClient):
-    """既存の change_my_password / delete_my_account と同じ規約（400）に統一する
+    """change_my_password / line-link / bank-account と同じ規約（400）に統一する
     （QA High-2対応。401は「トークン自体が無効」の意味で deps.py の認証ゲートが
-    使うため、パスワード不一致とは意味を区別する）。"""
+    使うため、パスワード不一致とは意味を区別する）。退会（DELETE /users/me・
+    DELETE /operator/me）だけは不可逆操作のため 403 に分離した（r8-verify-fix）。"""
     token = await _signup_user(client, "reauth2@example.com", "password123")
     r = await client.post(
         "/api/v1/users/me/reauth-token",
@@ -451,8 +452,8 @@ async def test_unlink_line_success(client: AsyncClient, db_session: AsyncSession
 
 
 async def test_unlink_line_wrong_password_400(client: AsyncClient):
-    """既存の change_my_password / delete_my_account と同じ規約（400）に統一する
-    （QA High-2対応）。"""
+    """change_my_password / reauth-token と同じ規約（400）に統一する（QA High-2対応。
+    退会だけは不可逆操作のため 403。r8-verify-fix の契約統一）。"""
     token = await _signup_user(client, "unlink2@example.com", "password123")
     r = await client.request(
         "DELETE",
@@ -594,7 +595,12 @@ async def test_delete_account_confirm_false_422(client: AsyncClient):
     assert r.status_code == 422
 
 
-async def test_delete_account_wrong_password_400(client: AsyncClient):
+async def test_delete_account_wrong_password_403(client: AsyncClient):
+    """退会の再認証失敗は 403（業者退会 DELETE /operator/me と同一契約）。
+
+    r8-verify-fix の指摘（同一意味に 400/403 が混在）に対する統一。パスワード変更・
+    reauth-token・line-link の再認証失敗は従来どおり 400 のまま（不可逆操作ではない）。
+    """
     token = await _signup_user(client, "delwrongpw@example.com")
     r = await client.request(
         "DELETE",
@@ -602,7 +608,8 @@ async def test_delete_account_wrong_password_400(client: AsyncClient):
         json={"password": "wrongpassword", "confirm": True},
         headers=_auth(token),
     )
-    assert r.status_code == 400
+    assert r.status_code == 403
+    assert r.json()["detail"] == "パスワードが正しくありません。"
 
 
 async def test_delete_account_success(client: AsyncClient, db_session: AsyncSession):

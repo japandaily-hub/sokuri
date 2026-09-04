@@ -12,11 +12,13 @@ cancel_case からも同一のロック規約に参加する必要が生じた�
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.case import Case
+from app.db.models.operator import Operator
 from app.db.models.transaction import Transaction
 
 
@@ -27,6 +29,31 @@ async def lock_case_row(session: AsyncSession, case_id: uuid.UUID) -> None:
     並行更新を伴う。ロック取得のみが目的のため取得列は主キーのみに絞る。
     """
     await session.execute(select(Case.id).where(Case.id == case_id).with_for_update())
+
+
+async def lock_operator_row(
+    session: AsyncSession, operator_id: uuid.UUID
+) -> datetime | None:
+    """業者行をロックし、``deleted_at`` を同一トランザクション内で読み直す（r8 H-1 残窓の閉塞）。
+
+    ``operator_profile.delete_my_operator_account``（退会）と ``bids.select_bid``
+    （落札）は、どのCase・どのBidを触るかが**互いに事前に確定しない**（退会側は
+    「その業者の全pending入札」、落札側は「その案件の1入札」）。Case行ロックだけ
+    では、退会側が対象集合を確定した後に新規INSERTされた入札を掴めず窓が残る。
+    双方が必ず触る唯一の共通行＝Operator行を明示ロックして直列化する。
+
+    ロック順序は **Case → Operator**（select_bid は lock_case_row の後に呼ぶ）。
+    退会側はCase行を掴まないため循環は生じない。SQLite（テスト）では no-op。
+
+    戻り値は ``operators.deleted_at``（退会済みなら非None）。業者行が存在しない
+    場合も None を返すが、呼び出し元はいずれも FK 経由の既存IDを渡すため到達しない
+    （404 への変換は ``lock_transaction_rows`` と同じく呼び出し元の責務）。
+    ロック取得と同時に読むことで、identity map 上の陳腐化した ``Bid.operator``
+    ではなく必ずコミット済みの最新値で判定できる。
+    """
+    return await session.scalar(
+        select(Operator.deleted_at).where(Operator.id == operator_id).with_for_update()
+    )
 
 
 async def lock_transaction_rows(

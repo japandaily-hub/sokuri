@@ -47,6 +47,7 @@ from app.schemas_katadzuke import (
     ReauthTokenRequest,
     ReauthTokenResponse,
 )
+from app.services.case_lock import lock_operator_row
 from app.services.message_guard import contains_contact_info
 
 logger = logging.getLogger(__name__)
@@ -403,18 +404,32 @@ async def delete_my_operator_account(
     ③パスワード無効化 ④LINE 連携解除 ⑤公開プロフィール非公開化
     ⑥未決（pending）入札の一括取り下げ ⑦``deleted_at`` による旧トークン即時失効。
 
-    r8-review H-1（退会と落札の競合が直列化されていない）対応: 「進行中取引数の
-    事前判定 → 入札のrejected化 → deleted_at付与」の順だと、事前判定と入札
-    rejected化の間で ``bids.select_bid`` がCase行ロックを取って落札・Transaction
-    作成をcommitしても、本関数のrejected化は既にselected化された入札には当たらず
-    競合を検出できなかった。そこで「入札のrejected化 → flush → 進行中取引数の
-    再判定」の順に入れ替える。select_bid は対象Bid行を条件付きUPDATEで更新する
-    （＝行ロックを取る）ため、本関数の一括UPDATE（同じくWHERE status=pending）は
-    select_bid のUPDATEが未コミットの間は自然にブロックされ、コミット後には
-    status が既に selected へ変わっているためrejected化の対象から外れる。
-    直後の再判定でその新規Transactionが可視化される（READ COMMITTED）ため、
-    非0なら本関数側をrollbackして409にする（多層防御としてbids.select_bid側にも
-    ``target.operator.deleted_at is not None`` の409ガードを追加済み）。
+    r8-review H-1（退会と落札の競合が直列化されていない）対応 — **Operator行を
+    共通の直列化点にする**（r8-verify-fix で残っていた窓の閉塞）:
+
+    直前の実装は「入札の一括rejected化 → flush → 進行中取引数の再判定」の順で、
+    ``select_bid`` の条件付きUPDATEが取る**Bid行ロック**に直列化を依存していた。
+    既存の pending 入札に対しては機能するが、一括UPDATE〜commit の間に同一業者が
+    **新規に INSERT した入札**は当該行ロックの対象外で、その入札を掴んだ
+    ``select_bid`` は未コミットの ``deleted_at`` を読めない（READ COMMITTED）ため
+    素通りし、退会済み業者の進行中Transactionが成立しえた。
+
+    そこで本関数と ``bids.select_bid`` の双方が**同一のOperator行**を
+    ``SELECT ... FOR UPDATE`` で掴む規約にする（``_lock_operator_row``）。
+    - select_bid が先にOperator行を掴んでいれば、本関数のロック取得がブロックされ、
+      解放後の進行中取引数の判定でその成約が可視化される → rollback + 409。
+    - 本関数が先に掴んでいれば、select_bid 側のロック取得がブロックされ、
+      解放後に読む ``deleted_at`` は必ずコミット済み → select_bid が409。
+    どちらの順序でも「退会済み業者の進行中成約」は成立しない。入札が**どのCaseに
+    付くか**に依存しないため、新規入札のINSERTが同時着弾しても窓が開かない。
+
+    ロック順序は既存規約（Case → Transaction）の後段に Operator を足す形で
+    **Case → Operator** に統一する（select_bid は lock_case_row の後に取得する）。
+    本関数はCase行を掴まないため、両者の間にロック循環は生じない。
+    多層防御として select_bid 側にも ``deleted_at`` の409ガードを残す。
+
+    注: SQLite（テスト）では ``FOR UPDATE`` が no-op のため、この直列化が実効を
+    持つのは PostgreSQL 本番のみ（r8-review 未解決2 と同じ制約）。
     """
     ctx = request.state.rate_limit
     account_key = str(operator.id)
@@ -427,6 +442,10 @@ async def delete_my_operator_account(
             ctx.record_failure(account_key)
             raise _OPERATOR_DELETE_WRONG_PASSWORD
         ctx.reset_account(account_key)
+
+    # 落札（bids.select_bid）との直列化点。以降の判定・更新は全てこのロックの
+    # 内側で行う（上記docstring参照）。
+    await lock_operator_row(session, operator.id)
 
     # 未決入札は取り下げる（退会後に落札されると連絡不能の成約が生まれる）。
     # 依頼者への落選通知は出さない: 案件は open のまま残り、他業者の入札で

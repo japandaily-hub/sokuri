@@ -563,7 +563,8 @@ class TestSensitiveOperations:
                 json={"password": "wrong", "confirm": True},
                 headers=_auth(token),
             )
-            assert r.status_code == 400
+            # 退会の再認証失敗は403（不可逆操作。業者退会と統一。r8-verify-fix）。
+            assert r.status_code == 403
         r = await client.request(
             "DELETE",
             "/api/v1/users/me",

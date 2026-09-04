@@ -489,8 +489,14 @@ _DELETE_CONFIRM_REQUIRED = HTTPException(
     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
     detail="削除の確認が必要です。",
 )
+# 退会（＝復旧不能な破壊的操作）の再認証失敗のみ 403 に統一する（r8-verify-fix の
+# 契約非対称の是正）。業者退会（operator_profile._OPERATOR_DELETE_WRONG_PASSWORD）と
+# 同一の status・同一の文言にし、web は「パスワードが正しくありません」を出す。
+# パスワード変更・reauth-token・bank-account・line-link の再認証失敗は従来どおり
+# 400（_WRONG_CURRENT_PASSWORD 系）— こちらは user 側・operator 側で既に対称であり、
+# 退会だけを 403 に分離することで「不可逆操作か否か」を status で区別できる。
 _DELETE_WRONG_PASSWORD = HTTPException(
-    status_code=status.HTTP_400_BAD_REQUEST,
+    status_code=status.HTTP_403_FORBIDDEN,
     detail="パスワードが正しくありません。",
 )
 _DELETE_ACTIVE_TRANSACTION = HTTPException(
