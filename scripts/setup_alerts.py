@@ -146,6 +146,12 @@ def ensure_brevo_sender(api_key: str, sender_email: str) -> None:
         return
     h = {"api-key": api_key}
     st, body = http("GET", "https://api.brevo.com/v3/senders", headers=h)
+    if st in (401, 403):
+        warn(
+            f"差出人 {sender_email} の状態は Brevo の IP 制限のため API から確認できません。"
+            "Brevo > Senders 画面で認証済み（Verified）になっているか確認してください（送信自体は IP 制限の影響を受けません）"
+        )
+        return
     senders = (body or {}).get("senders", []) if isinstance(body, dict) else []
     hit = next((x for x in senders if x.get("email", "").lower() == sender_email.lower()), None)
     if hit and hit.get("active"):
