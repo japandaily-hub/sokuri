@@ -131,12 +131,34 @@ def validate(values: dict[str, str]) -> bool:
         st, body = http("GET", "https://api.brevo.com/v3/account", headers={"api-key": values["BREVO_API_KEY"]})
         if st == 200:
             ok(f"Brevo キー有効: {body.get('email') if isinstance(body, dict) else ''}")
+            ensure_brevo_sender(values["BREVO_API_KEY"], values.get("ALERT_MAIL_FROM", ""))
         else:
             fail(f"Brevo キーが無効です（HTTP {st}）")
             good = False
     if values.get("ALERT_WEBHOOK_URL"):
         ok("Webhook URL を登録します（疎通は最後のテスト通知で確認）")
     return good
+
+
+def ensure_brevo_sender(api_key: str, sender_email: str) -> None:
+    """差出人（ALERT_MAIL_FROM）が Brevo に登録・認証済みか確認し、未登録なら登録して確認メールを送らせる。"""
+    if not sender_email:
+        return
+    h = {"api-key": api_key}
+    st, body = http("GET", "https://api.brevo.com/v3/senders", headers=h)
+    senders = (body or {}).get("senders", []) if isinstance(body, dict) else []
+    hit = next((x for x in senders if x.get("email", "").lower() == sender_email.lower()), None)
+    if hit and hit.get("active"):
+        ok(f"差出人 {sender_email} は Brevo で認証済み")
+        return
+    if hit:
+        warn(f"差出人 {sender_email} は登録済みですが未認証です。{sender_email} に届いた Brevo の確認メールのリンクを押してください")
+        return
+    st, body = http("POST", "https://api.brevo.com/v3/senders", headers=h, body={"name": "カタヅケ", "email": sender_email})
+    if st in (200, 201):
+        warn(f"差出人 {sender_email} を Brevo に登録しました。{sender_email} に届く確認メールのリンクを押すと送信できるようになります")
+    else:
+        fail(f"差出人の登録に失敗（HTTP {st}: {body}）。Brevo の Senders 画面で {sender_email} を手動追加してください")
 
 
 # ──────────────────────────── GitHub ────────────────────────────
@@ -271,6 +293,30 @@ def setup_render(api_key: str, values: dict[str, str], dry_run: bool) -> bool:
     return all_ok
 
 
+def fetch_render_env(api_key: str, key: str) -> str | None:
+    """Render のサービス環境変数から key の値を取得する（無ければ None）。"""
+    h = {"Authorization": f"Bearer {api_key}"}
+    st, services = http("GET", "https://api.render.com/v1/services?limit=50", headers=h)
+    if st != 200:
+        return None
+    svc = None
+    for item in services or []:
+        s_ = item.get("service") or item
+        if s_.get("name") == RENDER_SERVICE_NAME:
+            svc = s_
+            break
+    if not svc:
+        return None
+    st, envs = http("GET", f"https://api.render.com/v1/services/{svc['id']}/env-vars?limit=100", headers=h)
+    if st != 200:
+        return None
+    for item in envs or []:
+        ev = item.get("envVar") or item
+        if ev.get("key") == key and ev.get("value"):
+            return ev["value"]
+    return None
+
+
 # ──────────────────────────── main ────────────────────────────
 
 
@@ -284,6 +330,13 @@ def main() -> int:
 
     values = read_env_file(ENV_FILE)
     print(f"設定ファイル: {ENV_FILE}\n")
+    # BREVO_API_KEY がファイルに無ければ、Render（顧客向けメールで既に登録済み）から取得して使う。
+    # 値はこのプロセス内でのみ扱い、ファイルには書き戻さない。
+    if not values.get("BREVO_API_KEY") and values.get("ALERT_EMAILS") and values.get("RENDER_API_KEY"):
+        fetched = fetch_render_env(values["RENDER_API_KEY"], "BREVO_API_KEY")
+        if fetched:
+            values["BREVO_API_KEY"] = fetched
+            print("  ℹ️  BREVO_API_KEY は Render の既存設定から取得して使用します（ファイルには保存しません）")
     if not validate(values):
         print("\n検証に失敗しました。値を直して再実行してください。")
         return 1

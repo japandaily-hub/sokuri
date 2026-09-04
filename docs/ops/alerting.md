@@ -65,6 +65,12 @@ LINE Notify は 2025年3月に終了しているため、Messaging API の別チ
 2. 疑似障害: `BACKEND_URL` を存在しない URL に変えた `workflow_dispatch` は用意していないため、ローカルで `BACKEND_URL=http://127.0.0.1:9 python scripts/uptime_check.py` を実行し、通知本文と `.uptime_state.json` の遷移（down → 復旧）を確認。
 3. アプリ内監視: `backend/tests/test_alerts.py` で送信・クールダウン・バースト検知を自動テスト。実機では Render の環境変数を設定後、意図的に 500 を返すエンドポイントは無いため、ログに `alerts:` 行が出ることと、Webhook（Slack/Discord）で受信できることを確認。
 
+## Brevo（メール）で実際に詰まった点と対処（2026-09-04）
+- **API キーの「Authorised IPs」制限**: 有効だと GitHub Actions / Render など固定IPでない送信元が全て 401 になる。Brevo の Security > Authorised IPs を無効にする。
+- **差出人の認証**: 未認証の差出人からの送信は Brevo が受理後に「rejected（sender not validated）」で捨てる（API は 201 を返すので気づきにくい）。差出人は Senders に追加し、届く6桁コードで認証する。差出人の追加・認証 API は未登録IPを常に拒否するため、認証は Brevo の画面で行う。
+- **本番の差出人**: `noreply@katadzuke.jp` はドメイン未認証のため送れない。当面 Render の `MAIL_FROM` と `ALERT_MAIL_FROM` を認証済みの `katazuke.support@gmail.com` にしている。katadzuke.jp を Brevo でドメイン認証（DNS に DKIM/SPF 追加）したら `noreply@katadzuke.jp` に戻せる。
+- 配信結果は `GET /v3/smtp/statistics/events?email=<宛先>` で確認できる（`requests`→`delivered` なら到達、`error` なら理由が出る）。
+
 ## 今後の拡張候補
 - 業務異常（AI解析の連続失敗、通知メール送信失敗、審査待ち業者・減額申請の放置日数）の日次サマリ
 - Sentry 等の導入（スタックトレース・発生頻度の可視化）
