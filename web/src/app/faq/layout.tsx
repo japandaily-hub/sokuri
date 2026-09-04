@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "よくある質問",
   description: "カタヅケの使い方・料金・入札・訪問買取に関するよくある質問と回答。",
+  alternates: { canonical: "/faq" },
 };
 
 export default function Layout({ children }: { children: React.ReactNode }) {

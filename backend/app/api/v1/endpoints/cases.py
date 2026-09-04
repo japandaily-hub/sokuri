@@ -8,10 +8,21 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
+from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    status,
+)
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,9 +31,17 @@ from sqlalchemy.orm import selectinload
 from app.api.deps import Actor, get_current_actor, get_current_user
 from app.api.rate_limit_deps import RateLimitGuard
 from app.db.models.bid import BID_STATUS_PENDING, BID_STATUS_REJECTED, BID_STATUS_WITHDRAWN, Bid
-from app.db.models.case import Case, CaseItem, CasePhoto
+from app.db.models.case import (
+    CASE_AI_STATUS_DONE,
+    CASE_AI_STATUS_FAILED,
+    CASE_AI_STATUS_PENDING,
+    Case,
+    CaseItem,
+    CasePhoto,
+)
 from app.db.models.transaction import Cancellation
 from app.db.models.user import User
+from app.db import session as db_session_module
 from app.db.session import get_session
 from app.schemas_katadzuke import (
     BidOut,
@@ -31,12 +50,13 @@ from app.schemas_katadzuke import (
     CaseMaskedOut,
     CaseOut,
 )
-from app.services import notify, notify_dispatch, storage
+from app.services import notify_dispatch, storage
 from app.services.case_lock import lock_case_row
 from app.services.case_view import build_case_masked_out
 from app.services.summary import (
     ItemAnalysisInput,
     MAX_PHOTOS_FOR_AI,
+    build_fallback_summary,
     generate_case_ai,
     generate_case_summary,
     photo_url_for_ai,
@@ -45,6 +65,202 @@ from app.services.summary import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+#: AI 解析（BackgroundTasks 側）の全体デッドライン（秒）。summary.py の1枚あたり
+#: タイムアウト（25秒）× 逐次実行の積み上げで最悪約200秒かかりうるため、案件単位で
+#: 上限を切る（r6-verify-backend の実測値。超過時は ai_status="failed" に落とし、
+#: 案件自体は作成時のフォールバック要約付きで有効なまま残す）。
+_AI_ANALYSIS_DEADLINE_SEC = 120
+
+#: 冪等キーの有効窓。プロキシタイムアウト（Cloudflare 100秒）後の手動再送信を
+#: 吸収できる長さで、かつ「同じ部屋をもう一度出品したい」正規利用を阻害しない長さ。
+_IDEMPOTENCY_WINDOW = timedelta(minutes=10)
+
+#: 業者向け案件一覧の既定件数／上限（r6 M-5。応答形状は list のまま変えない）。
+_OPERATOR_LIST_DEFAULT_LIMIT = 100
+_OPERATOR_LIST_MAX_LIMIT = 200
+
+#: ai_status="pending" が「解析タスクが失われた」とみなされるまでの経過時間
+#: （r6-review H2）。Starlette の BackgroundTasks はプロセス内タスクで永続キューでは
+#: ないため、案件作成応答の直後に Render のデプロイ・スリープ復帰・OOM・SIGTERM が
+#: 起きると _run_case_ai_analysis が実行されないまま失われ、ai_status は pending の
+#: まま恒久的に残り得る（誰も failed に落とさない＝web は「解析中」表示に固定される）。
+_AI_STALE_PENDING_WINDOW = timedelta(minutes=10)
+_AI_STALE_REASON = "stale"
+
+
+def _as_utc(value: datetime) -> datetime:
+    """naive な日時（SQLite の server_default 経由）を UTC 起点の aware に揃える。"""
+    return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+
+
+async def _reap_stale_pending_ai(session: AsyncSession, cases: list[Case]) -> None:
+    """pending が ``_AI_STALE_PENDING_WINDOW`` を超えた案件を failed へ倒す（r6-review H2）。
+
+    GET /cases/{id} ・依頼者向け一覧の応答直前に呼ぶ「遅延回収」。DB を更新した上で
+    引数の ORM オブジェクト自体も書き換えるため、呼び出し元は追加の再取得無しに
+    新しい状態をそのままシリアライズできる。対象が無ければ何もしない（クエリすら
+    発行しない）。
+    """
+    now = datetime.now(timezone.utc)
+    stale_ids = [
+        c.id
+        for c in cases
+        if c.ai_status == CASE_AI_STATUS_PENDING
+        and now - _as_utc(c.created_at) > _AI_STALE_PENDING_WINDOW
+    ]
+    if not stale_ids:
+        return
+    await session.execute(
+        update(Case)
+        .where(Case.id.in_(stale_ids))
+        .values(ai_status=CASE_AI_STATUS_FAILED, ai_failed_reason=_AI_STALE_REASON)
+    )
+    await session.commit()
+    stale_id_set = set(stale_ids)
+    for c in cases:
+        if c.id in stale_id_set:
+            c.ai_status = CASE_AI_STATUS_FAILED
+            c.ai_failed_reason = _AI_STALE_REASON
+    logger.info(
+        "cases: pending 放置（%s分超）の案件を failed へ遅延回収しました - count=%s",
+        int(_AI_STALE_PENDING_WINDOW.total_seconds() // 60),
+        len(stale_ids),
+    )
+
+
+async def sweep_stale_pending_ai(session: AsyncSession) -> int:
+    """起動時スイープ（main.py lifespan から1回だけ呼ぶ、r6-review H2 (b)）。
+
+    ``_reap_stale_pending_ai`` は GET のアクセスがあって初めて回収する遅延回収だが、
+    案件詳細に誰もアクセスしないまま放置されると pending が残り続ける。起動のたびに
+    pending かつ ``_AI_STALE_PENDING_WINDOW`` 超の案件を一括で failed にする。
+    失敗しても起動を止めない（呼び出し元で例外を捕捉する）。戻り値は回収件数。
+    """
+    cutoff = datetime.now(timezone.utc) - _AI_STALE_PENDING_WINDOW
+    result = await session.execute(
+        update(Case)
+        .where(Case.ai_status == CASE_AI_STATUS_PENDING, Case.created_at < cutoff)
+        .values(ai_status=CASE_AI_STATUS_FAILED, ai_failed_reason=_AI_STALE_REASON)
+    )
+    await session.commit()
+    count = result.rowcount or 0
+    if count:
+        logger.info(
+            "cases: 起動時スイープで pending 放置の案件を %s 件 failed へ回収しました。", count
+        )
+    return count
+
+
+async def _find_idempotent_case_id(
+    session: AsyncSession, user_id: uuid.UUID, idempotency_key: str
+) -> uuid.UUID | None:
+    """同一ユーザー・同一冪等キーの案件が有効窓内に存在すればその id を返す。
+
+    窓の判定は SQL ではなく Python 側で行う（``created_at`` は SQLite では
+    naive、PostgreSQL では aware で返るため、バインド値との型不一致で比較が
+    静かに常時 False になるのを避ける）。
+    """
+    row = (
+        await session.execute(
+            select(Case.id, Case.created_at)
+            .where(Case.user_id == user_id, Case.idempotency_key == idempotency_key)
+            .order_by(Case.created_at.desc())
+            .limit(1)
+        )
+    ).first()
+    if row is None:
+        return None
+    case_id, created_at = row
+    if datetime.now(timezone.utc) - _as_utc(created_at) > _IDEMPOTENCY_WINDOW:
+        return None
+    return case_id
+
+
+async def _run_case_ai_analysis(case_id: uuid.UUID) -> None:
+    """案件作成後の AI 解析を **新しいセッション** で実行し、結果を書き戻す。
+
+    リクエストスコープのセッション（``get_session``）はレスポンス送出時にクローズ
+    されるうえ、長時間処理でコネクションをトランザクションごと占有すると無関係な
+    API までプール枯渇で巻き込む（r6 ADD-1）。そのため BackgroundTasks からは必ず
+    ``get_background_session_factory()`` で別セッションを開く。
+
+    失敗（例外・デッドライン超過）は ``ai_status="failed"`` として記録するだけで
+    案件は有効なまま残す（``ai_summary`` には作成時に書いたフォールバック文が入って
+    いる）。通知・入札は AI 解析の成否に依存しない。
+    """
+    session_factory = db_session_module.get_background_session_factory()
+    try:
+        async with session_factory() as session:
+            case = await session.scalar(
+                select(Case)
+                .where(Case.id == case_id)
+                .options(
+                    selectinload(Case.photos),
+                    selectinload(Case.items).selectinload(CaseItem.photos),
+                )
+            )
+            if case is None:
+                # 解析前に削除された等（通常は到達しない）。
+                logger.warning("cases: AI 解析対象の案件が見つかりません - case_id=%s", case_id)
+                return
+
+            ungrouped_refs = [
+                (p.storage_key, p.url) for p in case.photos if p.case_item_id is None
+            ]
+            try:
+                async with asyncio.timeout(_AI_ANALYSIS_DEADLINE_SEC):
+                    if case.items:
+                        item_inputs = [
+                            ItemAnalysisInput(
+                                name=item.name,
+                                photo_refs=[(p.storage_key, p.url) for p in item.photos],
+                            )
+                            for item in case.items
+                        ]
+                        ai_summary, item_results = await generate_case_ai(
+                            purpose=case.purpose,
+                            housing_type=case.housing_type,
+                            floor_plan=case.floor_plan,
+                            items=item_inputs,
+                            ungrouped_refs=ungrouped_refs,
+                        )
+                        for item, result in zip(case.items, item_results):
+                            item.ai_detected_name = result.ai_detected_name
+                            item.ai_condition = result.ai_condition
+                            item.ai_summary = result.ai_summary
+                    else:
+                        # レガシー（items無し）経路: generate_case_summary の既存契約
+                        # （解決済み文字列のリストを渡す）は温存する。解析対象は先頭
+                        # MAX_PHOTOS_FOR_AI 枚のみのため、その分だけを base64 化する。
+                        resolved_refs: list[str] = []
+                        for storage_key, url in ungrouped_refs[:MAX_PHOTOS_FOR_AI]:
+                            ref = await photo_url_for_ai(storage_key, url)
+                            if ref is not None:
+                                resolved_refs.append(ref)
+                        ai_summary = await generate_case_summary(
+                            purpose=case.purpose,
+                            housing_type=case.housing_type,
+                            floor_plan=case.floor_plan,
+                            photo_urls=resolved_refs,
+                        )
+                case.ai_summary = ai_summary
+                case.ai_status = CASE_AI_STATUS_DONE
+                case.ai_failed_reason = None
+            except Exception as exc:  # noqa: BLE001 -- 解析失敗で案件を壊さない
+                # 例外オブジェクトをそのまま文字列化しない（SDK 例外に画像データや
+                # リクエスト内容が含まれうる。summary._detect_photo_labels と同方針）。
+                reason = f"{type(exc).__name__}: {str(exc)[:180]}"
+                logger.error(
+                    "cases: AI 解析に失敗（フォールバック要約のまま継続） - case_id=%s - %s",
+                    case_id,
+                    reason,
+                )
+                case.ai_status = CASE_AI_STATUS_FAILED
+                case.ai_failed_reason = reason[:255]
+            await session.commit()
+    except Exception:  # noqa: BLE001 -- BackgroundTask の外へ例外を出さない
+        logger.exception("cases: AI 解析タスクが異常終了しました - case_id=%s", case_id)
 
 
 def _to_case_out(case: Case) -> CaseOut:
@@ -116,16 +332,44 @@ async def create_case(
     body: CaseCreateRequest,
     background: BackgroundTasks,
     request: Request,
+    response: Response,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
     _rl: object = Depends(RateLimitGuard("case_create")),
 ) -> CaseOut:
+    """案件を作成して即座に返す（AI 解析は BackgroundTasks で後追いする）。
+
+    r6 H-1 / ADD-1 対応: 以前はリクエスト内で AI 解析（最悪約200秒）を完了させてから
+    commit していたため、(1) プロキシのタイムアウト後もサーバは案件を作り続け、依頼者の
+    再送信で同一内容の案件が二重に並ぶ、(2) その間 DB コネクションをトランザクションごと
+    占有し、無関係な API までプール枯渇で巻き込む、という2つの障害が同時に起きていた。
+
+    現在は「写真保存 + 案件行の作成」だけを短いトランザクションで commit して 201 を返し、
+    解析は ``_run_case_ai_analysis``（別セッション・120秒デッドライン）に委ねる。応答の
+    ``ai_status`` は ``pending`` で、フロントは完了まで ``GET /cases/{id}`` をポーリングする。
+    ``idempotency_key`` を指定した再送信は、直近10分内なら新規作成せず 200 で既存案件を返す。
+    """
     # AI解析(Gemini呼び出し)を伴うコストDoS対策（security review 指摘対応）。
     # IP軸は Depends(RateLimitGuard(...)) が既にカウント・判定済み。アカウント軸は
     # user_id が Depends 解決後にしか判明しないため、ここで明示的にカウントする
     # （成功/失敗を問わず毎リクエストをコストとして数える。login等の失敗時のみ
     # カウント方式とは異なる）。
     request.state.rate_limit.hit_account(str(user.id))
+
+    # 冪等キーによる再送信の吸収（r6 H-1）。既存案件があれば新規作成せず 200 で返す
+    # （201 と区別できるようにし、フロントが「作成された」と「既にあった」を判別できる）。
+    if body.idempotency_key:
+        existing_case_id = await _find_idempotent_case_id(
+            session, user.id, body.idempotency_key
+        )
+        if existing_case_id is not None:
+            logger.info(
+                "cases: 冪等キーの一致により既存案件を返却 - user_id=%s case_id=%s",
+                user.id,
+                existing_case_id,
+            )
+            response.status_code = status.HTTP_200_OK
+            return _to_case_out(await _get_case(session, existing_case_id))
 
     case = Case(
         user_id=user.id,
@@ -138,6 +382,8 @@ async def create_case(
         floor_plan=body.floor_plan,
         floor_number=body.floor_number,
         has_elevator=body.has_elevator,
+        ai_status=CASE_AI_STATUS_PENDING,
+        idempotency_key=body.idempotency_key,
     )
     # 直下（未分類）写真。case.photos は「案件の全写真（未分類 + 商品紐づけ）」の
     # 合算ビューとして扱う（CasePhoto.item_id 経由の写真も case.photos に含める。
@@ -185,53 +431,13 @@ async def create_case(
             case.photos.append(photo)
         case.items.append(item)
 
-    total_photo_count = len(case.photos)
-    try:
-        if case.items:
-            # 予算配分（どの写真が実際に解析されるか）が確定した後に初めて
-            # photo_url_for_ai（base64データURL化）を呼ぶよう、ここでは
-            # (storage_key, url) の生タプルのみを渡す（summary.py 側の
-            # _analyze_items_with_budget / generate_case_ai 内で遅延解決する。
-            # 全写真を先行してbase64化するとメモリ/CPUを無駄に消費するため。
-            # security review 指摘対応）。
-            item_inputs = [
-                ItemAnalysisInput(
-                    name=item.name,
-                    photo_refs=[(p.storage_key, p.url) for p in item.photos],
-                )
-                for item in case.items
-            ]
-            ungrouped_photo_refs = [(p.storage_key, p.url) for p in flat_photos]
-            case.ai_summary, item_results = await generate_case_ai(
-                purpose=case.purpose,
-                housing_type=case.housing_type,
-                floor_plan=case.floor_plan,
-                items=item_inputs,
-                ungrouped_refs=ungrouped_photo_refs,
-            )
-            for item, result in zip(case.items, item_results):
-                item.ai_detected_name = result.ai_detected_name
-                item.ai_condition = result.ai_condition
-                item.ai_summary = result.ai_summary
-        else:
-            # レガシー（items無し）経路: generate_case_summary の既存契約
-            # （解決済み文字列のリストを渡す）は温存する。解析対象は先頭
-            # MAX_PHOTOS_FOR_AI 枚のみのため、その分だけを base64 化する
-            # （案件上限が 150 枚になり、全件の先行解決はメモリを浪費するため）。
-            ungrouped_refs: list[str] = []
-            for p in flat_photos[:MAX_PHOTOS_FOR_AI]:
-                ref = await photo_url_for_ai(p.storage_key, p.url)
-                if ref is not None:
-                    ungrouped_refs.append(ref)
-            case.ai_summary = await generate_case_summary(
-                purpose=case.purpose,
-                housing_type=case.housing_type,
-                floor_plan=case.floor_plan,
-                photo_urls=ungrouped_refs,
-            )
-    except Exception as exc:
-        logger.error("cases: AI サマリー生成に失敗（フォールバック） - %s", exc)
-        case.ai_summary = f"利用目的: {case.purpose}。写真 {total_photo_count} 枚。"
+    # AI 解析（Gemini 呼び出し）はここでは行わない。作成応答をブロックしないよう
+    # BackgroundTasks（_run_case_ai_analysis）へ出し、ここでは暫定の要約だけを埋める
+    # （解析が失敗しても案件詳細の要約欄が空にならないようにするため。従来の except
+    # フォールバックと同じ役割を、常に先に書いておく形へ移した）。
+    case.ai_summary = build_fallback_summary(
+        case.purpose, case.housing_type, case.floor_plan, len(case.photos)
+    )
 
     session.add(case)
     try:
@@ -253,9 +459,19 @@ async def create_case(
     # _get_case() の eager load 定義（_CASE_LOAD）を再利用して確実に全関連をロードする。
     case = await _get_case(session, case.id)
 
-    # LINE専用ユーザーの仮メール（実メール未設定）宛には送信しない。
-    if not notify.is_placeholder_email(user.email):
-        background.add_task(notify.send_case_created, user.email, str(case.id))
+    # 案件登録完了通知（r6-verify-web A1）。従来は notify.send_case_created の直呼びで、
+    # LINE専用ユーザー（仮メール保持者）にはメールもLINEも届かなかった。他イベントと同じ
+    # notify_dispatch（LINE優先→未連携/失敗時にメール）へ揃える。仮メール判定も dispatch
+    # 側へ集約されている。AI 解析より**先に**登録することで、解析完了を待たずに通知する。
+    background.add_task(
+        notify_dispatch.dispatch_case_created,
+        user.line_user_id,
+        user.email,
+        str(case.id),
+    )
+    # AI 解析は別セッション・別トランザクションで後追いする（本リクエストの
+    # コネクションは既に返却される）。
+    background.add_task(_run_case_ai_analysis, case.id)
     return _to_case_out(case)
 
 
@@ -266,7 +482,22 @@ async def create_case(
 async def list_cases(
     actor: Actor = Depends(get_current_actor),
     session: AsyncSession = Depends(get_session),
+    limit: int = Query(
+        _OPERATOR_LIST_DEFAULT_LIMIT,
+        ge=1,
+        le=_OPERATOR_LIST_MAX_LIMIT,
+        description="業者向け一覧の取得件数（依頼者の自分の案件一覧には適用しない）",
+    ),
+    offset: int = Query(0, ge=0, description="業者向け一覧の取得開始位置"),
 ) -> list[CaseOut] | list[CaseMaskedOut]:
+    """依頼者は自分の案件、業者は入札可能案件（公開中）の一覧を返す。
+
+    業者分岐にのみ ``limit`` / ``offset`` を適用する（r6 M-5）。公開案件は業者間で
+    共有される全体集合であり件数に上限が無い一方、``_CASE_LOAD`` が写真・商品・入札まで
+    eager load するため、公開案件数に比例して1リクエストの応答が線形に重くなる。
+    依頼者側は「自分の案件が全部見えること」の方が重要なため、従来どおり全件返す
+    （応答形状はどちらも list のまま変えない）。
+    """
     if actor.typ == "user":
         assert actor.user is not None
         cases = (
@@ -277,6 +508,9 @@ async def list_cases(
                 .order_by(Case.created_at.desc())
             )
         ).all()
+        # pending 放置の遅延回収（r6-review H2）。依頼者向け一覧のみ ai_status を
+        # 応答へ含めるため対象にする（業者向け CaseMaskedOut は ai_status を持たない）。
+        await _reap_stale_pending_ai(session, list(cases))
         return [_to_case_out(c) for c in cases]
 
     assert actor.operator is not None
@@ -288,7 +522,11 @@ async def list_cases(
             select(Case)
             .where(Case.status.in_(["open", "bidding"]))
             .options(*_CASE_LOAD)
-            .order_by(Case.created_at.desc())
+            # created_at のみだと同時刻の案件で並びが不定になり、ページ跨ぎで
+            # 取りこぼし/重複が起きうるため id を第2キーにする（admin 側と同方針）。
+            .order_by(Case.created_at.desc(), Case.id.desc())
+            .limit(limit)
+            .offset(offset)
         )
     ).all()
     return [_to_masked_out(c, actor.operator.id) for c in cases]
@@ -311,6 +549,9 @@ async def get_case(
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail="この案件への権限がありません。"
             )
+        # pending 放置の遅延回収（r6-review H2）。案件詳細に ai_status を含めるのは
+        # 依頼者向け CaseOut のみのため、業者向け分岐（下）では呼ばない。
+        await _reap_stale_pending_ai(session, [case])
         return _to_case_out(case)
 
     assert actor.operator is not None

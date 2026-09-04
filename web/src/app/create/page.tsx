@@ -15,13 +15,7 @@ import Link from "next/link";
 import { Ic, type IcName } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
 import { useToken } from "@/components/kdz/Ui";
-import {
-  createCase,
-  uploadCasePhoto,
-  toDisplayMessage,
-  KdzNetworkError,
-  createTimeoutSignal,
-} from "@/lib/katadzuke-api";
+import { createCase, uploadCasePhoto, toDisplayMessage } from "@/lib/katadzuke-api";
 import "./create.css";
 
 const STEPS = ["写真", "利用目的", "住居情報", "確認"] as const;
@@ -123,9 +117,12 @@ export default function CreateCasePage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState("");
-  /** createCase が AbortSignal.timeout（180秒）で打ち切られた場合 true。
-   *  案件自体は作成されている可能性があるため、再送信させず /mypage へ誘導する。 */
-  const [timedOut, setTimedOut] = useState(false);
+  /**
+   * 冪等キー（crypto.randomUUID()）。AI 解析は backend 側で背景実行されるため
+   * POST /cases 自体は即応答するが、通信断・二重タップでの再送信時に同一案件を
+   * 二重作成させないよう、送信の最初の試行で1度だけ発行し、リトライでは使い回す。
+   */
+  const idempotencyKeyRef = useRef<string | null>(null);
 
   // ---- H3対策: 撮影済みの写真がある状態での離脱を防ぐ ----
   /** 離脱確認モーダル（ブラウザバック検知時）の開閉。 */
@@ -409,10 +406,14 @@ export default function CreateCasePage() {
         loosePayloads.push({ storage_key: key, sort_order: i });
       }
 
-      setProgress("AIが案件を要約しています…");
-      // AI画像解析（Gemini）は backend 側で同期実行されるためレスポンスが長時間化しうる
-      // （A1: BackgroundTasks化されていない）。クライアント側には従来タイムアウトが
-      // 一切無く無限待機になっていたため、180秒で打ち切る。
+      setProgress("送信しています…");
+      // POST /cases は AI 解析の完了を待たずに応答する（背景実行・r6 H-1）。
+      // idempotency_key は最初の試行で1度だけ発行し、通信断による再送信でも使い回すことで
+      // 同一案件の二重作成を防ぐ。ネットワーク断時のタイムアウトは request() の既定挙動
+      // （ブラウザ既定のタイムアウト）に委ねる。
+      if (!idempotencyKeyRef.current) {
+        idempotencyKeyRef.current = crypto.randomUUID();
+      }
       const created = await createCase(
         {
           purpose,
@@ -425,27 +426,13 @@ export default function CreateCasePage() {
           has_elevator: hasElevator,
           items: itemPayloads.length > 0 ? itemPayloads : undefined,
           photos: loosePayloads,
+          idempotency_key: idempotencyKeyRef.current,
         },
         token,
-        createTimeoutSignal(180_000),
       );
       allowLeaveRef.current = true;
       router.push(`/cases/${created.id}?created=1`);
     } catch (err) {
-      // AbortSignal.timeout による中断は fetch 失敗として KdzNetworkError にラップされ、
-      // 元の DOMException("TimeoutError") は cause に保持される（lib/katadzuke-api.ts request()）。
-      // 通常のネットワーク断（NETWORK_ERROR_MESSAGE）とは区別し、再送信させない専用の案内に切り替える
-      // （写真アップロードは既に完了済みで、案件自体は作成されている可能性があるため）。
-      const isTimeout =
-        err instanceof KdzNetworkError &&
-        err.cause instanceof DOMException &&
-        err.cause.name === "TimeoutError";
-      if (isTimeout) {
-        setTimedOut(true);
-        setSubmitting(false);
-        setProgress("");
-        return;
-      }
       setError(toDisplayMessage(err, "送信に失敗しました。もう一度お試しください。"));
       setSubmitting(false);
       setProgress("");
@@ -495,15 +482,6 @@ export default function CreateCasePage() {
                 <circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" />
               </svg>
               {error}
-            </div>
-          )}
-
-          {timedOut && (
-            <div className="auth-error" role="alert" style={{ marginBottom: 16 }}>
-              <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: "none", stroke: "var(--danger)", strokeWidth: 2, strokeLinecap: "round", flexShrink: 0 }}>
-                <circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" />
-              </svg>
-              解析に時間がかかっています。しばらくしてからマイページで案件をご確認ください（案件は作成されている場合があります）。
             </div>
           )}
 
@@ -833,12 +811,12 @@ export default function CreateCasePage() {
               </div>
               <div className="hint-banner">
                 <Ic name="clock" className="hint-ic" />
-                <span>送信するとAIが写真を解析するため、完了まで数十秒ほどかかることがあります。画面を閉じずにそのままお待ちください。</span>
+                <span>送信後、AIによる写真の解析は案件詳細画面で進みます（通常1〜2分）。この画面での待ち時間はありません。</span>
               </div>
               {submitting && (
                 <div className="hint-banner" role="status">
                   <Ic name="clock" className="hint-ic" />
-                  <span>AI解析には最大2分ほどかかることがあります。この画面を閉じないでください。</span>
+                  <span>送信しています…この画面を閉じないでください。</span>
                 </div>
               )}
             </div>
@@ -849,11 +827,7 @@ export default function CreateCasePage() {
       {/* flow-footer */}
       <div className="flow-footer">
         <div className="inner">
-          {timedOut ? (
-            <Link href="/mypage" className="btn-flow-next">
-              マイページで確認する<Ic name="arrow" />
-            </Link>
-          ) : step === 0 && mode.kind === "shoot" ? (
+          {step === 0 && mode.kind === "shoot" ? (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
               <button
                 type="button"

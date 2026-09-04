@@ -51,6 +51,15 @@ class Settings(BaseSettings):
     gemini_max_retries: int = 2
     # SQLAlchemy のクエリエコー
     sql_echo: bool = False
+    # ── DB コネクションプール（db/session.py）────────────────────────
+    # SQLAlchemy 既定（pool_size=5 / max_overflow=10 / pool_timeout=30）に依存すると、
+    # Render 無料 PostgreSQL の接続上限（同時接続が少ない）に対して過大になり、かつ
+    # プール枯渇時に 30 秒ブロックしてから 500 になる（r6 ADD-1）。明示値に固定して
+    # 「詰まるなら早く詰まる」を可視化する。案件作成の AI 解析は BackgroundTasks 化
+    # （cases.py）済みのため、1 本のコネクションを長時間占有する経路は無い。
+    db_pool_size: int = 5
+    db_max_overflow: int = 5
+    db_pool_timeout: int = 10
 
     # ── カタヅケ: 認証 / ストレージ / メール ──────────────────────────
     # JWT 署名鍵（本番では必ず環境変数 JWT_SECRET で上書きする）
@@ -224,6 +233,19 @@ class Settings(BaseSettings):
         """
         if v < 100:
             raise ValueError("RL_MAX_KEYS は100以上の整数である必要があります。")
+        return v
+
+    @field_validator("db_pool_size", "db_max_overflow", "db_pool_timeout", mode="after")
+    @classmethod
+    def _validate_db_pool(cls, v: int, info: ValidationInfo) -> int:
+        """プール設定は 1 以上（max_overflow のみ 0 以上）を強制する。
+
+        0 や負値を設定すると起動はできてしまい、DB を使う全 API がプール待ち
+        （または即時 TimeoutError）で静かに死ぬため、起動時に弾く。
+        """
+        floor = 0 if info.field_name == "db_max_overflow" else 1
+        if v < floor:
+            raise ValueError(f"{info.field_name} は{floor}以上の整数である必要があります。")
         return v
 
     @field_validator("gemini_max_concurrent_calls", mode="after")

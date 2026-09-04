@@ -7,8 +7,12 @@
  * 同じ role="dialog" + 背景クリックで閉じる構成を踏襲する。
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Notice, btnDanger, btnPrimary, btnSecondary, inputBase } from "@/components/kdz/Ui";
+
+/** dialog 内でフォーカス移動可能な要素（disabled は除く）を集める共通セレクタ。 */
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 export function ConfirmModal({
   title,
@@ -44,6 +48,45 @@ export function ConfirmModal({
   const [reason, setReason] = useState("");
   const reasonMissing = withReason && reasonRequired && reason.trim() === "";
 
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const cancelBtnRef = useRef<HTMLButtonElement>(null);
+
+  // マウント時: 開いた直前の要素を退避し、最初の操作可能要素（キャンセル）へフォーカスを移す。
+  // アンマウント時: 退避しておいた要素へフォーカスを戻す（破壊的操作モーダルなので誤操作を防ぐため
+  // 既定フォーカスは確定ボタンではなくキャンセルにする）。
+  useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    cancelBtnRef.current?.focus();
+    return () => {
+      previouslyFocused?.focus();
+    };
+  }, []);
+
+  // Esc で閉じる・Tab/Shift+Tab をダイアログ内に循環させる簡易フォーカストラップ。
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        onCancel();
+        return;
+      }
+      if (e.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <div
       role="dialog"
@@ -53,6 +96,7 @@ export function ConfirmModal({
       onClick={onCancel}
     >
       <div
+        ref={dialogRef}
         className="w-full max-w-md rounded-none border border-slate-200 bg-white p-5"
         onClick={(e) => e.stopPropagation()}
       >
@@ -83,7 +127,7 @@ export function ConfirmModal({
           </div>
         ) : null}
         <div className="mt-4 flex justify-end gap-2">
-          <button type="button" className={btnSecondary} onClick={onCancel} disabled={busy}>
+          <button type="button" ref={cancelBtnRef} className={btnSecondary} onClick={onCancel} disabled={busy}>
             {cancelLabel}
           </button>
           <button

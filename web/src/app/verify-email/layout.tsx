@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "メールアドレスの確認",
   description: "メールアドレス確認手続きのご案内。",
+  alternates: { canonical: "/verify-email" },
 };
 
 export default function Layout({ children }: { children: React.ReactNode }) {

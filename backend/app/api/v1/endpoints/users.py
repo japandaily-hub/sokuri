@@ -27,8 +27,9 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
+from app.db.models.bid import BID_STATUS_PENDING, BID_STATUS_REJECTED, Bid
 from app.db.models.case import Case
-from app.db.models.transaction import Transaction
+from app.db.models.transaction import Cancellation, Transaction
 from app.db.models.user import User
 from app.db.models.user_identity_document import UserIdentityDocument
 from app.db.session import get_session
@@ -50,6 +51,7 @@ from app.schemas_katadzuke import (
     prefecture_to_residence_area,
 )
 from app.services import notify, notify_dispatch
+from app.services.case_lock import lock_case_row
 
 logger = logging.getLogger(__name__)
 
@@ -497,6 +499,84 @@ _DELETE_ACTIVE_TRANSACTION = HTTPException(
 )
 # 取引未成立のまま宙に浮いた案件を退会時にキャンセル化するための非終端ステータス一覧。
 _NON_TERMINAL_CASE_STATUSES = ("draft", "open", "bidding")
+# うち「公開済み＝業者から入札が付きうる」ステータス。cases.cancel_case が
+# 取り下げを許可する範囲と同一（draft は同関数が409で弾くため含めない）。
+_CANCELLABLE_CASE_STATUSES = ("open", "bidding")
+_WITHDRAWAL_CANCEL_REASON = "依頼者の退会に伴う自動取り下げ"
+
+# 落選通知1件ぶんのプリミティブ値（line_user_id, email, case_id, prefecture, city, purpose）。
+# BackgroundTasks へ ORM オブジェクトを渡さない既存規約に従うため tuple で持ち回す。
+_LostBidNotification = tuple[str | None, str, str, str, str, str]
+
+
+async def _cancel_open_case_on_withdrawal(
+    session: AsyncSession, case: Case, notifications: list[_LostBidNotification]
+) -> None:
+    """退会に伴う open/bidding 案件の暗黙キャンセル（cases.cancel_case と同じ手順）。
+
+    退会経路は従来 ``case.status = "cancelled"`` の直接代入だけで、
+    ①pending入札の一括却下 ②Cancellation（監査証跡）の記録 ③落選業者への通知
+    の3点を欠いていた。その結果、案件が cancelled でも Bid が pending のまま
+    永久に残り、入札した業者には何も通知されなかった（r6-flow H-1）。
+
+    申し送り: 本関数は cases.cancel_case の手順を複製している（cases.py が別担当の
+    ため）。**両者は services/ の共通関数（許可ステータスと reason を引数化）へ
+    統合すべき**。放置すると片方だけ直る二重メンテになる。
+    """
+    # cases.cancel_case・bids.select_bid と同じロック規約に参加する（Case行→…の順）。
+    # 退会は本人操作のため競合は稀だが、多案件ユーザーではロック保持が案件数ぶん
+    # 積み上がる点に留意（退会は低頻度操作のため許容と判断）。
+    await lock_case_row(session, case.id)
+
+    # losers の収集は必ず一括UPDATEの**前**に行う（ORM Update の同期方式により
+    # identity map 上の Bid.status がその場で書き換わる。cases.py と同じ罠）。
+    losers: list[tuple[str | None, str]] = [
+        (b.operator.line_user_id, b.operator.contact_email)
+        for b in case.bids
+        if b.status == BID_STATUS_PENDING
+    ]
+
+    # 条件付きUPDATE（open/bidding であることをWHERE句で再検証してから更新する）。
+    result = await session.execute(
+        update(Case)
+        .where(Case.id == case.id, Case.status.in_(_CANCELLABLE_CASE_STATUSES))
+        .values(status="cancelled")
+    )
+    if result.rowcount != 1:
+        # ロック取得前に他経路（取り下げ・落札）で状態が変わった場合。退会自体は
+        # 続行し、当該案件の暗黙キャンセルのみ見送る（入札も触らない）。
+        logger.warning(
+            "users/me delete: 案件の暗黙キャンセルを見送り - case_id=%s status=%s",
+            case.id,
+            case.status,
+        )
+        return
+    case.status = "cancelled"
+
+    await session.execute(
+        update(Bid)
+        .where(Bid.case_id == case.id, Bid.status == BID_STATUS_PENDING)
+        .values(status=BID_STATUS_REJECTED)
+    )
+    session.add(
+        Cancellation(
+            case_id=case.id,
+            transaction_id=None,
+            cancelled_by="user",
+            reason=_WITHDRAWAL_CANCEL_REASON,
+        )
+    )
+    for loser_line_user_id, loser_email in losers:
+        notifications.append(
+            (
+                loser_line_user_id,
+                loser_email,
+                str(case.id),
+                case.prefecture,
+                case.city,
+                case.purpose,
+            )
+        )
 
 
 @router.delete(
@@ -507,6 +587,7 @@ _NON_TERMINAL_CASE_STATUSES = ("draft", "open", "bidding")
 async def delete_my_account(
     body: AccountDeleteRequest,
     request: Request,
+    background: BackgroundTasks,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
     _rl: object = Depends(RateLimitGuard("account_delete")),
@@ -536,13 +617,25 @@ async def delete_my_account(
 
     cases = (
         await session.scalars(
-            select(Case).where(Case.user_id == user.id).options(selectinload(Case.transaction))
+            select(Case)
+            .where(Case.user_id == user.id)
+            .options(
+                selectinload(Case.transaction),
+                # 暗黙キャンセル時の落選通知先（業者）を解決するため入札も読む。
+                selectinload(Case.bids).selectinload(Bid.operator),
+            )
         )
     ).all()
+    lost_bid_notifications: list[_LostBidNotification] = []
     for case in cases:
         txn = case.transaction
         if txn is None and case.status in _NON_TERMINAL_CASE_STATUSES:
-            case.status = "cancelled"
+            if case.status in _CANCELLABLE_CASE_STATUSES:
+                await _cancel_open_case_on_withdrawal(session, case, lost_bid_notifications)
+            else:
+                # draft は業者に公開されておらず入札も付かない（cases.cancel_case も
+                # 409で弾く状態）ため、監査証跡・通知の対象にせず status のみ更新する。
+                case.status = "cancelled"
         # 完了済み取引に紐づく案件のみ住所詳細を保持する（業者側の完了記録の整合性維持）。
         # それ以外（取引なし／キャンセル済み取引）は居住地PIIを退会時に除去する。
         if txn is None or txn.status != "completed":
@@ -599,5 +692,17 @@ async def delete_my_account(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="退会処理に失敗しました。時間をおいて再度お試しください。",
         ) from exc
+
+    # 落選通知は commit 後にプリミティブ値で送る（cases.cancel_case と同じ規約）。
+    for line_user_id, email, case_id, prefecture, city, purpose in lost_bid_notifications:
+        background.add_task(
+            notify_dispatch.dispatch_bid_lost,
+            line_user_id,
+            email,
+            case_id,
+            prefecture,
+            city,
+            purpose,
+        )
 
     return AccountDeleteResponse(detail="退会手続きが完了しました。")

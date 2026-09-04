@@ -60,12 +60,16 @@ async def db_engine():
     await engine.dispose()
 
 @pytest.fixture
-async def db_session(db_engine) -> AsyncSession:
+async def db_session(db_engine, monkeypatch) -> AsyncSession:
     session_factory = async_sessionmaker(
         bind=db_engine,
         expire_on_commit=False,
         autoflush=False,
     )
+    # BackgroundTasks から開かれる「新しいセッション」（cases.py の AI 解析など、
+    # app.db.session.get_background_session_factory() 経由）もテスト用エンジンへ向ける。
+    # これをしないと本物の AsyncSessionLocal（PostgreSQL）へ接続を試みてしまう。
+    monkeypatch.setattr("app.db.session.AsyncSessionLocal", session_factory)
     async with session_factory() as session:
         yield session
         await session.rollback()

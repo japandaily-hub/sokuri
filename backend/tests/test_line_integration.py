@@ -719,8 +719,12 @@ class TestPlaceholderEmailNotLeaked:
         assert r.status_code == 200
         line_user_token = r.json()["access_token"]
 
+        # 案件登録完了通知も notify_dispatch 経由になったため（r6-verify-web A1）、
+        # サービス層のメール送信関数そのものをパッチして「メールは一切発火しない」
+        # ことを検証する（LINE Push はトークン未設定でスキップ→仮メール判定で
+        # メールも送らない）。
         with patch(
-            "app.api.v1.endpoints.cases.notify.send_case_created", new=AsyncMock()
+            "app.services.notify.send_case_created", new=AsyncMock()
         ) as send_mock:
             await _create_case(client, line_user_token)
         send_mock.assert_not_called()

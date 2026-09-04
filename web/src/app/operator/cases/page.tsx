@@ -21,6 +21,7 @@ import { Ic } from "@/components/kdz/Icons";
 import { useToken } from "@/components/kdz/Ui";
 import {
   CASE_STATUS_LABEL,
+  LIST_DEFAULT_LIMIT,
   formatYen,
   getOperatorProfile,
   listOpenCases,
@@ -118,13 +119,34 @@ export default function OperatorCasesPage() {
   const [error, setError] = useState<string | null>(null);
   const [vendorStatus, setVendorStatus] = useState<string | null>(null);
   const [hasLicense, setHasLicense] = useState<boolean | null>(null);
+  // ページング（r6 H-1）: backend が既定100件で切り詰めるため、取得件数が limit と
+  // 一致する間は「さらに読み込む」余地があると判断する（総件数は応答に含まれない）。
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     if (!token) return;
-    listOpenCases(token)
-      .then(setCases)
+    listOpenCases(token, { limit: LIST_DEFAULT_LIMIT, offset: 0 })
+      .then((res) => {
+        setCases(res);
+        setHasMore(res.length === LIST_DEFAULT_LIMIT);
+      })
       .catch((e) => setError(toDisplayMessage(e, "取得に失敗しました")));
   }, [token]);
+
+  async function loadMore() {
+    if (!token || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await listOpenCases(token, { limit: LIST_DEFAULT_LIMIT, offset: cases?.length ?? 0 });
+      setCases((prev) => [...(prev ?? []), ...res]);
+      setHasMore(res.length === LIST_DEFAULT_LIMIT);
+    } catch (e) {
+      setError(toDisplayMessage(e, "追加の読み込みに失敗しました"));
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   // 承認状態（vendor_status）を取得して審査中バナーの表示を判定する。
   // listOpenCases は審査待ちの業者にも200を返すため、403検知では判定できない。
@@ -199,6 +221,11 @@ export default function OperatorCasesPage() {
               <span className="lot-filter-count">{visibleCases.length}件を表示</span>
             </div>
           ) : null}
+          {hasMore ? (
+            <p className="lot-filter-empty" style={{ marginTop: -4, marginBottom: 12 }}>
+              ※ エリア・未入札の絞り込みは、現在読み込み済みの{cases?.length ?? 0}件が対象です。
+            </p>
+          ) : null}
 
           {loading || (!cases && !error) ? (
             <div style={{ display: "flex", justifyContent: "center", padding: "60px 0" }}>
@@ -222,6 +249,14 @@ export default function OperatorCasesPage() {
               ) : null}
             </div>
           )}
+
+          {hasMore ? (
+            <div style={{ display: "flex", justifyContent: "center", padding: "16px 0" }}>
+              <button type="button" className="btn btn-ghost" onClick={loadMore} disabled={loadingMore}>
+                {loadingMore ? "読み込み中…" : "さらに読み込む"}
+              </button>
+            </div>
+          ) : null}
         </div>
       </main>
     </div>

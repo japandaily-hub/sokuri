@@ -39,6 +39,12 @@ class _State:
 
 _state = _State()
 
+#: fire_and_forget が生成した Task の強参照。``asyncio.create_task`` の戻り値を
+#: 保持しないと、イベントループは Task を弱参照でしか持たないため GC に回収されて
+#: アラートが送られないまま静かに消えることがある（CPython の既知の落とし穴）。
+#: 完了時に done コールバックで自身を取り除く（集合が無限に増えない）。
+_inflight_tasks: set[asyncio.Task] = set()
+
 
 def _truncate(text: str, limit: int = _ALERT_TEXT_MAX) -> str:
     return text if len(text) <= limit else text[: limit - 1] + "…"
@@ -152,10 +158,14 @@ async def send_alert(
     text = _format_text(title, body, severity)
     subject = f"[カタヅケ監視][{severity.upper()}] {title}"
     logger.warning("alerts: %s", text.replace("\n", " | "))
+    # 3チャネルは**同時**に走らせる（直列にしない）。アラートの主因の1つが
+    # 「Brevo が枠切れ・キー失効でメールを送れない」ことであり（r6 H-3）、
+    # メールの成否や遅延に LINE / Webhook を巻き込ませないため。gather の引数順は
+    # 「Brevo 非依存の経路を先に置く」という意図の明示（実行は並行）。
     results = await asyncio.gather(
-        _send_email(subject, text),
         _send_line(text),
         _send_webhook(text),
+        _send_email(subject, text),
         return_exceptions=True,
     )
     return any(r is True for r in results)
@@ -170,4 +180,7 @@ def fire_and_forget(coro) -> None:  # noqa: ANN001 -- asyncio コルーチン
         coro.close()
         return
     task = loop.create_task(coro)
+    # 強参照を保持してから done コールバックを付ける（GC 回収による送信取りこぼし防止）。
+    _inflight_tasks.add(task)
+    task.add_done_callback(_inflight_tasks.discard)
     task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)

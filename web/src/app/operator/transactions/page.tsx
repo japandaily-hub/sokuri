@@ -16,6 +16,7 @@ import { OperatorHeader } from "@/components/kdz/OperatorHeader";
 import { Ic } from "@/components/kdz/Icons";
 import { useToken } from "@/components/kdz/Ui";
 import {
+  LIST_DEFAULT_LIMIT,
   TXN_STATUS_LABEL,
   formatYen,
   listTransactions,
@@ -34,13 +35,34 @@ export default function OperatorTransactionsPage() {
   const { token, loading } = useToken();
   const [items, setItems] = useState<TransactionListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // ページング（r6 H-1）: backend が既定100件で切り詰めるため、取得件数が limit と
+  // 一致する間は「さらに読み込む」余地があると判断する（総件数は応答に含まれない）。
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     if (!token) return;
-    listTransactions(token)
-      .then(setItems)
+    listTransactions(token, { limit: LIST_DEFAULT_LIMIT, offset: 0 })
+      .then((res) => {
+        setItems(res);
+        setHasMore(res.length === LIST_DEFAULT_LIMIT);
+      })
       .catch((e) => setError(toDisplayMessage(e, "取得に失敗しました")));
   }, [token]);
+
+  async function loadMore() {
+    if (!token || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await listTransactions(token, { limit: LIST_DEFAULT_LIMIT, offset: items?.length ?? 0 });
+      setItems((prev) => [...(prev ?? []), ...res]);
+      setHasMore(res.length === LIST_DEFAULT_LIMIT);
+    } catch (e) {
+      setError(toDisplayMessage(e, "追加の読み込みに失敗しました"));
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   const attentionCount = items?.filter((t) => t.has_pending_reduction).length ?? 0;
 
@@ -89,6 +111,9 @@ export default function OperatorTransactionsPage() {
                     </div>
                   </div>
                   <div className="txn-row-right">
+                    {t.unread_count > 0 ? (
+                      <span className="status-chip unread">未読{t.unread_count}</span>
+                    ) : null}
                     {t.has_pending_reduction ? <span className="status-chip warn">減額申請中</span> : null}
                     <span className={`status-chip ${txnChipClass(t.status)}`}>{TXN_STATUS_LABEL[t.status]}</span>
                     <Ic name="arrow" style={{ color: "var(--body-soft)", width: 16, height: 16 }} />
@@ -97,6 +122,14 @@ export default function OperatorTransactionsPage() {
               ))}
             </div>
           )}
+
+          {hasMore ? (
+            <div style={{ display: "flex", justifyContent: "center", padding: "16px 0" }}>
+              <button type="button" className="btn btn-ghost" onClick={loadMore} disabled={loadingMore}>
+                {loadingMore ? "読み込み中…" : "さらに読み込む"}
+              </button>
+            </div>
+          ) : null}
         </div>
       </main>
     </div>

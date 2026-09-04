@@ -7,7 +7,20 @@ from datetime import datetime
 from datetime import date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import BigInteger, Boolean, Date, DateTime, ForeignKey, Integer, String, Text, Uuid
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    Uuid,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
@@ -33,7 +46,9 @@ class Transaction(Base, TimestampMixin):
         Uuid, ForeignKey("cases.id", ondelete="RESTRICT"), nullable=False, unique=True, index=True
     )
     bid_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("bids.id", ondelete="RESTRICT"), nullable=False
+        # 業者の取引一覧（join Bid → Bid.operator_id 絞込）と FK の RESTRICT 検査が
+        # 索引不在で全走査になるため索引を張る（r6-backend M-6 / alembic 0028）。
+        Uuid, ForeignKey("bids.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     initial_amount: Mapped[int] = mapped_column(BigInteger, nullable=False)   # 落札額
     final_amount: Mapped[int | None] = mapped_column(BigInteger)              # 減額後確定額
@@ -75,6 +90,19 @@ class ReductionRequest(Base, TimestampMixin):
     """
 
     __tablename__ = "reduction_requests"
+    __table_args__ = (
+        # 「未回答は取引あたり1件」をDBでも担保する（r6-backend M-4 / alembic 0028）。
+        # アプリ層の in-memory 判定だけでは同時2リクエストで pending が2行でき、
+        # 以後その判定により業者が恒久的に409で締め出される。
+        # PostgreSQL / SQLite いずれも部分一意索引を解し、テストでも同じ制約が効く。
+        Index(
+            "uq_reduction_requests_pending",
+            "transaction_id",
+            unique=True,
+            postgresql_where=text("status = 'pending'"),
+            sqlite_where=text("status = 'pending'"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     transaction_id: Mapped[uuid.UUID] = mapped_column(
@@ -123,6 +151,15 @@ class Cancellation(Base, TimestampMixin):
     """キャンセル記録。case_id / transaction_id は NULL 許容（削除後の履歴保全）。"""
 
     __tablename__ = "cancellations"
+    __table_args__ = (
+        # 二重送信で同一成約のキャンセル記録が2行できると、業者の cancel_count が
+        # 実際の2倍になり無実の業者に停止判断のペナルティが積み上がる（r6-backend M-2）。
+        # transaction_id は NULL 許容（案件単位の取り下げ）だが、PostgreSQL/SQLite とも
+        # NULL 同士は重複扱いしないため案件取り下げの記録は従来どおり複数行入る。
+        # 制約: 将来「運営による代理キャンセル」で同一成約に2行目を積む運用が要る場合、
+        # cancelled_by を含む複合一意へ緩める必要がある（現仕様では発生しない）。
+        UniqueConstraint("transaction_id", name="uq_cancellations_transaction_id"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     case_id: Mapped[uuid.UUID | None] = mapped_column(

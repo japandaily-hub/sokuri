@@ -96,7 +96,23 @@ async def _send(to_email: str, subject: str, html: str) -> bool:
             res.raise_for_status()
         return True
     except Exception as exc:
+        # 実行時の送信失敗（Brevo 無料枠 300通/日 到達の 429・キー失効の 401・
+        # 送信ドメイン未認証の 402 等）は、従来 logger.error のみで運営に届かず
+        # 「画面は正常なのに通知が1通も出ていない」状態が続いた（r6 H-3）。
+        # alerts.send_alert は key 単位のクールダウン（既定600秒＝10分）を持つため、
+        # 宛先別ではなく固定キーで束ねて連打を防ぐ。宛先・件名は本文に載せない
+        # （アラート経路にPIIを流さない）。
         logger.error("notify: メール送信失敗（処理は継続） - %s", exc)
+        alerts.fire_and_forget(
+            alerts.send_alert(
+                "メール送信に失敗しています（Brevo）",
+                "Brevo へのメール送信が失敗しました。日次上限（無料枠300通/日）到達、"
+                "APIキー失効、送信ドメインの認証切れ等が考えられます。"
+                f"直近のエラー: {type(exc).__name__}: {str(exc)[:200]}",
+                severity="warning",
+                key="notify_brevo_send_failed",
+            )
+        )
         return False
 
 
@@ -340,5 +356,91 @@ async def send_operator_application_rejected(to_email: str, company_name: str, r
             f"<p><strong>{html.escape(company_name)}</strong> 様</p>"
             "<p>誠に恐れ入りますが、今回のお申込みは承認を見送らせていただきました。</p>"
             f"<p>理由: {html.escape(reason)}</p>"
+        ),
+    )
+
+
+async def send_operator_verified(to_email: str, company_name: str, active: bool) -> bool:
+    """業者の入札可否切替（vendor_status: active/pending）の通知（業者宛・r6 H3）。
+
+    事前申込の承認（send_operator_application_approved）とは別イベント。実際に入札
+    できるようになった／できなくなったタイミングを本人に知らせる唯一の経路。
+    """
+    settings = get_settings()
+    if active:
+        url = f"{settings.frontend_base_url}/operator/cases"
+        return await _send(
+            to_email,
+            "【カタヅケ】入札のご利用が可能になりました",
+            _wrap(
+                f"<p><strong>{html.escape(company_name)}</strong> 様</p>"
+                "<p>審査が完了し、案件への入札をご利用いただけるようになりました。</p>"
+                f'<p><a href="{url}">公開中の案件を見る</a></p>'
+            ),
+        )
+    url = f"{settings.frontend_base_url}/operator"
+    return await _send(
+        to_email,
+        "【カタヅケ】入札のご利用状況について",
+        _wrap(
+            f"<p><strong>{html.escape(company_name)}</strong> 様</p>"
+            "<p>現在、案件への入札を一時的に停止させていただいております。</p>"
+            "<p>ご不明な点はお問い合わせください（katazuke.info@gmail.com）。</p>"
+            f'<p><a href="{url}">業者マイページを開く</a></p>'
+        ),
+    )
+
+
+async def send_account_unsuspended(to_email: str, party: str) -> bool:
+    """アカウント停止の解除通知（本人宛・r6 H1）。
+
+    停止（suspend）時は理由開示の是非が運用ポリシー判断のため通知しない。解除は
+    「復帰したことを本人が知る手段がゼロ」になるため必ず通知する。
+    """
+    settings = get_settings()
+    url = (
+        f"{settings.frontend_base_url}/operator"
+        if party == "operator"
+        else f"{settings.frontend_base_url}/mypage"
+    )
+    return await _send(
+        to_email,
+        "【カタヅケ】アカウントのご利用を再開いただけます",
+        _wrap(
+            "<p>アカウントの利用制限を解除しました。これまでどおりご利用いただけます。</p>"
+            "<p>ご不便をおかけし申し訳ありませんでした。</p>"
+            f'<p><a href="{url}">マイページを開く</a></p>'
+        ),
+    )
+
+
+async def send_identity_document_reviewed(
+    to_email: str, approved: bool, reason: str | None = None
+) -> bool:
+    """本人確認書類の審査結果通知（依頼者宛・r6 H2）。
+
+    却下時は再提出のために理由を本文へ含める（DB にも保存され /mypage/identity で
+    再確認できるが、能動的に再訪しない限り気付けないため）。
+    """
+    settings = get_settings()
+    url = f"{settings.frontend_base_url}/mypage/identity"
+    if approved:
+        return await _send(
+            to_email,
+            "【カタヅケ】本人確認が完了しました",
+            _wrap(
+                "<p>ご提出いただいた本人確認書類の確認が完了しました。</p>"
+                f'<p><a href="{url}">本人確認の状況を確認する</a></p>'
+            ),
+        )
+    reason_html = f"<p>理由: {html.escape(reason)}</p>" if reason else ""
+    return await _send(
+        to_email,
+        "【カタヅケ】本人確認書類のご確認のお願い",
+        _wrap(
+            "<p>ご提出いただいた本人確認書類を確認しましたが、受理できませんでした。</p>"
+            f"{reason_html}"
+            "<p>お手数ですが、内容をご確認のうえ再度ご提出ください。</p>"
+            f'<p><a href="{url}">本人確認書類を再提出する</a></p>'
         ),
     )

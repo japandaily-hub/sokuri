@@ -22,6 +22,8 @@ import { OperatorHeader } from "@/components/kdz/OperatorHeader";
 import { useToken } from "@/components/kdz/Ui";
 import { DisclosureNotice } from "@/components/kdz/DisclosureNotice";
 import {
+  REDUCTION_CHIP_CLASS,
+  REDUCTION_STATUS_LABEL,
   TXN_STATUS_LABEL,
   cancelTransaction,
   createReduction,
@@ -32,13 +34,6 @@ import {
   toDisplayMessage,
   type TransactionDetail,
 } from "@/lib/katadzuke-api";
-
-const REDUCTION_STATUS_LABEL = {
-  pending: "回答待ち",
-  approved: "承認",
-  rejected: "却下",
-} as const;
-const REDUCTION_CHIP_CLASS = { pending: "warn", approved: "bidding", rejected: "done" } as const;
 
 type ModalState = { kind: "reduction"; amount: number; reason: string } | { kind: "cancel" } | null;
 

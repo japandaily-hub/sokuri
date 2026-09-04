@@ -35,6 +35,15 @@ if TYPE_CHECKING:
     from app.db.models.transaction import Cancellation, Transaction
 
 
+# Case.ai_status の許容値（bid.py の BID_STATUS_* と同じ命名規約）。
+#: 解析待ち（案件作成直後。BackgroundTasks が解析を開始する前）
+CASE_AI_STATUS_PENDING = "pending"
+#: 解析完了（ai_summary / CaseItem.ai_* に結果が入っている）
+CASE_AI_STATUS_DONE = "done"
+#: 解析失敗（例外・デッドライン超過。ai_summary はフォールバック文のまま）
+CASE_AI_STATUS_FAILED = "failed"
+
+
 class Case(Base, TimestampMixin):
     """ユーザーが作成した片付け案件。
 
@@ -68,6 +77,21 @@ class Case(Base, TimestampMixin):
 
     # Gemini Vision が生成した案件サマリー
     ai_summary: Mapped[str | None] = mapped_column(Text)
+
+    # AI 解析の進捗（"pending" → "done" / "failed"）。案件作成は解析を待たずに
+    # commit して即応答し、解析は BackgroundTasks 内の別セッションで行うため、
+    # 依頼者・フロントが「まだ解析中」を判別できる状態列が必要になる（r6 H-1/ADD-1）。
+    # "failed" でも案件自体は有効（ai_summary には作成時のフォールバック文が入る）。
+    ai_status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="pending", server_default="pending", index=True
+    )
+    # 失敗理由（運営の切り分け用。例外の型名+要約のみを保持し、写真やAPIキーは載せない）
+    ai_failed_reason: Mapped[str | None] = mapped_column(String(255))
+
+    # 冪等キー（クライアント発行 UUID）。プロキシタイムアウト由来の再送信で同一内容の
+    # 案件が二重作成されるのを防ぐ（r6 H-1）。直近 10 分・同一ユーザー内でのみ照合する
+    # ため DB の一意制約は張らない（古いキーの再利用を恒久的に拒否したくない）。
+    idempotency_key: Mapped[str | None] = mapped_column(String(64), index=True)
 
     # relations
     photos: Mapped[list[CasePhoto]] = relationship(

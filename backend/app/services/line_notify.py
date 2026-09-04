@@ -13,6 +13,7 @@ from typing import Literal
 import httpx
 
 from app.config import get_settings
+from app.services import alerts
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +70,21 @@ async def _push(line_user_id: str, text: str) -> bool:
             res.raise_for_status()
         return True
     except Exception as exc:
+        # 実行時の送信失敗（トークン失効の 401、無料枠超過の 429、友だち解除の 400 等）
+        # は従来ログのみで、LINE 優先の通知が全滅しても運営が気付けなかった（r6 H-3）。
+        # 宛先別ではなく固定キーで束ね、alerts 側の 10 分クールダウンで連打を防ぐ。
+        # 宛先 line_user_id はアラート本文に載せない。
         logger.error("line_notify: LINE Push送信失敗（処理は継続） - %s", exc)
+        alerts.fire_and_forget(
+            alerts.send_alert(
+                "LINE Push 送信に失敗しています",
+                "LINE Messaging API への Push 送信が失敗しました。チャネルアクセストークンの"
+                "失効、無料枠の上限到達、ユーザーのブロック等が考えられます。"
+                f"直近のエラー: {type(exc).__name__}: {str(exc)[:200]}",
+                severity="warning",
+                key="line_notify_push_failed",
+            )
+        )
         return False
 
 
@@ -189,4 +204,69 @@ async def push_message_received(
     return await _push(
         line_user_id,
         f"【カタヅケ】新しいメッセージが届きました。\n{settings.frontend_base_url}{path}",
+    )
+
+
+async def push_case_created(line_user_id: str, case_id: str) -> bool:
+    """① 案件登録完了（依頼者宛・r6-verify-web A1）。
+
+    従来は notify.send_case_created の直呼びのみで、LINE専用ユーザー（仮メール保持者）
+    には案件登録完了の通知が一切届いていなかった。
+    """
+    settings = get_settings()
+    url = f"{settings.frontend_base_url}/cases/{case_id}"
+    return await _push(
+        line_user_id,
+        "【カタヅケ】お片付け案件の登録が完了しました。\n"
+        f"業者からの入札が届き次第お知らせします。\n{url}",
+    )
+
+
+async def push_operator_verified(line_user_id: str, active: bool) -> bool:
+    """業者の入札可否切替（vendor_status: active/pending）の通知（業者宛・r6 H3）。"""
+    settings = get_settings()
+    if active:
+        return await _push(
+            line_user_id,
+            "【カタヅケ】審査が完了し、案件への入札をご利用いただけるようになりました。\n"
+            f"{settings.frontend_base_url}/operator/cases",
+        )
+    return await _push(
+        line_user_id,
+        "【カタヅケ】現在、案件への入札を一時的に停止させていただいております。\n"
+        f"ご不明な点はお問い合わせください。\n{settings.frontend_base_url}/operator",
+    )
+
+
+async def push_account_unsuspended(
+    line_user_id: str, party: Literal["user", "operator"]
+) -> bool:
+    """アカウント停止の解除通知（本人宛・r6 H1）。"""
+    settings = get_settings()
+    path = "/operator" if party == "operator" else "/mypage"
+    return await _push(
+        line_user_id,
+        "【カタヅケ】アカウントの利用制限を解除しました。これまでどおりご利用いただけます。\n"
+        f"{settings.frontend_base_url}{path}",
+    )
+
+
+async def push_identity_document_reviewed(
+    line_user_id: str, approved: bool, reason: str | None = None
+) -> bool:
+    """本人確認書類の審査結果通知（依頼者宛・r6 H2）。"""
+    settings = get_settings()
+    url = f"{settings.frontend_base_url}/mypage/identity"
+    if approved:
+        return await _push(
+            line_user_id,
+            f"【カタヅケ】本人確認が完了しました。\n{url}",
+        )
+    # 却下理由は運営が入力する自由文＝通知文への差し込み。改行で偽の案内行を
+    # 作られないよう、他の差し込み値と同様に1行へ正規化する。
+    reason_line = f"理由: {_sanitize_inline(reason, max_length=80)}\n" if reason else ""
+    return await _push(
+        line_user_id,
+        "【カタヅケ】ご提出いただいた本人確認書類を受理できませんでした。\n"
+        f"{reason_line}お手数ですが再度ご提出ください。\n{url}",
     )

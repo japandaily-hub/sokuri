@@ -69,6 +69,8 @@
 
 /* 減額申請中などの注意チップ（cases.css の .status-chip に無い amber バリアント） */
 .status-chip.warn { background: var(--warm); color: var(--gold); border: 1px solid var(--gold); }
+/* 未読メッセージ件数バッジ（取引一覧カード。r6-flow M-3 対応） */
+.status-chip.unread { background: var(--primary); color: #fff; border: 1px solid var(--primary); }
 
 /* 案件詳細: AI要約 */
 .op-ai-summary { font-size: 11px; font-weight: 600; letter-spacing: .06em; color: var(--body-soft); margin-bottom: 6px; }

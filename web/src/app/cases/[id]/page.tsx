@@ -25,6 +25,7 @@ import {
 import {
   CASE_ITEM_CONDITION_LABEL,
   CASE_STATUS_LABEL,
+  REDUCTION_STATUS_LABEL,
   TXN_STATUS_LABEL,
   addCaseItemPhoto,
   cancelCase,
@@ -265,6 +266,29 @@ export default function UserCaseDetailPage() {
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  // AI 解析は backend 側で背景実行される（r6 H-1）。ai_status==="pending" の間は
+  // 3秒間隔でポーリングし、"done"/"failed" に遷移したら（依存配列の変化で）自動的に止まる。
+  // 最大3分でタイムアウトし、それ以降は自動更新を打ち切る（failed 表示のまま手動リロードに委ねる）。
+  useEffect(() => {
+    if (!token || caseData?.ai_status !== "pending") return;
+    const startedAt = Date.now();
+    const POLL_MS = 3000;
+    const MAX_MS = 180_000;
+    const timer = setInterval(async () => {
+      if (Date.now() - startedAt > MAX_MS) {
+        clearInterval(timer);
+        return;
+      }
+      try {
+        const c = await getCase(caseId, token);
+        setCaseData(c);
+      } catch {
+        // ポーリング中の一時的な失敗は無視し、次回の間隔で再試行する。
+      }
+    }, POLL_MS);
+    return () => clearInterval(timer);
+  }, [token, caseId, caseData?.ai_status]);
 
   async function act(fn: () => Promise<unknown>, confirmMsg?: string) {
     if (confirmMsg && !window.confirm(confirmMsg)) return;
@@ -521,7 +545,20 @@ export default function UserCaseDetailPage() {
           onChange={handleAddPhotoFilesSelected}
         />
 
-        {caseData.ai_summary ? (
+        {caseData.ai_status === "pending" ? (
+          <div className="mt-4 flex items-center gap-2 rounded-none bg-slate-50 p-4" role="status">
+            <Spinner className="h-4 w-4 text-brand-600" />
+            <p className="text-sm leading-relaxed text-slate-600">
+              AI が写真を解析中です（通常1〜2分）。この画面は自動で更新されます。
+            </p>
+          </div>
+        ) : caseData.ai_status === "failed" ? (
+          <div className="mt-4 rounded-none bg-slate-50 p-4">
+            <p className="text-sm leading-relaxed text-slate-600">
+              AI 要約を作成できませんでした。写真と入力内容で入札を受け付けます。
+            </p>
+          </div>
+        ) : caseData.ai_summary ? (
           <div className="mt-4 rounded-none bg-slate-50 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
               AI 要約（業者に提示されます）
@@ -588,12 +625,18 @@ export default function UserCaseDetailPage() {
                         {b.message}
                       </p>
                     ) : null}
+                    {b.operator_suspended ? (
+                      <p className="mt-2 max-w-md text-xs font-semibold leading-relaxed text-red-600" role="alert">
+                        この業者は現在利用停止中です。運営（<Link href="/contact" className="underline">/contact</Link>）にお問い合わせください。
+                      </p>
+                    ) : null}
                   </div>
                   {/* 一覧は activeBids（pending のみ）だが、多層防御として描画直前にも再確認する。 */}
                   {b.status === "pending" ? (
                     <button
                       type="button"
-                      disabled={busy}
+                      disabled={busy || b.operator_suspended}
+                      title={b.operator_suspended ? "この業者は現在利用停止中のため選択できません" : undefined}
                       onClick={() =>
                         act(
                           () => selectBid(caseId, b.id, token!),
@@ -659,6 +702,16 @@ export default function UserCaseDetailPage() {
             <StatusBadge value={txn.status} label={TXN_STATUS_LABEL[txn.status]} />
           </div>
 
+          {txn.operator_suspended ? (
+            <div className="mt-3 rounded-none border border-red-200 bg-red-50 p-3 text-sm leading-relaxed text-red-700" role="alert">
+              この業者は現在利用停止中です。運営（
+              <Link href="/contact" className="underline">
+                /contact
+              </Link>
+              ）にお問い合わせください。
+            </div>
+          ) : null}
+
           {/* 業者とのやり取り導線（チャット/日程調整） */}
           {txn.status !== "cancelled" && (
             <div className="mt-4 flex flex-wrap gap-2">
@@ -676,6 +729,36 @@ export default function UserCaseDetailPage() {
                   訪問予定: {formatVisitSchedule(txn.visit_date, txn.visit_time_slot)}
                 </p>
               ) : null}
+              {txn.operator_suspended ? (
+                <p className="w-full text-xs font-semibold text-red-600">
+                  ※ 業者が対応できないため、チャット送信・日程調整の返信が届かない場合があります。
+                </p>
+              ) : null}
+            </div>
+          )}
+
+          {/* 減額申請の履歴（承認・却下済みを含む全件。r6-flow M-4 対応。
+              ラベル定義は operator/transactions/[id]/page.tsx と共通の
+              REDUCTION_STATUS_LABEL（lib/katadzuke-api.ts）を使う。 */}
+          {txn.reduction_requests.length > 0 && (
+            <div className="mt-4">
+              <p className="text-sm font-normal text-slate-900">減額申請の履歴</p>
+              <ul className="mt-2 space-y-2">
+                {txn.reduction_requests.map((r) => (
+                  <li
+                    key={r.id}
+                    className="rounded-none border border-slate-200 p-3"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-semibold text-slate-900">
+                        {formatYen(r.original_amount)} → {formatYen(r.requested_amount)}
+                      </span>
+                      <StatusBadge value={r.status} label={REDUCTION_STATUS_LABEL[r.status]} />
+                    </div>
+                    <p className="mt-1 text-xs leading-relaxed text-slate-600">理由: {r.reason}</p>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 

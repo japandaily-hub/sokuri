@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "業者ログイン",
   description: "登録業者向けのログイン画面。",
+  alternates: { canonical: "/operator/login" },
 };
 
 export default function Layout({ children }: { children: React.ReactNode }) {

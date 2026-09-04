@@ -7,6 +7,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "コンディションを選択",
   robots: { index: false, follow: false },
+  alternates: { canonical: "/condition" },
 };
 
 export default function ConditionLayout({ children }: { children: React.ReactNode }) {

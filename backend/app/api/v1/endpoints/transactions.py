@@ -13,7 +13,8 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -21,6 +22,7 @@ from app.api.deps import Actor, get_current_actor
 from app.db.models.bid import Bid
 from app.db.models.case import Case, CaseItem
 from app.db.models.message import Message
+from app.db.models.operator import Operator
 from app.db.models.transaction import Cancellation, Transaction
 from app.db.models.user import User
 from app.db.session import get_session
@@ -39,6 +41,7 @@ from app.schemas_katadzuke import (
     TransactionOut,
 )
 from app.services import notify, notify_dispatch
+from app.services.case_lock import lock_case_row
 from app.services.case_view import build_case_masked_out
 
 logger = logging.getLogger(__name__)
@@ -52,9 +55,14 @@ router = APIRouter()
     summary="成約一覧（ユーザー: 自分の成約 / 業者: 落札案件）",
 )
 async def list_transactions(
+    limit: int = Query(100, ge=1, le=200, description="取得件数の上限"),
+    offset: int = Query(0, ge=0, description="取得開始位置"),
     actor: Actor = Depends(get_current_actor),
     session: AsyncSession = Depends(get_session),
 ) -> list[TransactionListItem]:
+    # limit/offset を付けるまでは全件を eager load していたため、成約が積み上がる
+    # ほど一覧が線形に重くなっていた（r6-verify-backend ADD-2）。応答形状（配列）は
+    # 変えず、既定100件・上限200件に制限する。
     stmt = (
         select(Transaction)
         .join(Case, Transaction.case_id == Case.id)
@@ -66,6 +74,8 @@ async def list_transactions(
             selectinload(Transaction.reviews),
         )
         .order_by(Transaction.created_at.desc())
+        .limit(limit)
+        .offset(offset)
     )
     if actor.typ == "user":
         assert actor.user is not None
@@ -75,6 +85,7 @@ async def list_transactions(
         stmt = stmt.where(Bid.operator_id == actor.operator.id)
 
     txns = (await session.scalars(stmt)).all()
+    unread_map = await _unread_counts(session, [t.id for t in txns], actor.typ)
     return [
         TransactionListItem(
             id=t.id,
@@ -92,9 +103,38 @@ async def list_transactions(
                 r.status == "pending" for r in t.reduction_requests
             ),
             has_review=any(rv.reviewer_type == "user" for rv in t.reviews),
+            unread_count=unread_map.get(t.id, 0),
         )
         for t in txns
     ]
+
+
+async def _unread_counts(
+    session: AsyncSession, txn_ids: list[uuid.UUID], party: str
+) -> dict[uuid.UUID, int]:
+    """取引ごとの未読数を **1クエリ**（GROUP BY）で数える（r6-flow M-3）。
+
+    既読ポインタ（user_last_read_at / operator_last_read_at）は取引ごとに異なるため、
+    transactions を join して行ごとの比較条件に使う。取引数ぶん _count_unread を
+    呼ぶ実装は N+1 になるため採らない。
+    """
+    if not txn_ids:
+        return {}
+    read_col = (
+        Transaction.user_last_read_at if party == "user" else Transaction.operator_last_read_at
+    )
+    peer_sender_type = "operator" if party == "user" else "user"
+    rows = await session.execute(
+        select(Message.transaction_id, func.count())
+        .join(Transaction, Transaction.id == Message.transaction_id)
+        .where(
+            Message.transaction_id.in_(txn_ids),
+            Message.sender_type == peer_sender_type,
+            or_(read_col.is_(None), Message.created_at > read_col),
+        )
+        .group_by(Message.transaction_id)
+    )
+    return {txn_id: int(count) for txn_id, count in rows}
 
 _TXN_LOAD = (
     selectinload(Transaction.case).selectinload(Case.photos),
@@ -124,6 +164,30 @@ async def _get_txn(session: AsyncSession, txn_id: uuid.UUID) -> Transaction:
             status_code=status.HTTP_404_NOT_FOUND, detail="成約情報が見つかりません。"
         )
     return txn
+
+
+async def _lock_txn_rows(session: AsyncSession, txn_id: uuid.UUID) -> None:
+    """成約の状態遷移用に **Case → Transaction の順**で行ロックを取る（r6-backend M-1）。
+
+    complete / cancel / confirm_schedule は read→check→write が非原子で、
+    「完了」と「キャンセル」の同時実行が後勝ちで互いに矛盾した状態
+    （transactions.status="completed" なのに cancellations 行が在る等）を残しうる。
+
+    ロック順序は既存規約（bids.select_bid・cases.cancel_case が Case を先に掴む）に
+    必ず合わせること。Transaction を先に掴むとデッドロックを新規に作る。
+    """
+    case_id = await session.scalar(
+        select(Transaction.case_id).where(Transaction.id == txn_id)
+    )
+    if case_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="成約情報が見つかりません。"
+        )
+    await lock_case_row(session, case_id)
+    # ロック取得のみが目的のため取得列は主キーのみに絞る（case_lock と同じ作法）。
+    await session.execute(
+        select(Transaction.id).where(Transaction.id == txn_id).with_for_update()
+    )
 
 
 def _assert_party(txn: Transaction, actor: Actor) -> str:
@@ -199,6 +263,11 @@ async def get_transaction(
             else:
                 out.contact_email = txn.bid.operator.contact_email
 
+    # 業者が利用停止されると当該業者の全操作が403（deps）になり、依頼者側は
+    # 「相手が無応答」の理由が分からないまま待たされる。依頼者に停止の事実だけを
+    # 伝える（停止事由は開示しない）。r6-flow H-2 対応。
+    out.operator_suspended = bool(txn.bid.operator.is_suspended)
+
     out.unread_count = await _count_unread(session, txn, party)
     return out
 
@@ -227,6 +296,9 @@ async def complete_transaction(
     actor: Actor = Depends(get_current_actor),
     session: AsyncSession = Depends(get_session),
 ) -> TransactionOut:
+    # Case → Transaction の順で行ロックを取ってから読み直す（同時実行の cancel と
+    # 後勝ちで矛盾しないようにする。r6-backend M-1）。
+    await _lock_txn_rows(session, transaction_id)
     txn = await _get_txn(session, transaction_id)
     party = _assert_party(txn, actor)
     if party != "user":
@@ -237,6 +309,14 @@ async def complete_transaction(
     if txn.status not in ("pending", "visiting"):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="完了にできる状態ではありません。"
+        )
+    # 未回答の減額申請を残したまま完了すると final_amount=initial_amount で確定した
+    # 後に decide_reduction が通り、確定額が事後に書き換わる（r6-flow ADD-2）。
+    # decide_reduction 側の status ガードと対で、両方向の穴を塞ぐ。
+    if any(r.status == "pending" for r in txn.reduction_requests):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="減額申請への回答が必要です。承認または却下のうえ完了してください。",
         )
     if txn.final_amount is None:
         txn.final_amount = txn.initial_amount
@@ -258,9 +338,13 @@ async def cancel_transaction(
     actor: Actor = Depends(get_current_actor),
     session: AsyncSession = Depends(get_session),
 ) -> TransactionOut:
+    # complete との同時実行・二重送信を直列化する（r6-backend M-1 / M-2）。
+    await _lock_txn_rows(session, transaction_id)
     txn = await _get_txn(session, transaction_id)
     party = _assert_party(txn, actor)
     if txn.status in ("completed", "cancelled"):
+        # 冪等化ではなく409。既に cancelled の取引に2行目の Cancellation を積まず、
+        # cancel_count も二重加算しない（ロック取得後の再判定なので確実に効く）。
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="キャンセルできる状態ではありません。"
         )
@@ -276,7 +360,14 @@ async def cancel_transaction(
         )
     )
     if party == "operator":
-        txn.bid.operator.cancel_count += 1
+        # read-modify-write（+= 1）だと、同一業者の別成約のキャンセルと同時実行した
+        # 際に更新が失われる。Case行ロックは案件単位のため業者行までは守れないので、
+        # DB側で原子的に加算する（r6-verify-backend M-1 の指摘対応）。
+        await session.execute(
+            update(Operator)
+            .where(Operator.id == txn.bid.operator_id)
+            .values(cancel_count=Operator.cancel_count + 1)
+        )
 
     # 相手方（キャンセルした側の逆）への通知（ADD-1対応: 通知が無いと、業者が
     # 依頼者のキャンセルに気づかないまま解約済み現場へ訪問しうる）。commit前に
@@ -296,7 +387,16 @@ async def cancel_transaction(
                 recipient_email = owner.email
     txn_id_str = str(txn.id)
 
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        # uq_cancellations_transaction_id（0028）違反を409へ変換する。行ロックにより
+        # 通常は到達しないが、変換しないと素通しで500になる（bids.py と同じ多層防御）。
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="キャンセルできる状態ではありません。",
+        ) from exc
     await session.refresh(txn)
 
     background.add_task(
@@ -475,6 +575,9 @@ async def confirm_schedule(
     actor: Actor = Depends(get_current_actor),
     session: AsyncSession = Depends(get_session),
 ) -> TransactionOut:
+    # complete / cancel との競合で「キャンセル済みなのに visiting へ戻る」等の
+    # 後勝ち上書きを防ぐ（r6-backend M-1。同型の遷移すべてに適用する）。
+    await _lock_txn_rows(session, transaction_id)
     txn = await _get_txn(session, transaction_id)
     party = _assert_party(txn, actor)
     if party != "user":

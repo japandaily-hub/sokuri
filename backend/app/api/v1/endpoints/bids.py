@@ -64,6 +64,10 @@ def _bid_out(bid: Bid) -> BidOut:
     out = BidOut.model_validate(bid)
     if bid.status == "selected" and bid.transaction is not None:
         out.transaction_id = bid.transaction.id
+    # 停止業者の入札は一覧から除外せず旗を立てる（除外すると依頼者からは入札が
+    # 黙って消えたようにしか見えず、選択できない理由も伝わらない）。実際の選択
+    # 禁止は select_bid 側の409で担保する。r6-flow ADD-1 対応。
+    out.operator_suspended = bool(bid.operator.is_suspended)
     return out
 
 
@@ -245,6 +249,25 @@ async def select_bid(
     if target.status != BID_STATUS_PENDING:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="この入札は選択できません。"
+        )
+    # 入札後に運営が業者を停止した場合、その入札を選択すると「成立直後から
+    # 業者側の全操作が403（deps.assert_operator_not_suspended）になる成約」が
+    # 生まれ、依頼者は他の入札を捨てた上で詰む。ロック取得後（＝停止操作との
+    # 競合後）の最新状態で弾く（r6-flow ADD-1 対応）。
+    if target.operator.is_suspended:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="この業者は現在利用停止中のため選択できません。運営にお問い合わせください。",
+        )
+    # 承認が取り消された（vendor_status != "active"）業者も同様に弾く。選択できて
+    # しまうと住所非開示（awaiting_approval=true）のまま停滞する成約になる
+    # （transactions.get_transaction の判定と同じ基準に揃える）。
+    # 注: "limited" はレガシー値で入札自体が不可（deps.py の get_verified_operator）
+    # のため、選定側も "active" のみを許可する。
+    if target.operator.vendor_status != "active":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="この業者は現在選択できません。運営にお問い合わせください。",
         )
 
     # 条件付きUPDATE（status=pendingであることをWHERE句で再検証してから更新）。

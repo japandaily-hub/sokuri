@@ -26,6 +26,7 @@ from app.core.client_ip import (
     resolve_client_ip,
     scan_client_ip_for_diagnostics_with_reason,
 )
+from app.api.v1.endpoints.cases import sweep_stale_pending_ai
 from app.db.session import AsyncSessionLocal, engine
 from app.services.seed import seed_channels_and_rules
 
@@ -47,6 +48,25 @@ async def _run_seed() -> None:
         logger.error("seed: チャネルシード失敗（サービスは継続） - %s", exc, exc_info=True)
 
 
+async def _run_stale_pending_ai_sweep() -> None:
+    """起動時に1回だけ、pending 放置の案件を failed へ回収する（r6-review H2 (b)）。
+
+    Starlette の BackgroundTasks はプロセス内タスクで永続キューではないため、
+    案件作成直後の再デプロイ・OOM・SIGTERM で AI 解析タスクが失われると ai_status は
+    pending のまま恒久的に残り得る（GET 側の遅延回収は該当案件へアクセスがあるまで
+    発火しない）。失敗してもサーバーは継続する（seed と同方針）。
+    """
+    try:
+        logger.info("cases: 起動時 pending スイープを開始")
+        async with AsyncSessionLocal() as session:
+            count = await sweep_stale_pending_ai(session)
+        logger.info("cases: 起動時 pending スイープ完了 - count=%s", count)
+    except Exception as exc:
+        logger.error(
+            "cases: 起動時 pending スイープ失敗（サービスは継続） - %s", exc, exc_info=True
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """起動時: DB エンジンを app.state に格納し、シードをバックグラウンドで起動。
@@ -59,10 +79,49 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Phase 4: バックグラウンドでチャネル・ルールを投入（冪等）
     asyncio.create_task(_run_seed())
+    # r6-review H2 (b): pending 放置の案件を起動のたびに一括回収する。
+    asyncio.create_task(_run_stale_pending_ai_sweep())
 
     yield
 
     await engine.dispose()
+
+
+def _config_readiness(settings: Settings) -> dict[str, bool]:
+    """本番必須設定が「使える状態か」を bool だけで返す（/readyz 用・r6 H-4）。
+
+    値そのもの（キー・URL）は絶対に返さない。判定は「設定されているか」に加えて、
+    形式不正で実行時に必ず失敗するもの（Fernet 鍵）は False にする:
+
+    - ``encryption_key``: APP_ENCRYPTION_KEY。未設定/形式不正だと業者の事前申込
+      （口座暗号化）が 500 で全滅するが、起動も /health も緑のままだった。
+    - ``brevo``: BREVO_API_KEY。未設定だと全メール通知が無言でスキップされる。
+    - ``line_push``: LINE_CHANNEL_ACCESS_TOKEN。未設定だと LINE 連携済みユーザーへの
+      Push が全てスキップされ、メールへフォールバックする。
+    - ``gemini``: GOOGLE_API_KEY。未設定だと案件の AI 解析が常にフォールバック文に落ちる。
+    - ``admin_emails``: ADMIN_EMAILS。未設定だと新規登録で admin が付与されない。
+    - ``frontend_base_url``: 本番で localhost のままだと通知メール内リンクが全て壊れる。
+    """
+    try:
+        from cryptography.fernet import Fernet
+
+        encryption_ok = bool(settings.app_encryption_key)
+        if encryption_ok:
+            Fernet(settings.app_encryption_key.encode("utf-8"))
+    except Exception:  # noqa: BLE001 -- 形式不正も「使えない」に集約する
+        encryption_ok = False
+
+    frontend_ok = bool(settings.frontend_base_url) and not (
+        settings.app_env == "production" and "localhost" in settings.frontend_base_url
+    )
+    return {
+        "encryption_key": encryption_ok,
+        "brevo": bool(settings.brevo_api_key),
+        "line_push": bool(settings.line_channel_access_token),
+        "gemini": bool(settings.google_api_key),
+        "admin_emails": bool(settings.admin_emails),
+        "frontend_base_url": frontend_ok,
+    }
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -225,6 +284,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         else:
             schema_ok = bool(tables) and all(tables.values())
 
+        # 本番必須設定の充足状況（r6 H-4）。**値は一切返さず bool のみ**返す
+        # （このpayloadは無認証で読めるため。DIAG_TOKEN のゲートは診断ログにしか
+        # 掛かっていない）。未設定があっても status は ready のまま維持する:
+        # 起動中断や 503 にすると「業者申込だけ 500」が「API 全断」へ悪化するため、
+        # ここでの目的はあくまで外形監視からの可視化に限定する。
+        config_flags = _config_readiness(settings)
+        degraded_config = sorted(k for k, ok in config_flags.items() if not ok)
+        if degraded_config:
+            logger.warning(
+                "readyz: 未設定の必須構成があります（起動は継続） - %s",
+                ",".join(degraded_config),
+            )
+
         payload: dict[str, object] = {
             "status": "ready" if schema_ok else "degraded",
             "db": "ok",
@@ -233,6 +305,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "expected_head": head_rev,
                 "tables": tables,
             },
+            "config": config_flags,
+            "degraded_config": degraded_config,
         }
 
         # スキーマ未達時のみ、start.sh が保存した直近の alembic 出力末尾を添付する

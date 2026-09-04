@@ -82,6 +82,12 @@ def _fallback_summary(
     return "".join(parts)
 
 
+#: 公開エイリアス。案件作成時（AI 解析の完了前）に暫定の ``Case.ai_summary`` を
+#: 埋めるため cases.py から使う（r6 H-1: 解析は BackgroundTasks 化したため、
+#: 作成直後の案件でも要約欄が空にならないようにする）。実体・出力は同一。
+build_fallback_summary = _fallback_summary
+
+
 async def _detect_photo_labels(photo_urls: list[str], max_photos: int) -> list[str]:
     """写真群からラベル（brand/model/状態注記込み）の一覧を検出する。
 

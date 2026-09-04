@@ -106,6 +106,12 @@ export interface CaseCreatePayload {
     photos: { storage_key: string; sort_order: number }[];
   }[];
   photos: { storage_key: string; sort_order: number }[];
+  /**
+   * 冪等キー（crypto.randomUUID() で生成）。同一送信の再試行では同じ値を送ることで、
+   * 通信断・二重タップによる案件の二重作成を防ぐ（backend: 同一ユーザー・同一キーが
+   * 直近10分に存在すれば新規作成せず既存案件を 200 で返す）。
+   */
+  idempotency_key?: string;
 }
 
 /** ユーザー向け案件（住所詳細あり） */
@@ -121,6 +127,13 @@ export interface CaseOut {
   floor_number: number | null;
   has_elevator: boolean | null;
   ai_summary: string | null;
+  /**
+   * AI 解析の進捗。案件作成は解析の完了を待たずに応答するため、"pending" の間は
+   * GET /cases/{id} を3秒間隔でポーリングする（最大3分）。"failed" でも案件自体は有効で、
+   * ai_summary には作成時のフォールバック文が入る。未対応の古いレスポンスとの互換のため
+   * 省略時は "done" 相当として扱うこと。
+   */
+  ai_status: "pending" | "done" | "failed";
   created_at: string;
   photos: CasePhoto[];
   bid_count: number;
@@ -167,6 +180,12 @@ export interface BidOut {
   operator: OperatorPublic | null;
   /** selected の場合のみ: 成約 ID（落札管理への導線） */
   transaction_id: string | null;
+  /**
+   * 入札業者が運営により利用停止中か。true の入札は選択不可として扱い
+   * 「この業者は現在利用停止中です。運営にお問い合わせください。」を表示する
+   * （一覧からは除外されず旗が立つ方式。r6-flow ADD-1）。
+   */
+  operator_suspended: boolean;
 }
 
 export interface TransactionListItem {
@@ -184,6 +203,8 @@ export interface TransactionListItem {
   has_pending_reduction: boolean;
   /** ユーザーが既にこの取引にレビュー（reviewer_type==="user"）を投稿済みか。 */
   has_review: boolean;
+  /** 相手方から届いた未読メッセージ数（自分側の last_read_at より後のもの）。r6-flow M-3 対応。 */
+  unread_count: number;
 }
 
 export interface TransactionOut {
@@ -232,6 +253,11 @@ export interface TransactionDetail extends TransactionOut {
   reviews: ReviewOut[];
   /** 相手が送信し、自分がまだ既読にしていないメッセージ数。 */
   unread_count: number;
+  /**
+   * 落札業者が利用停止中か（依頼者側にのみ意味がある。業者側は 403 の
+   * detail.code=account_suspended で自身の停止を知れる）。r6-flow H-2 対応。
+   */
+  operator_suspended: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -1380,12 +1406,11 @@ export function photoSrc(url: string | null): string {
 // ---------------------------------------------------------------------------
 
 /**
- * 案件を作成する。AI画像解析を同期実行するため長時間化しうる
- * （backend/api/v1/endpoints/cases.py: generate_case_ai を BackgroundTasks に逃がしていない）。
- * signal を渡すとその中断（AbortSignal.timeout 等）で fetch を打ち切れる。
- * タイムアウト時、呼び出し側は KdzNetworkError.cause が
- * DOMException("TimeoutError") かで判定し、専用の案内を出すこと
- * （案件自体は作成されている可能性があるため、再送信させない）。
+ * 案件を作成する。AI画像解析は backend 側で BackgroundTasks 化されており、
+ * このリクエスト自体は即応答する（`CaseOut.ai_status` が "pending" で返る）。
+ * 呼び出し側は `payload.idempotency_key` に `crypto.randomUUID()` を渡し、
+ * 同一送信の再試行では同じ値を使うこと（通信断・二重タップによる二重作成の防止）。
+ * 解析結果は `getCase` を "pending" の間 3 秒間隔でポーリングして取得する（最大3分）。
  */
 export function createCase(
   payload: CaseCreatePayload,
@@ -1396,11 +1421,34 @@ export function createCase(
 }
 
 export function listMyCases(token: string): Promise<CaseOut[]> {
+  // backend は依頼者の自分の案件一覧に limit を適用しない（全件返す。cases.py:list_cases 参照）ため
+  // クエリは付けない。
   return request("/cases", { token });
 }
 
-export function listOpenCases(token: string): Promise<CaseMasked[]> {
-  return request("/cases", { token });
+/** 一覧のページング既定値（backend の既定100・上限200と一致させる。r6 H-1）。 */
+export const LIST_DEFAULT_LIMIT = 100;
+export const LIST_MAX_LIMIT = 200;
+
+export interface ListPageParams {
+  limit?: number;
+  offset?: number;
+}
+
+function buildListPageQuery(params?: ListPageParams): string {
+  const sp = new URLSearchParams();
+  sp.set("limit", String(params?.limit ?? LIST_DEFAULT_LIMIT));
+  sp.set("offset", String(params?.offset ?? 0));
+  return sp.toString();
+}
+
+/**
+ * 業者向け「入札可能案件」一覧。backend は既定100・上限200件で切り詰める（r6 H-1）。
+ * 総件数はレスポンスに含まれないため、呼び出し側は取得件数が limit と一致する間
+ * 「さらに読み込む余地がある」と判断すること（未満なら終端）。
+ */
+export function listOpenCases(token: string, params?: ListPageParams): Promise<CaseMasked[]> {
+  return request(`/cases?${buildListPageQuery(params)}`, { token });
 }
 
 export function getCase(caseId: string, token: string): Promise<CaseOut> {
@@ -1481,8 +1529,13 @@ export function selectBid(
 // 成約
 // ---------------------------------------------------------------------------
 
-export function listTransactions(token: string): Promise<TransactionListItem[]> {
-  return request("/transactions", { token });
+/**
+ * 成約一覧（ユーザー: 自分の成約 / 業者: 落札案件）。backend は既定100・上限200件で
+ * 切り詰める（r6 H-1）。総件数はレスポンスに含まれないため、取得件数が limit と
+ * 一致する間は「さらに読み込む余地がある」と判断すること。
+ */
+export function listTransactions(token: string, params?: ListPageParams): Promise<TransactionListItem[]> {
+  return request(`/transactions?${buildListPageQuery(params)}`, { token });
 }
 
 export function getTransaction(
@@ -1989,4 +2042,20 @@ export const TXN_STATUS_LABEL: Record<TransactionStatus, string> = {
   visiting: "訪問予定",
   completed: "完了",
   cancelled: "キャンセル",
+};
+
+/**
+ * ReductionStatus の表示ラベル・チップ色（旧 operator/transactions/[id]/page.tsx の
+ * ローカル定義を移設）。依頼者側の減額履歴表示（cases/[id]/page.tsx）と共通化するため
+ * ここに一本化する（r6-flow M-4 対応）。
+ */
+export const REDUCTION_STATUS_LABEL: Record<ReductionStatus, string> = {
+  pending: "回答待ち",
+  approved: "承認",
+  rejected: "却下",
+};
+export const REDUCTION_CHIP_CLASS: Record<ReductionStatus, string> = {
+  pending: "warn",
+  approved: "bidding",
+  rejected: "done",
 };

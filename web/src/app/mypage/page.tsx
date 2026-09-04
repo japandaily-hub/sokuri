@@ -26,6 +26,7 @@ import { Ic } from "@/components/kdz/Icons";
 import { caseItemsLabel } from "@/lib/case-labels";
 import { StatusBadge, useToken } from "@/components/kdz/Ui";
 import {
+  LIST_MAX_LIMIT,
   formatYen,
   getMyProfile,
   listMyCases,
@@ -63,8 +64,8 @@ function statusChipInfo(c: CaseOut): { label: string; cls: string } {
   return { label: "下書き", cls: "negotiating" };
 }
 
-/** 出品カード（実データ版）。 */
-function LotCard({ c }: { c: CaseOut }) {
+/** 出品カード（実データ版）。unreadCount は成約後の取引に紐づく未読チャット件数（無ければ undefined）。 */
+function LotCard({ c, unreadCount }: { c: CaseOut; unreadCount?: number }) {
   const { label, cls } = statusChipInfo(c);
   const isDone = c.status === "closed" || c.status === "cancelled";
   return (
@@ -90,6 +91,7 @@ function LotCard({ c }: { c: CaseOut }) {
         <div className="lot-info">
           <div className="lot-info-top">
             <span className="lot-id lot-items" title={`案件ID ${c.id.slice(0, 8)}`}>{caseItemsLabel(c) ?? c.id.slice(0, 8).toUpperCase()}</span>
+            {unreadCount ? <span className="status-chip unread">未読{unreadCount}</span> : null}
             <span className={`status-chip ${cls}`}>{label}</span>
           </div>
           <div className="lot-cats">
@@ -175,7 +177,17 @@ export default function MyPage() {
       setError(toDisplayMessage(e, "案件の取得に失敗しました"));
     }
     try {
-      setTransactions(await listTransactions(token));
+      // このページは取引の一覧表示ではなくサマリー集計（成約件数・総買取額・未読数）に
+      // 使うため、backend の既定100件切り詰め（r6 H-1）をそのまま使うと成約が101件を
+      // 超えたユーザーで集計が過小になる。上限200件ずつ、取得件数が limit 未満になる
+      // まで（＝終端まで）ページングして全件を集計対象にする（安全上限20ページ=4000件）。
+      const all: TransactionListItem[] = [];
+      for (let page = 0; page < 20; page += 1) {
+        const res = await listTransactions(token, { limit: LIST_MAX_LIMIT, offset: page * LIST_MAX_LIMIT });
+        all.push(...res);
+        if (res.length < LIST_MAX_LIMIT) break;
+      }
+      setTransactions(all);
     } catch (e) {
       setError((prev) => prev ?? toDisplayMessage(e, "取引の取得に失敗しました"));
     }
@@ -213,6 +225,14 @@ export default function MyPage() {
 
   const activeLots = useMemo(() => (cases ?? []).filter(isActiveCase), [cases]);
   const doneLots = useMemo(() => (cases ?? []).filter(isDoneCase), [cases]);
+  /** 案件ID → 紐づく取引の未読チャット件数（r6-flow M-3 対応）。 */
+  const unreadByCaseId = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const t of transactions ?? []) {
+      if (t.unread_count > 0) map.set(t.case_id, t.unread_count);
+    }
+    return map;
+  }, [transactions]);
 
   const tabs: { key: TabKey; label: string; count: number; gray?: boolean }[] = [
     { key: "all", label: "すべて", count: (cases ?? []).length },
@@ -414,7 +434,7 @@ export default function MyPage() {
         {tab === "all" ? (
           <div className="lot-list">
             {(cases ?? []).length ? (
-              (cases ?? []).map((c) => <LotCard key={c.id} c={c} />)
+              (cases ?? []).map((c) => <LotCard key={c.id} c={c} unreadCount={unreadByCaseId.get(c.id)} />)
             ) : (
               <EmptyState title="まだ出品がありません" sub="最初の出品をしてみましょう。" />
             )}
@@ -425,7 +445,7 @@ export default function MyPage() {
         {tab === "active" ? (
           <div className="lot-list">
             {activeLots.length ? (
-              activeLots.map((c) => <LotCard key={c.id} c={c} />)
+              activeLots.map((c) => <LotCard key={c.id} c={c} unreadCount={unreadByCaseId.get(c.id)} />)
             ) : (
               <EmptyState title="進行中の出品はありません" sub="新しく出品してみましょう。" />
             )}
@@ -436,7 +456,7 @@ export default function MyPage() {
         {tab === "done" ? (
           <div className="lot-list">
             {doneLots.length ? (
-              doneLots.map((c) => <LotCard key={c.id} c={c} />)
+              doneLots.map((c) => <LotCard key={c.id} c={c} unreadCount={unreadByCaseId.get(c.id)} />)
             ) : (
               <EmptyState title="成約済みの出品はありません" />
             )}

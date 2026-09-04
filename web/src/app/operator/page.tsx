@@ -34,6 +34,7 @@ import { Spinner } from "@/components/Icon";
 import { useToken } from "@/components/kdz/Ui";
 import {
   KdzApiError,
+  LIST_DEFAULT_LIMIT,
   TXN_STATUS_LABEL,
   createBid,
   formatYen,
@@ -285,6 +286,12 @@ export default function OperatorDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [vendorStatus, setVendorStatus] = useState<string | null>(null);
   const [hasLicense, setHasLicense] = useState<boolean | null>(null);
+  // ページング（r6 H-1）: backend が既定100件で切り詰めるため、取得件数が limit と
+  // 一致する間は「さらに読み込む」余地があると判断する（総件数は応答に含まれない）。
+  const [hasMoreCases, setHasMoreCases] = useState(false);
+  const [hasMoreTxns, setHasMoreTxns] = useState(false);
+  const [loadingMoreCases, setLoadingMoreCases] = useState(false);
+  const [loadingMoreTxns, setLoadingMoreTxns] = useState(false);
 
   // 入札確認モーダル
   const [modalLotId, setModalLotId] = useState<string | null>(null);
@@ -302,12 +309,16 @@ export default function OperatorDashboardPage() {
   const reload = useCallback(async () => {
     if (!token) return;
     try {
-      setCases(await listOpenCases(token));
+      const res = await listOpenCases(token, { limit: LIST_DEFAULT_LIMIT, offset: 0 });
+      setCases(res);
+      setHasMoreCases(res.length === LIST_DEFAULT_LIMIT);
     } catch (e) {
       setError(toDisplayMessage(e, "案件の取得に失敗しました"));
     }
     try {
-      setTransactions(await listTransactions(token));
+      const res = await listTransactions(token, { limit: LIST_DEFAULT_LIMIT, offset: 0 });
+      setTransactions(res);
+      setHasMoreTxns(res.length === LIST_DEFAULT_LIMIT);
     } catch (e) {
       setError((prev) => prev ?? toDisplayMessage(e, "取引の取得に失敗しました"));
     }
@@ -316,6 +327,34 @@ export default function OperatorDashboardPage() {
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  async function loadMoreCases() {
+    if (!token || loadingMoreCases) return;
+    setLoadingMoreCases(true);
+    try {
+      const res = await listOpenCases(token, { limit: LIST_DEFAULT_LIMIT, offset: cases?.length ?? 0 });
+      setCases((prev) => [...(prev ?? []), ...res]);
+      setHasMoreCases(res.length === LIST_DEFAULT_LIMIT);
+    } catch (e) {
+      setError(toDisplayMessage(e, "追加の読み込みに失敗しました"));
+    } finally {
+      setLoadingMoreCases(false);
+    }
+  }
+
+  async function loadMoreTxns() {
+    if (!token || loadingMoreTxns) return;
+    setLoadingMoreTxns(true);
+    try {
+      const res = await listTransactions(token, { limit: LIST_DEFAULT_LIMIT, offset: transactions?.length ?? 0 });
+      setTransactions((prev) => [...(prev ?? []), ...res]);
+      setHasMoreTxns(res.length === LIST_DEFAULT_LIMIT);
+    } catch (e) {
+      setError(toDisplayMessage(e, "追加の読み込みに失敗しました"));
+    } finally {
+      setLoadingMoreTxns(false);
+    }
+  }
 
   // 承認状態（vendor_status）を取得して審査中バナー・入札フォームの出し分けに使う。
   // listOpenCases は審査待ちの業者にも200を返すため、403検知では判定できない
@@ -518,6 +557,13 @@ export default function OperatorDashboardPage() {
                 ))}
               </div>
             )}
+            {hasMoreCases ? (
+              <div style={{ display: "flex", justifyContent: "center", padding: "16px 0" }}>
+                <button type="button" className="btn btn-ghost" onClick={loadMoreCases} disabled={loadingMoreCases}>
+                  {loadingMoreCases ? "読み込み中…" : "さらに読み込む"}
+                </button>
+              </div>
+            ) : null}
           </div>
 
           {/* ---------- 入札中タブ ---------- */}
@@ -577,6 +623,13 @@ export default function OperatorDashboardPage() {
                 ))}
               </div>
             )}
+            {hasMoreTxns ? (
+              <div style={{ display: "flex", justifyContent: "center", padding: "16px 0" }}>
+                <button type="button" className="btn btn-ghost" onClick={loadMoreTxns} disabled={loadingMoreTxns}>
+                  {loadingMoreTxns ? "読み込み中…" : "さらに読み込む"}
+                </button>
+              </div>
+            ) : null}
           </div>
 
           {/* ---------- 成約済みタブ ---------- */}
@@ -613,6 +666,13 @@ export default function OperatorDashboardPage() {
                 ))}
               </div>
             )}
+            {hasMoreTxns ? (
+              <div style={{ display: "flex", justifyContent: "center", padding: "16px 0" }}>
+                <button type="button" className="btn btn-ghost" onClick={loadMoreTxns} disabled={loadingMoreTxns}>
+                  {loadingMoreTxns ? "読み込み中…" : "さらに読み込む"}
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
       )}

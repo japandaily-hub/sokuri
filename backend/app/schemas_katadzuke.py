@@ -560,6 +560,11 @@ class CaseCreateRequest(BaseModel):
     photos: list[CasePhotoIn] = Field(default_factory=list, max_length=MAX_PHOTOS_PER_CASE)
     # 商品ごとにグルーピングした写真。photos と併用可能（合計枚数は model_validator で検証）。
     items: list[CaseItemIn] = Field(default_factory=list, max_length=MAX_ITEMS_PER_CASE)
+    # 冪等キー（任意・クライアント発行の UUID）。AI 解析の背景化後も、通信断や
+    # プロキシタイムアウトによる再送信で同一内容の案件が二重作成されうるため、
+    # 同一ユーザー・同一キーの案件が直近10分に存在すれば新規作成せず 200 で
+    # 既存案件を返す（r6 H-1）。未指定時は従来どおり常に新規作成する。
+    idempotency_key: str | None = Field(default=None, max_length=64)
 
     @model_validator(mode="after")
     def _validate_total_photo_count(self) -> "CaseCreateRequest":
@@ -599,6 +604,10 @@ class CaseOut(BaseModel):
     floor_number: int | None
     has_elevator: bool | None
     ai_summary: str | None
+    # AI 解析の進捗（"pending" / "done" / "failed"）。案件作成は解析の完了を待たずに
+    # 201 を返すため、フロントは "pending" の間 GET /cases/{id} をポーリングする
+    # （"failed" でも案件は有効。ai_summary には作成時のフォールバック文が入る）。
+    ai_status: str = "done"
     created_at: datetime
     photos: list[CasePhotoOut] = []
     items: list[CaseItemOut] = []
@@ -649,6 +658,11 @@ class BidOut(BaseModel):
     created_at: datetime
     operator: OperatorPublicOut | None = None
     transaction_id: uuid.UUID | None = None
+    # 入札業者が運営により利用停止中か（web 契約: true の入札は選択不可として扱い
+    # 「この業者は現在利用停止中です。運営にお問い合わせください。」を表示する）。
+    # 一覧から除外はせず旗を立てる方式にした（除外すると入札が黙って消え、
+    # 依頼者からは「入札が減った」ようにしか見えないため）。r6-flow ADD-1 対応。
+    operator_suspended: bool = False
 
 
 # ──────────────────────────── 成約 ────────────────────────────
@@ -688,6 +702,9 @@ class TransactionDetailOut(TransactionOut):
     reduction_requests: list[ReductionOut] = []
     reviews: list[ReviewOut] = []
     unread_count: int = 0
+    # 落札業者が利用停止中か（依頼者側にのみ意味がある。業者側は 403 の
+    # detail.code=account_suspended で自身の停止を知れるため）。r6-flow H-2 対応。
+    operator_suspended: bool = False
 
 
 class TransactionCancelRequest(BaseModel):
@@ -712,6 +729,10 @@ class TransactionListItem(BaseModel):
     # ユーザー側レビュー（reviewer_type=='user'）が既に投稿済みかどうか（通知の恒久残存防止用）。
     # 業者側レビューの有無は含めない（意味は固定契約: フロントは !has_review で評価待ち通知を判定）。
     has_review: bool = False
+    # 相手方から届いた未読メッセージ数（自分側の last_read_at より後のもの）。
+    # 一覧での算出は GROUP BY 1本に集約する（N+1 禁止。transactions.py の
+    # _unread_counts を参照）。r6-flow M-3 対応。
+    unread_count: int = 0
 
 
 # ──────────────────────────── 減額申請 ────────────────────────────

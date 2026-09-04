@@ -10,6 +10,7 @@ import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -94,7 +95,19 @@ async def create_reduction(
         reason=body.reason,
     )
     session.add(reduction)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        # 上記の in-memory チェック（any(...)）は同時2リクエスト（二度押し・リトライ）を
+        # 防げない。pending が2行残ると以後その判定により業者が恒久的に409で締め出される
+        # ため、真の一意性は uq_reduction_requests_pending（0028 の部分一意索引）で担保し、
+        # 違反はここで409へ変換する（bids.create_bid と同じ多層防御パターン）。
+        # 注: 部分一意索引は PostgreSQL 専用で SQLite のテストでは発火しない。
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="未回答の減額申請があります。回答をお待ちください。",
+        ) from exc
     await session.refresh(reduction)
 
     # 依頼者への通知（ADD-2対応: 往路の通知が無いと、依頼者が気づかない限り
@@ -135,6 +148,14 @@ async def decide_reduction(
     if txn.case.user_id != user.id and user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="この成約への権限がありません。"
+        )
+    # 完了・キャンセル済みの取引では回答を受け付けない。受け付けると
+    # complete_transaction が確定させた final_amount が事後に書き換わる
+    # （r6-flow ADD-2 / r6-backend M-3）。create_reduction と同じ条件式を使う。
+    if txn.status not in ("pending", "visiting"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="回答できる状態ではありません。",
         )
     reduction = next((r for r in txn.reduction_requests if r.id == reduction_id), None)
     if reduction is None:

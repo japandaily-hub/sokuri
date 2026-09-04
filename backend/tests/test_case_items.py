@@ -285,12 +285,22 @@ async def test_legacy_case_without_items_returns_empty_items_list(client: AsyncC
     assert case["items"] == []
     assert case["item_count"] == 0
     assert case["photo_count"] == 2
-    # 既存フォーマット（generate_case_summary のフォールバック文）がそのまま使われる。
-    # storage_key に対応する実ファイルが存在しないため photo_url_for_ai は None を返し、
-    # AI解析対象0枚として扱われる（既存の写真アップロード無しテストと同じ挙動。
-    # photo_count（案件全体の実写真枚数=2）とは別概念であることに注意）。
+    # AI解析はBackgroundTasks化されたため（r6 H-1）、作成応答の時点では暫定の
+    # フォールバック要約（案件の実写真枚数=2 で生成）が入る。
+    assert case["ai_status"] == "pending"
     assert case["ai_summary"].startswith("利用目的: 遺品整理。")
-    assert "写真 0 枚" in case["ai_summary"]
+    assert "写真 2 枚" in case["ai_summary"]
+
+    # 解析完了後は既存フォーマット（generate_case_summary のフォールバック文）に
+    # 差し替わる。storage_key に対応する実ファイルが存在しないため photo_url_for_ai は
+    # None を返し、AI解析対象0枚として扱われる（既存の写真アップロード無しテストと
+    # 同じ挙動。photo_count（案件全体の実写真枚数=2）とは別概念であることに注意）。
+    r = await client.get(f"/api/v1/cases/{case['id']}", headers=_auth(token))
+    assert r.status_code == 200, r.text
+    analyzed = r.json()
+    assert analyzed["ai_status"] == "done"
+    assert analyzed["ai_summary"].startswith("利用目的: 遺品整理。")
+    assert "写真 0 枚" in analyzed["ai_summary"]
 
 
 # ──────────────────────────── 6. 商品削除のカスケード ────────────────────────────
@@ -360,6 +370,21 @@ async def test_cross_case_item_reference_rejected_by_composite_fk(
 # ──────────────────────────── 8. Gemini呼び出し予算 ────────────────────────────
 
 
+async def _case_after_analysis(client: AsyncClient, token: str, case_id: str) -> dict:
+    """AI解析（BackgroundTasks）完了後の案件詳細を取得する。
+
+    r6 H-1 以降、``POST /cases`` の応答は解析を待たずに返るため（ai_status="pending"）、
+    AI 由来のフィールド（items[].ai_detected_name / ai_summary）は作成応答ではなく
+    詳細取得で検証する。ASGITransport は BackgroundTasks の完了までを待つため、
+    ここでのポーリングは不要（本番のフロントは pending の間ポーリングする）。
+    """
+    r = await client.get(f"/api/v1/cases/{case_id}", headers=_auth(token))
+    assert r.status_code == 200, r.text
+    detail = r.json()
+    assert detail["ai_status"] in ("done", "failed"), detail["ai_status"]
+    return detail
+
+
 async def test_eight_items_all_analyzed_within_budget(
     client: AsyncClient, tmp_storage, monkeypatch
 ):
@@ -377,7 +402,7 @@ async def test_eight_items_all_analyzed_within_budget(
     payload = {**_base_case_fields(), "photos": [], "items": items}
     r = await client.post("/api/v1/cases", json=payload, headers=_auth(token))
     assert r.status_code == 201, r.text
-    case = r.json()
+    case = await _case_after_analysis(client, token, r.json()["id"])
 
     assert len(call_log) <= 8
     for item in case["items"]:
@@ -405,7 +430,7 @@ async def test_ten_items_exceeds_budget_capped_at_eight_calls(
     payload = {**_base_case_fields(), "photos": [], "items": items}
     r = await client.post("/api/v1/cases", json=payload, headers=_auth(token))
     assert r.status_code == 201, r.text
-    case = r.json()
+    case = await _case_after_analysis(client, token, r.json()["id"])
 
     assert len(call_log) <= 8
     assert len(case["items"]) == 10
@@ -434,7 +459,7 @@ async def test_one_item_analysis_failure_does_not_break_others(
     }
     r = await client.post("/api/v1/cases", json=payload, headers=_auth(token))
     assert r.status_code == 201, r.text
-    case = r.json()
+    case = await _case_after_analysis(client, token, r.json()["id"])
 
     detected_names = [it["ai_detected_name"] for it in case["items"]]
     assert "生存品目" in detected_names
@@ -459,7 +484,7 @@ async def test_poisoned_detected_name_not_persisted(
     }
     r = await client.post("/api/v1/cases", json=payload, headers=_auth(token))
     assert r.status_code == 201, r.text
-    case = r.json()
+    case = await _case_after_analysis(client, token, r.json()["id"])
 
     assert case["items"][0]["ai_detected_name"] is None
     assert "evil.example" not in (case["ai_summary"] or "")

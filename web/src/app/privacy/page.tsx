@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: "プライバシーポリシー",
   description:
     "カタヅケ運営事務局が、ユーザーおよび登録業者の個人情報をどのように収集・利用・保護するかを定めたプライバシーポリシーです。",
+  alternates: { canonical: "/privacy" },
 };
 
 /** 第2条「収集する情報」の表データ。バックエンドの実収集項目

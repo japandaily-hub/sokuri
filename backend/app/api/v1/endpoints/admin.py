@@ -65,7 +65,7 @@ from app.schemas_katadzuke import (
     UserSuspendRequest,
     UserSuspendResponse,
 )
-from app.services import alerts, notify
+from app.services import alerts, notify, notify_dispatch
 from app.services.review_stats import recalc_operator_review_stats
 
 # admin 一覧系 API 共通の既定/上限（M2対応）。既存 web 呼び出し（クエリ省略時）が
@@ -166,6 +166,28 @@ def _to_application_out(application: OperatorApplication) -> OperatorApplication
 
 async def _get_application_or_404(session: AsyncSession, application_id: uuid.UUID) -> OperatorApplication:
     application = await session.get(OperatorApplication, application_id)
+    if application is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="申込が見つかりません。")
+    return application
+
+
+async def _get_application_for_update_or_404(
+    session: AsyncSession, application_id: uuid.UUID
+) -> OperatorApplication:
+    """審査（承認/却下）用に申込行を **排他ロックして** 取得する（r6 M-7）。
+
+    ロックが無いと「``status != 'received'`` の判定」と commit の間に別の管理者
+    （または二度押し）が割り込み、招待コードが 2 件発行される。``application.invite_code``
+    は後勝ちで 1 件しか残らないため、先に発行されたコードで本登録されると申込と業者の
+    紐付けが辿れなくなる。参照系（一覧・詳細）まで行ロックを掛けないよう、
+    ``_get_application_or_404`` とは別関数として分ける。
+
+    SQLite（テスト）では ``FOR UPDATE`` 句が生成されず no-op になる。同時実行の
+    直列化は PostgreSQL 本番でのみ有効。
+    """
+    application = await session.get(
+        OperatorApplication, application_id, with_for_update=True
+    )
     if application is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="申込が見つかりません。")
     return application
@@ -316,6 +338,7 @@ async def list_operators(
 async def verify_operator(
     operator_id: uuid.UUID,
     body: OperatorVerifyRequest,
+    background: BackgroundTasks,
     admin: User = Depends(get_current_admin),
     session: AsyncSession = Depends(get_session),
 ) -> OperatorOut:
@@ -334,6 +357,17 @@ async def verify_operator(
     operator.vendor_status = "active" if body.verified else "pending"
     await session.commit()
     await session.refresh(operator)
+    # 入札可否が切り替わったことを業者本人へ通知する（r6 H3）。事前申込の承認
+    # （approve_operator_application）とは別イベントで、ここが「いつ入札できるように
+    # なったか」を業者が知る唯一の経路。ORMオブジェクトはBackgroundTaskへ渡さず、
+    # プリミティブ値へ変換してから渡す（notify_dispatch の設計前提）。
+    background.add_task(
+        notify_dispatch.dispatch_operator_verified,
+        operator.line_user_id,
+        operator.contact_email,
+        operator.company_name,
+        body.verified,
+    )
     logger.info(
         "admin_operator_verify admin=%s operator=%s verified=%s", admin.id, operator.id, body.verified
     )
@@ -344,6 +378,7 @@ async def verify_operator(
 async def suspend_operator(
     operator_id: uuid.UUID,
     body: OperatorSuspendRequest,
+    background: BackgroundTasks,
     admin: User = Depends(get_current_admin),
     session: AsyncSession = Depends(get_session),
 ) -> OperatorOut:
@@ -359,6 +394,15 @@ async def suspend_operator(
     operator.is_suspended = body.suspended
     await session.commit()
     await session.refresh(operator)
+    if not body.suspended:
+        # 解除のみ通知する（r6-verify-web H1）。停止時の理由開示は運用ポリシーの
+        # 選択であり既定にしない一方、解除は本人が復帰を知る手段が他に無い。
+        background.add_task(
+            notify_dispatch.dispatch_account_unsuspended,
+            operator.line_user_id,
+            operator.contact_email,
+            "operator",
+        )
     logger.info(
         "admin_operator_suspend admin=%s operator=%s suspended=%s", admin.id, operator.id, body.suspended
     )
@@ -724,6 +768,7 @@ async def admin_list_users(
 async def suspend_user(
     user_id: uuid.UUID,
     body: UserSuspendRequest,
+    background: BackgroundTasks,
     admin: User = Depends(get_current_admin),
     session: AsyncSession = Depends(get_session),
 ) -> UserSuspendResponse:
@@ -753,6 +798,14 @@ async def suspend_user(
     target.suspended_reason = body.reason if body.suspended else None
     await session.commit()
     await session.refresh(target)
+    if not body.suspended:
+        # 解除のみ通知する（suspend_operator と同じ方針・r6-verify-web H1）。
+        background.add_task(
+            notify_dispatch.dispatch_account_unsuspended,
+            target.line_user_id,
+            target.email,
+            "user",
+        )
 
     # QA未解決リスク（依頼者停止後の進行中案件の扱いが未定義）対応: 停止操作自体では
     # 案件・成約の状態には一切干渉しないが、運営が後続対応（案件のキャンセル・
@@ -1028,7 +1081,7 @@ async def approve_operator_application(
     admin: User = Depends(get_current_admin),
     session: AsyncSession = Depends(get_session),
 ) -> OperatorApplicationApproveResponse:
-    application = await _get_application_or_404(session, application_id)
+    application = await _get_application_for_update_or_404(session, application_id)
     if application.status != "received":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -1092,7 +1145,7 @@ async def reject_operator_application(
     admin: User = Depends(get_current_admin),
     session: AsyncSession = Depends(get_session),
 ) -> OperatorApplicationOut:
-    application = await _get_application_or_404(session, application_id)
+    application = await _get_application_for_update_or_404(session, application_id)
     if application.status != "received":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -1251,6 +1304,7 @@ async def get_identity_document_file_admin(
 )
 async def approve_identity_document(
     document_id: uuid.UUID,
+    background: BackgroundTasks,
     admin: User = Depends(get_current_admin),
     session: AsyncSession = Depends(get_session),
 ) -> UserIdentityDocumentAdminOut:
@@ -1298,6 +1352,16 @@ async def approve_identity_document(
             UserIdentityDocument.id == document.id
         )
     )
+    # 審査結果を本人へ通知する（r6 H2）。従来は /mypage/identity を能動的に再訪
+    # しない限り結果に気付けなかった。LINE優先→メールの dispatch 経由で送る。
+    if user is not None:
+        background.add_task(
+            notify_dispatch.dispatch_identity_document_reviewed,
+            user.line_user_id,
+            user.email,
+            True,
+            None,
+        )
     logger.info(
         "admin: 本人確認書類を承認しました - document_id=%s user_id=%s admin_id=%s",
         document.id,
@@ -1326,6 +1390,7 @@ async def approve_identity_document(
 async def reject_identity_document(
     document_id: uuid.UUID,
     body: IdentityDocumentRejectRequest,
+    background: BackgroundTasks,
     admin: User = Depends(get_current_admin),
     session: AsyncSession = Depends(get_session),
 ) -> UserIdentityDocumentAdminOut:
@@ -1374,6 +1439,15 @@ async def reject_identity_document(
             UserIdentityDocument.id == document.id
         )
     )
+    # 却下理由つきで本人へ通知する（r6 H2。再提出のために理由が必要）。
+    if user is not None:
+        background.add_task(
+            notify_dispatch.dispatch_identity_document_reviewed,
+            user.line_user_id,
+            user.email,
+            False,
+            body.reject_reason,
+        )
     logger.info(
         "admin: 本人確認書類を却下しました - document_id=%s user_id=%s admin_id=%s",
         document.id,

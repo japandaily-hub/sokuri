@@ -82,6 +82,69 @@ async def dispatch_bid_selected(
 
 
 @_best_effort
+async def dispatch_case_created(line_user_id: str | None, email: str, case_id: str) -> None:
+    """① 案件登録完了通知（依頼者宛）。LINE優先・失敗/未連携時はメールにフォールバック。
+
+    r6-verify-web A1 対応: 従来 cases.py が notify.send_case_created を直呼びしており、
+    LINE専用ユーザー（仮メール保持者）には出品直後の通知が LINE・メールとも届いて
+    いなかった。他イベントと同じ dispatch 規約へ揃える。
+    """
+    if line_user_id:
+        ok = await line_notify.push_case_created(line_user_id, case_id)
+        if ok:
+            return
+    if notify.is_placeholder_email(email):
+        return
+    await notify.send_case_created(email, case_id)
+
+
+@_best_effort
+async def dispatch_operator_verified(
+    line_user_id: str | None, email: str, company_name: str, active: bool
+) -> None:
+    """業者の入札可否切替の通知（業者宛・r6 H3）。LINE優先・失敗/未連携時はメール。"""
+    if line_user_id:
+        ok = await line_notify.push_operator_verified(line_user_id, active)
+        if ok:
+            return
+    if notify.is_placeholder_email(email):
+        return
+    await notify.send_operator_verified(email, company_name, active)
+
+
+@_best_effort
+async def dispatch_account_unsuspended(
+    line_user_id: str | None, email: str | None, party: Literal["user", "operator"]
+) -> None:
+    """アカウント停止の解除通知（本人宛・r6 H1）。LINE優先・失敗/未連携時はメール。
+
+    停止（suspend）側は理由開示の是非が運用ポリシー判断のため通知しない。解除は
+    本人が復帰を知る手段が他に無いため必ず送る。
+    """
+    if line_user_id:
+        ok = await line_notify.push_account_unsuspended(line_user_id, party)
+        if ok:
+            return
+    if not email or notify.is_placeholder_email(email):
+        return
+    await notify.send_account_unsuspended(email, party)
+
+
+@_best_effort
+async def dispatch_identity_document_reviewed(
+    line_user_id: str | None, email: str | None, approved: bool, reason: str | None = None
+) -> None:
+    """本人確認書類の審査結果通知（依頼者宛・r6 H2）。LINE優先・失敗/未連携時はメール。"""
+    if line_user_id:
+        ok = await line_notify.push_identity_document_reviewed(line_user_id, approved, reason)
+        if ok:
+            return
+    if not email or notify.is_placeholder_email(email):
+        return
+    await notify.send_identity_document_reviewed(email, approved, reason)
+
+
+@_best_effort
 async def dispatch_bank_account_changed(
     line_user_id: str | None, email: str, action: str
 ) -> None:

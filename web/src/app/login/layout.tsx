@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "ログイン",
   description: "カタヅケにログインして、出品状況や業者とのやり取りを確認できます。",
+  alternates: { canonical: "/login" },
 };
 
 export default function Layout({ children }: { children: React.ReactNode }) {

@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: "利用規約",
   description:
     "カタヅケの利用規約です。ユーザー利用規約・業者利用規約について定めています。",
+  alternates: { canonical: "/terms" },
 };
 
 export default function TermsPage() {

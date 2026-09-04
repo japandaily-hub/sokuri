@@ -344,6 +344,11 @@
   background: #fee2e2;
   color: #dc2626;
 }
+/* 未読メッセージ件数バッジ（成約済みカード。r6-flow M-3 対応） */
+.status-chip.unread {
+  background: var(--blue);
+  color: #fff;
+}
 
 .lot-cats {
   display: flex;
