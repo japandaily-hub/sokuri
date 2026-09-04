@@ -7,6 +7,8 @@ LINE_CHANNEL_ACCESS_TOKEN 未設定時は送信をスキップしてログのみ
 from __future__ import annotations
 
 import logging
+import re
+from typing import Literal
 
 import httpx
 
@@ -16,12 +18,38 @@ logger = logging.getLogger(__name__)
 
 _LINE_PUSH_ENDPOINT = "https://api.line.me/v2/bot/message/push"
 
+# 通知文へ差し込む外部入力（業者名など）から改行・タブ・全半角の連続空白を潰す。
+# LINE のテキストメッセージは改行でそのまま行が増えるため、社名に改行を仕込まれると
+# 「【カタヅケ】…」に続く偽の案内行（フィッシングURL等）を捏造できてしまう。
+_INLINE_WHITESPACE_RE = re.compile("[\r\n\t　 ]+")
+
+#: 差し込み値の最大長。LINE の1通あたり上限ではなく、可読性の確保と
+#: 長大文字列による行崩し・本文押し出しの抑止が目的。
+_INLINE_MAX_LENGTH = 40
+
+
+def _sanitize_inline(value: str, *, max_length: int = _INLINE_MAX_LENGTH) -> str:
+    """通知文へ差し込む外部入力を「改行なしの1行・長さ上限つき」へ正規化する。"""
+    return _INLINE_WHITESPACE_RE.sub(" ", value).strip()[:max_length]
+
+
+def _mask_line_user_id(line_user_id: str | None) -> str:
+    """ログ出力用の LINE ユーザーID マスク（先頭4文字のみ残す）。
+
+    line_user_id は個人を一意に識別する外部IDであり、Push の宛先そのもの。
+    平文でログに残すと、ログ閲覧権限しか持たない者が宛先を収集できてしまう。
+    """
+    if not line_user_id:
+        return "(none)"
+    return f"{line_user_id[:4]}…"
+
 
 async def _push(line_user_id: str, text: str) -> bool:
     settings = get_settings()
     if not settings.line_channel_access_token:
         logger.info(
-            "line_notify: LINE_CHANNEL_ACCESS_TOKEN 未設定のため送信スキップ - %s", line_user_id
+            "line_notify: LINE_CHANNEL_ACCESS_TOKEN 未設定のため送信スキップ - %s",
+            _mask_line_user_id(line_user_id),
         )
         return False
     payload = {
@@ -56,6 +84,15 @@ async def push_bid_selected(line_user_id: str, transaction_id: str, amount: int)
     )
 
 
+async def push_bank_account_changed(line_user_id: str, action: str) -> bool:
+    """振込先口座の登録・変更・削除の本人通知（口座番号等は含めない）。"""
+    return await _push(
+        line_user_id,
+        f"【カタヅケ】お客様の振込先口座情報が{action}されました。"
+        "お心当たりがない場合は、至急カタヅケまでご連絡ください。",
+    )
+
+
 async def push_bid_lost(line_user_id: str, case_id: str) -> bool:
     """落札通知（落選業者宛）。"""
     return await _push(
@@ -72,4 +109,40 @@ async def push_schedule_confirmed(line_user_id: str, transaction_id: str, visit_
     return await _push(
         line_user_id,
         f"【カタヅケ】訪問日程が {visit_date} に確定しました。\n{url}",
+    )
+
+
+async def push_bid_received(
+    line_user_id: str, case_id: str, company_name: str, amount: int
+) -> bool:
+    """新規入札通知（依頼者宛）。"""
+    settings = get_settings()
+    url = f"{settings.frontend_base_url}/cases/{case_id}"
+    # 業者名は業者自身が入力する値＝通知文への信頼できない差し込み。改行を含めると
+    # 独立した行として描画され、ブランドを騙る案内行やURLを捏造できるため、
+    # Push 直前に1行へ正規化する（security review Medium指摘対応）。
+    safe_company_name = _sanitize_inline(company_name)
+    return await _push(
+        line_user_id,
+        f"【カタヅケ】新しい入札が届きました。\n{safe_company_name}：{amount:,} 円\n{url}",
+    )
+
+
+async def push_message_received(
+    line_user_id: str, transaction_id: str, recipient_party: Literal["user", "operator"]
+) -> bool:
+    """新着チャットメッセージ通知（当事者宛）。
+
+    メッセージ本文は含めない。チャットは住所・連絡先等の機微情報を含みうるため、
+    第三者チャネル（LINE）へ本文を流さず「新着がある」事実と遷移先URLのみを通知する。
+    """
+    settings = get_settings()
+    path = (
+        f"/chat/{transaction_id}"
+        if recipient_party == "user"
+        else f"/operator/chat/{transaction_id}"
+    )
+    return await _push(
+        line_user_id,
+        f"【カタヅケ】新しいメッセージが届きました。\n{settings.frontend_base_url}{path}",
     )

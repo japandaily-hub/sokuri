@@ -56,11 +56,16 @@ def create_access_token(
     token_type: TokenType,
     role: str,
     expires_minutes: int | None = None,
+    issued_at: datetime | None = None,
 ) -> str:
-    """JWT を発行する。payload: sub / typ / role / exp / iat。"""
+    """JWT を発行する。payload: sub / typ / role / exp / iat。
+
+    ``issued_at`` は通常 None（現在時刻）。発行時刻に依存するゲート（step-up 認証の
+    「直近ログイン」判定等）のテストで過去時刻のトークンを作るためにのみ指定する。
+    """
     settings = get_settings()
     minutes = expires_minutes if expires_minutes is not None else settings.jwt_expire_minutes
-    now = datetime.now(timezone.utc)
+    now = issued_at if issued_at is not None else datetime.now(timezone.utc)
     payload: dict[str, Any] = {
         "sub": str(subject_id),
         "typ": token_type,

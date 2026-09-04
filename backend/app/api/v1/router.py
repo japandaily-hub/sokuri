@@ -23,6 +23,7 @@ from app.api.v1.endpoints.operator_profile import router as operator_profile_rou
 from app.api.v1.endpoints.reductions import router as reductions_router
 from app.api.v1.endpoints.reviews import router as reviews_router
 from app.api.v1.endpoints.transactions import router as transactions_router
+from app.api.v1.endpoints.user_identity import router as user_identity_router
 from app.api.v1.endpoints.users import router as users_router
 
 api_router = APIRouter()
@@ -39,6 +40,7 @@ api_router.include_router(case_items_router, tags=["CaseItems"])
 api_router.include_router(bids_router, tags=["Bids"])
 api_router.include_router(transactions_router, tags=["Transactions"])
 api_router.include_router(users_router, tags=["account"])
+api_router.include_router(user_identity_router, tags=["UserIdentity"])
 api_router.include_router(operator_profile_router, tags=["OperatorProfile"])
 api_router.include_router(operator_license_router, tags=["OperatorLicenseImage"])
 api_router.include_router(reductions_router, tags=["Reductions"])

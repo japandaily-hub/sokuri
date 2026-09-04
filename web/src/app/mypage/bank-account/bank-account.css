@@ -1,0 +1,204 @@
+/* ============================================================
+   振込口座ページ（/mypage/bank-account）固有スタイル
+   共通クラス(.field/.btn/.kdz-toast/.spinning 等)は katazuke.css / katazuke-pages.css の正典を使用。
+   form-card / edit-section-title は profile.css の見た目を踏襲しつつ、
+   ページ間でクラスを共有しない既存の慣習に合わせて .bank-page 配下に再定義する。
+   ============================================================ */
+
+.bank-page {
+  min-height: 100vh;
+  background: var(--pale-2);
+}
+
+.bank-wrap {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 24px 20px 80px;
+}
+
+.bank-page .edit-section-title {
+  font-family: var(--head);
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--navy);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.bank-page .edit-section-title .ic {
+  width: 16px;
+  height: 16px;
+  stroke: var(--blue);
+  stroke-width: 2;
+}
+
+.bank-page .form-card {
+  background: #fff;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-soft);
+  padding: 22px 20px;
+  margin-bottom: 16px;
+}
+
+.bank-page .field label {
+  font-size: 13px;
+}
+.bank-page .field input {
+  font-size: 15px;
+}
+.bank-page .field label .req {
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--blue);
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 5px;
+  vertical-align: middle;
+}
+.bank-page .field-hint {
+  font-size: 12px;
+  color: var(--body-soft);
+  margin-top: 5px;
+  line-height: 1.6;
+}
+.bank-page .field-hint.bank-kana-warn {
+  color: var(--danger);
+}
+
+/* 注意事項（identity.css の .id-notice-box と同一の見た目） */
+.bank-page .id-notice-box {
+  background: var(--pale);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+.bank-page .id-notice-box ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  line-height: 1.9;
+  color: var(--body-soft);
+}
+
+/* 登録済み口座のサマリー */
+.bank-page .bank-summary {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+  margin: 0 0 16px;
+}
+.bank-page .bank-summary > div {
+  display: flex;
+  justify-content: space-between;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.bank-page .bank-summary > div:last-child {
+  border-bottom: none;
+}
+.bank-page .bank-summary dt {
+  font-size: 12.5px;
+  color: var(--body-soft);
+}
+.bank-page .bank-summary dd {
+  margin: 0;
+  font-size: 14px;
+  color: var(--navy);
+  font-weight: 600;
+}
+
+.bank-page .bank-actions {
+  display: flex;
+  gap: 10px;
+}
+.bank-page .bank-actions .btn {
+  flex: 1;
+}
+
+.bank-page .btn-bank-delete {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--danger);
+  background: #fff;
+  border: 1.5px solid #ffc0c0;
+  padding: 12px 22px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+.bank-page .btn-bank-delete:hover {
+  background: #fff3f3;
+}
+.bank-page .btn-bank-delete:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 預金種別ラジオ */
+.bank-page .bank-radio-row {
+  display: flex;
+  gap: 20px;
+  padding-top: 4px;
+}
+.bank-page .bank-radio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.bank-page .bank-radio input {
+  width: 16px;
+  height: 16px;
+}
+
+.bank-page .pw-change-error {
+  font-size: 12.5px;
+  color: #e05c5c;
+  margin-bottom: 10px;
+  padding: 10px 14px;
+  background: #fff3f3;
+  border-radius: 0;
+  border: 1px solid #ffc0c0;
+}
+
+.bank-page .id-back-link {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.bank-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--deep);
+  color: #fff;
+  font-family: var(--head);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 13px 22px;
+  border-radius: 0;
+  z-index: 200;
+  max-width: calc(100vw - 32px);
+  text-align: center;
+  animation: bank-toast-fade 3.2s ease forwards;
+}
+@keyframes bank-toast-fade {
+  0% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@media (max-width: 480px) {
+  .bank-wrap { padding: 16px 14px 60px; }
+  .bank-page .form-card { padding: 18px 14px; }
+  .bank-page .bank-summary > div { flex-direction: column; gap: 2px; }
+}

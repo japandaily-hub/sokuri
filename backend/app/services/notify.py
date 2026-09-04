@@ -154,6 +154,23 @@ async def send_schedule_confirmed(to_email: str, transaction_id: str, visit_date
     )
 
 
+async def send_bank_account_changed(to_email: str, action: str) -> bool:
+    """振込先口座の登録・変更・削除を本人へ通知する（security review M-1）。
+
+    不正アクセスによる振込先の書き換えの早期検知が目的のため、``action``
+    （"登録"/"変更"/"削除"）のみを伝え、口座番号等の機微情報は本文に含めない。
+    """
+    return await _send(
+        to_email,
+        "【カタヅケ】振込先口座の情報が更新されました",
+        _wrap(
+            f"<p>お客様の振込先口座情報が<strong>{html.escape(action)}</strong>されました。</p>"
+            "<p>お心当たりがない場合は、お手数ですが至急パスワードを変更のうえ、"
+            "カタヅケまでご連絡ください。</p>"
+        ),
+    )
+
+
 async def send_operator_application_received(to_email: str, company_name: str) -> bool:
     """④ 業者事前申込の受付確認（申込者宛）。"""
     return await _send(

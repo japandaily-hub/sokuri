@@ -98,6 +98,8 @@ const BADGE_STYLES: Record<string, string> = {
   selected: "bg-emerald-100 text-emerald-700",
   rejected: "bg-slate-200 text-slate-500",
   approved: "bg-emerald-100 text-emerald-700",
+  unverified: "bg-slate-100 text-slate-500",
+  withdrawn: "bg-slate-200 text-slate-500",
 };
 
 export function StatusBadge({

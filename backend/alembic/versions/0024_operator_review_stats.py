@@ -1,11 +1,11 @@
 """operators に review_count / latest_review_comment、reviews に hidden_at / hidden_reason を追加（口コミ常時公開・表示拡充）
 
-Revision ID: 0022_operator_review_stats
-Revises: 0021_bid_withdrawal_append_only
+Revision ID: 0024_operator_review_stats
+Revises: 0023_user_identity_documents
 Create Date: 2026-09-04
 
 alembic revision id は過去の alembic_version 全断障害の再発防止のため32文字以内を
-厳守する（本リビジョンは26文字）。
+厳守する（本リビジョンは26文字。並行作業の 0022/0023 と衝突したため 0024 に付替）。
 
 背景: 口コミを常時公開する方針（2026-09-04 ユーザー決定）に伴い、入札一覧・業者一覧で
 「★平均 (件数)」と最新口コミの抜粋を表示する。operators.rating と同じ非正規化列として
@@ -21,8 +21,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0022_operator_review_stats"
-down_revision: str | None = "0021_bid_withdrawal_append_only"
+revision: str = "0024_operator_review_stats"
+down_revision: str | None = "0023_user_identity_documents"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

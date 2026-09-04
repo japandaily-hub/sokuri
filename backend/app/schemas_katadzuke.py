@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 import uuid
 from datetime import date, datetime, timedelta
 from typing import Annotated, Literal
@@ -272,7 +273,9 @@ class UserAddressUpdateRequest(BaseModel):
     @field_validator("postal_code")
     @classmethod
     def _normalize_postal_code(cls, v: str) -> str:
-        digits = v.replace("-", "").replace("ー", "").strip()
+        # NFKC正規化で全角数字（"１５０-０００１"等）を半角に変換してから桁数検証する
+        # （QAレビュー指摘対応。account_number と同じ理由）。
+        digits = unicodedata.normalize("NFKC", v).replace("-", "").replace("ー", "").strip()
         if not re.match(_POSTAL_CODE_DIGITS_RE, digits):
             raise ValueError("郵便番号は数字7桁で入力してください。")
         return digits
@@ -306,13 +309,20 @@ class UserBankAccountUpdateRequest(BaseModel):
     account_type: Literal["普通", "当座"]
     account_number: str
     account_holder_kana: str = Field(min_length=1, max_length=64)
+    # 振込口座の変更は攻撃者が乗っ取ったセッション/端末から金銭の流出先を書き換える
+    # 攻撃に直結するため再認証を必須にする（security review H-1）。パスワード未設定
+    # （LINEログイン専用）ユーザーは JWT 自体が LINE 認証由来であるため免除する
+    # （users.py 側で user.password_hash の有無により必須/免除を分岐する）。
+    current_password: str | None = None
 
     @field_validator("account_number")
     @classmethod
     def _validate_account_number(cls, v: str) -> str:
-        if not re.match(r"^\d{7}$", v):
+        # NFKC正規化で全角数字を半角に変換してから桁数検証する（QAレビュー指摘対応）。
+        normalized = unicodedata.normalize("NFKC", v)
+        if not re.match(r"^\d{7}$", normalized):
             raise ValueError("口座番号は数字7桁で入力してください。")
-        return v
+        return normalized
 
     @field_validator("account_holder_kana")
     @classmethod
@@ -320,6 +330,12 @@ class UserBankAccountUpdateRequest(BaseModel):
         if not re.match(_KANA_RE, v) or v.strip() == "":
             raise ValueError("口座名義（カナ）は全角カタカナで入力してください。")
         return v
+
+
+class UserBankAccountDeleteRequest(BaseModel):
+    """振込先口座の削除。current_password の要否は PUT と同じ（security review H-1）。"""
+
+    current_password: str | None = None
 
 
 # ──────────────────────────── マイページ: 本人確認 ────────────────────────────

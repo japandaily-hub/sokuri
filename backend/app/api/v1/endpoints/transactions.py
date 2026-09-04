@@ -328,6 +328,7 @@ async def list_messages(
 async def create_message(
     transaction_id: uuid.UUID,
     body: MessageCreateRequest,
+    background: BackgroundTasks,
     actor: Actor = Depends(get_current_actor),
     session: AsyncSession = Depends(get_session),
 ) -> MessageOut:
@@ -343,8 +344,34 @@ async def create_message(
         kind="text",
     )
     session.add(message)
+
+    # 送信者の反対側（受信者）の LINE 宛に新着通知を出す。BackgroundTasks は
+    # セッションクローズ後に走るため、commit 前にプリミティブ値へ取り出しておく
+    # （detached インスタンスの遅延ロードによる MissingGreenlet を避ける）。
+    # txn.case / txn.bid.operator は _TXN_LOAD で eager load 済みだが、
+    # case.user_id からの User は未ロードのため明示取得する（PK取得=1クエリ）。
+    if party == "operator":
+        recipient_party: str = "user"
+        recipient_line_user_id: str | None = None
+        owner_id = txn.case.user_id
+        if owner_id is not None:
+            owner = await session.get(User, owner_id)
+            recipient_line_user_id = owner.line_user_id if owner is not None else None
+    else:
+        recipient_party = "operator"
+        recipient_line_user_id = txn.bid.operator.line_user_id
+    txn_id_str = str(txn.id)
+
     await session.commit()
     await session.refresh(message)
+
+    if recipient_line_user_id:
+        background.add_task(
+            notify_dispatch.dispatch_message_received,
+            recipient_line_user_id,
+            txn_id_str,
+            recipient_party,
+        )
     return _to_message_out(message, party)
 
 

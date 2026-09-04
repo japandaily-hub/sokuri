@@ -40,6 +40,7 @@ import app.db.models.bid
 import app.db.models.message
 import app.db.models.transaction
 import app.db.models.user
+import app.db.models.user_identity_document
 import app.db.models.invite
 configure_mappers()
 

@@ -24,16 +24,19 @@ import { Spinner } from "@/components/Icon";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import { Ic } from "@/components/kdz/Icons";
 import { caseItemsLabel } from "@/lib/case-labels";
-import { useToken } from "@/components/kdz/Ui";
+import { StatusBadge, useToken } from "@/components/kdz/Ui";
 import {
   formatYen,
+  getMyProfile,
   listMyCases,
   listTransactions,
   photoSrc,
   toDisplayMessage,
+  IDENTITY_STATUS_LABEL,
   type CaseOut,
   type CaseStatus,
   type TransactionListItem,
+  type UserProfile,
 } from "@/lib/katadzuke-api";
 
 type TabKey = "all" | "active" | "done";
@@ -161,6 +164,7 @@ export default function MyPage() {
 
   const [cases, setCases] = useState<CaseOut[] | null>(null);
   const [transactions, setTransactions] = useState<TransactionListItem[] | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
@@ -174,6 +178,11 @@ export default function MyPage() {
       setTransactions(await listTransactions(token));
     } catch (e) {
       setError((prev) => prev ?? toDisplayMessage(e, "取引の取得に失敗しました"));
+    }
+    try {
+      setProfile(await getMyProfile(token));
+    } catch (e) {
+      setError((prev) => prev ?? toDisplayMessage(e, "プロフィールの取得に失敗しました"));
     }
   }, [token]);
 
@@ -355,6 +364,34 @@ export default function MyPage() {
             </Link>
           </div>
         </div>
+
+        {/* 会員情報の入力状況（本人確認/振込口座/LINE連携） */}
+        {profile ? (
+          <div className="member-status-card">
+            <div className="member-status-title">会員情報の入力状況</div>
+            <Link href="/mypage/identity" className="member-status-row">
+              <span className="member-status-label">本人確認</span>
+              <StatusBadge
+                value={profile.identity_status === "approved" ? "approved" : profile.identity_status}
+                label={IDENTITY_STATUS_LABEL[profile.identity_status]}
+              />
+            </Link>
+            <Link href="/mypage/bank-account" className="member-status-row">
+              <span className="member-status-label">振込口座</span>
+              <StatusBadge
+                value={profile.has_bank_account ? "approved" : "unverified"}
+                label={profile.has_bank_account ? "登録済み" : "未登録"}
+              />
+            </Link>
+            <Link href="/notifications" className="member-status-row">
+              <span className="member-status-label">LINE連携</span>
+              <StatusBadge
+                value={profile.line_linked ? "approved" : "unverified"}
+                label={profile.line_linked ? "連携済み" : "未連携"}
+              />
+            </Link>
+          </div>
+        ) : null}
 
         {/* タブ */}
         <div className="my-tabs" role="tablist">

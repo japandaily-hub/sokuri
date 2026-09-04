@@ -85,6 +85,21 @@ def assert_operator_not_suspended(operator: Operator) -> None:
         )
 
 
+def get_current_user_claims(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+) -> dict:
+    """依頼者トークンの検証済みクレーム（sub/typ/role/iat/exp）を返す。
+
+    ``get_current_user`` と併用し、トークンの発行時刻（iat）に依存する step-up 判定
+    （例: LINE 専用ユーザーの振込口座変更は「直近ログイン」のトークンのみ許可）で使う。
+    typ の検証は行うが、失効ゲート（退会・パスワード変更）は ``get_current_user`` 側が担う。
+    """
+    payload = _decode(credentials)
+    if payload.get("typ") != "user":
+        raise _CRED_EXC
+    return payload
+
+
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     session: AsyncSession = Depends(get_session),

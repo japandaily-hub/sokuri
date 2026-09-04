@@ -24,7 +24,7 @@ from app.db.models.transaction import Transaction
 from app.db.models.user import User
 from app.db.session import get_session
 from app.schemas_katadzuke import BidCreateRequest, BidOut, TransactionOut
-from app.services import notify, notify_dispatch
+from app.services import notify_dispatch
 from app.services.case_lock import lock_case_row
 from app.services.message_guard import contains_contact_info
 
@@ -164,11 +164,13 @@ async def create_bid(
 
     if case.user_id is not None:
         owner = await session.get(User, case.user_id)
-        # LINE専用ユーザーの仮メール（実メール未設定）宛には送信しない。
-        # 配送不能なだけでなく、実在しないドメインへの送信試行をログに残さないため。
-        if owner is not None and not notify.is_placeholder_email(owner.email):
+        # LINE優先→メールフォールバック。仮メール（LINE専用ユーザー）判定は
+        # dispatch 側へ集約する（仮メールでもLINE連携済みならLINEには届けるため）。
+        # detached 対策として ORM ではなくプリミティブ値のみを add_task に渡す。
+        if owner is not None:
             background.add_task(
-                notify.send_bid_received,
+                notify_dispatch.dispatch_bid_received,
+                owner.line_user_id,
                 owner.email,
                 str(case.id),
                 operator.company_name,
