@@ -1,0 +1,84 @@
+name: Uptime alert
+
+# 外形監視（5分毎）。障害検知・復旧・遅延を運営へ通知する。
+# 必要な Secrets（Settings > Secrets and variables > Actions）:
+#   BREVO_API_KEY, ALERT_EMAILS, ALERT_MAIL_FROM（任意）,
+#   ALERT_LINE_CHANNEL_ACCESS_TOKEN, ALERT_LINE_USER_IDS（顧客向けとは別の公式アカウント）,
+#   ALERT_WEBHOOK_URL（任意: Slack / Discord）
+# 未設定のチャネルはスキップされる。手動実行（workflow_dispatch）で疎通確認できる。
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+    inputs:
+      force_notify:
+        description: "true なら現在の状態に関わらずテスト通知を送る"
+        required: false
+        default: "false"
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: uptime-alert
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # 直前の状態（up/down）を持ち回す。restore-keys の前方一致で最新の保存分を拾う。
+      - name: Restore previous state
+        uses: actions/cache/restore@v4
+        with:
+          path: .uptime_state.json
+          key: uptime-state-${{ github.run_id }}
+          restore-keys: |
+            uptime-state-
+
+      - name: Test notification (manual only)
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.force_notify == 'true' }}
+        env:
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          ALERT_EMAILS: ${{ secrets.ALERT_EMAILS }}
+          ALERT_MAIL_FROM: ${{ secrets.ALERT_MAIL_FROM }}
+          ALERT_LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.ALERT_LINE_CHANNEL_ACCESS_TOKEN }}
+          ALERT_LINE_USER_IDS: ${{ secrets.ALERT_LINE_USER_IDS }}
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+        run: |
+          python - <<'PY'
+          import os, sys
+          sys.path.insert(0, "scripts")
+          from uptime_check import notify
+          sent = notify("[カタヅケ監視][TEST] 疎通テスト", "✅ これはテスト通知です。受信できていれば設定完了です。")
+          print("sent:", sent)
+          PY
+
+      - name: Run uptime check
+        env:
+          BACKEND_URL: https://sokuri-backend.onrender.com
+          FRONTEND_URL: https://sokuri.vercel.app
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          ALERT_EMAILS: ${{ secrets.ALERT_EMAILS }}
+          ALERT_MAIL_FROM: ${{ secrets.ALERT_MAIL_FROM }}
+          ALERT_LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.ALERT_LINE_CHANNEL_ACCESS_TOKEN }}
+          ALERT_LINE_USER_IDS: ${{ secrets.ALERT_LINE_USER_IDS }}
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+        run: python scripts/uptime_check.py
+
+      - name: Save state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .uptime_state.json
+          key: uptime-state-${{ github.run_id }}

@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
+from app.core.alert_middleware import ServerErrorAlertMiddleware
 from app.api.v1.router import api_router
 from app.config import Settings, get_settings
 from app.core.client_ip import (
@@ -123,6 +124,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         version="0.1.0",
         lifespan=lifespan,
     )
+
+    # 未処理例外・5xx バーストを運営へ通知する（services/alerts.py。未設定時はログのみ）
+    app.add_middleware(ServerErrorAlertMiddleware)
 
     app.add_middleware(
         CORSMiddleware,

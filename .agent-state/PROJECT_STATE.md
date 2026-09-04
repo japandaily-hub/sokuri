@@ -50,7 +50,7 @@
 - なし（push はユーザー判断）。
 
 ## 次アクション
-- **P1（2026-09-04 起票・ユーザー指示）: 障害・異常時アラート基盤の構築。** システム障害や業務上の異常が起きたら運営に自動で通知が届く仕組みを作る。
+- **P1（2026-09-04 起票・ユーザー指示）: 障害・異常時アラート基盤の構築 — 実装済み（外形監視 `.github/workflows/uptime-alert.yml` + `scripts/uptime_check.py`、アプリ内 `app/core/alert_middleware.py` + `app/services/alerts.py`、手順 `docs/ops/alerting.md`）。残り＝ユーザー作業: GitHub Secrets と Render 環境変数（ALERT_EMAILS / ALERT_LINE_CHANNEL_ACCESS_TOKEN / ALERT_LINE_USER_IDS / ALERT_WEBHOOK_URL / BREVO_API_KEY）の登録、運営用 LINE 公式アカウント（顧客向けとは別）の作成、Actions の Run workflow（force_notify=true）で疎通確認。** システム障害や業務上の異常が起きたら運営に自動で通知が届く仕組みを作る。
   - 検知対象（案）: ①外形監視（/health・/readyz が非200 / commit 不一致 / 応答遅延）②バックエンドの 5xx・例外の急増（Render ログ or アプリ内エラーハンドラ）③Vercel/Render のデプロイ失敗 ④業務異常（AI解析の連続失敗、通知メール送信失敗、入札API の 4xx 急増、審査待ち業者の放置日数、減額申請の未回答日数）⑤DB 到達不能・alembic head 不一致 ⑥外部連携（Gemini 429/5xx、Brevo・LINE の送信失敗）
   - 通知先（案）: メール（Brevo 既存）＋ LINE（既存 Messaging API）。重大度で分ける（Critical=即時、Warning=日次まとめ）。
   - 実装案: 最小構成は GitHub Actions の cron（5分毎）で外形監視→失敗時に Brevo/LINE へ送信。アプリ側は FastAPI の例外ハンドラ／ミドルウェアで 5xx をカウントし閾値超過で notify.py 経由送信（再送抑制つき）。将来は Sentry 等の導入を検討。

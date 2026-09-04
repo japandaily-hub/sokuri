@@ -72,6 +72,22 @@ class Settings(BaseSettings):
     app_encryption_key: str = ""
     # LINE Messaging API のチャネルアクセストークン（Push通知送信用）。未設定時は送信をスキップする。
     line_channel_access_token: str = ""
+
+    # ── 運営向けアラート（services/alerts.py）。顧客向け通知とは宛先・アカウントを分離する ──
+    # 送信先メール（カンマ区切り・運営の監視用メールボックス）。未設定ならメール送信しない。
+    alert_emails_raw: str = Field(default="", alias="ALERT_EMAILS")
+    # 差出人（未設定なら mail_from を流用。差出人名は常に「カタヅケ監視」）
+    alert_mail_from: str = ""
+    # 運営向け LINE 公式アカウント（顧客向けとは別チャネル）のトークンと、通知先の LINE ユーザーID（カンマ区切り）
+    alert_line_channel_access_token: str = ""
+    alert_line_user_ids_raw: str = Field(default="", alias="ALERT_LINE_USER_IDS")
+    # Slack / Discord の Incoming Webhook URL（任意）
+    alert_webhook_url: str = ""
+    # 同一 key のアラート再送抑制（秒）
+    alert_cooldown_seconds: int = 600
+    # 5xx バースト検知: 直近 window 秒間に threshold 件以上でアラート
+    alert_5xx_threshold: int = 5
+    alert_5xx_window_seconds: int = 300
     # LINE Login チャネル ID（フロントの LINE_CLIENT_ID と同一値）。
     # /auth/line/exchange でアクセストークンの発行元チャネルを検証（audience 検証）するために使用する。
     # 未設定時は LINE ログイン機能自体を未構成とみなし 503 を返す（セキュリティ上、検証をスキップしない）。
@@ -240,6 +256,16 @@ class Settings(BaseSettings):
         if not (0 <= v <= 5):
             raise ValueError("GEMINI_MAX_RETRIES は0〜5の整数である必要があります。")
         return v
+
+    @property
+    def alert_emails(self) -> list[str]:
+        """ALERT_EMAILS をカンマ区切りで正規化して返す。"""
+        return [e.strip() for e in self.alert_emails_raw.split(",") if e.strip()]
+
+    @property
+    def alert_line_user_ids(self) -> list[str]:
+        """ALERT_LINE_USER_IDS をカンマ区切りで正規化して返す。"""
+        return [u.strip() for u in self.alert_line_user_ids_raw.split(",") if u.strip()]
 
     @property
     def admin_emails(self) -> list[str]:
