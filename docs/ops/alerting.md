@@ -31,6 +31,7 @@ LINE Notify は 2025年3月に終了しているため、Messaging API の別チ
    ```
    値の検証（LINE トークン・Brevo キーの疎通込み）→ GitHub Secrets 登録 → Render 環境変数登録（自動再デプロイ）→ Actions「Uptime alert」をテスト通知付きで起動し結果を表示、まで自動で行います。`--dry-run` で登録前の確認だけもできます。
 3. メール／LINE／Webhook に「[カタヅケ監視][TEST] 疎通テスト」が届けば完了。
+   - `setup_alerts.py` は実行ごとに `force_notify=true` で起動するため、**実行した回数ぶんテスト通知が届く**（設定を何度もやり直すとその都度メールが来る）。テスト通知は手動実行専用で、定期実行では送られない。
 
 人手で必要なのは「運営用 LINE 公式アカウントの作成（顧客向けとは別）」「PAT と API キーの発行」「`.env.alerts` への記入」の3点だけです。
 
@@ -51,6 +52,8 @@ LINE Notify は 2025年3月に終了しているため、Messaging API の別チ
 - up → down: `[CRITICAL] 障害検知`
 - down 継続: `ALERT_REPEAT_EVERY`（既定 12 回＝約1時間）ごとに再通知
 - down → up: `[RECOVERED] 復旧しました`
+- 応答遅延（Warning）も遷移型: 遅くなった時に 1 回、通常速度に戻った時に `[INFO] 解消` を 1 回。遅い間の再送はしない
+- **正常時は何も送らない**（5分毎のチェック結果はメールされず、Actions の Step Summary にだけ残る）
 - 状態は `actions/cache` で持ち回します（キャッシュが消えた場合は「初回検知」として再通知されるだけで、取りこぼしはありません）。
 
 ### アプリ内監視（`app/core/alert_middleware.py`）

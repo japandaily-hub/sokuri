@@ -11,7 +11,8 @@
   - 直前状態 up → 今回 down: Critical「障害検知」
   - 直前状態 down → 今回 up: 復旧通知
   - down が継続: ALERT_REPEAT_EVERY 回に 1 回だけ再通知（既定 12 回＝5分間隔なら約1時間ごと）
-状態は STATE_FILE（既定 .uptime_state.json。Actions では actions/cache で持ち回す）に保存する。
+  - 応答遅延も遷移型: 遅くなった時に Warning を 1 回、通常速度に戻った時に解消通知を 1 回（遅い間は再送しない）
+正常時は何も送らない。状態は STATE_FILE（既定 .uptime_state.json。Actions では actions/cache で持ち回す）に保存する。
 
 通知先（環境変数。未設定のチャネルはスキップ）:
   BREVO_API_KEY + ALERT_EMAILS（カンマ区切り）+ ALERT_MAIL_FROM
@@ -159,7 +160,7 @@ def load_state() -> dict:
         with open(STATE_FILE, encoding="utf-8") as f:
             return json.load(f)
     except Exception:  # noqa: BLE001
-        return {"down": False, "down_runs": 0, "since": None}
+        return {"down": False, "down_runs": 0, "since": None, "slow": False}
 
 
 def save_state(state: dict) -> None:
@@ -212,16 +213,24 @@ def main() -> int:
                 "[カタヅケ監視][RECOVERED] 復旧しました",
                 f"✅ カタヅケ監視 復旧\n障害発生: {state.get('since')} → 復旧確認: {now}\n\n{body}",
             )
-        state = {"down": False, "down_runs": 0, "since": None}
-        if slow:
+        was_slow = bool(state.get("slow"))
+        state = {"down": False, "down_runs": 0, "since": None, "slow": bool(slow)}
+        # 遅延も状態遷移でのみ通知する（遅い間ずっと毎回送らない）
+        if slow and not was_slow:
             names = "、".join(f"{r.name}({r.ms}ms)" for r in slow)
             sent += notify(
                 f"[カタヅケ監視][WARNING] 応答遅延: {names}",
                 f"⚠️【Warning】応答が遅くなっています（しきい値 {SLOW_MS}ms）\n\n{body}",
             )
+        elif was_slow and not slow:
+            sent += notify(
+                "[カタヅケ監視][INFO] 応答遅延が解消しました",
+                f"✅ 応答速度が通常に戻りました（しきい値 {SLOW_MS}ms）\n\n{body}",
+            )
 
     save_state(state)
-    lines += ["", f"状態: {'DOWN' if state.get('down') else 'UP'} / 通知: {', '.join(sent) if sent else 'なし'}"]
+    status = "DOWN" if state.get("down") else ("UP(遅延)" if state.get("slow") else "UP")
+    lines += ["", f"状態: {status} / 通知: {', '.join(sent) if sent else 'なし'}"]
     write_summary(lines)
     return 0
 
