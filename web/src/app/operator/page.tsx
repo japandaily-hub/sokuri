@@ -33,6 +33,7 @@ import { ApprovalPendingNotice } from "@/components/kdz/ApprovalPendingNotice";
 import { Spinner } from "@/components/Icon";
 import { useToken } from "@/components/kdz/Ui";
 import {
+  KdzApiError,
   TXN_STATUS_LABEL,
   createBid,
   formatYen,
@@ -255,6 +256,8 @@ function LotCard({
                   <>
                     成約時のみ買取額の8%が手数料
                     <br />
+                    ※サービス開始当初（β期間）は手数料を請求しません。請求開始の際は事前にメールでお知らせします。
+                    <br />
                     <span style={{ fontSize: "11.5px" }}>{BID_RANGE_HINT}</span>
                   </>
                 )}
@@ -389,6 +392,12 @@ export default function OperatorDashboardPage() {
       showToast(`¥${yen(val)} で入札しました`);
     } catch (e) {
       showToast(toDisplayMessage(e, "入札に失敗しました"));
+      // 409（他社落札・依頼者の出品取り下げ等）の場合、一覧に古い案件状態が残ったままだと
+      // 同じ入力での再送信を誘発する。案件・取引一覧を再取得し、状態（成約済み/取り下げ済み/
+      // 自分の入札有無）を最新化してカードの表示を更新する。
+      if (e instanceof KdzApiError && e.status === 409) {
+        await reload();
+      }
     } finally {
       setBidBusy(false);
     }

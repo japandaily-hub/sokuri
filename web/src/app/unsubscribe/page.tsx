@@ -1,50 +1,50 @@
 "use client";
 
-/** 配信停止ページ（法的要件: CAN-SPAM/特商法 メール配信停止受付）。
- * URLパラメータ ?token=xxx&email=xxx を受け取り、停止申請受付を表示する。
- * Phase 1: 実際の抑制リストは運営者が手動管理。
+/** メールの受け取りについてのご案内（/unsubscribe）。
+ * カタヅケが送るのは取引に必要な通知のみで、広告宣伝メールは送らない。
+ * 抑制リスト等のバックエンド実装は存在しないため、このページでは
+ * 「配信停止を受け付けた」という事実に反する表示は行わず、
+ * 通知設定（/notifications）と退会（/mypage/withdraw）へ案内する。
  *
- * デザインレビュー A-2 対応: 旧 slate 意匠を廃し、完了系画面（signup/create-complete）と
- * 同じ done-circle（green）+ 共通 .form-card/.btn の語彙に統一。ヘッダー/フッターは
- * 他の静的ページ（terms/contact 等）と同様、共通 SiteChrome のマーケ用クロムのままとする。
+ * デザインレビュー A-2 対応: 完了系画面（signup/create-complete）と同じ
+ * 共通 .form-card/.btn の語彙に揃える。ヘッダー/フッターは他の静的ページ
+ * （terms/contact 等）と同様、共通 SiteChrome のマーケ用クロムのままとする。
  */
 
 import "./unsubscribe.css";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 function UnsubscribeContent() {
   const params = useSearchParams();
   const email = params.get("email") ?? "";
-  const [submitted, setSubmitted] = useState(false);
-
-  // ページ表示と同時に受付済みとする（Phase1: 手動運用）
-  useEffect(() => {
-    setSubmitted(true);
-  }, []);
 
   return (
     <div className="unsub-page">
       <div className="form-card">
-        <div className="done-circle">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M4 12.5l5.5 5.5L20 7" />
-          </svg>
-        </div>
-        <h1>配信停止のご申請を受け付けました</h1>
+        <h1>メールの受け取りについて</h1>
         <p>
-          {email ? (
-            <>
-              <strong style={{ color: "var(--navy)" }}>{email}</strong> 宛てのカタヅケからのご案内メールの送信を停止いたします。
-            </>
-          ) : (
-            "カタヅケからのご案内メールの送信を停止いたします。"
-          )}
+          カタヅケからお送りするのは、出品の受付・入札のお知らせ・成約・訪問日程のご連絡など、
+          <strong style={{ color: "var(--navy)" }}>お取引に必要な通知のみ</strong>
+          です。広告・宣伝を目的としたメールをお送りすることはありません。
         </p>
-        <p>すでに送信処理中のメールは届く場合がございます。あらかじめご了承ください。</p>
-        <p style={{ fontSize: 12.5 }}>停止処理の完了までに数営業日かかる場合がございます。</p>
+        {email ? (
+          <p>
+            <strong style={{ color: "var(--navy)" }}>{email}</strong> 宛てのご連絡についても同様です。
+          </p>
+        ) : null}
+        <p>
+          通知の受け取り方（メール・LINE）は、マイページの
+          <Link href="/notifications">通知設定</Link>
+          から変更できます。
+        </p>
+        <p>
+          アカウントそのものの削除をご希望の場合は、
+          <Link href="/mypage/withdraw">退会手続き</Link>
+          からお手続きください。退会後は、法令上保存が必要な期間を除き、個人情報を遅滞なく削除します。
+        </p>
         <div style={{ marginTop: 28 }}>
           <Link href="/" className="btn btn-primary">
             トップへ戻る
@@ -52,7 +52,7 @@ function UnsubscribeContent() {
         </div>
       </div>
       <p className="unsub-footnote">
-        ご不明な点は <a href="mailto:katazuke-support@gmail.com">katazuke-support@gmail.com</a> までお問い合わせください。
+        ご不明な点は <a href="mailto:katazuke.info@gmail.com">katazuke.info@gmail.com</a> までお問い合わせください。
       </p>
     </div>
   );

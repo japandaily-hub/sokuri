@@ -25,6 +25,7 @@ import {
   BID_STATUS_LABEL,
   CASE_ITEM_CONDITION_LABEL,
   CASE_STATUS_LABEL,
+  KdzApiError,
   createBid,
   formatYen,
   getCaseMasked,
@@ -100,6 +101,12 @@ export default function OperatorCaseDetailPage() {
       await reload();
     } catch (err) {
       setError(toDisplayMessage(err, "入札に失敗しました"));
+      // 409（他社落札・出品取り下げ等で入札を受け付けられない状態）の場合、フォームに
+      // 古い案件状態が残ったままだと再送信を誘発する。案件データを再取得し、
+      // canBid の判定材料（status・my_bid）を最新化して古いフォームを消す。
+      if (err instanceof KdzApiError && err.status === 409) {
+        await reload();
+      }
     } finally {
       setBusy(false);
     }

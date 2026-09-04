@@ -319,7 +319,7 @@ export default function UserCaseDetailPage() {
     <div className="container-aw max-w-3xl space-y-6 py-10">
       {search.get("created") ? (
         <Notice tone="success">
-          依頼を受け付けました。業者から入札が届くとメールでお知らせします。
+          依頼を受け付けました。業者から入札が届くと、LINE連携済みの方はLINEで、未連携の方はメールでお知らせします。
         </Notice>
       ) : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
@@ -539,7 +539,7 @@ export default function UserCaseDetailPage() {
           <h2 className="font-normal text-slate-900">入札一覧（{activeBids.length} 件）</h2>
           {activeBids.length === 0 ? (
             <p className="mt-3 text-sm text-slate-500">
-              まだ入札がありません。入札が届くとメールでお知らせします。
+              まだ入札がありません。入札が届くと、LINE連携済みの方はLINEで、未連携の方はメールでお知らせします。
             </p>
           ) : (
             <ul className="mt-4 space-y-3">

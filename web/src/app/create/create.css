@@ -175,3 +175,21 @@
   .create-page .purpose-grid { grid-template-columns: 1fr; }
   .create-page .field-row { grid-template-columns: 1fr; }
 }
+
+/* 離脱確認モーダル（H3対策: ブラウザバック検知）。operator/dashboard.css の
+   .modal-overlay/.modal と同じ視覚言語を、create ページのトークンで再現する。 */
+.create-page .leave-modal-overlay {
+  position: fixed; inset: 0; z-index: 200; background: rgba(20, 30, 20, .45);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.create-page .leave-modal {
+  background: #fff; border: 1px solid var(--line); border-radius: var(--radius-s);
+  max-width: 380px; width: 100%; padding: 24px 22px;
+}
+.create-page .leave-modal h3 {
+  font-family: var(--head); font-weight: 400; font-size: 17px; color: var(--navy); margin: 0 0 10px;
+}
+.create-page .leave-modal p { font-size: 13.5px; color: var(--body-soft); line-height: 1.8; margin: 0 0 20px; }
+.create-page .leave-modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.create-page .leave-modal-actions .btn-flow-back,
+.create-page .leave-modal-actions .btn-flow-next { padding: 10px 18px; font-size: 13.5px; }

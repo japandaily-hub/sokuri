@@ -19,7 +19,7 @@
  *   業者（Operator）のLINE単独新規作成はバックエンド側で行われない。
  */
 
-import NextAuth from "next-auth";
+import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import LINE from "next-auth/providers/line";
 import type { Provider } from "next-auth/providers";
@@ -46,18 +46,45 @@ function apiBase(): string {
   return url.replace(/\/$/, "");
 }
 
+/**
+ * r3 セキュリティレビュー R-M1 是正: 停止アカウントのログインを
+ * 「メールアドレスまたはパスワードが正しくありません」と誤表示しないための専用エラー。
+ * NextAuth v5 の仕様（CredentialsSignin を継承し code を設定）に従う。
+ * signIn({ redirect: false }) の戻り値で result.code === "account_suspended" として拾える。
+ */
+class AccountSuspendedError extends CredentialsSignin {
+  code = "account_suspended";
+}
+
 async function backendLogin(
   path: "/auth/login" | "/auth/operator/login",
   email: string,
   password: string,
 ): Promise<BackendAuthResponse | null> {
+  let res: Response;
   try {
-    const res = await fetch(`${apiBase()}${path}`, {
+    res = await fetch(`${apiBase()}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
-    if (!res.ok) return null;
+  } catch {
+    return null;
+  }
+  if (res.status === 403) {
+    // backend は依頼者・業者どちらの停止も 403 { detail: { code: "account_suspended" } } を返す。
+    let detailCode: unknown;
+    try {
+      const body = (await res.json()) as { detail?: { code?: unknown } };
+      detailCode = body?.detail?.code;
+    } catch {
+      /* JSON でないレスポンスは無視し、通常の認証失敗として扱う */
+    }
+    if (detailCode === "account_suspended") throw new AccountSuspendedError();
+    return null;
+  }
+  if (!res.ok) return null;
+  try {
     return (await res.json()) as BackendAuthResponse;
   } catch {
     return null;
@@ -144,9 +171,22 @@ function buildProviders(): Provider[] {
   return providers;
 }
 
+/**
+ * backend JWT の有効期限（config.py の jwt_expire_minutes = 60*24*7 = 7日）と揃える。
+ * 根本対策は katadzuke-api.ts の 401 共通ハンドリング（signOut→再ログイン誘導）であり、
+ * これは補助（NextAuthセッションだけが独り歩きして「見た目はログイン中」の期間を短くする）。
+ * updateAge を maxAge と同値にし、アクセスの都度スライド延長されないようにする
+ * （スライドすると継続利用中のセッションが7日を超えて残り続け、揃えた意味が薄れるため）。
+ */
+const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
-  session: { strategy: "jwt" },
+  session: {
+    strategy: "jwt",
+    maxAge: SESSION_MAX_AGE_SECONDS,
+    updateAge: SESSION_MAX_AGE_SECONDS,
+  },
   pages: { signIn: "/login" },
   providers: buildProviders(),
   callbacks: {

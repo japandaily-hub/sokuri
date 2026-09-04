@@ -799,6 +799,92 @@ class OperatorSuspendRequest(BaseModel):
     suspended: bool
 
 
+class AdminCaseListItem(BaseModel):
+    """案件一覧（GET /admin/cases）の1行。admin向けのため依頼者メールはマスクしない。"""
+
+    id: uuid.UUID
+    status: str
+    created_at: datetime
+    purpose: str
+    prefecture: str
+    city: str
+    user_email: str | None = None
+    company_name: str | None = None
+    amount: int | None = None
+    visit_date: date | None = None
+
+
+class AdminCaseListResponse(BaseModel):
+    items: list[AdminCaseListItem]
+    total: int
+
+
+class AdminTransactionListItem(BaseModel):
+    """成約一覧（GET /admin/transactions）の1行。admin向けのため依頼者メールはマスクしない。"""
+
+    id: uuid.UUID
+    case_id: uuid.UUID
+    status: str
+    created_at: datetime
+    user_email: str | None = None
+    company_name: str | None = None
+    amount: int | None = None
+    visit_date: date | None = None
+
+
+class AdminTransactionListResponse(BaseModel):
+    items: list[AdminTransactionListItem]
+    total: int
+
+
+class AdminUserListItem(BaseModel):
+    """依頼者一覧（GET /admin/users）の1行（r3-verify-operator ADD-2対応）。"""
+
+    id: uuid.UUID
+    email: str
+    display_name: str | None = None
+    role: str
+    is_suspended: bool
+    suspended_at: datetime | None = None
+    created_at: datetime
+    case_count: int
+
+
+class AdminUserListResponse(BaseModel):
+    items: list[AdminUserListItem]
+    total: int
+
+
+class UserSuspendRequest(BaseModel):
+    """依頼者アカウントの停止／停止解除（admin 専用）。"""
+
+    suspended: bool
+    reason: str | None = Field(default=None, max_length=200)
+
+
+class UserSuspendResponse(BaseModel):
+    id: uuid.UUID
+    is_suspended: bool
+    suspended_at: datetime | None = None
+    open_case_count: int = Field(
+        default=0,
+        description=(
+            "停止操作時点で対象依頼者が保有する open/bidding 状態の案件数。"
+            "QA未解決リスク対応: 停止のみでは案件・成約は自動的に扱いが変わらないため、"
+            "運営が案件側の後続対応（キャンセル・業者への連絡等）を判断する材料として返す。"
+        ),
+    )
+
+
+class AdminUserRoleResponse(BaseModel):
+    """R3再レビュー Critical対応: 2人目以降の admin 追加/削除（promote/demote）の
+    レスポンス。役割変更後の最新状態のみを返す（一覧の再取得は呼び出し元の責務）。
+    """
+
+    id: uuid.UUID
+    role: str
+
+
 # ──────────────────────────── 業者事前申込（/business） ────────────────────────────
 
 
@@ -1023,6 +1109,73 @@ class OperatorPublicListItemOut(BaseModel):
     rating: float | None = None
     review_count: int = 0
     latest_review_comment: str | None = None
+
+
+# ──────────────────────────── お問い合わせ ────────────────────────────
+
+# web/src/app/contact/page.tsx の <select name="category"> の value 属性と1対1で
+# 一致させる（security review M-1対応。以前は任意文字列を許容しており、通知メール
+# Subject への CR/LF・Unicode双方向制御文字（U+202E 等）混入を防げなかった）。
+ContactCategory = Literal[
+    "service", "pricing", "area", "privacy", "trouble", "partner", "press", "other"
+]
+
+
+#: 制御文字として拒否する Unicode カテゴリ（security review N-9対応）。
+#: Cc（C0/C1制御文字）/Cf（書式文字。双方向制御 U+202A-202E・U+2066-2069、
+#: ゼロ幅文字 U+200B 等を含む）/Co（私用領域）/Cs（サロゲート）に限定する。
+#: Cn（未割り当て）はここから除外する: 実行環境の Python（unicodedata）が
+#: 束ねる Unicode バージョンより新しく割り当てられた文字（絵文字の新規追加等）は
+#: 手元では Cn と判定されてしまい、危険性が無いのに正当な入力を拒否してしまう
+#: （偽陽性）ため。危険性があるのは「割り当てられていないから」ではなく
+#: 「制御・書式・私用・サロゲートとして解釈されるから」であり、Cn自体は
+#: レンダリング上ただの不可視/未対応文字（豆腐表示）に留まり、CR/LF injection・
+#: 双方向制御によるなりすまし表示・ゼロ幅による不可視文字混入のような
+#: 実害を持たない。
+_REJECTED_CONTROL_CATEGORIES = {"Cc", "Cf", "Co", "Cs"}
+
+
+def _reject_non_newline_control_chars(value: str, *, field_label: str) -> str:
+    """改行（``\\n``）以外の制御文字・Unicode双方向制御文字・ゼロ幅文字を拒否する。
+
+    security review M-1対応。Unicode カテゴリ Cc/Cf/Co/Cs
+    （_REJECTED_CONTROL_CATEGORIES）は C0/C1制御文字・書式文字
+    （U+202A-202E の LRE/RLE/PDF/LRO/RLO、U+2066-2069 の LRI/RLI/FSI/PDI
+    双方向制御・U+200B等のゼロ幅文字を含む）を捕捉する（``app.services.text_sanitize``
+    と同じ判定基準だが、あちらは無害化のため改行ごと除去する仕様のため、
+    複数行の問い合わせ本文（``message``）向けに改行のみ許可する別実装として持つ）。
+    N-9対応: Cn（未割り当て）は誤検知源のため対象外にする（詳細は
+    ``_REJECTED_CONTROL_CATEGORIES`` のコメント参照）。
+    """
+    for ch in value:
+        if ch == "\n":
+            continue
+        if unicodedata.category(ch) in _REJECTED_CONTROL_CATEGORIES:
+            raise ValueError(f"{field_label}に制御文字を含めることはできません。")
+    return value
+
+
+class ContactCreateRequest(BaseModel):
+    """/contact フォームからの送信内容（認証不要）。"""
+
+    name: str = Field(min_length=1, max_length=100)
+    email: EmailStr
+    category: ContactCategory
+    message: str = Field(min_length=1, max_length=4000)
+
+    @field_validator("name")
+    @classmethod
+    def _validate_name(cls, value: str) -> str:
+        return _reject_non_newline_control_chars(value, field_label="お名前")
+
+    @field_validator("message")
+    @classmethod
+    def _validate_message(cls, value: str) -> str:
+        return _reject_non_newline_control_chars(value, field_label="お問い合わせ内容")
+
+
+class ContactCreateResponse(BaseModel):
+    ok: bool = True
 
 
 # 前方参照の解決

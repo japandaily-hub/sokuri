@@ -504,12 +504,12 @@ function SchedulePageInner() {
 
           <div className="notice-box">
             <Ic name="clock" />
-            日程確定後はメールでお知らせします。LINE連携済みの場合はLINEにも届きます。変更が必要な場合はチャットで業者へご連絡ください。
+            日程を確定すると、業者へ通知が送られます。確定内容はマイページとチャットで確認できます。変更が必要な場合はチャットで業者へご連絡ください。
           </div>
 
           <div className="notice-box warn">
             <Ic name="clock" />
-            訪問買取は特定商取引法によりクーリングオフの対象です。詳しくは
+            訪問による買取には特定商取引法（訪問購入）の規定が適用される場合があります。クーリング・オフの可否は、品目（家具・家電等は対象外）や契約に至った経緯（ご自身の依頼で業者が訪問した場合は対象外となることがあります）によって異なります。業者から交付される書面をご確認ください。詳しくは
             <Link href="/legal">こちら</Link>。
           </div>
         </div>
@@ -532,7 +532,7 @@ function SchedulePageInner() {
               <br />
               <strong>{selectedTime}</strong>に訪問します。
               <br />
-              メールでお知らせします。LINE連携済みの場合はLINEにも届きます。
+              業者に通知しました。確定内容はマイページとチャットで確認できます。
             </p>
             <div className="sch-modal-btns">
               <Link href="/mypage" className="btn btn-primary btn-lg">

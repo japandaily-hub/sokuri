@@ -71,17 +71,50 @@ def assert_user_not_revoked(user: User, payload: dict) -> None:
         raise _CRED_EXC
 
 
+# 依頼者停止時の 403 detail（security review L-2対応）。従来は文言のみの文字列
+# だったため、web 側が文字列一致でしかハンドリングできなかった。code を機械可読な
+# 識別子として付与し、web が「停止中」表示を汎用エラーと区別できるようにする
+# （FastAPI の HTTPException.detail は dict を許容する）。auth.py の signup/
+# line_exchange 経路の同種チェックからも同じ定数を参照する（DRY・文言の分岐防止）。
+SUSPENDED_ACCOUNT_DETAIL: dict[str, str] = {
+    "code": "account_suspended",
+    "message": "このアカウントは利用停止中です。お問い合わせ窓口までご連絡ください。",
+}
+
+
+def assert_user_not_suspended(user: User) -> None:
+    """停止中（is_suspended）依頼者の旧トークンを 403 で失効させる。
+
+    ``assert_operator_not_suspended`` の依頼者側対応（r3-verify-operator ADD-2）。
+    ``get_current_user`` / ``get_current_actor`` の user 分岐、および ``auth.py`` の
+    ``user_login`` / ``line_exchange``（Bearer付き連携経路・user分岐）で同一ゲートを
+    適用するためにモジュール関数として公開する。公開API（/vendors 等・認証不要の
+    エンドポイント）はこのゲートを経由しないため影響しない。
+    """
+    if user.is_suspended:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=SUSPENDED_ACCOUNT_DETAIL,
+        )
+
+
 def assert_operator_not_suspended(operator: Operator) -> None:
     """停止中（is_suspended）業者の旧トークンを 403 で失効させる。
 
     ``get_current_operator`` / ``get_current_actor`` に元々インラインで書かれていた
     判定を抽出したもの。``auth.py`` の ``line_exchange``（Bearer付き連携経路・
     operator分岐）でも同一ゲートを適用するために再利用する。
+
+    security review N-6 / R-L3対応: 従来は detail が文字列のままで依頼者側
+    （``assert_user_not_suspended``）とは非対称だったため、web 側が
+    ``detailCode==="account_suspended"`` の機械可読判定に乗れず、停止業者は
+    自動サインアウトや停止案内への誘導がされなかった。依頼者側と同一の
+    ``SUSPENDED_ACCOUNT_DETAIL`` を共用することで契約を一本化する。
     """
     if operator.is_suspended:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="アカウントは停止中です。運営へお問い合わせください。",
+            detail=SUSPENDED_ACCOUNT_DETAIL,
         )
 
 
@@ -111,6 +144,7 @@ async def get_current_user(
     if user is None:
         raise _CRED_EXC
     assert_user_not_revoked(user, payload)
+    assert_user_not_suspended(user)
     return user
 
 
@@ -154,11 +188,9 @@ async def get_verified_operator(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="アカウントは承認待ちです。運営の承認完了後に入札などの操作ができるようになります。",
         )
-    if operator.is_suspended:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="アカウントは停止中です。運営へお問い合わせください。",
-        )
+    # N-6対応: assert_operator_not_suspended と同一の dict detail を使う
+    # （複製されていた文字列 detail を残すと契約が再度非対称に戻るため）。
+    assert_operator_not_suspended(operator)
     return operator
 
 
@@ -189,6 +221,7 @@ async def get_current_actor(
         if user is None:
             raise _CRED_EXC
         assert_user_not_revoked(user, payload)
+        assert_user_not_suspended(user)
         return Actor(typ="user", user=user)
     if typ == "operator":
         operator = await session.get(Operator, subject_id)

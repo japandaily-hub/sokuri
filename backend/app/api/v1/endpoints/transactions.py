@@ -254,6 +254,7 @@ async def complete_transaction(
 async def cancel_transaction(
     transaction_id: uuid.UUID,
     body: TransactionCancelRequest,
+    background: BackgroundTasks,
     actor: Actor = Depends(get_current_actor),
     session: AsyncSession = Depends(get_session),
 ) -> TransactionOut:
@@ -276,8 +277,35 @@ async def cancel_transaction(
     )
     if party == "operator":
         txn.bid.operator.cancel_count += 1
+
+    # 相手方（キャンセルした側の逆）への通知（ADD-1対応: 通知が無いと、業者が
+    # 依頼者のキャンセルに気づかないまま解約済み現場へ訪問しうる）。commit前に
+    # プリミティブ値へ取り出す（bids.py/reductions.py と同じ規約）。
+    if party == "user":
+        recipient_party = "operator"
+        recipient_line_user_id = txn.bid.operator.line_user_id
+        recipient_email = txn.bid.operator.contact_email
+    else:
+        recipient_party = "user"
+        recipient_line_user_id = None
+        recipient_email = None
+        if txn.case.user_id is not None:
+            owner = await session.get(User, txn.case.user_id)
+            if owner is not None:
+                recipient_line_user_id = owner.line_user_id
+                recipient_email = owner.email
+    txn_id_str = str(txn.id)
+
     await session.commit()
     await session.refresh(txn)
+
+    background.add_task(
+        notify_dispatch.dispatch_transaction_cancelled,
+        recipient_line_user_id,
+        recipient_email,
+        txn_id_str,
+        recipient_party,
+    )
     return TransactionOut.model_validate(txn)
 
 

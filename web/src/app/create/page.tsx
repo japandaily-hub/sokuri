@@ -15,7 +15,13 @@ import Link from "next/link";
 import { Ic, type IcName } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
 import { useToken } from "@/components/kdz/Ui";
-import { createCase, uploadCasePhoto, toDisplayMessage } from "@/lib/katadzuke-api";
+import {
+  createCase,
+  uploadCasePhoto,
+  toDisplayMessage,
+  KdzNetworkError,
+  createTimeoutSignal,
+} from "@/lib/katadzuke-api";
 import "./create.css";
 
 const STEPS = ["写真", "利用目的", "住居情報", "確認"] as const;
@@ -117,6 +123,17 @@ export default function CreateCasePage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState("");
+  /** createCase が AbortSignal.timeout（180秒）で打ち切られた場合 true。
+   *  案件自体は作成されている可能性があるため、再送信させず /mypage へ誘導する。 */
+  const [timedOut, setTimedOut] = useState(false);
+
+  // ---- H3対策: 撮影済みの写真がある状態での離脱を防ぐ ----
+  /** 離脱確認モーダル（ブラウザバック検知時）の開閉。 */
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+  /** true の間はブラウザバックのガードを素通しする（確認モーダルで「離れる」を選んだ直後）。 */
+  const allowLeaveRef = useRef(false);
+  /** 履歴に番兵エントリを積んだかどうか（写真が0→1枚になった最初の1回だけ積む）。 */
+  const guardArmedRef = useRef(false);
 
   // Blob URL のメモリリーク防止: 個別削除時に都度 revoke、それ以外はアンマウント時にまとめて revoke する。
   // items/loosePhotos は ref に都度同期し、アンマウント時のクリーンアップはこの ref から読む
@@ -139,6 +156,68 @@ export default function CreateCasePage() {
   const totalPhotoCount =
     items.reduce((sum, it) => sum + it.photos.length, 0) + loosePhotos.length;
   const totalItemCount = items.length;
+
+  // H3対策 1/2: リロード・タブを閉じる離脱に標準の確認ダイアログを出す。
+  // ブラウザは returnValue の文言を無視し固定の汎用テキストを表示する仕様のため、
+  // ここでは preventDefault + returnValue セットのみ行う（カスタム文言は表示できない）。
+  useEffect(() => {
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      if (totalPhotoCount === 0) return;
+      e.preventDefault();
+      e.returnValue = "";
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [totalPhotoCount]);
+
+  // H3対策 2/2: ブラウザバックに確認モーダルを挟む。
+  // 履歴に番兵エントリを1つ積み、popstate（=バック操作）を検知したら即座に
+  // 履歴を押し戻して離脱を一旦キャンセルし、代わりに確認モーダルを出す
+  // （SPAで一般的な「二重pushで戻るを横取りする」パターン）。
+  useEffect(() => {
+    function currentPhotoCount() {
+      return (
+        itemsRef.current.reduce((sum, it) => sum + it.photos.length, 0) +
+        loosePhotosRef.current.length
+      );
+    }
+    function handlePopState() {
+      if (allowLeaveRef.current) return;
+      if (currentPhotoCount() === 0) return;
+      window.history.pushState({ kdzCreateGuard: true }, "", window.location.href);
+      setLeaveConfirmOpen(true);
+    }
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  useEffect(() => {
+    if (totalPhotoCount > 0 && !guardArmedRef.current) {
+      guardArmedRef.current = true;
+      window.history.pushState({ kdzCreateGuard: true }, "", window.location.href);
+    }
+  }, [totalPhotoCount]);
+
+  /** 離脱確認モーダル「入力を続ける」（安全側のデフォルト）。 */
+  function cancelLeave() {
+    setLeaveConfirmOpen(false);
+  }
+
+  /**
+   * 離脱確認モーダル「ページを離れる」。
+   * QAレビュー H1 是正: window.history.go(-2) は履歴段数のハードコードで、
+   * /create が新規タブ・直接アクセス等で履歴の先頭にある場合 no-op になり
+   * 永久に離脱できなくなる。履歴段数に依存せず、ブラウザバック検知（popstate）
+   * 経路も含めて router.push("/mypage") に出口を統一する
+   * （/create は入口が複数あるため戻り先はマイページ固定が安全）。
+   * allowLeaveRef を先に立てるため、遷移後に popstate ガードが誤って
+   * 再度モーダルを開くことはない。
+   */
+  function confirmLeave() {
+    allowLeaveRef.current = true;
+    setLeaveConfirmOpen(false);
+    router.push("/mypage");
+  }
 
   const currentItemIndex = mode.kind === "shoot" ? items.findIndex((it) => it.id === mode.itemId) : -1;
   const currentItem = currentItemIndex >= 0 ? items[currentItemIndex] : undefined;
@@ -331,6 +410,9 @@ export default function CreateCasePage() {
       }
 
       setProgress("AIが案件を要約しています…");
+      // AI画像解析（Gemini）は backend 側で同期実行されるためレスポンスが長時間化しうる
+      // （A1: BackgroundTasks化されていない）。クライアント側には従来タイムアウトが
+      // 一切無く無限待機になっていたため、180秒で打ち切る。
       const created = await createCase(
         {
           purpose,
@@ -345,9 +427,25 @@ export default function CreateCasePage() {
           photos: loosePayloads,
         },
         token,
+        createTimeoutSignal(180_000),
       );
+      allowLeaveRef.current = true;
       router.push(`/cases/${created.id}?created=1`);
     } catch (err) {
+      // AbortSignal.timeout による中断は fetch 失敗として KdzNetworkError にラップされ、
+      // 元の DOMException("TimeoutError") は cause に保持される（lib/katadzuke-api.ts request()）。
+      // 通常のネットワーク断（NETWORK_ERROR_MESSAGE）とは区別し、再送信させない専用の案内に切り替える
+      // （写真アップロードは既に完了済みで、案件自体は作成されている可能性があるため）。
+      const isTimeout =
+        err instanceof KdzNetworkError &&
+        err.cause instanceof DOMException &&
+        err.cause.name === "TimeoutError";
+      if (isTimeout) {
+        setTimedOut(true);
+        setSubmitting(false);
+        setProgress("");
+        return;
+      }
       setError(toDisplayMessage(err, "送信に失敗しました。もう一度お試しください。"));
       setSubmitting(false);
       setProgress("");
@@ -397,6 +495,15 @@ export default function CreateCasePage() {
                 <circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" />
               </svg>
               {error}
+            </div>
+          )}
+
+          {timedOut && (
+            <div className="auth-error" role="alert" style={{ marginBottom: 16 }}>
+              <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: "none", stroke: "var(--danger)", strokeWidth: 2, strokeLinecap: "round", flexShrink: 0 }}>
+                <circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" />
+              </svg>
+              解析に時間がかかっています。しばらくしてからマイページで案件をご確認ください（案件は作成されている場合があります）。
             </div>
           )}
 
@@ -728,6 +835,12 @@ export default function CreateCasePage() {
                 <Ic name="clock" className="hint-ic" />
                 <span>送信するとAIが写真を解析するため、完了まで数十秒ほどかかることがあります。画面を閉じずにそのままお待ちください。</span>
               </div>
+              {submitting && (
+                <div className="hint-banner" role="status">
+                  <Ic name="clock" className="hint-ic" />
+                  <span>AI解析には最大2分ほどかかることがあります。この画面を閉じないでください。</span>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -736,7 +849,11 @@ export default function CreateCasePage() {
       {/* flow-footer */}
       <div className="flow-footer">
         <div className="inner">
-          {step === 0 && mode.kind === "shoot" ? (
+          {timedOut ? (
+            <Link href="/mypage" className="btn-flow-next">
+              マイページで確認する<Ic name="arrow" />
+            </Link>
+          ) : step === 0 && mode.kind === "shoot" ? (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
               <button
                 type="button"
@@ -781,6 +898,31 @@ export default function CreateCasePage() {
           )}
         </div>
       </div>
+
+      {/* 離脱確認モーダル（ブラウザバック検知時。beforeunload はブラウザ標準ダイアログに委ねる） */}
+      {leaveConfirmOpen && (
+        <div
+          className="leave-modal-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) cancelLeave();
+          }}
+        >
+          <div className="leave-modal" role="dialog" aria-modal="true" aria-label="ページを離れる確認">
+            <h3>入力中の内容が失われます</h3>
+            <p>
+              撮影した写真・商品情報はまだ送信されていません。このままページを離れると、入力内容がすべて失われます。
+            </p>
+            <div className="leave-modal-actions">
+              <button type="button" className="btn-flow-back" onClick={confirmLeave}>
+                ページを離れる
+              </button>
+              <button type="button" className="btn-flow-next" onClick={cancelLeave}>
+                入力を続ける
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

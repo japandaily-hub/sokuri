@@ -207,6 +207,8 @@ _SCOPE_MESSAGES: dict[str, str] = {
     "case_create": "案件の作成が集中しています。しばらく時間をおいて再度お試しください。",
     "case_cancel": "出品の取り下げの試行回数が上限に達しました。しばらく時間をおいて再度お試しください。",
     "public_read": "リクエストが集中しています。しばらく時間をおいて再度お試しください。",
+    "analyze": "画像解析のリクエストが集中しています。しばらく時間をおいて再度お試しください。",
+    "contact": "お問い合わせが集中しています。時間をおいて再度お送りください。",
 }
 
 
@@ -420,6 +422,27 @@ def _scope_spec(scope: str, config: RateLimitConfig) -> _ScopeSpec:
         # 無認証の公開参照（業者一覧・公開プロフィール）。DB 走査を伴うため IP 軸で
         # 全リクエストをカウントする（security review M-2）。
         return _ScopeSpec(ip_rule=config.public_read_ip, account_rule=None, count_all=True)
+    if scope == "analyze":
+        # AI Vision（Gemini呼び出し）を伴うコストDoS対策（R3-operator ADD-1対応）。
+        # config.py に新規キーは追加せず、既存の case_create 用ルール
+        # （IP軸・アカウント軸とも全リクエストカウント）をそのまま流用する
+        # （案件作成と同種のコストプロファイルのAI呼び出しのため）。
+        return _ScopeSpec(
+            ip_rule=config.case_create_ip, account_rule=config.case_create_account,
+            count_all=True,
+        )
+    if scope == "contact":
+        # 無認証の /contact（security review N-2対応）: 従来 scope="case_create" を
+        # そのまま流用していたため、IP軸のバケット実体が POST /cases と共有され、
+        # 同一IP（集合住宅・キャリアNAT等）から案件作成を繰り返したユーザーが
+        # 問い合わせできなくなる／その逆の巻き添えが生じていた。analyze と同様
+        # config.py に新規キーは追加せず数値ルールのみ case_create から流用しつつ、
+        # scope名を "contact" に分離することで _build_key() のバケット実体
+        # （"{scope}:{axis}:{digest}"）を独立させる。
+        return _ScopeSpec(
+            ip_rule=config.case_create_ip, account_rule=config.case_create_account,
+            count_all=True,
+        )
     raise ValueError(f"未知の rate limit scope です: {scope!r}")
 
 

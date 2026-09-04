@@ -171,7 +171,21 @@ async def photo_url_for_ai(storage_key: str, raw_url: str | None) -> str | None:
     if path is not None:
         return await asyncio.to_thread(_read_and_encode_data_url, path)
     if raw_url and raw_url.startswith("https://"):
-        return raw_url
+        # R3再レビュー Medium対応: vision.analyze_image は security review N-7
+        # 対応（SSRF対策）により https:// URL の受け付けを全面撤廃済みのため、
+        # ここで raw_url をそのまま返すと呼び出し先で必ず ValueError になり、
+        # 到達すれば無意味な Gemini 呼び出し試行（＋タイムアウト待ち）だけが
+        # 発生する。呼び出し元（analyze_item/_detect_photo_labels）は例外を
+        # 握り潰して継続する設計のため案件作成自体は失敗しないが、意図が
+        # 不明瞭な死んだ分岐のため、ここで明示的に AI 解析をスキップする
+        # （None を返す＝「解析対象から除外」。案件作成は継続）。
+        logger.warning(
+            "photo_url_for_ai: storage_key=%s の実体を解決できず、raw_url が "
+            "https のため AI 解析をスキップします（vision.analyze_image は "
+            "https を受け付けない設計）。",
+            storage_key,
+        )
+        return None
     return None
 
 

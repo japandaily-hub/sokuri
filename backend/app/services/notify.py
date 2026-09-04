@@ -79,7 +79,8 @@ def _wrap(body: str) -> str:
         '<h2 style="color:#14B8A6;margin:0 0 16px;">カタヅケ</h2>'
         f"{body}"
         '<p style="color:#888;font-size:12px;margin-top:24px;">'
-        "このメールはカタヅケから自動送信されています。</p></div>"
+        "このメールはカタヅケ運営事務局（神奈川県横浜市）から自動送信されています。"
+        "お問い合わせ: katazuke.info@gmail.com</p></div>"
     )
 
 
@@ -92,7 +93,7 @@ async def send_case_created(to_email: str, case_id: str) -> bool:
         "【カタヅケ】案件の登録が完了しました",
         _wrap(
             "<p>お片付け案件の登録が完了しました。</p>"
-            "<p>業者からの入札が届き次第、メールでお知らせします。</p>"
+            "<p>業者からの入札が届き次第、お知らせします（LINE連携済みの方はLINE、未連携の方はメール）。</p>"
             f'<p><a href="{url}">案件の状況を確認する</a></p>'
         ),
     )
@@ -128,14 +129,18 @@ async def send_bid_selected(to_email: str, transaction_id: str, amount: int) -> 
     )
 
 
-async def send_bid_lost(to_email: str, case_id: str) -> bool:
-    """落札通知（落選業者宛）。"""
+async def send_bid_lost(to_email: str, case_id: str, prefecture: str, city: str, purpose: str) -> bool:
+    """落札通知（落選業者宛）。案件を特定できるよう地域・利用目的とリンクを本文に含める（M7対応）。"""
+    settings = get_settings()
+    url = f"{settings.frontend_base_url}/operator/cases/{case_id}"
     return await _send(
         to_email,
         "【カタヅケ】ご入札いただいた案件について",
         _wrap(
-            "<p>ご入札いただいた案件は、誠に恐れ入りますが今回は成約に至りませんでした。</p>"
+            f"<p>ご入札いただいた案件（{html.escape(prefecture)}{html.escape(city)}／"
+            f"{html.escape(purpose)}）は、誠に恐れ入りますが今回は成約に至りませんでした。</p>"
             "<p>またの機会がございましたらよろしくお願いいたします。</p>"
+            f'<p><a href="{url}">案件の詳細を確認する</a></p>'
         ),
     )
 
@@ -207,6 +212,94 @@ async def send_operator_application_approved(to_email: str, company_name: str, i
             "<p>業者登録の審査が完了し、承認されました。以下の招待コードで本登録を完了してください。</p>"
             f'<p style="font-size:20px;font-weight:bold;letter-spacing:1px;">{html.escape(invite_code)}</p>'
             f'<p><a href="{url}">本登録ページへ進む</a></p>'
+        ),
+    )
+
+
+async def send_reduction_requested(to_email: str, case_id: str, amount: int) -> bool:
+    """減額申請の受付通知（依頼者宛・ADD-2対応）。"""
+    settings = get_settings()
+    url = f"{settings.frontend_base_url}/cases/{case_id}"
+    return await _send(
+        to_email,
+        "【カタヅケ】減額のご相談が届いています",
+        _wrap(
+            f"<p>落札業者から <strong>{amount:,} 円</strong> への減額のご相談が届いています。</p>"
+            f'<p><a href="{url}">内容を確認して回答する</a></p>'
+        ),
+    )
+
+
+async def send_reduction_decided(to_email: str, transaction_id: str, approved: bool, amount: int) -> bool:
+    """減額申請の承認／却下結果通知（申請業者宛・H2対応）。"""
+    settings = get_settings()
+    url = f"{settings.frontend_base_url}/operator/transactions/{transaction_id}"
+    if approved:
+        subject = "【カタヅケ】減額のご相談が承認されました"
+        body = (
+            f"<p>ご相談いただいた減額（<strong>{amount:,} 円</strong>）が承認されました。"
+            "成約金額が更新されています。</p>"
+        )
+    else:
+        subject = "【カタヅケ】減額のご相談について"
+        body = "<p>ご相談いただいた減額は、依頼者により見送られました。</p>"
+    return await _send(
+        to_email,
+        subject,
+        _wrap(body + f'<p><a href="{url}">成約詳細を確認する</a></p>'),
+    )
+
+
+async def send_transaction_cancelled(to_email: str, transaction_id: str, recipient_party: str) -> bool:
+    """成約キャンセル通知（相手方宛・ADD-1対応）。"""
+    settings = get_settings()
+    path = (
+        f"/chat/{transaction_id}"
+        if recipient_party == "user"
+        else f"/operator/transactions/{transaction_id}"
+    )
+    url = f"{settings.frontend_base_url}{path}"
+    return await _send(
+        to_email,
+        "【カタヅケ】成約がキャンセルされました",
+        _wrap(
+            "<p>進行中だった成約が、相手方によりキャンセルされました。</p>"
+            f'<p><a href="{url}">詳細を確認する</a></p>'
+        ),
+    )
+
+
+# QA M-5対応: 運営宛メールの「種別」に、ContactCategory（英字スラッグ）ではなく
+# web/src/app/contact/page.tsx:227-234 の <option> と1対1で一致する日本語ラベルを
+# 出す。ContactCategory は schemas_katadzuke.py の Literal で固定8値に限定済みの
+# ため、想定外の値は ``.get`` のフォールバックでスラッグをそのまま表示する
+# （バリデーションを通過している前提で通常到達しないが、安全側フォールバック）。
+_CONTACT_CATEGORY_LABELS: dict[str, str] = {
+    "service": "サービスについて",
+    "pricing": "料金・費用について",
+    "area": "対応エリアについて",
+    "privacy": "個人情報の取り扱いについて",
+    "trouble": "トラブル・クレーム",
+    "partner": "業者登録・提携について",
+    "press": "取材・メディア掲載",
+    "other": "その他",
+}
+
+
+async def send_contact_received(
+    to_email: str, name: str, email: str, category: str, message: str
+) -> bool:
+    """お問い合わせフォーム（/contact）の受付通知（運営admin宛・H1対応）。"""
+    category_label = _CONTACT_CATEGORY_LABELS.get(category, category)
+    return await _send(
+        to_email,
+        f"【カタヅケ】お問い合わせを受け付けました（{category_label}）",
+        _wrap(
+            f"<p>氏名: {html.escape(name)}</p>"
+            f"<p>連絡先メール: {html.escape(email)}</p>"
+            f"<p>種別: {html.escape(category_label)}</p>"
+            "<p>本文:</p>"
+            f'<p style="white-space:pre-wrap;">{html.escape(message)}</p>'
         ),
     )
 

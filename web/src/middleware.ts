@@ -66,14 +66,28 @@ export default auth((req) => {
     return loginUrl("/login");
   }
 
+  // r3 セキュリティレビュー H-2 是正: 非admin かつログイン済みのユーザーを /login へ送ると、
+  // login/page.tsx の「認証済みなら自動で replace」が callbackUrl（=/admin配下）へ即座に
+  // 送り返し、ミドルウェアが再度弾く…という無限リダイレクトループになりうる。
+  // ログイン済みには /forbidden（権限不足の案内。再ログインを促さない）へ送る。
   if (needsAdmin && session.role !== "admin") {
-    return loginUrl("/login");
+    const url = req.nextUrl.clone();
+    url.pathname = "/forbidden";
+    url.search = "";
+    return NextResponse.redirect(url);
   }
-  if (needsOperator && session.accountType !== "operator") {
-    return loginUrl("/operator/login");
-  }
-  if (needsUser && session.accountType !== "user") {
-    return loginUrl("/login");
+  // r3 再レビュー N-3 是正: 上と同じ理由で、ログイン済みだが accountType が異なる場合
+  // （業者セッションが /cases 等を踏む・依頼者セッションが /operator 配下を踏む）も
+  // loginUrl（=ログインページ）へ戻すと login/page.tsx 側の callbackUrl 自動 replace と
+  // 往復し無限ループになりうる。/forbidden（?reason=account_type）へ送り、再ログインを促さない。
+  if (
+    (needsOperator && session.accountType !== "operator") ||
+    (needsUser && session.accountType !== "user")
+  ) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/forbidden";
+    url.search = "?reason=account_type";
+    return NextResponse.redirect(url);
   }
   return NextResponse.next();
 });

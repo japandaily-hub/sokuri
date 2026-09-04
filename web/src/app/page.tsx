@@ -25,7 +25,7 @@ const FAQ_ITEMS = [
   { q: "しつこい営業電話は来ますか？", a: "連絡が来るのは、あなたが選んだ1社だけ。選ぶまで連絡先は業者に開示されず、選ばなかった業者には自動でお断りが入るため、一斉架電は起こりません。" },
   { q: "個人情報はどう扱われますか？", a: "査定段階で業者に渡るのは、写真・品目・地域（都道府県・市区町村）・住居情報などの出品内容のみ。お名前や電話番号が業者に渡ることはなく、詳細住所と連絡用のメールアドレスも交渉が成立した1社にのみ開示されます。" },
   { q: "利用にお金はかかりますか？", a: "出品・査定・成約まで、すべて無料です。費用は一切かかりません。" },
-  { q: "訪問買取に不安があります", a: "参加するのは古物商許可を確認した登録事業者のみ。訪問買取は特定商取引法によりクーリングオフの対象です。" },
+  { q: "訪問買取に不安があります", a: "参加するのは、古物商許可番号の登録を必須とし、運営が許可証を確認した登録事業者のみ。訪問による買取には特定商取引法（訪問購入）の規定が適用される場合があり、クーリング・オフの可否は品目や契約に至った経緯によって異なります。業者から交付される書面をご確認ください。" },
 ];
 
 const STEPS: { n: string; en: string; icon: IcName; h: string; p: string; img: string }[] = [
@@ -302,8 +302,8 @@ export default function HomePage() {
                 <div className="tc-body"><h3>連絡先は成立後に開示</h3><p>査定段階で業者に渡るのは、写真・品目・地域（都道府県・市区町村）・住居情報などの出品内容のみ。お名前や電話番号は業者に渡らず、詳細住所と連絡用のメールアドレスは交渉が成立するまで開示されません。</p></div>
               </Reveal>
               <Reveal as="article" className="trust-c" delay={2}>
-                <div className="tc-illus ph-wrap"><PhImg src="/img/real/trust-illus-3.webp" alt="訪問買取はクーリングオフの対象となるイメージ" label="trust-illus-3.webp" icon="check-circle" imgStyle={{ width: "100%", height: "100%", objectFit: "contain", padding: 10 }} /></div>
-                <div className="tc-body"><h3>訪問買取はクーリングオフ対象</h3><p>訪問による買取には特定商取引法が適用され、法定書面の交付や8日間のクーリングオフ等の保護を受けられます。</p></div>
+                <div className="tc-illus ph-wrap"><PhImg src="/img/real/trust-illus-3.webp" alt="訪問買取に特定商取引法の規定が適用されるイメージ" label="trust-illus-3.webp" icon="check-circle" imgStyle={{ width: "100%", height: "100%", objectFit: "contain", padding: 10 }} /></div>
+                <div className="tc-body"><h3>訪問買取は特定商取引法の対象</h3><p>訪問による買取には特定商取引法（訪問購入）の規定が適用される場合があります。クーリング・オフの可否は、品目（家具・家電等は対象外）や契約に至った経緯（ご自身の依頼で業者が訪問した場合は対象外となることがあります）によって異なります。業者から交付される書面をご確認ください。</p></div>
               </Reveal>
             </div>
           </div>
@@ -325,6 +325,9 @@ export default function HomePage() {
                 <div className="fee-row"><span className="fl">査定を見て断る<small>金額に納得できなければ取りやめOK</small></span><span className="fv">無料</span></div>
                 <div className="fee-row"><span className="fl">成約・引き取り<small>買取額や条件は事前に明示</small></span><span className="fv">無料</span></div>
               </div>
+              <p style={{ fontSize: 12.5, color: "var(--body-soft)", lineHeight: 1.8, margin: "14px 0 0" }}>
+                ※ 訪問時の現物確認により、業者から減額のご相談が届くことがあります。同意しない場合は取引を断れます。
+              </p>
             </Reveal>
           </div>
         </section>
@@ -415,7 +418,7 @@ export default function HomePage() {
               <div className="biz-banner-copy">
                 <span className="eyebrow">買取業者の方へ</span>
                 <h2>買取業者の方へ。<br />カタヅケに参加しませんか。</h2>
-                <p>顧客と業者、双方に無駄がない。だから長く続く。<br />一括出品への入札で、効率的な仕入れルートを開拓できます。</p>
+                <p>顧客と業者、双方に無駄がない。だから長く続く。<br />一括出品への入札で、効率的な仕入れルートを開拓できます。<br />※ サービス開始当初（β期間）は手数料を請求しません。請求開始の際は事前にメールでお知らせします。</p>
                 <div className="biz-banner-tags">
                   <span className="biz-tag">初期費用・月額費用 無料</span>
                   <span className="biz-tag">成約時8%のみ</span>

@@ -8,7 +8,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { signupUser, toDisplayMessage } from "@/lib/katadzuke-api";
+import { signupUser, toDisplayMessage, clearRedirectLoopStorage } from "@/lib/katadzuke-api";
 import { Ic } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
 import { PasswordField, LineAuthButton } from "@/components/kdz/auth";
@@ -112,6 +112,8 @@ export default function SignupPage() {
         await signupUser({ email, password, name: name || undefined });
         const res = await signIn("user-credentials", { email, password, redirect: false });
         if (res?.error) throw new Error("登録後のログインに失敗しました。");
+        // r3 再レビュー3回目 是正: 新規登録直後のログイン成功でもループ検知の発火履歴をリセットする。
+        clearRedirectLoopStorage();
         goTo(4);
       } catch (err) {
         setAuthErr(toDisplayMessage(err, "登録に失敗しました。"));

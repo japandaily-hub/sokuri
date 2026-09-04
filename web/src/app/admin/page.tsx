@@ -299,9 +299,20 @@ export default function AdminPage() {
         title="管理画面"
         description="業者招待コードの発行・アカウント承認・セル密度を管理します。"
         actions={
-          <Link href="/admin/identity-documents" className={btnSecondary}>
-            本人確認書類の審査へ
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/admin/cases" className={btnSecondary}>
+              案件一覧へ
+            </Link>
+            <Link href="/admin/transactions" className={btnSecondary}>
+              取引一覧へ
+            </Link>
+            <Link href="/admin/users" className={btnSecondary}>
+              依頼者一覧へ
+            </Link>
+            <Link href="/admin/identity-documents" className={btnSecondary}>
+              本人確認書類の審査へ
+            </Link>
+          </div>
         }
       >
       {error ? (

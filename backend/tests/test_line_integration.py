@@ -296,9 +296,11 @@ class TestNotifyDispatch:
         monkeypatch.setattr("app.services.line_notify.push_bid_lost", push_mock)
         monkeypatch.setattr("app.services.notify.send_bid_lost", email_mock)
 
-        await notify_dispatch.dispatch_bid_lost("U123", "op@example.com", "case1")
+        await notify_dispatch.dispatch_bid_lost(
+            "U123", "op@example.com", "case1", "東京都", "世田谷区", "遺品整理"
+        )
 
-        push_mock.assert_called_once_with("U123", "case1")
+        push_mock.assert_called_once_with("U123", "case1", "東京都", "世田谷区", "遺品整理")
         email_mock.assert_not_called()
 
     async def test_dispatch_bid_lost_falls_back_to_email(self, monkeypatch):
@@ -307,10 +309,12 @@ class TestNotifyDispatch:
         monkeypatch.setattr("app.services.line_notify.push_bid_lost", push_mock)
         monkeypatch.setattr("app.services.notify.send_bid_lost", email_mock)
 
-        await notify_dispatch.dispatch_bid_lost(None, "op@example.com", "case1")
+        await notify_dispatch.dispatch_bid_lost(
+            None, "op@example.com", "case1", "東京都", "世田谷区", "遺品整理"
+        )
 
         push_mock.assert_not_called()
-        email_mock.assert_called_once_with("op@example.com", "case1")
+        email_mock.assert_called_once_with("op@example.com", "case1", "東京都", "世田谷区", "遺品整理")
 
     async def test_dispatch_schedule_confirmed_prefers_line(self, monkeypatch):
         push_mock = AsyncMock(return_value=True)
@@ -635,7 +639,7 @@ class TestSelectBidDispatch:
         async def _fake_selected(line_user_id, email, transaction_id, amount):
             selected_calls.append((line_user_id, email, transaction_id, amount))
 
-        async def _fake_lost(line_user_id, email, case_id):
+        async def _fake_lost(line_user_id, email, case_id, prefecture, city, purpose):
             lost_calls.append((line_user_id, email, case_id))
 
         with patch(
@@ -1010,6 +1014,8 @@ class TestLineExchangeReauthAndRebind:
                 headers=_auth(op_token),
             )
         assert r.status_code == 403
+        # N-6対応: 依頼者側と同一の機械可読 detail.code を持つこと。
+        assert r.json()["detail"]["code"] == "account_suspended"
 
     async def test_operator_rebind_to_different_line_account_returns_409(
         self, client: AsyncClient, db_session: AsyncSession

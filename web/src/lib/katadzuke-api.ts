@@ -5,6 +5,8 @@
  * 認証が必要な関数は token（backend JWT / session.accessToken）を受け取る。
  */
 
+import { signOut } from "next-auth/react";
+
 // ---------------------------------------------------------------------------
 // 型定義
 // ---------------------------------------------------------------------------
@@ -257,7 +259,7 @@ export function listMessages(
   after?: string,
 ): Promise<MessageOut[]> {
   const query = after ? `?after=${encodeURIComponent(after)}` : "";
-  return request(`/transactions/${transactionId}/messages${query}`, { token });
+  return request(`/transactions/${encodeURIComponent(transactionId)}/messages${query}`, { token });
 }
 
 export function sendMessage(
@@ -265,7 +267,7 @@ export function sendMessage(
   body: string,
   token: string,
 ): Promise<MessageOut> {
-  return request(`/transactions/${transactionId}/messages`, {
+  return request(`/transactions/${encodeURIComponent(transactionId)}/messages`, {
     method: "POST",
     body: JSON.stringify({ body }),
     token,
@@ -276,7 +278,7 @@ export function markMessagesRead(
   transactionId: string,
   token: string,
 ): Promise<TransactionOut> {
-  return request(`/transactions/${transactionId}/messages/read`, {
+  return request(`/transactions/${encodeURIComponent(transactionId)}/messages/read`, {
     method: "POST",
     token,
   });
@@ -292,7 +294,7 @@ export function proposeSchedule(
   slots: string[],
   token: string,
 ): Promise<MessageOut> {
-  return request(`/transactions/${transactionId}/schedule/propose`, {
+  return request(`/transactions/${encodeURIComponent(transactionId)}/schedule/propose`, {
     method: "POST",
     body: JSON.stringify({ slots }),
     token,
@@ -305,7 +307,7 @@ export function confirmSchedule(
   payload: { visit_date: string; visit_time_slot: string; note?: string },
   token: string,
 ): Promise<TransactionOut> {
-  return request(`/transactions/${transactionId}/schedule/confirm`, {
+  return request(`/transactions/${encodeURIComponent(transactionId)}/schedule/confirm`, {
     method: "POST",
     body: JSON.stringify(payload),
     token,
@@ -392,14 +394,7 @@ export async function uploadOperatorLicenseImage(
     throw new KdzNetworkError(e);
   }
   if (!res.ok) {
-    let message = `HTTP ${res.status}`;
-    try {
-      const body = (await res.json()) as { detail?: unknown };
-      if (typeof body.detail === "string") message = body.detail;
-    } catch {
-      /* JSON でないレスポンスは無視 */
-    }
-    throw new KdzApiError(res.status, message);
+    await throwHttpError(res);
   }
   return (await res.json()) as OperatorLicenseImageUploadResponse;
 }
@@ -431,7 +426,7 @@ export interface OperatorPublicProfile {
 }
 
 export function getVendorPublicProfile(operatorId: string): Promise<OperatorPublicProfile> {
-  return request(`/vendors/${operatorId}`);
+  return request(`/vendors/${encodeURIComponent(operatorId)}`);
 }
 
 /** 業者一覧（GET /vendors）の1行。承認済み・停止中でない業者のみ。個人情報は含まない。 */
@@ -498,11 +493,170 @@ export function apiBase(): string {
   return url.replace(/\/$/, "");
 }
 
+// ---------------------------------------------------------------------------
+// セッション失効（401）／アカウント停止（403 account_suspended）共通処理
+//
+// backend は JWT 失効時に英語の生 detail（"Invalid credentials. Please log in
+// again."）を返す（backend/app/api/deps.py、編集除外のため直せない）。
+// これをそのまま画面に出さず、日本語文言 + signOut → 役割別ログイン画面への
+// 誘導に差し替える。line-link.ts の linkLineToCurrentUser は本ファイルの
+// request() を使わず独自 fetch で 401 を reauth_required（正常系）として
+// 扱っているため、ここでの自動リダイレクトの影響を受けない（opt-out 不要）。
+//
+// r3 セキュリティレビュー H-2 是正: signOut 失敗時にまで無条件で画面遷移すると、
+// 遷移後も古いセッションが残り 401 → 遷移 → 401 の無限ループになりうる。
+// signOut を await し成功時のみ遷移し、失敗時は遷移せず案内文言のみ返す。
+// ループ検知はモジュール変数（フルページ遷移でリセットされる）ではなく
+// sessionStorage に発火時刻を永続化し、60秒以内に3回以上発火したら
+// signOut/遷移そのものを止めて案内だけ出す。
+// ---------------------------------------------------------------------------
+
+export const SESSION_EXPIRED_MESSAGE =
+  "セッションの有効期限が切れました。もう一度ログインしてください。";
+
+export const SESSION_SUSPENDED_MESSAGE =
+  "このアカウントは利用停止中です。お問い合わせ窓口までご連絡ください。";
+
+/** signOut に失敗した場合／リダイレクトループを検知した場合に表示する文言（画面遷移はしない）。 */
+export const SESSION_EXPIRED_STUCK_MESSAGE =
+  "セッションを終了できませんでした。ページを再読み込みするか、ログアウトしてください。";
+
+/** 同時に複数の401/403が発生しても signOut/遷移を1回だけに絞るモジュールスコープのガード。 */
+let sessionExpiredHandled = false;
+
+const REDIRECT_LOOP_STORAGE_KEY = "kdz_session_redirect_attempts";
+const REDIRECT_LOOP_WINDOW_MS = 60_000;
+const REDIRECT_LOOP_MAX_ATTEMPTS = 3;
+
+/**
+ * リダイレクトループ検知。sessionExpiredHandled はフルページ遷移
+ * （window.location.href の代入）でモジュールが再読込されリセットされるため、
+ * それをまたいで検知できるよう sessionStorage に発火時刻を永続化する。
+ * 直近60秒以内の発火回数が3回以上ならループとみなし true を返す。
+ * sessionStorage が使えない環境（プライベートブラウズ等）では検知をスキップする（fail-open）。
+ */
+function isRedirectLooping(): boolean {
+  try {
+    const now = Date.now();
+    const raw = window.sessionStorage.getItem(REDIRECT_LOOP_STORAGE_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    const prevTimestamps = Array.isArray(parsed)
+      ? parsed.filter((t): t is number => typeof t === "number")
+      : [];
+    const recent = prevTimestamps.filter((t) => now - t < REDIRECT_LOOP_WINDOW_MS);
+    recent.push(now);
+    window.sessionStorage.setItem(REDIRECT_LOOP_STORAGE_KEY, JSON.stringify(recent));
+    return recent.length >= REDIRECT_LOOP_MAX_ATTEMPTS;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * r3 セキュリティレビュー N-8 是正: ログインに成功した経路で呼ぶ。
+ * ループ検知用の発火履歴を消し、直後に 401/403 を踏んだ場合の誤検知
+ * （実際にはループしていないのに3回とカウントされてしまう）を防ぐ。
+ * sessionStorage が使えない環境では何もしない（fail-safe）。
+ */
+export function clearRedirectLoopStorage(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(REDIRECT_LOOP_STORAGE_KEY);
+  } catch {
+    /* プライベートブラウズ等で sessionStorage が使えない場合は無視 */
+  }
+}
+
+/**
+ * backend 401／停止アカウントの 403 を検知した際の共通後始末。
+ * NextAuth の signOut を await し、成功した場合のみ役割別ログイン画面
+ * （依頼者 /login・業者 /operator/login）または停止案内（/login?reason=suspended）
+ * へ遷移する。signOut 失敗時・直近60秒に3回以上発火したループ検知時は遷移せず、
+ * 呼び出し元にそのまま表示させる案内文言を返す。
+ * サーバー側（SSR/RSC）実行時は window が無いため何もしない（fail-safe）。
+ */
+async function handleSessionExpired(opts: { suspended?: boolean } = {}): Promise<string> {
+  const fallbackMessage = opts.suspended ? SESSION_SUSPENDED_MESSAGE : SESSION_EXPIRED_MESSAGE;
+  if (typeof window === "undefined") return fallbackMessage;
+  if (sessionExpiredHandled) return fallbackMessage;
+  sessionExpiredHandled = true;
+
+  if (isRedirectLooping()) return SESSION_EXPIRED_STUCK_MESSAGE;
+
+  try {
+    await signOut({ redirect: false });
+  } catch {
+    return SESSION_EXPIRED_STUCK_MESSAGE;
+  }
+
+  const isOperator = window.location.pathname.startsWith("/operator");
+  if (opts.suspended) {
+    // r3 セキュリティレビュー N-6 是正: 業者停止時は /login ではなく
+    // /operator/login?reason=suspended へ送り、業者向けの案内文言を出す。
+    window.location.href = isOperator ? "/operator/login?reason=suspended" : "/login?reason=suspended";
+    return SESSION_SUSPENDED_MESSAGE;
+  }
+  const loginPath = isOperator ? "/operator/login" : "/login";
+  window.location.href = `${loginPath}?callbackUrl=${encodeURIComponent(
+    window.location.pathname + window.location.search,
+  )}`;
+  return SESSION_EXPIRED_MESSAGE;
+}
+
+/**
+ * !res.ok の共通エラー化。401 はここで日本語文言へ差し替え、セッション失効の後始末を行う。
+ * 403 かつ detail.code === "account_suspended"（backend 停止ゲート）も同じ後始末に合流させる。
+ */
+async function throwHttpError(
+  res: Response,
+  opts?: { skipAuthRedirect?: boolean },
+): Promise<never> {
+  if (res.status === 401 && !opts?.skipAuthRedirect) {
+    const message = await handleSessionExpired();
+    throw new KdzApiError(401, message);
+  }
+  let message = `HTTP ${res.status}`;
+  let detailCode: string | undefined;
+  try {
+    const body = (await res.json()) as { detail?: unknown };
+    if (typeof body.detail === "string") {
+      message = body.detail;
+    } else if (body.detail && typeof body.detail === "object") {
+      const detail = body.detail as { code?: unknown; message?: unknown };
+      if (typeof detail.code === "string") detailCode = detail.code;
+      if (typeof detail.message === "string") message = detail.message;
+    }
+  } catch {
+    /* JSON でないレスポンスは無視 */
+  }
+  if (res.status === 403 && detailCode === "account_suspended" && !opts?.skipAuthRedirect) {
+    const suspendedMessage = await handleSessionExpired({ suspended: true });
+    throw new KdzApiError(403, suspendedMessage);
+  }
+  throw new KdzApiError(res.status, message);
+}
+
+/**
+ * AbortSignal.timeout の代替。Safari 15 以前・古い Android WebView・LINE内蔵ブラウザ等
+ * 未実装の環境で AbortSignal.timeout(ms) を直接呼ぶと同期的な TypeError が投げられ
+ * 送信ボタンが即座に失敗するため（QAレビュー未解決リスク1）、呼び出し前に必ずこれを経由する。
+ * フォールバック時も TimeoutError 名の DOMException で abort し、
+ * 呼び出し側の isTimeout 判定（err.cause?.name === "TimeoutError"）と互換にする。
+ */
+export function createTimeoutSignal(ms: number): AbortSignal {
+  if (typeof AbortSignal.timeout === "function") return AbortSignal.timeout(ms);
+  const controller = new AbortController();
+  setTimeout(() => {
+    controller.abort(new DOMException("The operation timed out.", "TimeoutError"));
+  }, ms);
+  return controller.signal;
+}
+
 async function request<T>(
   path: string,
-  init?: RequestInit & { token?: string },
+  init?: RequestInit & { token?: string; skipAuthRedirect?: boolean },
 ): Promise<T> {
-  const { token, ...rest } = init ?? {};
+  const { token, skipAuthRedirect, ...rest } = init ?? {};
   let res: Response;
   try {
     res = await fetch(`${apiBase()}${path}`, {
@@ -518,14 +672,7 @@ async function request<T>(
     throw new KdzNetworkError(e);
   }
   if (!res.ok) {
-    let message = `HTTP ${res.status}`;
-    try {
-      const body = (await res.json()) as { detail?: unknown };
-      if (typeof body.detail === "string") message = body.detail;
-    } catch {
-      /* JSON でないレスポンスは無視 */
-    }
-    throw new KdzApiError(res.status, message);
+    await throwHttpError(res, { skipAuthRedirect });
   }
   if (res.status === 204) return undefined as T;
   try {
@@ -721,7 +868,7 @@ export function updateMyAddress(
 }
 
 // ---------------------------------------------------------------------------
-// 振込口座（買取代金の受取先。業者には非開示）
+// 振込口座（お振込みを希望する場合に業者へ伝える口座情報。業者へ自動開示はしない）
 // ---------------------------------------------------------------------------
 
 export type BankAccountType = "普通" | "当座";
@@ -780,7 +927,7 @@ export function deleteMyBankAccount(
 }
 
 // ---------------------------------------------------------------------------
-// 本人確認（古物営業法対応。1万円以上の買取で住所・氏名・職業・年齢確認が必要）
+// 本人確認（なりすまし・不正出品の防止のため。任意提出）
 // ---------------------------------------------------------------------------
 
 /** 書類種別の内部トークン。backend の doc_type と1:1対応する。 */
@@ -864,14 +1011,7 @@ export async function uploadIdentityDocument(
     throw new KdzNetworkError(e);
   }
   if (!res.ok) {
-    let message = `HTTP ${res.status}`;
-    try {
-      const body = (await res.json()) as { detail?: unknown };
-      if (typeof body.detail === "string") message = body.detail;
-    } catch {
-      /* JSON でないレスポンスは無視 */
-    }
-    throw new KdzApiError(res.status, message);
+    await throwHttpError(res);
   }
   return (await res.json()) as IdentityOut;
 }
@@ -889,7 +1029,7 @@ export async function fetchMyIdentityDocumentBlob(
   let res: Response;
   try {
     res = await fetch(
-      `${apiBase()}/users/me/identity-documents/${documentId}/file?side=${side}`,
+      `${apiBase()}/users/me/identity-documents/${encodeURIComponent(documentId)}/file?${new URLSearchParams({ side })}`,
       { headers: { Authorization: `Bearer ${token}` } },
     );
   } catch (e) {
@@ -897,14 +1037,7 @@ export async function fetchMyIdentityDocumentBlob(
     throw new KdzNetworkError(e);
   }
   if (!res.ok) {
-    let message = `HTTP ${res.status}`;
-    try {
-      const body = (await res.json()) as { detail?: unknown };
-      if (typeof body.detail === "string") message = body.detail;
-    } catch {
-      /* JSON でないレスポンスは無視 */
-    }
-    throw new KdzApiError(res.status, message);
+    await throwHttpError(res);
   }
   return await res.blob();
 }
@@ -930,7 +1063,7 @@ export function listIdentityDocumentsAdmin(
   status: "pending" | "all",
   token: string,
 ): Promise<AdminIdentityDocument[]> {
-  return request(`/admin/identity-documents?status=${status}`, { token });
+  return request(`/admin/identity-documents?${new URLSearchParams({ status })}`, { token });
 }
 
 export async function fetchIdentityDocumentBlobAdmin(
@@ -941,7 +1074,7 @@ export async function fetchIdentityDocumentBlobAdmin(
   let res: Response;
   try {
     res = await fetch(
-      `${apiBase()}/admin/identity-documents/${documentId}/file?side=${side}`,
+      `${apiBase()}/admin/identity-documents/${encodeURIComponent(documentId)}/file?${new URLSearchParams({ side })}`,
       { headers: { Authorization: `Bearer ${token}` } },
     );
   } catch (e) {
@@ -949,14 +1082,7 @@ export async function fetchIdentityDocumentBlobAdmin(
     throw new KdzNetworkError(e);
   }
   if (!res.ok) {
-    let message = `HTTP ${res.status}`;
-    try {
-      const body = (await res.json()) as { detail?: unknown };
-      if (typeof body.detail === "string") message = body.detail;
-    } catch {
-      /* JSON でないレスポンスは無視 */
-    }
-    throw new KdzApiError(res.status, message);
+    await throwHttpError(res);
   }
   return await res.blob();
 }
@@ -965,7 +1091,7 @@ export function approveIdentityDocument(
   documentId: string,
   token: string,
 ): Promise<AdminIdentityDocument> {
-  return request(`/admin/identity-documents/${documentId}/approve`, {
+  return request(`/admin/identity-documents/${encodeURIComponent(documentId)}/approve`, {
     method: "PATCH",
     token,
   });
@@ -976,7 +1102,7 @@ export function rejectIdentityDocument(
   rejectReason: string,
   token: string,
 ): Promise<AdminIdentityDocument> {
-  return request(`/admin/identity-documents/${documentId}/reject`, {
+  return request(`/admin/identity-documents/${encodeURIComponent(documentId)}/reject`, {
     method: "PATCH",
     body: JSON.stringify({ reject_reason: rejectReason }),
     token,
@@ -1019,6 +1145,29 @@ export function unlinkLine(currentPassword: string, token: string): Promise<void
     body: JSON.stringify({ current_password: currentPassword }),
     token,
   });
+}
+
+// ---------------------------------------------------------------------------
+// お問い合わせ（/contact）
+// ---------------------------------------------------------------------------
+
+export interface ContactMessagePayload {
+  name: string;
+  email: string;
+  category: string;
+  message: string;
+}
+
+/**
+ * お問い合わせフォームの送信。未ログイン訪問者も送信できるため token なし。
+ * 成功: 202 { ok: true }。422（入力不正）/429（送信過多）/5xx はいずれも
+ * 呼び出し側で日本語の案内へ変換して表示し、偽の完了表示は出さないこと
+ * （運営導線監査 r3-operator.md H1 是正）。
+ */
+export function submitContactMessage(
+  payload: ContactMessagePayload,
+): Promise<{ ok: boolean }> {
+  return request("/contact", { method: "POST", body: JSON.stringify(payload) });
 }
 
 // ---------------------------------------------------------------------------
@@ -1088,7 +1237,10 @@ export async function uploadCasePhoto(
     if (e instanceof KdzApiError) throw e;
     throw new KdzNetworkError(e);
   }
-  if (!res.ok) throw new KdzApiError(res.status, "写真のアップロードに失敗しました");
+  if (!res.ok) {
+    if (res.status === 401) await throwHttpError(res);
+    throw new KdzApiError(res.status, "写真のアップロードに失敗しました");
+  }
   return presign;
 }
 
@@ -1103,11 +1255,20 @@ export function photoSrc(url: string | null): string {
 // 案件
 // ---------------------------------------------------------------------------
 
+/**
+ * 案件を作成する。AI画像解析を同期実行するため長時間化しうる
+ * （backend/api/v1/endpoints/cases.py: generate_case_ai を BackgroundTasks に逃がしていない）。
+ * signal を渡すとその中断（AbortSignal.timeout 等）で fetch を打ち切れる。
+ * タイムアウト時、呼び出し側は KdzNetworkError.cause が
+ * DOMException("TimeoutError") かで判定し、専用の案内を出すこと
+ * （案件自体は作成されている可能性があるため、再送信させない）。
+ */
 export function createCase(
   payload: CaseCreatePayload,
   token: string,
+  signal?: AbortSignal,
 ): Promise<CaseOut> {
-  return request("/cases", { method: "POST", body: JSON.stringify(payload), token });
+  return request("/cases", { method: "POST", body: JSON.stringify(payload), token, signal });
 }
 
 export function listMyCases(token: string): Promise<CaseOut[]> {
@@ -1119,11 +1280,11 @@ export function listOpenCases(token: string): Promise<CaseMasked[]> {
 }
 
 export function getCase(caseId: string, token: string): Promise<CaseOut> {
-  return request(`/cases/${caseId}`, { token });
+  return request(`/cases/${encodeURIComponent(caseId)}`, { token });
 }
 
 export function getCaseMasked(caseId: string, token: string): Promise<CaseMasked> {
-  return request(`/cases/${caseId}`, { token });
+  return request(`/cases/${encodeURIComponent(caseId)}`, { token });
 }
 
 // ---------------------------------------------------------------------------
@@ -1136,7 +1297,7 @@ export function updateCaseItem(
   payload: CaseItemUpdatePayload,
   token: string,
 ): Promise<CaseItemOut> {
-  return request(`/cases/${caseId}/items/${itemId}`, {
+  return request(`/cases/${encodeURIComponent(caseId)}/items/${encodeURIComponent(itemId)}`, {
     method: "PUT",
     body: JSON.stringify(payload),
     token,
@@ -1144,11 +1305,11 @@ export function updateCaseItem(
 }
 
 export function deleteCaseItem(caseId: string, itemId: string, token: string): Promise<void> {
-  return request(`/cases/${caseId}/items/${itemId}`, { method: "DELETE", token });
+  return request(`/cases/${encodeURIComponent(caseId)}/items/${encodeURIComponent(itemId)}`, { method: "DELETE", token });
 }
 
 export function deleteCasePhoto(caseId: string, photoId: string, token: string): Promise<void> {
-  return request(`/cases/${caseId}/photos/${photoId}`, { method: "DELETE", token });
+  return request(`/cases/${encodeURIComponent(caseId)}/photos/${encodeURIComponent(photoId)}`, { method: "DELETE", token });
 }
 
 export function addCaseItemPhoto(
@@ -1157,7 +1318,7 @@ export function addCaseItemPhoto(
   payload: { storage_key: string; sort_order: number },
   token: string,
 ): Promise<CasePhoto> {
-  return request(`/cases/${caseId}/items/${itemId}/photos`, {
+  return request(`/cases/${encodeURIComponent(caseId)}/items/${encodeURIComponent(itemId)}/photos`, {
     method: "POST",
     body: JSON.stringify(payload),
     token,
@@ -1169,7 +1330,7 @@ export function addCaseItemPhoto(
 // ---------------------------------------------------------------------------
 
 export function listBids(caseId: string, token: string): Promise<BidOut[]> {
-  return request(`/cases/${caseId}/bids`, { token });
+  return request(`/cases/${encodeURIComponent(caseId)}/bids`, { token });
 }
 
 export function createBid(
@@ -1177,7 +1338,7 @@ export function createBid(
   payload: { amount: number; message?: string },
   token: string,
 ): Promise<BidOut> {
-  return request(`/cases/${caseId}/bids`, {
+  return request(`/cases/${encodeURIComponent(caseId)}/bids`, {
     method: "POST",
     body: JSON.stringify(payload),
     token,
@@ -1189,7 +1350,7 @@ export function selectBid(
   bidId: string,
   token: string,
 ): Promise<TransactionOut> {
-  return request(`/cases/${caseId}/bids/${bidId}/select`, { method: "POST", token });
+  return request(`/cases/${encodeURIComponent(caseId)}/bids/${encodeURIComponent(bidId)}/select`, { method: "POST", token });
 }
 
 // ---------------------------------------------------------------------------
@@ -1204,14 +1365,14 @@ export function getTransaction(
   transactionId: string,
   token: string,
 ): Promise<TransactionDetail> {
-  return request(`/transactions/${transactionId}`, { token });
+  return request(`/transactions/${encodeURIComponent(transactionId)}`, { token });
 }
 
 export function completeTransaction(
   transactionId: string,
   token: string,
 ): Promise<TransactionOut> {
-  return request(`/transactions/${transactionId}/complete`, { method: "POST", token });
+  return request(`/transactions/${encodeURIComponent(transactionId)}/complete`, { method: "POST", token });
 }
 
 export function cancelTransaction(
@@ -1219,7 +1380,7 @@ export function cancelTransaction(
   reason: string | null,
   token: string,
 ): Promise<TransactionOut> {
-  return request(`/transactions/${transactionId}/cancel`, {
+  return request(`/transactions/${encodeURIComponent(transactionId)}/cancel`, {
     method: "POST",
     body: JSON.stringify({ reason }),
     token,
@@ -1236,7 +1397,7 @@ export function cancelCase(
   reason: string | null,
   token: string,
 ): Promise<CaseOut> {
-  return request(`/cases/${caseId}/cancel`, {
+  return request(`/cases/${encodeURIComponent(caseId)}/cancel`, {
     method: "POST",
     body: JSON.stringify({ reason }),
     token,
@@ -1252,7 +1413,7 @@ export function createReduction(
   payload: { requested_amount: number; reason: string },
   token: string,
 ): Promise<ReductionOut> {
-  return request(`/transactions/${transactionId}/reduction`, {
+  return request(`/transactions/${encodeURIComponent(transactionId)}/reduction`, {
     method: "POST",
     body: JSON.stringify(payload),
     token,
@@ -1265,7 +1426,7 @@ export function decideReduction(
   action: "approve" | "reject",
   token: string,
 ): Promise<ReductionOut> {
-  return request(`/transactions/${transactionId}/reduction/${reductionId}`, {
+  return request(`/transactions/${encodeURIComponent(transactionId)}/reduction/${encodeURIComponent(reductionId)}`, {
     method: "PATCH",
     body: JSON.stringify({ action }),
     token,
@@ -1323,7 +1484,7 @@ export function adminVerifyOperator(
   verified: boolean,
   token: string,
 ): Promise<OperatorOut> {
-  return request(`/admin/operators/${operatorId}/verify`, {
+  return request(`/admin/operators/${encodeURIComponent(operatorId)}/verify`, {
     method: "PATCH",
     body: JSON.stringify({ verified }),
     token,
@@ -1336,7 +1497,7 @@ export function adminSuspendOperator(
   suspended: boolean,
   token: string,
 ): Promise<OperatorOut> {
-  return request(`/admin/operators/${operatorId}/suspend`, {
+  return request(`/admin/operators/${encodeURIComponent(operatorId)}/suspend`, {
     method: "PATCH",
     body: JSON.stringify({ suspended }),
     token,
@@ -1354,7 +1515,7 @@ export async function adminGetOperatorLicenseImage(
 ): Promise<Blob> {
   let res: Response;
   try {
-    res = await fetch(`${apiBase()}/admin/operators/${operatorId}/license-image`, {
+    res = await fetch(`${apiBase()}/admin/operators/${encodeURIComponent(operatorId)}/license-image`, {
       headers: { Authorization: `Bearer ${token}` },
     });
   } catch (e) {
@@ -1362,14 +1523,7 @@ export async function adminGetOperatorLicenseImage(
     throw new KdzNetworkError(e);
   }
   if (!res.ok) {
-    let message = `HTTP ${res.status}`;
-    try {
-      const body = (await res.json()) as { detail?: unknown };
-      if (typeof body.detail === "string") message = body.detail;
-    } catch {
-      /* JSON でないレスポンスは無視 */
-    }
-    throw new KdzApiError(res.status, message);
+    await throwHttpError(res);
   }
   return await res.blob();
 }
@@ -1385,6 +1539,160 @@ export interface CellDensityRow {
 
 export function adminGetCellDensity(token: string): Promise<CellDensityRow[]> {
   return request("/admin/cell-density", { token });
+}
+
+// ---------------------------------------------------------------------------
+// 管理: 案件・成約の横断閲覧（トラブル介入の起点。r3-operator H2 対応）
+// ---------------------------------------------------------------------------
+
+export interface AdminCaseListItem {
+  id: string;
+  status: CaseStatus;
+  created_at: string;
+  purpose: string;
+  prefecture: string;
+  city: string;
+  /** admin専用のためマスクなし。 */
+  user_email: string | null;
+  /** 成約済み（selected bid）の場合のみ非null。 */
+  company_name: string | null;
+  /** 成約済みの場合のみ非null。 */
+  amount: number | null;
+  /** 成約済みの場合のみ非null。 */
+  visit_date: string | null;
+}
+
+export interface AdminCaseListResponse {
+  items: AdminCaseListItem[];
+  total: number;
+}
+
+export interface AdminTransactionListItem {
+  id: string;
+  case_id: string;
+  status: TransactionStatus;
+  created_at: string;
+  user_email: string | null;
+  company_name: string | null;
+  amount: number | null;
+  visit_date: string | null;
+}
+
+export interface AdminTransactionListResponse {
+  items: AdminTransactionListItem[];
+  total: number;
+}
+
+/** admin一覧APIの既定ページサイズ（backend の _ADMIN_CASE_TXN_DEFAULT_LIMIT と同値）。 */
+export const ADMIN_LIST_DEFAULT_LIMIT = 50;
+
+export interface AdminListParams {
+  q?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+}
+
+function buildAdminListQuery(params: AdminListParams): string {
+  const sp = new URLSearchParams();
+  if (params.q && params.q.trim()) sp.set("q", params.q.trim());
+  if (params.status && params.status !== "all") sp.set("status", params.status);
+  sp.set("limit", String(params.limit ?? ADMIN_LIST_DEFAULT_LIMIT));
+  sp.set("offset", String(params.offset ?? 0));
+  return sp.toString();
+}
+
+export function adminListCases(
+  params: AdminListParams,
+  token: string,
+): Promise<AdminCaseListResponse> {
+  return request(`/admin/cases?${buildAdminListQuery(params)}`, { token });
+}
+
+export function adminListTransactions(
+  params: AdminListParams,
+  token: string,
+): Promise<AdminTransactionListResponse> {
+  return request(`/admin/transactions?${buildAdminListQuery(params)}`, { token });
+}
+
+// ---------------------------------------------------------------------------
+// 管理: 依頼者アカウント（一覧・停止／解除。r3-verify-operator ADD-2 対応）
+// ---------------------------------------------------------------------------
+
+export interface AdminUserListItem {
+  id: string;
+  email: string;
+  display_name: string | null;
+  role: "user" | "admin";
+  is_suspended: boolean;
+  suspended_at: string | null;
+  created_at: string;
+  case_count: number;
+}
+
+export interface AdminUserListResponse {
+  items: AdminUserListItem[];
+  total: number;
+}
+
+export function adminListUsers(
+  params: Pick<AdminListParams, "q" | "limit" | "offset">,
+  token: string,
+): Promise<AdminUserListResponse> {
+  return request(`/admin/users?${buildAdminListQuery(params)}`, { token });
+}
+
+export interface AdminUserSuspendResponse {
+  id: string;
+  is_suspended: boolean;
+  suspended_at: string | null;
+  /** r3 セキュリティレビュー R-M5 是正: 停止操作時点の進行中案件（open/bidding）件数。 */
+  open_case_count: number;
+}
+
+/**
+ * admin が依頼者アカウントを停止（true）／停止解除（false）する。
+ * role=admin のユーザーを対象にした場合は 409（backend側で拒否）。
+ */
+export function adminSuspendUser(
+  userId: string,
+  suspended: boolean,
+  reason: string | null,
+  token: string,
+): Promise<AdminUserSuspendResponse> {
+  return request(`/admin/users/${encodeURIComponent(userId)}/suspend`, {
+    method: "PATCH",
+    body: JSON.stringify({ suspended, reason }),
+    token,
+  });
+}
+
+export interface AdminUserRoleResponse {
+  id: string;
+  role: "user" | "admin";
+}
+
+/**
+ * admin が依頼者アカウントを管理者へ昇格させる。
+ * 停止中のアカウントは対象外（backend側で拒否）。
+ */
+export function adminPromoteUser(userId: string, token: string): Promise<AdminUserRoleResponse> {
+  return request(`/admin/users/${encodeURIComponent(userId)}/promote`, {
+    method: "POST",
+    token,
+  });
+}
+
+/**
+ * admin が管理者アカウントを一般ユーザーへ降格させる。
+ * 自分自身・最後の1名の管理者は対象外（backend側で409拒否）。
+ */
+export function adminDemoteUser(userId: string, token: string): Promise<AdminUserRoleResponse> {
+  return request(`/admin/users/${encodeURIComponent(userId)}/demote`, {
+    method: "POST",
+    token,
+  });
 }
 
 // ---------------------------------------------------------------------------

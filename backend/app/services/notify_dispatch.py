@@ -98,15 +98,66 @@ async def dispatch_bank_account_changed(
 
 
 @_best_effort
-async def dispatch_bid_lost(line_user_id: str | None, email: str, case_id: str) -> None:
-    """落札通知（落選業者宛）。LINE優先・失敗/未連携時はメールにフォールバック。"""
+async def dispatch_bid_lost(
+    line_user_id: str | None, email: str, case_id: str, prefecture: str, city: str, purpose: str
+) -> None:
+    """落札通知（落選業者宛）。LINE優先・失敗/未連携時はメールにフォールバック。
+
+    案件情報（地域・利用目的）を本文に含める（M7対応。案件を横断入札している
+    業者が「どの案件が落選したか」を判別できるようにするため）。
+    """
     if line_user_id:
-        ok = await line_notify.push_bid_lost(line_user_id, case_id)
+        ok = await line_notify.push_bid_lost(line_user_id, case_id, prefecture, city, purpose)
         if ok:
             return
     if notify.is_placeholder_email(email):
         return
-    await notify.send_bid_lost(email, case_id)
+    await notify.send_bid_lost(email, case_id, prefecture, city, purpose)
+
+
+@_best_effort
+async def dispatch_reduction_requested(
+    line_user_id: str | None, email: str | None, case_id: str, amount: int
+) -> None:
+    """減額申請の受付通知（依頼者宛）。LINE優先・失敗/未連携時はメールにフォールバック（ADD-2対応）。"""
+    if line_user_id:
+        ok = await line_notify.push_reduction_requested(line_user_id, case_id, amount)
+        if ok:
+            return
+    if not email or notify.is_placeholder_email(email):
+        return
+    await notify.send_reduction_requested(email, case_id, amount)
+
+
+@_best_effort
+async def dispatch_reduction_decided(
+    line_user_id: str | None, email: str, transaction_id: str, approved: bool, amount: int
+) -> None:
+    """減額申請の承認／却下結果通知（申請業者宛）。LINE優先・失敗/未連携時はメールにフォールバック（H2対応）。"""
+    if line_user_id:
+        ok = await line_notify.push_reduction_decided(line_user_id, transaction_id, approved, amount)
+        if ok:
+            return
+    if notify.is_placeholder_email(email):
+        return
+    await notify.send_reduction_decided(email, transaction_id, approved, amount)
+
+
+@_best_effort
+async def dispatch_transaction_cancelled(
+    line_user_id: str | None,
+    email: str | None,
+    transaction_id: str,
+    recipient_party: Literal["user", "operator"],
+) -> None:
+    """成約キャンセル通知（相手方宛）。LINE優先・失敗/未連携時はメールにフォールバック（ADD-1対応）。"""
+    if line_user_id:
+        ok = await line_notify.push_transaction_cancelled(line_user_id, transaction_id, recipient_party)
+        if ok:
+            return
+    if not email or notify.is_placeholder_email(email):
+        return
+    await notify.send_transaction_cancelled(email, transaction_id, recipient_party)
 
 
 @_best_effort

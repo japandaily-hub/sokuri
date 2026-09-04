@@ -45,6 +45,20 @@ def _vision_result():
         image_object_key="mock/key.jpg",
     )
 
+
+def _auth(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
+
+
+async def _signup_and_auth(client: AsyncClient, email: str = "analyze-user@example.com") -> dict[str, str]:
+    """/analyze は認証必須（R3-operator ADD-1対応）のため、テスト用ユーザーを作成する。"""
+    r = await client.post(
+        "/api/v1/auth/signup",
+        json={"email": email, "password": "password123", "name": "テスト太郎"},
+    )
+    assert r.status_code == 201, r.text
+    return _auth(r.json()["access_token"])
+
 # --- /health ---
 async def test_health_200(client: AsyncClient):
     r = await client.get("/health")
@@ -55,33 +69,70 @@ async def test_health_status_ok(client: AsyncClient):
     assert r.json() == {"status": "ok"}
 
 # --- /analyze ---
-async def test_analyze_200(client: AsyncClient):
+async def test_analyze_requires_authentication_401(client: AsyncClient):
+    """R3-operator ADD-1対応: 無認証での /analyze 呼び出しは401（従来は無認証で200）。"""
     with patch("app.api.v1.endpoints.analyze.analyze_image", new_callable=AsyncMock) as m:
         m.return_value = _vision_result()
         r = await client.post("/api/v1/analyze", json={"base_image": "data:image/jpeg;base64,abc"})
+    assert r.status_code == 401
+    m.assert_not_awaited()
+
+async def test_analyze_200(client: AsyncClient):
+    headers = await _signup_and_auth(client)
+    with patch("app.api.v1.endpoints.analyze.analyze_image", new_callable=AsyncMock) as m:
+        m.return_value = _vision_result()
+        r = await client.post(
+            "/api/v1/analyze", json={"base_image": "data:image/jpeg;base64,abc"}, headers=headers
+        )
     assert r.status_code == 200
 
 async def test_analyze_returns_item_id(client: AsyncClient):
+    headers = await _signup_and_auth(client, "analyze-user-id@example.com")
     with patch("app.api.v1.endpoints.analyze.analyze_image", new_callable=AsyncMock) as m:
         m.return_value = _vision_result()
-        r = await client.post("/api/v1/analyze", json={"base_image": "data:image/jpeg;base64,abc"})
+        r = await client.post(
+            "/api/v1/analyze", json={"base_image": "data:image/jpeg;base64,abc"}, headers=headers
+        )
     data = r.json()
     assert "item_id" in data
     uuid.UUID(data["item_id"])
 
 async def test_analyze_response_fields(client: AsyncClient):
+    headers = await _signup_and_auth(client, "analyze-user-fields@example.com")
     with patch("app.api.v1.endpoints.analyze.analyze_image", new_callable=AsyncMock) as m:
         m.return_value = _vision_result()
-        r = await client.post("/api/v1/analyze", json={"base_image": "data:image/jpeg;base64,abc"})
+        r = await client.post(
+            "/api/v1/analyze", json={"base_image": "data:image/jpeg;base64,abc"}, headers=headers
+        )
     data = r.json()
     assert data["detected_name"] == "iPhone 15 Pro 256GB Space Black"
     assert data["category_tier"] == "high_value_standard"
     assert data["initial_condition"] == "good"
 
+@pytest.mark.parametrize(
+    "base_image",
+    ["https://example.com/item.jpg", "http://example.com/item.jpg", "HTTPS://EXAMPLE.COM/item.jpg"],
+)
+async def test_analyze_rejects_external_url_422(client: AsyncClient, base_image: str):
+    """security review M-5対応: 外部URL（http/https）は422で拒否し、base64のみ受理する。"""
+    headers = await _signup_and_auth(client, "analyze-user-url-reject@example.com")
+    with patch("app.api.v1.endpoints.analyze.analyze_image", new_callable=AsyncMock) as m:
+        r = await client.post(
+            "/api/v1/analyze", json={"base_image": base_image}, headers=headers
+        )
+    assert r.status_code == 422, r.text
+    m.assert_not_awaited()
+
+
 async def test_analyze_vision_called_with_image(client: AsyncClient):
+    headers = await _signup_and_auth(client, "analyze-user-called@example.com")
     with patch("app.api.v1.endpoints.analyze.analyze_image", new_callable=AsyncMock) as m:
         m.return_value = _vision_result()
-        await client.post("/api/v1/analyze", json={"base_image": "data:image/jpeg;base64,abc123"})
+        await client.post(
+            "/api/v1/analyze",
+            json={"base_image": "data:image/jpeg;base64,abc123"},
+            headers=headers,
+        )
     m.assert_awaited_once_with("data:image/jpeg;base64,abc123")
 
 # --- /estimate ---

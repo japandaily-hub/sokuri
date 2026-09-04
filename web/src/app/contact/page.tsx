@@ -2,20 +2,25 @@
 
 /** お問い合わせ（フォーム）。デザイン handoff: docs/design_handoff_katazuke/contact.html を忠実移植。
  *  ヘッダー/フッターは共通 SiteChrome が付与するため、ここでは <main id="main"> の中身のみ描画する。
- *  送信はバックエンド未配線。クライアント側で必須項目の簡易バリデーションを行い、
- *  通過したら「送信を受け付けました（デモ）」の完了表示に切り替える。 */
+ *  POST /contact（katadzuke-api.ts submitContactMessage）へ配線済み。422/429/5xx は日本語の
+ *  案内に変換して表示し、失敗時に偽の完了表示は出さない（運営導線監査 r3-operator.md H1 是正）。 */
 
 import { useState } from "react";
 import Link from "next/link";
 import { Ic } from "@/components/kdz/Icons";
+import { KdzApiError, submitContactMessage, toDisplayMessage } from "@/lib/katadzuke-api";
 import "./contact.css";
 
 type FieldId = "name" | "email" | "category" | "message";
 
 const REQUIRED: FieldId[] = ["name", "email", "category", "message"];
 
+const SUBMIT_FAILED_MESSAGE = "送信できませんでした。しばらくしてからもう一度お試しください。";
+
 export default function ContactPage() {
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<FieldId, boolean>>({
     name: false,
     email: false,
@@ -27,8 +32,9 @@ export default function ContactPage() {
     setErrors((prev) => (prev[id] ? { ...prev, [id]: false } : prev));
   }
 
-  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (sending) return; // 二重送信防止
     const form = e.currentTarget;
     const next: Record<FieldId, boolean> = {
       name: false,
@@ -54,9 +60,30 @@ export default function ContactPage() {
     }
     setErrors(next);
     if (!ok) return;
-    setSent(true);
-    if (typeof window !== "undefined") {
-      window.scrollTo({ top: 0, behavior: "smooth" });
+
+    const name = (form.elements.namedItem("name") as HTMLInputElement).value.trim();
+    const email = (form.elements.namedItem("email") as HTMLInputElement).value.trim();
+    const category = (form.elements.namedItem("category") as HTMLSelectElement).value;
+    const message = (form.elements.namedItem("message") as HTMLTextAreaElement).value.trim();
+
+    setSending(true);
+    setSubmitError(null);
+    try {
+      await submitContactMessage({ name, email, category, message });
+      setSent(true);
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    } catch (err) {
+      if (err instanceof KdzApiError && err.status === 422) {
+        setSubmitError("入力内容をご確認のうえ、もう一度お試しください。");
+      } else if (err instanceof KdzApiError && err.status === 429) {
+        setSubmitError("送信が集中しています。しばらく時間をおいて再度お試しください。");
+      } else {
+        setSubmitError(toDisplayMessage(err, SUBMIT_FAILED_MESSAGE));
+      }
+    } finally {
+      setSending(false);
     }
   }
 
@@ -100,6 +127,28 @@ export default function ContactPage() {
             {!sent ? (
               <div id="form-body">
                 <p className="form-section-label">お問い合わせフォーム</p>
+
+                {submitError && (
+                  <div className="auth-error" role="alert" style={{ marginBottom: 16 }}>
+                    <svg
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                      style={{
+                        width: 16,
+                        height: 16,
+                        fill: "none",
+                        stroke: "var(--danger)",
+                        strokeWidth: 2,
+                        strokeLinecap: "round",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <circle cx="12" cy="12" r="9" />
+                      <path d="M12 8v4M12 16h.01" />
+                    </svg>
+                    {submitError}
+                  </div>
+                )}
 
                 <form onSubmit={onSubmit} noValidate>
                   <div className="field-row">
@@ -201,7 +250,7 @@ export default function ContactPage() {
                   </div>
 
                   <div className="submit-area">
-                    <button type="submit" className="btn-submit">
+                    <button type="submit" className="btn-submit" disabled={sending}>
                       <svg
                         viewBox="0 0 24 24"
                         aria-hidden="true"
@@ -219,7 +268,7 @@ export default function ContactPage() {
                         <path d="M22 2L11 13" />
                         <path d="M22 2L15 22l-4-9-9-4 20-7z" />
                       </svg>
-                      送信する
+                      {sending ? "送信中…" : "送信する"}
                     </button>
                     <p className="note">
                       送信いただいた内容は、通常3営業日以内にご返信します。
@@ -252,13 +301,11 @@ export default function ContactPage() {
                     <path d="M8 12l2.5 2.5L16 9" />
                   </svg>
                 </div>
-                <h3>送信を受け付けました（デモ）</h3>
+                <h3>送信を受け付けました</h3>
                 <p>
                   お問い合わせありがとうございます。
                   <br />
-                  通常3営業日以内にご連絡いたします。
-                  <br />
-                  しばらくお待ちください。
+                  3営業日以内に登録メールアドレスへご連絡します。
                 </p>
                 <Link href="/" className="btn btn-ghost btn-lg">
                   トップページへ戻る

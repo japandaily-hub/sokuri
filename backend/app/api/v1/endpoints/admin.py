@@ -10,8 +10,9 @@ from typing import Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from fastapi.responses import Response
-from sqlalchemy import func, select, text, update
+from sqlalchemy import func, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_admin
 from app.core.crypto import decrypt_json
@@ -35,6 +36,13 @@ from app.db.models.user_identity_document import (
 )
 from app.db.session import get_session
 from app.schemas_katadzuke import (
+    AdminCaseListItem,
+    AdminCaseListResponse,
+    AdminTransactionListItem,
+    AdminTransactionListResponse,
+    AdminUserListItem,
+    AdminUserListResponse,
+    AdminUserRoleResponse,
     BankAccountMaskedOut,
     IdentityDocumentRejectRequest,
     InviteBulkCreateRequest,
@@ -51,13 +59,43 @@ from app.schemas_katadzuke import (
     ReviewHideRequest,
     ReviewOut,
     UserIdentityDocumentAdminOut,
+    UserSuspendRequest,
+    UserSuspendResponse,
 )
-from app.services import notify
+from app.services import alerts, notify
 from app.services.review_stats import recalc_operator_review_stats
+
+# admin 一覧系 API 共通の既定/上限（M2対応）。既存 web 呼び出し（クエリ省略時）が
+# 従来どおり動くよう、既定値は「事実上の全件」に近い値にする。
+_DEFAULT_LIST_LIMIT = 100
+_MAX_LIST_LIMIT = 500
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _escape_ilike_value(value: str) -> str:
+    """ilike の特殊文字（``%`` / ``_`` / ``\\``）をエスケープする（security review M-3対応）。
+
+    ``.ilike(pattern, escape="\\")`` と組み合わせて使うこと。エスケープ文字
+    自体を最初に置換しないと、後続の ``%``/``_`` エスケープが二重解釈されて
+    しまう（例: 元の文字列に ``\\%`` を含む入力）。
+    """
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _try_parse_uuid(value: str) -> uuid.UUID | None:
+    """``value`` を UUID としてパースできればその値を、できなければ ``None`` を返す。
+
+    admin 一覧の ID 検索で使う（security review M-3: ``cast(id, String).ilike``
+    による前方一致・全表スキャンをやめ、UUID として厳密にパースできた場合のみ
+    ``==`` の等価比較で絞り込む）。
+    """
+    try:
+        return uuid.UUID(value)
+    except ValueError:
+        return None
 
 
 def _generate_code() -> str:
@@ -160,19 +198,31 @@ async def create_invites_bulk(
 
 @router.get("/admin/invites", response_model=list[InviteOut])
 async def list_invites(
+    limit: int = Query(default=_DEFAULT_LIST_LIMIT, ge=1, le=_MAX_LIST_LIMIT),
+    offset: int = Query(default=0, ge=0),
     admin: User = Depends(get_current_admin),
     session: AsyncSession = Depends(get_session),
 ) -> list[InviteOut]:
-    invites = (await session.scalars(select(Invite).order_by(Invite.created_at.desc()))).all()
+    invites = (
+        await session.scalars(
+            select(Invite).order_by(Invite.created_at.desc()).limit(limit).offset(offset)
+        )
+    ).all()
     return [InviteOut.model_validate(i) for i in invites]
 
 
 @router.get("/admin/operators", response_model=list[OperatorOut])
 async def list_operators(
+    limit: int = Query(default=_DEFAULT_LIST_LIMIT, ge=1, le=_MAX_LIST_LIMIT),
+    offset: int = Query(default=0, ge=0),
     admin: User = Depends(get_current_admin),
     session: AsyncSession = Depends(get_session),
 ) -> list[OperatorOut]:
-    operators = (await session.scalars(select(Operator).order_by(Operator.created_at.desc()))).all()
+    operators = (
+        await session.scalars(
+            select(Operator).order_by(Operator.created_at.desc()).limit(limit).offset(offset)
+        )
+    ).all()
     return [OperatorOut.model_validate(o) for o in operators]
 
 
@@ -305,17 +355,486 @@ async def get_cell_density(
     return result
 
 
+# ──────────────────────────── 案件・成約の横断閲覧（R3-operator H2対応） ────────────────────────────
+#
+# 運営は従来 GET /cases・GET /transactions を叩いても「admin自身がuserとして
+# 作成した案件」しか返らず、トラブル対応・強制介入の起点となるID自体に到達
+# できなかった（一覧が空を返す）。個別取得（GET /cases/{id}・GET /transactions/{id}）
+# は既に role=="admin" を許容済みのため、ここでは一覧・検索のみを提供する。
+
+_ADMIN_CASE_TXN_DEFAULT_LIMIT = 50
+_ADMIN_CASE_TXN_MAX_LIMIT = 200
+
+
+@router.get(
+    "/admin/cases",
+    response_model=AdminCaseListResponse,
+    summary="案件一覧（admin横断閲覧・依頼者メール/案件IDで検索可）",
+)
+async def admin_list_cases(
+    q: str | None = Query(default=None, max_length=255, description="案件IDの完全一致（UUID） または 依頼者メールの部分一致"),
+    status_filter: str | None = Query(default=None, alias="status", max_length=32),
+    limit: int = Query(default=_ADMIN_CASE_TXN_DEFAULT_LIMIT, ge=1, le=_ADMIN_CASE_TXN_MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
+    admin: User = Depends(get_current_admin),
+    session: AsyncSession = Depends(get_session),
+) -> AdminCaseListResponse:
+    conditions = []
+    if status_filter:
+        conditions.append(Case.status == status_filter)
+    q_norm = (q or "").strip()
+    if q_norm:
+        # ``q`` は ORM のバインドパラメータとして渡すため SQL インジェクションの
+        # 余地はないが、ilike の `%`/`_` はワイルドカードとして解釈されるため
+        # escape 付きで無害化する（security review M-3）。ID 検索は
+        # cast(id, String).ilike による前方一致（全表スキャン）をやめ、UUID として
+        # 厳密にパースできた場合のみ == の等価比較にする。
+        owner_ids_subq = select(User.id).where(
+            User.email.ilike(f"%{_escape_ilike_value(q_norm)}%", escape="\\")
+        )
+        or_clauses: list = [Case.user_id.in_(owner_ids_subq)]
+        parsed_case_id = _try_parse_uuid(q_norm)
+        if parsed_case_id is not None:
+            or_clauses.append(Case.id == parsed_case_id)
+        conditions.append(or_(*or_clauses))
+
+    total = await session.scalar(
+        select(func.count()).select_from(Case).where(*conditions)
+    )
+
+    stmt = (
+        select(Case)
+        .where(*conditions)
+        .options(
+            selectinload(Case.bids).selectinload(Bid.operator),
+            selectinload(Case.bids).selectinload(Bid.transaction),
+        )
+        # QA M3対応: created_at 単独キーは同時刻の複数行で順序が不定になりうるため、
+        # id を tie-breaker として付け、ページング結果を決定的にする。
+        .order_by(Case.created_at.desc(), Case.id.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    cases = (await session.scalars(stmt)).all()
+
+    # 依頼者メールをバッチ取得する（N+1回避。Case には user へのORMリレーションが
+    # 無いため、行ごとに session.get するとケース数分のクエリになってしまう）。
+    user_ids = {c.user_id for c in cases if c.user_id is not None}
+    users_by_id: dict[uuid.UUID, User] = {}
+    if user_ids:
+        rows = (await session.scalars(select(User).where(User.id.in_(user_ids)))).all()
+        users_by_id = {u.id: u for u in rows}
+
+    items: list[AdminCaseListItem] = []
+    for case in cases:
+        selected_bid = next((b for b in case.bids if b.status == "selected"), None)
+        txn = selected_bid.transaction if selected_bid is not None else None
+        owner = users_by_id.get(case.user_id) if case.user_id is not None else None
+        items.append(
+            AdminCaseListItem(
+                id=case.id,
+                status=case.status,
+                created_at=case.created_at,
+                purpose=case.purpose,
+                prefecture=case.prefecture,
+                city=case.city,
+                user_email=owner.email if owner is not None else None,
+                company_name=selected_bid.operator.company_name if selected_bid is not None else None,
+                amount=(txn.final_amount if txn is not None and txn.final_amount is not None else (
+                    txn.initial_amount if txn is not None else (
+                        selected_bid.amount if selected_bid is not None else None
+                    )
+                )),
+                visit_date=txn.visit_date if txn is not None else None,
+            )
+        )
+
+    logger.info(
+        "admin: 案件一覧を取得しました - count=%d total=%d admin_id=%s", len(items), total or 0, admin.id
+    )
+    return AdminCaseListResponse(items=items, total=int(total or 0))
+
+
+@router.get(
+    "/admin/transactions",
+    response_model=AdminTransactionListResponse,
+    summary="成約一覧（admin横断閲覧・依頼者メール/業者名/成約ID/案件IDで検索可）",
+)
+async def admin_list_transactions(
+    q: str | None = Query(
+        default=None,
+        max_length=255,
+        description="成約ID/案件IDの完全一致（UUID） または 依頼者メール/業者名の部分一致",
+    ),
+    status_filter: str | None = Query(default=None, alias="status", max_length=32),
+    limit: int = Query(default=_ADMIN_CASE_TXN_DEFAULT_LIMIT, ge=1, le=_ADMIN_CASE_TXN_MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
+    admin: User = Depends(get_current_admin),
+    session: AsyncSession = Depends(get_session),
+) -> AdminTransactionListResponse:
+    conditions = []
+    if status_filter:
+        conditions.append(Transaction.status == status_filter)
+    q_norm = (q or "").strip()
+    if q_norm:
+        # security review M-3: ilike は escape 付きで無害化し、ID 検索は UUID として
+        # 厳密にパースできた場合のみ == の等価比較にする（admin_list_cases と同じ方針）。
+        escaped_q = _escape_ilike_value(q_norm)
+        owner_ids_subq = select(User.id).where(User.email.ilike(f"%{escaped_q}%", escape="\\"))
+        case_ids_by_owner_subq = select(Case.id).where(Case.user_id.in_(owner_ids_subq))
+        operator_ids_subq = select(Operator.id).where(
+            Operator.company_name.ilike(f"%{escaped_q}%", escape="\\")
+        )
+        bid_ids_by_operator_subq = select(Bid.id).where(Bid.operator_id.in_(operator_ids_subq))
+        or_clauses: list = [
+            Transaction.case_id.in_(case_ids_by_owner_subq),
+            Transaction.bid_id.in_(bid_ids_by_operator_subq),
+        ]
+        parsed_id = _try_parse_uuid(q_norm)
+        if parsed_id is not None:
+            # 貼り付けられた ID が Transaction.id / Case.id のどちらかは
+            # UI側では区別できないため、両方に対する厳密一致を許容する
+            # （前方一致だった従来動作の意味的等価物）。
+            or_clauses.append(Transaction.id == parsed_id)
+            or_clauses.append(Transaction.case_id == parsed_id)
+        conditions.append(or_(*or_clauses))
+
+    total = await session.scalar(
+        select(func.count()).select_from(Transaction).where(*conditions)
+    )
+
+    stmt = (
+        select(Transaction)
+        .where(*conditions)
+        .options(
+            selectinload(Transaction.case),
+            selectinload(Transaction.bid).selectinload(Bid.operator),
+        )
+        # QA M3対応: created_at 単独キーは同時刻の複数行で順序が不定になりうるため、
+        # id を tie-breaker として付け、ページング結果を決定的にする。
+        .order_by(Transaction.created_at.desc(), Transaction.id.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    txns = (await session.scalars(stmt)).all()
+
+    # 依頼者メールをバッチ取得する（N+1回避。上記 admin_list_cases と同じ理由）。
+    user_ids = {t.case.user_id for t in txns if t.case is not None and t.case.user_id is not None}
+    users_by_id: dict[uuid.UUID, User] = {}
+    if user_ids:
+        rows = (await session.scalars(select(User).where(User.id.in_(user_ids)))).all()
+        users_by_id = {u.id: u for u in rows}
+
+    items: list[AdminTransactionListItem] = []
+    for txn in txns:
+        owner = (
+            users_by_id.get(txn.case.user_id)
+            if txn.case is not None and txn.case.user_id is not None
+            else None
+        )
+        items.append(
+            AdminTransactionListItem(
+                id=txn.id,
+                case_id=txn.case_id,
+                status=txn.status,
+                created_at=txn.created_at,
+                user_email=owner.email if owner is not None else None,
+                company_name=txn.bid.operator.company_name if txn.bid is not None else None,
+                amount=txn.final_amount if txn.final_amount is not None else txn.initial_amount,
+                visit_date=txn.visit_date,
+            )
+        )
+
+    logger.info(
+        "admin: 成約一覧を取得しました - count=%d total=%d admin_id=%s", len(items), total or 0, admin.id
+    )
+    return AdminTransactionListResponse(items=items, total=int(total or 0))
+
+
+@router.get(
+    "/admin/users",
+    response_model=AdminUserListResponse,
+    summary="依頼者一覧（admin横断閲覧・メール/表示名/IDで検索可・既定で退会済みを除外）",
+)
+async def admin_list_users(
+    q: str | None = Query(default=None, max_length=255, description="メール/表示名/IDの部分一致・完全一致"),
+    limit: int = Query(default=_ADMIN_CASE_TXN_DEFAULT_LIMIT, ge=1, le=_ADMIN_CASE_TXN_MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
+    include_deleted: bool = Query(
+        default=False,
+        description="true の場合、退会済み（匿名化済み・deleted_at 非null）ユーザーも含める。既定は除外。",
+    ),
+    admin: User = Depends(get_current_admin),
+    session: AsyncSession = Depends(get_session),
+) -> AdminUserListResponse:
+    # QA M2対応: 退会済み（deleted_at 非null）ユーザーは既定で一覧から除外する
+    # （個人情報は既に匿名化済みだが、運営の日常オペレーション上はノイズになるため）。
+    # include_deleted=true で明示的に含められるようにする。
+    conditions = [] if include_deleted else [User.deleted_at.is_(None)]
+    q_norm = (q or "").strip()
+    if q_norm:
+        # security review M-3: ilike は escape 付きで無害化する。QA H-2対応:
+        # admin_list_cases/admin_list_transactions と同様に ID（UUID厳密一致）
+        # 検索も追加する（web の CopyableId でコピーした ID を貼り付けて
+        # 検索した際に0件になる不整合の是正）。
+        escaped_q = _escape_ilike_value(q_norm)
+        or_clauses: list = [
+            User.email.ilike(f"%{escaped_q}%", escape="\\"),
+            User.name.ilike(f"%{escaped_q}%", escape="\\"),
+        ]
+        parsed_id = _try_parse_uuid(q_norm)
+        if parsed_id is not None:
+            or_clauses.append(User.id == parsed_id)
+        conditions.append(or_(*or_clauses))
+
+    total = await session.scalar(select(func.count()).select_from(User).where(*conditions))
+
+    stmt = (
+        select(User)
+        .where(*conditions)
+        # QA M3対応: created_at は同時刻の複数行がありうる単独キーのため、
+        # limit/offset のページングで並び順が不定になりうる（行の重複・欠落）。
+        # id を tie-breaker として付け、決定的な順序を保証する
+        # （admin_list_cases/admin_list_transactions と同型の是正）。
+        .order_by(User.created_at.desc(), User.id.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    users = (await session.scalars(stmt)).all()
+
+    # 案件数をバッチ集計する（N+1回避。admin_list_cases の依頼者メール取得と同じ理由。
+    # ユーザーごとに個別クエリを発行すると一覧件数分のクエリになってしまう）。
+    user_ids = [u.id for u in users]
+    case_counts: dict[uuid.UUID, int] = {}
+    if user_ids:
+        rows = (
+            await session.execute(
+                select(Case.user_id, func.count(Case.id))
+                .where(Case.user_id.in_(user_ids))
+                .group_by(Case.user_id)
+            )
+        ).all()
+        case_counts = {uid: cnt for uid, cnt in rows if uid is not None}
+
+    items = [
+        AdminUserListItem(
+            id=u.id,
+            email=u.email,
+            display_name=u.name,
+            role=u.role,
+            is_suspended=u.is_suspended,
+            suspended_at=u.suspended_at,
+            created_at=u.created_at,
+            case_count=case_counts.get(u.id, 0),
+        )
+        for u in users
+    ]
+
+    logger.info(
+        "admin: 依頼者一覧を取得しました - count=%d total=%d admin_id=%s", len(items), total or 0, admin.id
+    )
+    return AdminUserListResponse(items=items, total=int(total or 0))
+
+
+@router.patch("/admin/users/{user_id}/suspend", response_model=UserSuspendResponse)
+async def suspend_user(
+    user_id: uuid.UUID,
+    body: UserSuspendRequest,
+    admin: User = Depends(get_current_admin),
+    session: AsyncSession = Depends(get_session),
+) -> UserSuspendResponse:
+    """依頼者アカウントを停止（suspended=true）／停止解除（false）する（r3-verify-operator ADD-2対応）。
+
+    停止中は ``assert_user_not_suspended``（deps.py）により既存トークンでの全操作が
+    403 になり、ログインも拒否される（auth.py の ``user_login`` / ``line_exchange``）。
+    admin 自身、および role="admin" のユーザーは対象外（409）とし、運営操作の
+    誤ロックアウトを防ぐ（``suspend_operator`` には無い制約だが、admin は user
+    テーブルを共用するため依頼者側にのみ必要な安全策）。
+    """
+    if user_id == admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="自分自身のアカウントは停止できません。",
+        )
+    target = await session.get(User, user_id)
+    if target is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+    if target.role == "admin":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="管理者アカウントは停止できません。",
+        )
+    target.is_suspended = body.suspended
+    target.suspended_at = datetime.now(timezone.utc) if body.suspended else None
+    target.suspended_reason = body.reason if body.suspended else None
+    await session.commit()
+    await session.refresh(target)
+
+    # QA未解決リスク（依頼者停止後の進行中案件の扱いが未定義）対応: 停止操作自体では
+    # 案件・成約の状態には一切干渉しないが、運営が後続対応（案件のキャンセル・
+    # 業者への連絡等）を判断できるよう、停止操作時点の open/bidding 案件数を返す
+    # （admin_list_cases の active 判定 admin.py:get_cell_density と同じ状態集合）。
+    open_case_count = int(
+        await session.scalar(
+            select(func.count())
+            .select_from(Case)
+            .where(Case.user_id == target.id, Case.status.in_(("open", "bidding")))
+        )
+        or 0
+    )
+
+    logger.info(
+        "admin_user_suspend admin=%s user=%s suspended=%s open_case_count=%d",
+        admin.id,
+        target.id,
+        body.suspended,
+        open_case_count,
+    )
+    return UserSuspendResponse(
+        id=target.id,
+        is_suspended=target.is_suspended,
+        suspended_at=target.suspended_at,
+        open_case_count=open_case_count,
+    )
+
+
+async def _has_other_active_admin(session: AsyncSession, exclude_user_id: uuid.UUID) -> bool:
+    """``exclude_user_id`` 以外に有効な（``deleted_at IS NULL``）admin が
+    1人でも存在すれば True を返す（demote で「最後の1人」判定に使う）。
+    """
+    other_admin = await session.scalar(
+        select(User.id).where(
+            User.role == "admin",
+            User.deleted_at.is_(None),
+            User.id != exclude_user_id,
+        ).limit(1)
+    )
+    return other_admin is not None
+
+
+@router.post("/admin/users/{user_id}/promote", response_model=AdminUserRoleResponse)
+async def promote_user_to_admin(
+    user_id: uuid.UUID,
+    admin: User = Depends(get_current_admin),
+    session: AsyncSession = Depends(get_session),
+) -> AdminUserRoleResponse:
+    """一般ユーザーを admin に昇格させる（R3再レビュー Critical対応）。
+
+    ADMIN_EMAILS 経由の自動昇格（auth.py の ``_promote_to_admin_if_listed``）は
+    「DB に有効な admin が1人も居ない場合のみ」に限定したため、既に admin が
+    存在する状態での2人目以降の admin 追加は、本エンドポイント（admin 認可必須）
+    のみを正規経路とする。対象は ``deleted_at IS NULL``・``is_suspended=False``・
+    role="user" であることを要求し、自己（既に admin）への呼び出しは 409 とする。
+    """
+    if user_id == admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="自分自身の権限は変更できません。",
+        )
+    target = await session.get(User, user_id)
+    if target is None or target.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+    if target.is_suspended:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="停止中のアカウントは昇格できません。",
+        )
+    if target.role != "user":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="対象は既に admin 権限を持っています。",
+        )
+    target.role = "admin"
+    await session.commit()
+    await session.refresh(target)
+
+    logger.warning(
+        "admin role granted: email=%s via=%s user_id=%s granted_by=%s",
+        target.email,
+        "admin_promote",
+        target.id,
+        admin.id,
+    )
+    alerts.fire_and_forget(
+        alerts.send_alert(
+            "admin 権限が付与されました",
+            f"email={target.email}\nvia=admin_promote\nuser_id={target.id}\n"
+            f"granted_by={admin.id}",
+            severity="critical",
+            key=f"admin-grant:{target.email}",
+        )
+    )
+    return AdminUserRoleResponse(id=target.id, role=target.role)
+
+
+@router.post("/admin/users/{user_id}/demote", response_model=AdminUserRoleResponse)
+async def demote_admin_to_user(
+    user_id: uuid.UUID,
+    admin: User = Depends(get_current_admin),
+    session: AsyncSession = Depends(get_session),
+) -> AdminUserRoleResponse:
+    """admin を一般ユーザーへ降格させる（R3再レビュー Critical対応）。
+
+    自己降格・最後の1人の admin の降格はいずれも 409 とする（誤操作で
+    運営が誰も admin 操作できなくなる自己ロックアウトを防ぐため。
+    ``suspend_operator``/``suspend_user`` の「admin は対象外」制約と同系統の
+    安全策）。
+    """
+    if user_id == admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="自分自身の権限は変更できません。",
+        )
+    target = await session.get(User, user_id)
+    if target is None or target.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+    if target.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="対象は admin 権限を持っていません。",
+        )
+    if not await _has_other_active_admin(session, exclude_user_id=target.id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="最後の1人の admin は降格できません。",
+        )
+    target.role = "user"
+    await session.commit()
+    await session.refresh(target)
+
+    logger.warning(
+        "admin role revoked: email=%s user_id=%s revoked_by=%s",
+        target.email,
+        target.id,
+        admin.id,
+    )
+    alerts.fire_and_forget(
+        alerts.send_alert(
+            "admin 権限が剥奪されました",
+            f"email={target.email}\nuser_id={target.id}\nrevoked_by={admin.id}",
+            severity="critical",
+            key=f"admin-revoke:{target.email}",
+        )
+    )
+    return AdminUserRoleResponse(id=target.id, role=target.role)
+
+
 # ──────────────────────────── 業者事前申込（審査） ────────────────────────────
 
 
 @router.get("/admin/operator-applications", response_model=list[OperatorApplicationOut])
 async def list_operator_applications(
+    limit: int = Query(default=_DEFAULT_LIST_LIMIT, ge=1, le=_MAX_LIST_LIMIT),
+    offset: int = Query(default=0, ge=0),
     admin: User = Depends(get_current_admin),
     session: AsyncSession = Depends(get_session),
 ) -> list[OperatorApplicationOut]:
     applications = (
         await session.scalars(
-            select(OperatorApplication).order_by(OperatorApplication.created_at.desc())
+            select(OperatorApplication)
+            .order_by(OperatorApplication.created_at.desc())
+            .limit(limit)
+            .offset(offset)
         )
     ).all()
     return [_to_application_out(a) for a in applications]
@@ -496,6 +1015,8 @@ async def list_identity_documents(
     status_filter: Literal["pending", "approved", "rejected", "all"] = Query(
         default="pending", alias="status"
     ),
+    limit: int = Query(default=_DEFAULT_LIST_LIMIT, ge=1, le=_MAX_LIST_LIMIT),
+    offset: int = Query(default=0, ge=0),
     admin: User = Depends(get_current_admin),
     session: AsyncSession = Depends(get_session),
 ) -> list[UserIdentityDocumentAdminOut]:
@@ -523,6 +1044,7 @@ async def list_identity_documents(
     )
     if status_filter != "all":
         stmt = stmt.where(UserIdentityDocument.status == status_filter)
+    stmt = stmt.limit(limit).offset(offset)
 
     rows = (await session.execute(stmt)).all()
     # PII本体（氏名・メール等）はログに書かず、監査に必要な操作主体・件数・

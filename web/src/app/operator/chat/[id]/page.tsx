@@ -511,12 +511,14 @@ export default function OperatorChatPage() {
               <span className="lbl">合意額</span>
               <span className="val blue">{yen(detail?.final_amount ?? detail?.initial_amount ?? 0)}</span>
             </div>
+            {/* r3 再レビュー QA-H3 是正: 「手数料 8,000円（予定額・完了時確定）」と
+                「完了後は0円」が同一カード内で矛盾していた。fee_amount の加算実装が
+                無く実額に意味がない（URISK-2）ため、完了前後にかかわらず買取額の8%の
+                予定額のみを一貫して表示し、直下の注記と正面から矛盾しないようにする。 */}
             <div className="dp-row">
-              <span className="lbl">手数料</span>
+              <span className="lbl">手数料予定額（買取額の8%）</span>
               <span className="val">
-                {detail?.status === "completed"
-                  ? yen(detail.fee_amount)
-                  : `${yen(Math.round((detail?.final_amount ?? detail?.initial_amount ?? 0) * 0.08))}（予定・完了時確定）`}
+                {yen(Math.round((detail?.final_amount ?? detail?.initial_amount ?? 0) * 0.08))}
               </span>
             </div>
             <div className="dp-row">
@@ -524,6 +526,9 @@ export default function OperatorChatPage() {
               <span className="val green">{statusLabel}</span>
             </div>
           </div>
+          <p style={{ fontSize: 11.5, color: "var(--body-soft)", marginTop: -8, marginBottom: 12, lineHeight: 1.6 }}>
+            ※ サービス開始当初（β期間）は手数料を請求しません。請求開始の際は事前にメールでお知らせします。
+          </p>
           <button type="button" className="btn-propose" onClick={toggleScheduleCard}>
             <CalendarIc />
             引き取り日程を提案

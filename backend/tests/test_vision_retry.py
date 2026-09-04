@@ -100,6 +100,29 @@ async def test_retries_after_one_429_then_succeeds(monkeypatch: pytest.MonkeyPat
     assert generate_content.await_count == 2
 
 
+@pytest.mark.parametrize(
+    "base_image",
+    [
+        "https://example.com/item.jpg",
+        "https://169.254.169.254/latest/meta-data/",
+        "http://example.com/item.jpg",
+    ],
+)
+async def test_analyze_image_rejects_url_input_ssrf_n7(
+    monkeypatch: pytest.MonkeyPatch, base_image: str
+):
+    """security review N-7対応: https(s):// URL は Gemini への file_data として
+    素通しされず、ValueError で即座に拒否される（SSRFシンクの排除）。
+    Gemini クライアントは呼ばれない（バリデーションが通信より先に走ること）。
+    """
+    generate_content = AsyncMock()
+    _patch_genai_client(monkeypatch, generate_content)
+
+    with pytest.raises(ValueError):
+        await vision_module.analyze_image(base_image)
+    generate_content.assert_not_called()
+
+
 async def test_retries_after_one_503_then_succeeds(monkeypatch: pytest.MonkeyPatch):
     """5xx（サーバ側一時障害）も同様にリトライ対象であることを確認する。"""
     generate_content = AsyncMock(side_effect=[_api_error(503), _make_response()])
@@ -170,12 +193,30 @@ async def test_retry_exhaustion_maps_to_503_via_analyze_endpoint(
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
+        # /analyze は認証必須（R3-operator ADD-1対応）のため、テスト用ユーザーで認証する。
+        signup_res = await client.post(
+            "/api/v1/auth/signup",
+            json={
+                "email": "vision-retry-analyze@example.com",
+                "password": "password123",
+                "name": "テスト太郎",
+            },
+        )
+        assert signup_res.status_code == 201, signup_res.text
+        token = signup_res.json()["access_token"]
+
         response = await client.post(
-            "/api/v1/analyze", json={"base_image": _DUMMY_BASE_IMAGE}
+            "/api/v1/analyze",
+            json={"base_image": _DUMMY_BASE_IMAGE},
+            headers={"Authorization": f"Bearer {token}"},
         )
 
     assert response.status_code == 503
-    assert "AI サービスとの通信に失敗しました" in response.json()["detail"]
+    # security review M-4対応: Gemini の生例外メッセージではなく固定文言を返す
+    # （内部エンドポイント情報等の漏洩防止。詳細はサーバーログにのみ残す）。
+    assert response.json()["detail"] == (
+        "AI サービスが一時的に利用できません。時間をおいて再度お試しください。"
+    )
 
 
 async def test_gemini_max_retries_zero_boundary_immediate_raise(

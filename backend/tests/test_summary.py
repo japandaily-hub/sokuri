@@ -164,3 +164,35 @@ async def test_suspicious_attribute_is_not_embedded_in_summary(monkeypatch):
     text = await _generate(monkeypatch, [result])
     assert "evil.example" not in text
     assert "AI 検出品目: 家電A。" in text
+
+
+async def test_photo_url_for_ai_skips_https_raw_url_without_calling_vision(
+    monkeypatch, caplog
+):
+    """R3再レビュー Medium対応: ローカル保存ファイルが解決できず raw_url が
+    https:// の場合、vision.analyze_image は N-7対応で https を全面拒否する
+    設計になっているため、そのまま渡さず None を返して AI 解析をスキップする
+    （案件作成自体は失敗させない）。
+    """
+    import logging
+
+    monkeypatch.setattr(summary_module.storage, "file_path", lambda storage_key: None)
+
+    with caplog.at_level(logging.WARNING):
+        ref = await summary_module.photo_url_for_ai(
+            "some-storage-key", "https://example.com/photo.jpg"
+        )
+    assert ref is None
+    assert any(
+        "photo_url_for_ai" in rec.message and "https" in rec.message
+        for rec in caplog.records
+    )
+
+
+async def test_photo_url_for_ai_returns_none_when_no_local_file_and_no_raw_url(
+    monkeypatch,
+):
+    """raw_url も無い（None）場合も同様に None を返す（従来通りの挙動を維持）。"""
+    monkeypatch.setattr(summary_module.storage, "file_path", lambda storage_key: None)
+    ref = await summary_module.photo_url_for_ai("some-storage-key", None)
+    assert ref is None

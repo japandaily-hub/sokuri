@@ -357,7 +357,7 @@ export default function ChatPage() {
               {/* LINE通知バナー */}
               <div className="line-banner">
                 <span className="line-dot" aria-hidden="true" />
-                新着メッセージはメールでお知らせします。LINE連携済みの場合はLINEにも届きます。返信はこのページで行えます。
+                新着メッセージの通知は、LINE連携済みの方にLINEでお知らせします（メールでの新着通知はありません）。返信はこのページで行えます。
               </div>
 
               {messagesError ? (

@@ -3,7 +3,8 @@
 設計判断:
 - ``google-genai`` SDK の ``client.aio.models.generate_content`` で全体を async 統一。
 - ``response_schema`` に Pydantic モデルを直接渡し、型安全な構造化抽出を実現。
-- 入力画像は base64 data URI・HTTPS URL の両方を受け付ける（AnalyzeRequest 契約通り）。
+- 入力画像は base64 data URI のみを受け付ける（security review N-7対応。https:// URL の
+  素通しはSSRFシンクになるため廃止した。詳細は analyze_image() のコメント参照）。
 - ``image_object_key`` はオブジェクトストレージキーのモック（Phase 4 以降で実ストレージに置換）。
 - ``base_market_price_jpy`` を含む完全な ``VisionResult`` を返し、呼び出し側が Item に保存する。
 """
@@ -250,8 +251,8 @@ async def analyze_image(base_image: str) -> VisionResult:
     """画像を Gemini Vision で解析し :class:`VisionResult` を返す。
 
     Args:
-        base_image: base64 エンコード文字列（``data:image/...;base64,...`` 形式）
-                    または HTTPS URL。
+        base_image: base64 エンコード文字列（``data:image/...;base64,...`` 形式）。
+                    HTTPS URL はSSRF対策のため受け付けない（N-7対応）。
 
     Returns:
         AI が抽出した製品情報の内部 DTO。
@@ -270,14 +271,23 @@ async def analyze_image(base_image: str) -> VisionResult:
         mime_type = header.split(":")[1].split(";")[0]  # e.g. "image/jpeg"
         image_bytes = base64.b64decode(b64data)
         image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
-    elif base_image.startswith("https://"):
-        # 公開 HTTPS URL は file_data 経由で渡す
-        image_part = types.Part(
-            file_data=types.FileData(file_uri=base_image, mime_type="image/jpeg")
-        )
     else:
+        # security review N-7対応（SSRFシンク）: 従来は任意の https:// URL を
+        # Gemini の file_data（file_uri）としてそのまま素通しできた。呼び出し元を
+        # 全数grepで洗い出した結果、現状のいずれの呼び出し元も https を渡し得ない:
+        #   - analyze.py（公開 /api/v1/analyze）: schemas.AnalyzeRequest の
+        #     field_validator が http(s):// を 422 で拒否済み（base64のみ）。
+        #   - summary.py（案件フロー）: photo_url_for_ai() は保存済みファイルを
+        #     必ず base64 データURL化して渡す。https フォールバックは
+        #     raw_url.startswith("https://") が真の場合のみ発火するが、
+        #     Photo.url は常に storage.public_url() の相対パス
+        #     （"/api/v1/files/{key}"）であり https では始まらないため到達しない。
+        # 案件フローが data:/base64 以外を渡さない前提が崩れる（R2/S3 移行等で
+        # 外部ストレージの https URL を実際に扱うようになる）場合は、許可ホストの
+        # allowlist 判定を明示的に追加してから https 対応を再度有効化すること
+        # （安易な全面素通しへ戻さない）。
         raise ValueError(
-            "base_image は 'data:image/...' の base64 文字列または 'https://' の URL である必要があります。"
+            "base_image は 'data:image/...' の base64 文字列である必要があります。"
         )
 
     # プロセス全体の同時実行数制限（Semaphore）+ 429/5xx リトライを経由して

@@ -436,6 +436,9 @@ async def cancel_case(
     )
 
     case_id_str = str(case.id)
+    case_prefecture = case.prefecture
+    case_city = case.city
+    case_purpose = case.purpose
 
     try:
         await session.commit()
@@ -457,5 +460,8 @@ async def cancel_case(
             loser_line_user_id,
             loser_email,
             case_id_str,
+            case_prefecture,
+            case_city,
+            case_purpose,
         )
     return _to_case_out(case)

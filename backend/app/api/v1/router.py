@@ -16,6 +16,7 @@ from app.api.v1.endpoints.bids import router as bids_router
 from app.api.v1.endpoints.case_items import router as case_items_router
 from app.api.v1.endpoints.case_photos import router as case_photos_router
 from app.api.v1.endpoints.cases import router as cases_router
+from app.api.v1.endpoints.contact import router as contact_router
 from app.api.v1.endpoints.estimate import router as estimate_router
 from app.api.v1.endpoints.operator_applications import router as operator_applications_router
 from app.api.v1.endpoints.operator_license import router as operator_license_router
@@ -33,6 +34,7 @@ api_router.include_router(estimate_router, tags=["Estimate"])
 # api_router.include_router(albums_router, tags=["Albums"])
 # ── カタヅケ（クローズドβ） ──────────────────────────────────────
 api_router.include_router(auth_router, tags=["Auth"])
+api_router.include_router(contact_router, tags=["Contact"])
 api_router.include_router(operator_applications_router, tags=["OperatorApplications"])
 api_router.include_router(case_photos_router, tags=["Photos"])
 api_router.include_router(cases_router, tags=["Cases"])

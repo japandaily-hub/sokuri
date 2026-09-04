@@ -41,6 +41,7 @@ import {
   requestLineReauthToken,
   unlinkLine,
   toDisplayMessage,
+  clearRedirectLoopStorage,
   KdzApiError,
   type CaseOut,
   type TransactionListItem,
@@ -144,7 +145,10 @@ function NotificationsContent() {
     const linked = searchParams.get("linked");
     const err = searchParams.get("error");
     if (linked === "1") {
-      setLineNotice({ tone: "success", text: "LINE連携が完了しました。今後は入札・メッセージの通知がLINEにも届きます。" });
+      setLineNotice({ tone: "success", text: "LINE連携が完了しました。今後は入札・メッセージの通知がLINEに届きます（メールの代わりにLINEでお知らせします）。" });
+      // r3 再レビュー3回目 是正: LINE連携成功（=認証が正常往復した）経路でもループ検知の
+      // 発火履歴をリセットする。
+      clearRedirectLoopStorage();
     } else if (err === "already_linked") {
       setLineNotice({ tone: "error", text: "このLINEアカウントは既に別のアカウントと連携されています。" });
     } else if (err === "reauth_required") {
@@ -314,7 +318,7 @@ function NotificationsContent() {
                     <>
                       <strong>LINE連携済み</strong>
                       <br />
-                      入札・メッセージの通知がLINEにも届きます。
+                      入札・メッセージの通知はLINEに届きます（メールの代わりにLINEでお知らせします）。
                     </>
                   ) : (
                     <>

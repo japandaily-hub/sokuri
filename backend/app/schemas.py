@@ -15,7 +15,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from pydantic import BaseModel, Field, HttpUrl, model_validator
+from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
 
 from app.db.models.enums import CategoryTier, ChannelType, ItemCondition, RoutingMethod
 
@@ -74,9 +74,27 @@ class AnalyzeRequest(BaseModel):
     """写真投稿による製品スペック特定リクエスト。"""
 
     base_image: str = Field(
-        description="撮影画像。base64 エンコード文字列 または HTTPS URL を受け付ける。",
-        examples=["data:image/jpeg;base64,/9j/4AAQ...", "https://example.com/item.jpg"],
+        description="撮影画像。base64 エンコード文字列（data: URL）のみ受け付ける（外部URLは不可）。",
+        examples=["data:image/jpeg;base64,/9j/4AAQ..."],
     )
+
+    @field_validator("base_image")
+    @classmethod
+    def _reject_external_url(cls, value: str) -> str:
+        """外部 URL（http(s)://）を拒否し、base64 / data: URL のみ受理する（security review M-5）。
+
+        ``app.services.vision`` の内部実装は HTTPS URL も file_uri として
+        Gemini へ素通しできるが、任意の外部URLを公開APIの入力としてそのまま
+        受け付けると、内部/私設アドレスの探索や第三者リソースへの帯域消費の
+        踏み台にされ得る（SSRF系の悪用面）。vision.py 自体（案件フローが
+        別途利用）は変更せず、この公開エンドポイントの契約としてのみ制限する。
+        """
+        stripped = value.strip().lower()
+        if stripped.startswith("http://") or stripped.startswith("https://"):
+            raise ValueError(
+                "画像は base64 エンコード文字列（data: URL）で送信してください。外部URLは指定できません。"
+            )
+        return value
 
 
 class AnalyzeResponse(BaseModel):

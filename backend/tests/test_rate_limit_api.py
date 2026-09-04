@@ -1059,6 +1059,79 @@ class TestCaseCreateRateLimit:
         assert r.json() == {"detail": _CASE_CREATE_MSG}
 
 
+_CONTACT_MSG = "お問い合わせが集中しています。時間をおいて再度お送りください。"
+
+
+class TestContactRateLimit:
+    """``POST /contact`` のレート制限（security review H-1 / N-2対応）。
+
+    config.py に新規スコープを追加しない方針のため、数値ルールは既存の
+    case_create（IP軸・アカウント軸とも10req/3600s、両軸とも全リクエスト
+    カウント）を流用するが、scope 名は専用の "contact" に分離しているため
+    バケット実体は POST /cases とは独立している（N-2対応）。
+    """
+
+    @pytest.fixture(autouse=True)
+    def _reset_contact_process_cap(self):
+        """contact.py のプロセス内キャップ（N-4）はモジュールグローバルの
+        deque でテスト間共有されるため、各テスト前にリセットする（R-M4対応）。
+        """
+        from app.api.v1.endpoints import contact as contact_endpoint
+
+        contact_endpoint._recent_notification_timestamps.clear()
+        yield
+        contact_endpoint._recent_notification_timestamps.clear()
+
+    @staticmethod
+    def _payload(email: str) -> dict:
+        return {
+            "name": "テスト太郎",
+            "email": email,
+            "category": "trouble",
+            "message": "取引でトラブルが発生しました。ご確認をお願いします。",
+        }
+
+    async def test_ip_axis_blocks_after_ten_across_distinct_emails(self, client: AsyncClient):
+        """同一IPから異なるメールアドレスで送っても、IP軸の上限(10)超過で429になる。"""
+        xff = {"X-Forwarded-For": "198.51.100.88"}
+        with patch(
+            "app.api.v1.endpoints.contact.notify.send_contact_received",
+            new_callable=AsyncMock,
+        ):
+            for i in range(10):
+                r = await client.post(
+                    "/api/v1/contact",
+                    json=self._payload(f"contact-ip-{i}@example.com"),
+                    headers=xff,
+                )
+                assert r.status_code == 202, r.text
+            r = await client.post(
+                "/api/v1/contact",
+                json=self._payload("contact-ip-final@example.com"),
+                headers=xff,
+            )
+        assert r.status_code == 429
+        assert r.json() == {"detail": _CONTACT_MSG}
+
+    async def test_account_axis_blocks_after_ten_for_same_email(self, client: AsyncClient):
+        """ループバックIP（IP軸は自動スキップされる）の下で、同一メールアドレス
+        への hit_account（アカウント軸）のみを検証する。"""
+        with patch(
+            "app.api.v1.endpoints.contact.notify.send_contact_received",
+            new_callable=AsyncMock,
+        ):
+            for _ in range(10):
+                r = await client.post(
+                    "/api/v1/contact", json=self._payload("contact-acct@example.com")
+                )
+                assert r.status_code == 202, r.text
+            r = await client.post(
+                "/api/v1/contact", json=self._payload("contact-acct@example.com")
+            )
+        assert r.status_code == 429
+        assert r.json() == {"detail": _CONTACT_MSG}
+
+
 # ──────────────────────────── キルスイッチ / 既存テスト非破壊 ────────────────────────────
 
 

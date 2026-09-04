@@ -350,7 +350,7 @@ export default function MyPage() {
         {/* LINE通知誘導（通知トグル群の代替・1行） */}
         <div className="user-card" style={{ marginBottom: 20, padding: "14px 20px" }}>
           <div className="user-card-info" style={{ fontSize: 13, color: "var(--body-soft)" }}>
-            入札・メッセージの通知はメールでお知らせします。LINE連携済みの場合はLINEにも届きます。
+            入札の通知は、LINE連携済みの方はLINEで、未連携の方はメールでお知らせします。チャットの新着通知はLINE連携済みの方のみに届きます。
             <Link href="/notifications" style={{ marginLeft: 6, fontWeight: 600 }}>
               通知設定を見る（本人確認のためパスワード入力があります）→
             </Link>

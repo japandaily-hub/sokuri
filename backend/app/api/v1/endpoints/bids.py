@@ -282,6 +282,9 @@ async def select_bid(
     winner_contact_email = target.operator.contact_email
     winner_amount = target.amount
     case_id_str = str(case.id)
+    case_prefecture = case.prefecture
+    case_city = case.city
+    case_purpose = case.purpose
     try:
         await session.commit()
     except IntegrityError as exc:
@@ -309,6 +312,9 @@ async def select_bid(
             loser_line_user_id,
             loser_email,
             case_id_str,
+            case_prefecture,
+            case_city,
+            case_purpose,
         )
     return TransactionOut.model_validate(txn)
 

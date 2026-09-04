@@ -7,8 +7,10 @@ summary がフォールバック文を返し、Brevo はキー未設定でスキ
 
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import AsyncIterator
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi import FastAPI
@@ -2052,3 +2054,460 @@ async def test_vendor_list_excludes_suspended(
     ids = {v["operator_id"] for v in r.json()}
     assert active_id in ids
     assert suspended_id not in ids
+
+
+# ──────────────────────────── 通知配線: 減額申請（往路・復路） ────────────────────────────
+
+
+async def _create_txn_for_notify_tests(
+    client: AsyncClient, db_session: AsyncSession, admin_token: str
+) -> tuple[str, str, str, str]:
+    """減額/キャンセル通知テスト用に、成約直後の状態まで進める。
+
+    戻り値: (user_token, op_token, case_id, txn_id)
+    """
+    user_token = await _signup_user(client, "notify_user@example.com")
+    op_token, op_id = await _verified_operator(
+        client, db_session, admin_token, "notify_op@example.com", "通知テスト株式会社"
+    )
+    case = await _create_case(client, user_token)
+    case_id = case["id"]
+    r = await client.post(
+        f"/api/v1/cases/{case_id}/bids",
+        json={"amount": 50000},
+        headers=_auth(op_token),
+    )
+    bid = r.json()
+    r = await client.post(
+        f"/api/v1/cases/{case_id}/bids/{bid['id']}/select", headers=_auth(user_token)
+    )
+    assert r.status_code == 201, r.text
+    txn_id = r.json()["id"]
+    return user_token, op_token, case_id, txn_id
+
+
+async def test_create_reduction_notifies_case_owner(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """ADD-2対応: 減額申請の送信が依頼者に通知される（往路）。"""
+    admin_token = await _make_admin(client, db_session)
+    user_token, op_token, case_id, txn_id = await _create_txn_for_notify_tests(
+        client, db_session, admin_token
+    )
+
+    with patch(
+        "app.api.v1.endpoints.reductions.notify_dispatch.dispatch_reduction_requested",
+        new_callable=AsyncMock,
+    ) as dispatch_mock:
+        r = await client.post(
+            f"/api/v1/transactions/{txn_id}/reduction",
+            json={"requested_amount": 40000, "reason": "現地確認の結果、破損が見つかったため"},
+            headers=_auth(op_token),
+        )
+    assert r.status_code == 201, r.text
+    dispatch_mock.assert_called_once()
+    call_args = dispatch_mock.call_args[0]
+    assert call_args[2] == case_id  # case_id
+    assert call_args[3] == 40000  # requested_amount
+
+
+async def test_decide_reduction_notifies_operator(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """R3-vendor H2対応: 減額申請の承認/却下結果が業者に通知される（復路）。"""
+    admin_token = await _make_admin(client, db_session)
+    user_token, op_token, case_id, txn_id = await _create_txn_for_notify_tests(
+        client, db_session, admin_token
+    )
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/reduction",
+        json={"requested_amount": 40000, "reason": "現地確認の結果、破損が見つかったため"},
+        headers=_auth(op_token),
+    )
+    reduction_id = r.json()["id"]
+
+    with patch(
+        "app.api.v1.endpoints.reductions.notify_dispatch.dispatch_reduction_decided",
+        new_callable=AsyncMock,
+    ) as dispatch_mock:
+        r = await client.patch(
+            f"/api/v1/transactions/{txn_id}/reduction/{reduction_id}",
+            json={"action": "approve"},
+            headers=_auth(user_token),
+        )
+    assert r.status_code == 200, r.text
+    dispatch_mock.assert_called_once()
+    call_args = dispatch_mock.call_args[0]
+    assert call_args[2] == txn_id
+    assert call_args[3] is True  # approved
+    assert call_args[4] == 40000
+
+
+# ──────────────────────────── 通知配線: 成約キャンセル ────────────────────────────
+
+
+async def test_cancel_transaction_notifies_operator_when_user_cancels(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """ADD-1対応: 依頼者がキャンセルすると業者に通知される（空振り訪問の防止）。"""
+    admin_token = await _make_admin(client, db_session)
+    user_token, op_token, case_id, txn_id = await _create_txn_for_notify_tests(
+        client, db_session, admin_token
+    )
+
+    with patch(
+        "app.api.v1.endpoints.transactions.notify_dispatch.dispatch_transaction_cancelled",
+        new_callable=AsyncMock,
+    ) as dispatch_mock:
+        r = await client.post(
+            f"/api/v1/transactions/{txn_id}/cancel",
+            json={"reason": "気が変わった"},
+            headers=_auth(user_token),
+        )
+    assert r.status_code == 200, r.text
+    dispatch_mock.assert_called_once()
+    call_args = dispatch_mock.call_args[0]
+    assert call_args[2] == txn_id
+    assert call_args[3] == "operator"  # 依頼者がキャンセルしたので業者へ通知
+
+
+async def test_cancel_transaction_notifies_user_when_operator_cancels(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """ADD-1対応: 業者がキャンセルすると依頼者に通知される。"""
+    admin_token = await _make_admin(client, db_session)
+    user_token, op_token, case_id, txn_id = await _create_txn_for_notify_tests(
+        client, db_session, admin_token
+    )
+
+    with patch(
+        "app.api.v1.endpoints.transactions.notify_dispatch.dispatch_transaction_cancelled",
+        new_callable=AsyncMock,
+    ) as dispatch_mock:
+        r = await client.post(
+            f"/api/v1/transactions/{txn_id}/cancel",
+            json={"reason": "対応できなくなった"},
+            headers=_auth(op_token),
+        )
+    assert r.status_code == 200, r.text
+    dispatch_mock.assert_called_once()
+    call_args = dispatch_mock.call_args[0]
+    assert call_args[3] == "user"  # 業者がキャンセルしたので依頼者へ通知
+
+
+# ──────────────────────────── admin: 案件・成約の横断閲覧（R3-operator H2） ────────────────────────────
+
+
+async def test_admin_list_cases_and_transactions(
+    client: AsyncClient, db_session: AsyncSession
+):
+    admin_token = await _make_admin(client, db_session)
+    user_token, op_token, case_id, txn_id = await _create_txn_for_notify_tests(
+        client, db_session, admin_token
+    )
+
+    r = await client.get("/api/v1/admin/cases", headers=_auth(admin_token))
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["total"] >= 1
+    row = next(c for c in body["items"] if c["id"] == case_id)
+    assert row["status"] == "closed"
+    assert row["user_email"] == "notify_user@example.com"
+    assert row["company_name"] == "通知テスト株式会社"
+    assert row["amount"] == 50000
+
+    r = await client.get("/api/v1/admin/transactions", headers=_auth(admin_token))
+    assert r.status_code == 200, r.text
+    body = r.json()
+    row = next(t for t in body["items"] if t["id"] == txn_id)
+    assert row["case_id"] == case_id
+    assert row["user_email"] == "notify_user@example.com"
+    assert row["company_name"] == "通知テスト株式会社"
+
+    # q: 依頼者メールの部分一致で検索できる
+    r = await client.get(
+        "/api/v1/admin/cases", params={"q": "notify_user"}, headers=_auth(admin_token)
+    )
+    assert r.status_code == 200
+    assert any(c["id"] == case_id for c in r.json()["items"])
+
+    # q: 業者名の部分一致で成約検索できる
+    r = await client.get(
+        "/api/v1/admin/transactions",
+        params={"q": "通知テスト"},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 200
+    assert any(t["id"] == txn_id for t in r.json()["items"])
+
+    # 非adminは403/401
+    r = await client.get("/api/v1/admin/cases", headers=_auth(op_token))
+    assert r.status_code in (401, 403)
+    r = await client.get("/api/v1/admin/transactions")
+    assert r.status_code in (401, 403)
+
+
+async def test_admin_list_cases_respects_limit_and_offset(
+    client: AsyncClient, db_session: AsyncSession
+):
+    admin_token = await _make_admin(client, db_session)
+    user_token = await _signup_user(client, "paging_user@example.com")
+    for _ in range(3):
+        await _create_case(client, user_token)
+
+    r = await client.get(
+        "/api/v1/admin/cases", params={"limit": 2, "offset": 0}, headers=_auth(admin_token)
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert len(body["items"]) == 2
+    assert body["total"] >= 3
+
+    r = await client.get(
+        "/api/v1/admin/cases", params={"limit": 200, "offset": 0}, headers=_auth(admin_token)
+    )
+    assert r.status_code == 200
+
+    r = await client.get(
+        "/api/v1/admin/cases", params={"limit": 201}, headers=_auth(admin_token)
+    )
+    assert r.status_code == 422  # 上限200超過
+
+
+# ──────────────────────────── admin: 一覧系APIの limit/offset 後方互換（M2） ────────────────────────────
+
+
+async def test_admin_invites_and_operators_list_accept_limit_offset_and_default_unchanged(
+    client: AsyncClient, db_session: AsyncSession
+):
+    admin_token = await _make_admin(client, db_session)
+    await _invite_code(client, admin_token)
+    await _invite_code(client, admin_token)
+
+    # クエリ省略時は従来どおり動く（後方互換）
+    r = await client.get("/api/v1/admin/invites", headers=_auth(admin_token))
+    assert r.status_code == 200
+    assert len(r.json()) >= 2
+
+    r = await client.get(
+        "/api/v1/admin/invites", params={"limit": 1, "offset": 0}, headers=_auth(admin_token)
+    )
+    assert r.status_code == 200
+    assert len(r.json()) == 1
+
+    r = await client.get(
+        "/api/v1/admin/invites", params={"limit": 501}, headers=_auth(admin_token)
+    )
+    assert r.status_code == 422  # 上限500超過
+
+    r = await client.get("/api/v1/admin/operators", headers=_auth(admin_token))
+    assert r.status_code == 200
+
+
+# ──────────────────────────── auth: admin昇格経路（ADD-3） ────────────────────────────
+
+
+async def test_login_promotes_existing_user_to_admin_when_email_listed(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    monkeypatch,
+    caplog: pytest.LogCaptureFixture,
+):
+    """ADD-3対応: ADMIN_EMAILS に後から追記されたメールでも、次回ログインで admin に昇格する。
+
+    security review C-1対応: 昇格が発生した瞬間を WARNING ログに残すことも検証する
+    （アラート基盤が admin 付与イベントを拾えることの確認）。
+    """
+    from app.config import get_settings
+
+    email = "promote-me@example.com"
+    r = await client.post(
+        "/api/v1/auth/signup",
+        json={"email": email, "password": "password123", "name": "昇格太郎"},
+    )
+    assert r.status_code == 201
+    assert r.json()["user"]["role"] == "user"
+
+    monkeypatch.setattr(get_settings(), "admin_emails_raw", email)
+
+    with caplog.at_level(logging.WARNING):
+        r = await client.post(
+            "/api/v1/auth/login", json={"email": email, "password": "password123"}
+        )
+    assert r.status_code == 200, r.text
+    assert r.json()["user"]["role"] == "admin"
+
+    user = await db_session.scalar(select(User).where(User.email == email))
+    await db_session.refresh(user)
+    assert user.role == "admin"
+    assert any(
+        "admin role granted" in rec.message
+        and "via=login_promotion" in rec.message
+        and email in rec.message
+        for rec in caplog.records
+    )
+
+
+async def test_signup_grants_admin_and_logs_warning(
+    client: AsyncClient, monkeypatch, caplog: pytest.LogCaptureFixture
+):
+    """security review C-1対応: サインアップ時の admin 付与も WARNING ログを残す。"""
+    from app.config import get_settings
+
+    email = "landgrab-admin@example.com"
+    monkeypatch.setattr(get_settings(), "admin_emails_raw", email)
+
+    with caplog.at_level(logging.WARNING):
+        r = await client.post(
+            "/api/v1/auth/signup",
+            json={"email": email, "password": "password123", "name": "初代管理者"},
+        )
+    assert r.status_code == 201, r.text
+    assert r.json()["user"]["role"] == "admin"
+    assert any(
+        "admin role granted" in rec.message and "via=signup" in rec.message and email in rec.message
+        for rec in caplog.records
+    )
+
+
+async def test_signup_does_not_grant_admin_when_admin_already_exists(
+    client: AsyncClient, db_session: AsyncSession, monkeypatch
+):
+    """security review N-1（Critical）対応: DB に role=admin のユーザーが既に
+    1人でも存在する場合、ADMIN_EMAILS 掲載アドレスでの signup であっても
+    role="user" になる（初回ブートストラップ限定。以降はログイン昇格のみ）。
+    """
+    from app.config import get_settings
+
+    existing_admin = User(
+        email="existing-admin@example.com",
+        password_hash=hash_password("password123"),
+        name="既存管理者",
+        role="admin",
+    )
+    db_session.add(existing_admin)
+    await db_session.commit()
+
+    landgrab_email = "landgrab-second@example.com"
+    monkeypatch.setattr(
+        get_settings(), "admin_emails_raw", f"existing-admin@example.com,{landgrab_email}"
+    )
+
+    r = await client.post(
+        "/api/v1/auth/signup",
+        json={"email": landgrab_email, "password": "password123", "name": "二人目"},
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["user"]["role"] == "user"
+
+    user = await db_session.scalar(select(User).where(User.email == landgrab_email))
+    assert user.role == "user"
+
+    # R3再レビュー Critical対応: 既存 admin が居る間はログイン時昇格も塞がれる
+    # （従来はログイン昇格だけは無条件で許していたため、ADMIN_EMAILS に残った
+    # アドレスで際限なく admin を量産できる経路になっていた）。
+    r = await client.post(
+        "/api/v1/auth/login",
+        json={"email": landgrab_email, "password": "password123"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["user"]["role"] == "user"
+
+    user = await db_session.scalar(select(User).where(User.email == landgrab_email))
+    await db_session.refresh(user)
+    assert user.role == "user"
+
+
+async def test_login_promotion_blocked_fires_warning_alert_when_admin_exists(
+    client: AsyncClient, db_session: AsyncSession, monkeypatch
+):
+    """R3再レビュー Critical対応: 既存 admin が居るため昇格をブロックした場合、
+    ブロックした事実自体を運営アラート（severity=warning）で通知する
+    （ADMIN_EMAILS の設定不備・退職者アドレス残存の早期検知のため）。
+    """
+    import asyncio
+
+    from app.config import get_settings
+
+    existing_admin = User(
+        email="existing-admin-2@example.com",
+        password_hash=hash_password("password123"),
+        name="既存管理者",
+        role="admin",
+    )
+    db_session.add(existing_admin)
+    await db_session.commit()
+
+    landgrab_email = "landgrab-blocked@example.com"
+    r = await client.post(
+        "/api/v1/auth/signup",
+        json={"email": landgrab_email, "password": "password123", "name": "二人目"},
+    )
+    assert r.status_code == 201, r.text
+
+    monkeypatch.setattr(
+        get_settings(), "admin_emails_raw", f"existing-admin-2@example.com,{landgrab_email}"
+    )
+
+    with patch(
+        "app.api.v1.endpoints.auth.alerts.send_alert", new_callable=AsyncMock
+    ) as alert_mock:
+        r = await client.post(
+            "/api/v1/auth/login",
+            json={"email": landgrab_email, "password": "password123"},
+        )
+        await asyncio.sleep(0.05)  # fire_and_forget のタスクを消化
+    assert r.status_code == 200, r.text
+    assert r.json()["user"]["role"] == "user"
+    alert_mock.assert_awaited_once()
+    assert alert_mock.await_args.kwargs["severity"] == "warning"
+
+
+async def test_signup_admin_grant_fires_critical_alert(
+    client: AsyncClient, monkeypatch
+):
+    """N-1対応: admin 付与は WARNING ログだけでなく alerts.send_alert
+    （severity=critical）でも通知される（検知漏れ防止）。"""
+    import asyncio
+
+    from app.api.v1.endpoints import auth as auth_endpoint
+    from app.config import get_settings
+
+    email = "alert-signup-admin@example.com"
+    monkeypatch.setattr(get_settings(), "admin_emails_raw", email)
+
+    with patch(
+        "app.api.v1.endpoints.auth.alerts.send_alert", new_callable=AsyncMock
+    ) as alert_mock:
+        r = await client.post(
+            "/api/v1/auth/signup",
+            json={"email": email, "password": "password123", "name": "初代管理者"},
+        )
+        await asyncio.sleep(0.05)  # fire_and_forget のタスクを消化
+    assert r.status_code == 201, r.text
+    alert_mock.assert_awaited_once()
+    assert alert_mock.await_args.kwargs["severity"] == "critical"
+
+
+async def test_promote_to_admin_if_listed_normalizes_email_case_and_whitespace(
+    db_session: AsyncSession, monkeypatch
+):
+    """security review L-1対応: user.email 側の大文字小文字・前後空白の揺れを
+    正規化してから ADMIN_EMAILS と照合すること（LINE経由で作成されたユーザーは
+    email 正規化が保証されないため）。DB に有効な admin が居ないことが前提
+    （R3再レビュー Critical対応で ``_promote_to_admin_if_listed`` は session 引数を
+    取り、admin 不在条件を判定するようになった）。"""
+    from app.api.v1.endpoints.auth import _promote_to_admin_if_listed
+    from app.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "admin_emails_raw", "promote-case@example.com")
+    user = User(
+        email="  Promote-Case@example.com  ",
+        password_hash=hash_password("password123"),
+        name="ケース太郎",
+        role="user",
+    )
+    db_session.add(user)
+    await db_session.commit()
+    assert await _promote_to_admin_if_listed(db_session, user) is True
+    assert user.role == "admin"

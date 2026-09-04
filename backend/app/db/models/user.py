@@ -6,7 +6,7 @@ import uuid
 from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import CheckConstraint, Date, DateTime, String, Text
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, TimestampMixin
@@ -87,3 +87,10 @@ class User(Base, TimestampMixin):
     password_changed_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+    # 運営による利用停止（Operator.is_suspended と同形。r3-verify-operator ADD-2対応）。
+    # 停止中は deps.py の assert_user_not_suspended により既存トークンでの全操作が
+    # 403 になり、ログインも拒否される（deleted_at の論理削除とは異なり可逆）。
+    is_suspended: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
+    suspended_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    suspended_reason: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)

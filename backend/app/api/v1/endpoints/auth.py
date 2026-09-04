@@ -22,6 +22,7 @@ from app.api.deps import (
     Actor,
     assert_operator_not_suspended,
     assert_user_not_revoked,
+    assert_user_not_suspended,
     get_current_actor,
 )
 from app.api.rate_limit_deps import RateLimitGuard
@@ -48,11 +49,95 @@ from app.schemas_katadzuke import (
     UserOut,
     UserSignupRequest,
 )
+from app.services import alerts
 from app.services.notify import is_placeholder_email
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _is_listed_admin_email(email: str) -> bool:
+    """``email`` が ADMIN_EMAILS に含まれるかを判定する（security review L-1対応）。
+
+    ``get_settings().admin_emails`` は既に ``.strip().lower()`` 済みのリストだが、
+    比較対象の ``email`` 側は正規化されているとは限らない（LINE 連携経由で
+    作成されたユーザーの ``User.email`` は正規化が保証されない）。比較直前に
+    必ず ``.strip().lower()`` してから照合することで、大文字小文字・前後空白の
+    揺れによる判定ミスを防ぐ。
+    """
+    return email.strip().lower() in get_settings().admin_emails
+
+
+async def _admin_role_available(session: AsyncSession) -> bool:
+    """DB に有効な（``deleted_at IS NULL`` の）``role="admin"`` ユーザーが
+    1人も存在しない場合に True を返す。
+
+    R3再レビュー Critical対応: ADMIN_EMAILS 経由の自動昇格（signup 時の初回
+    ブートストラップ／ログイン時の再評価昇格）が許される条件を、この関数
+    1つに一本化する（従来は signup 側にのみ同等のインライン判定があり、
+    ログイン時昇格 ``_promote_to_admin_if_listed`` は無条件で昇格していたため、
+    ADMIN_EMAILS に一般ユーザーのメールアドレスが誤って残っていると際限なく
+    admin を量産できる特権昇格経路になっていた）。論理削除済み（退会済み）の
+    admin は「不在」として扱い、再ブートストラップを許可する。
+    """
+    existing = await session.scalar(
+        select(User.id).where(User.role == "admin", User.deleted_at.is_(None)).limit(1)
+    )
+    return existing is None
+
+
+async def _promote_to_admin_if_listed(session: AsyncSession, user: User) -> bool:
+    """ADMIN_EMAILS に含まれ、かつ DB に有効な admin が1人も居ない場合のみ昇格させる。
+
+    R3-operator ADD-3対応: 従来 role="admin" の付与はサインアップ時の一度きり
+    だったため、後から ADMIN_EMAILS に追記しても既存アカウントは永久に一般
+    ユーザーのままだった。ログイン成功のたびに再評価することで、既存
+    アカウントも次回ログイン時に自動昇格させる（降格は行わない一方向）。
+
+    R3再レビュー Critical対応: 上記の再評価を「ADMIN_EMAILS 該当なら常に昇格」
+    のまま実装していたため、既に admin が存在する状態でも ADMIN_EMAILS に
+    残った/誤って追記されたメールアドレスでログインするだけで際限なく admin を
+    増やせてしまっていた。signup 側の初回ブートストラップ条件
+    （``_admin_role_available``）と判定を一本化し、「DB に有効な admin が
+    1人も存在しない場合のみ」昇格する。既存 admin が居る状態での2人目以降の
+    admin 付与は ``POST /admin/users/{id}/promote``（admin 認可必須）経由のみ
+    とする。呼び出し元は戻り値が True の場合のみ commit し、commit **成功後**に
+    昇格アラートを発火すること（commit 失敗時に「昇格した」という偽の通知を
+    送らないため）。
+    """
+    if user.role == "admin" or not _is_listed_admin_email(user.email):
+        return False
+    if not await _admin_role_available(session):
+        # security review C-1対応の延長: 昇格をブロックした事実も検知可能に
+        # しておく（ADMIN_EMAILS の設定不備・退職者アドレス残存の早期発見のため）。
+        logger.warning(
+            "admin promotion blocked (admin already exists): email=%s user_id=%s",
+            user.email,
+            user.id,
+        )
+        alerts.fire_and_forget(
+            alerts.send_alert(
+                "ADMIN_EMAILS 記載アドレスが admin 不在条件を満たさずログイン",
+                f"email={user.email}\nuser_id={user.id}\nvia=login_promotion",
+                severity="warning",
+                key=f"admin-promotion-blocked:{user.email}",
+            )
+        )
+        return False
+    user.role = "admin"
+    # security review C-1対応: admin 権限の付与はアカウント奪取の直接経路になり
+    # うるため、昇格が発生した瞬間を必ず WARNING ログに残す（アラート基盤が
+    # 拾える形にする）。本番の ADMIN_EMAILS 実値・該当ユーザー行の存在は運用側で
+    # 別途確認すること（本修正の対象外・r3-review-security.md R-3）。
+    logger.warning(
+        "admin role granted: email=%s via=%s user_id=%s",
+        user.email,
+        "login_promotion",
+        user.id,
+    )
+    return True
+
 
 _LOGIN_FAILED = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
@@ -105,7 +190,22 @@ async def user_signup(
             status_code=status.HTTP_409_CONFLICT,
             detail="このメールアドレスは既に登録されています。",
         )
-    role = "admin" if email in get_settings().admin_emails else "user"
+    # security review L-1対応: email は既に .lower() 済みだが、比較関数側と
+    # 判定条件を一本化するため _is_listed_admin_email 経由で比較する。
+    # N-1（Critical）対応: signup 時の admin 付与は「DB に有効な role=admin の
+    # ユーザーがまだ1人も存在しない（＝初回ブートストラップ）」場合のみに限定
+    # する（判定は ``_admin_role_available`` に一本化。ログイン時昇格
+    # ``_promote_to_admin_if_listed`` も同じ関数で同じ条件を判定する）。
+    # ADMIN_EMAILS は運用上変更・追記されうるため、2人目以降の admin 付与は
+    # 既存アカウントのログイン時昇格、または ``POST /admin/users/{id}/promote``
+    # （admin 認可必須）のみを経路とする。これにより ADMIN_EMAILS に後から
+    # 追記されたアドレスへ、初回登録より前に第三者が signup して admin を
+    # 先取りする経路を塞ぐ。
+    role = (
+        "admin"
+        if await _admin_role_available(session) and _is_listed_admin_email(email)
+        else "user"
+    )
     user = User(
         email=email,
         password_hash=hash_password(body.password),
@@ -115,6 +215,21 @@ async def user_signup(
     session.add(user)
     await session.commit()
     await session.refresh(user)
+    if role == "admin":
+        # security review C-1対応: サインアップ時の admin 付与はアカウント奪取の
+        # 直接経路（ADMIN_EMAILS 未登録アドレスの land-grab）になりうるため、
+        # 発生した瞬間を必ず WARNING ログに残す（アラート基盤が拾える形にする）。
+        logger.warning("admin role granted: email=%s via=%s user_id=%s", email, "signup", user.id)
+        # N-1対応: WARNING ログのみでは検知漏れになりうるため、運営アラート
+        # （severity=critical）でも通知する（login_promotion 側と同一パターン）。
+        alerts.fire_and_forget(
+            alerts.send_alert(
+                "admin 権限が付与されました",
+                f"email={email}\nvia=signup\nuser_id={user.id}",
+                severity="critical",
+                key=f"admin-grant:{email}",
+            )
+        )
     token = create_access_token(user.id, "user", user.role)
     return AuthTokenResponse(
         access_token=token, account_type="user", user=UserOut.model_validate(user)
@@ -149,6 +264,25 @@ async def user_login(
         ctx.record_failure(rl_account_key)
         raise _LOGIN_FAILED
     ctx.reset_account(rl_account_key)
+    # 停止判定はレート制限（総当たり対策）とは別関心のビジネスルールのため、
+    # リセット後に判定する（operator_login と同じ順序）。deps.py の
+    # assert_user_not_suspended と同一の detail（security review L-2対応の
+    # dict 形式）を使うため、判定ロジックを重複させずそちらへ委譲する。
+    assert_user_not_suspended(user)
+    if await _promote_to_admin_if_listed(session, user):
+        await session.commit()
+        await session.refresh(user)
+        # R3再レビュー Critical対応: 昇格アラートは commit 成功後にのみ発火する
+        # （commit 前に発火すると、commit が何らかの理由で失敗した場合に
+        # 「昇格した」という偽の通知が運営に届いてしまうため）。
+        alerts.fire_and_forget(
+            alerts.send_alert(
+                "admin 権限が付与されました",
+                f"email={user.email}\nvia=login_promotion\nuser_id={user.id}",
+                severity="critical",
+                key=f"admin-grant:{user.email}",
+            )
+        )
     token = create_access_token(user.id, "user", user.role)
     return AuthTokenResponse(
         access_token=token, account_type="user", user=UserOut.model_validate(user)
@@ -267,11 +401,10 @@ async def operator_login(
     # 停止判定はレート制限（総当たり対策）とは別関心のビジネスルールのため、
     # リセット後に判定する。
     ctx.reset_account(rl_account_key)
-    if operator.is_suspended:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="アカウントが停止されています。運営にお問い合わせください。",
-        )
+    # R3再レビュー Medium対応: 停止時の detail を独自の文字列で組み立てず、
+    # deps.py の assert_operator_not_suspended（dict detail・SUSPENDED_ACCOUNT_DETAIL
+    # 共用）に委譲する（user_login・LINE連携経路と契約を一本化する）。
+    assert_operator_not_suspended(operator)
     token = create_access_token(operator.id, "operator", "operator")
     return AuthTokenResponse(
         access_token=token,
@@ -493,6 +626,8 @@ async def line_exchange(
             # 退会（論理削除）済み・パスワード変更後の旧トークンは deps.py と同一ゲートで失効させる
             # （security review 指摘: line_exchange のBearer経路はこのゲートを経由していなかった）。
             assert_user_not_revoked(user, payload)
+            # 停止中依頼者の旧トークンも deps.py と同一ゲートで失効させる（r3-verify-operator ADD-2）。
+            assert_user_not_suspended(user)
 
             # 既に別のLINEアカウントに連携済みの場合は無条件で拒否する（再バインド禁止。
             # security review 最重要指摘）。同一 line_user_id の再送（冪等な再連携）は許可する。
@@ -608,6 +743,22 @@ async def line_exchange(
     # 業者テーブルへの LINE 単独新規作成はここでは行わない（連携情報が無いため）。
     existing_user = await session.scalar(select(User).where(User.line_user_id == line_user_id))
     if existing_user is not None:
+        # 停止中依頼者は LINE ログインでも新規トークンを発行しない（user_login と同一ゲート・
+        # detail は deps.py の assert_user_not_suspended に委譲し文言を一本化する）。
+        assert_user_not_suspended(existing_user)
+        if await _promote_to_admin_if_listed(session, existing_user):
+            await session.commit()
+            await session.refresh(existing_user)
+            # user_login と同じ理由でcommit成功後にのみ発火する。
+            alerts.fire_and_forget(
+                alerts.send_alert(
+                    "admin 権限が付与されました",
+                    f"email={existing_user.email}\nvia=login_promotion\n"
+                    f"user_id={existing_user.id}",
+                    severity="critical",
+                    key=f"admin-grant:{existing_user.email}",
+                )
+            )
         token = create_access_token(existing_user.id, "user", existing_user.role)
         return AuthTokenResponse(
             access_token=token, account_type="user", user=UserOut.model_validate(existing_user)

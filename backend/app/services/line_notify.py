@@ -93,12 +93,56 @@ async def push_bank_account_changed(line_user_id: str, action: str) -> bool:
     )
 
 
-async def push_bid_lost(line_user_id: str, case_id: str) -> bool:
-    """落札通知（落選業者宛）。"""
+async def push_bid_lost(line_user_id: str, case_id: str, prefecture: str, city: str, purpose: str) -> bool:
+    """落札通知（落選業者宛）。案件を特定できるよう地域・利用目的とリンクを本文に含める（M7対応）。"""
+    settings = get_settings()
+    url = f"{settings.frontend_base_url}/operator/cases/{case_id}"
+    safe_prefecture = _sanitize_inline(prefecture)
+    safe_city = _sanitize_inline(city)
+    safe_purpose = _sanitize_inline(purpose)
     return await _push(
         line_user_id,
-        "【カタヅケ】ご入札いただいた案件は、誠に恐れ入りますが今回は成約に至りませんでした。"
-        "またの機会がございましたらよろしくお願いいたします。",
+        f"【カタヅケ】ご入札いただいた案件（{safe_prefecture}{safe_city}／{safe_purpose}）は、"
+        f"誠に恐れ入りますが今回は成約に至りませんでした。\n{url}",
+    )
+
+
+async def push_reduction_requested(line_user_id: str, case_id: str, amount: int) -> bool:
+    """減額申請の受付通知（依頼者宛・ADD-2対応）。"""
+    settings = get_settings()
+    url = f"{settings.frontend_base_url}/cases/{case_id}"
+    return await _push(
+        line_user_id,
+        f"【カタヅケ】落札業者から {amount:,} 円への減額のご相談が届いています。\n{url}",
+    )
+
+
+async def push_reduction_decided(
+    line_user_id: str, transaction_id: str, approved: bool, amount: int
+) -> bool:
+    """減額申請の承認／却下結果通知（申請業者宛・H2対応）。"""
+    settings = get_settings()
+    url = f"{settings.frontend_base_url}/operator/transactions/{transaction_id}"
+    if approved:
+        text = f"【カタヅケ】ご相談いただいた減額（{amount:,} 円）が承認されました。\n{url}"
+    else:
+        text = f"【カタヅケ】ご相談いただいた減額は、依頼者により見送られました。\n{url}"
+    return await _push(line_user_id, text)
+
+
+async def push_transaction_cancelled(
+    line_user_id: str, transaction_id: str, recipient_party: Literal["user", "operator"]
+) -> bool:
+    """成約キャンセル通知（相手方宛・ADD-1対応）。"""
+    settings = get_settings()
+    path = (
+        f"/chat/{transaction_id}"
+        if recipient_party == "user"
+        else f"/operator/transactions/{transaction_id}"
+    )
+    return await _push(
+        line_user_id,
+        f"【カタヅケ】進行中だった成約が、相手方によりキャンセルされました。\n{settings.frontend_base_url}{path}",
     )
 
 
