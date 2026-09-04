@@ -25,11 +25,11 @@ const HOUSING_TYPES = ["一戸建て", "マンション", "アパート", "そ�
 const FLOOR_PLANS = ["1R/1K", "1DK/1LDK", "2K/2DK", "2LDK", "3LDK", "4LDK以上"] as const;
 
 /** 案件全体の写真上限（items 内 + loose 合計、バックエンド契約に合わせる）。 */
-const CASE_PHOTO_LIMIT = 20;
+const CASE_PHOTO_LIMIT = 150;
 /** 商品1点あたりの写真上限。 */
-const ITEM_PHOTO_LIMIT = 8;
+const ITEM_PHOTO_LIMIT = 12;
 /** 商品数の上限。 */
-const ITEM_LIMIT = 10;
+const ITEM_LIMIT = 30;
 
 /** 撮影のコツ（表示のみ）。撮影完了の前提となる確認レ点は `${itemId}:confirm` キーで checkedHints に持つ（APIには送らない）。 */
 const HINT_ITEMS: { key: string; icon: IcName; label: string }[] = [
@@ -39,6 +39,45 @@ const HINT_ITEMS: { key: string; icon: IcName; label: string }[] = [
 ];
 
 type DraftPhoto = { id: string; file: File; previewUrl: string; uploadedKey?: string };
+
+/* ---- 端末側の縮小（アップロード前） ----
+   上限を 150 枚に引き上げたため、スマホの原寸写真（3〜10MB）をそのまま送ると
+   通信時間とサーバー側ディスクが持たない。長辺 2000px・JPEG 品質 0.85 に縮小して
+   から扱う（縮小に失敗した場合は元ファイルをそのまま使う）。 */
+const DOWNSCALE_MAX_EDGE = 2000;
+const DOWNSCALE_SKIP_BYTES = 1_200_000;
+
+async function downscaleImage(file: File): Promise<File> {
+  if (typeof createImageBitmap !== "function") return file;
+  try {
+    const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const longEdge = Math.max(bitmap.width, bitmap.height);
+    if (longEdge <= DOWNSCALE_MAX_EDGE && file.size <= DOWNSCALE_SKIP_BYTES) {
+      bitmap.close();
+      return file;
+    }
+    const scale = Math.min(1, DOWNSCALE_MAX_EDGE / longEdge);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      bitmap.close();
+      return file;
+    }
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", 0.85),
+    );
+    if (!blob || blob.size >= file.size) return file;
+    const name = file.name.replace(/\.[^.]+$/, "") + ".jpg";
+    return new File([blob], name, { type: "image/jpeg", lastModified: file.lastModified });
+  } catch {
+    return file;
+  }
+}
+
 type DraftItem = { id: string; name: string; photos: DraftPhoto[] };
 type Step1Mode = { kind: "list" } | { kind: "shoot"; itemId: string };
 
@@ -181,10 +220,13 @@ export default function CreateCasePage() {
     );
   }
 
-  function handleItemFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleItemFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(e.target.files ?? []);
-    if (mode.kind === "shoot") addFilesToItem(mode.itemId, selected);
     if (itemInputRef.current) itemInputRef.current.value = "";
+    if (mode.kind !== "shoot") return;
+    const targetItemId = mode.itemId;
+    const prepared = await Promise.all(selected.map(downscaleImage));
+    addFilesToItem(targetItemId, prepared);
   }
 
   function addLooseFiles(files: File[]) {
@@ -210,10 +252,11 @@ export default function CreateCasePage() {
     }
   }
 
-  function handleLooseFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleLooseFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(e.target.files ?? []);
-    addLooseFiles(selected);
     if (looseInputRef.current) looseInputRef.current.value = "";
+    const prepared = await Promise.all(selected.map(downscaleImage));
+    addLooseFiles(prepared);
   }
 
   function removeLoosePhoto(photoId: string) {

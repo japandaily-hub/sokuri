@@ -17,6 +17,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.router import api_router
+from app.core.limits import MAX_PHOTOS_PER_CASE, MAX_PHOTOS_PER_ITEM
 from app.core.security import hash_password
 from app.db.models.case import CaseItem, CasePhoto
 from app.db.session import get_session
@@ -704,7 +705,7 @@ async def test_add_photo_422_item_limit_exceeded(client: AsyncClient, tmp_storag
         "items": [
             {
                 "name": "商品",
-                "photos": [_photo_with_file(tmp_storage, i) for i in range(8)],
+                "photos": [_photo_with_file(tmp_storage, i) for i in range(MAX_PHOTOS_PER_ITEM)],
             }
         ],
     }
@@ -723,26 +724,26 @@ async def test_add_photo_422_item_limit_exceeded(client: AsyncClient, tmp_storag
 
 
 async def test_add_photo_422_case_limit_exceeded(client: AsyncClient, tmp_storage):
-    """商品側は上限未満（7枚）でも、案件全体が上限(20枚)に達していれば422になる。"""
+    """商品側は上限未満でも、案件全体が上限(MAX_PHOTOS_PER_CASE)に達していれば422になる。"""
     token = await _signup_user(client)
-    # item: 7枚（商品上限8枚未満）+ 直下: 13枚 = 合計20枚（案件上限ちょうど）。
+    # item: 上限-1枚（商品上限未満）+ 直下: 残り = 合計 MAX_PHOTOS_PER_CASE 枚（案件上限ちょうど）。
     payload = {
         **_base_case_fields(),
-        "photos": [_photo_with_file(tmp_storage, i) for i in range(13)],
+        "photos": [_photo_with_file(tmp_storage, i) for i in range(MAX_PHOTOS_PER_CASE - (MAX_PHOTOS_PER_ITEM - 1))],
         "items": [
             {
                 "name": "商品",
-                "photos": [_photo_with_file(tmp_storage, j) for j in range(7)],
+                "photos": [_photo_with_file(tmp_storage, j) for j in range(MAX_PHOTOS_PER_ITEM - 1)],
             }
         ],
     }
     r = await client.post("/api/v1/cases", json=payload, headers=_auth(token))
     assert r.status_code == 201, r.text
     case = r.json()
-    assert case["photo_count"] == 20
+    assert case["photo_count"] == MAX_PHOTOS_PER_CASE
     case_id = case["id"]
     item_id = case["items"][0]["id"]
-    assert len(case["items"][0]["photos"]) == 7  # 商品側は上限(8)未満
+    assert len(case["items"][0]["photos"]) == MAX_PHOTOS_PER_ITEM - 1  # 商品側は上限未満
 
     r2 = await client.post(
         f"/api/v1/cases/{case_id}/items/{item_id}/photos",

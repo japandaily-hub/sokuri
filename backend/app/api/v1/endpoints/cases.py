@@ -36,6 +36,7 @@ from app.services.case_lock import lock_case_row
 from app.services.case_view import build_case_masked_out
 from app.services.summary import (
     ItemAnalysisInput,
+    MAX_PHOTOS_FOR_AI,
     generate_case_ai,
     generate_case_summary,
     photo_url_for_ai,
@@ -214,11 +215,11 @@ async def create_case(
                 item.ai_summary = result.ai_summary
         else:
             # レガシー（items無し）経路: generate_case_summary の既存契約
-            # （解決済み文字列のリストを渡す）は温存する。写真数は
-            # MAX_PHOTOS_PER_CASE(20枚)が上限のため、全件を先行解決しても
-            # items経路ほどの無駄は生じない。
+            # （解決済み文字列のリストを渡す）は温存する。解析対象は先頭
+            # MAX_PHOTOS_FOR_AI 枚のみのため、その分だけを base64 化する
+            # （案件上限が 150 枚になり、全件の先行解決はメモリを浪費するため）。
             ungrouped_refs: list[str] = []
-            for p in flat_photos:
+            for p in flat_photos[:MAX_PHOTOS_FOR_AI]:
                 ref = await photo_url_for_ai(p.storage_key, p.url)
                 if ref is not None:
                     ungrouped_refs.append(ref)

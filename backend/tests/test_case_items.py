@@ -14,6 +14,8 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
+
+from app.core.limits import MAX_ITEMS_PER_CASE, MAX_PHOTOS_PER_ITEM
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -223,7 +225,7 @@ async def test_too_many_items_422(client: AsyncClient):
     payload = {
         **_base_case_fields(),
         "photos": [],
-        "items": [{"name": f"item{i}", "photos": []} for i in range(11)],
+        "items": [{"name": f"item{i}", "photos": [_photo(0)]} for i in range(MAX_ITEMS_PER_CASE + 1)],
     }
     r = await client.post("/api/v1/cases", json=payload, headers=_auth(token))
     assert r.status_code == 422
@@ -234,21 +236,21 @@ async def test_too_many_photos_per_item_422(client: AsyncClient):
     payload = {
         **_base_case_fields(),
         "photos": [],
-        "items": [{"name": "item", "photos": [_photo(i) for i in range(9)]}],
+        "items": [{"name": "item", "photos": [_photo(i) for i in range(MAX_PHOTOS_PER_ITEM + 1)]}],
     }
     r = await client.post("/api/v1/cases", json=payload, headers=_auth(token))
     assert r.status_code == 422
 
 
 async def test_total_photo_count_over_case_limit_422(client: AsyncClient):
-    """各商品は上限(8枚)以下でも、合計(3商品×7枚=21枚)が案件上限(20枚)を超えれば422。"""
+    """各商品は上限(12枚)以下でも、合計(13商品×12枚=156枚)が案件上限(150枚)を超えれば422。"""
     token = await _signup_user(client)
     payload = {
         **_base_case_fields(),
         "photos": [],
         "items": [
-            {"name": f"item{i}", "photos": [_photo(j) for j in range(7)]}
-            for i in range(3)
+            {"name": f"item{i}", "photos": [_photo(j) for j in range(12)]}
+            for i in range(13)
         ],
     }
     r = await client.post("/api/v1/cases", json=payload, headers=_auth(token))

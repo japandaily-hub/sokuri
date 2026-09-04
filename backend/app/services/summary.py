@@ -21,6 +21,8 @@ from app.services.vision import analyze_image
 logger = logging.getLogger(__name__)
 
 _MAX_PHOTOS_FOR_AI = 4
+# cases.py（レガシー経路）が base64 化の枚数を絞るための公開エイリアス。
+MAX_PHOTOS_FOR_AI = _MAX_PHOTOS_FOR_AI
 # Gemini呼び出し（analyze_image）1回あたりのタイムアウト。無応答のままイベント
 # ループを塞ぎ続け、案件作成リクエスト全体が長時間ハングするのを防ぐ
 # （security review 指摘対応: コストDoS/可用性）。写真解析は既存の try/except
