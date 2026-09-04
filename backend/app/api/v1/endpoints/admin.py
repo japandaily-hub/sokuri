@@ -52,8 +52,10 @@ from app.schemas_katadzuke import (
     OperatorApplicationApproveResponse,
     OperatorApplicationBankAccountRevealOut,
     OperatorApplicationListResponse,
+    OperatorListResponse,
     OperatorApplicationOut,
     OperatorApplicationRejectRequest,
+    OperatorListCounts,
     OperatorOut,
     OperatorSuspendRequest,
     OperatorVerifyRequest,
@@ -70,6 +72,13 @@ from app.services.review_stats import recalc_operator_review_stats
 # 従来どおり動くよう、既定値は「事実上の全件」に近い値にする。
 _DEFAULT_LIST_LIMIT = 100
 _MAX_LIST_LIMIT = 500
+
+# admin/cases・admin/transactions・admin/users・admin/operators・
+# admin/operator-applications 共通の既定/上限（H-1対応で operators にも適用）。
+# list_operators（本ファイル前方）が参照するため、案件・成約横断閲覧セクションより
+# 前で定義する必要がある（Query() のデフォルト引数はモジュール読込時に評価される）。
+_ADMIN_CASE_TXN_DEFAULT_LIMIT = 50
+_ADMIN_CASE_TXN_MAX_LIMIT = 200
 
 logger = logging.getLogger(__name__)
 
@@ -212,19 +221,95 @@ async def list_invites(
     return [InviteOut.model_validate(i) for i in invites]
 
 
-@router.get("/admin/operators", response_model=list[OperatorOut])
+@router.get("/admin/operators", response_model=OperatorListResponse)
 async def list_operators(
-    limit: int = Query(default=_DEFAULT_LIST_LIMIT, ge=1, le=_MAX_LIST_LIMIT),
+    status_filter: Literal["all", "pending", "limited", "active", "rejected", "suspended"] = Query(
+        default="all",
+        alias="status",
+        description="pending/limited/active/rejected/suspended のいずれか。省略時 all。"
+        " suspended は is_suspended=True の業者（承認状態=vendor_statusとは独立の軸）。",
+    ),
+    q: str | None = Query(default=None, max_length=255, description="会社名/メール/許可番号の部分一致"),
+    limit: int = Query(default=_ADMIN_CASE_TXN_DEFAULT_LIMIT, ge=1, le=_ADMIN_CASE_TXN_MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
     admin: User = Depends(get_current_admin),
     session: AsyncSession = Depends(get_session),
-) -> list[OperatorOut]:
-    operators = (
-        await session.scalars(
-            select(Operator).order_by(Operator.created_at.desc()).limit(limit).offset(offset)
+) -> OperatorListResponse:
+    """業者一覧（H-1対応: status/q絞込 + total + counts を追加、応答は {items,total,counts}）。
+
+    web側が現在ページ（既定100件→50件）のみをクライアント絞込していたため、
+    2ページ目以降の pending 業者が「審査待ち0件」に見えてしまうバグ（承認漏れ＝
+    売上機会の直接損失）の是正。事前申込一覧（list_operator_applications）と同型の
+    契約にし、pending を常に先頭固定・その中では created_at 降順・同時刻は id 降順
+    で決定的に並べる。``counts`` は現在の status/q 絞込に関わらない全件内訳
+    （web担当と合意済みの契約。バッジ表示用）。
+    """
+    conditions = []
+    if status_filter == "suspended":
+        conditions.append(Operator.is_suspended.is_(True))
+    elif status_filter != "all":
+        conditions.append(Operator.vendor_status == status_filter)
+    q_norm = (q or "").strip()
+    if q_norm:
+        # security review M-3 と同方針: ilike はエスケープ付きで無害化する。
+        escaped_q = _escape_ilike_value(q_norm)
+        conditions.append(
+            or_(
+                Operator.company_name.ilike(f"%{escaped_q}%", escape="\\"),
+                Operator.contact_email.ilike(f"%{escaped_q}%", escape="\\"),
+                Operator.license_number.ilike(f"%{escaped_q}%", escape="\\"),
+            )
+        )
+
+    total = await session.scalar(select(func.count()).select_from(Operator).where(*conditions))
+
+    # バッジ用の内訳は現在の絞込に関わらず全件中の値を返す（H-1修正案）。
+    # vendor_status 4値 + is_suspended を1クエリで集計し、N+1（値ごとの個別count）
+    # を避ける。
+    counts_rows = (
+        await session.execute(
+            select(
+                Operator.vendor_status,
+                func.count().label("cnt"),
+                func.sum(case((Operator.is_suspended.is_(True), 1), else_=0)).label(
+                    "suspended_cnt"
+                ),
+            ).group_by(Operator.vendor_status)
         )
     ).all()
-    return [OperatorOut.model_validate(o) for o in operators]
+    counts_by_status: dict[str, int] = {"pending": 0, "limited": 0, "active": 0, "rejected": 0}
+    total_all = 0
+    total_suspended = 0
+    for vendor_status_value, cnt, suspended_cnt in counts_rows:
+        cnt = int(cnt or 0)
+        total_all += cnt
+        total_suspended += int(suspended_cnt or 0)
+        if vendor_status_value in counts_by_status:
+            counts_by_status[vendor_status_value] = cnt
+    counts = OperatorListCounts(
+        all=total_all,
+        pending=counts_by_status["pending"],
+        limited=counts_by_status["limited"],
+        active=counts_by_status["active"],
+        rejected=counts_by_status["rejected"],
+        suspended=total_suspended,
+    )
+
+    pending_first = case((Operator.vendor_status == "pending", 0), else_=1)
+    operators = (
+        await session.scalars(
+            select(Operator)
+            .where(*conditions)
+            .order_by(pending_first, Operator.created_at.desc(), Operator.id.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+    ).all()
+    return OperatorListResponse(
+        items=[OperatorOut.model_validate(o) for o in operators],
+        total=int(total or 0),
+        counts=counts,
+    )
 
 
 @router.patch("/admin/operators/{operator_id}/verify", response_model=OperatorOut)
@@ -362,9 +447,7 @@ async def get_cell_density(
 # 作成した案件」しか返らず、トラブル対応・強制介入の起点となるID自体に到達
 # できなかった（一覧が空を返す）。個別取得（GET /cases/{id}・GET /transactions/{id}）
 # は既に role=="admin" を許容済みのため、ここでは一覧・検索のみを提供する。
-
-_ADMIN_CASE_TXN_DEFAULT_LIMIT = 50
-_ADMIN_CASE_TXN_MAX_LIMIT = 200
+# （_ADMIN_CASE_TXN_DEFAULT_LIMIT / _ADMIN_CASE_TXN_MAX_LIMIT はファイル冒頭で定義）
 
 
 @router.get(
@@ -825,10 +908,10 @@ async def demote_admin_to_user(
 
 @router.get("/admin/operator-applications", response_model=OperatorApplicationListResponse)
 async def list_operator_applications(
-    status_filter: str | None = Query(
-        default=None, alias="status", max_length=32, description="未指定は全件（received/approved/rejected）"
+    status_filter: Literal["received", "approved", "rejected"] | None = Query(
+        default=None, alias="status", description="未指定は全件（received/approved/rejected）"
     ),
-    q: str | None = Query(default=None, max_length=255, description="会社名/メールの部分一致"),
+    q: str | None = Query(default=None, max_length=255, description="会社名/メール/許可番号の部分一致"),
     limit: int = Query(default=_ADMIN_CASE_TXN_DEFAULT_LIMIT, ge=1, le=_ADMIN_CASE_TXN_MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
     admin: User = Depends(get_current_admin),
@@ -851,6 +934,7 @@ async def list_operator_applications(
             or_(
                 OperatorApplication.company_name.ilike(f"%{escaped_q}%", escape="\\"),
                 OperatorApplication.contact_email.ilike(f"%{escaped_q}%", escape="\\"),
+                OperatorApplication.license_number.ilike(f"%{escaped_q}%", escape="\\"),
             )
         )
 
@@ -950,6 +1034,19 @@ async def approve_operator_application(
             status_code=status.HTTP_409_CONFLICT,
             detail="この申込は既に審査済みです。",
         )
+    # M-3対応: 同じメールの Operator が既に存在する場合、招待コードを発行しても
+    # /operator/signup が必ず 409（重複メール）で詰み、運営は成功したと誤認したまま
+    # 気付けない（招待メールも届いてしまう）。承認前にここで検査して弾く。
+    existing_operator = await session.scalar(
+        select(Operator).where(
+            func.lower(Operator.contact_email) == (application.contact_email or "").strip().lower()
+        )
+    )
+    if existing_operator is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="このメールアドレスの業者アカウントは既に存在します。招待コードは発行していません。",
+        )
 
     code = await _issue_unique_invite_code(session)
     invite = Invite(code=code, email=application.contact_email)
@@ -958,6 +1055,9 @@ async def approve_operator_application(
     application.status = "approved"
     application.reviewed_by = admin.id
     application.reviewed_at = datetime.now(timezone.utc)
+    # M-4対応: 招待コード経由の本登録完了時に operator_id を逆引きできるよう、
+    # 発行したコードを申込側にも控えておく。
+    application.invite_code = code
 
     await session.commit()
     await session.refresh(application)

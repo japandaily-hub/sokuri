@@ -49,6 +49,10 @@ export default function AdminUsersPage() {
 
   const [suspendTarget, setSuspendTarget] = useState<AdminUserListItem | null>(null);
   const [roleTarget, setRoleTarget] = useState<RoleActionTarget | null>(null);
+  // r5-fix-frontend M-2: 失敗時にモーダルを閉じず、ConfirmModal の error prop へ表示する
+  // （画面下部の行を操作した場合、ページ上部 Notice は画面外に出て見落とされやすいため）。
+  const [suspendModalError, setSuspendModalError] = useState<string | null>(null);
+  const [roleModalError, setRoleModalError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     if (!token) return;
@@ -77,7 +81,7 @@ export default function AdminUsersPage() {
     if (!suspendTarget || !token || busy) return;
     const next = !suspendTarget.is_suspended;
     setBusy(true);
-    setError(null);
+    setSuspendModalError(null);
     setNotice(null);
     try {
       const result = await adminSuspendUser(suspendTarget.id, next, reason, token);
@@ -89,10 +93,9 @@ export default function AdminUsersPage() {
       }
       await reload();
     } catch (e) {
-      // r4-fix-frontend2 M2 波及是正: 失敗時も対象をクリアしてモーダルを閉じ、
-      // 隠れずに見える Notice でエラーを出す（admin/page.tsx・operator-applications/page.tsx と同型）。
-      setSuspendTarget(null);
-      setError(toDisplayMessage(e, "更新に失敗しました"));
+      // r5-fix-frontend M-2 是正: 失敗時はモーダルを閉じず、ConfirmModal の error prop に
+      // 表示する（admin/page.tsx・operator-applications/page.tsx と同型）。
+      setSuspendModalError(toDisplayMessage(e, "更新に失敗しました"));
     } finally {
       setBusy(false);
     }
@@ -102,7 +105,7 @@ export default function AdminUsersPage() {
     if (!roleTarget || !token || busy) return;
     const { user: target, action } = roleTarget;
     setBusy(true);
-    setError(null);
+    setRoleModalError(null);
     setNotice(null);
     try {
       if (action === "promote") {
@@ -113,8 +116,7 @@ export default function AdminUsersPage() {
       setRoleTarget(null);
       await reload();
     } catch (e) {
-      setRoleTarget(null);
-      setError(
+      setRoleModalError(
         toDisplayMessage(
           e,
           action === "promote" ? "管理者への昇格に失敗しました" : "管理者権限の解除に失敗しました",
@@ -215,7 +217,10 @@ export default function AdminUsersPage() {
                         {u.email !== myEmail && u.role === "user" && !u.is_suspended ? (
                           <button
                             type="button"
-                            onClick={() => setRoleTarget({ user: u, action: "promote" })}
+                            onClick={() => {
+                              setRoleModalError(null);
+                              setRoleTarget({ user: u, action: "promote" });
+                            }}
                             disabled={busy}
                             className={btnSecondary}
                           >
@@ -225,7 +230,10 @@ export default function AdminUsersPage() {
                         {u.email !== myEmail && u.role === "admin" ? (
                           <button
                             type="button"
-                            onClick={() => setRoleTarget({ user: u, action: "demote" })}
+                            onClick={() => {
+                              setRoleModalError(null);
+                              setRoleTarget({ user: u, action: "demote" });
+                            }}
                             disabled={busy}
                             className={btnSecondary}
                           >
@@ -235,7 +243,10 @@ export default function AdminUsersPage() {
                         {u.role === "admin" ? null : (
                           <button
                             type="button"
-                            onClick={() => setSuspendTarget(u)}
+                            onClick={() => {
+                              setSuspendModalError(null);
+                              setSuspendTarget(u);
+                            }}
                             disabled={busy}
                             className={u.is_suspended ? btnPrimary : btnDanger}
                           >
@@ -287,8 +298,12 @@ export default function AdminUsersPage() {
           danger={!suspendTarget.is_suspended}
           withReason
           reasonLabel="理由（任意・社内記録用）"
+          error={suspendModalError}
           busy={busy}
-          onCancel={() => setSuspendTarget(null)}
+          onCancel={() => {
+            setSuspendModalError(null);
+            setSuspendTarget(null);
+          }}
           onConfirm={(reason) => void confirmSuspend(reason)}
         />
       ) : null}
@@ -307,8 +322,12 @@ export default function AdminUsersPage() {
           }
           confirmLabel={roleTarget.action === "promote" ? "管理者にする" : "解除する"}
           danger={roleTarget.action === "demote"}
+          error={roleModalError}
           busy={busy}
-          onCancel={() => setRoleTarget(null)}
+          onCancel={() => {
+            setRoleModalError(null);
+            setRoleTarget(null);
+          }}
           onConfirm={() => void confirmRoleChange()}
         />
       ) : null}

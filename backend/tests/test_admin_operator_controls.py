@@ -222,7 +222,7 @@ async def test_suspend_and_unsuspend_operator(client: AsyncClient, db_session: A
     # 一覧にも反映される
     r = await client.get("/api/v1/admin/operators", headers=_auth(admin_token))
     assert r.status_code == 200
-    row = next(o for o in r.json() if o["id"] == op_id)
+    row = next(o for o in r.json()["items"] if o["id"] == op_id)
     assert row["is_suspended"] is False
 
 
@@ -284,4 +284,91 @@ async def test_public_profile_is_approved_follows_vendor_status(client: AsyncCli
     assert r.json()["is_approved"] is True
     # 招待コード登録は verified_at が付かないが、承認済みバッジの根拠は vendor_status
     assert r.json()["verified_at"] is None
+
+
+# ──────────────────────────── 一覧の status/q 絞込・counts（H-1） ────────────────────────────
+
+
+async def test_list_operators_status_q_total_counts(client: AsyncClient, db_session: AsyncSession):
+    """H-1対応: GET /admin/operators の status/q絞込・total・counts・
+    並び順（pending優先→created_at降順→id降順のtie-breaker）を検証する。
+
+    是正前は limit/offset のみで status/total を返さず、web側のクライアント絞込が
+    「現在ページの50件」しか見ていなかったため、2ページ目以降のpending業者が
+    「審査待ち0件」に見える承認漏れが起きていた。
+    """
+    admin_token = await _make_admin(client, db_session)
+
+    _, pending_id = await _signup_pending_operator(client, "ctl_list_pending@example.com")
+    _, active_id = await _signup_invited_operator(client, admin_token, "ctl_list_active@example.com")
+
+    r = await client.patch(
+        f"/api/v1/admin/operators/{active_id}/suspend",
+        json={"suspended": True},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 200
+
+    # 全件（status未指定=all）: pending が先頭に来ること・counts は全件中の値。
+    r = await client.get("/api/v1/admin/operators", headers=_auth(admin_token))
+    assert r.status_code == 200
+    body = r.json()
+    ids = [item["id"] for item in body["items"]]
+    assert ids.index(pending_id) < ids.index(active_id)
+    assert body["total"] == 2
+    assert body["counts"] == {
+        "all": 2,
+        "pending": 1,
+        "limited": 0,
+        "active": 1,
+        "rejected": 0,
+        "suspended": 1,
+    }
+
+    # status=pending
+    r = await client.get(
+        "/api/v1/admin/operators", params={"status": "pending"}, headers=_auth(admin_token)
+    )
+    assert r.status_code == 200
+    body = r.json()
+    returned_ids = {item["id"] for item in body["items"]}
+    assert pending_id in returned_ids
+    assert active_id not in returned_ids
+    assert all(item["vendor_status"] == "pending" for item in body["items"])
+    assert body["counts"]["pending"] == 1  # 絞込に関わらずバッジ用の値は全件中のまま
+    assert body["counts"]["all"] == 2
+
+    # status=suspended（is_suspended=True で絞込。vendor_statusとは独立の軸）
+    r = await client.get(
+        "/api/v1/admin/operators", params={"status": "suspended"}, headers=_auth(admin_token)
+    )
+    assert r.status_code == 200
+    body = r.json()
+    returned_ids = {item["id"] for item in body["items"]}
+    assert active_id in returned_ids
+    assert pending_id not in returned_ids
+    assert all(item["is_suspended"] is True for item in body["items"])
+
+    # q: 会社名/メール/許可番号の部分一致（メールで絞る）
+    r = await client.get(
+        "/api/v1/admin/operators",
+        params={"q": "ctl_list_pending"},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["total"] == 1
+    assert body["items"][0]["id"] == pending_id
+
+    # 不正なstatus値（綴り違い）は422（空一覧で無言に失敗しない）
+    r = await client.get(
+        "/api/v1/admin/operators", params={"status": "pendingg"}, headers=_auth(admin_token)
+    )
+    assert r.status_code == 422
+
+    # limit上限（200）超過は422
+    r = await client.get(
+        "/api/v1/admin/operators", params={"limit": 201}, headers=_auth(admin_token)
+    )
+    assert r.status_code == 422
 

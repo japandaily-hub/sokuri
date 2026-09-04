@@ -61,6 +61,10 @@ export default function AdminIdentityDocumentsPage() {
   const [showRejectForm, setShowRejectForm] = useState(false);
   const [offset, setOffset] = useState(0);
   const [showApproveConfirm, setShowApproveConfirm] = useState(false);
+  // r5-fix-frontend M-2: 失敗時にモーダル／却下フォームを閉じず、その場にエラーを表示する
+  // （画面下部の行を操作した場合、ページ上部 Notice は詳細モーダルの背後に隠れ見落とされるため）。
+  const [approveModalError, setApproveModalError] = useState<string | null>(null);
+  const [rejectFormError, setRejectFormError] = useState<string | null>(null);
 
   // レース条件対策（openDetailの完了前に別行を選択した場合、古い結果を捨てる）
   const selectedIdRef = useRef<string | null>(null);
@@ -106,6 +110,8 @@ export default function AdminIdentityDocumentsPage() {
     setImagesGone(false);
     setRejectReason("");
     setShowRejectForm(false);
+    setApproveModalError(null);
+    setRejectFormError(null);
     if (!token) return;
     setImagesLoading(true);
     try {
@@ -137,22 +143,23 @@ export default function AdminIdentityDocumentsPage() {
     setBackUrl(null);
     setImagesGone(false);
     setShowApproveConfirm(false);
+    setApproveModalError(null);
+    setRejectFormError(null);
   }
 
   async function onApprove() {
     if (!selected || !token || busy) return;
     setBusy(true);
-    setError(null);
+    setApproveModalError(null);
     try {
       await approveIdentityDocument(selected.id, token);
       setShowApproveConfirm(false);
       closeDetail();
       await reload();
     } catch (e) {
-      // r4-fix-frontend2 M2 波及是正: 失敗時も対象（確認モーダル）をクリアして閉じ、
-      // 隠れずに見える Notice でエラーを出す（admin/page.tsx 等と同型）。
-      setShowApproveConfirm(false);
-      setError(toDisplayMessage(e, "承認に失敗しました"));
+      // r5-fix-frontend M-2 是正: 失敗時はモーダルを閉じず、ConfirmModal の error prop に
+      // 表示する（画面下部の行を操作した場合でも見落とされないようにするため）。
+      setApproveModalError(toDisplayMessage(e, "承認に失敗しました"));
     } finally {
       setBusy(false);
     }
@@ -161,17 +168,19 @@ export default function AdminIdentityDocumentsPage() {
   async function onReject() {
     if (!selected || !token || busy) return;
     if (!rejectReason.trim()) {
-      setError("却下理由を入力してください");
+      setRejectFormError("却下理由を入力してください");
       return;
     }
     setBusy(true);
-    setError(null);
+    setRejectFormError(null);
     try {
       await rejectIdentityDocument(selected.id, rejectReason.trim(), token);
       closeDetail();
       await reload();
     } catch (e) {
-      setError(toDisplayMessage(e, "却下に失敗しました"));
+      // r5-fix-frontend M-2 是正: 却下フォームは詳細モーダル内にあるため、
+      // ページ上部 Notice ではなくフォーム直下にエラーを表示する（背後に隠れて見落とされるのを防ぐ）。
+      setRejectFormError(toDisplayMessage(e, "却下に失敗しました"));
     } finally {
       setBusy(false);
     }
@@ -354,8 +363,18 @@ export default function AdminIdentityDocumentsPage() {
                   onChange={(e) => setRejectReason(e.target.value)}
                   placeholder="例: 書類の住所が登録住所と一致していません"
                 />
+                {rejectFormError ? (
+                  <p className="mt-1 text-xs text-red-600">{rejectFormError}</p>
+                ) : null}
                 <div className="mt-2 flex justify-end gap-2">
-                  <button type="button" className={btnSecondary} onClick={() => setShowRejectForm(false)}>
+                  <button
+                    type="button"
+                    className={btnSecondary}
+                    onClick={() => {
+                      setRejectFormError(null);
+                      setShowRejectForm(false);
+                    }}
+                  >
                     キャンセル
                   </button>
                   <button type="button" className={btnDanger} disabled={busy || imagesGone} onClick={() => void onReject()}>
@@ -369,7 +388,10 @@ export default function AdminIdentityDocumentsPage() {
                   type="button"
                   className={btnDanger}
                   disabled={busy || imagesGone}
-                  onClick={() => setShowRejectForm(true)}
+                  onClick={() => {
+                    setRejectFormError(null);
+                    setShowRejectForm(true);
+                  }}
                 >
                   却下する
                 </button>
@@ -377,7 +399,10 @@ export default function AdminIdentityDocumentsPage() {
                   type="button"
                   className={btnPrimary}
                   disabled={busy || imagesGone}
-                  onClick={() => setShowApproveConfirm(true)}
+                  onClick={() => {
+                    setApproveModalError(null);
+                    setShowApproveConfirm(true);
+                  }}
                 >
                   承認する
                 </button>
@@ -392,8 +417,12 @@ export default function AdminIdentityDocumentsPage() {
           title={`${selected.user_name ?? selected.user_email}の本人確認を承認します`}
           message="承認すると、依頼者は本人確認済みの状態になります。よろしいですか？"
           confirmLabel="承認する"
+          error={approveModalError}
           busy={busy}
-          onCancel={() => setShowApproveConfirm(false)}
+          onCancel={() => {
+            setApproveModalError(null);
+            setShowApproveConfirm(false);
+          }}
           onConfirm={() => void onApprove()}
         />
       ) : null}

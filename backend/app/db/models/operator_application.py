@@ -59,6 +59,11 @@ class OperatorApplication(Base, TimestampMixin):
         Uuid, ForeignKey("operators.id", ondelete="SET NULL"), nullable=True
     )
 
+    # 承認時に発行された招待コード（Invite.code）を控えておき、業者が実際に
+    # その招待コードで /operator/signup を完了した際に operator_id を逆引きできる
+    # ようにする（M-4対応）。招待コードは1申込につき1つのみ発行されるため一意。
+    invite_code: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+
     # 送信元IPアドレス（IPv6も許容し余裕を持たせた長さ）。レート制限・不正申込の追跡に使用。
     # X-Forwarded-For が無い直接接続環境では None にはならないが、プロキシ構成が
     # 不明な場合に備え nullable にしておく（欠損してもアプリを壊さない）。

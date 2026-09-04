@@ -3,6 +3,7 @@
 更新: 2026-09-04（Claude・r3 導線監査ループ）
 
 ## 現在フェーズ
+- **2026-09-04 第5周（r5・最終回帰）。** r4 追加分に絞った回帰で High 1（業者一覧の検索・状態絞込・件数バッジがページ内50件限定＝51件目以降の審査待ちが「0」）・Medium 7 → 修正: `GET /admin/operators` を status(Literal)/q(会社名・メール・許可番号)/limit/offset＋`{items,total,counts}`（pending 優先）へ、事前申込 approve の重複メール 409（大小文字非区別）、事前申込 q に許可番号・status Literal、`OperatorApplication.invite_code/operator_id`（alembic 0026）で本登録を追跡、ConfirmModal 内エラー表示に一本化、privacy にお問い合わせ種別、docstring 是正。独立検証で web/backend の契約不一致（pending_count vs counts）を捕捉→是正。**r4 コミット 3da71de の admin.py に前方参照（NameError）があり import 不能だった**（r5 で修正・未push だったため本番影響なし）。pytest 全件緑・tsc 0。
 - **2026-09-04 第4周（r4・回帰監査）をローカルコミット（3da71de・未push）。** 依頼者 0 件／業者 Medium 1／運営 High 1・Medium 2／横断 High 3・Medium 7 → 独立検証で REJECTED 1・重大度修正 3・追加 High 3（管理画面の無言 truncate・メール送信キー未設定の無言スキップ・業者規約版数の不一致）。修正: `/admin/operator-applications`（事前申込の審査画面）新設、業者・招待コード・本人確認書類一覧のページング、ConfirmModal 統一、`/operator/login` の既存セッション自動遷移＋callbackUrl 制限、admin ルートの認可負テスト30件、BREVO 未設定時の critical アラート（LINE 配送までテスト）、`GET /admin/operator-applications` を {items,total}＋status/q/received優先へ、規約改定日 2026-09-04・業者規約版数同期、本人確認目的／返信目安／プライバシー（お問い合わせ情報）の文言、招待テンプレ・事業計画書の「許可番号任意・承認1営業日」訂正。pytest 748 / tsc 0 / eslint 0 error。本番ビルド（`next build`）は worktree で検証中。
 - **2026-09-04 3視点導線監査 第3周（r3）をローカルコミット（885f2ec・未push）。** `/loop /strategy-agents` の自走。依頼者/業者/運営/横断（法務表記・通知文）の4系統 finder→独立検証（1:1）→実装→セキュリティ/QA レビュー3周→最終独立検証「合格（Critical/High 0）」。台帳は `.agent-state/audit/r3-*.md`（監査 r3-{user,vendor,operator,crosscut}、検証 r3-verify-*、実装 r3-impl-*、レビュー r3-review-*、修正 r3-fix-*）。pytest 714 / tsc 0 / eslint 0 error。ローカル実機（run_local_e2e + seed、worktree dev 3000）で新画面・文言・停止ゲート・/contact を確認済み。
   - 主な追加: 減額申請の作成/決定・取引キャンセルの通知配線／`POST /contact`（専用レート制限＋プロセス内キャップ300/h・超過503+Retry-After）／`GET /admin/{cases,transactions,users}`・`PATCH /admin/users/{id}/suspend`・`POST /admin/users/{id}/{promote,demote}`（alembic 0025 users.is_suspended）／ADMIN_EMAILS 自動付与は「有効 admin 不在時のみ」に一本化（signup/login/LINE）＋alerts critical／`/analyze` 認証必須・URL 拒否／停止時 403 は `{code:"account_suspended"}`／web: 401/403 共通処理（signOut 成功時のみ遷移・sessionStorage ループ検知・役割別ログイン画面）、/create 離脱保護＋180秒タイムアウト、入札409で再取得、/forbidden、ログイン画面のアカウント切替導線、管理画面3一覧＋操作。
@@ -55,7 +56,7 @@
 - なし（push はユーザー判断）。
 
 ## 次アクション
-- **P1（自動・次 wake）: r5 最終回帰。** r4 の変更（管理画面3画面＋事前申込審査・ページング・認可負テスト）に対する回帰のみ確認し、新規 High 0 なら自走ループを停止して完了報告。~~r4 回帰監査~~（済・3da71de）
+- **P1（ユーザー）: r4・r5 分の push 可否の判断**（本番デプロイ。alembic 0026 を含む。push 後は /readyz で 0026 を確認）。~~r5 最終回帰~~（済）。自走ループは r5 で停止。~~r4 回帰監査~~（済・3da71de）
 - **P1（ユーザー）: 本番 ADMIN_EMAILS の実値と、各アドレスの user 行・role=admin を `GET /admin/users?q=` で実測**（未登録アドレスが載っていれば即除外）。あわせて r3 で置いた仮定4件（支払経路＝当事者間精算／入札期間の上限なし／8%はβ期間請求なし／所在地＝横浜）を承認または差し戻し。
 - **P1: 障害・異常時アラート基盤 — 完了（2026-09-04）。** 外形監視 `.github/workflows/uptime-alert.yml`（5分毎）＋アプリ内 `app/core/alert_middleware.py`。通知先は運営用 LINE 公式アカウント「カタヅケ運営」（@854kzrrb・Channel ID 2011424972・顧客向け【公式】カタヅケとは別チャネル）。GitHub Secrets と Render 環境変数（ALERT_LINE_CHANNEL_ACCESS_TOKEN / ALERT_LINE_USER_IDS / ALERT_MAIL_FROM）は `scripts/setup_alerts.py` で登録済み、Actions の疎通テスト success、LINE push は HTTP 200 で到達確認。メール（Brevo）も設定済み: 宛先 katazuke.support@gmail.com、差出人 katazuke.support@gmail.com（Brevo で認証済み）、テスト送信は delivered を確認。**併せて本番の依頼者向けメールが BREVO_API_KEY 未設定で一度も送信されていなかった問題を解消**（Render に BREVO_API_KEY を登録し、MAIL_FROM を noreply@katadzuke.jp → katazuke.support@gmail.com に変更。katadzuke.jp のドメイン認証を Brevo で行えば noreply@ に戻せる）。Brevo の Authorised IPs は無効化済み（Actions/Render から送るため）。Webhook は未設定。GitHub PAT（katadzuke-alerts）は30日期限＝2026-10-04 に失効するが、登録済み Secrets はそのまま有効で監視は継続する（再登録時のみ再発行が必要）。
 - P1: 別セッションの cancel_case 置換が終わったら、本番で依頼者ログイン後の案件詳細に出品取り下げボタンが出ることを目視（業者ログインが必要な検証は Claude 側では不可＝パスワード入力禁止。ユーザー実施）。
@@ -85,3 +86,4 @@
 | 2026-09-04 | push はしない（本番デプロイ＝停止点） | §3 の破壊的操作 | ユーザー承認後に push |
 | 2026-09-04 | r4: 事前申込一覧 API を配列→{items,total} に破壊的変更（web 同時切替） | バッジ・フィルタが最新100件内のみで古い未審査が埋没 | received 優先ソート・status/q・total を追加 |
 | 2026-09-04 | 業者規約版数 CURRENT_OPERATOR_TERMS_VERSION を 2026-09-04 に更新（再同意ゲート無しを確認） | 公開規約の改定日と同意証跡の版が不一致 | 既存業者への告知・再同意は法務確認事項として TODO 01 |
+| 2026-09-04 | r5 で自走ループを停止 | 回帰周の新規 High が「直前周で追加したコードの隣接」に収束し、独立検証でも新次元の欠陥が出なくなった（較正台帳の打ち止め条件） | 残りはユーザー判断事項（push・仮定4件・法務・環境実値） |

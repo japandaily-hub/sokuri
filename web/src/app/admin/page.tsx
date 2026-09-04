@@ -19,6 +19,7 @@ import {
 } from "@/components/kdz/Ui";
 import { AdminPagination } from "./_components/AdminPagination";
 import { ConfirmModal } from "./_components/ConfirmModal";
+import { StatusFilterBar } from "./_components/StatusFilterBar";
 import {
   ADMIN_LIST_DEFAULT_LIMIT,
   adminBulkCreateInvites,
@@ -31,6 +32,7 @@ import {
   adminSuspendOperator,
   adminVerifyOperator,
   toDisplayMessage,
+  type AdminOperatorListResponse,
   type CellDensityRow,
   type InviteBulkCreateResponse,
   type InviteOut,
@@ -46,7 +48,7 @@ const VENDOR_STATUS_LABEL: Record<string, { label: string; badgeValue: string }>
 export default function AdminPage() {
   const { token, loading } = useToken();
   const [invites, setInvites] = useState<InviteOut[] | null>(null);
-  const [operators, setOperators] = useState<OperatorOut[] | null>(null);
+  const [operatorsData, setOperatorsData] = useState<AdminOperatorListResponse | null>(null);
   const [cellDensity, setCellDensity] = useState<CellDensityRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -67,7 +69,11 @@ export default function AdminPage() {
   const [bulkLotName, setBulkLotName] = useState("");
   const [bulkResult, setBulkResult] = useState<InviteBulkCreateResponse | null>(null);
 
+  // r5-fix-frontend H-1: 検索・状態絞り込みは backend 側の絞り込み結果（total/counts）に
+  // 基づく。operatorSearchInput は入力中の値、operatorSearchQuery は「検索」実行済みの値
+  // （他の admin 一覧ページの qInput/q と同じパターン）。
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [operatorSearchInput, setOperatorSearchInput] = useState("");
   const [operatorSearchQuery, setOperatorSearchQuery] = useState("");
   const [operatorOffset, setOperatorOffset] = useState(0);
   const [inviteOffset, setInviteOffset] = useState(0);
@@ -79,7 +85,11 @@ export default function AdminPage() {
   const [pendingApplicationsError, setPendingApplicationsError] = useState<string | null>(null);
 
   const [suspendTarget, setSuspendTarget] = useState<OperatorOut | null>(null);
+  // r5-fix-frontend M-2: 失敗時にモーダルを閉じず、ConfirmModal の error prop へ表示する
+  // （モーダルを閉じた後の画面上部 Notice は見落とされやすいため）。
+  const [suspendModalError, setSuspendModalError] = useState<string | null>(null);
   const [verifyTarget, setVerifyTarget] = useState<OperatorOut | null>(null);
+  const [verifyModalError, setVerifyModalError] = useState<string | null>(null);
 
   /* ---- 許可証画像確認モーダル ---- */
   const [licenseModalOperator, setLicenseModalOperator] = useState<OperatorOut | null>(null);
@@ -139,7 +149,10 @@ export default function AdminPage() {
     if (!token) return;
     const [invResult, opsResult, densityResult, appsResult] = await Promise.allSettled([
       adminListInvites({ limit: ADMIN_LIST_DEFAULT_LIMIT, offset: inviteOffset }, token),
-      adminListOperators({ limit: ADMIN_LIST_DEFAULT_LIMIT, offset: operatorOffset }, token),
+      adminListOperators(
+        { status: statusFilter, q: operatorSearchQuery, limit: ADMIN_LIST_DEFAULT_LIMIT, offset: operatorOffset },
+        token,
+      ),
       adminGetCellDensity(token),
       adminListOperatorApplications({ status: "received", limit: 1, offset: 0 }, token),
     ]);
@@ -152,7 +165,7 @@ export default function AdminPage() {
     }
 
     if (opsResult.status === "fulfilled") {
-      setOperators(opsResult.value);
+      setOperatorsData(opsResult.value);
       setOperatorListError(null);
     } else {
       setOperatorListError(toDisplayMessage(opsResult.reason, "業者アカウントの取得に失敗しました"));
@@ -175,7 +188,7 @@ export default function AdminPage() {
     }
 
     setInitialLoadDone(true);
-  }, [token, inviteOffset, operatorOffset]);
+  }, [token, inviteOffset, operatorOffset, statusFilter, operatorSearchQuery]);
 
   useEffect(() => {
     void reload();
@@ -247,22 +260,41 @@ export default function AdminPage() {
     URL.revokeObjectURL(url);
   }
 
+  function openSuspendModal(op: OperatorOut) {
+    setSuspendModalError(null);
+    setSuspendTarget(op);
+  }
+
+  function closeSuspendModal() {
+    setSuspendModalError(null);
+    setSuspendTarget(null);
+  }
+
+  function openVerifyModal(op: OperatorOut) {
+    setVerifyModalError(null);
+    setVerifyTarget(op);
+  }
+
+  function closeVerifyModal() {
+    setVerifyModalError(null);
+    setVerifyTarget(null);
+  }
+
   // 停止／停止解除。停止中は業者の既存トークンが全て 403 になりログインも拒否される。
   // r4回帰是正: window.confirm ではなく ConfirmModal（自前ダイアログ）で確認する（依頼者一覧と同型）。
   async function confirmSuspendChange(op: OperatorOut) {
     if (!token || busy) return;
     const next = !op.is_suspended;
     setBusy(true);
-    setError(null);
+    setSuspendModalError(null);
     try {
       await adminSuspendOperator(op.id, next, token);
-      setSuspendTarget(null);
+      closeSuspendModal();
       await reload();
     } catch (e) {
-      // r4-fix-frontend2 M2 是正: 失敗時も対象をクリアしてモーダルを閉じ、
-      // 隠れずに見える Notice でエラーを出す。
-      setSuspendTarget(null);
-      showError(toDisplayMessage(e, "更新に失敗しました"));
+      // r5-fix-frontend M-2 是正: 失敗時はモーダルを閉じず、ConfirmModal の error prop に
+      // 表示する（モーダルを閉じた後の画面上部 Notice は見落とされやすいため）。
+      setSuspendModalError(toDisplayMessage(e, "更新に失敗しました"));
     } finally {
       setBusy(false);
     }
@@ -273,19 +305,28 @@ export default function AdminPage() {
   async function confirmVerifyChange(op: OperatorOut) {
     if (!token || busy) return;
     setBusy(true);
-    setError(null);
+    setVerifyModalError(null);
     try {
       await adminVerifyOperator(op.id, op.vendor_status !== "active", token);
-      setVerifyTarget(null);
+      closeVerifyModal();
       await reload();
     } catch (e) {
-      // r4-fix-frontend2 M2 是正: 失敗時も対象をクリアしてモーダルを閉じ、
-      // 隠れずに見える Notice でエラーを出す。
-      setVerifyTarget(null);
-      showError(toDisplayMessage(e, "更新に失敗しました"));
+      // r5-fix-frontend M-2 是正: 失敗時はモーダルを閉じず、ConfirmModal の error prop に
+      // 表示する（409「既存業者あり」等の detail もそのまま見える）。
+      setVerifyModalError(toDisplayMessage(e, "更新に失敗しました"));
     } finally {
       setBusy(false);
     }
+  }
+
+  function changeOperatorStatus(next: string) {
+    setOperatorOffset(0);
+    setStatusFilter(next);
+  }
+
+  function runOperatorSearch() {
+    setOperatorOffset(0);
+    setOperatorSearchQuery(operatorSearchInput.trim());
   }
 
   function copyCode(code: string) {
@@ -295,39 +336,22 @@ export default function AdminPage() {
     });
   }
 
-  // 承認待ち（pending）が埋もれないよう pending → limited → active の順に並べる。
-  // 同一ステータス内は既存の順序を維持するため、安定ソートに依存する。
-  const VENDOR_STATUS_ORDER: Record<string, number> = { pending: 0, limited: 1, active: 2 };
-  const sortedOperators = operators
-    ? [...operators].sort(
-        (a, b) =>
-          (VENDOR_STATUS_ORDER[a.vendor_status] ?? 99) -
-          (VENDOR_STATUS_ORDER[b.vendor_status] ?? 99),
-      )
-    : null;
+  // r5-fix-frontend H-1: status/q/limit/offset を backend 側で絞り込み・集計するため、
+  // クライアント側の再フィルタ・再ソートは行わない（pending優先の並びも backend が保証する）。
+  const operators = operatorsData?.items ?? null;
 
-  const normalizedOperatorSearch = operatorSearchQuery.trim().toLowerCase();
-  const matchesOperatorSearch = (op: { company_name: string; contact_email: string }) =>
-    normalizedOperatorSearch === "" ||
-    op.company_name.toLowerCase().includes(normalizedOperatorSearch) ||
-    op.contact_email.toLowerCase().includes(normalizedOperatorSearch);
-
-  // 件数バッジは検索語を反映した件数にする（バッジと空状態表示が矛盾しないように）
-  const searchedOperators = sortedOperators?.filter(matchesOperatorSearch) ?? null;
-  const operatorStatusCounts =
-    searchedOperators?.reduce<Record<string, number>>((acc, op) => {
-      acc[op.vendor_status] = (acc[op.vendor_status] ?? 0) + 1;
-      return acc;
-    }, {}) ?? {};
-
-  const suspendedCount = searchedOperators?.filter((op) => op.is_suspended).length ?? 0;
-  const filteredOperators = searchedOperators?.filter((op) =>
-    statusFilter === "all"
-      ? true
-      : statusFilter === "suspended"
-        ? op.is_suspended
-        : op.vendor_status === statusFilter,
-  );
+  // 各ボタンの件数は backend が返す counts（検索語・絞り込みに関わらず常に全体の内訳）を表示する
+  // （r5-ops.md H-1: 審査待ちバッジが「表示中ページのみ」で0件と誤表示される事故の再発防止。
+  //   検索語で絞り込んだ結果件数は一覧下部の「全N件中」に出る）。
+  const c = operatorsData?.counts;
+  const operatorStatusOptions: { value: string; label: string; count?: number }[] = [
+    { value: "all", label: "すべて", count: c?.all },
+    { value: "active", label: "active", count: c?.active },
+    { value: "limited", label: "limited", count: c?.limited },
+    { value: "pending", label: "pending", count: c?.pending },
+    { value: "rejected", label: "rejected", count: c?.rejected },
+    { value: "suspended", label: "停止中", count: c?.suspended },
+  ];
 
   if (loading || !initialLoadDone) {
     return (
@@ -519,42 +543,25 @@ export default function AdminPage() {
                 <Notice tone="error">{operatorListError}</Notice>
               </div>
             ) : null}
-            <div className="flex flex-wrap gap-2">
-              {["all", "active", "limited", "pending", "suspended"].map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setStatusFilter(s)}
-                  className={`rounded-none px-3 py-1.5 text-xs font-medium transition-colors ${
-                    statusFilter === s
-                      ? "bg-brand-600 text-white"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
-                >
-                  {s === "all" ? "すべて" : s === "suspended" ? "停止中" : s}{" "}
-                  {s === "all"
-                    ? searchedOperators?.length ?? 0
-                    : s === "suspended"
-                      ? suspendedCount
-                      : operatorStatusCounts[s] ?? 0}
-                </button>
-              ))}
-            </div>
+            <StatusFilterBar options={operatorStatusOptions} value={statusFilter} onChange={changeOperatorStatus} />
           </div>
-          <div className="mt-3">
+          <div className="mt-3 flex gap-2">
             <input
               type="text"
-              value={operatorSearchQuery}
-              onChange={(e) => setOperatorSearchQuery(e.target.value)}
+              value={operatorSearchInput}
+              onChange={(e) => setOperatorSearchInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") runOperatorSearch();
+              }}
               className={inputBase}
-              placeholder="会社名・メールで検索"
+              placeholder="会社名・メール・許可番号で検索（部分一致）"
             />
-            <p className="mt-1 text-xs text-slate-400">
-              件数・検索は表示中のページ（{ADMIN_LIST_DEFAULT_LIMIT}件）のみが対象です。他のページは下部のページングで確認してください。
-            </p>
+            <button type="button" onClick={runOperatorSearch} className={`${btnPrimary} shrink-0`}>
+              検索
+            </button>
           </div>
           <ul className="mt-4 divide-y divide-slate-100">
-            {filteredOperators?.map((op) => {
+            {operators?.map((op) => {
               const statusInfo = VENDOR_STATUS_LABEL[op.vendor_status] ?? {
                 label: op.vendor_status,
                 badgeValue: "pending",
@@ -591,7 +598,7 @@ export default function AdminPage() {
                     <div className="flex flex-col items-end gap-1">
                       <button
                         type="button"
-                        onClick={() => setVerifyTarget(op)}
+                        onClick={() => openVerifyModal(op)}
                         disabled={
                           busy || op.is_suspended || (op.vendor_status !== "active" && !op.has_license_image)
                         }
@@ -609,7 +616,7 @@ export default function AdminPage() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => setSuspendTarget(op)}
+                      onClick={() => openSuspendModal(op)}
                       disabled={busy}
                       className={op.is_suspended ? btnPrimary : btnDanger}
                     >
@@ -619,13 +626,13 @@ export default function AdminPage() {
                 </li>
               );
             })}
-            {filteredOperators && filteredOperators.length === 0 ? (
+            {operators && operators.length === 0 ? (
               <li className="py-3 text-sm text-slate-500">該当業者はいません。</li>
             ) : null}
           </ul>
           {operators ? (
             <AdminPagination
-              total={null}
+              total={operatorsData?.total ?? null}
               limit={ADMIN_LIST_DEFAULT_LIMIT}
               offset={operatorOffset}
               itemCount={operators.length}
@@ -760,8 +767,9 @@ export default function AdminPage() {
           }
           confirmLabel={suspendTarget.is_suspended ? "停止を解除する" : "停止する"}
           danger={!suspendTarget.is_suspended}
+          error={suspendModalError}
           busy={busy}
-          onCancel={() => setSuspendTarget(null)}
+          onCancel={closeSuspendModal}
           onConfirm={() => void confirmSuspendChange(suspendTarget)}
         />
       ) : null}
@@ -780,8 +788,9 @@ export default function AdminPage() {
           }
           confirmLabel={verifyTarget.vendor_status === "active" ? "承認を取り消す" : "承認する"}
           danger={verifyTarget.vendor_status === "active"}
+          error={verifyModalError}
           busy={busy}
-          onCancel={() => setVerifyTarget(null)}
+          onCancel={closeVerifyModal}
           onConfirm={() => void confirmVerifyChange(verifyTarget)}
         />
       ) : null}

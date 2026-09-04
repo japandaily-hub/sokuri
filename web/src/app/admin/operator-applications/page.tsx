@@ -92,6 +92,10 @@ export default function AdminOperatorApplicationsPage() {
   const [rejectTarget, setRejectTarget] = useState<OperatorApplicationOut | null>(null);
   const [approveTarget, setApproveTarget] = useState<OperatorApplicationOut | null>(null);
   const [approveResult, setApproveResult] = useState<{ inviteCode: string } | null>(null);
+  // r5-fix-frontend M-2: 失敗時にモーダルを閉じず、ConfirmModal の error prop へ表示する
+  // （画面下部の行を操作した場合、ページ上部 Notice は画面外に出て見落とされやすいため）。
+  const [approveModalError, setApproveModalError] = useState<string | null>(null);
+  const [rejectModalError, setRejectModalError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     if (!token) return;
@@ -153,7 +157,7 @@ export default function AdminOperatorApplicationsPage() {
   async function confirmApprove() {
     if (!approveTarget || !token || busy) return;
     setBusy(true);
-    setError(null);
+    setApproveModalError(null);
     try {
       const res = await adminApproveOperatorApplication(approveTarget.id, token);
       setApproveTarget(null);
@@ -161,11 +165,10 @@ export default function AdminOperatorApplicationsPage() {
       closeDetail();
       await reload();
     } catch (e) {
-      // r4-fix-frontend2 M2 是正: 失敗時も対象をクリアしてモーダルを閉じ、
-      // 隠れずに見える Notice でエラーを出す（409「既に審査済み」等の detail は
-      // backend が日本語で返すため toDisplayMessage でそのまま表示される）。
-      setApproveTarget(null);
-      setError(toDisplayMessage(e, "承認に失敗しました"));
+      // r5-fix-frontend M-2 是正: 失敗時はモーダルを閉じず、ConfirmModal の error prop に
+      // 表示する（409「既に審査済み」等の detail は backend が日本語で返すため
+      // toDisplayMessage でそのまま表示される）。
+      setApproveModalError(toDisplayMessage(e, "承認に失敗しました"));
     } finally {
       setBusy(false);
     }
@@ -176,19 +179,18 @@ export default function AdminOperatorApplicationsPage() {
     if (!reason || !reason.trim()) {
       // ConfirmModal 側で reasonRequired により空欄は確定ボタンが disabled になるため
       // 通常到達しないが、防御的に残す。
-      setError("却下理由を入力してください");
+      setRejectModalError("却下理由を入力してください");
       return;
     }
     setBusy(true);
-    setError(null);
+    setRejectModalError(null);
     try {
       await adminRejectOperatorApplication(rejectTarget.id, reason.trim(), token);
       setRejectTarget(null);
       closeDetail();
       await reload();
     } catch (e) {
-      setRejectTarget(null);
-      setError(toDisplayMessage(e, "却下に失敗しました"));
+      setRejectModalError(toDisplayMessage(e, "却下に失敗しました"));
     } finally {
       setBusy(false);
     }
@@ -250,7 +252,7 @@ export default function AdminOperatorApplicationsPage() {
                   if (e.key === "Enter") runSearch();
                 }}
                 className={inputBase}
-                placeholder="会社名・メール・許可番号で検索"
+                placeholder="会社名／メール／許可番号（部分一致）"
               />
               <button type="button" onClick={runSearch} className={`${btnPrimary} shrink-0`}>
                 検索
@@ -455,7 +457,10 @@ export default function AdminOperatorApplicationsPage() {
                   type="button"
                   className={btnDanger}
                   disabled={busy}
-                  onClick={() => setRejectTarget(selected)}
+                  onClick={() => {
+                    setRejectModalError(null);
+                    setRejectTarget(selected);
+                  }}
                 >
                   却下する
                 </button>
@@ -463,7 +468,10 @@ export default function AdminOperatorApplicationsPage() {
                   type="button"
                   className={btnPrimary}
                   disabled={busy}
-                  onClick={() => setApproveTarget(selected)}
+                  onClick={() => {
+                    setApproveModalError(null);
+                    setApproveTarget(selected);
+                  }}
                 >
                   承認する
                 </button>
@@ -484,8 +492,12 @@ export default function AdminOperatorApplicationsPage() {
           title={`${approveTarget.company_name}を承認します`}
           message="承認すると招待コードが発行され、申込者へ承認メールが送信されます。よろしいですか？"
           confirmLabel="承認する"
+          error={approveModalError}
           busy={busy}
-          onCancel={() => setApproveTarget(null)}
+          onCancel={() => {
+            setApproveModalError(null);
+            setApproveTarget(null);
+          }}
           onConfirm={() => void confirmApprove()}
         />
       ) : null}
@@ -499,8 +511,12 @@ export default function AdminOperatorApplicationsPage() {
           withReason
           reasonRequired
           reasonLabel="却下理由（必須・申込者に表示されます）"
+          error={rejectModalError}
           busy={busy}
-          onCancel={() => setRejectTarget(null)}
+          onCancel={() => {
+            setRejectModalError(null);
+            setRejectTarget(null);
+          }}
           onConfirm={(reason) => void confirmReject(reason)}
         />
       ) : null}

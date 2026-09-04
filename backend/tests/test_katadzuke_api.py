@@ -533,7 +533,7 @@ async def test_full_flow_bid_select_reduction_complete_review(
     assert r.status_code == 201
 
     r = await client.get("/api/v1/admin/operators", headers=_auth(admin_token))
-    op1 = next(o for o in r.json() if o["id"] == op1_id)
+    op1 = next(o for o in r.json()["items"] if o["id"] == op1_id)
     assert op1["rating"] == 5.0
 
 
@@ -1429,6 +1429,141 @@ async def test_admin_list_operator_applications_status_q_total_and_received_firs
         headers=_auth(admin_token),
     )
     assert r.status_code == 422
+
+
+async def test_admin_list_operator_applications_invalid_status_422(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """M-5対応: status に許可されていない値（綴り違い等）を渡すと422になる。
+
+    是正前は空一覧 {"items":[],"total":0} を無言で返しており、審査待ちキューが
+    「0件」に見える無言の失敗になっていた。
+    """
+    admin_token = await _make_admin(client, db_session)
+    r = await client.get(
+        "/api/v1/admin/operator-applications",
+        params={"status": "pendingg"},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 422
+
+
+async def test_admin_list_operator_applications_q_matches_license_number(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """M-1対応: q は会社名/メールに加え古物商許可番号の部分一致でも申込を検索できる。"""
+    admin_token = await _make_admin(client, db_session)
+    r = await client.post(
+        "/api/v1/operator-applications",
+        json=_application_payload(email="license_q_check@example.com"),
+    )
+    assert r.status_code == 201
+
+    r = await client.get(
+        "/api/v1/admin/operator-applications",
+        params={"q": "123456789012"},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["total"] == 1
+    assert body["items"][0]["contact_email"] == "license_q_check@example.com"
+
+
+async def test_admin_approve_operator_application_existing_operator_409(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """M-3対応: 同じメールのOperatorが既に存在する場合、招待コードを発行せず409。
+
+    是正前は承認が成功したように見えるが、申込者が本登録すると必ず409（重複メール）
+    で詰み、運営は問い合わせが来るまで気付けなかった。
+    """
+    admin_token = await _make_admin(client, db_session)
+
+    r = await client.post(
+        "/api/v1/auth/operator/signup",
+        json={
+            "company_name": "既存業者株式会社",
+            "email": "dup_existing_operator@example.com",
+            "password": "password123",
+            "license_number": "第123456789012号",
+            "agreed": True,
+        },
+    )
+    assert r.status_code == 201
+
+    r = await client.post(
+        "/api/v1/operator-applications",
+        json=_application_payload(email="dup_existing_operator@example.com"),
+    )
+    application_id = r.json()["application_id"]
+
+    r = await client.patch(
+        f"/api/v1/admin/operator-applications/{application_id}/approve",
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 409
+    assert r.json()["detail"] == "このメールアドレスの業者アカウントは既に存在します。招待コードは発行していません。"
+
+    from app.db.models.invite import Invite
+    from app.db.models.operator_application import OperatorApplication
+
+    app_row = await db_session.get(OperatorApplication, uuid.UUID(application_id))
+    assert app_row.status == "received"  # 審査済みにしない（再承認できる状態を維持）
+    invite = await db_session.scalar(
+        select(Invite).where(Invite.email == "dup_existing_operator@example.com")
+    )
+    assert invite is None  # 使用不能な招待コードを発行・送信しない
+
+
+async def test_operator_application_operator_id_tracked_after_signup(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """M-4対応: 承認発行の招待コードで本登録が完了すると、申込のoperator_idに
+    新規Operatorのidが書き込まれる（一覧・詳細どちらのレスポンスにも反映）。
+    """
+    admin_token = await _make_admin(client, db_session)
+
+    r = await client.post(
+        "/api/v1/operator-applications",
+        json=_application_payload(email="operator_id_track@example.com"),
+    )
+    application_id = r.json()["application_id"]
+
+    r = await client.patch(
+        f"/api/v1/admin/operator-applications/{application_id}/approve",
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 200
+    assert r.json()["application"]["operator_id"] is None  # 承認直後・本登録未完了
+    invite_code = r.json()["invite_code"]
+
+    r = await client.post(
+        "/api/v1/auth/operator/signup",
+        json={
+            "invite_code": invite_code,
+            "company_name": "追跡テスト株式会社",
+            "email": "operator_id_track@example.com",
+            "password": "password123",
+            "license_number": "第123456789012号",
+            "agreed": True,
+        },
+    )
+    assert r.status_code == 201
+    operator_id = r.json()["operator"]["id"]
+
+    r = await client.get(
+        f"/api/v1/admin/operator-applications/{application_id}", headers=_auth(admin_token)
+    )
+    assert r.status_code == 200
+    assert r.json()["operator_id"] == operator_id
+
+    r = await client.get(
+        "/api/v1/admin/operator-applications", headers=_auth(admin_token)
+    )
+    assert r.status_code == 200
+    target = next(a for a in r.json()["items"] if a["id"] == application_id)
+    assert target["operator_id"] == operator_id
 
 
 # ──────────────────────────── チャット・日程調整・プロフィール・最高入札額 ────────────────────────────

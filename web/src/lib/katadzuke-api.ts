@@ -1615,11 +1615,36 @@ export function adminListInvites(
   return request(`/admin/invites?${buildOffsetListQuery(params)}`, { token });
 }
 
+/**
+ * admin業者一覧のレスポンス（r5-fix-frontend H-1: backend が status/q 絞り込み＋total集計、
+ * および現在の絞り込みに関わらず常に正確な状態別件数を返す counts に対応）。
+ * items は pending 優先ソート（backend側）。
+ */
+export interface AdminOperatorListResponse {
+  items: OperatorOut[];
+  total: number;
+  /** 状態別の全体件数。status/q の絞り込み内容に関わらず常に全件の内訳を返す
+   *  （審査待ちバッジを常に正確に保つため。r5-ops.md H-1 是正・backend の counts と 1:1）。 */
+  counts: {
+    all: number;
+    pending: number;
+    limited: number;
+    active: number;
+    rejected: number;
+    suspended: number;
+  };
+}
+
+/**
+ * status（"all"|"pending"|"limited"|"active"|"rejected"|"suspended"）/q/limit/offset は
+ * すべて backend 側で絞り込み・集計される（r5-fix-frontend H-1: 旧「表示中ページのみが
+ * 検索・件数の対象」制約を解消。/admin/operator-applications と同型）。
+ */
 export function adminListOperators(
-  params: AdminOffsetListParams,
+  params: AdminListParams,
   token: string,
-): Promise<OperatorOut[]> {
-  return request(`/admin/operators?${buildOffsetListQuery(params)}`, { token });
+): Promise<AdminOperatorListResponse> {
+  return request(`/admin/operators?${buildAdminListQuery(params)}`, { token });
 }
 
 export function adminVerifyOperator(

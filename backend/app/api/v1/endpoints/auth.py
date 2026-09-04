@@ -36,6 +36,7 @@ from app.core.security import (
 )
 from app.db.models.invite import Invite
 from app.db.models.operator import Operator
+from app.db.models.operator_application import OperatorApplication
 from app.db.models.user import User
 from app.db.session import get_session
 from app.schemas_katadzuke import (
@@ -362,6 +363,16 @@ async def operator_signup(
     if invite is not None:
         invite.used_at = datetime.now(timezone.utc)
         invite.operator_id = operator.id
+        # M-4対応: admin承認フローで発行された招待コードなら、その発行元の
+        # 事前申込（invite_codeで対応付け）に operator_id を書き戻す。
+        # 招待コードとの対応付けは OperatorApplication.invite_code
+        # （承認時に発行コードを控える。app/api/v1/endpoints/admin.py の
+        # approve_operator_application 参照）で引く。
+        application = await session.scalar(
+            select(OperatorApplication).where(OperatorApplication.invite_code == invite.code)
+        )
+        if application is not None:
+            application.operator_id = operator.id
     await session.commit()
     await session.refresh(operator)
     token = create_access_token(operator.id, "operator", "operator")

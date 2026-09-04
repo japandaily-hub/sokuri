@@ -104,6 +104,34 @@ class OperatorOut(BaseModel):
     has_license_image: bool = False
 
 
+class OperatorListCounts(BaseModel):
+    """GET /admin/operators の ``counts``（現在の status/q 絞込に関わらず全件中の内訳）。
+
+    web側のステータスバッジ（審査待ち等）が「現在ページの50件」だけを集計して
+    しまい2ページ目以降の pending 業者を見落とす事故（承認漏れ）を防ぐため、
+    全件ベースの内訳を毎回返す。
+    """
+
+    all: int
+    pending: int
+    limited: int
+    active: int
+    rejected: int
+    suspended: int
+
+
+class OperatorListResponse(BaseModel):
+    """H-1対応: GET /admin/operators の一覧応答（items + total + counts）。
+
+    OperatorApplicationListResponse と同型の契約（items/total）に加え、
+    絞込に関わらない全件内訳の ``counts`` を返す（web 担当と合意済みの契約）。
+    """
+
+    items: list[OperatorOut]
+    total: int
+    counts: OperatorListCounts
+
+
 class OperatorPublicOut(BaseModel):
     """ユーザーに見せる業者公開情報。"""
 
