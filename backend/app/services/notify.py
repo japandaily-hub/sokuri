@@ -2,6 +2,11 @@
 
 BREVO_API_KEY 未設定時は送信をスキップしてログのみ残す（開発・テスト安全側）。
 送信失敗は呼び出し元の処理を失敗させない（通知はベストエフォート）。
+
+BREVO_API_KEY 未設定によるスキップは、admin 宛の業者申込通知（重要度が高い）を
+含む全メール通知が無言で消える事故（ADD-H2）につながるため、プロセス内で最初の
+1回だけ運営アラート（alerts.send_alert）を発火して可視化する（同一プロセスでの
+連打は行わない。alerts.send_alert 自体も key 単位のクールダウンを持つ）。
 """
 
 from __future__ import annotations
@@ -12,10 +17,19 @@ import logging
 import httpx
 
 from app.config import get_settings
+from app.services import alerts
 
 logger = logging.getLogger(__name__)
 
 _BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/email"
+# BREVO_API_KEY 未設定スキップの運営アラートを、プロセス内で最初の1回だけ発火するためのフラグ。
+_brevo_missing_key_alerted = False
+
+
+def reset_brevo_missing_key_alert_state_for_tests() -> None:
+    """テスト専用: 「未設定アラート発火済み」フラグを初期化する。"""
+    global _brevo_missing_key_alerted
+    _brevo_missing_key_alerted = False
 # LINE専用ユーザー（実メール未設定）に払い出す仮メールのドメインサフィックス。
 # auth.py の line_exchange で `line-{line_user_id}@line.katazuke.internal` として発行される。
 _PLACEHOLDER_EMAIL_SUFFIX = "@line.katazuke.internal"
@@ -51,7 +65,20 @@ def is_deleted_account_email(email: str | None) -> bool:
 async def _send(to_email: str, subject: str, html: str) -> bool:
     settings = get_settings()
     if not settings.brevo_api_key:
-        logger.info("notify: BREVO_API_KEY 未設定のため送信スキップ - %s / %s", to_email, subject)
+        logger.error("notify: BREVO_API_KEY 未設定のため送信スキップ - %s / %s", to_email, subject)
+        global _brevo_missing_key_alerted
+        if not _brevo_missing_key_alerted:
+            _brevo_missing_key_alerted = True
+            alerts.fire_and_forget(
+                alerts.send_alert(
+                    "メール送信キー未設定（BREVO_API_KEY）",
+                    "BREVO_API_KEY が未設定のため、メール通知が無言でスキップされています。"
+                    "admin宛の業者申込通知（send_operator_application_admin_alert 等）を含む"
+                    "全てのメール送信が届いていません。至急、環境変数を設定してください。",
+                    severity="critical",
+                    key="notify_brevo_api_key_missing",
+                )
+            )
         return False
     payload = {
         "sender": {"email": settings.mail_from, "name": settings.mail_from_name},

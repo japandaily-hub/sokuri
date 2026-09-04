@@ -409,7 +409,7 @@ export default function FaqPage() {
                 <Ic name="chat" />
                 <div className="faq-contact-info">
                   <h3>解決しない場合はお問い合わせください</h3>
-                  <p>フォームよりお気軽にご連絡ください。通常2営業日以内にご返信いたします。</p>
+                  <p>フォームよりお気軽にご連絡ください。通常3営業日以内にご返信いたします。</p>
                   <Link
                     href="/contact"
                     className="btn btn-primary"

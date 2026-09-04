@@ -40,7 +40,7 @@ class UserLoginRequest(BaseModel):
 # 業者向け利用規約・プライバシーポリシーの現行バージョン。
 # クライアントからは受け取らず、同意時点でサーバーがこの値を確定させて記録する
 # （クライアント入力のバージョン文字列は改ざん・偽装され得るため信用しない）。
-CURRENT_OPERATOR_TERMS_VERSION = "2026-07-02"
+CURRENT_OPERATOR_TERMS_VERSION = "2026-09-04"
 
 
 class OperatorSignupRequest(BaseModel):
@@ -925,7 +925,9 @@ class BankAccountMaskedOut(BaseModel):
 
     bank_name: str
     branch_name: str
-    account_type: str
+    # L1対応: 申込時の入力（BankAccountIn.account_type）と同じ Literal にし、
+    # web の型（TS Literal）と契約を一致させる（QA r4-review L1）。
+    account_type: Literal["ordinary", "checking"]
     account_number_masked: str
     account_holder: str
 
@@ -957,12 +959,23 @@ class OperatorApplicationOut(BaseModel):
     created_at: datetime
 
 
+class OperatorApplicationListResponse(BaseModel):
+    """M4対応: GET /admin/operator-applications の一覧応答（items + total）。
+
+    admin_list_cases/admin_list_transactions/admin_list_users と同型の契約にし、
+    web 側のページング・件数表示を一覧APIごとに作り分けずに済むようにする。
+    """
+
+    items: list[OperatorApplicationOut]
+    total: int
+
+
 class OperatorApplicationBankAccountRevealOut(BaseModel):
     """admin向け: 口座情報の全桁復号結果。アクセスは呼び出し元でログに記録すること。"""
 
     bank_name: str
     branch_name: str
-    account_type: str
+    account_type: Literal["ordinary", "checking"]
     account_number: str
     account_holder: str
 

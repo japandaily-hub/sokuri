@@ -6,7 +6,9 @@
  * デザインレビュー B-3 対応: 旧 slate 系 AuthCard（components/AuthCard.tsx）を廃し、
  * ユーザー側 /login と同じ視覚言語（AuthBar/auth-card/Field/PasswordField、
  * katazuke-pages.css）に統一。BUYER タグでアカウント種別を明示する。
- * 認証ロジック（signIn("operator-credentials")・callbackUrl・オープンリダイレクト対策）は変更していない。
+ * signIn("operator-credentials") 自体のロジックは変更していない。
+ * r4-fix-frontend2 M3: callbackUrl は /operator 配下のみ許可（それ以外は既定の /operator へ）し、
+ * 同一アカウント種別（業者）でログイン中でも自動遷移せずバナー＋サインアウト導線を出すよう変更。
  */
 
 import "../operator-auth.css";
@@ -23,11 +25,26 @@ function OperatorLoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const { data: session, status } = useSession();
-  // オープンリダイレクト対策: サイト内パスのみ許可
-  const callbackUrl = safeInternalPath(params.get("callbackUrl"), "/operator/cases");
+  // オープンリダイレクト対策: サイト内パスのみ許可。
+  // r4-fix-frontend2 M3 是正: さらに /operator 配下以外への到達性ガードを追加する
+  // （safeInternalPath はサイト内パスかどうかしか見ないため、/mypage 等 /operator 圏外の
+  // パスもそのまま通ってしまい、遷移先で middleware に弾かれて /forbidden 行きになっていた）。
+  const rawCallbackUrl = safeInternalPath(params.get("callbackUrl"), "/operator");
+  const callbackUrl =
+    rawCallbackUrl === "/operator" || rawCallbackUrl.startsWith("/operator/")
+      ? rawCallbackUrl
+      : "/operator";
   // r3 再レビュー N-6 是正: katadzuke-api.ts の共通後始末（403 account_suspended）が
   // /operator配下のパスから発火した場合はここへ ?reason=suspended 付きで遷移させる。
   const suspended = params.get("reason") === "suspended";
+
+  // r4-fix-frontend2 M3 是正: 従来は accountType==="operator" の一致ケースを
+  // useEffect で無条件に自動 replace していたため、既に業者としてログイン中の状態から
+  // /operator/login を開いて「別の業者アカウントでログインし直す」導線に一切到達できな
+  // かった（自動遷移がフォーム描画直後に発火し、バナーを見る前に離脱させられていた）。
+  // 自動遷移は廃止し、同一アカウント種別でもバナー＋ダッシュボードへの手動リンク＋
+  // サインアウト導線を表示する。
+  const sameAccountSignedIn = status === "authenticated" && session?.accountType === "operator";
   // r3 再レビュー3回目 是正: /login と対称に、依頼者アカウントでログイン中に
   // /operator/login を開いた場合はフォームを表示したまま上部にバナー＋サインアウト導線を出す。
   const otherAccountSignedIn = status === "authenticated" && session?.accountType !== "operator";
@@ -77,6 +94,25 @@ function OperatorLoginForm() {
               <h1 className="auth-title">業者ログイン</h1>
               <p className="auth-sub">登録業者さま向けの管理画面に入ります。</p>
             </div>
+
+            {sameAccountSignedIn ? (
+              <div className="auth-error" role="status" style={{ flexDirection: "column", alignItems: "flex-start", gap: 8 }}>
+                <span>
+                  既に業者アカウントでログイン中です。
+                  <Link href={callbackUrl} style={{ marginLeft: 4, textDecoration: "underline" }}>
+                    ダッシュボードへ進む →
+                  </Link>
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-block"
+                  onClick={() => void onSignOutToOperatorLogin()}
+                  disabled={signOutBusy}
+                >
+                  {signOutBusy ? "サインアウト中…" : "別の業者アカウントでログインする（サインアウト）"}
+                </button>
+              </div>
+            ) : null}
 
             {otherAccountSignedIn ? (
               <div className="auth-error" role="alert" style={{ flexDirection: "column", alignItems: "flex-start", gap: 8 }}>

@@ -727,7 +727,7 @@ export interface UserProfile {
   /** false の場合 LINE専用アカウント（パスワード未設定）。 */
   has_password: boolean;
   line_linked: boolean;
-  /** "YYYY-MM-DD"。古物営業法の本人確認・年齢確認に使用。 */
+  /** "YYYY-MM-DD"。なりすまし・不正出品の防止および運営からの本人確認のため（任意提出）に使用。古物営業法第15条の確認義務を負うのは訪問する古物商（業者）であり、当社ではない。 */
   birth_date: string | null;
   occupation: string | null;
   identity_status: IdentityStatus;
@@ -830,7 +830,7 @@ export function deleteMyAccount(
 }
 
 // ---------------------------------------------------------------------------
-// 住所（古物営業法の本人確認・成約時開示に使用）
+// 住所（なりすまし・不正出品の防止および運営からの本人確認のため（任意提出）に使用。成約時は業者へ開示。古物営業法第15条の確認義務を負うのは訪問する古物商＝業者であり、当社ではない）
 // ---------------------------------------------------------------------------
 
 export interface AddressOut {
@@ -1061,9 +1061,13 @@ export interface AdminIdentityDocument {
 
 export function listIdentityDocumentsAdmin(
   status: "pending" | "all",
+  params: { limit?: number; offset?: number },
   token: string,
 ): Promise<AdminIdentityDocument[]> {
-  return request(`/admin/identity-documents?${new URLSearchParams({ status })}`, { token });
+  const sp = new URLSearchParams({ status });
+  sp.set("limit", String(params.limit ?? ADMIN_LIST_DEFAULT_LIMIT));
+  sp.set("offset", String(params.offset ?? 0));
+  return request(`/admin/identity-documents?${sp.toString()}`, { token });
 }
 
 export async function fetchIdentityDocumentBlobAdmin(
@@ -1199,6 +1203,126 @@ export function submitOperatorApplication(payload: {
   agreed: boolean;
 }): Promise<{ application_id: string; status: string }> {
   return request("/operator-applications", { method: "POST", body: JSON.stringify(payload) });
+}
+
+// ---------------------------------------------------------------------------
+// 管理: 業者事前申込（/business 経由）の審査・承認・却下・口座開示
+// r4監査 H1/ADD-H1 対応: 一覧・詳細・承認・却下・口座開示のいずれも画面から到達できなかった穴を埋める。
+// ---------------------------------------------------------------------------
+
+export type OperatorApplicationStatus = "received" | "approved" | "rejected";
+
+/** admin一覧・詳細用。口座番号は下4桁マスクのみ含む（全桁はreveal APIで別途取得）。 */
+export interface BankAccountMaskedOut {
+  bank_name: string;
+  branch_name: string;
+  account_type: "ordinary" | "checking";
+  account_number_masked: string;
+  account_holder: string;
+}
+
+export interface OperatorApplicationOut {
+  id: string;
+  status: OperatorApplicationStatus;
+  company_name: string;
+  representative_name: string;
+  registered_address: string;
+  contact_name: string;
+  contact_email: string;
+  contact_phone: string;
+  license_number: string;
+  business_type: "corp" | "sole" | null;
+  service_area: string | null;
+  categories: string | null;
+  message: string | null;
+  invoice_number: string | null;
+  bank_account: BankAccountMaskedOut | null;
+  agreed_terms_version: string | null;
+  agreed_at: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  reject_reason: string | null;
+  operator_id: string | null;
+  created_at: string;
+}
+
+/** admin向け: 口座情報の全桁復号結果。取得のたびに backend 側でアクセスログが記録される。 */
+export interface OperatorApplicationBankAccountRevealOut {
+  bank_name: string;
+  branch_name: string;
+  account_type: string;
+  account_number: string;
+  account_holder: string;
+}
+
+export interface OperatorApplicationApproveResponse {
+  application: OperatorApplicationOut;
+  invite_code: string;
+}
+
+/**
+ * admin一覧のレスポンス（r4-fix-frontend2 M4: backend が status/q 絞り込み＋total 集計に対応）。
+ * items は status="received" 優先ソート（backend側）。
+ */
+export interface OperatorApplicationListResponse {
+  items: OperatorApplicationOut[];
+  total: number;
+}
+
+/**
+ * status/q/limit/offset はすべて backend 側で絞り込み・集計される
+ * （r4-fix-frontend2 M4: 旧「先頭ページのみが検索・件数の対象」制約を解消）。
+ * status は AdminListParams.status を流用し "all" 指定時は絞り込みなし（buildAdminListQuery参照）。
+ */
+export function adminListOperatorApplications(
+  params: AdminListParams,
+  token: string,
+): Promise<OperatorApplicationListResponse> {
+  return request(`/admin/operator-applications?${buildAdminListQuery(params)}`, { token });
+}
+
+export function adminGetOperatorApplication(
+  applicationId: string,
+  token: string,
+): Promise<OperatorApplicationOut> {
+  return request(`/admin/operator-applications/${encodeURIComponent(applicationId)}`, { token });
+}
+
+/**
+ * admin が業者申込の振込先口座情報を全桁復号して取得する。
+ * 必要な時（口座内容を実際に確認する時）だけ呼び出すこと（backend でアクセスがログ記録される）。
+ */
+export function adminRevealOperatorApplicationBankAccount(
+  applicationId: string,
+  token: string,
+): Promise<OperatorApplicationBankAccountRevealOut> {
+  return request(
+    `/admin/operator-applications/${encodeURIComponent(applicationId)}/reveal-bank-account`,
+    { method: "POST", token },
+  );
+}
+
+/** admin が業者申込を承認する。招待コードが新規発行され、申込者へ承認メールが送られる。 */
+export function adminApproveOperatorApplication(
+  applicationId: string,
+  token: string,
+): Promise<OperatorApplicationApproveResponse> {
+  return request(
+    `/admin/operator-applications/${encodeURIComponent(applicationId)}/approve`,
+    { method: "PATCH", token },
+  );
+}
+
+/** admin が業者申込を却下する。理由は申込者へ却下メールで送られる。 */
+export function adminRejectOperatorApplication(
+  applicationId: string,
+  rejectReason: string,
+  token: string,
+): Promise<OperatorApplicationOut> {
+  return request(
+    `/admin/operator-applications/${encodeURIComponent(applicationId)}/reject`,
+    { method: "PATCH", body: JSON.stringify({ reject_reason: rejectReason }), token },
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1471,12 +1595,31 @@ export function adminBulkCreateInvites(
   });
 }
 
-export function adminListInvites(token: string): Promise<InviteOut[]> {
-  return request("/admin/invites", { token });
+/** 一覧の既定/上限ページサイズ（backend の _DEFAULT_LIST_LIMIT=100 未満に抑え、無言truncateを避ける）。 */
+export interface AdminOffsetListParams {
+  limit?: number;
+  offset?: number;
 }
 
-export function adminListOperators(token: string): Promise<OperatorOut[]> {
-  return request("/admin/operators", { token });
+function buildOffsetListQuery(params: AdminOffsetListParams): string {
+  const sp = new URLSearchParams();
+  sp.set("limit", String(params.limit ?? ADMIN_LIST_DEFAULT_LIMIT));
+  sp.set("offset", String(params.offset ?? 0));
+  return sp.toString();
+}
+
+export function adminListInvites(
+  params: AdminOffsetListParams,
+  token: string,
+): Promise<InviteOut[]> {
+  return request(`/admin/invites?${buildOffsetListQuery(params)}`, { token });
+}
+
+export function adminListOperators(
+  params: AdminOffsetListParams,
+  token: string,
+): Promise<OperatorOut[]> {
+  return request(`/admin/operators?${buildOffsetListQuery(params)}`, { token });
 }
 
 export function adminVerifyOperator(

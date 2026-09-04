@@ -89,6 +89,9 @@ export default function AdminUsersPage() {
       }
       await reload();
     } catch (e) {
+      // r4-fix-frontend2 M2 波及是正: 失敗時も対象をクリアしてモーダルを閉じ、
+      // 隠れずに見える Notice でエラーを出す（admin/page.tsx・operator-applications/page.tsx と同型）。
+      setSuspendTarget(null);
       setError(toDisplayMessage(e, "更新に失敗しました"));
     } finally {
       setBusy(false);
@@ -110,6 +113,7 @@ export default function AdminUsersPage() {
       setRoleTarget(null);
       await reload();
     } catch (e) {
+      setRoleTarget(null);
       setError(
         toDisplayMessage(
           e,

@@ -117,7 +117,7 @@ export default function AdminTransactionsPage() {
                   if (e.key === "Enter") runSearch();
                 }}
                 className={inputBase}
-                placeholder="取引ID・案件ID（前方一致）／依頼者メール・業者名（部分一致）で検索"
+                placeholder="取引ID・案件ID（完全一致）／依頼者メール・業者名（部分一致）で検索"
               />
               <button type="button" onClick={runSearch} className={`${btnPrimary} shrink-0`}>
                 検索

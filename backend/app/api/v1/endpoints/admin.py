@@ -10,7 +10,7 @@ from typing import Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from fastapi.responses import Response
-from sqlalchemy import func, or_, select, text, update
+from sqlalchemy import case, func, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -51,6 +51,7 @@ from app.schemas_katadzuke import (
     InviteOut,
     OperatorApplicationApproveResponse,
     OperatorApplicationBankAccountRevealOut,
+    OperatorApplicationListResponse,
     OperatorApplicationOut,
     OperatorApplicationRejectRequest,
     OperatorOut,
@@ -822,22 +823,58 @@ async def demote_admin_to_user(
 # ──────────────────────────── 業者事前申込（審査） ────────────────────────────
 
 
-@router.get("/admin/operator-applications", response_model=list[OperatorApplicationOut])
+@router.get("/admin/operator-applications", response_model=OperatorApplicationListResponse)
 async def list_operator_applications(
-    limit: int = Query(default=_DEFAULT_LIST_LIMIT, ge=1, le=_MAX_LIST_LIMIT),
+    status_filter: str | None = Query(
+        default=None, alias="status", max_length=32, description="未指定は全件（received/approved/rejected）"
+    ),
+    q: str | None = Query(default=None, max_length=255, description="会社名/メールの部分一致"),
+    limit: int = Query(default=_ADMIN_CASE_TXN_DEFAULT_LIMIT, ge=1, le=_ADMIN_CASE_TXN_MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
     admin: User = Depends(get_current_admin),
     session: AsyncSession = Depends(get_session),
-) -> list[OperatorApplicationOut]:
+) -> OperatorApplicationListResponse:
+    """業者事前申込の一覧（M4対応: status/q絞込 + total を追加、応答は {items,total}）。
+
+    web側が最新100件しか見ておらず未審査(received)がページ外に埋もれるバグの是正として、
+    received を常に先頭に固定し、その中では created_at 降順・同時刻は id 降順で決定的に
+    並べる（admin_list_cases 等と同型の tie-breaker。QA M3系の再発防止）。
+    """
+    conditions = []
+    if status_filter:
+        conditions.append(OperatorApplication.status == status_filter)
+    q_norm = (q or "").strip()
+    if q_norm:
+        # security review M-3 と同方針: ilike はエスケープ付きで無害化する。
+        escaped_q = _escape_ilike_value(q_norm)
+        conditions.append(
+            or_(
+                OperatorApplication.company_name.ilike(f"%{escaped_q}%", escape="\\"),
+                OperatorApplication.contact_email.ilike(f"%{escaped_q}%", escape="\\"),
+            )
+        )
+
+    total = await session.scalar(
+        select(func.count()).select_from(OperatorApplication).where(*conditions)
+    )
+
+    received_first = case((OperatorApplication.status == "received", 0), else_=1)
     applications = (
         await session.scalars(
             select(OperatorApplication)
-            .order_by(OperatorApplication.created_at.desc())
+            .where(*conditions)
+            .order_by(
+                received_first,
+                OperatorApplication.created_at.desc(),
+                OperatorApplication.id.desc(),
+            )
             .limit(limit)
             .offset(offset)
         )
     ).all()
-    return [_to_application_out(a) for a in applications]
+    return OperatorApplicationListResponse(
+        items=[_to_application_out(a) for a in applications], total=int(total or 0)
+    )
 
 
 @router.get(

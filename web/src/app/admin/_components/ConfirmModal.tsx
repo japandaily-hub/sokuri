@@ -8,7 +8,7 @@
  */
 
 import { useState } from "react";
-import { btnDanger, btnPrimary, btnSecondary, inputBase } from "@/components/kdz/Ui";
+import { Notice, btnDanger, btnPrimary, btnSecondary, inputBase } from "@/components/kdz/Ui";
 
 export function ConfirmModal({
   title,
@@ -18,6 +18,8 @@ export function ConfirmModal({
   danger = false,
   withReason = false,
   reasonLabel = "理由（任意）",
+  reasonRequired = false,
+  error = null,
   busy = false,
   onCancel,
   onConfirm,
@@ -28,14 +30,19 @@ export function ConfirmModal({
   cancelLabel?: string;
   /** true の場合、確定ボタンを btnDanger（停止など不可逆寄りの操作向け）にする。 */
   danger?: boolean;
-  /** true の場合、任意入力の理由欄を表示し onConfirm に渡す。 */
+  /** true の場合、理由欄を表示し onConfirm に渡す。 */
   withReason?: boolean;
   reasonLabel?: string;
+  /** true かつ withReason の場合、理由が空だと確定ボタンを disabled にしヒントを表示する（却下理由必須フロー用。r4-fix-frontend2 M2）。 */
+  reasonRequired?: boolean;
+  /** 操作失敗時のエラーメッセージ。渡された場合、モーダル内にも表示する（r4-fix-frontend2 M2: ConfirmModal拡張）。 */
+  error?: string | null;
   busy?: boolean;
   onCancel: () => void;
   onConfirm: (reason: string | null) => void;
 }) {
   const [reason, setReason] = useState("");
+  const reasonMissing = withReason && reasonRequired && reason.trim() === "";
 
   return (
     <div
@@ -53,6 +60,11 @@ export function ConfirmModal({
           {title}
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-slate-600">{message}</p>
+        {error ? (
+          <div className="mt-3">
+            <Notice tone="error">{error}</Notice>
+          </div>
+        ) : null}
         {withReason ? (
           <div className="mt-3">
             <label className="text-xs text-slate-500" htmlFor="adminConfirmModalReason">
@@ -65,6 +77,9 @@ export function ConfirmModal({
               value={reason}
               onChange={(e) => setReason(e.target.value)}
             />
+            {reasonMissing ? (
+              <p className="mt-1 text-xs text-red-600">理由を入力してください</p>
+            ) : null}
           </div>
         ) : null}
         <div className="mt-4 flex justify-end gap-2">
@@ -75,7 +90,7 @@ export function ConfirmModal({
             type="button"
             className={danger ? btnDanger : btnPrimary}
             onClick={() => onConfirm(withReason ? reason.trim() || null : null)}
-            disabled={busy}
+            disabled={busy || reasonMissing}
           >
             {confirmLabel}
           </button>

@@ -145,7 +145,7 @@ function NotificationsContent() {
     const linked = searchParams.get("linked");
     const err = searchParams.get("error");
     if (linked === "1") {
-      setLineNotice({ tone: "success", text: "LINE連携が完了しました。今後は入札・メッセージの通知がLINEに届きます（メールの代わりにLINEでお知らせします）。" });
+      setLineNotice({ tone: "success", text: "LINE連携が完了しました。今後は入札の通知はメールの代わりにLINEへ届きます。チャットの新着通知はLINE連携中のみ届きます（連携を解除するとチャット通知は届きません）。" });
       // r3 再レビュー3回目 是正: LINE連携成功（=認証が正常往復した）経路でもループ検知の
       // 発火履歴をリセットする。
       clearRedirectLoopStorage();
@@ -318,7 +318,7 @@ function NotificationsContent() {
                     <>
                       <strong>LINE連携済み</strong>
                       <br />
-                      入札・メッセージの通知はLINEに届きます（メールの代わりにLINEでお知らせします）。
+                      入札の通知はメールの代わりにLINEへ届きます。チャットの新着通知はLINE連携中のみ届きます（連携を解除するとチャット通知は届きません）。
                     </>
                   ) : (
                     <>
@@ -468,7 +468,7 @@ function NotificationsContent() {
             <p className="modal-sub">
               {modal === "link"
                 ? "本人確認のため、現在のパスワードを入力してください。"
-                : "解除すると、以後の入札・メッセージ通知はLINEに届かなくなります。本人確認のため、現在のパスワードを入力してください。"}
+                : "解除すると、入札の通知はメールに戻り、チャットの新着通知は届かなくなります。本人確認のため、現在のパスワードを入力してください。"}
             </p>
             <form onSubmit={(e) => void onConfirmModal(e)}>
               <Field label="現在のパスワード" htmlFor="line-modal-pw" error={pwErr}>

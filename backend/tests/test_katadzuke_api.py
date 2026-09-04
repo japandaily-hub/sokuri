@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import timedelta
 from typing import AsyncIterator
 from unittest.mock import AsyncMock, patch
 
@@ -231,6 +232,41 @@ async def test_operator_signup_records_agreement(
     assert operator is not None
     assert operator.agreed_terms_version == CURRENT_OPERATOR_TERMS_VERSION
     assert operator.agreed_at is not None
+
+
+async def test_operator_with_old_terms_version_can_still_login(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """CURRENT_OPERATOR_TERMS_VERSION 改定前に同意した既存業者も、再同意ゲートが
+    存在しないためログイン・API利用がブロックされないことを確認する（ADD-H1対応）。
+
+    agreed_terms_version は auth.py/operator_applications.py の登録・申込時にのみ
+    書き込まれ、ログイン処理（operator_login）を含むどのエンドポイントも比較・検査
+    していない（grep で確認済み）。よって定数更新は既存業者の締め出しを生まない。
+    """
+    import uuid as _uuid
+
+    old_op = Operator(
+        id=_uuid.uuid4(),
+        company_name="旧規約同意業者",
+        contact_email="old_terms_op@example.com",
+        password_hash=hash_password("password123"),
+        vendor_status="active",
+        agreed_terms_version="2026-07-02",
+    )
+    db_session.add(old_op)
+    await db_session.commit()
+
+    r = await client.post(
+        "/api/v1/auth/operator/login",
+        json={"email": "old_terms_op@example.com", "password": "password123"},
+    )
+    assert r.status_code == 200, r.text
+    assert old_op.agreed_terms_version != CURRENT_OPERATOR_TERMS_VERSION
+
+    op_token = r.json()["access_token"]
+    r = await client.get("/api/v1/cases", headers=_auth(op_token))
+    assert r.status_code == 200
 
 
 async def test_operator_signup_requires_valid_invite(client: AsyncClient):
@@ -1114,7 +1150,9 @@ async def test_admin_list_operator_applications_masks_bank_account(
         "/api/v1/admin/operator-applications", headers=_auth(admin_token)
     )
     assert r.status_code == 200
-    applications = r.json()
+    body = r.json()
+    assert "total" in body and body["total"] >= 1  # M4: 一覧は {items,total} を返す
+    applications = body["items"]
     target = next(a for a in applications if a["contact_email"] == "mask_check@example.com")
     assert target["bank_account"]["account_number_masked"] == "***4567"
     assert "1234567" not in str(target["bank_account"])
@@ -1291,6 +1329,106 @@ async def test_admin_reject_operator_application(
     data = r.json()
     assert data["status"] == "rejected"
     assert data["reject_reason"] == "古物商許可番号の記載内容に不備があるため"
+
+
+async def test_admin_list_operator_applications_status_q_total_and_received_first(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """M4対応: GET /admin/operator-applications の status/q絞込・total・
+    並び順（received優先 → created_at降順 → id降順のtie-breaker）を検証する。
+
+    admin/page.tsx・operator-applications/page.tsx のバッジ・フィルタが最新100件
+    内のみで、未審査(received)がページ外に埋もれていた不整合（QA r4-review M4）
+    の是正。
+    """
+    from app.db.models.operator_application import OperatorApplication
+
+    admin_token = await _make_admin(client, db_session)
+
+    async def _create(email: str, company: str) -> str:
+        r = await client.post(
+            "/api/v1/operator-applications",
+            json=_application_payload(email=email, company=company),
+        )
+        assert r.status_code == 201
+        return r.json()["application_id"]
+
+    received_old_id = await _create("m4_received_old@example.com", "M4申込A株式会社")
+    received_new_id = await _create("m4_received_new@example.com", "M4申込B株式会社")
+    approved_id = await _create("m4_approved@example.com", "M4申込C株式会社")
+    rejected_id = await _create("m4_rejected@example.com", "M4申込D株式会社")
+
+    # received_old は received_new より古い created_at にする
+    # （received 同士の created_at 降順が効いていることを検証するため）。
+    old_app = await db_session.get(OperatorApplication, uuid.UUID(received_old_id))
+    old_app.created_at = old_app.created_at - timedelta(days=1)
+    # approved は received より新しい created_at にしても、received が常に先頭に
+    # 来ること（received_first のソートキーが created_at より優先されること）を検証する。
+    approved_app = await db_session.get(OperatorApplication, uuid.UUID(approved_id))
+    approved_app.created_at = approved_app.created_at + timedelta(days=1)
+    await db_session.commit()
+
+    r = await client.patch(
+        f"/api/v1/admin/operator-applications/{approved_id}/approve", headers=_auth(admin_token)
+    )
+    assert r.status_code == 200
+    r = await client.patch(
+        f"/api/v1/admin/operator-applications/{rejected_id}/reject",
+        json={"reject_reason": "書類不備"},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 200
+
+    # 全件（status未指定）: received が先頭2件（新→旧）、以降は非receivedがcreated_at降順。
+    r = await client.get("/api/v1/admin/operator-applications", headers=_auth(admin_token))
+    assert r.status_code == 200
+    body = r.json()
+    ids = [item["id"] for item in body["items"]]
+    assert ids.index(received_new_id) < ids.index(received_old_id) < ids.index(approved_id)
+    assert body["total"] >= 4
+
+    # status絞込
+    r = await client.get(
+        "/api/v1/admin/operator-applications",
+        params={"status": "received"},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 200
+    body = r.json()
+    returned_ids = {item["id"] for item in body["items"]}
+    assert received_new_id in returned_ids and received_old_id in returned_ids
+    assert approved_id not in returned_ids and rejected_id not in returned_ids
+    assert all(item["status"] == "received" for item in body["items"])
+
+    # q: 会社名の部分一致
+    r = await client.get(
+        "/api/v1/admin/operator-applications",
+        params={"q": "M4申込C"},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["total"] == 1
+    assert body["items"][0]["id"] == approved_id
+
+    # q: メールの部分一致
+    r = await client.get(
+        "/api/v1/admin/operator-applications",
+        params={"q": "m4_rejected"},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["total"] == 1
+    assert body["items"][0]["id"] == rejected_id
+
+    # limit上限（200）超過は422（M4: 既定50・上限200へ変更）
+    r = await client.get(
+        "/api/v1/admin/operator-applications",
+        params={"limit": 201},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 422
 
 
 # ──────────────────────────── チャット・日程調整・プロフィール・最高入札額 ────────────────────────────

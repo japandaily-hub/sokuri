@@ -21,7 +21,10 @@ import {
   inputBase,
   useToken,
 } from "@/components/kdz/Ui";
+import { AdminPagination } from "../_components/AdminPagination";
+import { ConfirmModal } from "../_components/ConfirmModal";
 import {
+  ADMIN_LIST_DEFAULT_LIMIT,
   listIdentityDocumentsAdmin,
   fetchIdentityDocumentBlobAdmin,
   approveIdentityDocument,
@@ -56,6 +59,8 @@ export default function AdminIdentityDocumentsPage() {
   const [imagesGone, setImagesGone] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [showRejectForm, setShowRejectForm] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const [showApproveConfirm, setShowApproveConfirm] = useState(false);
 
   // レース条件対策（openDetailの完了前に別行を選択した場合、古い結果を捨てる）
   const selectedIdRef = useRef<string | null>(null);
@@ -70,16 +75,27 @@ export default function AdminIdentityDocumentsPage() {
   const reload = useCallback(async () => {
     if (!token) return;
     try {
-      setDocs(await listIdentityDocumentsAdmin(statusFilter, token));
+      setDocs(
+        await listIdentityDocumentsAdmin(
+          statusFilter,
+          { limit: ADMIN_LIST_DEFAULT_LIMIT, offset },
+          token,
+        ),
+      );
       setError(null);
     } catch (e) {
       setError(toDisplayMessage(e, "取得に失敗しました"));
     }
-  }, [token, statusFilter]);
+  }, [token, statusFilter, offset]);
 
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  function changeStatusFilter(next: "pending" | "all") {
+    setOffset(0);
+    setStatusFilter(next);
+  }
 
   async function openDetail(doc: AdminIdentityDocument) {
     selectedIdRef.current = doc.id;
@@ -120,19 +136,22 @@ export default function AdminIdentityDocumentsPage() {
     setFrontUrl(null);
     setBackUrl(null);
     setImagesGone(false);
+    setShowApproveConfirm(false);
   }
 
   async function onApprove() {
     if (!selected || !token || busy) return;
-    const ok = window.confirm(`${selected.user_name ?? selected.user_email}の本人確認を承認します。よろしいですか？`);
-    if (!ok) return;
     setBusy(true);
     setError(null);
     try {
       await approveIdentityDocument(selected.id, token);
+      setShowApproveConfirm(false);
       closeDetail();
       await reload();
     } catch (e) {
+      // r4-fix-frontend2 M2 波及是正: 失敗時も対象（確認モーダル）をクリアして閉じ、
+      // 隠れずに見える Notice でエラーを出す（admin/page.tsx 等と同型）。
+      setShowApproveConfirm(false);
       setError(toDisplayMessage(e, "承認に失敗しました"));
     } finally {
       setBusy(false);
@@ -195,7 +214,7 @@ export default function AdminIdentityDocumentsPage() {
                 <button
                   key={s}
                   type="button"
-                  onClick={() => setStatusFilter(s)}
+                  onClick={() => changeStatusFilter(s)}
                   className={`rounded-none px-3 py-1.5 text-xs font-medium transition-colors ${
                     statusFilter === s
                       ? "bg-brand-600 text-white"
@@ -248,6 +267,16 @@ export default function AdminIdentityDocumentsPage() {
               <p className="py-6 text-center text-sm text-slate-500">該当する提出はありません。</p>
             ) : null}
           </div>
+          {docs ? (
+            <AdminPagination
+              total={null}
+              limit={ADMIN_LIST_DEFAULT_LIMIT}
+              offset={offset}
+              itemCount={docs.length}
+              onPrev={() => setOffset(Math.max(0, offset - ADMIN_LIST_DEFAULT_LIMIT))}
+              onNext={() => setOffset(offset + ADMIN_LIST_DEFAULT_LIMIT)}
+            />
+          ) : null}
         </Card>
       </PageShell>
 
@@ -344,13 +373,29 @@ export default function AdminIdentityDocumentsPage() {
                 >
                   却下する
                 </button>
-                <button type="button" className={btnPrimary} disabled={busy || imagesGone} onClick={() => void onApprove()}>
+                <button
+                  type="button"
+                  className={btnPrimary}
+                  disabled={busy || imagesGone}
+                  onClick={() => setShowApproveConfirm(true)}
+                >
                   承認する
                 </button>
               </div>
             )}
           </div>
         </div>
+      ) : null}
+
+      {showApproveConfirm && selected ? (
+        <ConfirmModal
+          title={`${selected.user_name ?? selected.user_email}の本人確認を承認します`}
+          message="承認すると、依頼者は本人確認済みの状態になります。よろしいですか？"
+          confirmLabel="承認する"
+          busy={busy}
+          onCancel={() => setShowApproveConfirm(false)}
+          onConfirm={() => void onApprove()}
+        />
       ) : null}
     </div>
   );

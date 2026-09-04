@@ -17,12 +17,16 @@ import {
   inputBase,
   useToken,
 } from "@/components/kdz/Ui";
+import { AdminPagination } from "./_components/AdminPagination";
+import { ConfirmModal } from "./_components/ConfirmModal";
 import {
+  ADMIN_LIST_DEFAULT_LIMIT,
   adminBulkCreateInvites,
   adminCreateInvite,
   adminGetCellDensity,
   adminGetOperatorLicenseImage,
   adminListInvites,
+  adminListOperatorApplications,
   adminListOperators,
   adminSuspendOperator,
   adminVerifyOperator,
@@ -47,6 +51,15 @@ export default function AdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // r4-fix-frontend2 M1: reload() を Promise.allSettled に分離した各区画専用のエラー。
+  // 1区画の5xxで他区画（招待コード・業者・セル密度）が使えなくなるのを防ぐ。
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [operatorListError, setOperatorListError] = useState<string | null>(null);
+  const [cellDensityError, setCellDensityError] = useState<string | null>(null);
+  /** reload() が一度でも完了したか。allSettled化により単一の error state だけでは
+   *  初回スケルトン表示の終了を判定できないため専用フラグを持つ。 */
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
+
   const [inviteEmail, setInviteEmail] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -56,6 +69,17 @@ export default function AdminPage() {
 
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [operatorSearchQuery, setOperatorSearchQuery] = useState("");
+  const [operatorOffset, setOperatorOffset] = useState(0);
+  const [inviteOffset, setInviteOffset] = useState(0);
+
+  /** 事前申込の未審査（status==="received"）件数（ナビのバッジ用）。
+   *  backend の GET /admin/operator-applications?status=received&limit=1 が返す total を使う
+   *  （r4-fix-frontend2 M4: 先頭ページ内カウントの近似表示から backend 側の正確な総件数に切替）。 */
+  const [pendingApplications, setPendingApplications] = useState<number | null>(null);
+  const [pendingApplicationsError, setPendingApplicationsError] = useState<string | null>(null);
+
+  const [suspendTarget, setSuspendTarget] = useState<OperatorOut | null>(null);
+  const [verifyTarget, setVerifyTarget] = useState<OperatorOut | null>(null);
 
   /* ---- 許可証画像確認モーダル ---- */
   const [licenseModalOperator, setLicenseModalOperator] = useState<OperatorOut | null>(null);
@@ -109,21 +133,49 @@ export default function AdminPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  // r4-fix-frontend2 M1: 4本を Promise.allSettled にし、1本の5xxで画面全体が
+  // 不能にならないようにする。各区画は自分の結果だけを見て自分の error state を更新する。
   const reload = useCallback(async () => {
     if (!token) return;
-    try {
-      const [inv, ops, density] = await Promise.all([
-        adminListInvites(token),
-        adminListOperators(token),
-        adminGetCellDensity(token),
-      ]);
-      setInvites(inv);
-      setOperators(ops);
-      setCellDensity(density);
-    } catch (e) {
-      showError(toDisplayMessage(e, "取得に失敗しました"));
+    const [invResult, opsResult, densityResult, appsResult] = await Promise.allSettled([
+      adminListInvites({ limit: ADMIN_LIST_DEFAULT_LIMIT, offset: inviteOffset }, token),
+      adminListOperators({ limit: ADMIN_LIST_DEFAULT_LIMIT, offset: operatorOffset }, token),
+      adminGetCellDensity(token),
+      adminListOperatorApplications({ status: "received", limit: 1, offset: 0 }, token),
+    ]);
+
+    if (invResult.status === "fulfilled") {
+      setInvites(invResult.value);
+      setInviteError(null);
+    } else {
+      setInviteError(toDisplayMessage(invResult.reason, "招待コードの取得に失敗しました"));
     }
-  }, [token]);
+
+    if (opsResult.status === "fulfilled") {
+      setOperators(opsResult.value);
+      setOperatorListError(null);
+    } else {
+      setOperatorListError(toDisplayMessage(opsResult.reason, "業者アカウントの取得に失敗しました"));
+    }
+
+    if (densityResult.status === "fulfilled") {
+      setCellDensity(densityResult.value);
+      setCellDensityError(null);
+    } else {
+      setCellDensityError(toDisplayMessage(densityResult.reason, "セル密度の取得に失敗しました"));
+    }
+
+    if (appsResult.status === "fulfilled") {
+      setPendingApplications(appsResult.value.total);
+      setPendingApplicationsError(null);
+    } else {
+      setPendingApplicationsError(
+        toDisplayMessage(appsResult.reason, "事前申込件数の取得に失敗しました"),
+      );
+    }
+
+    setInitialLoadDone(true);
+  }, [token, inviteOffset, operatorOffset]);
 
   useEffect(() => {
     void reload();
@@ -195,49 +247,45 @@ export default function AdminPage() {
     URL.revokeObjectURL(url);
   }
 
-  async function toggleVerify(op: OperatorOut) {
+  // 停止／停止解除。停止中は業者の既存トークンが全て 403 になりログインも拒否される。
+  // r4回帰是正: window.confirm ではなく ConfirmModal（自前ダイアログ）で確認する（依頼者一覧と同型）。
+  async function confirmSuspendChange(op: OperatorOut) {
+    if (!token || busy) return;
+    const next = !op.is_suspended;
+    setBusy(true);
+    setError(null);
+    try {
+      await adminSuspendOperator(op.id, next, token);
+      setSuspendTarget(null);
+      await reload();
+    } catch (e) {
+      // r4-fix-frontend2 M2 是正: 失敗時も対象をクリアしてモーダルを閉じ、
+      // 隠れずに見える Notice でエラーを出す。
+      setSuspendTarget(null);
+      showError(toDisplayMessage(e, "更新に失敗しました"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // 承認（active化）・承認取消のいずれも ConfirmModal で確認する
+  // （r4監査 M2: 承認取消だけ確認なしで即時実行されていた点も是正）。
+  async function confirmVerifyChange(op: OperatorOut) {
     if (!token || busy) return;
     setBusy(true);
     setError(null);
     try {
       await adminVerifyOperator(op.id, op.vendor_status !== "active", token);
+      setVerifyTarget(null);
       await reload();
     } catch (e) {
+      // r4-fix-frontend2 M2 是正: 失敗時も対象をクリアしてモーダルを閉じ、
+      // 隠れずに見える Notice でエラーを出す。
+      setVerifyTarget(null);
       showError(toDisplayMessage(e, "更新に失敗しました"));
     } finally {
       setBusy(false);
     }
-  }
-
-  // 停止／停止解除。停止中は業者の既存トークンが全て 403 になりログインも拒否される。
-  async function toggleSuspend(op: OperatorOut) {
-    if (!token || busy) return;
-    const next = !op.is_suspended;
-    const ok = window.confirm(
-      next
-        ? `${op.company_name}のアカウントを停止します。停止中は業者の全操作とログインができなくなります。よろしいですか？`
-        : `${op.company_name}の停止を解除します。よろしいですか？`,
-    );
-    if (!ok) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await adminSuspendOperator(op.id, next, token);
-      await reload();
-    } catch (e) {
-      showError(toDisplayMessage(e, "更新に失敗しました"));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // 承認（active化）の前だけ確認ダイアログを挟む。承認取消は従来通り即時実行する。
-  function handleVerifyClick(op: OperatorOut) {
-    if (op.vendor_status !== "active") {
-      const ok = window.confirm(`${op.company_name}を承認（active化）します。よろしいですか？`);
-      if (!ok) return;
-    }
-    void toggleVerify(op);
   }
 
   function copyCode(code: string) {
@@ -281,7 +329,7 @@ export default function AdminPage() {
         : op.vendor_status === statusFilter,
   );
 
-  if (loading || (!invites && !error)) {
+  if (loading || !initialLoadDone) {
     return (
       <div className="admin-page">
         <AppHeader showBell={false} />
@@ -300,6 +348,17 @@ export default function AdminPage() {
         description="業者招待コードの発行・アカウント承認・セル密度を管理します。"
         actions={
           <div className="flex flex-wrap gap-2">
+            <Link href="/admin/operator-applications" className={btnSecondary}>
+              事前申込の審査へ
+              {pendingApplications !== null && pendingApplications > 0 ? (
+                <span className="ml-1.5 rounded-none bg-red-600 px-1.5 py-0.5 text-xs font-semibold text-white">
+                  {pendingApplications}
+                </span>
+              ) : null}
+              {pendingApplicationsError ? (
+                <span className="ml-1.5 text-xs font-normal text-red-600">件数取得失敗</span>
+              ) : null}
+            </Link>
             <Link href="/admin/cases" className={btnSecondary}>
               案件一覧へ
             </Link>
@@ -325,6 +384,11 @@ export default function AdminPage() {
         {/* 招待コード（単発） */}
         <Card>
           <h2 className="font-normal text-slate-900">業者招待コード（単発）</h2>
+          {inviteError ? (
+            <div className="mt-2">
+              <Notice tone="error">{inviteError}</Notice>
+            </div>
+          ) : null}
           <div className="mt-3 flex gap-2">
             <input
               type="email"
@@ -376,6 +440,16 @@ export default function AdminPage() {
               <li className="py-3 text-sm text-slate-500">まだ発行されていません。</li>
             ) : null}
           </ul>
+          {invites ? (
+            <AdminPagination
+              total={null}
+              limit={ADMIN_LIST_DEFAULT_LIMIT}
+              offset={inviteOffset}
+              itemCount={invites.length}
+              onPrev={() => setInviteOffset(Math.max(0, inviteOffset - ADMIN_LIST_DEFAULT_LIMIT))}
+              onNext={() => setInviteOffset(inviteOffset + ADMIN_LIST_DEFAULT_LIMIT)}
+            />
+          ) : null}
         </Card>
 
         {/* バルク発行 */}
@@ -440,6 +514,11 @@ export default function AdminPage() {
         <Card>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-normal text-slate-900">業者アカウント</h2>
+            {operatorListError ? (
+              <div className="w-full">
+                <Notice tone="error">{operatorListError}</Notice>
+              </div>
+            ) : null}
             <div className="flex flex-wrap gap-2">
               {["all", "active", "limited", "pending", "suspended"].map((s) => (
                 <button
@@ -470,6 +549,9 @@ export default function AdminPage() {
               className={inputBase}
               placeholder="会社名・メールで検索"
             />
+            <p className="mt-1 text-xs text-slate-400">
+              件数・検索は表示中のページ（{ADMIN_LIST_DEFAULT_LIMIT}件）のみが対象です。他のページは下部のページングで確認してください。
+            </p>
           </div>
           <ul className="mt-4 divide-y divide-slate-100">
             {filteredOperators?.map((op) => {
@@ -509,7 +591,7 @@ export default function AdminPage() {
                     <div className="flex flex-col items-end gap-1">
                       <button
                         type="button"
-                        onClick={() => handleVerifyClick(op)}
+                        onClick={() => setVerifyTarget(op)}
                         disabled={
                           busy || op.is_suspended || (op.vendor_status !== "active" && !op.has_license_image)
                         }
@@ -527,7 +609,7 @@ export default function AdminPage() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => void toggleSuspend(op)}
+                      onClick={() => setSuspendTarget(op)}
                       disabled={busy}
                       className={op.is_suspended ? btnPrimary : btnDanger}
                     >
@@ -541,6 +623,16 @@ export default function AdminPage() {
               <li className="py-3 text-sm text-slate-500">該当業者はいません。</li>
             ) : null}
           </ul>
+          {operators ? (
+            <AdminPagination
+              total={null}
+              limit={ADMIN_LIST_DEFAULT_LIMIT}
+              offset={operatorOffset}
+              itemCount={operators.length}
+              onPrev={() => setOperatorOffset(Math.max(0, operatorOffset - ADMIN_LIST_DEFAULT_LIMIT))}
+              onNext={() => setOperatorOffset(operatorOffset + ADMIN_LIST_DEFAULT_LIMIT)}
+            />
+          ) : null}
         </Card>
       </div>
 
@@ -551,6 +643,11 @@ export default function AdminPage() {
           <p className="mt-1 text-xs text-slate-500">
             都道府県×目的別の直近30日案件数 / アクティブ業者数。1.5超は赤表示（需要過多）。
           </p>
+          {cellDensityError ? (
+            <div className="mt-3">
+              <Notice tone="error">{cellDensityError}</Notice>
+            </div>
+          ) : null}
           {cellDensity && cellDensity.length > 0 ? (
             <div className="mt-4 overflow-x-auto">
               <table className="w-full text-sm">
@@ -595,7 +692,7 @@ export default function AdminPage() {
             </div>
           ) : cellDensity && cellDensity.length === 0 ? (
             <p className="mt-4 text-sm text-slate-500">直近30日に案件はありません。</p>
-          ) : (
+          ) : cellDensityError ? null : (
             <div className="mt-4 flex items-center gap-2 text-sm text-slate-400">
               <Spinner className="h-4 w-4" /> 読み込み中…
             </div>
@@ -647,6 +744,46 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
+      ) : null}
+
+      {suspendTarget ? (
+        <ConfirmModal
+          title={
+            suspendTarget.is_suspended
+              ? `${suspendTarget.company_name}の停止を解除します`
+              : `${suspendTarget.company_name}を停止します`
+          }
+          message={
+            suspendTarget.is_suspended
+              ? "停止を解除すると、業者は再びログイン・入札ができるようになります。よろしいですか？"
+              : "停止すると、業者の既存トークンは失効しログイン・全操作ができなくなります。よろしいですか？"
+          }
+          confirmLabel={suspendTarget.is_suspended ? "停止を解除する" : "停止する"}
+          danger={!suspendTarget.is_suspended}
+          busy={busy}
+          onCancel={() => setSuspendTarget(null)}
+          onConfirm={() => void confirmSuspendChange(suspendTarget)}
+        />
+      ) : null}
+
+      {verifyTarget ? (
+        <ConfirmModal
+          title={
+            verifyTarget.vendor_status === "active"
+              ? `${verifyTarget.company_name}の承認を取り消します`
+              : `${verifyTarget.company_name}を承認します`
+          }
+          message={
+            verifyTarget.vendor_status === "active"
+              ? "承認を取り消すと、業者は案件の閲覧・入札ができなくなります。よろしいですか？"
+              : "承認すると、業者は案件の閲覧・入札ができるようになります。よろしいですか？"
+          }
+          confirmLabel={verifyTarget.vendor_status === "active" ? "承認を取り消す" : "承認する"}
+          danger={verifyTarget.vendor_status === "active"}
+          busy={busy}
+          onCancel={() => setVerifyTarget(null)}
+          onConfirm={() => void confirmVerifyChange(verifyTarget)}
+        />
       ) : null}
     </div>
   );

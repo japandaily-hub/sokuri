@@ -751,7 +751,7 @@ export default function ProfileEditPage() {
               <span className="link-card-ic">{ICON_SHIELD}</span>
               <span className="link-card-body">
                 <strong>本人確認</strong>
-                <span>古物営業法に基づく住所・氏名・年齢の確認</span>
+                <span>ご本人確認のための書類提出（任意）</span>
               </span>
               <StatusBadge
                 value={profile.identity_status === "approved" ? "approved" : profile.identity_status}

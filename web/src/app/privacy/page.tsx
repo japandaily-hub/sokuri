@@ -19,6 +19,7 @@ const COLLECTED: { type: string; how: string; detail: string }[] = [
   { type: "出品情報", how: "出品登録時", detail: "品物の写真（AIが写真から品目・要約を生成）、利用目的、住所（都道府県・市区町村・番地等）、住居情報（住居種別・間取り・階数・エレベーターの有無）" },
   { type: "業者情報", how: "業者申込・登録時", detail: "会社名・屋号、代表者名、担当者名、法人登録住所、メールアドレス、パスワード、電話番号、古物商許可番号、事業形態、対応エリア、取扱カテゴリ、インボイス番号、振込先口座（暗号化して保存）、LINE連携時はLINEユーザーID" },
   { type: "取引情報", how: "取引の過程で", detail: "入札額・入札メッセージ、成約額、訪問日時、チャットの内容、評価・レビュー" },
+  { type: "お問い合わせ情報", how: "お問い合わせフォーム送信時", detail: "お名前、メールアドレス、お問い合わせ内容（回答のためにのみ利用します）" },
   { type: "アクセス情報", how: "自動取得", detail: "IPアドレス、ブラウザ情報、Cookie、閲覧ページ・時間" },
 ];
 
@@ -29,7 +30,7 @@ export default function PrivacyPage() {
         <div className="container">
           <span className="eyebrow">プライバシーポリシー</span>
           <h1>プライバシーポリシー</h1>
-          <p className="updated">制定・施行：2026年4月1日　最終改定：2026年6月25日</p>
+          <p className="updated">制定・施行：2026年4月1日　最終改定：2026年9月4日</p>
         </div>
       </section>
 

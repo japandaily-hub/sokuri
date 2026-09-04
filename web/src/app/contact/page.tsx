@@ -305,7 +305,7 @@ export default function ContactPage() {
                 <p>
                   お問い合わせありがとうございます。
                   <br />
-                  3営業日以内に登録メールアドレスへご連絡します。
+                  ご入力いただいたメールアドレス宛に、3営業日以内にご連絡します。自動の受付確認メールはお送りしていません。
                 </p>
                 <Link href="/" className="btn btn-ghost btn-lg">
                   トップページへ戻る
