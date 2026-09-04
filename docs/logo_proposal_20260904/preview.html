@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><title>カタヅケ ロゴ調整案 プレビュー</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;600&family=Montserrat:wght@600&display=swap" rel="stylesheet">
+<style>
+:root{--primary:#1447e0;--ink:#20242e;--body:#454e59;--body-soft:#63707b;--line:#dce3ea;--lime:#8fb4ff;--pale:#eef3ff;
+ --head:"Noto Serif JP","Hiragino Mincho ProN","Yu Mincho",serif;--en:"Montserrat",sans-serif;}
+*{box-sizing:border-box}body{margin:0;background:#fff;color:var(--ink);font-family:var(--head);font-weight:400;letter-spacing:.03em;-webkit-font-smoothing:auto}
+.wrap{width:1140px;margin:0 auto;padding:28px 0 60px}
+h1{font-size:22px;font-weight:400;letter-spacing:.08em;margin:0 0 6px}
+h2{font-size:15px;font-weight:400;letter-spacing:.1em;color:var(--body-soft);margin:34px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.note{font-size:13px;color:var(--body);line-height:1.9;margin:0}
+.row{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start}
+.cell{border:1px solid var(--line);padding:16px;background:#fff}
+.cell.dark{background:var(--ink)}.cell.blue{background:var(--primary)}.cell.pale{background:var(--pale)}
+.cap{font-size:12px;color:var(--body-soft);letter-spacing:.06em;margin-top:8px;font-family:var(--head)}
+.cell.dark .cap,.cell.blue .cap{color:rgba(255,255,255,.75)}
+img{display:block}
+/* 現行ワードマーク（katazuke.css .kdz-wm と同値） */
+.kdz-wm{display:inline-flex;flex-direction:column;line-height:1;color:var(--ink)}
+.kdz-wm-ja{font-family:var(--head);font-weight:400;font-size:var(--wm,22px);letter-spacing:.14em;white-space:nowrap}
+.kdz-wm-en{font-family:var(--en);font-weight:600;font-size:calc(var(--wm,22px)*.4);letter-spacing:.18em;color:var(--primary);margin-top:4px}
+.kdz-wm.white{color:#fff}.kdz-wm.white .kdz-wm-en{color:var(--lime)}
+/* ロックアップ */
+.lock{display:inline-flex;align-items:center;gap:10px}
+.lock img{height:calc(var(--wm,22px)*1.75);width:auto}
+.lock.v{flex-direction:column;gap:12px}
+/* ヘッダー実寸モック（katazuke.css .header） */
+.header{background:#fff;border-bottom:1px solid var(--line)}
+.header .inner{display:flex;align-items:center;gap:24px;height:72px;padding:0 24px}
+.header nav{display:flex;align-items:center;gap:28px;margin-left:auto}
+.header nav a{font-family:var(--head);font-size:14px;letter-spacing:.12em;color:var(--ink);text-decoration:none}
+.h-cta{background:#06c755;color:#fff;padding:12px 22px;font-size:14px;letter-spacing:.08em;font-weight:600}
+.m .inner{height:60px;padding:0 18px}.m nav{display:none}
+.mock{border:1px solid var(--line);margin-bottom:14px;width:100%}
+.mock.m{width:390px}
+.fav{display:flex;gap:14px;align-items:flex-end}
+.tab{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-bottom:0;padding:8px 14px;font:13px system-ui;background:#f3f4f6;color:#333}
+</style></head><body><div class="wrap">
+<h1>カタヅケ ロゴ調整案（現行テーマ整合・2026-09-04）</h1>
+<p class="note">前提: 現行サイトは 明朝（Noto Serif JP 400）／主色 青 #1447e0／墨 #20242e／角丸0・影0／アイコン線幅1.5。ヘッダーは文字ワードマーク運用中で、旧PNG（紺#1e2a44＋金#e8b923・太線・丸角）はファビコン・OG用にのみ残存。</p>
+
+<h2>1. 変更点の比較（左: 旧PNG ／ 右: 提案A）</h2>
+<div class="row">
+ <div class="cell"><img src="../../web/public/logo-icon.png" width="160" height="160"><div class="cap">旧: 紺+金 / 線幅≈9% / 丸角 / 結び目=円</div></div>
+ <div class="cell"><img src="png/weight_9.png" width="160"><div class="cap">配色のみ更新（線幅9%・角0）</div></div>
+ <div class="cell"><img src="png/weight_5_5.png" width="160"><div class="cap">線幅5.5%（細身・査読で「ナビアイコンに負ける」と判定）</div></div>
+ <div class="cell"><img src="png/icon_A_ink_blue.png" width="160"><div class="cap">提案A: 線幅7% / 角0 / 結び目=正方形 / 庇の端は垂直切り</div></div>
+</div>
+
+<h2>2. 配色バリエーション（A〜F）</h2>
+<div class="row">
+ <div class="cell"><img src="png/icon_A_ink_blue.png" width="120"><div class="cap">A 墨＋青（推奨）</div></div>
+ <div class="cell"><img src="png/icon_B_mono_ink.png" width="120"><div class="cap">B 墨 単色</div></div>
+ <div class="cell"><img src="png/icon_C_mono_blue.png" width="120"><div class="cap">C 青 単色</div></div>
+ <div class="cell"><img src="png/icon_D_ink_gold.png" width="120"><div class="cap">D 墨＋金（参考・非推奨）</div></div>
+ <div class="cell blue"><img src="png/icon_E_white_on_blue.png" width="120"><div class="cap">E 白抜き（青地）</div></div>
+ <div class="cell dark"><img src="png/icon_F_white_on_ink.png" width="120"><div class="cap">F 白抜き（墨地）</div></div>
+</div>
+
+<h2>3. ワードマークとの組み合わせ（ロックアップ）</h2>
+<div class="row">
+ <div class="cell"><span class="lock" style="--wm:22px"><img src="svg/icon_A_ink_blue.svg" alt=""><span class="kdz-wm"><span class="kdz-wm-ja">カタヅケ</span><span class="kdz-wm-en">KATAZUKE</span></span></span><div class="cap">横組み（ヘッダー22px）</div></div>
+ <div class="cell"><span class="lock" style="--wm:22px"><img src="svg/icon_B_mono_ink.svg" alt=""><span class="kdz-wm"><span class="kdz-wm-ja">カタヅケ</span><span class="kdz-wm-en">KATAZUKE</span></span></span><div class="cap">横組み・B墨単色（青は英字のみ）</div></div>
+ <div class="cell"><span class="lock v" style="--wm:30px"><img src="svg/icon_A_ink_blue.svg" alt="" style="height:84px"><span class="kdz-wm" style="align-items:center"><span class="kdz-wm-ja">カタヅケ</span><span class="kdz-wm-en">KATAZUKE</span></span></span><div class="cap">縦組み（OG画像・完了画面）</div></div>
+ <div class="cell blue"><span class="lock" style="--wm:22px"><img src="svg/icon_E_white_on_blue.svg" alt=""><span class="kdz-wm white"><span class="kdz-wm-ja">カタヅケ</span><span class="kdz-wm-en">KATAZUKE</span></span></span><div class="cap">白抜き（業者バナー・CTA帯）</div></div>
+ <div class="cell"><span class="kdz-wm" style="--wm:22px"><span class="kdz-wm-ja">カタヅケ</span><span class="kdz-wm-en">KATAZUKE</span></span><div class="cap">参考: 現行（文字のみ）</div></div>
+</div>
+
+<h2>4. ヘッダー実寸モック（PC 72px ／ モバイル 60px）</h2>
+<div class="mock header"><div class="inner"><span class="lock" style="--wm:22px"><img src="svg/icon_A_ink_blue.svg" alt=""><span class="kdz-wm"><span class="kdz-wm-ja">カタヅケ</span><span class="kdz-wm-en">KATAZUKE</span></span></span>
+ <nav><a>使い方</a><a>成約イメージ</a><a>撮影ガイド</a><a>よくある質問</a><a>ログイン</a><span class="h-cta">LINEではじめる</span></nav></div></div>
+<div class="mock header"><div class="inner"><span class="kdz-wm" style="--wm:22px"><span class="kdz-wm-ja">カタヅケ</span><span class="kdz-wm-en">KATAZUKE</span></span>
+ <nav><a>使い方</a><a>成約イメージ</a><a>撮影ガイド</a><a>よくある質問</a><a>ログイン</a><span class="h-cta">LINEではじめる</span></nav></div><div class="cap" style="padding:0 24px 8px">参考: 現行ヘッダー（文字のみ）</div></div>
+<div class="mock header m"><div class="inner"><span class="lock" style="--wm:18px"><img src="svg/icon_A_ink_blue.svg" alt=""><span class="kdz-wm"><span class="kdz-wm-ja">カタヅケ</span><span class="kdz-wm-en">KATAZUKE</span></span></span><span style="margin-left:auto;width:44px;height:44px;border:1px solid var(--line)"></span></div></div>
+
+<h2>5. ファビコン・アプリアイコン</h2>
+<div class="fav">
+ <div class="cell"><div class="fav"><img src="../../web/src/app/icon.png" width="16" height="16"><img src="../../web/src/app/icon.png" width="32" height="32"></div><div class="cap">現行 icon.png（紺+金）</div></div>
+ <div class="cell"><div class="fav"><img src="png/favicon_A.png" width="16" height="16"><img src="png/favicon_A.png" width="32" height="32"><img src="png/favicon_A.png" width="64" height="64"></div><div class="cap">提案A 線画ファビコン（線幅8%・目を拡大）</div></div>
+ <div class="cell"><div class="fav"><img src="png/favicon_A_solid.png" width="16" height="16"><img src="png/favicon_A_solid.png" width="32" height="32"><img src="png/favicon_A_solid.png" width="64" height="64"></div><div class="cap">提案A 面塗りファビコン（16px用・目なし）</div></div>
+ <div class="cell"><span class="tab"><img src="png/favicon_A_solid.png" width="16" height="16">カタヅケ｜家まるごと、まとめて片付け買取</span><div class="cap">ブラウザタブ想定</div></div>
+ <div class="cell pale"><img src="png/apple_icon_A.png" width="90" height="90" style="border:1px solid var(--line)"><div class="cap">apple-icon 180px（白地・余白広め）</div></div>
+</div>
+</div></body></html>

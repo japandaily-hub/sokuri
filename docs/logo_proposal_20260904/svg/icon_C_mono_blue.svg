@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 86" width="512" height="440" role="img" aria-label="カタヅケ">
+  <defs><clipPath id="eave-C_mono_blue"><rect x="4" y="0" width="92" height="100"/></clipPath></defs>
+  <g fill="none" stroke="#1447e0" stroke-width="7" stroke-linecap="butt" stroke-linejoin="miter" stroke-miterlimit="10">
+    <!-- 屋根（庇は壁より外へ。線を長めに引き、垂直クリップで庇の端を垂直に切る＝角丸0の作法） -->
+    <path d="M-2 52.3 L50 6 L102 52.3" clip-path="url(#eave-C_mono_blue)"/>
+    <!-- 壁 -->
+    <path d="M13 38 V74 M87 38 V74"/>
+  </g>
+  <!-- 土台バー（塗り・角丸0） -->
+  <rect x="9.5" y="68.4" width="81" height="11.200000000000001" fill="#1447e0"/>
+  <!-- 目 -->
+  <circle cx="37" cy="47" r="3.2" fill="#1447e0"/><circle cx="63" cy="47" r="3.2" fill="#1447e0"/>
+  <!-- 蝶ネクタイ（結び目は正方形） -->
+  <path d="M35 55.5 L48 61 L35 66.5 Z M65 55.5 L52 61 L65 66.5 Z" fill="#1447e0"/>
+  <rect x="47.6" y="58.6" width="4.8" height="4.8" fill="#ffffff"/></svg>

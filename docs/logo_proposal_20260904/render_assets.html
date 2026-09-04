@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><title>カタヅケ 書き出し用アートボード</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;600&family=Montserrat:wght@600&display=swap" rel="stylesheet">
+<style>
+:root{--primary:#1447e0;--ink:#20242e;--head:"Noto Serif JP",serif;--en:"Montserrat",sans-serif}
+body{margin:0;background:#888;font-family:var(--head);-webkit-font-smoothing:auto}
+.board{background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--ink);margin:20px}
+.ja{font-family:var(--head);font-weight:400;letter-spacing:.14em;line-height:1;white-space:nowrap}
+.en{font-family:var(--en);font-weight:600;letter-spacing:.18em;line-height:1;color:var(--primary)}
+/* LINE プロフィール画像 640×640（丸くトリミング表示されるため、内容は中央の直径約560pxに収める） */
+#line{width:640px;height:640px}
+#line img{width:250px;height:auto;margin-bottom:38px}
+#line .ja{font-size:74px}
+#line .en{font-size:28px;margin-top:16px}
+/* LINE リッチメニュー等の横長ロゴ 1200×400（余白込み） */
+#wide{width:1200px;height:400px;flex-direction:row;gap:56px}
+#wide img{width:220px;height:auto}
+#wide .ja{font-size:120px}
+#wide .en{font-size:46px;margin-top:20px}
+#wide .col{display:flex;flex-direction:column;align-items:flex-start}
+</style></head><body>
+<div class="board" id="line"><img src="svg/icon_A_ink_blue.svg" alt=""><div class="ja">カタヅケ</div><div class="en">KATAZUKE</div></div>
+<div class="board" id="wide"><img src="svg/icon_A_ink_blue.svg" alt=""><div class="col"><div class="ja">カタヅケ</div><div class="en">KATAZUKE</div></div></div>
+</body></html>
