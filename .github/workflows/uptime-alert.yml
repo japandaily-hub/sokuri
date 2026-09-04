@@ -1,6 +1,6 @@
 name: Uptime alert
 
-# 外形監視（5分毎）。障害検知・復旧・遅延を運営へ通知する。
+# 外形監視（5分毎）。障害検知・復旧・遅延を運営へ通知する。正常時は通知しない。
 # 必要な Secrets（Settings > Secrets and variables > Actions）:
 #   BREVO_API_KEY, ALERT_EMAILS, ALERT_MAIL_FROM（任意）,
 #   ALERT_LINE_CHANNEL_ACCESS_TOKEN, ALERT_LINE_USER_IDS（顧客向けとは別の公式アカウント）,
