@@ -21,7 +21,7 @@ const CATEGORIES: { img: string; name: string; ex: string }[] = [
 
 const FAQ_ITEMS = [
   { q: "1点だけでも依頼できますか？", a: "はい。ただし、まとめて出すほど業者の買取総額が伸びやすく、値がつかない物も一緒に引き取ってもらいやすくなります。" },
-  { q: "値段がつかない物はどうなりますか？", a: <>業者は1点ごとではなく<span className="mk">まとめ全体の金額で入札</span>します。単体では値がつきにくい物も、まとめに含めて引き取ってもらえる場合があります。</> },
+  { q: "値段がつかない物はどうなりますか？", a: <>業者は1点ごとではなく<span className="mk">出品した商品すべてに対する買取総額で入札</span>します。単体では値がつきにくい物も、他の商品と一緒に引き取ってもらえる場合があります。</> },
   { q: "しつこい営業電話は来ますか？", a: "連絡が来るのは、あなたが選んだ1社だけ。選ぶまで連絡先は業者に開示されず、選ばなかった業者には自動でお断りが入るため、一斉架電は起こりません。" },
   { q: "個人情報はどう扱われますか？", a: "査定段階で業者に渡るのは、写真・品目・地域（都道府県・市区町村）・住居情報などの出品内容のみ。お名前や電話番号が業者に渡ることはなく、詳細住所と連絡用のメールアドレスも交渉が成立した1社にのみ開示されます。" },
   { q: "利用にお金はかかりますか？", a: "出品・査定・成約まで、すべて無料です。費用は一切かかりません。" },
@@ -200,7 +200,7 @@ export default function HomePage() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <span className="bc-ic"><img src="/img/real/bundle-bag.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span>
                 <h3>値がつかない物も、まとめて回収</h3>
-                <p>業者は1点ごとではなく<strong className="mk">まとめ全体の金額で入札</strong>します。だから単体では値がつきにくい物も、まとめに含めて引き取り。「これは売れないかも」も、一緒に手放せます。</p>
+                <p>業者は1点ごとではなく<strong className="mk">出品した商品すべてに対する買取総額で入札</strong>します。だから単体では値がつきにくい物も、他の商品と一緒に引き取り。「これは売れないかも」も、一緒に手放せます。</p>
               </Reveal>
               <Reveal as="article" className="bundle-c" delay={2}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -220,7 +220,7 @@ export default function HomePage() {
             <div className="section-head">
               <span className="eyebrow">入札のしくみ</span>
               <h2>業者が<span className="mk">買取総額</span>で競うから、<br className="sp-br" />高くなりやすい。</h2>
-              <p className="sub">あなたが出したのは写真だけ。あとは登録業者どうしが、あなたの品物まとめに買取総額で入札し合います。</p>
+              <p className="sub">あなたが出したのは写真だけ。あとは登録業者どうしが、あなたが出品した商品に買取総額で入札し合います。</p>
             </div>
             <div className="auc-grid">
               <Reveal className="auc-figure ph-wrap">
@@ -228,7 +228,7 @@ export default function HomePage() {
               </Reveal>
               <ol className="auc-steps">
                 <li><span className="an">1</span><div><h4>連絡先を伏せて出品内容が届く</h4><p>業者に届くのは、写真・品目・地域（都道府県・市区町村）・住居情報などの出品内容のみ。あなたのお名前・電話・詳細住所は伏せたままです。</p></div></li>
-                <li><span className="an">2</span><div><h4>登録業者が買取総額で入札</h4><p>複数の業者が、まとめ全体に対して金額を提示。競争で総額が引き上げられます。</p></div></li>
+                <li><span className="an">2</span><div><h4>登録業者が買取総額で入札</h4><p>複数の業者が、出品した商品すべてに対して買取総額を提示。競争で総額が引き上げられます。</p></div></li>
                 <li><span className="an">3</span><div><h4>連絡が来るのは選んだ1社だけ</h4><p>選ぶまで、業者はあなたに連絡できません。選ばなかった業者には自動でお断りが入り、営業電話の一斉架電はありません。</p></div></li>
                 <li><span className="an">4</span><div><h4>あなたは選んで、引き取りを待つだけ</h4><p>提示を見比べて1社を選択。成立後に連絡先を開示し、引き取り日時を決めます。</p></div></li>
               </ol>
@@ -415,7 +415,7 @@ export default function HomePage() {
               <div className="biz-banner-copy">
                 <span className="eyebrow">買取業者の方へ</span>
                 <h2>買取業者の方へ。<br />カタヅケに参加しませんか。</h2>
-                <p>顧客と業者、双方に無駄がない。だから長く続く。<br />まとめ出品への入札で、効率的な仕入れルートを開拓できます。</p>
+                <p>顧客と業者、双方に無駄がない。だから長く続く。<br />一括出品への入札で、効率的な仕入れルートを開拓できます。</p>
                 <div className="biz-banner-tags">
                   <span className="biz-tag">初期費用・月額費用 無料</span>
                   <span className="biz-tag">成約時8%のみ</span>

@@ -69,7 +69,7 @@ const TOGGLES: { key: ToggleKey; title: string; desc: string }[] = [
   { key: "showStats", title: "実績数を公開する", desc: "成約実績・入札履行率・平均引き取り日数を表示します。" },
   { key: "showReviews", title: "口コミを公開する", desc: "成約ユーザーからの評価・口コミを表示します。" },
   { key: "showMessage", title: "業者メッセージを公開する", desc: "自己紹介メッセージをプロフィール上部に表示します。" },
-  { key: "acceptUnsellable", title: "値のつかない物もまとめて引き取る", desc: "「まとめて回収可」のバッジが付与され、まとめ出品で選ばれやすくなります。" },
+  { key: "acceptUnsellable", title: "値のつかない物もまとめて引き取る", desc: "「まとめて回収可」のバッジが付与され、一括出品の案件で選ばれやすくなります。" },
 ];
 
 /* ---- 編集可能項目のみのフォーム状態（審査確定項目は含めない） ---- */
@@ -509,7 +509,7 @@ export default function OperatorProfilePage() {
                 <div className="cat-legend">
                   <span className="legend-star">★</span>
                   <span>
-                    を付けた<span className="legend-chip">得意</span>カテゴリは、公開プロフィールで強調表示され、まとめ出品で選ばれやすくなります。
+                    を付けた<span className="legend-chip">得意</span>カテゴリは、公開プロフィールで強調表示され、一括出品の案件で選ばれやすくなります。
                   </span>
                 </div>
               </div>
