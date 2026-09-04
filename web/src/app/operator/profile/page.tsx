@@ -24,6 +24,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Ic, type IcName } from "@/components/kdz/Icons";
 import { OperatorHeader } from "@/components/kdz/OperatorHeader";
+import { vendorCategoryName } from "@/lib/categories";
 import { useToken } from "@/components/kdz/Ui";
 import {
   getOperatorProfile,
@@ -51,15 +52,15 @@ const AREAS: { name: string; soon?: boolean }[] = [
 
 /* ---- 取扱カテゴリ（アイコンはスプライト名） ---- */
 const CATEGORIES: { id: string; name: string; icon: IcName }[] = [
-  { id: "kaden", name: "家電・PC", icon: "sun" },
-  { id: "brand", name: "ブランド品", icon: "bag" },
-  { id: "camera", name: "カメラ", icon: "camera" },
-  { id: "watch", name: "時計・宝飾", icon: "clock" },
-  { id: "fashion", name: "衣類・靴", icon: "tag" },
-  { id: "furniture", name: "家具", icon: "sofa" },
-  { id: "game", name: "ゲーム・玩具", icon: "box" },
-  { id: "hobby", name: "楽器・趣味", icon: "spark" },
-  { id: "other", name: "その他", icon: "house" },
+  { id: "kaden", name: vendorCategoryName("kaden"), icon: "sun" },
+  { id: "brand", name: vendorCategoryName("brand"), icon: "bag" },
+  { id: "camera", name: vendorCategoryName("camera"), icon: "camera" },
+  { id: "watch", name: vendorCategoryName("watch"), icon: "clock" },
+  { id: "fashion", name: vendorCategoryName("fashion"), icon: "tag" },
+  { id: "furniture", name: vendorCategoryName("furniture"), icon: "sofa" },
+  { id: "game", name: vendorCategoryName("game"), icon: "box" },
+  { id: "hobby", name: vendorCategoryName("hobby"), icon: "spark" },
+  { id: "other", name: vendorCategoryName("other"), icon: "house" },
 ];
 
 /* ---- 公開情報トグル（バックエンドフィールド名にマッピング） ---- */

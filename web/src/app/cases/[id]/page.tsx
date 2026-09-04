@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { Icon, Spinner } from "@/components/Icon";
 import { AppHeader } from "@/components/kdz/AppHeader";
+import { formatVisitSchedule } from "@/lib/categories";
 import {
   Card,
   Notice,
@@ -307,6 +308,8 @@ export default function UserCaseDetailPage() {
   // 取り下げ済み等の非アクティブな入札は依頼者側に完全非表示にする（再入札不可の設計に合わせ、
   // 「決める」対象になり得ない入札を一覧・件数・空状態のいずれからも除外する）。
   const activeBids = bids.filter((b) => b.status === "pending");
+  const topBidAmount = activeBids.length > 0 ? Math.max(...activeBids.map((b) => b.amount)) : null;
+  const topBidCount = activeBids.filter((b) => b.amount === topBidAmount).length;
   const pendingReduction = txn?.reduction_requests.find((r) => r.status === "pending");
   const myReview = txn?.reviews.find((r) => r.reviewer_type === "user");
 
@@ -548,7 +551,20 @@ export default function UserCaseDetailPage() {
                           ★ {b.operator.rating.toFixed(1)}
                         </span>
                       ) : null}
+                      {topBidAmount != null && b.amount === topBidAmount && activeBids.length > 1 ? (
+                        <span className="ml-2 rounded-none bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
+                          {topBidCount > 1 ? "同額で最高額" : "最高額"}
+                        </span>
+                      ) : null}
                     </p>
+                    {b.operator ? (
+                      <Link
+                        href={`/vendors/${b.operator.id}`}
+                        className="mt-0.5 inline-block text-xs font-semibold text-brand-700 underline underline-offset-2"
+                      >
+                        業者のプロフィール・口コミを見る
+                      </Link>
+                    ) : null}
                     <p className="mt-0.5 text-lg font-semibold text-brand-700 tabular-nums">
                       {formatYen(b.amount)}
                     </p>
@@ -642,8 +658,7 @@ export default function UserCaseDetailPage() {
               ) : null}
               {txn.visit_date ? (
                 <p className="self-center text-sm font-semibold text-slate-600">
-                  訪問予定: {txn.visit_date}
-                  {txn.visit_time_slot ? ` ${txn.visit_time_slot}` : ""}
+                  訪問予定: {formatVisitSchedule(txn.visit_date, txn.visit_time_slot)}
                 </p>
               ) : null}
             </div>

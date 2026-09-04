@@ -8,6 +8,7 @@ import { useParams } from "next/navigation";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import { Spinner } from "@/components/Icon";
 import { Notice } from "@/components/kdz/Ui";
+import { vendorCategoryName } from "@/lib/categories";
 import {
   getVendorPublicProfile,
   toDisplayMessage,
@@ -144,7 +145,7 @@ export default function VendorDetailPage() {
                           : undefined
                       }
                     >
-                      {c}
+                      {vendorCategoryName(c)}
                       {profile.strong_categories.includes(c) ? " ★" : ""}
                     </div>
                   ))}

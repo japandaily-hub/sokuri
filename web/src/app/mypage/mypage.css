@@ -675,3 +675,6 @@
     padding: 12px 10px;
   }
 }
+
+/* 品目要約（案件IDの代わりの見出し補助） */
+.lot-id.lot-items { font-size: 13px; letter-spacing: 0; color: var(--ink); font-weight: 600; text-transform: none; }

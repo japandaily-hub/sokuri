@@ -340,10 +340,7 @@ function SchedulePageInner() {
             </div>
             <div className="biz-amount">
               <div className="label">成約買取額</div>
-              <div className="amount">
-                ¥{yen(vendorAmount)}
-                <span>円</span>
-              </div>
+              <div className="amount">¥{yen(vendorAmount)}</div>
             </div>
           </div>
 

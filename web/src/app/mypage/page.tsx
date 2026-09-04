@@ -23,6 +23,7 @@ import Link from "next/link";
 import { Spinner } from "@/components/Icon";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import { Ic } from "@/components/kdz/Icons";
+import { caseItemsLabel } from "@/lib/case-labels";
 import { useToken } from "@/components/kdz/Ui";
 import {
   formatYen,
@@ -85,7 +86,7 @@ function LotCard({ c }: { c: CaseOut }) {
 
         <div className="lot-info">
           <div className="lot-info-top">
-            <span className="lot-id">{c.id.slice(0, 8).toUpperCase()}</span>
+            <span className="lot-id lot-items" title={`案件ID ${c.id.slice(0, 8)}`}>{caseItemsLabel(c) ?? c.id.slice(0, 8).toUpperCase()}</span>
             <span className={`status-chip ${cls}`}>{label}</span>
           </div>
           <div className="lot-cats">
@@ -207,7 +208,7 @@ export default function MyPage() {
   const tabs: { key: TabKey; label: string; count: number; gray?: boolean }[] = [
     { key: "all", label: "すべて", count: (cases ?? []).length },
     { key: "active", label: "進行中", count: activeLots.length },
-    { key: "done", label: "終了", count: doneLots.length, gray: true },
+    { key: "done", label: "成約・終了", count: doneLots.length, gray: true },
   ];
 
   const isLoading = loading || (!cases && !error);

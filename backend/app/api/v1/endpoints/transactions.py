@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import re
+
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -435,7 +437,11 @@ async def confirm_schedule(
     txn.visit_time_slot = body.visit_time_slot
     txn.status = "visiting"
 
-    confirm_body = f"訪問日程が {body.visit_date} {body.visit_time_slot} に確定しました。"
+    # 候補日ラベル（例「9月7日（日）10:00〜12:00」）に日付が含まれる場合は ISO 日付を重ねて出さない
+    if re.search(r"\d+月\d+日", body.visit_time_slot):
+        confirm_body = f"訪問日程が {body.visit_time_slot} に確定しました。"
+    else:
+        confirm_body = f"訪問日程が {body.visit_date} {body.visit_time_slot} に確定しました。"
     if body.note:
         confirm_body += f" ({body.note})"
     session.add(

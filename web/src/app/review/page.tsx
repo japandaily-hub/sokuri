@@ -6,6 +6,7 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AppHeader } from "@/components/kdz/AppHeader";
+import { formatVisitSchedule } from "@/lib/categories";
 import { Spinner } from "@/components/Icon";
 import { Notice, useToken } from "@/components/kdz/Ui";
 import {
@@ -47,13 +48,6 @@ const MAX_COMMENT = 300;
  * JST 環境では toLocaleString で前日または当日の別時刻にズレる（典型バグ）。
  * ここでは Date化せず文字列を直接分解して組み立てる。
  */
-function formatVisitDate(visitDate: string | null): string {
-  if (!visitDate) return "—";
-  const m = visitDate.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (!m) return visitDate;
-  const [, y, mo, d] = m;
-  return `${y}年${Number(mo)}月${Number(d)}日`;
-}
 
 function ReviewPageInner() {
   const search = useSearchParams();
@@ -173,7 +167,7 @@ function ReviewPageInner() {
   const amountText = formatYen(txn.final_amount ?? txn.initial_amount);
   const itemsText = txn.case?.purpose ?? "—";
   const visitText = txn.visit_date
-    ? `${formatVisitDate(txn.visit_date)}${txn.visit_time_slot ? ` ${txn.visit_time_slot}` : ""}`
+    ? formatVisitSchedule(txn.visit_date, txn.visit_time_slot)
     : "—";
 
   return (
