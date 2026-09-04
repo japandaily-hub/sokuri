@@ -3,6 +3,7 @@
 更新: 2026-09-04（Claude・r3 導線監査ループ）
 
 ## 現在フェーズ
+- **2026-09-05 第9周（r9・アクセシビリティ機械検査）をローカルコミット（8babde5・9801f31・未push）。** 本番ビルドに axe-core 4.10（WCAG 2.0 A/AA）を注入して公開 12・依頼者 7・業者 5・運営 4 ページを実測。違反は全てコントラスト（補助テキスト `--body-soft`、状態バッジ slate-500、注意見出し・琥珀ラベル `--gold` on `--warm`）と管理画面の label 未関連付け・スクロール領域のキーボード操作。`--body-soft` を #56636e、`--gold-text` #8a5b00 を新設して文字用途を置換、バッジを slate-600/700、admin に `htmlFor`/`tabIndex`/`aria-label`。再検査で残るのは LINE ブランド色ボタン（白 on #06c755・LINE 公式配色として許容）と装飾ワードマーク（aria-hidden）のみ。
 - **2026-09-05 第8周（r8・異常系・中断系）をローカルコミット（8b46750・a8fe9fa・24f4ee7・未push）。** 監査→独立検証（High 4→真の High 1 に較正）→ backend/web 実装→統合レビュー（High 4）→修正→最終検証「合格（Critical/High 0・新規回帰 0）」。主な変更: 終了取引（cancelled/completed）でのチャット送信・候補日提案を 409 `transaction_closed`、`TransactionDetail.cancellation`（誰が・いつ・理由）と `user_suspended`/`operator_deleted`、減額申請は1取引2回まで（ロック内判定）、`PATCH /admin/transactions/{id}/cancel`（理由必須・双方通知・admin 記録 0031）、`DELETE /operator/me`（password 再認証・進行中取引 409・レート制限 429・Operator 行ロックで落札と直列化・0030 `operators.deleted_at`）、退会業者は選定不可・一覧除外・admin 操作 409、ログインの 429/5xx を別文言、写真アップロードの MIME/サイズ事前検証と日本語 detail、`purpose` の Literal 化（web はラベル一元化＋フォールバック）、依頼者・業者・運営の確認ダイアログを共通 ConfirmModal（busy 制御・入力上限・注記）へ、admin 一覧の退会済みトグル。pytest 819 / tsc 0 / eslint 0 error / 本番ビルド成功。
   - 実機（本番ビルド）: 運営の強制終了→依頼者チャットに「この取引は終了しています」と送信欄非表示・案件詳細に「キャンセル: 運営による・理由」／API で送信 409／業者の退会（パスワード）→ `reason=withdrawn`・業者一覧から除外／誤パスワード5回→6回目 429 と UI 文言。
   - 事故と対策: 検証用 worktree が残っていた間に実装エージェントが worktree 側のファイルを編集し正本に反映されない事故（`git -C wt diff | git apply -3` で移植）。以後、実装エージェント起動前に worktree を消すか指示文で `.claude/worktrees/` を編集禁止にする。
@@ -64,8 +65,8 @@
 - なし（push はユーザー判断）。
 
 ## 次アクション
-- ~~P1（自動）: r8 異常系~~（済・24f4ee7）。次の自動周（r9）はアクセシビリティ機械検査（axe）と残る Low の掃除。
-- **P1（ユーザー）: r4〜r8 分の push**（本番デプロイ・alembic 0026〜0031・push 後に `/readyz` で 0031 と `degraded_config: []` を確認）。
+- ~~P1（自動）: r8 異常系~~（済・24f4ee7）／~~r9 a11y~~（済・9801f31）。自走はここで停止。
+- **P1（ユーザー）: r4〜r9 分の push**（本番デプロイ・alembic 0026〜0031・push 後に `/readyz` で 0031 と `degraded_config: []` を確認）。
 - **P1（ユーザー）: r4〜r6 分の push 可否の判断**（本番デプロイ。alembic 0026〜0029 を含む。push 後は /readyz で 0029 と degraded_config を確認）。~~r4 回帰監査~~（済・3da71de）
 - **P1（ユーザー）: 本番 ADMIN_EMAILS の実値と、各アドレスの user 行・role=admin を `GET /admin/users?q=` で実測**（未登録アドレスが載っていれば即除外）。あわせて r3 で置いた仮定4件（支払経路＝当事者間精算／入札期間の上限なし／8%はβ期間請求なし／所在地＝横浜）を承認または差し戻し。
 - **P1: 障害・異常時アラート基盤 — 完了（2026-09-04）。** 外形監視 `.github/workflows/uptime-alert.yml`（5分毎）＋アプリ内 `app/core/alert_middleware.py`。通知先は運営用 LINE 公式アカウント「カタヅケ運営」（@854kzrrb・Channel ID 2011424972・顧客向け【公式】カタヅケとは別チャネル）。GitHub Secrets と Render 環境変数（ALERT_LINE_CHANNEL_ACCESS_TOKEN / ALERT_LINE_USER_IDS / ALERT_MAIL_FROM）は `scripts/setup_alerts.py` で登録済み、Actions の疎通テスト success、LINE push は HTTP 200 で到達確認。メール（Brevo）も設定済み: 宛先 katazuke.support@gmail.com、差出人 katazuke.support@gmail.com（Brevo で認証済み）、テスト送信は delivered を確認。**併せて本番の依頼者向けメールが BREVO_API_KEY 未設定で一度も送信されていなかった問題を解消**（Render に BREVO_API_KEY を登録し、MAIL_FROM を noreply@katadzuke.jp → katazuke.support@gmail.com に変更。katadzuke.jp のドメイン認証を Brevo で行えば noreply@ に戻せる）。Brevo の Authorised IPs は無効化済み（Actions/Render から送るため）。Webhook は未設定。GitHub PAT（katadzuke-alerts）は30日期限＝2026-10-04 に失効するが、登録済み Secrets はそのまま有効で監視は継続する（再登録時のみ再発行が必要）。

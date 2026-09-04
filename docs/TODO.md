@@ -15,7 +15,7 @@
 9. [ ] **規約・プライバシーポリシー改定（2026-09-04）の告知** — 既存ユーザー・業者への告知方法と再同意の要否（定型約款の変更・民法548条の4）を法務に確認。業者規約の版数は 2026-09-04 に更新済み（再同意ゲートは無い）。
 10. [ ] **本番の BREVO_API_KEY／LINE アラート設定の実値確認** — 未設定だと申込・成約通知が届かない。r4 でキー未設定時に critical アラート（LINE）を出すようにしたが、LINE 側も未設定なら無音。
 11. [ ] **手数料8%の税区分（税込／税別）を決める** — 規約・特商法表記に未記載。
-12. [ ] **r4〜r8 分を push する（本番デプロイ・alembic 0026〜0031 含む）** — push 後に `/readyz` で `alembic_version=0031_cancellation_admin` と `degraded_config: []` を確認（brevo / line_push / gemini / encryption_key が false なら Render の環境変数を設定）。事前申込一覧・業者一覧の API は応答形式が変わるため web と backend は同時反映（同一コミットなので通常の push で揃う）。
+12. [ ] **r4〜r9 分を push する（本番デプロイ・alembic 0026〜0031 含む）** — push 後に `/readyz` で `alembic_version=0031_cancellation_admin` と `degraded_config: []` を確認（brevo / line_push / gemini / encryption_key が false なら Render の環境変数を設定）。事前申込一覧・業者一覧の API は応答形式が変わるため web と backend は同時反映（同一コミットなので通常の push で揃う）。
 13. [ ] **/contact の実受信確認** — 本番で1通送り、ADMIN_EMAILS 宛に届くこと（Brevo）を確認。届かなければ ADMIN_EMAILS か MAIL 設定。
 
 ## 02 課題・構想（決めてから着手）
@@ -28,6 +28,7 @@
 
 ## 03 開発の積み残し（指示があれば着手可能）
 
+- [ ] **a11y の許容例外** — LINE ログインボタン（白文字 on #06c755）は LINE 公式配色のため据え置き／ヘッダーの装飾ワードマーク（aria-hidden）は対象外。
 - [ ] **r8 の意図的未対応（Low）** — PG 実機での行ロック（退会×落札・減額件数）の並行実証／新規入札 INSERT の閉塞が FK 暗黙ロック依存（`create_bid` で `lock_operator_row` を取ると明示化できる）／退会業者のレビュー統計再計算／`cancel_count` の運用しきい値／業者 reauth の 400 と退会 403 の非対称／`BidOut` に `operator_deleted` なし。
 - [ ] **r7 の未解決（Low）** — `POST /cases` の `purpose` が任意文字列を受け付け UI にキーがそのまま出る（`/create` の選択肢に限定する Literal 化）／タイムアウト後に内容を編集して再送信すると別案件になる（仕様）／0027 の自動テスト無し（SQLite で全チェーン不可）。
 - [ ] **r6 の意図的未対応** — 写真が Render の一時ディスク保存（再起動で消える・既知のβ許容。R2/S3 移行）／入札ゼロ放置・訪問日超過のリマインド（未実装機能）／`cancel_case` と退会時キャンセルの共通化（services へ切り出し）／PG での同時実行実測（FOR UPDATE・部分一意索引）／DB_POOL_SIZE・AI デッドライン 120 秒・CDN タイムアウトの実測／退会 admin 後の再ブートストラップ窓／停止業者の既存進行中取引の扱い。
@@ -51,6 +52,7 @@
 
 ## 完了（2026-08-31〜09-04）
 
+- [x] 09-05 第9周（r9）: axe による WCAG AA 実測とコントラスト是正（--body-soft/--gold-text）、管理画面の label とスクロール領域（未push）
 - [x] 09-05 導線監査 第8周（r8・異常系）: 終了取引のガード、キャンセルの可視化、減額申請の回数制限、運営の強制終了、業者退会（再認証）、ログイン429/5xx文言、写真の事前検証、共通 ConfirmModal、purpose Literal（未push）
 - [x] 09-05 導線監査 第7周（r7）: 背景解析中のDB接続占有を解消、冪等キーの窓廃止、create の冪等キー再発行と60秒タイムアウト（406fcc5・未push）
 - [x] 09-05 導線監査 第6周（r6）: 案件作成の AI 解析を背景化（即応答・冪等・放置回収）、同時実行ロック・減額/停止業者ガード・退会時キャンセル整合、/readyz の設定検証、通知失敗の可視化と運営操作の通知、canonical/sitemap、一覧ページング・未読数、公開ページの 401 挙動（未push）
