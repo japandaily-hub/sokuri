@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from fastapi import (
@@ -55,6 +56,7 @@ from app.services.case_lock import lock_case_row
 from app.services.case_view import build_case_masked_out
 from app.services.summary import (
     ItemAnalysisInput,
+    ItemAnalysisResult,
     MAX_PHOTOS_FOR_AI,
     build_fallback_summary,
     generate_case_ai,
@@ -71,10 +73,6 @@ router = APIRouter()
 #: 上限を切る（r6-verify-backend の実測値。超過時は ai_status="failed" に落とし、
 #: 案件自体は作成時のフォールバック要約付きで有効なまま残す）。
 _AI_ANALYSIS_DEADLINE_SEC = 120
-
-#: 冪等キーの有効窓。プロキシタイムアウト（Cloudflare 100秒）後の手動再送信を
-#: 吸収できる長さで、かつ「同じ部屋をもう一度出品したい」正規利用を阻害しない長さ。
-_IDEMPOTENCY_WINDOW = timedelta(minutes=10)
 
 #: 業者向け案件一覧の既定件数／上限（r6 M-5。応答形状は list のまま変えない）。
 _OPERATOR_LIST_DEFAULT_LIMIT = 100
@@ -155,110 +153,196 @@ async def sweep_stale_pending_ai(session: AsyncSession) -> int:
 async def _find_idempotent_case_id(
     session: AsyncSession, user_id: uuid.UUID, idempotency_key: str
 ) -> uuid.UUID | None:
-    """同一ユーザー・同一冪等キーの案件が有効窓内に存在すればその id を返す。
+    """同一ユーザー・同一冪等キーの案件が存在すればその id を返す（期間の制限なし）。
 
-    窓の判定は SQL ではなく Python 側で行う（``created_at`` は SQLite では
-    naive、PostgreSQL では aware で返るため、バインド値との型不一致で比較が
-    静かに常時 False になるのを避ける）。
+    r7 M-1: 以前は10分の有効窓を持っていたが、DB の一意制約
+    ``uq_cases_user_id_idempotency_key`` は期限を持たないため、窓を過ぎた再送信は
+    「既存案件も返せず INSERT も通らない」恒久 409 の袋小路になっていた（web は
+    キーを再発行しないため、リロードするまで何度押しても 409）。制約と同じ
+    「恒久」セマンティクスへ寄せ、同一キーなら常に既存案件を 200 で返す。
     """
-    row = (
-        await session.execute(
-            select(Case.id, Case.created_at)
-            .where(Case.user_id == user_id, Case.idempotency_key == idempotency_key)
-            .order_by(Case.created_at.desc())
-            .limit(1)
+    return await session.scalar(
+        select(Case.id)
+        .where(Case.user_id == user_id, Case.idempotency_key == idempotency_key)
+        .order_by(Case.created_at.desc())
+        .limit(1)
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class _CaseAnalysisInput:
+    """AI 解析に必要な値だけを ORM／セッションから切り離して保持する入れ物（r7 H-1）。
+
+    Gemini 呼び出し中に ``Case`` の ORM インスタンスを掴んだままにすると、detached
+    属性の遅延ロードで実質セッションが必要になる。解析段では ORM を一切参照しない
+    よう、プリミティブへ写し取ってから渡す。
+    """
+
+    purpose: str
+    housing_type: str | None
+    floor_plan: str | None
+    #: ``item_inputs`` と同順の CaseItem.id（書き戻し時の突き合わせキー）。
+    item_ids: list[uuid.UUID]
+    item_inputs: list[ItemAnalysisInput]
+    ungrouped_refs: list[tuple[str, str | None]]
+
+
+async def _load_case_analysis_input(case_id: uuid.UUID) -> _CaseAnalysisInput | None:
+    """[1/3] 短いセッションで解析入力を読み出し、**セッションを閉じてから**返す。"""
+    session_factory = db_session_module.get_background_session_factory()
+    async with session_factory() as session:
+        case = await session.scalar(
+            select(Case)
+            .where(Case.id == case_id)
+            .options(
+                selectinload(Case.photos),
+                selectinload(Case.items).selectinload(CaseItem.photos),
+            )
         )
-    ).first()
-    if row is None:
-        return None
-    case_id, created_at = row
-    if datetime.now(timezone.utc) - _as_utc(created_at) > _IDEMPOTENCY_WINDOW:
-        return None
-    return case_id
+        if case is None:
+            return None
+        return _CaseAnalysisInput(
+            purpose=case.purpose,
+            housing_type=case.housing_type,
+            floor_plan=case.floor_plan,
+            item_ids=[item.id for item in case.items],
+            item_inputs=[
+                ItemAnalysisInput(
+                    name=item.name,
+                    photo_refs=[(p.storage_key, p.url) for p in item.photos],
+                )
+                for item in case.items
+            ],
+            ungrouped_refs=[
+                (p.storage_key, p.url) for p in case.photos if p.case_item_id is None
+            ],
+        )
+
+
+async def _analyze_case(
+    payload: _CaseAnalysisInput,
+) -> tuple[str, list[ItemAnalysisResult]]:
+    """[2/3] DB セッションを一切持たずに AI 解析だけを行う（r7 H-1 の核心）。
+
+    この関数の実行中、本タスクがプールから借りている接続は 0 本であることが不変条件
+    （``tests/test_case_ai_background.py`` の
+    ``test_no_db_session_is_open_during_ai_analysis`` が回帰を検知する）。
+    """
+    async with asyncio.timeout(_AI_ANALYSIS_DEADLINE_SEC):
+        if payload.item_inputs:
+            return await generate_case_ai(
+                purpose=payload.purpose,
+                housing_type=payload.housing_type,
+                floor_plan=payload.floor_plan,
+                items=payload.item_inputs,
+                ungrouped_refs=payload.ungrouped_refs,
+            )
+        # レガシー（items無し）経路: generate_case_summary の既存契約（解決済み
+        # 文字列のリストを渡す）は温存する。解析対象は先頭 MAX_PHOTOS_FOR_AI 枚
+        # のみのため、その分だけを base64 化する。
+        resolved_refs: list[str] = []
+        for storage_key, url in payload.ungrouped_refs[:MAX_PHOTOS_FOR_AI]:
+            ref = await photo_url_for_ai(storage_key, url)
+            if ref is not None:
+                resolved_refs.append(ref)
+        ai_summary = await generate_case_summary(
+            purpose=payload.purpose,
+            housing_type=payload.housing_type,
+            floor_plan=payload.floor_plan,
+            photo_urls=resolved_refs,
+        )
+        return ai_summary, []
+
+
+async def _persist_case_analysis(
+    case_id: uuid.UUID,
+    *,
+    ai_summary: str,
+    item_ids: list[uuid.UUID],
+    item_results: list[ItemAnalysisResult],
+) -> None:
+    """[3/3] 新しい短いセッションで解析結果を書き戻す。"""
+    session_factory = db_session_module.get_background_session_factory()
+    async with session_factory() as session:
+        case = await session.scalar(
+            select(Case).where(Case.id == case_id).options(selectinload(Case.items))
+        )
+        if case is None:
+            # 解析中に削除された等（通常は到達しない）。
+            logger.warning(
+                "cases: AI 解析結果の書き戻し先の案件が見つかりません - case_id=%s", case_id
+            )
+            return
+        # 解析中に item が増減しうる（case_items.py の追加/削除 API）ため、位置では
+        # なく id で突き合わせる。
+        results_by_item_id = dict(zip(item_ids, item_results))
+        for item in case.items:
+            result = results_by_item_id.get(item.id)
+            if result is None:
+                continue
+            item.ai_detected_name = result.ai_detected_name
+            item.ai_condition = result.ai_condition
+            item.ai_summary = result.ai_summary
+        case.ai_summary = ai_summary
+        case.ai_status = CASE_AI_STATUS_DONE
+        case.ai_failed_reason = None
+        await session.commit()
+
+
+async def _mark_case_analysis_failed(case_id: uuid.UUID, reason: str) -> None:
+    """解析失敗を短いセッションで記録する（案件自体は有効なまま残す）。"""
+    session_factory = db_session_module.get_background_session_factory()
+    async with session_factory() as session:
+        await session.execute(
+            update(Case)
+            .where(Case.id == case_id)
+            .values(ai_status=CASE_AI_STATUS_FAILED, ai_failed_reason=reason[:255])
+        )
+        await session.commit()
 
 
 async def _run_case_ai_analysis(case_id: uuid.UUID) -> None:
-    """案件作成後の AI 解析を **新しいセッション** で実行し、結果を書き戻す。
+    """案件作成後の AI 解析を **DB セッションを持たずに** 実行し、結果を書き戻す。
 
     リクエストスコープのセッション（``get_session``）はレスポンス送出時にクローズ
-    されるうえ、長時間処理でコネクションをトランザクションごと占有すると無関係な
-    API までプール枯渇で巻き込む（r6 ADD-1）。そのため BackgroundTasks からは必ず
-    ``get_background_session_factory()`` で別セッションを開く。
+    されるため、BackgroundTasks からは必ず ``get_background_session_factory()`` で
+    別セッションを開く（r6 ADD-1）。さらに r7 H-1 対応として、解析（最長120秒の
+    Gemini 呼び出し）の間は**接続を1本も借りない**よう3段に分割する:
+
+    1. ``_load_case_analysis_input``: 短いセッションで入力を読み、即クローズ
+    2. ``_analyze_case``: セッション無しで解析（PostgreSQL の ``idle in transaction``
+       が120秒続かない ＝ 同時作成がプールサイズを超えても他 API を巻き込まない）
+    3. ``_persist_case_analysis``: 新しい短いセッションで結果を書き戻す
 
     失敗（例外・デッドライン超過）は ``ai_status="failed"`` として記録するだけで
     案件は有効なまま残す（``ai_summary`` には作成時に書いたフォールバック文が入って
     いる）。通知・入札は AI 解析の成否に依存しない。
     """
-    session_factory = db_session_module.get_background_session_factory()
     try:
-        async with session_factory() as session:
-            case = await session.scalar(
-                select(Case)
-                .where(Case.id == case_id)
-                .options(
-                    selectinload(Case.photos),
-                    selectinload(Case.items).selectinload(CaseItem.photos),
-                )
+        payload = await _load_case_analysis_input(case_id)
+        if payload is None:
+            # 解析前に削除された等（通常は到達しない）。
+            logger.warning("cases: AI 解析対象の案件が見つかりません - case_id=%s", case_id)
+            return
+        try:
+            ai_summary, item_results = await _analyze_case(payload)
+        except Exception as exc:  # noqa: BLE001 -- 解析失敗で案件を壊さない
+            # 例外オブジェクトをそのまま文字列化しない（SDK 例外に画像データや
+            # リクエスト内容が含まれうる。summary._detect_photo_labels と同方針）。
+            reason = f"{type(exc).__name__}: {str(exc)[:180]}"
+            logger.error(
+                "cases: AI 解析に失敗（フォールバック要約のまま継続） - case_id=%s - %s",
+                case_id,
+                reason,
             )
-            if case is None:
-                # 解析前に削除された等（通常は到達しない）。
-                logger.warning("cases: AI 解析対象の案件が見つかりません - case_id=%s", case_id)
-                return
-
-            ungrouped_refs = [
-                (p.storage_key, p.url) for p in case.photos if p.case_item_id is None
-            ]
-            try:
-                async with asyncio.timeout(_AI_ANALYSIS_DEADLINE_SEC):
-                    if case.items:
-                        item_inputs = [
-                            ItemAnalysisInput(
-                                name=item.name,
-                                photo_refs=[(p.storage_key, p.url) for p in item.photos],
-                            )
-                            for item in case.items
-                        ]
-                        ai_summary, item_results = await generate_case_ai(
-                            purpose=case.purpose,
-                            housing_type=case.housing_type,
-                            floor_plan=case.floor_plan,
-                            items=item_inputs,
-                            ungrouped_refs=ungrouped_refs,
-                        )
-                        for item, result in zip(case.items, item_results):
-                            item.ai_detected_name = result.ai_detected_name
-                            item.ai_condition = result.ai_condition
-                            item.ai_summary = result.ai_summary
-                    else:
-                        # レガシー（items無し）経路: generate_case_summary の既存契約
-                        # （解決済み文字列のリストを渡す）は温存する。解析対象は先頭
-                        # MAX_PHOTOS_FOR_AI 枚のみのため、その分だけを base64 化する。
-                        resolved_refs: list[str] = []
-                        for storage_key, url in ungrouped_refs[:MAX_PHOTOS_FOR_AI]:
-                            ref = await photo_url_for_ai(storage_key, url)
-                            if ref is not None:
-                                resolved_refs.append(ref)
-                        ai_summary = await generate_case_summary(
-                            purpose=case.purpose,
-                            housing_type=case.housing_type,
-                            floor_plan=case.floor_plan,
-                            photo_urls=resolved_refs,
-                        )
-                case.ai_summary = ai_summary
-                case.ai_status = CASE_AI_STATUS_DONE
-                case.ai_failed_reason = None
-            except Exception as exc:  # noqa: BLE001 -- 解析失敗で案件を壊さない
-                # 例外オブジェクトをそのまま文字列化しない（SDK 例外に画像データや
-                # リクエスト内容が含まれうる。summary._detect_photo_labels と同方針）。
-                reason = f"{type(exc).__name__}: {str(exc)[:180]}"
-                logger.error(
-                    "cases: AI 解析に失敗（フォールバック要約のまま継続） - case_id=%s - %s",
-                    case_id,
-                    reason,
-                )
-                case.ai_status = CASE_AI_STATUS_FAILED
-                case.ai_failed_reason = reason[:255]
-            await session.commit()
+            await _mark_case_analysis_failed(case_id, reason)
+            return
+        await _persist_case_analysis(
+            case_id,
+            ai_summary=ai_summary,
+            item_ids=payload.item_ids,
+            item_results=item_results,
+        )
     except Exception:  # noqa: BLE001 -- BackgroundTask の外へ例外を出さない
         logger.exception("cases: AI 解析タスクが異常終了しました - case_id=%s", case_id)
 
@@ -326,6 +410,12 @@ async def _get_case(session: AsyncSession, case_id: uuid.UUID) -> Case:
     "/cases",
     response_model=CaseOut,
     status_code=status.HTTP_201_CREATED,
+    responses={
+        status.HTTP_200_OK: {
+            "model": CaseOut,
+            "description": "冪等キー一致（新規作成せず既存案件を返却・r7 M-4）",
+        }
+    },
     summary="案件作成（写真 + 住居情報 + AI 要約）",
 )
 async def create_case(
@@ -347,7 +437,8 @@ async def create_case(
     現在は「写真保存 + 案件行の作成」だけを短いトランザクションで commit して 201 を返し、
     解析は ``_run_case_ai_analysis``（別セッション・120秒デッドライン）に委ねる。応答の
     ``ai_status`` は ``pending`` で、フロントは完了まで ``GET /cases/{id}`` をポーリングする。
-    ``idempotency_key`` を指定した再送信は、直近10分内なら新規作成せず 200 で既存案件を返す。
+    ``idempotency_key`` を指定した再送信は、期間によらず新規作成せず 200 で既存案件を返す
+    （DB の一意制約と同じ恒久セマンティクス・r7 M-1）。
     """
     # AI解析(Gemini呼び出し)を伴うコストDoS対策（security review 指摘対応）。
     # IP軸は Depends(RateLimitGuard(...)) が既にカウント・判定済み。アカウント軸は
@@ -357,7 +448,8 @@ async def create_case(
     request.state.rate_limit.hit_account(str(user.id))
 
     # 冪等キーによる再送信の吸収（r6 H-1）。既存案件があれば新規作成せず 200 で返す
-    # （201 と区別できるようにし、フロントが「作成された」と「既にあった」を判別できる）。
+    # （201 と区別できるようにし、フロントが「作成された」と「既にあった」を判別できる。
+    # r7 M-1: 経過時間で窓を切らない＝DB の一意制約と同じ恒久セマンティクス）。
     if body.idempotency_key:
         existing_case_id = await _find_idempotent_case_id(
             session, user.id, body.idempotency_key

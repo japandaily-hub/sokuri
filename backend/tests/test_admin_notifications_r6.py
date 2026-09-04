@@ -246,6 +246,59 @@ async def test_operator_unsuspend_repeat_does_not_renotify(
     dispatch_mock.assert_awaited_once()
 
 
+async def test_user_unsuspend_repeat_does_not_renotify(
+    client: AsyncClient, db_session: AsyncSession, monkeypatch
+):
+    """一度も停止していない依頼者へ suspended=false を送っても通知しない（r7 M-2）。
+
+    業者側（test_operator_unsuspend_repeat_does_not_renotify）と対称。停止→解除の
+    遷移が実際に起きた時だけ通知する。
+    """
+    admin_token = await _make_admin(client, db_session)
+    await _signup_user(client, "unsuspend_repeat_user@example.com")
+    target = await db_session.scalar(
+        select(User).where(User.email == "unsuspend_repeat_user@example.com")
+    )
+    assert target is not None
+    dispatch_mock = AsyncMock()
+    monkeypatch.setattr(
+        "app.services.notify_dispatch.dispatch_account_unsuspended", dispatch_mock
+    )
+
+    # 停止していない状態への suspended=false は状態が変わらない＝通知しない。
+    r = await client.patch(
+        f"/api/v1/admin/users/{target.id}/suspend",
+        json={"suspended": False},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["is_suspended"] is False
+    dispatch_mock.assert_not_awaited()
+
+    # 停止 → 解除の遷移では1通だけ届く。
+    await client.patch(
+        f"/api/v1/admin/users/{target.id}/suspend",
+        json={"suspended": True, "reason": "規約違反の疑い"},
+        headers=_auth(admin_token),
+    )
+    r = await client.patch(
+        f"/api/v1/admin/users/{target.id}/suspend",
+        json={"suspended": False},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 200, r.text
+    dispatch_mock.assert_awaited_once()
+
+    # 解除済みへの再送では増えない。
+    r = await client.patch(
+        f"/api/v1/admin/users/{target.id}/suspend",
+        json={"suspended": False},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 200, r.text
+    dispatch_mock.assert_awaited_once()
+
+
 async def test_user_unsuspend_notifies(
     client: AsyncClient, db_session: AsyncSession, monkeypatch
 ):

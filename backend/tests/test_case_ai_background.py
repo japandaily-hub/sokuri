@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from typing import AsyncIterator
 from unittest.mock import AsyncMock
@@ -24,6 +25,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.router import api_router
+from app.db import session as db_session_module
 from app.db.models.case import Case
 from app.db.models.operator import Operator
 from app.db.session import get_session
@@ -175,6 +177,109 @@ async def test_create_case_notifies_via_dispatch_not_direct_mail(
     assert args[2] == r.json()["id"]
 
 
+async def test_no_db_session_is_open_during_ai_analysis(
+    client: AsyncClient, monkeypatch, db_session: AsyncSession
+):
+    """Gemini 呼び出しの間、バックグラウンドタスクは DB セッションを1つも開いていない。
+
+    r7 H-1 の回帰テスト。解析は最長120秒かかりうるため、その間セッション（＝プールの
+    1接続・PostgreSQL では ``idle in transaction``）を保持していると、同時作成数が
+    プールサイズを超えた瞬間に無関係な API まで QueuePool の枯渇で 500 になる。
+    ``get_background_session_factory()`` が返すファクトリを数えるラッパで包み、解析
+    関数の実行時点で open なセッションが 0 であることを直接検証する。
+    """
+    token = await _signup_user(client, "ai_session_scope_user@example.com")
+
+    inner_factory = db_session_module.AsyncSessionLocal
+    state = {"open": 0, "opened_total": 0}
+
+    @asynccontextmanager
+    async def _tracked_session():
+        state["open"] += 1
+        state["opened_total"] += 1
+        try:
+            async with inner_factory() as session:
+                yield session
+        finally:
+            state["open"] -= 1
+
+    # get_background_session_factory() はモジュール属性を毎回解決するため、ここでの
+    # 差し替えがバックグラウンドタスクへそのまま効く（db/session.py の設計）。
+    monkeypatch.setattr(
+        db_session_module, "AsyncSessionLocal", lambda: _tracked_session()
+    )
+
+    open_sessions_during_analysis: list[int] = []
+
+    async def _fake_generate_case_summary(**_kwargs: object) -> str:
+        open_sessions_during_analysis.append(state["open"])
+        return "解析済み要約"
+
+    monkeypatch.setattr(
+        "app.api.v1.endpoints.cases.generate_case_summary", _fake_generate_case_summary
+    )
+
+    r = await client.post("/api/v1/cases", json=_case_payload(), headers=_auth(token))
+    assert r.status_code == 201, r.text
+    case_id = r.json()["id"]
+
+    # 解析は1回だけ呼ばれ、その瞬間に open なセッションは 0 本。
+    assert open_sessions_during_analysis == [0]
+    # 読み出し用と書き戻し用で最低2回はセッションを開き直している（＝掴みっぱなしで
+    # はなく、短いセッションに割られている）。
+    assert state["opened_total"] >= 2
+    assert state["open"] == 0
+
+    # 分割しても結果は従来どおり書き戻される。
+    r = await client.get(f"/api/v1/cases/{case_id}", headers=_auth(token))
+    assert r.status_code == 200, r.text
+    assert r.json()["ai_status"] == "done"
+    assert r.json()["ai_summary"] == "解析済み要約"
+
+
+async def test_item_analysis_results_are_written_back_after_session_reopen(
+    client: AsyncClient, monkeypatch
+):
+    """items 経路でも、解析後に開き直したセッションで各商品の AI 結果が保存される。
+
+    r7 H-1 で書き戻しを別セッションへ分離したため、item 単位の結果が id で正しく
+    突き合わされていることを確認する（位置ずれ・取りこぼしの回帰検知）。
+    """
+    token = await _signup_user(client, "ai_item_writeback_user@example.com")
+
+    async def _fake_generate_case_ai(*, items, **_kwargs: object):
+        return "商品つき要約", [
+            summary_module.ItemAnalysisResult(
+                ai_detected_name=f"検出_{item.name}",
+                ai_condition=None,
+                ai_summary=f"要約_{item.name}",
+            )
+            for item in items
+        ]
+
+    monkeypatch.setattr(
+        "app.api.v1.endpoints.cases.generate_case_ai", _fake_generate_case_ai
+    )
+
+    payload = _case_payload(
+        photos=[],
+        items=[
+            {"name": "冷蔵庫", "photos": [{"storage_key": f"{uuid.uuid4().hex}.jpg"}]},
+            {"name": "洗濯機", "photos": [{"storage_key": f"{uuid.uuid4().hex}.jpg"}]},
+        ],
+    )
+    r = await client.post("/api/v1/cases", json=payload, headers=_auth(token))
+    assert r.status_code == 201, r.text
+
+    r = await client.get(f"/api/v1/cases/{r.json()['id']}", headers=_auth(token))
+    assert r.status_code == 200, r.text
+    detail = r.json()
+    assert detail["ai_status"] == "done"
+    assert detail["ai_summary"] == "商品つき要約"
+    detected = {it["name"]: it["ai_detected_name"] for it in detail["items"]}
+    assert detected == {"冷蔵庫": "検出_冷蔵庫", "洗濯機": "検出_洗濯機"}
+
+
 # ──────────────── H-1: 冪等キー ────────────────
 
 
@@ -190,6 +295,42 @@ async def test_same_idempotency_key_returns_existing_case_with_200(client: Async
 
     # 写真キーは新しいものにする（DB の storage_key UNIQUE を踏まないため）。
     # 冪等キー一致の時点で写真を見ずに既存案件を返すことの確認でもある。
+    second = await client.post(
+        "/api/v1/cases", json=_case_payload(idempotency_key=key), headers=_auth(token)
+    )
+    assert second.status_code == 200, second.text
+    assert second.json()["id"] == first.json()["id"]
+
+    r = await client.get("/api/v1/cases", headers=_auth(token))
+    assert r.status_code == 200, r.text
+    assert len(r.json()) == 1
+
+
+async def test_same_idempotency_key_returns_existing_case_regardless_of_age(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """古い（旧実装の10分窓を過ぎた）冪等キーでも 409 にならず 200 で既存案件を返す。
+
+    r7 M-1 の回帰テスト。DB の一意制約 uq_cases_user_id_idempotency_key は期限を
+    持たないため、窓を切ると「既存案件も返せず INSERT も通らない」恒久 409 の袋小路に
+    なる（web は 409 でキーを再発行しないため、リロードするまで何度押しても失敗する）。
+    """
+    token = await _signup_user(client, "idem_old_user@example.com")
+    key = str(uuid.uuid4())
+
+    first = await client.post(
+        "/api/v1/cases", json=_case_payload(idempotency_key=key), headers=_auth(token)
+    )
+    assert first.status_code == 201, first.text
+
+    # 旧実装の有効窓（10分）を大きく超えた過去に見せかける。
+    row = await db_session.scalar(
+        select(Case).where(Case.id == uuid.UUID(first.json()["id"]))
+    )
+    assert row is not None
+    row.created_at = datetime.now(timezone.utc) - timedelta(days=30)
+    await db_session.commit()
+
     second = await client.post(
         "/api/v1/cases", json=_case_payload(idempotency_key=key), headers=_auth(token)
     )

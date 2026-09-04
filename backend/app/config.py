@@ -52,14 +52,19 @@ class Settings(BaseSettings):
     # SQLAlchemy のクエリエコー
     sql_echo: bool = False
     # ── DB コネクションプール（db/session.py）────────────────────────
-    # SQLAlchemy 既定（pool_size=5 / max_overflow=10 / pool_timeout=30）に依存すると、
-    # Render 無料 PostgreSQL の接続上限（同時接続が少ない）に対して過大になり、かつ
-    # プール枯渇時に 30 秒ブロックしてから 500 になる（r6 ADD-1）。明示値に固定して
-    # 「詰まるなら早く詰まる」を可視化する。案件作成の AI 解析は BackgroundTasks 化
-    # （cases.py）済みのため、1 本のコネクションを長時間占有する経路は無い。
+    # SQLAlchemy 既定（pool_size=5 / max_overflow=10 / pool_timeout=30）の max_overflow は
+    # Render 無料 PostgreSQL の接続上限（同時接続が少ない）に対して過大なため、明示値に
+    # 固定する（r6 ADD-1）。案件作成の AI 解析は BackgroundTasks 化（cases.py）済みで、
+    # かつ r7 H-1 で Gemini 呼び出し中は接続を1本も借りない3段構成にしたため、1 本の
+    # コネクションを長時間占有する経路は無い（この前提は
+    # tests/test_case_ai_background.py::test_no_db_session_is_open_during_ai_analysis
+    # が担保する）。
+    # pool_timeout は 30 秒（SQLAlchemy 既定）へ戻した（r7 H-1）: 10 秒では瞬間的な
+    # バーストで待てば取れたはずの接続まで 500 に倒れ、失敗が早くなるだけで可用性は
+    # 上がらなかった。長時間占有の根本原因を取り除いたため待ちに戻す。
     db_pool_size: int = 5
     db_max_overflow: int = 5
-    db_pool_timeout: int = 10
+    db_pool_timeout: int = 30
 
     # ── カタヅケ: 認証 / ストレージ / メール ──────────────────────────
     # JWT 署名鍵（本番では必ず環境変数 JWT_SECRET で上書きする）

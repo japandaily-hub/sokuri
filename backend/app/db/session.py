@@ -26,9 +26,9 @@ _pool_kwargs: dict = {}
 if _settings.database_url.startswith("postgresql+asyncpg"):
     _connect_args = {"timeout": 10, "command_timeout": 30}
     # 既定値依存をやめ、Render 無料 PostgreSQL の接続上限に収まる明示値に固定する
-    # （r6 ADD-1: 長時間処理がコネクションを占有した際、既定の pool_timeout=30 秒
-    # ブロックだと無関係な API まで巻き込んで詰まる。10 秒で早期に 500 へ倒し、
-    # プール枯渇を隠さない）。上限は config で上書きできる。
+    # （r6 ADD-1）。pool_timeout は 30 秒（r7 H-1 で 10 秒から復帰）: 長時間占有の
+    # 根本原因（AI 解析中の接続保持）を cases.py 側で除去したため、瞬間的なバースト
+    # は待って吸収する。上限は config で上書きできる。
     _pool_kwargs = {
         "pool_size": _settings.db_pool_size,
         "max_overflow": _settings.db_max_overflow,

@@ -27,7 +27,7 @@ from app.core.client_ip import (
     scan_client_ip_for_diagnostics_with_reason,
 )
 from app.api.v1.endpoints.cases import sweep_stale_pending_ai
-from app.db.session import AsyncSessionLocal, engine
+from app.db.session import engine, get_background_session_factory
 from app.services.seed import seed_channels_and_rules
 
 logger = logging.getLogger(__name__)
@@ -36,12 +36,18 @@ logger = logging.getLogger(__name__)
 # これらのまま本番運用されると署名検証が事実上無効化される（fail-open）ため起動を止める。
 _WEAK_JWT_SECRETS = {"dev-secret-change-me", "change-me-to-random-64-hex"}
 
+#: 直近に WARNING を出した ``degraded_config`` の内容（r7 M-3）。``/readyz`` は外形監視が
+#: 定期ポーリングする無認証エンドポイントのため、毎回 WARNING を出すとログ保持期間
+#: （Render 無料枠は7日）を未設定1件で埋め尽くし、障害時の追跡を妨げる。起動後の初回と
+#: 内容が変化した時だけ記録する。``None`` は「まだ一度も記録していない」を表す。
+_logged_degraded_config: list[str] | None = None
+
 
 async def _run_seed() -> None:
     """バックグラウンドでチャネルシードを実行する。失敗してもサーバーは継続する。"""
     try:
         logger.info("seed: チャネルシードを開始")
-        async with AsyncSessionLocal() as session:
+        async with get_background_session_factory()() as session:
             await seed_channels_and_rules(session)
         logger.info("seed: チャネルシード完了")
     except Exception as exc:
@@ -55,10 +61,15 @@ async def _run_stale_pending_ai_sweep() -> None:
     案件作成直後の再デプロイ・OOM・SIGTERM で AI 解析タスクが失われると ai_status は
     pending のまま恒久的に残り得る（GET 側の遅延回収は該当案件へアクセスがあるまで
     発火しない）。失敗してもサーバーは継続する（seed と同方針）。
+
+    セッションは ``get_background_session_factory()`` 経由で毎回解決する（r7 M-6）:
+    import 時に ``AsyncSessionLocal`` を束縛すると、テストの
+    ``monkeypatch.setattr("app.db.session.AsyncSessionLocal", ...)`` が効かず、
+    lifespan を有効にしたテストが本物の DATABASE_URL へ接続しに行ってしまう。
     """
     try:
         logger.info("cases: 起動時 pending スイープを開始")
-        async with AsyncSessionLocal() as session:
+        async with get_background_session_factory()() as session:
             count = await sweep_stale_pending_ai(session)
         logger.info("cases: 起動時 pending スイープ完了 - count=%s", count)
     except Exception as exc:
@@ -303,11 +314,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # ここでの目的はあくまで外形監視からの可視化に限定する。
         config_flags = _config_readiness(settings)
         degraded_config = sorted(k for k, ok in config_flags.items() if not ok)
-        if degraded_config:
-            logger.warning(
-                "readyz: 未設定の必須構成があります（起動は継続） - %s",
-                ",".join(degraded_config),
-            )
+        # ログは起動後の初回と「内容が変化した時」だけ（r7 M-3）。payload は毎回返す。
+        global _logged_degraded_config
+        if degraded_config != _logged_degraded_config:
+            _logged_degraded_config = degraded_config
+            if degraded_config:
+                logger.warning(
+                    "readyz: 未設定の必須構成があります（起動は継続） - %s",
+                    ",".join(degraded_config),
+                )
+            else:
+                logger.info("readyz: 必須構成の未設定は解消しました。")
 
         payload: dict[str, object] = {
             "status": "ready" if schema_ok else "degraded",

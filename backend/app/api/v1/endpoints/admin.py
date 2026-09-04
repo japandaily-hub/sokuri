@@ -801,13 +801,16 @@ async def suspend_user(
             status_code=status.HTTP_409_CONFLICT,
             detail="管理者アカウントは停止できません。",
         )
+    prev_suspended = target.is_suspended
     target.is_suspended = body.suspended
     target.suspended_at = datetime.now(timezone.utc) if body.suspended else None
     target.suspended_reason = body.reason if body.suspended else None
     await session.commit()
     await session.refresh(target)
-    if not body.suspended:
+    if prev_suspended and not body.suspended:
         # 解除のみ通知する（suspend_operator と同じ方針・r6-verify-web H1）。
+        # 実際に停止→解除へ状態が変わった時だけ送る（r7 M-2 で業者側と対称化）:
+        # 一度も停止していない依頼者へ suspended=false を送っても通知しない。
         background.add_task(
             notify_dispatch.dispatch_account_unsuspended,
             target.line_user_id,

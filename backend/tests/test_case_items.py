@@ -377,11 +377,16 @@ async def _case_after_analysis(client: AsyncClient, token: str, case_id: str) ->
     AI 由来のフィールド（items[].ai_detected_name / ai_summary）は作成応答ではなく
     詳細取得で検証する。ASGITransport は BackgroundTasks の完了までを待つため、
     ここでのポーリングは不要（本番のフロントは pending の間ポーリングする）。
+
+    r7 M-7: 本セクションの呼び出し元は analyze_image をすべてモックで成功させるため、
+    期待値は "done" ちょうど。``in ("done", "failed")`` に緩めると
+    ``_run_case_ai_analysis`` が丸ごと落ちても（＝解析が一切走らなくても）緑になり、
+    「毒入り検出名が保存されないこと」の検証が空振りする。
     """
     r = await client.get(f"/api/v1/cases/{case_id}", headers=_auth(token))
     assert r.status_code == 200, r.text
     detail = r.json()
-    assert detail["ai_status"] in ("done", "failed"), detail["ai_status"]
+    assert detail["ai_status"] == "done", detail["ai_status"]
     return detail
 
 
@@ -488,6 +493,10 @@ async def test_poisoned_detected_name_not_persisted(
 
     assert case["items"][0]["ai_detected_name"] is None
     assert "evil.example" not in (case["ai_summary"] or "")
+    # 解析が実際に走った上で「検出名だけが落ちた」ことを担保する（r7 M-7）。解析が
+    # 例外で丸ごと落ちても ai_detected_name は None になるため、それだけでは
+    # サニタイズの検証にならない。ai_condition は VisionResult 由来で保存される。
+    assert case["items"][0]["ai_condition"] is not None
 
 
 # ──────────────────────────── 11. transactions.py の items eager load ────────────────────────────

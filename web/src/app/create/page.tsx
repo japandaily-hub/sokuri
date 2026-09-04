@@ -15,7 +15,7 @@ import Link from "next/link";
 import { Ic, type IcName } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
 import { useToken } from "@/components/kdz/Ui";
-import { createCase, uploadCasePhoto, toDisplayMessage } from "@/lib/katadzuke-api";
+import { createCase, uploadCasePhoto, toDisplayMessage, createTimeoutSignal, KdzNetworkError } from "@/lib/katadzuke-api";
 import "./create.css";
 
 const STEPS = ["写真", "利用目的", "住居情報", "確認"] as const;
@@ -120,9 +120,15 @@ export default function CreateCasePage() {
   /**
    * 冪等キー（crypto.randomUUID()）。AI 解析は backend 側で背景実行されるため
    * POST /cases 自体は即応答するが、通信断・二重タップでの再送信時に同一案件を
-   * 二重作成させないよう、送信の最初の試行で1度だけ発行し、リトライでは使い回す。
+   * 二重作成させないよう発行する。送信内容（lastSubmitSignatureRef と比較）が
+   * 前回送信時から変わっていない場合のみ使い回し、変わっていれば再発行する
+   * （r7監査 H1是正: 「戻る」で編集してから再送信すると、backend の冪等一致判定
+   * （同一キー10分以内は新規作成せず既存案件をそのまま200で返す）により編集前の
+   * 古い内容の案件が無言で返り続ける事故を防ぐ）。
    */
   const idempotencyKeyRef = useRef<string | null>(null);
+  /** 直前に送信した案件内容の JSON 文字列（idempotencyKeyRef を再発行すべきかの判定に使用）。 */
+  const lastSubmitSignatureRef = useRef<string | null>(null);
 
   // ---- H3対策: 撮影済みの写真がある状態での離脱を防ぐ ----
   /** 離脱確認モーダル（ブラウザバック検知時）の開閉。 */
@@ -407,33 +413,48 @@ export default function CreateCasePage() {
       }
 
       setProgress("送信しています…");
-      // POST /cases は AI 解析の完了を待たずに応答する（背景実行・r6 H-1）。
-      // idempotency_key は最初の試行で1度だけ発行し、通信断による再送信でも使い回すことで
-      // 同一案件の二重作成を防ぐ。ネットワーク断時のタイムアウトは request() の既定挙動
-      // （ブラウザ既定のタイムアウト）に委ねる。
-      if (!idempotencyKeyRef.current) {
+      const casePayload = {
+        purpose,
+        prefecture,
+        city: city.trim(),
+        address_detail: addressDetail.trim() || null,
+        housing_type: housingType,
+        floor_plan: floorPlan,
+        floor_number: floorNumber === "" ? null : Number(floorNumber),
+        has_elevator: hasElevator,
+        items: itemPayloads.length > 0 ? itemPayloads : undefined,
+        photos: loosePayloads,
+      };
+      // r7監査 H1是正: 送信内容（写真キー・品目・住所・目的・備考）の安定な JSON 文字列を
+      // 前回送信時のものと比較し、変わっていれば冪等キーを再発行する（同一内容の再試行では
+      // 同じキーを使い回し、通信断等による二重作成は引き続き防ぐ）。
+      const submitSignature = JSON.stringify(casePayload);
+      if (lastSubmitSignatureRef.current !== submitSignature) {
         idempotencyKeyRef.current = crypto.randomUUID();
+        lastSubmitSignatureRef.current = submitSignature;
       }
+      // r7監査 M1是正: POST /cases は AI 解析の完了を待たずに応答する（背景実行・r6 H-1）ため
+      // 通常は即応答だが、backend側の一時的な遅延・DBプール枯渇・回線不調でリクエストそのものが
+      // 返らない場合に備え、60秒でタイムアウトさせる（疎通異常の検知が目的でAI待ちではない）。
       const created = await createCase(
-        {
-          purpose,
-          prefecture,
-          city: city.trim(),
-          address_detail: addressDetail.trim() || null,
-          housing_type: housingType,
-          floor_plan: floorPlan,
-          floor_number: floorNumber === "" ? null : Number(floorNumber),
-          has_elevator: hasElevator,
-          items: itemPayloads.length > 0 ? itemPayloads : undefined,
-          photos: loosePayloads,
-          idempotency_key: idempotencyKeyRef.current,
-        },
+        { ...casePayload, idempotency_key: idempotencyKeyRef.current ?? undefined },
         token,
+        createTimeoutSignal(60_000),
       );
+      // 送信成功後は次回の送信（別案件の新規作成）に備えてキーを破棄する。
+      idempotencyKeyRef.current = null;
+      lastSubmitSignatureRef.current = null;
       allowLeaveRef.current = true;
       router.push(`/cases/${created.id}?created=1`);
     } catch (err) {
-      setError(toDisplayMessage(err, "送信に失敗しました。もう一度お試しください。"));
+      const isTimeout =
+        err instanceof KdzNetworkError &&
+        (err.cause as { name?: string } | null | undefined)?.name === "TimeoutError";
+      setError(
+        isTimeout
+          ? "送信に時間がかかっています。しばらくしてからマイページをご確認ください。同じ内容で再送信しても重複登録されません"
+          : toDisplayMessage(err, "送信に失敗しました。もう一度お試しください。"),
+      );
       setSubmitting(false);
       setProgress("");
     }
