@@ -15,6 +15,7 @@ import { Spinner } from "@/components/Icon";
 import { OperatorHeader } from "@/components/kdz/OperatorHeader";
 import { Ic } from "@/components/kdz/Icons";
 import { useToken } from "@/components/kdz/Ui";
+import { formatPurposeLabel } from "@/lib/case-labels";
 import {
   LIST_DEFAULT_LIMIT,
   TXN_STATUS_LABEL,
@@ -102,7 +103,7 @@ export default function OperatorTransactionsPage() {
               {items?.map((t) => (
                 <Link href={`/operator/transactions/${t.id}`} className="txn-row" key={t.id}>
                   <div className="txn-row-info">
-                    <div className="txn-row-title">{t.purpose}</div>
+                    <div className="txn-row-title">{formatPurposeLabel(t.purpose)}</div>
                     <div className="txn-row-meta">
                       {t.prefecture} {t.city} ・ 落札額 {formatYen(t.initial_amount)}
                       {t.final_amount != null && t.final_amount !== t.initial_amount
@@ -116,6 +117,12 @@ export default function OperatorTransactionsPage() {
                       <span className="status-chip unread">未読{t.unread_count}</span>
                     ) : null}
                     {t.has_pending_reduction ? <span className="status-chip warn">減額申請中</span> : null}
+                    {/* r8-fix-frontend2 M4 是正: 依頼者が利用停止中の取引を一覧からも判別できるようにする。 */}
+                    {t.user_suspended ? (
+                      <span className="status-chip warn" title="この依頼者は現在利用停止中です">
+                        依頼者停止中
+                      </span>
+                    ) : null}
                     <span className={`status-chip ${txnChipClass(t.status)}`}>{TXN_STATUS_LABEL[t.status]}</span>
                     <Ic name="arrow" style={{ color: "var(--body-soft)", width: 16, height: 16 }} />
                   </div>

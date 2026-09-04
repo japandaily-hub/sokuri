@@ -23,7 +23,7 @@ import Link from "next/link";
 import { Spinner } from "@/components/Icon";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import { Ic } from "@/components/kdz/Icons";
-import { caseItemsLabel } from "@/lib/case-labels";
+import { caseItemsLabel, formatPurposeLabel } from "@/lib/case-labels";
 import { StatusBadge, useToken } from "@/components/kdz/Ui";
 import {
   LIST_MAX_LIMIT,
@@ -95,7 +95,7 @@ function LotCard({ c, unreadCount }: { c: CaseOut; unreadCount?: number }) {
             <span className={`status-chip ${cls}`}>{label}</span>
           </div>
           <div className="lot-cats">
-            <span className="lot-cat-chip">{c.purpose}</span>
+            <span className="lot-cat-chip">{formatPurposeLabel(c.purpose)}</span>
           </div>
           <div className="lot-meta">
             <span className="lot-meta-item">

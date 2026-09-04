@@ -17,9 +17,10 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,13 +31,14 @@ from app.core.security import (
     create_reauth_token,
     verify_password,
 )
-from app.db.models.bid import Bid
+from app.db.models.bid import BID_STATUS_PENDING, BID_STATUS_REJECTED, Bid
 from app.db.models.operator import Operator
 from app.db.models.operator_profile import OperatorProfile
 from app.db.models.transaction import Review, Transaction
 from app.db.session import get_session
 from app.schemas_katadzuke import (
     LineLinkUnlinkRequest,
+    OperatorAccountDeleteRequest,
     OperatorProfileOut,
     OperatorProfileUpdateRequest,
     OperatorPublicListItemOut,
@@ -172,7 +174,8 @@ async def get_vendor_public_profile(
     _rl: object = Depends(RateLimitGuard("public_read")),
 ) -> OperatorPublicProfileOut:
     operator = await session.get(Operator, operator_id)
-    if operator is None or operator.is_suspended:
+    # 退会済み（deleted_at）も停止中と同様に 404 とする（r8-M6）。
+    if operator is None or operator.is_suspended or operator.deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="業者が見つかりません。")
 
     profile = await session.get(OperatorProfile, operator_id)
@@ -243,7 +246,12 @@ async def list_vendors(
         await session.execute(
             select(Operator, OperatorProfile)
             .outerjoin(OperatorProfile, OperatorProfile.operator_id == Operator.id)
-            .where(Operator.vendor_status == "active", Operator.is_suspended.is_(False))
+            .where(
+                Operator.vendor_status == "active",
+                Operator.is_suspended.is_(False),
+                # 退会済み業者は公開一覧から除外する（r8-M6）。
+                Operator.deleted_at.is_(None),
+            )
             .order_by(
                 Operator.rating.is_(None),
                 Operator.rating.desc(),
@@ -353,3 +361,122 @@ async def unlink_operator_line(
 
     operator.line_user_id = None
     await session.commit()
+
+
+# ──────────────────────────── 退会（論理削除・匿名化） ────────────────────────────
+# 依頼者側（users.py の DELETE /users/me）と同じ方針。物理削除はしない
+# （完了済み取引・レビュー・キャンセル記録は依頼者側の記録として保持する）。
+
+_OPERATOR_DELETE_ACTIVE_TRANSACTION = HTTPException(
+    status_code=status.HTTP_409_CONFLICT,
+    detail="進行中の取引があるため退会できません。取引の完了またはキャンセル後に再度お試しください。",
+)
+_OPERATOR_DELETE_WRONG_PASSWORD = HTTPException(
+    status_code=status.HTTP_403_FORBIDDEN,
+    detail="パスワードが正しくありません。",
+)
+# 退会（cancelled / completed 以外）を妨げる進行中ステータス。将来 status が
+# 増えた場合も「終端でなければ進行中」と解釈されるよう、終端側を列挙する。
+_TERMINAL_TXN_STATUSES = ("cancelled", "completed")
+
+
+@router.delete(
+    "/operator/me",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="業者アカウントの退会（パスワード再照合必須・匿名化。進行中取引があれば409）",
+)
+async def delete_my_operator_account(
+    body: OperatorAccountDeleteRequest,
+    request: Request,
+    operator: Operator = Depends(get_current_operator),
+    session: AsyncSession = Depends(get_session),
+    _rl: object = Depends(RateLimitGuard("account_delete")),
+) -> None:
+    """業者の退会（r8-M6 / r8-review H-1・H-4対応）。
+
+    従来は業者が自分でアカウントを閉じる手段が API・UI とも無く、privacy ページの
+    「退会された場合…遅滞なく削除します」が業者に対しては空手形になっていた。
+
+    処理は依頼者退会（users.delete_my_account）と同型:
+    ①パスワード再照合＋レート制限（account_delete・アカウント軸を実際に効かせる）
+    ②メールのトムストン化（＝ログイン不能化・再登録時の unique 衝突回避）
+    ③パスワード無効化 ④LINE 連携解除 ⑤公開プロフィール非公開化
+    ⑥未決（pending）入札の一括取り下げ ⑦``deleted_at`` による旧トークン即時失効。
+
+    r8-review H-1（退会と落札の競合が直列化されていない）対応: 「進行中取引数の
+    事前判定 → 入札のrejected化 → deleted_at付与」の順だと、事前判定と入札
+    rejected化の間で ``bids.select_bid`` がCase行ロックを取って落札・Transaction
+    作成をcommitしても、本関数のrejected化は既にselected化された入札には当たらず
+    競合を検出できなかった。そこで「入札のrejected化 → flush → 進行中取引数の
+    再判定」の順に入れ替える。select_bid は対象Bid行を条件付きUPDATEで更新する
+    （＝行ロックを取る）ため、本関数の一括UPDATE（同じくWHERE status=pending）は
+    select_bid のUPDATEが未コミットの間は自然にブロックされ、コミット後には
+    status が既に selected へ変わっているためrejected化の対象から外れる。
+    直後の再判定でその新規Transactionが可視化される（READ COMMITTED）ため、
+    非0なら本関数側をrollbackして409にする（多層防御としてbids.select_bid側にも
+    ``target.operator.deleted_at is not None`` の409ガードを追加済み）。
+    """
+    ctx = request.state.rate_limit
+    account_key = str(operator.id)
+    ctx.check_account(account_key)
+
+    # operator は operator_signup で必ず password_hash を持つ想定だが、user側
+    # （LINE専用ユーザーはパスワード確認不要）と同型に念のため分岐する。
+    if operator.password_hash is not None:
+        if not verify_password(body.password, operator.password_hash):
+            ctx.record_failure(account_key)
+            raise _OPERATOR_DELETE_WRONG_PASSWORD
+        ctx.reset_account(account_key)
+
+    # 未決入札は取り下げる（退会後に落札されると連絡不能の成約が生まれる）。
+    # 依頼者への落選通知は出さない: 案件は open のまま残り、他業者の入札で
+    # 通常どおり成立しうるため「落選」ではない。
+    await session.execute(
+        update(Bid)
+        .where(Bid.operator_id == operator.id, Bid.status == BID_STATUS_PENDING)
+        .values(status=BID_STATUS_REJECTED)
+    )
+    await session.flush()
+
+    active_txn_count = await session.scalar(
+        select(func.count())
+        .select_from(Transaction)
+        .join(Bid, Transaction.bid_id == Bid.id)
+        .where(
+            Bid.operator_id == operator.id,
+            Transaction.status.not_in(_TERMINAL_TXN_STATUSES),
+        )
+    )
+    if active_txn_count:
+        await session.rollback()
+        raise _OPERATOR_DELETE_ACTIVE_TRANSACTION
+
+    profile = await session.get(OperatorProfile, operator.id)
+    if profile is not None:
+        profile.is_public = False
+        profile.show_message = False
+        # 自由文（自己紹介）は退会後に公開経路へ残さない。
+        profile.intro_message = None
+
+    operator.contact_email = f"deleted-{operator.id}@deleted.katazuke.internal"
+    operator.password_hash = None
+    operator.line_user_id = None
+    operator.deleted_at = datetime.now(timezone.utc)
+
+    try:
+        await session.commit()
+    except Exception as exc:
+        await session.rollback()
+        logger.error(
+            "operator/me delete: 退会処理のコミットに失敗 - operator_id=%s - %s",
+            operator.id,
+            exc,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="退会処理に失敗しました。時間をおいて再度お試しください。",
+        ) from exc
+
+    # 監査ログ（依頼者退会と同様、誰がいつ退会したかを追えるようにする）。
+    logger.info("operator_withdraw operator=%s", operator.id)

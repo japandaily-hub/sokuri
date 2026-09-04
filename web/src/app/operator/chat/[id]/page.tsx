@@ -25,6 +25,7 @@ import { useToken } from "@/components/kdz/Ui";
 import {
   TXN_STATUS_LABEL,
   getTransaction,
+  KdzApiError,
   listMessages,
   listTransactions,
   LIST_MAX_LIMIT,
@@ -226,6 +227,9 @@ export default function OperatorChatPage() {
       setDraft("");
     } catch (e) {
       showToast(toDisplayMessage(e, "メッセージの送信に失敗しました"));
+      // r8-fix-frontend2 H3 是正: 409 transaction_closed（取引終了後の送信）を
+      // 受けた場合、detail が古いままだと入力欄が有効なまま残るため再取得する。
+      if (e instanceof KdzApiError && e.status === 409) await reloadDetail();
     } finally {
       setSending(false);
     }
@@ -269,6 +273,9 @@ export default function OperatorChatPage() {
       showToast("候補日を送信しました");
     } catch (e) {
       showToast(toDisplayMessage(e, "候補日の送信に失敗しました"));
+      // r8-fix-frontend2 H3 是正: 409 transaction_closed（取引終了後の候補日提案）を
+      // 受けた場合、detail を再取得して終了バナー・提案ボタンの無効化に反映させる。
+      if (e instanceof KdzApiError && e.status === 409) await reloadDetail();
     } finally {
       setProposing(false);
     }
@@ -277,6 +284,9 @@ export default function OperatorChatPage() {
   const peerInitial = "客";
   const caseIdShort = detail?.case_id ? detail.case_id.slice(0, 8).toUpperCase() : "";
   const statusLabel = detail ? TXN_STATUS_LABEL[detail.status] : "";
+  // r8-fix-frontend2 H3 是正: キャンセル済み・完了済みの取引ではチャットの続行操作
+  // （送信・日程提案）を無効化し、事実に即した終了表示に切り替える。
+  const isClosed = detail?.status === "cancelled" || detail?.status === "completed";
 
   return (
     <div className="opchat-page">
@@ -379,6 +389,14 @@ export default function OperatorChatPage() {
                 {statusLabel}
               </div>
 
+              {/* r8-fix-frontend2 H3 是正: キャンセル済み・完了済みの取引では続行操作
+                  （送信・日程提案）ができないことを明示する。 */}
+              {isClosed ? (
+                <div style={{ padding: "8px 20px", fontSize: 12.5, color: "var(--body-soft)" }} role="status">
+                  この取引は終了しています。メッセージの送信・日程提案はできません。
+                </div>
+              ) : null}
+
               {messagesError ? (
                 <div style={{ padding: "8px 20px", fontSize: 12.5, color: "var(--danger)" }}>{messagesError}</div>
               ) : null}
@@ -417,7 +435,7 @@ export default function OperatorChatPage() {
                   );
                 })}
 
-                {scheduleVisible ? (
+                {scheduleVisible && !isClosed ? (
                   <div className="schedule-propose" id="schedule-propose">
                     <div className="sp-head">
                       <CalendarIc />
@@ -455,41 +473,47 @@ export default function OperatorChatPage() {
                 ) : null}
               </div>
 
-              {/* 入力エリア */}
-              <div className="input-area">
-                <div className="input-tools">
-                  <button type="button" className="tool-btn" title="日程を提案" aria-label="日程を提案" onClick={toggleScheduleCard}>
-                    <CalendarIc />
+              {/* 入力エリア（終了済み取引では非表示にし、終了案内のみ出す） */}
+              {isClosed ? (
+                <div className="input-area" style={{ color: "var(--body-soft)", fontSize: 13, padding: "12px 20px" }}>
+                  この取引は終了しています
+                </div>
+              ) : (
+                <div className="input-area">
+                  <div className="input-tools">
+                    <button type="button" className="tool-btn" title="日程を提案" aria-label="日程を提案" onClick={toggleScheduleCard}>
+                      <CalendarIc />
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    className="msg-input"
+                    placeholder="メッセージを入力…"
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        void handleSend();
+                      }
+                    }}
+                    aria-label="メッセージを入力"
+                    disabled={sending}
+                  />
+                  <button
+                    type="button"
+                    className="btn-send"
+                    aria-label="送信"
+                    disabled={!draft.trim() || sending}
+                    onClick={() => void handleSend()}
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M22 2L11 13" />
+                      <path d="M22 2L15 22l-4-9-9-4 20-7z" />
+                    </svg>
                   </button>
                 </div>
-                <input
-                  type="text"
-                  className="msg-input"
-                  placeholder="メッセージを入力…"
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      void handleSend();
-                    }
-                  }}
-                  aria-label="メッセージを入力"
-                  disabled={sending}
-                />
-                <button
-                  type="button"
-                  className="btn-send"
-                  aria-label="送信"
-                  disabled={!draft.trim() || sending}
-                  onClick={() => void handleSend()}
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M22 2L11 13" />
-                    <path d="M22 2L15 22l-4-9-9-4 20-7z" />
-                  </svg>
-                </button>
-              </div>
+              )}
             </>
           )}
         </div>
@@ -530,7 +554,7 @@ export default function OperatorChatPage() {
           <p style={{ fontSize: 11.5, color: "var(--body-soft)", marginTop: -8, marginBottom: 12, lineHeight: 1.6 }}>
             ※ サービス開始当初（β期間）は手数料を請求しません。請求開始の際は事前にメールでお知らせします。
           </p>
-          <button type="button" className="btn-propose" onClick={toggleScheduleCard}>
+          <button type="button" className="btn-propose" onClick={toggleScheduleCard} disabled={isClosed}>
             <CalendarIc />
             引き取り日程を提案
           </button>

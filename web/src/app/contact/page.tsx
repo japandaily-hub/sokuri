@@ -79,6 +79,11 @@ export default function ContactPage() {
         setSubmitError("入力内容をご確認のうえ、もう一度お試しください。");
       } else if (err instanceof KdzApiError && err.status === 429) {
         setSubmitError("送信が集中しています。しばらく時間をおいて再度お試しください。");
+      } else if (err instanceof KdzApiError && err.status === 503) {
+        // r8-fix-frontend2 M7 是正: toDisplayMessage は 5xx を一律汎用文言に潰すため、
+        // backend が「今は混んでいる（後で通る）」意図で返す 503 detail（Retry-After 付き）
+        // が届かなかった。他の 5xx（壊れている）とは区別し detail をそのまま出す。
+        setSubmitError(err.message.trim() || "ただいま混み合っています。数分後に再度お送りください。");
       } else {
         setSubmitError(toDisplayMessage(err, SUBMIT_FAILED_MESSAGE));
       }

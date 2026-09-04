@@ -27,7 +27,20 @@ _MAX_DECLARED_CONTENT_LENGTH = MAX_UPLOAD_BYTES + 64 * 1024
 _READ_CHUNK_BYTES = 1024 * 1024
 _TOO_LARGE = HTTPException(
     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-    detail="ファイルサイズが上限（10MB）を超えています。",
+    detail="ファイルサイズが上限（10MB）を超えています。写真を縮小するか、別の写真をお試しください。",
+)
+# 非対応形式の 415。web は detail をそのまま表示する契約のため、実際に多い失敗
+# （iPhone の HEIC を「すべてのファイル」で選択して accept を回避した場合）に
+# 次の行動が分かる文言にする（r8-H4）。判定は storage.sniff_image_ext の
+# マジックバイト方式（jpeg/png/webp のみ）と1対1で対応させること。
+_UNSUPPORTED_IMAGE = HTTPException(
+    status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+    detail=(
+        "この形式の画像には対応していません。"
+        "JPEG・PNG・WebP のいずれかでアップロードしてください"
+        "（iPhone の HEIC 形式は「設定 > カメラ > フォーマット > 互換性優先」で"
+        "JPEG として保存できます）。"
+    ),
 )
 
 
@@ -88,16 +101,14 @@ async def upload(
 
     if not data:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="ファイルが空です。"
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="ファイルが空です。写真を選び直してお試しください。",
         )
     # Content-Type ヘッダ・拡張子は詐称可能なため信用せず、実バイト列の先頭
     # シグネチャ（マジックバイト）で画像形式を判定する（security review 指摘対応。
     # operator_license.py の許可証画像アップロードと同じ方式に統一する）。
     if storage.sniff_image_ext(data) is None:
-        raise HTTPException(
-            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail="画像ファイルのみアップロードできます。",
-        )
+        raise _UNSUPPORTED_IMAGE
     try:
         storage.save_bytes(storage_key, data)
     except StorageKeyConflictError as exc:

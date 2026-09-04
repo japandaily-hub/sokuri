@@ -20,8 +20,10 @@ import Link from "next/link";
 import { Spinner } from "@/components/Icon";
 import { OperatorHeader } from "@/components/kdz/OperatorHeader";
 import { useToken } from "@/components/kdz/Ui";
+import { formatPurposeLabel } from "@/lib/case-labels";
 import { DisclosureNotice } from "@/components/kdz/DisclosureNotice";
 import {
+  CANCELLED_BY_LABEL,
   REDUCTION_CHIP_CLASS,
   REDUCTION_STATUS_LABEL,
   TXN_STATUS_LABEL,
@@ -170,7 +172,7 @@ export default function OperatorTransactionPage() {
           {/* ===== 概要 ===== */}
           <div className="listing-card">
             <div className="listing-info">
-              <div className="listing-title">{txn.case?.purpose ?? "片付け案件"}</div>
+              <div className="listing-title">{formatPurposeLabel(txn.case?.purpose, "片付け案件")}</div>
               <div className="listing-meta">
                 落札額 {formatYen(txn.initial_amount)}
                 {txn.final_amount != null && txn.final_amount !== txn.initial_amount
@@ -186,6 +188,31 @@ export default function OperatorTransactionPage() {
           <div className="op-card">
             <DisclosureNotice viewer="operator" disclosed={disclosed} awaitingApproval={txn.awaiting_approval} />
           </div>
+
+          {/* r8-fix-frontend2 H2 是正: キャンセルの理由が相手方に一切届かなかった問題への対応。
+              誰が・なぜ・いつキャンセルしたかを表示する。 */}
+          {txn.cancellation ? (
+            <div className="op-card">
+              <p style={{ fontFamily: "var(--head)", fontWeight: 600, color: "var(--navy)" }}>
+                キャンセル: {CANCELLED_BY_LABEL[txn.cancellation.cancelled_by]}による
+              </p>
+              <p style={{ fontSize: 12, color: "var(--body-soft)", marginTop: 4 }}>
+                {new Date(txn.cancellation.cancelled_at).toLocaleString("ja-JP")}
+              </p>
+              <p style={{ marginTop: 6, wordBreak: "break-word", overflowWrap: "anywhere" }}>
+                {txn.cancellation.reason ? `理由: ${txn.cancellation.reason}` : "理由の記載なし"}
+              </p>
+            </div>
+          ) : null}
+
+          {/* r8-fix-frontend2 M4 是正: 依頼者が運営により利用停止中の場合、業者側には
+              従来まったく表示されず（相手が応答しない理由が分からないまま）取引が pending
+              で固定されていた。理由を明示する。 */}
+          {txn.user_suspended ? (
+            <div className="op-alert warn">
+              この依頼者は現在利用停止中です。運営にお問い合わせください。返信が来ない場合があります。
+            </div>
+          ) : null}
 
           {/* お客様とのやり取り導線（チャット・日程調整はチャット画面から行う） */}
           {txn.status !== "cancelled" ? (
@@ -300,7 +327,7 @@ export default function OperatorTransactionPage() {
             <div className="op-card">
               <h2>キャンセル</h2>
               <p style={{ fontSize: 13, color: "var(--body-soft)", marginTop: 4, marginBottom: 14 }}>
-                業者都合のキャンセルは記録され、アカウント評価に影響します。
+                キャンセルは記録され、運営が確認します。
               </p>
               <button
                 type="button"
@@ -407,7 +434,7 @@ export default function OperatorTransactionPage() {
           <div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="cancelModalTitle">
             <h2 className="modal-title" id="cancelModalTitle">本当にキャンセルしますか？</h2>
             <p className="modal-sub">
-              <strong>業者都合のキャンセルは記録され、アカウント評価に影響します。</strong>
+              <strong>キャンセルは記録され、運営が確認します。入力した理由はそのまま依頼者に表示されます。</strong>
               <br />
               理由を入力してください。
             </p>

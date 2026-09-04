@@ -326,6 +326,17 @@ async def test_create_case_has_ai_summary_and_photos(client: AsyncClient):
     assert case["address_detail"] == "桜丘1-2-3 メゾン桜 101号室"
 
 
+async def test_create_case_rejects_unknown_purpose_422(client: AsyncClient):
+    """purpose は web の選択肢＋既存テスト・シードで使われてきた値に限定される
+    （CasePurpose の Literal 化）。未知の値は 422。
+    """
+    token = await _signup_user(client)
+    payload = _case_payload()
+    payload["purpose"] = "存在しない目的"
+    r = await client.post("/api/v1/cases", json=payload, headers=_auth(token))
+    assert r.status_code == 422, r.text
+
+
 async def test_unverified_operator_can_list_cases_but_not_bid(
     client: AsyncClient, db_session: AsyncSession
 ):
@@ -696,6 +707,44 @@ async def test_reviews_only_after_completed(
         headers=_auth(user_token),
     )
     assert r.status_code == 409
+
+
+async def test_duplicate_review_by_same_party_409(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """成約完了後、同一当事者による2件目のレビュー投稿は409（uq_reviews_transaction_reviewer）。"""
+    admin_token = await _make_admin(client, db_session)
+    user_token = await _signup_user(client)
+    op_token, _ = await _verified_operator(
+        client, db_session, admin_token, "op_dup_review@example.com"
+    )
+    case = await _create_case(client, user_token)
+    r = await client.post(
+        f"/api/v1/cases/{case['id']}/bids", json={"amount": 10000}, headers=_auth(op_token)
+    )
+    bid = r.json()
+    r = await client.post(
+        f"/api/v1/cases/{case['id']}/bids/{bid['id']}/select", headers=_auth(user_token)
+    )
+    txn_id = r.json()["id"]
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/complete", headers=_auth(user_token)
+    )
+    assert r.status_code == 200, r.text
+
+    r = await client.post(
+        "/api/v1/reviews",
+        json={"transaction_id": txn_id, "rating": 5, "comment": "良かったです"},
+        headers=_auth(user_token),
+    )
+    assert r.status_code == 201, r.text
+
+    r = await client.post(
+        "/api/v1/reviews",
+        json={"transaction_id": txn_id, "rating": 4, "comment": "2回目"},
+        headers=_auth(user_token),
+    )
+    assert r.status_code == 409, r.text
 
 
 # ──────────────────────────── 写真アップロード ────────────────────────────
@@ -1668,6 +1717,43 @@ async def test_messages_non_party_forbidden(client: AsyncClient, db_session: Asy
         headers=_auth(other_op_token),
     )
     assert r.status_code == 403
+
+
+async def test_suspended_operator_cannot_bid_or_chat_403_dict(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """停止中（is_suspended）業者は入札・チャット送信のいずれも403で拒否される。
+    detail は機械可読dict（{"code": "account_suspended", ...}）で、依頼者側
+    （assert_user_not_suspended）と同一契約を共用する（deps.assert_operator_not_suspended。
+    既存トークンをその場で失効させる）。
+    """
+    admin_token = await _make_admin(client, db_session)
+    user_token = await _signup_user(client, "susp_user@example.com")
+    op_token, op_id = await _verified_operator(
+        client, db_session, admin_token, "susp_op@example.com"
+    )
+    _, txn_id = await _create_transaction(client, user_token, op_token)
+    other_case = await _create_case(client, user_token)
+
+    operator = await db_session.get(Operator, uuid.UUID(op_id))
+    operator.is_suspended = True
+    await db_session.commit()
+
+    r = await client.post(
+        f"/api/v1/cases/{other_case['id']}/bids",
+        json={"amount": 10000},
+        headers=_auth(op_token),
+    )
+    assert r.status_code == 403, r.text
+    assert r.json()["detail"]["code"] == "account_suspended"
+
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/messages",
+        json={"body": "訪問予定についてご連絡します"},
+        headers=_auth(op_token),
+    )
+    assert r.status_code == 403, r.text
+    assert r.json()["detail"]["code"] == "account_suspended"
 
 
 async def test_messages_send_and_after_diff(client: AsyncClient, db_session: AsyncSession):

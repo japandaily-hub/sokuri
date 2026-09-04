@@ -12,6 +12,7 @@ tests/test_case_cancel.py 等と同様、各テストファイルは自己完結
 from __future__ import annotations
 
 import uuid
+from datetime import date, timedelta
 from typing import AsyncIterator
 from unittest.mock import AsyncMock, patch
 
@@ -246,6 +247,51 @@ async def test_decide_reduction_rejected_after_cancel(
     assert r.status_code == 409, r.text
 
 
+async def test_reduction_can_be_resubmitted_after_rejection(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """減額申請が却下（rejected）された後は pending が残らないため、業者は再申請できる
+    （create_reduction のガードは「未回答(pending)が残っているか」のみを見る仕様であり、
+    却下という結果自体は再申請を妨げない）。
+    """
+    admin_token = await _make_admin(client, db_session)
+    user_token = await _signup_user(client)
+    op_token, _ = await _verified_operator(client, admin_token, "op1@example.com")
+    _, txn_id = await _create_transaction(client, user_token, op_token)
+
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/reduction",
+        json={"requested_amount": 25000, "reason": "初回の減額申請理由です"},
+        headers=_auth(op_token),
+    )
+    assert r.status_code == 201, r.text
+    first_id = r.json()["id"]
+
+    r = await client.patch(
+        f"/api/v1/transactions/{txn_id}/reduction/{first_id}",
+        json={"action": "reject"},
+        headers=_auth(user_token),
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "rejected"
+
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/reduction",
+        json={"requested_amount": 20000, "reason": "再度の減額申請理由です"},
+        headers=_auth(op_token),
+    )
+    assert r.status_code == 201, r.text
+    second_id = r.json()["id"]
+    assert second_id != first_id
+
+    count = await db_session.scalar(
+        select(func.count())
+        .select_from(ReductionRequest)
+        .where(ReductionRequest.transaction_id == uuid.UUID(txn_id))
+    )
+    assert count == 2
+
+
 # ──────────────── 2. 停止業者の選定禁止（flow ADD-1） ────────────────
 
 
@@ -339,6 +385,93 @@ async def test_cancel_transaction_twice_is_rejected_without_double_record(
         .where(Cancellation.transaction_id == uuid.UUID(txn_id))
     )
     assert count == 1
+    operator = await db_session.get(Operator, uuid.UUID(op_id))
+    await db_session.refresh(operator)
+    assert operator.cancel_count == 1
+
+
+async def _confirm_schedule(client: AsyncClient, user_token: str, txn_id: str) -> None:
+    """日程確定（visit_date/visit_time_slot）まで進め、txn.status を "visiting" にする。"""
+    visit_date = (date.today() + timedelta(days=7)).isoformat()
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/schedule/confirm",
+        json={"visit_date": visit_date, "visit_time_slot": "10:00-12:00"},
+        headers=_auth(user_token),
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "visiting"
+
+
+async def test_cancel_after_schedule_confirmed_by_user(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """日程確定（visiting）後の依頼者キャンセルでも、Cancellation記録・相手方（業者）への
+    通知が入る（cancel_count は業者側キャンセルのみ加算するため、依頼者キャンセルでは
+    据え置き）。
+    """
+    admin_token = await _make_admin(client, db_session)
+    user_token = await _signup_user(client)
+    op_token, op_id = await _verified_operator(client, admin_token, "op1@example.com")
+    _, txn_id = await _create_transaction(client, user_token, op_token)
+    await _confirm_schedule(client, user_token, txn_id)
+
+    with patch(
+        "app.api.v1.endpoints.transactions.notify_dispatch.dispatch_transaction_cancelled",
+        new_callable=AsyncMock,
+    ) as dispatch_mock:
+        r = await client.post(
+            f"/api/v1/transactions/{txn_id}/cancel",
+            json={"reason": "日程確定後だが都合により中止"},
+            headers=_auth(user_token),
+        )
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "cancelled"
+    dispatch_mock.assert_called_once()
+    assert dispatch_mock.call_args[0][3] == "operator"  # 依頼者がキャンセル→業者へ通知
+
+    cancellation = await db_session.scalar(
+        select(Cancellation).where(Cancellation.transaction_id == uuid.UUID(txn_id))
+    )
+    assert cancellation is not None
+    assert cancellation.cancelled_by == "user"
+
+    operator = await db_session.get(Operator, uuid.UUID(op_id))
+    await db_session.refresh(operator)
+    assert operator.cancel_count == 0
+
+
+async def test_cancel_after_schedule_confirmed_by_operator(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """日程確定（visiting）後の業者キャンセルでは cancel_count が加算され、
+    Cancellation記録・依頼者への通知が入る。
+    """
+    admin_token = await _make_admin(client, db_session)
+    user_token = await _signup_user(client)
+    op_token, op_id = await _verified_operator(client, admin_token, "op1@example.com")
+    _, txn_id = await _create_transaction(client, user_token, op_token)
+    await _confirm_schedule(client, user_token, txn_id)
+
+    with patch(
+        "app.api.v1.endpoints.transactions.notify_dispatch.dispatch_transaction_cancelled",
+        new_callable=AsyncMock,
+    ) as dispatch_mock:
+        r = await client.post(
+            f"/api/v1/transactions/{txn_id}/cancel",
+            json={"reason": "日程確定後だが対応不可になった"},
+            headers=_auth(op_token),
+        )
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "cancelled"
+    dispatch_mock.assert_called_once()
+    assert dispatch_mock.call_args[0][3] == "user"  # 業者がキャンセル→依頼者へ通知
+
+    cancellation = await db_session.scalar(
+        select(Cancellation).where(Cancellation.transaction_id == uuid.UUID(txn_id))
+    )
+    assert cancellation is not None
+    assert cancellation.cancelled_by == "operator"
+
     operator = await db_session.get(Operator, uuid.UUID(op_id))
     await db_session.refresh(operator)
     assert operator.cancel_count == 1

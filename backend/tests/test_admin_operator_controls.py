@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 from typing import AsyncIterator
 
 import pytest
@@ -372,3 +373,57 @@ async def test_list_operators_status_q_total_counts(client: AsyncClient, db_sess
     )
     assert r.status_code == 422
 
+
+
+# ──────────────────────────── 退会済み業者の除外・保護（r8-review 未解決5） ────────────────────────────
+
+
+async def test_admin_operators_excludes_deleted_by_default(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """退会済み（deleted_at 非null）業者は既定で一覧・countsから除外され、
+    include_deleted=true で明示的に含められる。verify/suspend は409。"""
+    admin_token = await _make_admin(client, db_session)
+
+    _, active_id = await _signup_invited_operator(client, admin_token, "ctl_del_active@example.com")
+    _, deleted_id = await _signup_invited_operator(client, admin_token, "ctl_del_deleted@example.com")
+
+    deleted_operator = await db_session.get(Operator, uuid.UUID(deleted_id))
+    deleted_operator.deleted_at = datetime.now(timezone.utc)
+    await db_session.commit()
+
+    # 既定（include_deleted省略）: 退会済みは一覧・countsから消える。
+    r = await client.get("/api/v1/admin/operators", headers=_auth(admin_token))
+    assert r.status_code == 200, r.text
+    body = r.json()
+    ids = {item["id"] for item in body["items"]}
+    assert active_id in ids
+    assert deleted_id not in ids
+    assert body["total"] == 1
+    assert body["counts"]["all"] == 1
+
+    # include_deleted=true: 含まれる。
+    r = await client.get(
+        "/api/v1/admin/operators", params={"include_deleted": True}, headers=_auth(admin_token)
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    ids = {item["id"] for item in body["items"]}
+    assert deleted_id in ids
+    assert body["total"] == 2
+    assert body["counts"]["all"] == 2
+
+    # 退会済み業者への verify / suspend は409（状態不整合の防止）。
+    r = await client.patch(
+        f"/api/v1/admin/operators/{deleted_id}/verify",
+        json={"verified": True},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 409, r.text
+
+    r = await client.patch(
+        f"/api/v1/admin/operators/{deleted_id}/suspend",
+        json={"suspended": True},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 409, r.text

@@ -65,12 +65,18 @@ function LoginForm() {
   // AccountSuspendedError, code="account_suspended"）の場合、
   // 「メールアドレスまたはパスワードが正しくありません」ではなく停止案内を出す。
   const [suspendedNow, setSuspendedNow] = useState(false);
+  // r8-fix-frontend2 H1 是正: 429（試行集中）／5xx・ネットワーク失敗を
+  // 「パスワードが違います」と誤診させず、事実に即した文言を個別に出す。
+  const [rateLimited, setRateLimited] = useState(false);
+  const [serverError, setServerError] = useState(false);
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setAuthErr(null);
     setSuspendedNow(false);
+    setRateLimited(false);
+    setServerError(false);
     let ok = true;
     if (!EMAIL_RE.test(email)) {
       setEmailErr("メールアドレスを正しく入力してください");
@@ -87,6 +93,14 @@ function LoginForm() {
     setBusy(false);
     if (res?.code === "account_suspended") {
       setSuspendedNow(true);
+      return;
+    }
+    if (res?.code === "rate_limited") {
+      setRateLimited(true);
+      return;
+    }
+    if (res?.code === "server_error") {
+      setServerError(true);
       return;
     }
     if (res?.error) {
@@ -140,6 +154,26 @@ function LoginForm() {
                     お問い合わせはこちら
                   </Link>
                 </span>
+              </div>
+            ) : null}
+
+            {rateLimited ? (
+              <div className="auth-error" role="alert">
+                <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: "none", stroke: "var(--danger)", strokeWidth: 2, strokeLinecap: "round", flexShrink: 0 }}>
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 8v4M12 16h.01" />
+                </svg>
+                <span>しばらく時間をおいてから再度お試しください（短時間に試行が集中しました）</span>
+              </div>
+            ) : null}
+
+            {serverError ? (
+              <div className="auth-error" role="alert">
+                <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: "none", stroke: "var(--danger)", strokeWidth: 2, strokeLinecap: "round", flexShrink: 0 }}>
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 8v4M12 16h.01" />
+                </svg>
+                <span>サーバーに接続できませんでした。時間をおいて再度お試しください</span>
               </div>
             ) : null}
 

@@ -36,6 +36,8 @@ export interface OperatorOut {
   created_at: string;
   /** 古物商許可証画像を提出済みか（admin一覧のバッジ表示・確認ボタン活性化に使用）。 */
   has_license_image: boolean;
+  /** 業者都合でキャンセルした取引の累計件数（運営がキャンセル常習を検知する材料）。r8-fix-frontend2 M1 対応。 */
+  cancel_count: number;
 }
 
 export interface OperatorPublic {
@@ -206,7 +208,26 @@ export interface TransactionListItem {
   has_review: boolean;
   /** 相手方から届いた未読メッセージ数（自分側の last_read_at より後のもの）。r6-flow M-3 対応。 */
   unread_count: number;
+  /**
+   * 依頼者が運営により利用停止中か（業者側にのみ意味がある）。
+   * r8-fix-frontend2 M4 対応。
+   */
+  user_suspended: boolean;
 }
+
+/** キャンセルの記録（誰が・なぜ・いつ）。r8-fix-frontend2 H2 対応。 */
+export interface TransactionCancellation {
+  cancelled_by: "user" | "operator" | "admin";
+  reason: string | null;
+  cancelled_at: string;
+}
+
+/** cancelled_by の表示ラベル。 */
+export const CANCELLED_BY_LABEL: Record<TransactionCancellation["cancelled_by"], string> = {
+  user: "依頼者",
+  operator: "業者",
+  admin: "運営",
+};
 
 export interface TransactionOut {
   id: string;
@@ -259,6 +280,13 @@ export interface TransactionDetail extends TransactionOut {
    * detail.code=account_suspended で自身の停止を知れる）。r6-flow H-2 対応。
    */
   operator_suspended: boolean;
+  /**
+   * 依頼者が運営により利用停止中か（業者側にのみ意味がある）。
+   * r8-fix-frontend2 M4 対応。
+   */
+  user_suspended: boolean;
+  /** キャンセル済みの場合のみ非null。誰が・なぜ・いつキャンセルしたか。r8-fix-frontend2 H2 対応。 */
+  cancellation: TransactionCancellation | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -388,6 +416,19 @@ export function updateOperatorProfile(
   return request("/operator/profile", {
     method: "PUT",
     body: JSON.stringify(payload),
+    token,
+  });
+}
+
+/**
+ * 業者アカウントを退会（削除）する。パスワード再照合が必須（403: パスワード不一致）。
+ * 進行中の取引が残っている場合は 409（detail は文字列）。短時間の連打は 429。
+ * r8-fix-frontend2 M6 / r8-review H-4 対応。
+ */
+export function deleteMyOperatorAccount(password: string, token: string): Promise<void> {
+  return request("/operator/me", {
+    method: "DELETE",
+    body: JSON.stringify({ password }),
     token,
   });
 }
@@ -1390,15 +1431,26 @@ export function adminRejectOperatorApplication(
 // 写真アップロード
 // ---------------------------------------------------------------------------
 
+/** アップロード可能な画像形式（backend の storage.sniff_image_ext と一致させる）。 */
+const ALLOWED_PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+/** 写真アップロードのサイズ上限（backend の services/storage.py MAX_UPLOAD_BYTES = 10MB と一致）。 */
+export const MAX_PHOTO_UPLOAD_BYTES = 10 * 1024 * 1024;
+
 export async function uploadCasePhoto(
   file: File,
   token: string,
 ): Promise<PresignResponse> {
-  const contentType = (
-    ["image/jpeg", "image/png", "image/webp"].includes(file.type)
-      ? file.type
-      : "image/jpeg"
-  ) as "image/jpeg" | "image/png" | "image/webp";
+  // r8-fix-frontend2 H4 是正: 非対応形式（HEIC 等）を "image/jpeg" と偽って送ると
+  // backend のマジックバイト判定で必ず 415 になり、原因不明の失敗として再試行を招く。
+  // 送信前にクライアント側で弾き、対応形式・上限サイズを明示する。
+  if (!ALLOWED_PHOTO_TYPES.has(file.type)) {
+    throw new KdzApiError(422, "対応形式は JPEG / PNG / WebP です。別の形式（HEIC等）の場合は変換してからお試しください。");
+  }
+  if (file.size > MAX_PHOTO_UPLOAD_BYTES) {
+    throw new KdzApiError(422, "ファイルサイズが上限（10MB）を超えています。");
+  }
+  const contentType = file.type as "image/jpeg" | "image/png" | "image/webp";
 
   const presign = await request<PresignResponse>("/upload/presign", {
     method: "POST",
@@ -1422,10 +1474,10 @@ export async function uploadCasePhoto(
     if (e instanceof KdzApiError) throw e;
     throw new KdzNetworkError(e);
   }
-  if (!res.ok) {
-    if (res.status === 401) await throwHttpError(res);
-    throw new KdzApiError(res.status, "写真のアップロードに失敗しました");
-  }
+  // r8-fix-frontend2 H4 是正: 従来は 401 以外の全エラーを汎用文言に潰していたため、
+  // 413/415/422 の backend detail（サイズ超過・非対応形式・空ファイル等）が
+  // 一切表示されなかった。throwHttpError に一本化し detail をそのまま出す。
+  if (!res.ok) await throwHttpError(res);
   return presign;
 }
 
@@ -1862,11 +1914,30 @@ export interface AdminTransactionListItem {
   company_name: string | null;
   amount: number | null;
   visit_date: string | null;
+  /** キャンセル済みの場合のみ非null。r8-fix-frontend2 H2 対応。 */
+  cancelled_by: string | null;
 }
 
 export interface AdminTransactionListResponse {
   items: AdminTransactionListItem[];
   total: number;
+}
+
+/**
+ * 運営が取引を強制終了する（理由必須。cancelled_by="admin" として記録される）。
+ * 依頼者停止等で当事者が動かせなくなった取引を運営が終わらせるための唯一の手段。
+ * r8-fix-frontend2 M5 対応。
+ */
+export function adminCancelTransaction(
+  transactionId: string,
+  reason: string,
+  token: string,
+): Promise<{ id: string; status: TransactionStatus }> {
+  return request(`/admin/transactions/${encodeURIComponent(transactionId)}/cancel`, {
+    method: "PATCH",
+    body: JSON.stringify({ reason }),
+    token,
+  });
 }
 
 /** admin一覧APIの既定ページサイズ（backend の _ADMIN_CASE_TXN_DEFAULT_LIMIT と同値）。 */

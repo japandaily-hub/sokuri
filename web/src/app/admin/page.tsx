@@ -19,6 +19,7 @@ import {
 } from "@/components/kdz/Ui";
 import { AdminPagination } from "./_components/AdminPagination";
 import { ConfirmModal } from "./_components/ConfirmModal";
+import { formatPurposeLabel } from "@/lib/case-labels";
 import { StatusFilterBar } from "./_components/StatusFilterBar";
 import {
   ADMIN_LIST_DEFAULT_LIMIT,
@@ -584,6 +585,11 @@ export default function AdminPage() {
                         value={op.has_license_image ? "completed" : "pending"}
                         label={op.has_license_image ? "許可証: 提出済み" : "許可証: 未提出"}
                       />
+                      {/* r8-fix-frontend2 M1 是正: 業者都合キャンセルの累計を運営が確認できる
+                          唯一の材料。0件時は目立たせず、1件以上のみ警告色で出す。 */}
+                      {op.cancel_count > 0 ? (
+                        <StatusBadge value="rejected" label={`キャンセル ${op.cancel_count}件`} />
+                      ) : null}
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -675,7 +681,7 @@ export default function AdminPage() {
                       className={row.status === "dense" ? "bg-red-50" : ""}
                     >
                       <td className="py-2 pr-4 font-medium">{row.prefecture}</td>
-                      <td className="py-2 pr-4 text-slate-600">{row.purpose}</td>
+                      <td className="py-2 pr-4 text-slate-600">{formatPurposeLabel(row.purpose)}</td>
                       <td className="py-2 pr-4 text-right">{row.open_cases}</td>
                       <td className="py-2 pr-4 text-right">{row.active_suppliers}</td>
                       <td className="py-2 pr-4 text-right font-mono">

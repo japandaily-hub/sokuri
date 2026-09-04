@@ -67,7 +67,9 @@ def _bid_out(bid: Bid) -> BidOut:
     # 停止業者の入札は一覧から除外せず旗を立てる（除外すると依頼者からは入札が
     # 黙って消えたようにしか見えず、選択できない理由も伝わらない）。実際の選択
     # 禁止は select_bid 側の409で担保する。r6-flow ADD-1 対応。
-    out.operator_suspended = bool(bid.operator.is_suspended)
+    # 退会済み（deleted_at 非null）業者も同じ旗を流用する（r8-review H-1対応。
+    # スキーマに operator_deleted を追加する本筋改修は別途）。
+    out.operator_suspended = bool(bid.operator.is_suspended) or bid.operator.deleted_at is not None
     return out
 
 
@@ -268,6 +270,15 @@ async def select_bid(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="この業者は現在選択できません。運営にお問い合わせください。",
+        )
+    # 退会済み（deleted_at 非null）業者も選択不可（r8-review H-1）。
+    # operator_profile.delete_my_operator_account 側の「入札rejected化→再判定」の
+    # 順序変更により通常この分岐には到達しない想定だが、Case行ロックを経由しない
+    # 将来の経路（管理者操作等）が増えても安全なよう多層防御として判定する。
+    if target.operator.deleted_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="この業者は退会済みのため選択できません。運営にお問い合わせください。",
         )
 
     # 条件付きUPDATE（status=pendingであることをWHERE句で再検証してから更新）。

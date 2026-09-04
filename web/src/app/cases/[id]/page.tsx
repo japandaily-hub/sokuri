@@ -11,7 +11,9 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { Icon, Spinner } from "@/components/Icon";
 import { AppHeader } from "@/components/kdz/AppHeader";
+import { ConfirmModal } from "@/components/kdz/ConfirmModal";
 import { formatVisitSchedule } from "@/lib/categories";
+import { formatPurposeLabel } from "@/lib/case-labels";
 import {
   Card,
   Notice,
@@ -23,6 +25,7 @@ import {
   useToken,
 } from "@/components/kdz/Ui";
 import {
+  CANCELLED_BY_LABEL,
   CASE_ITEM_CONDITION_LABEL,
   CASE_STATUS_LABEL,
   REDUCTION_STATUS_LABEL,
@@ -57,6 +60,15 @@ const EDITABLE_CASE_STATUSES = new Set(["draft", "open"]);
 /** 出品取り下げを許可する案件ステータス（backend の cancel_case と同条件）。 */
 const CANCELLABLE_CASE_STATUSES = new Set(["open", "bidding"]);
 
+/** window.confirm の代わりに表示する ConfirmModal の内容（r8-fix-frontend）。 */
+type ConfirmState = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  danger?: boolean;
+  onConfirm: () => void;
+} | null;
+
 export default function UserCaseDetailPage() {
   const params = useParams<{ id: string }>();
   const search = useSearchParams();
@@ -72,6 +84,7 @@ export default function UserCaseDetailPage() {
   const [aiPollTimedOut, setAiPollTimedOut] = useState(false);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
+  const [confirmState, setConfirmState] = useState<ConfirmState>(null);
 
   // ===== 商品の編集/削除・写真の追加/削除 =====
   // busyOps は進行中の操作キー集合。キー形式は "item:{itemId}:save" / "item:{itemId}:delete" /
@@ -149,9 +162,21 @@ export default function UserCaseDetailPage() {
   }
 
   /** 編集内容を破棄し、AI推定値（ai_condition/ai_summary）へ戻す。商品名は変更しない。 */
-  async function resetEditItemToAi(item: CaseItemOut) {
+  function resetEditItemToAi(item: CaseItemOut) {
     if (!token || isItemBusy(item.id)) return;
-    if (!window.confirm("状態・説明の編集内容を破棄して、AIの推定値に戻しますか？")) return;
+    setConfirmState({
+      title: "AIの推定値に戻しますか？",
+      message: "状態・説明の編集内容を破棄して、AIの推定値に戻しますか？",
+      confirmLabel: "リセットする",
+      onConfirm: () => {
+        setConfirmState(null);
+        void performResetEditItemToAi(item);
+      },
+    });
+  }
+
+  async function performResetEditItemToAi(item: CaseItemOut) {
+    if (!token || isItemBusy(item.id)) return;
     const key = `item:${item.id}:reset`;
     beginOp(key);
     setEditError(null);
@@ -175,9 +200,22 @@ export default function UserCaseDetailPage() {
     }
   }
 
-  async function handleDeleteItem(item: CaseItemOut) {
+  function handleDeleteItem(item: CaseItemOut) {
     if (!token || isItemBusy(item.id)) return;
-    if (!window.confirm("この商品を削除しますか？紐づく写真も削除されます。")) return;
+    setConfirmState({
+      title: "商品を削除しますか？",
+      message: "この商品を削除しますか？紐づく写真も削除されます。",
+      confirmLabel: "削除する",
+      danger: true,
+      onConfirm: () => {
+        setConfirmState(null);
+        void performDeleteItem(item);
+      },
+    });
+  }
+
+  async function performDeleteItem(item: CaseItemOut) {
+    if (!token || isItemBusy(item.id)) return;
     const key = `item:${item.id}:delete`;
     beginOp(key);
     setError(null);
@@ -192,11 +230,26 @@ export default function UserCaseDetailPage() {
     }
   }
 
-  async function handleDeletePhoto(photoId: string) {
+  function handleDeletePhoto(photoId: string) {
     if (!token) return;
     const key = `photo:${photoId}:delete`;
     if (busyOps.has(key)) return;
-    if (!window.confirm("この写真を削除しますか？")) return;
+    setConfirmState({
+      title: "写真を削除しますか？",
+      message: "この写真を削除しますか？",
+      confirmLabel: "削除する",
+      danger: true,
+      onConfirm: () => {
+        setConfirmState(null);
+        void performDeletePhoto(photoId);
+      },
+    });
+  }
+
+  async function performDeletePhoto(photoId: string) {
+    if (!token) return;
+    const key = `photo:${photoId}:delete`;
+    if (busyOps.has(key)) return;
     beginOp(key);
     setError(null);
     try {
@@ -308,8 +361,7 @@ export default function UserCaseDetailPage() {
     };
   }, [token, caseId, caseData?.ai_status]);
 
-  async function act(fn: () => Promise<unknown>, confirmMsg?: string) {
-    if (confirmMsg && !window.confirm(confirmMsg)) return;
+  async function act(fn: () => Promise<unknown>) {
     if (busy) return;
     setBusy(true);
     setError(null);
@@ -370,7 +422,7 @@ export default function UserCaseDetailPage() {
       <Card>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-xl font-normal text-slate-900">{caseData.purpose}</h1>
+            <h1 className="text-xl font-normal text-slate-900">{formatPurposeLabel(caseData.purpose)}</h1>
             <p className="mt-1 text-sm text-slate-500">
               {caseData.prefecture} {caseData.city}
               {caseData.address_detail ? ` ${caseData.address_detail}` : ""}
@@ -384,7 +436,13 @@ export default function UserCaseDetailPage() {
           <StatusBadge value={caseData.status} label={CASE_STATUS_LABEL[caseData.status]} />
           {caseData.status === "cancelled" ? (
             <div className="mt-3 w-full rounded-none border border-slate-200 bg-slate-50 p-3 text-sm leading-relaxed text-slate-600" role="status">
-              この出品は取り下げ済みです。届いていた入札はすべて自動でお断りになりました。再度依頼する場合は「出品する」から新しく出品してください。
+              {/* r8-fix-frontend2 M2/ADD-1 是正: 成約後キャンセル（txn が存在）と
+                  出品の取り下げ（txn が存在しない）で経緯が異なるため文言を分岐する。
+                  従来は成約キャンセルにも「取り下げ済み」「入札を自動でお断り」という
+                  事実に反する文言が出ていた。 */}
+              {txn
+                ? "取引はキャンセルされました。必要であれば新しく出品してください。"
+                : "この出品は取り下げ済みです。届いていた入札はすべて自動でお断りになりました。再度依頼する場合は「出品する」から新しく出品してください。"}
             </div>
           ) : null}
         </div>
@@ -665,10 +723,15 @@ export default function UserCaseDetailPage() {
                       disabled={busy || b.operator_suspended}
                       title={b.operator_suspended ? "この業者は現在利用停止中のため選択できません" : undefined}
                       onClick={() =>
-                        act(
-                          () => selectBid(caseId, b.id, token!),
-                          `${b.operator?.company_name ?? "この業者"}（${formatYen(b.amount)}）に決定しますか？\n決定後、業者へ住所詳細が開示されます。`,
-                        )
+                        setConfirmState({
+                          title: "この業者に決定しますか？",
+                          message: `${b.operator?.company_name ?? "この業者"}（${formatYen(b.amount)}）に決定しますか？決定後、業者へ住所詳細が開示されます。`,
+                          confirmLabel: "決定する",
+                          onConfirm: () => {
+                            setConfirmState(null);
+                            void act(() => selectBid(caseId, b.id, token!));
+                          },
+                        })
                       }
                       className={btnPrimary}
                     >
@@ -689,10 +752,16 @@ export default function UserCaseDetailPage() {
                   // prompt の「キャンセル」（null）は取り下げ自体の中止。空文字は理由なしで続行。
                   const reason = window.prompt("取り下げ理由（任意）");
                   if (reason === null) return;
-                  void act(
-                    () => cancelCase(caseId, reason === "" ? null : reason, token),
-                    "出品を取り下げますか？付いている入札はすべて無効になり、元に戻せません。",
-                  );
+                  setConfirmState({
+                    title: "出品を取り下げますか？",
+                    message: "出品を取り下げますか？付いている入札はすべて無効になり、元に戻せません。",
+                    confirmLabel: "取り下げる",
+                    danger: true,
+                    onConfirm: () => {
+                      setConfirmState(null);
+                      void act(() => cancelCase(caseId, reason === "" ? null : reason, token));
+                    },
+                  });
                 }}
                 className={`mt-4 ${btnDanger}`}
               >
@@ -736,6 +805,24 @@ export default function UserCaseDetailPage() {
                 /contact
               </Link>
               ）にお問い合わせください。
+            </div>
+          ) : null}
+
+          {/* r8-fix-frontend2 H2 是正: キャンセルの理由が相手方に一切届かなかった問題への対応。
+              誰が・なぜ・いつキャンセルしたかを表示する。 */}
+          {txn.cancellation ? (
+            <div className="mt-3 rounded-none border border-slate-200 bg-slate-50 p-3 text-sm leading-relaxed text-slate-700" role="status">
+              <p className="font-semibold text-slate-900">
+                キャンセル: {CANCELLED_BY_LABEL[txn.cancellation.cancelled_by]}による
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                {new Date(txn.cancellation.cancelled_at).toLocaleString("ja-JP")}
+              </p>
+              {txn.cancellation.reason ? (
+                <p className="mt-1 break-words">理由: {txn.cancellation.reason}</p>
+              ) : (
+                <p className="mt-1 text-slate-400">理由の記載なし</p>
+              )}
             </div>
           ) : null}
 
@@ -805,10 +892,15 @@ export default function UserCaseDetailPage() {
                   type="button"
                   disabled={busy}
                   onClick={() =>
-                    act(
-                      () => decideReduction(txn.id, pendingReduction.id, "approve", token!),
-                      "減額を承認しますか？確定額が更新されます。",
-                    )
+                    setConfirmState({
+                      title: "減額を承認しますか？",
+                      message: "減額を承認しますか？確定額が更新されます。",
+                      confirmLabel: "承認する",
+                      onConfirm: () => {
+                        setConfirmState(null);
+                        void act(() => decideReduction(txn.id, pendingReduction.id, "approve", token!));
+                      },
+                    })
                   }
                   className={btnPrimary}
                 >
@@ -818,7 +910,16 @@ export default function UserCaseDetailPage() {
                   type="button"
                   disabled={busy}
                   onClick={() =>
-                    act(() => decideReduction(txn.id, pendingReduction.id, "reject", token!))
+                    setConfirmState({
+                      title: "減額申請を却下しますか？",
+                      message: "減額申請を却下しますか？この操作は元に戻せません。",
+                      confirmLabel: "却下する",
+                      danger: true,
+                      onConfirm: () => {
+                        setConfirmState(null);
+                        void act(() => decideReduction(txn.id, pendingReduction.id, "reject", token!));
+                      },
+                    })
                   }
                   className={btnSecondary}
                 >
@@ -835,10 +936,15 @@ export default function UserCaseDetailPage() {
                 type="button"
                 disabled={busy || Boolean(pendingReduction)}
                 onClick={() =>
-                  act(
-                    () => completeTransaction(txn.id, token!),
-                    "作業の完了を確定しますか？確定後はレビューを投稿できます。",
-                  )
+                  setConfirmState({
+                    title: "作業完了を確定しますか？",
+                    message: "作業の完了を確定しますか？確定後はレビューを投稿できます。",
+                    confirmLabel: "確定する",
+                    onConfirm: () => {
+                      setConfirmState(null);
+                      void act(() => completeTransaction(txn.id, token!));
+                    },
+                  })
                 }
                 className={btnPrimary}
               >
@@ -849,10 +955,16 @@ export default function UserCaseDetailPage() {
                 disabled={busy}
                 onClick={() => {
                   const reason = window.prompt("キャンセル理由（任意）") ?? null;
-                  void act(
-                    () => cancelTransaction(txn.id, reason, token!),
-                    "本当にキャンセルしますか？",
-                  );
+                  setConfirmState({
+                    title: "本当にキャンセルしますか？",
+                    message: "本当にキャンセルしますか？案件ごと終了し、入札は戻せません。理由は業者に共有されます。",
+                    confirmLabel: "キャンセルする",
+                    danger: true,
+                    onConfirm: () => {
+                      setConfirmState(null);
+                      void act(() => cancelTransaction(txn.id, reason, token!));
+                    },
+                  });
                 }}
                 className={btnDanger}
               >
@@ -929,6 +1041,17 @@ export default function UserCaseDetailPage() {
         ← マイ案件一覧へ
       </Link>
     </div>
+    {confirmState ? (
+      <ConfirmModal
+        title={confirmState.title}
+        message={confirmState.message}
+        confirmLabel={confirmState.confirmLabel}
+        danger={confirmState.danger}
+        busy={busy}
+        onCancel={() => setConfirmState(null)}
+        onConfirm={confirmState.onConfirm}
+      />
+    ) : null}
     </>
   );
 }

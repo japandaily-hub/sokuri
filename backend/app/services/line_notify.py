@@ -161,6 +161,26 @@ async def push_transaction_cancelled(
     )
 
 
+async def push_transaction_cancelled_by_admin(
+    line_user_id: str, transaction_id: str, recipient_party: Literal["user", "operator"]
+) -> bool:
+    """運営による成約の強制終了の通知（当事者双方宛・r8-M5）。
+
+    push_transaction_cancelled と本文のみ異なる（「相手方により」→「運営の判断により」）。
+    理由は画面で確認してもらう（運営入力の自由文をpush本文に載せない）。
+    """
+    settings = get_settings()
+    path = (
+        f"/chat/{transaction_id}"
+        if recipient_party == "user"
+        else f"/operator/transactions/{transaction_id}"
+    )
+    return await _push(
+        line_user_id,
+        f"【カタヅケ】進行中だった成約が、運営の判断によりキャンセルされました。\n{settings.frontend_base_url}{path}",
+    )
+
+
 async def push_schedule_confirmed(line_user_id: str, transaction_id: str, visit_date: str) -> bool:
     """訪問日程が確定した際の通知（業者宛）。"""
     settings = get_settings()

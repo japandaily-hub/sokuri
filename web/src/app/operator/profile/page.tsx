@@ -21,13 +21,17 @@
 import "./profile.css";
 
 import Link from "next/link";
+import { signOut } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ConfirmModal } from "@/components/kdz/ConfirmModal";
 import { Ic, type IcName } from "@/components/kdz/Icons";
 import { OperatorHeader } from "@/components/kdz/OperatorHeader";
 import { vendorCategoryName } from "@/lib/categories";
 import { useToken } from "@/components/kdz/Ui";
 import {
+  deleteMyOperatorAccount,
   getOperatorProfile,
+  KdzApiError,
   toDisplayMessage,
   updateOperatorProfile,
   uploadOperatorLicenseImage,
@@ -149,6 +153,37 @@ export default function OperatorProfilePage() {
   const [state, setState] = useState<ProfileState>(EMPTY_STATE);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  /* ---- 退会（r8-fix-frontend2 M6: 業者に退会手段が一切無かった） ---- */
+  const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
+  const [withdrawing, setWithdrawing] = useState(false);
+  async function onWithdraw(password?: string) {
+    if (!token) return;
+    if (!password) {
+      setWithdrawError("パスワードを入力してください");
+      return;
+    }
+    setWithdrawing(true);
+    setWithdrawError(null);
+    try {
+      await deleteMyOperatorAccount(password, token);
+      await signOut({ callbackUrl: "/operator/login?reason=withdrawn" });
+    } catch (e) {
+      // r8-review H-4 対応: 403 パスワード不一致 / 409 進行中の取引 / 429 レート制限を
+      // 依頼者側（mypage/withdraw）と同じ語彙で区別して表示する。
+      if (e instanceof KdzApiError && e.status === 403) {
+        setWithdrawError(toDisplayMessage(e, "パスワードが正しくありません。"));
+      } else if (e instanceof KdzApiError && e.status === 409) {
+        setWithdrawError(toDisplayMessage(e, "進行中の取引があるため退会できません。"));
+      } else if (e instanceof KdzApiError && e.status === 429) {
+        setWithdrawError("短時間に操作が集中しました。しばらくしてから再度お試しください。");
+      } else {
+        setWithdrawError(toDisplayMessage(e, "退会に失敗しました"));
+      }
+      setWithdrawing(false);
+    }
+  }
 
   /* ---- トースト ---- */
   const [toast, setToast] = useState<string | null>(null);
@@ -700,6 +735,25 @@ export default function OperatorProfilePage() {
                 </div>
               </div>
             </section>
+
+            {/* 退会（r8-fix-frontend2 M6 対応） */}
+            <section className="prof-card flush">
+              <div className="prof-card-body">
+                <p style={{ fontSize: 12.5, color: "var(--body-soft, #6b7280)", lineHeight: 1.7 }}>
+                  アカウントの退会をご希望の場合はこちらから手続きできます。進行中の取引がある場合は退会できません（先に取引を完了・キャンセルしてください）。
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWithdrawError(null);
+                    setWithdrawModalOpen(true);
+                  }}
+                  style={{ marginTop: 10, fontSize: 13, fontWeight: 600, color: "#dc2626", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", padding: 0 }}
+                >
+                  退会する
+                </button>
+              </div>
+            </section>
           </aside>
         </div>
       </main>
@@ -727,6 +781,21 @@ export default function OperatorProfilePage() {
         <div className="kdz-toast" role="status">
           {toast}
         </div>
+      ) : null}
+
+      {withdrawModalOpen ? (
+        <ConfirmModal
+          title="退会しますか？"
+          message="退会すると、業者アカウントは削除され、ログインできなくなります。この操作は元に戻せません。"
+          confirmLabel="退会する"
+          danger
+          withPassword
+          passwordLabel="現在のパスワード"
+          error={withdrawError}
+          busy={withdrawing}
+          onCancel={() => setWithdrawModalOpen(false)}
+          onConfirm={(_reason, password) => void onWithdraw(password)}
+        />
       ) : null}
     </div>
   );

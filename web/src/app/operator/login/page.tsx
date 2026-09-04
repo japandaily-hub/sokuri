@@ -37,6 +37,8 @@ function OperatorLoginForm() {
   // r3 再レビュー N-6 是正: katadzuke-api.ts の共通後始末（403 account_suspended）が
   // /operator配下のパスから発火した場合はここへ ?reason=suspended 付きで遷移させる。
   const suspended = params.get("reason") === "suspended";
+  // r8-fix-frontend2 M6 是正: 退会完了後に signOut → ここへ ?reason=withdrawn 付きで遷移させる。
+  const withdrawn = params.get("reason") === "withdrawn";
 
   // r4-fix-frontend2 M3 是正: 従来は accountType==="operator" の一致ケースを
   // useEffect で無条件に自動 replace していたため、既に業者としてログイン中の状態から
@@ -60,6 +62,10 @@ function OperatorLoginForm() {
   // r3 再レビュー R-M1 是正: signIn の結果が停止アカウント専用エラー
   // （auth.ts の AccountSuspendedError, code="account_suspended"）の場合に停止案内を出す。
   const [suspendedNow, setSuspendedNow] = useState(false);
+  // r8-fix-frontend2 H1 是正: 429（試行集中）／5xx・ネットワーク失敗を
+  // 「ログインに失敗しました」と一括表示させず、事実に即した文言を個別に出す。
+  const [rateLimited, setRateLimited] = useState(false);
+  const [serverError, setServerError] = useState(false);
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
@@ -67,10 +73,20 @@ function OperatorLoginForm() {
     setBusy(true);
     setError(null);
     setSuspendedNow(false);
+    setRateLimited(false);
+    setServerError(false);
     const res = await signIn("operator-credentials", { email, password, redirect: false });
     setBusy(false);
     if (res?.code === "account_suspended") {
       setSuspendedNow(true);
+      return;
+    }
+    if (res?.code === "rate_limited") {
+      setRateLimited(true);
+      return;
+    }
+    if (res?.code === "server_error") {
+      setServerError(true);
       return;
     }
     if (res?.error) {
@@ -140,6 +156,36 @@ function OperatorLoginForm() {
                     お問い合わせはこちら
                   </Link>
                 </span>
+              </div>
+            ) : null}
+
+            {withdrawn ? (
+              <div className="auth-error" role="status">
+                <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: "none", stroke: "var(--danger)", strokeWidth: 2, strokeLinecap: "round", flexShrink: 0 }}>
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 8v4M12 16h.01" />
+                </svg>
+                <span>退会手続きが完了しました。ご利用ありがとうございました。</span>
+              </div>
+            ) : null}
+
+            {rateLimited ? (
+              <div className="auth-error" role="alert">
+                <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: "none", stroke: "var(--danger)", strokeWidth: 2, strokeLinecap: "round", flexShrink: 0 }}>
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 8v4M12 16h.01" />
+                </svg>
+                <span>しばらく時間をおいてから再度お試しください（短時間に試行が集中しました）</span>
+              </div>
+            ) : null}
+
+            {serverError ? (
+              <div className="auth-error" role="alert">
+                <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: "none", stroke: "var(--danger)", strokeWidth: 2, strokeLinecap: "round", flexShrink: 0 }}>
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 8v4M12 16h.01" />
+                </svg>
+                <span>サーバーに接続できませんでした。時間をおいて再度お試しください</span>
               </div>
             ) : null}
 

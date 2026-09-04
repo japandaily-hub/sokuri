@@ -400,7 +400,13 @@ async def operator_login(
     rl_account_key = f"operator:{email}"
     ctx.check_account(rl_account_key)
 
-    operator = await session.scalar(select(Operator).where(Operator.contact_email == email))
+    # 退会済み業者は contact_email がトムストン化されるため通常は一致しないが、
+    # 多層防御として deleted_at でも明示的に除外する（r8-M6）。
+    operator = await session.scalar(
+        select(Operator).where(
+            Operator.contact_email == email, Operator.deleted_at.is_(None)
+        )
+    )
     if (
         operator is None
         or operator.password_hash is None

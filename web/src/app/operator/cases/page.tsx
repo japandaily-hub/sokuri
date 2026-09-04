@@ -30,7 +30,7 @@ import {
   toDisplayMessage,
   type CaseMasked,
 } from "@/lib/katadzuke-api";
-import { caseItemsLabel } from "@/lib/case-labels";
+import { caseItemsLabel, formatPurposeLabel } from "@/lib/case-labels";
 
 /** ステータス+自社入札状況 → チップ表示のマッピング。 */
 function statusChipInfo(c: CaseMasked): { label: string; cls: string } {
@@ -81,7 +81,7 @@ function LotCard({ c }: { c: CaseMasked }) {
             <span className="lot-id lot-items" title={`案件ID ${c.id.slice(0, 8)}`}>{caseItemsLabel(c) ?? `#${c.id.slice(0, 8)}`}</span>
             <span className={`status-chip ${cls}`}>{label}</span>
           </div>
-          <div className="lot-title">{c.purpose}</div>
+          <div className="lot-title">{formatPurposeLabel(c.purpose)}</div>
           <div className="lot-meta">
             <span className="lot-meta-item">
               <Ic name="pin" />

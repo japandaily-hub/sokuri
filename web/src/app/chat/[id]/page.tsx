@@ -24,12 +24,14 @@ import { useToken } from "@/components/kdz/Ui";
 import {
   confirmSchedule as apiConfirmSchedule,
   getTransaction,
+  KdzApiError,
   listMessages,
   listTransactions,
   LIST_MAX_LIMIT,
   markMessagesRead,
   sendMessage,
   toDisplayMessage,
+  TXN_STATUS_LABEL,
   type MessageOut,
   type TransactionDetail,
   type TransactionListItem,
@@ -232,6 +234,9 @@ export default function ChatPage() {
       setDraft("");
     } catch (e) {
       showToast(toDisplayMessage(e, "メッセージの送信に失敗しました"));
+      // r8-fix-frontend2 H3 是正: 409 transaction_closed（取引終了後の送信）を
+      // 受けた場合、detail が古いままだと入力欄が有効なまま残るため再取得する。
+      if (e instanceof KdzApiError && e.status === 409) await reloadDetail();
     } finally {
       setSending(false);
     }
@@ -258,6 +263,9 @@ export default function ChatPage() {
       await Promise.all([reloadDetail(), fetchMessages(false)]);
     } catch (e) {
       showToast(toDisplayMessage(e, "日程の確定に失敗しました"));
+      // r8-fix-frontend2 H3 是正: 409 transaction_closed（取引終了後の日程確定）を
+      // 受けた場合、detail を再取得して終了バナー・ボタン無効化に反映させる。
+      if (e instanceof KdzApiError && e.status === 409) await reloadDetail();
     } finally {
       setConfirmingMsgId(null);
     }
@@ -266,6 +274,9 @@ export default function ChatPage() {
   const biz = detail?.operator ?? null;
   const bizInitial = biz?.company_name?.charAt(0) ?? "業";
   const appId = detail?.id ? detail.id.slice(0, 8).toUpperCase() : "";
+  // r8-fix-frontend2 H3 是正: キャンセル済み・完了済みの取引ではチャットの続行操作
+  // （送信・日程提案の確定）を無効化し、事実に即した終了表示に切り替える。
+  const isClosed = detail?.status === "cancelled" || detail?.status === "completed";
 
   return (
     <div className="chat-page">
@@ -355,11 +366,19 @@ export default function ChatPage() {
                 </div>
               </div>
 
-              {/* LINE通知バナー */}
-              <div className="line-banner">
-                <span className="line-dot" aria-hidden="true" />
-                新着メッセージの通知は、LINE連携済みの方にLINEでお知らせします（メールでの新着通知はありません）。返信はこのページで行えます。
-              </div>
+              {/* r8-fix-frontend2 H3 是正: キャンセル済み・完了済みの取引では、通常のLINE通知
+                  バナーの代わりに終了案内を出す（送信欄・候補日確定は無効化される）。 */}
+              {isClosed ? (
+                <div className="line-banner" role="status">
+                  <span className="line-dot" aria-hidden="true" />
+                  この取引は終了しています（{detail ? TXN_STATUS_LABEL[detail.status] : ""}）。新しいメッセージは送信できません。
+                </div>
+              ) : (
+                <div className="line-banner">
+                  <span className="line-dot" aria-hidden="true" />
+                  新着メッセージの通知は、LINE連携済みの方にLINEでお知らせします（メールでの新着通知はありません）。返信はこのページで行えます。
+                </div>
+              )}
 
               {messagesError ? (
                 <div style={{ padding: "8px 20px", fontSize: 12.5, color: "var(--danger)" }}>{messagesError}</div>
@@ -409,11 +428,13 @@ export default function ChatPage() {
                             onClick={() => handleConfirmSchedule(m, slots)}
                             disabled={confirmingMsgId === m.id || detail?.status !== "pending"}
                           >
-                            {detail?.status !== "pending"
-                              ? "日程確定済み"
-                              : confirmingMsgId === m.id
-                                ? "確定中…"
-                                : `${slots[pick] ?? ""} を選ぶ`}
+                            {isClosed && detail
+                              ? TXN_STATUS_LABEL[detail.status]
+                              : detail?.status !== "pending"
+                                ? "日程確定済み"
+                                : confirmingMsgId === m.id
+                                  ? "確定中…"
+                                  : `${slots[pick] ?? ""} を選ぶ`}
                           </button>
                         </div>
                       </div>
@@ -434,36 +455,42 @@ export default function ChatPage() {
                 })}
               </div>
 
-              {/* 入力エリア */}
-              <div className="input-area">
-                <input
-                  type="text"
-                  className="msg-input"
-                  placeholder="メッセージを入力…"
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      void handleSend();
-                    }
-                  }}
-                  aria-label="メッセージを入力"
-                  disabled={sending}
-                />
-                <button
-                  type="button"
-                  className="btn-send"
-                  aria-label="送信"
-                  disabled={!draft.trim() || sending}
-                  onClick={() => void handleSend()}
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M22 2L11 13" />
-                    <path d="M22 2L15 22l-4-9-9-4 20-7z" />
-                  </svg>
-                </button>
-              </div>
+              {/* 入力エリア（終了済み取引では非表示にし、終了案内のみ出す） */}
+              {isClosed ? (
+                <div className="input-area" style={{ color: "var(--body-soft)", fontSize: 13, padding: "12px 20px" }}>
+                  この取引は終了しています
+                </div>
+              ) : (
+                <div className="input-area">
+                  <input
+                    type="text"
+                    className="msg-input"
+                    placeholder="メッセージを入力…"
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        void handleSend();
+                      }
+                    }}
+                    aria-label="メッセージを入力"
+                    disabled={sending}
+                  />
+                  <button
+                    type="button"
+                    className="btn-send"
+                    aria-label="送信"
+                    disabled={!draft.trim() || sending}
+                    onClick={() => void handleSend()}
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M22 2L11 13" />
+                      <path d="M22 2L15 22l-4-9-9-4 20-7z" />
+                    </svg>
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>

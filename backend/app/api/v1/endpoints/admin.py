@@ -11,6 +11,7 @@ from typing import Literal
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from fastapi.responses import Response
 from sqlalchemy import case, func, or_, select, text, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -22,7 +23,7 @@ from app.db.models.case import Case
 from app.db.models.invite import Invite
 from app.db.models.operator import Operator
 from app.db.models.operator_application import OperatorApplication
-from app.db.models.transaction import Review, Transaction
+from app.db.models.transaction import Cancellation, Review, Transaction
 from app.db.models.user import (
     IDENTITY_STATUS_APPROVED,
     IDENTITY_STATUS_REJECTED,
@@ -38,6 +39,8 @@ from app.db.session import get_session
 from app.schemas_katadzuke import (
     AdminCaseListItem,
     AdminCaseListResponse,
+    AdminTransactionCancelRequest,
+    AdminTransactionCancelResponse,
     AdminTransactionListItem,
     AdminTransactionListResponse,
     AdminUserListItem,
@@ -66,6 +69,7 @@ from app.schemas_katadzuke import (
     UserSuspendResponse,
 )
 from app.services import alerts, notify, notify_dispatch
+from app.services.case_lock import lock_transaction_rows
 from app.services.review_stats import recalc_operator_review_stats
 
 # admin 一覧系 API 共通の既定/上限（M2対応）。既存 web 呼び出し（クエリ省略時）が
@@ -254,6 +258,10 @@ async def list_operators(
     q: str | None = Query(default=None, max_length=255, description="会社名/メール/許可番号の部分一致"),
     limit: int = Query(default=_ADMIN_CASE_TXN_DEFAULT_LIMIT, ge=1, le=_ADMIN_CASE_TXN_MAX_LIMIT),
     offset: int = Query(default=0, ge=0),
+    include_deleted: bool = Query(
+        default=False,
+        description="true の場合、退会済み（匿名化済み・deleted_at 非null）業者も含める。既定は除外。",
+    ),
     admin: User = Depends(get_current_admin),
     session: AsyncSession = Depends(get_session),
 ) -> OperatorListResponse:
@@ -265,8 +273,12 @@ async def list_operators(
     契約にし、pending を常に先頭固定・その中では created_at 降順・同時刻は id 降順
     で決定的に並べる。``counts`` は現在の status/q 絞込に関わらない全件内訳
     （web担当と合意済みの契約。バッジ表示用）。
+
+    r8-review 未解決5対応: 退会済み業者は admin_list_users（既存の
+    ``include_deleted`` パターン）と同様、既定で一覧・counts から除外する。
     """
-    conditions = []
+    deleted_condition = [] if include_deleted else [Operator.deleted_at.is_(None)]
+    conditions = list(deleted_condition)
     if status_filter == "suspended":
         conditions.append(Operator.is_suspended.is_(True))
     elif status_filter != "all":
@@ -285,7 +297,9 @@ async def list_operators(
 
     total = await session.scalar(select(func.count()).select_from(Operator).where(*conditions))
 
-    # バッジ用の内訳は現在の絞込に関わらず全件中の値を返す（H-1修正案）。
+    # バッジ用の内訳は現在の status/q 絞込に関わらず全件中の値を返す（H-1修正案）。
+    # ただし include_deleted は他の一覧系エンドポイント（admin_list_users）と
+    # 揃え、既定では退会済みを除いた値にする（r8-review 未解決5対応）。
     # vendor_status 4値 + is_suspended を1クエリで集計し、N+1（値ごとの個別count）
     # を避ける。
     counts_rows = (
@@ -296,7 +310,9 @@ async def list_operators(
                 func.sum(case((Operator.is_suspended.is_(True), 1), else_=0)).label(
                     "suspended_cnt"
                 ),
-            ).group_by(Operator.vendor_status)
+            )
+            .where(*deleted_condition)
+            .group_by(Operator.vendor_status)
         )
     ).all()
     counts_by_status: dict[str, int] = {"pending": 0, "limited": 0, "active": 0, "rejected": 0}
@@ -345,6 +361,10 @@ async def verify_operator(
     operator = await session.get(Operator, operator_id)
     if operator is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Operator not found.")
+    if operator.deleted_at is not None:
+        # r8-review 未解決5対応: 退会済み業者の承認状態を変更できてしまうと、
+        # 退会（匿名化・ログイン不能化）と状態遷移の意味が矛盾する。
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="退会済みの業者です。")
     # 承認（pending/limited → active）は古物商許可証画像の提出を必須にする。
     # 招待コード登録で既に active の業者に対する verified_at の付与は対象外
     # （状態遷移を伴わないため）。フロント（/admin）の disabled 制御と同じ規則。
@@ -396,6 +416,11 @@ async def suspend_operator(
     operator = await session.get(Operator, operator_id)
     if operator is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Operator not found.")
+    if operator.deleted_at is not None:
+        # r8-review 未解決5対応: 退会済み業者は既にログイン不能（deps.py）なため
+        # 停止解除は意味を持たず、状態不整合（is_suspended=False かつ deleted_at
+        # 非null）を生むだけなので変更自体を禁止する。
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="退会済みの業者です。")
     prev_suspended = operator.is_suspended
     operator.is_suspended = body.suspended
     await session.commit()
@@ -661,6 +686,19 @@ async def admin_list_transactions(
         rows = (await session.scalars(select(User).where(User.id.in_(user_ids)))).all()
         users_by_id = {u.id: u for u in rows}
 
+    # キャンセル実行主体もバッチ取得する（行ごとの個別SELECTはN+1。r8-H2）。
+    # uq_cancellations_transaction_id（0028）により成約あたり最大1行のため、
+    # dict への上書きは発生しない（万一複数行あっても最後の1件が残るだけで安全）。
+    cancelled_by_txn: dict[uuid.UUID, str] = {}
+    cancelled_txn_ids = [t.id for t in txns if t.status == "cancelled"]
+    if cancelled_txn_ids:
+        rows = await session.execute(
+            select(Cancellation.transaction_id, Cancellation.cancelled_by)
+            .where(Cancellation.transaction_id.in_(cancelled_txn_ids))
+            .order_by(Cancellation.created_at.asc())
+        )
+        cancelled_by_txn = {txn_id: by for txn_id, by in rows if txn_id is not None}
+
     items: list[AdminTransactionListItem] = []
     for txn in txns:
         owner = (
@@ -678,6 +716,7 @@ async def admin_list_transactions(
                 company_name=txn.bid.operator.company_name if txn.bid is not None else None,
                 amount=txn.final_amount if txn.final_amount is not None else txn.initial_amount,
                 visit_date=txn.visit_date,
+                cancelled_by=cancelled_by_txn.get(txn.id),
             )
         )
 
@@ -685,6 +724,112 @@ async def admin_list_transactions(
         "admin: 成約一覧を取得しました - count=%d total=%d admin_id=%s", len(items), total or 0, admin.id
     )
     return AdminTransactionListResponse(items=items, total=int(total or 0))
+
+
+@router.patch(
+    "/admin/transactions/{transaction_id}/cancel",
+    response_model=AdminTransactionCancelResponse,
+    summary="成約の強制終了（運営。理由必須・当事者双方へ通知）",
+)
+async def admin_cancel_transaction(
+    transaction_id: uuid.UUID,
+    body: AdminTransactionCancelRequest,
+    background: BackgroundTasks,
+    admin: User = Depends(get_current_admin),
+    session: AsyncSession = Depends(get_session),
+) -> AdminTransactionCancelResponse:
+    """固まった取引を運営が終わらせる唯一の手段（r8-M5）。
+
+    従来は依頼者の停止・当事者の失踪で取引が pending のまま永久に固定され、運営は
+    業者に「評価に影響します」と表示されるキャンセルを依頼するしかなかった。
+
+    - ロック順序は当事者経路（transactions.cancel_transaction）と同一
+      （Case → Transaction。services/case_lock.lock_transaction_rows）。
+    - ``Cancellation(cancelled_by="admin")`` を記録し、当事者双方の成約詳細
+      （``cancellation``）と本一覧の ``cancelled_by`` から参照できるようにする。
+    - ``Operator.cancel_count`` は加算しない（運営判断のキャンセルを業者の
+      責に帰さない。r8-M1 の「常習検知」指標を汚染しないため）。
+    """
+    case_id = await lock_transaction_rows(session, transaction_id)
+    if case_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="成約情報が見つかりません。"
+        )
+    txn = await session.scalar(
+        select(Transaction)
+        .where(Transaction.id == transaction_id)
+        .options(
+            selectinload(Transaction.case),
+            selectinload(Transaction.bid).selectinload(Bid.operator),
+        )
+        .execution_options(populate_existing=True)
+    )
+    if txn is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="成約情報が見つかりません。"
+        )
+    if txn.status in ("completed", "cancelled"):
+        # 当事者経路と同じく冪等化せず409（2行目の Cancellation を積まない）。
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="キャンセルできる状態ではありません。"
+        )
+
+    txn.status = "cancelled"
+    txn.case.status = "cancelled"
+    session.add(
+        Cancellation(
+            case_id=txn.case_id,
+            transaction_id=txn.id,
+            cancelled_by="admin",
+            reason=body.reason,
+        )
+    )
+
+    # 通知先は commit 前にプリミティブ値へ取り出す（BackgroundTasks へ ORM
+    # オブジェクトを渡さない既存規約。transactions.py / bids.py と同じ）。
+    operator_line_user_id = txn.bid.operator.line_user_id
+    operator_email = txn.bid.operator.contact_email
+    owner_line_user_id: str | None = None
+    owner_email: str | None = None
+    if txn.case.user_id is not None:
+        owner = await session.get(User, txn.case.user_id)
+        if owner is not None:
+            owner_line_user_id = owner.line_user_id
+            owner_email = owner.email
+    txn_id_str = str(txn.id)
+
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        # uq_cancellations_transaction_id（0028）違反を409へ変換する（行ロックにより
+        # 通常は到達しないが、変換しないと素通しで500になる。当事者経路と同型）。
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="キャンセルできる状態ではありません。",
+        ) from exc
+
+    background.add_task(
+        notify_dispatch.dispatch_transaction_cancelled_by_admin,
+        owner_line_user_id,
+        owner_email,
+        txn_id_str,
+        "user",
+    )
+    background.add_task(
+        notify_dispatch.dispatch_transaction_cancelled_by_admin,
+        operator_line_user_id,
+        operator_email,
+        txn_id_str,
+        "operator",
+    )
+    logger.info(
+        "admin_transaction_cancel admin=%s transaction=%s case=%s",
+        admin.id,
+        transaction_id,
+        case_id,
+    )
+    return AdminTransactionCancelResponse(id=txn.id, status="cancelled")
 
 
 @router.get(

@@ -24,6 +24,7 @@ import {
   type CaseStatus,
 } from "@/lib/katadzuke-api";
 import { formatVisitSchedule } from "@/lib/categories";
+import { formatPurposeLabel } from "@/lib/case-labels";
 
 type StatusFilterValue = CaseStatus | "all";
 
@@ -155,7 +156,7 @@ export default function AdminCasesPage() {
                     </td>
                     <td className="py-2 pr-4 text-slate-700">{c.user_email ?? "—"}</td>
                     <td className="py-2 pr-4 text-slate-700">
-                      {c.purpose} ・ {c.prefecture}{c.city}
+                      {formatPurposeLabel(c.purpose)} ・ {c.prefecture}{c.city}
                     </td>
                     <td className="py-2 pr-4 text-slate-700">{c.company_name ?? "—"}</td>
                     <td className="py-2 pr-4 text-right whitespace-nowrap">{formatYen(c.amount)}</td>

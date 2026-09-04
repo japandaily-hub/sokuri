@@ -312,6 +312,32 @@ async def send_transaction_cancelled(to_email: str, transaction_id: str, recipie
     )
 
 
+async def send_transaction_cancelled_by_admin(
+    to_email: str, transaction_id: str, recipient_party: str
+) -> bool:
+    """運営による成約の強制終了の通知（当事者双方宛・r8-M5）。
+
+    「相手方により」ではなく運営の判断である旨を明示する（当事者が相手を誤解し、
+    直接連絡・トラブル化するのを防ぐ）。理由は画面（成約詳細の cancellation）で
+    確認してもらう（メール本文には運営入力の自由文を載せない）。
+    """
+    settings = get_settings()
+    path = (
+        f"/chat/{transaction_id}"
+        if recipient_party == "user"
+        else f"/operator/transactions/{transaction_id}"
+    )
+    url = f"{settings.frontend_base_url}{path}"
+    return await _send(
+        to_email,
+        "【カタヅケ】成約が運営によりキャンセルされました",
+        _wrap(
+            "<p>進行中だった成約が、運営の判断によりキャンセルされました。</p>"
+            f'<p><a href="{url}">詳細と理由を確認する</a></p>'
+        ),
+    )
+
+
 # QA M-5対応: 運営宛メールの「種別」に、ContactCategory（英字スラッグ）ではなく
 # web/src/app/contact/page.tsx:227-234 の <option> と1対1で一致する日本語ラベルを
 # 出す。ContactCategory は schemas_katadzuke.py の Literal で固定8値に限定済みの

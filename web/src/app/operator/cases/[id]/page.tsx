@@ -20,6 +20,7 @@ import { OperatorHeader } from "@/components/kdz/OperatorHeader";
 import { ApprovalPendingNotice } from "@/components/kdz/ApprovalPendingNotice";
 import { Ic } from "@/components/kdz/Icons";
 import { useToken } from "@/components/kdz/Ui";
+import { formatPurposeLabel } from "@/lib/case-labels";
 import { DisclosureNotice } from "@/components/kdz/DisclosureNotice";
 import {
   BID_STATUS_LABEL,
@@ -160,7 +161,7 @@ export default function OperatorCaseDetailPage() {
               ) : null}
             </div>
             <div className="listing-info">
-              <div className="listing-title">{caseData.purpose}</div>
+              <div className="listing-title">{formatPurposeLabel(caseData.purpose)}</div>
               <div className="listing-meta">
                 {caseData.prefecture} {caseData.city}（詳細住所は落札後に開示）
               </div>
@@ -217,7 +218,7 @@ export default function OperatorCaseDetailPage() {
           {/* ===== 入札フォーム / 自社入札状況 ===== */}
           {bidDone ? (
             <div className="op-alert success" role="status">
-              入札を受け付けました。お客様が業者を選ぶまでお待ちください（結果はメールでお知らせします）。
+              入札を受け付けました。お客様が業者を選ぶまでお待ちください（結果はLINE連携済みならLINE、未連携ならメールでお知らせします）。
             </div>
           ) : null}
           {caseData.my_bid ? (

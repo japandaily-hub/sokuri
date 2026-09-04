@@ -12,14 +12,18 @@ import { Spinner } from "@/components/Icon";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import { Card, Notice, PageShell, StatusBadge, btnPrimary, btnSecondary, inputBase, useToken } from "@/components/kdz/Ui";
 import { AdminPagination } from "../_components/AdminPagination";
+import { ConfirmModal } from "../_components/ConfirmModal";
 import { CopyableId } from "../_components/CopyableId";
 import { StatusFilterBar } from "../_components/StatusFilterBar";
 import {
   ADMIN_LIST_DEFAULT_LIMIT,
+  CANCELLED_BY_LABEL,
   TXN_STATUS_LABEL,
+  adminCancelTransaction,
   adminListTransactions,
   formatYen,
   toDisplayMessage,
+  type AdminTransactionListItem,
   type AdminTransactionListResponse,
   type TransactionStatus,
 } from "@/lib/katadzuke-api";
@@ -35,6 +39,12 @@ const STATUS_OPTIONS: { value: StatusFilterValue; label: string }[] = [
   })),
 ];
 
+/** cancelled_by は backend 契約上 string（将来値追加への耐性）のため、未知値は素通しする。 */
+function cancelledByLabel(value: string | null): string {
+  if (value == null) return "—";
+  return (CANCELLED_BY_LABEL as Record<string, string>)[value] ?? value;
+}
+
 export default function AdminTransactionsPage() {
   const { token, loading } = useToken();
   const [data, setData] = useState<AdminTransactionListResponse | null>(null);
@@ -45,6 +55,38 @@ export default function AdminTransactionsPage() {
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilterValue>("all");
   const [offset, setOffset] = useState(0);
+
+  // r8-fix-frontend2 M5 是正: 依頼者停止等で当事者が動かせなくなった取引を
+  // 運営が強制終了できる手段が無かったため、一覧に強制終了ボタン（理由必須）を追加する。
+  const [cancelTarget, setCancelTarget] = useState<AdminTransactionListItem | null>(null);
+  const [cancelModalError, setCancelModalError] = useState<string | null>(null);
+  const [cancelBusy, setCancelBusy] = useState(false);
+
+  function closeCancelModal() {
+    setCancelTarget(null);
+    setCancelModalError(null);
+  }
+
+  async function confirmForceCancel(reason: string | null) {
+    if (!cancelTarget || !token) return;
+    const trimmed = (reason ?? "").trim();
+    if (!trimmed) {
+      setCancelModalError("理由を入力してください。");
+      return;
+    }
+    setCancelBusy(true);
+    setCancelModalError(null);
+    try {
+      await adminCancelTransaction(cancelTarget.id, trimmed, token);
+      closeCancelModal();
+      await reload();
+    } catch (e) {
+      // r5-fix-frontend M-2 と同型: 失敗時はモーダルを閉じず、error prop に表示する。
+      setCancelModalError(toDisplayMessage(e, "強制終了に失敗しました"));
+    } finally {
+      setCancelBusy(false);
+    }
+  }
 
   const reload = useCallback(async () => {
     if (!token) return;
@@ -137,6 +179,7 @@ export default function AdminTransactionsPage() {
                   <th className="pb-2 pr-4">業者</th>
                   <th className="pb-2 pr-4 text-right">金額</th>
                   <th className="pb-2 pr-4">訪問予定</th>
+                  <th className="pb-2 pr-4">キャンセル元</th>
                   <th className="pb-2" />
                 </tr>
               </thead>
@@ -158,10 +201,24 @@ export default function AdminTransactionsPage() {
                     <td className="py-2 pr-4 whitespace-nowrap text-slate-500">
                       {t.visit_date ? formatVisitSchedule(t.visit_date, null) : "—"}
                     </td>
-                    <td className="py-2 text-right">
+                    <td className="py-2 pr-4 text-slate-500">{cancelledByLabel(t.cancelled_by)}</td>
+                    <td className="py-2 text-right whitespace-nowrap">
                       <Link href={`/chat/${t.id}`} className={btnSecondary}>
                         依頼者画面で開く
                       </Link>
+                      {t.status !== "cancelled" && t.status !== "completed" ? (
+                        <button
+                          type="button"
+                          className={`${btnSecondary} ml-2`}
+                          style={{ borderColor: "#dc2626", color: "#dc2626" }}
+                          onClick={() => {
+                            setCancelModalError(null);
+                            setCancelTarget(t);
+                          }}
+                        >
+                          強制終了
+                        </button>
+                      ) : null}
                     </td>
                   </tr>
                 ))}
@@ -189,6 +246,22 @@ export default function AdminTransactionsPage() {
           ) : null}
         </Card>
       </PageShell>
+
+      {cancelTarget ? (
+        <ConfirmModal
+          title="この取引を強制終了しますか？"
+          message="依頼者・業者どちらも応答不能等で進行不能な取引を、運営の判断で終了します。入力した理由は依頼者・業者の双方に表示されます。この操作は元に戻せません。"
+          confirmLabel="強制終了する"
+          danger
+          withReason
+          reasonLabel="終了理由（必須・当事者双方に表示されます）"
+          reasonRequired
+          error={cancelModalError}
+          busy={cancelBusy}
+          onCancel={closeCancelModal}
+          onConfirm={(reason) => void confirmForceCancel(reason)}
+        />
+      ) : null}
     </div>
   );
 }

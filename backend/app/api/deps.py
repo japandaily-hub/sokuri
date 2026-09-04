@@ -169,6 +169,11 @@ async def get_current_operator(
     operator = await session.get(Operator, uuid.UUID(payload["sub"]))
     if operator is None:
         raise _CRED_EXC
+    # 論理削除ゲート（依頼者側 assert_user_not_revoked と同じ趣旨・r8-M6）:
+    # 退会済み業者の旧トークンは即時失効させる。これが無いと、退会直後の
+    # 発行済みトークンで最長トークン有効期限ぶん操作を続けられてしまう。
+    if operator.deleted_at is not None:
+        raise _CRED_EXC
     assert_operator_not_suspended(operator)
     return operator
 

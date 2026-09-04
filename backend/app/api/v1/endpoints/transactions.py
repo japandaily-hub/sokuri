@@ -35,18 +35,39 @@ from app.schemas_katadzuke import (
     ScheduleConfirmRequest,
     ScheduleProposeRequest,
     TransactionAddressOut,
+    TransactionCancellationOut,
     TransactionCancelRequest,
     TransactionDetailOut,
     TransactionListItem,
     TransactionOut,
 )
 from app.services import notify, notify_dispatch
-from app.services.case_lock import lock_case_row
+from app.services.case_lock import lock_transaction_rows
 from app.services.case_view import build_case_masked_out
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# 終了済み（cancelled / completed）取引への書き込みを拒否する共通の 409（r8-H3）。
+# web はキャンセル通知メールのリンクからこの取引のチャット画面に着地しうるため、
+# 機械可読な code と、そのまま表示できる日本語 message の両方を返す契約にする
+# （deps.SUSPENDED_ACCOUNT_DETAIL と同じ dict detail 方式）。
+TRANSACTION_CLOSED_DETAIL: dict[str, str] = {
+    "code": "transaction_closed",
+    "message": "この取引は終了しています。",
+}
+# 書き込みを許可する取引ステータス。既読ポインタ更新（mark_messages_read）は
+# 「過去ログを読んだ」記録に過ぎず終了後も正当なため、意図的に対象外とする。
+_ACTIVE_TXN_STATUSES = ("pending", "visiting")
+
+
+def _assert_txn_open(txn: Transaction) -> None:
+    """終了済み取引への書き込み（メッセージ送信・日程候補提示）を 409 で拒否する。"""
+    if txn.status not in _ACTIVE_TXN_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=TRANSACTION_CLOSED_DETAIL
+        )
 
 
 @router.get(
@@ -86,6 +107,9 @@ async def list_transactions(
 
     txns = (await session.scalars(stmt)).all()
     unread_map = await _unread_counts(session, [t.id for t in txns], actor.typ)
+    suspended_users = await _suspended_user_ids(
+        session, [t.case.user_id for t in txns if t.case.user_id is not None]
+    )
     return [
         TransactionListItem(
             id=t.id,
@@ -104,9 +128,25 @@ async def list_transactions(
             ),
             has_review=any(rv.reviewer_type == "user" for rv in t.reviews),
             unread_count=unread_map.get(t.id, 0),
+            user_suspended=t.case.user_id in suspended_users,
         )
         for t in txns
     ]
+
+
+async def _suspended_user_ids(
+    session: AsyncSession, user_ids: list[uuid.UUID]
+) -> set[uuid.UUID]:
+    """停止中の依頼者IDを **1クエリ**で引く（r8-M4。取引ごとの個別取得は N+1 になる）。
+
+    停止中の行だけを返す（大半のユーザーは停止されていないため転送量が最小になる）。
+    """
+    if not user_ids:
+        return set()
+    rows = await session.scalars(
+        select(User.id).where(User.id.in_(set(user_ids)), User.is_suspended.is_(True))
+    )
+    return set(rows.all())
 
 
 async def _unread_counts(
@@ -167,27 +207,15 @@ async def _get_txn(session: AsyncSession, txn_id: uuid.UUID) -> Transaction:
 
 
 async def _lock_txn_rows(session: AsyncSession, txn_id: uuid.UUID) -> None:
-    """成約の状態遷移用に **Case → Transaction の順**で行ロックを取る（r6-backend M-1）。
+    """成約の状態遷移用の行ロック（実体は services/case_lock.lock_transaction_rows）。
 
-    complete / cancel / confirm_schedule は read→check→write が非原子で、
-    「完了」と「キャンセル」の同時実行が後勝ちで互いに矛盾した状態
-    （transactions.status="completed" なのに cancellations 行が在る等）を残しうる。
-
-    ロック順序は既存規約（bids.select_bid・cases.cancel_case が Case を先に掴む）に
-    必ず合わせること。Transaction を先に掴むとデッドロックを新規に作る。
+    ロック手順そのものは admin の強制終了（r8-M5）と共有するため services へ移設した。
+    本ラッパーは「見つからなければ 404」という当エンドポイント群の契約のみを担う。
     """
-    case_id = await session.scalar(
-        select(Transaction.case_id).where(Transaction.id == txn_id)
-    )
-    if case_id is None:
+    if await lock_transaction_rows(session, txn_id) is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="成約情報が見つかりません。"
         )
-    await lock_case_row(session, case_id)
-    # ロック取得のみが目的のため取得列は主キーのみに絞る（case_lock と同じ作法）。
-    await session.execute(
-        select(Transaction.id).where(Transaction.id == txn_id).with_for_update()
-    )
 
 
 async def _assert_party_before_lock(
@@ -245,11 +273,31 @@ def _assert_party(txn: Transaction, actor: Actor) -> str:
     )
 
 
-async def _owner_email(session: AsyncSession, txn: Transaction) -> str | None:
+async def _owner(session: AsyncSession, txn: Transaction) -> User | None:
+    """案件所有者（依頼者）を1クエリ（PK取得）で引く。
+
+    ``_owner_email`` を置き換える（メールに加えて停止状態 is_suspended も要るため。
+    r8-M4）。case.user_id は退会・匿名化後も残る（NULL になるのは案件削除時のみ）。
+    """
     if txn.case.user_id is None:
         return None
-    owner = await session.get(User, txn.case.user_id)
-    return owner.email if owner else None
+    return await session.get(User, txn.case.user_id)
+
+
+async def _latest_cancellation(
+    session: AsyncSession, txn_id: uuid.UUID
+) -> Cancellation | None:
+    """当該成約のキャンセル記録（最新1件）を引く。
+
+    uq_cancellations_transaction_id（0028）により成約あたり最大1行だが、制約が
+    緩められた場合に備えて created_at 降順の先頭を返す（LIMIT 1 で走査は定数）。
+    """
+    return await session.scalar(
+        select(Cancellation)
+        .where(Cancellation.transaction_id == txn_id)
+        .order_by(Cancellation.created_at.desc(), Cancellation.id.desc())
+        .limit(1)
+    )
 
 
 @router.get(
@@ -266,6 +314,7 @@ async def get_transaction(
     party = _assert_party(txn, actor)
 
     case = txn.case
+    owner = await _owner(session, txn)
     base = TransactionOut.model_validate(txn)
     out = TransactionDetailOut(**base.model_dump())
     out.case = build_case_masked_out(case)
@@ -290,7 +339,7 @@ async def get_transaction(
                 address_detail=case.address_detail,
             )
             if party == "operator":
-                owner_email = await _owner_email(session, txn)
+                owner_email = owner.email if owner is not None else None
                 # 内部専用メールはそのまま業者に開示しない。実在しないドメインの開示は
                 # 業者側の連絡試行を無意味に失敗させ、退会トムストンは内部UUIDの漏出にもなる。
                 # 退会済み→「退会済みユーザー」、LINE専用の仮メール→LINE経由の連絡を促す。
@@ -301,12 +350,30 @@ async def get_transaction(
                 else:
                     out.contact_email = owner_email
             else:
-                out.contact_email = txn.bid.operator.contact_email
+                # 業者退会（r8-M6）後は contact_email が同型のトムストンになるため、
+                # 依頼者側にも同じ扱い（内部UUIDを開示しない）を適用する。
+                operator_email = txn.bid.operator.contact_email
+                out.contact_email = (
+                    "退会済み業者"
+                    if notify.is_deleted_account_email(operator_email)
+                    else operator_email
+                )
 
     # 業者が利用停止されると当該業者の全操作が403（deps）になり、依頼者側は
     # 「相手が無応答」の理由が分からないまま待たされる。依頼者に停止の事実だけを
     # 伝える（停止事由は開示しない）。r6-flow H-2 対応。
     out.operator_suspended = bool(txn.bid.operator.is_suspended)
+    # 逆方向（依頼者の停止）も業者に伝える。停止中の依頼者は日程確定・完了確定
+    # （ユーザー専用操作）ができず取引が固定されるため、業者が待ち続ける理由を
+    # 知れるようにする。停止事由は開示しない。r8-M4 対応。
+    out.user_suspended = bool(owner is not None and owner.is_suspended)
+
+    # キャンセル済みの場合のみ「誰が・なぜ・いつ」を返す（r8-H2）。理由は当事者の
+    # 自由文であり、相手方・運営が経緯を把握する唯一の手段。
+    if txn.status == "cancelled":
+        cancellation = await _latest_cancellation(session, txn.id)
+        if cancellation is not None:
+            out.cancellation = TransactionCancellationOut.model_validate(cancellation)
 
     out.unread_count = await _count_unread(session, txn, party)
     return out
@@ -506,6 +573,9 @@ async def create_message(
 ) -> MessageOut:
     txn = await _get_txn(session, transaction_id)
     party = _assert_party(txn, actor)
+    # キャンセル済み・完了済みの取引には発言できない（r8-H3）。従来は 201 を返し、
+    # 相手方に「終了済み案件への発言」が届き続けていた。
+    _assert_txn_open(txn)
 
     # sender_type はクライアント入力を受け取らず actor から自動判定する（なりすまし防止）。
     message = Message(
@@ -592,6 +662,9 @@ async def propose_schedule(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="日程候補の提示は落札業者のみ行えます。",
         )
+    # 終了済み取引への候補提示を拒否する（r8-H3）。confirm_schedule 側は既に
+    # status=="pending" のみ許可しているため、往路（提示）だけが穴になっていた。
+    _assert_txn_open(txn)
 
     message = Message(
         transaction_id=txn.id,

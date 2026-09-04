@@ -34,6 +34,12 @@ class Operator(Base, TimestampMixin):
     line_user_id: Mapped[Optional[str]] = mapped_column(
         String(64), unique=True, index=True, nullable=True
     )
+    # 退会（論理削除・匿名化）日時。User.deleted_at と同じ意味・同じゲート
+    # （deps.get_current_operator が旧トークンを即時失効させる）。物理削除はしない
+    # ＝ 完了済み取引・レビュー・キャンセル記録を依頼者側の記録として保持するため。
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
 
     # ── 古物商許可証画像（審査書類。認証必須の専用エンドポイントでのみ配信） ──
     # BLOB本体は deferred=True とし、admin一覧等の既存の select(Operator) /

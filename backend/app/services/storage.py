@@ -42,7 +42,12 @@ def new_storage_key(content_type: str) -> str:
     """content_type から安全な storage_key を生成する。"""
     ext = _EXT_BY_CONTENT_TYPE.get(content_type)
     if ext is None:
-        raise ValueError(f"未対応の content_type です: {content_type}")
+        # 呼び出し元（case_photos.presign）は本文言をそのまま 422 detail として
+        # 返し、web が画面表示する。ユーザー入力（content_type）は反射せず、
+        # 対応形式の提示のみを返す（r8-H4）。
+        raise ValueError(
+            "この形式の画像には対応していません。JPEG・PNG・WebP のいずれかを選択してください。"
+        )
     return f"{uuid.uuid4().hex}.{ext}"
 
 
@@ -63,7 +68,7 @@ def save_bytes(storage_key: str, data: bytes) -> None:
     if not is_valid_key(storage_key):
         raise ValueError("storage_key が不正です")
     if len(data) > MAX_UPLOAD_BYTES:
-        raise ValueError("ファイルサイズが上限（10MB）を超えています")
+        raise ValueError("ファイルサイズが上限（10MB）を超えています。")
     path = _storage_root() / storage_key
     # 既存ファイルへの上書きを禁止する（security review 指摘対応）。presign が
     # 都度新規UUIDを発行する設計上、正規フローでは同一キーへの2回目のPUTは

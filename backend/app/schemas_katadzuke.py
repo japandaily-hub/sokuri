@@ -99,6 +99,10 @@ class OperatorOut(BaseModel):
     created_at: datetime
     agreed_terms_version: str | None = None
     agreed_at: datetime | None = None
+    # 成約後キャンセルの累計回数（運営がキャンセル常習業者を検知する唯一の材料。
+    # 従来は加算のみで読み出しが1件も無かった）。OperatorOut は admin 一覧と
+    # 業者自身の応答にのみ用いる（公開系は OperatorPublic*Out）。r8-M1 対応。
+    cancel_count: int = 0
     # BLOB本体（license_image_data）は含めない。導出フラグのみ（Operatorモデルの
     # has_license_image プロパティから from_attributes 経由で取得する）。
     has_license_image: bool = False
@@ -245,6 +249,18 @@ class AccountDeleteRequest(BaseModel):
 
 class AccountDeleteResponse(BaseModel):
     detail: str
+
+
+class OperatorAccountDeleteRequest(BaseModel):
+    """業者退会（DELETE /operator/me）のリクエストボディ（r8-review H-4対応）。
+
+    依頼者側の ``AccountDeleteRequest`` と異なり ``confirm`` は持たない（web側の
+    確認モーダルで既に同意取得済みのため、backend契約としては password 必須の
+    1フィールドのみで足りる。password は operator_signup で必ず設定されるため
+    ``str | None`` にはしない）。
+    """
+
+    password: str
 
 
 # ──────────────────────────── マイページ: 住所 ────────────────────────────
@@ -547,8 +563,30 @@ class CaseItemUpdateRequest(BaseModel):
         return v
 
 
+#: 案件の利用目的として受け付ける値。web の選択肢（片付け整理／遺品整理／引っ越し／その他）に加え、
+#: 既存テスト・ローカル E2E シード（seed_local_e2e.py）で使われてきた値を後方互換のため含める。
+#: 未知の値は 422（Pydantic のバリデーションエラー）とする。
+CASE_PURPOSE_VALUES: tuple[str, ...] = (
+    "片付け整理",
+    "遺品整理",
+    "引っ越し",
+    "その他",
+    "不用品処分",
+    "断捨離",
+)
+
+CasePurpose = Literal[
+    "片付け整理",
+    "遺品整理",
+    "引っ越し",
+    "その他",
+    "不用品処分",
+    "断捨離",
+]
+
+
 class CaseCreateRequest(BaseModel):
-    purpose: str = Field(max_length=64)
+    purpose: CasePurpose
     prefecture: str = Field(min_length=1, max_length=32)
     city: str = Field(min_length=1, max_length=64)
     address_detail: str | None = None
@@ -691,6 +729,22 @@ class TransactionOut(BaseModel):
     created_at: datetime
 
 
+class TransactionCancellationOut(BaseModel):
+    """キャンセルの内訳（誰が・なぜ・いつ）。当事者双方に同じ内容を返す（r8-H2）。
+
+    ``Cancellation`` は3経路（依頼者/業者/運営）で必ず記録されるが、従来どの API からも
+    読み出されず「相手方によりキャンセルされました」以上の情報が誰にも届かなかった。
+    reason は当事者が入力した自由文のためそのまま返す（web 側でエスケープ表示する契約）。
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    cancelled_by: Literal["user", "operator", "admin"]
+    reason: str | None = None
+    # Cancellation は TimestampMixin の created_at を持つ。API 契約名は cancelled_at。
+    cancelled_at: datetime = Field(validation_alias="created_at")
+
+
 class TransactionDetailOut(TransactionOut):
     """当事者向け詳細。address は落札業者・所有ユーザーにのみ含める。"""
 
@@ -705,6 +759,12 @@ class TransactionDetailOut(TransactionOut):
     # 落札業者が利用停止中か（依頼者側にのみ意味がある。業者側は 403 の
     # detail.code=account_suspended で自身の停止を知れるため）。r6-flow H-2 対応。
     operator_suspended: bool = False
+    # 依頼者が利用停止中か（業者側にのみ意味がある。停止中の依頼者は日程確定・
+    # 完了確定ができず取引が pending のまま固定されるため、業者が「無応答の理由」を
+    # 知れるようにする。停止事由は開示しない）。r8-M4 対応。
+    user_suspended: bool = False
+    # status が cancelled の場合のみ非 None（それ以外は None）。r8-H2 対応。
+    cancellation: TransactionCancellationOut | None = None
 
 
 class TransactionCancelRequest(BaseModel):
@@ -733,6 +793,9 @@ class TransactionListItem(BaseModel):
     # 一覧での算出は GROUP BY 1本に集約する（N+1 禁止。transactions.py の
     # _unread_counts を参照）。r6-flow M-3 対応。
     unread_count: int = 0
+    # 依頼者が利用停止中か（業者一覧側で「対応できない相手」を識別するため。
+    # 一覧でも詳細と同じ契約を持たせる。取得は case.user_id のバッチ1クエリ）。r8-M4 対応。
+    user_suspended: bool = False
 
 
 # ──────────────────────────── 減額申請 ────────────────────────────
@@ -879,11 +942,25 @@ class AdminTransactionListItem(BaseModel):
     company_name: str | None = None
     amount: int | None = None
     visit_date: date | None = None
+    # キャンセル済み成約の実行主体（'user'|'operator'|'admin'）。運営がキャンセルの
+    # 偏り（特定業者の常習キャンセル等）を一覧から検知できるようにする。r8-H2 対応。
+    cancelled_by: str | None = None
 
 
 class AdminTransactionListResponse(BaseModel):
     items: list[AdminTransactionListItem]
     total: int
+
+
+class AdminTransactionCancelRequest(BaseModel):
+    """運営による成約の強制終了（r8-M5）。理由は必須（証跡として Cancellation に残す）。"""
+
+    reason: str = Field(min_length=1, max_length=500)
+
+
+class AdminTransactionCancelResponse(BaseModel):
+    id: uuid.UUID
+    status: str
 
 
 class AdminUserListItem(BaseModel):

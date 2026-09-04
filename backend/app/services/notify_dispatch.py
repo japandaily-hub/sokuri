@@ -224,6 +224,25 @@ async def dispatch_transaction_cancelled(
 
 
 @_best_effort
+async def dispatch_transaction_cancelled_by_admin(
+    line_user_id: str | None,
+    email: str | None,
+    transaction_id: str,
+    recipient_party: Literal["user", "operator"],
+) -> None:
+    """運営による成約強制終了の通知（当事者双方宛・r8-M5）。LINE優先・メールへフォールバック。"""
+    if line_user_id:
+        ok = await line_notify.push_transaction_cancelled_by_admin(
+            line_user_id, transaction_id, recipient_party
+        )
+        if ok:
+            return
+    if not email or notify.is_placeholder_email(email):
+        return
+    await notify.send_transaction_cancelled_by_admin(email, transaction_id, recipient_party)
+
+
+@_best_effort
 async def dispatch_schedule_confirmed(
     line_user_id: str | None, email: str, transaction_id: str, visit_date: str
 ) -> None:

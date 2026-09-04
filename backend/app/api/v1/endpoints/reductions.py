@@ -30,6 +30,9 @@ from app.services import notify_dispatch
 
 router = APIRouter()
 
+# 1取引あたりの減額申請の上限回数（却下後に1回だけ再申請できる）。r8-M3 対応。
+_MAX_REDUCTION_REQUESTS = 2
+
 _TXN_LOAD = (
     selectinload(Transaction.case),
     # Bid.operator は減額の往路（依頼者への申請通知）・復路（業者への決定通知）
@@ -77,6 +80,16 @@ async def create_reduction(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="未回答の減額申請があります。回答をお待ちください。",
+        )
+    # 却下後の再申請は1回まで（r8-M3）。無制限だと、依頼者の「作業完了を確定する」は
+    # pending 減額があると 409（transactions.complete）になるため、業者が却下のたびに
+    # 再申請するだけで依頼者を完了不能に閉じ込められる（ループ可能）。
+    # 同時2リクエストは uq_reduction_requests_pending（0028）が pending 2行を禁じるため、
+    # 「1件が却下されるまで次は入らない」の直列化と本カウントの併用で上限が保たれる。
+    if len(txn.reduction_requests) >= _MAX_REDUCTION_REQUESTS:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="減額申請は1つの取引につき2回までです。",
         )
 
     original = txn.final_amount if txn.final_amount is not None else txn.initial_amount

@@ -16,10 +16,12 @@ import { Ic, type IcName } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
 import { useToken } from "@/components/kdz/Ui";
 import { createCase, uploadCasePhoto, toDisplayMessage, createTimeoutSignal, KdzNetworkError } from "@/lib/katadzuke-api";
+import { CASE_PURPOSES } from "@/lib/case-labels";
 import "./create.css";
 
 const STEPS = ["写真", "利用目的", "住居情報", "確認"] as const;
-const PURPOSES = ["片付け整理", "遺品整理", "引っ越し", "その他"] as const;
+// 選択肢は lib/case-labels.ts の CASE_PURPOSES を正とする（表示側の未知値フォールバックと一元化）。
+const PURPOSES = CASE_PURPOSES;
 const PREFECTURES = ["東京都", "神奈川県", "埼玉県", "千葉県"] as const;
 const HOUSING_TYPES = ["一戸建て", "マンション", "アパート", "その他"] as const;
 const FLOOR_PLANS = ["1R/1K", "1DK/1LDK", "2K/2DK", "2LDK", "3LDK", "4LDK以上"] as const;

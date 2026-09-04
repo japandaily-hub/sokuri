@@ -56,6 +56,24 @@ class AccountSuspendedError extends CredentialsSignin {
   code = "account_suspended";
 }
 
+/**
+ * r8-fix-frontend2 H1 是正: backend が 429（ログイン試行のレート制限）を返した場合、
+ * 従来は他の非2xxと同じく null に潰され、画面には「メールアドレスまたはパスワードが
+ * 正しくありません」という事実と異なる文言が出ていた（自己回復するが誤診である点は変わらない）。
+ * AccountSuspendedError と同型（CredentialsSignin 継承・code で判別）で専用エラー化する。
+ */
+class RateLimitedError extends CredentialsSignin {
+  code = "rate_limited";
+}
+
+/**
+ * r8-fix-frontend2 H1 是正: backend の 5xx（全断・デプロイ中等）／fetch 自体の失敗
+ * （ネットワーク不通）も同様に「パスワードが違う」と誤診させないための専用エラー。
+ */
+class ServerUnavailableError extends CredentialsSignin {
+  code = "server_error";
+}
+
 async function backendLogin(
   path: "/auth/login" | "/auth/operator/login",
   email: string,
@@ -69,7 +87,7 @@ async function backendLogin(
       body: JSON.stringify({ email, password }),
     });
   } catch {
-    return null;
+    throw new ServerUnavailableError();
   }
   if (res.status === 403) {
     // backend は依頼者・業者どちらの停止も 403 { detail: { code: "account_suspended" } } を返す。
@@ -83,6 +101,8 @@ async function backendLogin(
     if (detailCode === "account_suspended") throw new AccountSuspendedError();
     return null;
   }
+  if (res.status === 429) throw new RateLimitedError();
+  if (res.status >= 500) throw new ServerUnavailableError();
   if (!res.ok) return null;
   try {
     return (await res.json()) as BackendAuthResponse;

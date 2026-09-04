@@ -47,7 +47,7 @@ import {
   type CaseMasked,
   type TransactionListItem,
 } from "@/lib/katadzuke-api";
-import { caseItemsLabel } from "@/lib/case-labels";
+import { caseItemsLabel, formatPurposeLabel } from "@/lib/case-labels";
 
 /** 入札額の許容範囲・刻み（バックエンド le=100_000_000 と一致させる）。 */
 const BID_MIN = 1000;
@@ -164,7 +164,7 @@ function LotCard({
             <div className="lot-photo" style={{ gridRow: "1 / 3" }}>
               <div className="imgph">
                 <Ic name={catIcon(lot.purpose)} />
-                <small>{lot.purpose}</small>
+                <small>{formatPurposeLabel(lot.purpose)}</small>
               </div>
             </div>
           )}
@@ -181,7 +181,7 @@ function LotCard({
             {statusTag}
           </div>
           <div className="lot-items-row">
-            <span className="lot-item-chip">{lot.purpose}</span>
+            <span className="lot-item-chip">{formatPurposeLabel(lot.purpose)}</span>
           </div>
           <div className="lot-meta">
             <span className="lot-meta-item">
@@ -638,7 +638,7 @@ export default function OperatorDashboardPage() {
                       <Ic name="chat" />
                     </div>
                     <div className="neg-info">
-                      <div className="neg-lot">{t.purpose}</div>
+                      <div className="neg-lot">{formatPurposeLabel(t.purpose)}</div>
                       <div className="neg-preview">
                         {t.prefecture} {t.city}　{TXN_STATUS_LABEL[t.status]}
                       </div>
@@ -680,7 +680,7 @@ export default function OperatorDashboardPage() {
                       <Ic name="check" />
                     </div>
                     <div className="neg-info">
-                      <div className="neg-lot">{t.purpose}</div>
+                      <div className="neg-lot">{formatPurposeLabel(t.purpose)}</div>
                       <div className="neg-preview">
                         {t.prefecture} {t.city}　成約日：
                         {new Date(t.created_at).toLocaleDateString("ja-JP")}

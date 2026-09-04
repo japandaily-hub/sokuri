@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import { formatVisitSchedule } from "@/lib/categories";
+import { formatPurposeLabel } from "@/lib/case-labels";
 import { Spinner } from "@/components/Icon";
 import { Notice, useToken } from "@/components/kdz/Ui";
 import {
@@ -165,7 +166,7 @@ function ReviewPageInner() {
   const showSubmittedScreen = isCompleted && (alreadyReviewed || justSubmitted);
   const vendorName = txn.operator?.company_name ?? "業者";
   const amountText = formatYen(txn.final_amount ?? txn.initial_amount);
-  const itemsText = txn.case?.purpose ?? "—";
+  const itemsText = formatPurposeLabel(txn.case?.purpose, "—");
   const visitText = txn.visit_date
     ? formatVisitSchedule(txn.visit_date, txn.visit_time_slot)
     : "—";
