@@ -11,7 +11,7 @@ import { ImageResponse } from "next/og";
 export const runtime = "edge";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
-export const alt = "カタヅケ｜部屋ごと撮るだけ、片付けと買取の見積もりが届く";
+export const alt = "カタヅケ｜不用品を撮って送るだけ、片付けと買取の見積もりが届く";
 
 export default function OgImage() {
   return new ImageResponse(
@@ -87,7 +87,7 @@ export default function OgImage() {
               color: "#333333",
             }}
           >
-            部屋ごと撮るだけ。
+            不用品を撮って送るだけ。
           </div>
           <div
             style={{

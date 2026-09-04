@@ -13,10 +13,10 @@ import type { MetadataRoute } from "next";
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "カタヅケ｜部屋ごと撮るだけAI片付け査定",
+    name: "カタヅケ｜不用品を撮るだけAI片付け査定",
     short_name: "カタヅケ",
     description:
-      "部屋ごと撮るだけ。AIが片付け・不用品を案件化し、リユース業者の見積もりが届くマッチングサービス。",
+      "部屋にある不用品を撮って送るだけ。AIが片付け・不用品を案件化し、リユース業者の見積もりが届くマッチングサービス。",
     start_url: "/",
     display: "standalone",
     background_color: "#ffffff",
@@ -47,7 +47,7 @@ export default function manifest(): MetadataRoute.Manifest {
       {
         name: "まとめて査定",
         short_name: "まとめて",
-        description: "部屋ごと撮影して片付け・不用品をまとめて依頼",
+        description: "部屋にある不用品を撮影して片付け・買取をまとめて依頼",
         url: "/create",
       },
     ],
