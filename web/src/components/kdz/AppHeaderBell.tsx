@@ -13,7 +13,7 @@
 
 import { useEffect, useState } from "react";
 import { useToken } from "./Ui";
-import { listTransactions, getTransaction, KdzApiError } from "@/lib/katadzuke-api";
+import { listTransactions, getTransaction, KdzApiError, LIST_MAX_LIMIT } from "@/lib/katadzuke-api";
 
 /** 未読判定のために詳細取得する成約の上限件数。 */
 const MAX_CHECK = 5;
@@ -78,8 +78,15 @@ export function AppHeaderBell() {
 
     (async () => {
       try {
-        const txns = await listTransactions(token);
-        const active = txns.filter((t) => t.status !== "cancelled").slice(0, MAX_CHECK);
+        // limit 200（r6-verify L5）。それでも直近のアクティブな取引が0件（＝先頭が
+        // キャンセル済みで埋まっている等）の場合のみ、2ページ目まで読みに行く。
+        let txns = await listTransactions(token, { limit: LIST_MAX_LIMIT, offset: 0 });
+        let active = txns.filter((t) => t.status !== "cancelled").slice(0, MAX_CHECK);
+        if (active.length === 0 && txns.length === LIST_MAX_LIMIT) {
+          const page2 = await listTransactions(token, { limit: LIST_MAX_LIMIT, offset: txns.length });
+          txns = txns.concat(page2);
+          active = txns.filter((t) => t.status !== "cancelled").slice(0, MAX_CHECK);
+        }
         let found = false;
         for (const t of active) {
           if (cancelled) return;

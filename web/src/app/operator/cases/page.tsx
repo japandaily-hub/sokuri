@@ -22,6 +22,7 @@ import { useToken } from "@/components/kdz/Ui";
 import {
   CASE_STATUS_LABEL,
   LIST_DEFAULT_LIMIT,
+  dedupeById,
   formatYen,
   getOperatorProfile,
   listOpenCases,
@@ -139,7 +140,7 @@ export default function OperatorCasesPage() {
     setLoadingMore(true);
     try {
       const res = await listOpenCases(token, { limit: LIST_DEFAULT_LIMIT, offset: cases?.length ?? 0 });
-      setCases((prev) => [...(prev ?? []), ...res]);
+      setCases((prev) => dedupeById([...(prev ?? []), ...res]));
       setHasMore(res.length === LIST_DEFAULT_LIMIT);
     } catch (e) {
       setError(toDisplayMessage(e, "追加の読み込みに失敗しました"));

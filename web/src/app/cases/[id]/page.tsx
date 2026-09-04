@@ -68,6 +68,8 @@ export default function UserCaseDetailPage() {
   const [txn, setTxn] = useState<TransactionDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** AI解析ポーリングが打ち切り時間（backend の遅延回収窓=10分）に達したかどうか。 */
+  const [aiPollTimedOut, setAiPollTimedOut] = useState(false);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
 
@@ -268,26 +270,42 @@ export default function UserCaseDetailPage() {
   }, [reload]);
 
   // AI 解析は backend 側で背景実行される（r6 H-1）。ai_status==="pending" の間は
-  // 3秒間隔でポーリングし、"done"/"failed" に遷移したら（依存配列の変化で）自動的に止まる。
-  // 最大3分でタイムアウトし、それ以降は自動更新を打ち切る（failed 表示のまま手動リロードに委ねる）。
+  // 最初の3分は3秒間隔、それ以降は15秒間隔でポーリングし、"done"/"failed" に遷移したら
+  // （依存配列の変化で）自動的に止まる。backend の遅延回収窓（stale pending の10分後
+  // 自動回収）に合わせ、10分を超えたら自動更新を打ち切り「再読み込み」導線を表示する。
   useEffect(() => {
     if (!token || caseData?.ai_status !== "pending") return;
+    setAiPollTimedOut(false);
     const startedAt = Date.now();
-    const POLL_MS = 3000;
-    const MAX_MS = 180_000;
-    const timer = setInterval(async () => {
-      if (Date.now() - startedAt > MAX_MS) {
-        clearInterval(timer);
+    const FAST_POLL_MS = 3000;
+    const SLOW_POLL_MS = 15_000;
+    const FAST_WINDOW_MS = 180_000; // 3分
+    const MAX_MS = 600_000; // 10分（backend _AI_STALE_PENDING_WINDOW と一致）
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const tick = async () => {
+      const elapsed = Date.now() - startedAt;
+      if (elapsed > MAX_MS) {
+        if (!cancelled) setAiPollTimedOut(true);
         return;
       }
       try {
         const c = await getCase(caseId, token);
-        setCaseData(c);
+        if (!cancelled) setCaseData(c);
       } catch {
         // ポーリング中の一時的な失敗は無視し、次回の間隔で再試行する。
       }
-    }, POLL_MS);
-    return () => clearInterval(timer);
+      if (!cancelled) {
+        timer = setTimeout(tick, elapsed < FAST_WINDOW_MS ? FAST_POLL_MS : SLOW_POLL_MS);
+      }
+    };
+    timer = setTimeout(tick, FAST_POLL_MS);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [token, caseId, caseData?.ai_status]);
 
   async function act(fn: () => Promise<unknown>, confirmMsg?: string) {
@@ -545,7 +563,16 @@ export default function UserCaseDetailPage() {
           onChange={handleAddPhotoFilesSelected}
         />
 
-        {caseData.ai_status === "pending" ? (
+        {caseData.ai_status === "pending" && aiPollTimedOut ? (
+          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-none bg-slate-50 p-4" role="status">
+            <p className="text-sm leading-relaxed text-slate-600">
+              解析に時間がかかっています。ページを再読み込みしてください。
+            </p>
+            <button type="button" onClick={() => window.location.reload()} className={btnSecondary}>
+              再読み込み
+            </button>
+          </div>
+        ) : caseData.ai_status === "pending" ? (
           <div className="mt-4 flex items-center gap-2 rounded-none bg-slate-50 p-4" role="status">
             <Spinner className="h-4 w-4 text-brand-600" />
             <p className="text-sm leading-relaxed text-slate-600">

@@ -31,6 +31,7 @@ import {
   getMyProfile,
   listMyCases,
   listTransactions,
+  LIST_MAX_LIMIT,
   toDisplayMessage,
   KdzApiError,
   type UserProfile,
@@ -100,7 +101,8 @@ export default function WithdrawPage() {
       setCaseCount(null);
     }
     try {
-      const txns = await listTransactions(token);
+      // 表示用途のみ（退会ガード自体は backend の COUNT が担保。r6-verify L5）。
+      const txns = await listTransactions(token, { limit: LIST_MAX_LIMIT, offset: 0 });
       setCompletedCount(txns.filter((t) => t.status === "completed").length);
     } catch {
       setCompletedCount(null);

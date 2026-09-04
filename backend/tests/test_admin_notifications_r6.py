@@ -124,11 +124,45 @@ async def test_verify_operator_notifies_operator(
     assert args[3] is True
 
 
+async def test_verify_operator_repeat_same_state_does_not_renotify(
+    client: AsyncClient, db_session: AsyncSession, monkeypatch
+):
+    """既に active な業者へ verified=True を再送しても通知は重複しない（r6-verify-fix M4）。"""
+    admin_token = await _make_admin(client, db_session)
+    operator = await _make_operator(db_session, "verify_repeat_op@example.com")
+    dispatch_mock = AsyncMock()
+    monkeypatch.setattr(
+        "app.services.notify_dispatch.dispatch_operator_verified", dispatch_mock
+    )
+
+    r = await client.patch(
+        f"/api/v1/admin/operators/{operator.id}/verify",
+        json={"verified": True},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 200, r.text
+    dispatch_mock.assert_awaited_once()
+
+    # 状態不変のまま再送（誤操作・二重送信を想定）。通知は増えない。
+    r = await client.patch(
+        f"/api/v1/admin/operators/{operator.id}/verify",
+        json={"verified": True},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["vendor_status"] == "active"
+    dispatch_mock.assert_awaited_once()
+
+
 async def test_unverify_operator_notifies_with_inactive_flag(
     client: AsyncClient, db_session: AsyncSession, monkeypatch
 ):
     admin_token = await _make_admin(client, db_session)
     operator = await _make_operator(db_session, "unverify_notify_op@example.com")
+    # 状態不変時は通知しない（r6-verify-fix M4）ため、実際に active → pending へ
+    # 遷移する状態から出発させる（pending のまま unverify しても遷移が起きない）。
+    operator.vendor_status = "active"
+    await db_session.commit()
     dispatch_mock = AsyncMock()
     monkeypatch.setattr(
         "app.services.notify_dispatch.dispatch_operator_verified", dispatch_mock
@@ -175,6 +209,41 @@ async def test_operator_unsuspend_notifies_but_suspend_does_not(
     args = dispatch_mock.await_args.args
     assert args[1] == "suspend_notify_op@example.com"
     assert args[2] == "operator"
+
+
+async def test_operator_unsuspend_repeat_does_not_renotify(
+    client: AsyncClient, db_session: AsyncSession, monkeypatch
+):
+    """既に解除済みの業者へ suspended=false を再送しても通知は重複しない（r6-verify-fix M4）。"""
+    admin_token = await _make_admin(client, db_session)
+    operator = await _make_operator(db_session, "unsuspend_repeat_op@example.com")
+    dispatch_mock = AsyncMock()
+    monkeypatch.setattr(
+        "app.services.notify_dispatch.dispatch_account_unsuspended", dispatch_mock
+    )
+
+    await client.patch(
+        f"/api/v1/admin/operators/{operator.id}/suspend",
+        json={"suspended": True},
+        headers=_auth(admin_token),
+    )
+    r = await client.patch(
+        f"/api/v1/admin/operators/{operator.id}/suspend",
+        json={"suspended": False},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 200, r.text
+    dispatch_mock.assert_awaited_once()
+
+    # 既に解除済み（is_suspended=False）へ再度 suspended=false を送っても増えない。
+    r = await client.patch(
+        f"/api/v1/admin/operators/{operator.id}/suspend",
+        json={"suspended": False},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["is_suspended"] is False
+    dispatch_mock.assert_awaited_once()
 
 
 async def test_user_unsuspend_notifies(

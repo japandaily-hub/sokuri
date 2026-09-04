@@ -190,6 +190,46 @@ async def _lock_txn_rows(session: AsyncSession, txn_id: uuid.UUID) -> None:
     )
 
 
+async def _assert_party_before_lock(
+    session: AsyncSession, txn_id: uuid.UUID, actor: Actor
+) -> None:
+    """認可（当事者性）の事前照会（軽量・ロック無し）。
+
+    _lock_txn_rows を認可判定より先に呼ぶと、無関係な第三者が他人の
+    transaction_id を大量に送りつけるだけで正規の complete/cancel/confirm_schedule
+    処理を待たせるロック争奪DoSを誘発できてしまう（r6-verify-fix M1）。
+    bids.select_bid・cases.cancel_case と同じパターンで、ロック取得前に
+    Case.user_id / Bid.operator_id のみを読んで当事者性を確認する。
+    ロック取得後は _get_txn + _assert_party を必ず再実行すること（本関数と
+    ロックの間の競合に対する多層防御。上記2エンドポイントと同型）。
+    """
+    row = (
+        await session.execute(
+            select(Case.user_id, Bid.operator_id)
+            .select_from(Transaction)
+            .join(Case, Transaction.case_id == Case.id)
+            .join(Bid, Transaction.bid_id == Bid.id)
+            .where(Transaction.id == txn_id)
+        )
+    ).first()
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="成約情報が見つかりません。"
+        )
+    case_user_id, bid_operator_id = row
+    if actor.typ == "user":
+        assert actor.user is not None
+        if case_user_id == actor.user.id or actor.user.role == "admin":
+            return
+    else:
+        assert actor.operator is not None
+        if bid_operator_id == actor.operator.id:
+            return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN, detail="この成約への権限がありません。"
+    )
+
+
 def _assert_party(txn: Transaction, actor: Actor) -> str:
     """当事者チェック。'user'（所有者/管理者）か 'operator'（落札業者）を返す。"""
     if actor.typ == "user":
@@ -296,6 +336,8 @@ async def complete_transaction(
     actor: Actor = Depends(get_current_actor),
     session: AsyncSession = Depends(get_session),
 ) -> TransactionOut:
+    # 認可（当事者性）はロック取得より前に確認する（r6-verify-fix M1）。
+    await _assert_party_before_lock(session, transaction_id, actor)
     # Case → Transaction の順で行ロックを取ってから読み直す（同時実行の cancel と
     # 後勝ちで矛盾しないようにする。r6-backend M-1）。
     await _lock_txn_rows(session, transaction_id)
@@ -338,6 +380,8 @@ async def cancel_transaction(
     actor: Actor = Depends(get_current_actor),
     session: AsyncSession = Depends(get_session),
 ) -> TransactionOut:
+    # 認可（当事者性）はロック取得より前に確認する（r6-verify-fix M1）。
+    await _assert_party_before_lock(session, transaction_id, actor)
     # complete との同時実行・二重送信を直列化する（r6-backend M-1 / M-2）。
     await _lock_txn_rows(session, transaction_id)
     txn = await _get_txn(session, transaction_id)
@@ -575,6 +619,8 @@ async def confirm_schedule(
     actor: Actor = Depends(get_current_actor),
     session: AsyncSession = Depends(get_session),
 ) -> TransactionOut:
+    # 認可（当事者性）はロック取得より前に確認する（r6-verify-fix M1）。
+    await _assert_party_before_lock(session, transaction_id, actor)
     # complete / cancel との競合で「キャンセル済みなのに visiting へ戻る」等の
     # 後勝ち上書きを防ぐ（r6-backend M-1。同型の遷移すべてに適用する）。
     await _lock_txn_rows(session, transaction_id)

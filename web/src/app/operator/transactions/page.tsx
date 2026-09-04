@@ -18,6 +18,7 @@ import { useToken } from "@/components/kdz/Ui";
 import {
   LIST_DEFAULT_LIMIT,
   TXN_STATUS_LABEL,
+  dedupeById,
   formatYen,
   listTransactions,
   toDisplayMessage,
@@ -55,7 +56,7 @@ export default function OperatorTransactionsPage() {
     setLoadingMore(true);
     try {
       const res = await listTransactions(token, { limit: LIST_DEFAULT_LIMIT, offset: items?.length ?? 0 });
-      setItems((prev) => [...(prev ?? []), ...res]);
+      setItems((prev) => dedupeById([...(prev ?? []), ...res]));
       setHasMore(res.length === LIST_DEFAULT_LIMIT);
     } catch (e) {
       setError(toDisplayMessage(e, "追加の読み込みに失敗しました"));

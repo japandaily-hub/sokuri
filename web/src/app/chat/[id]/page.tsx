@@ -26,6 +26,7 @@ import {
   getTransaction,
   listMessages,
   listTransactions,
+  LIST_MAX_LIMIT,
   markMessagesRead,
   sendMessage,
   toDisplayMessage,
@@ -125,7 +126,7 @@ export default function ChatPage() {
     let cancelled = false;
     (async () => {
       try {
-        const list = await listTransactions(token);
+        const list = await listTransactions(token, { limit: LIST_MAX_LIMIT, offset: 0 });
         if (!cancelled) setTransactions(list);
       } catch (e) {
         if (!cancelled) showToast(toDisplayMessage(e, "案件一覧の取得に失敗しました"));

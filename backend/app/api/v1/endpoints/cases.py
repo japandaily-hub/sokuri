@@ -443,11 +443,34 @@ async def create_case(
     try:
         await session.commit()
     except IntegrityError as exc:
+        await session.rollback()
+        # DB制約 uq_cases_user_id_idempotency_key の違反（r6-verify-fix M2）: 上の
+        # _find_idempotent_case_id は commit 前の in-memory チェックのため同時2
+        # リクエスト（二度押し・リトライ）を防げず、真の一意性はDB制約が担保する。
+        # 制約名/対象カラム名（SQLiteは "cases.user_id, cases.idempotency_key"、
+        # PostgreSQLは制約名そのもの）がエラーメッセージに含まれることを利用して
+        # 判別し、reductions.create_reduction と同じ多層防御パターンで既存案件を
+        # 200で返す（存在しない場合のみ409へフォールバック）。
+        if body.idempotency_key and "idempotency_key" in str(getattr(exc, "orig", exc)).lower():
+            existing_case_id = await _find_idempotent_case_id(
+                session, user.id, body.idempotency_key
+            )
+            if existing_case_id is not None:
+                logger.info(
+                    "cases: 冪等キー競合(DB制約)により既存案件を返却 - user_id=%s case_id=%s",
+                    user.id,
+                    existing_case_id,
+                )
+                response.status_code = status.HTTP_200_OK
+                return _to_case_out(await _get_case(session, existing_case_id))
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="同一の冪等キーを使った案件が既に存在します。新しい冪等キーで再送信してください。",
+            ) from exc
         # case_photos.storage_key の DB UNIQUE制約違反（security review 指摘対応・H-1、
         # case_items.py の add_case_item_photo と同じ多層防御）。他人が既にアップロード
         # 済みの storage_key を新規案件作成時に流用しようとした場合もここで一律拒否する
         # （素通しで500になるのを防ぐ）。
-        await session.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="指定された写真の一部は既に別の案件で使用されています。presign からやり直してください。",

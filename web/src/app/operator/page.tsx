@@ -37,6 +37,7 @@ import {
   LIST_DEFAULT_LIMIT,
   TXN_STATUS_LABEL,
   createBid,
+  dedupeById,
   formatYen,
   getOperatorProfile,
   listOpenCases,
@@ -289,9 +290,16 @@ export default function OperatorDashboardPage() {
   // ページング（r6 H-1）: backend が既定100件で切り詰めるため、取得件数が limit と
   // 一致する間は「さらに読み込む」余地があると判断する（総件数は応答に含まれない）。
   const [hasMoreCases, setHasMoreCases] = useState(false);
+  // 取引データの生プールに、まだ取得していない件数が残っているかどうか（交渉中・成約済み
+  // 両タブに共通の下限。個々のタブの表示件数が増えるとは限らない＝下記 loadMoreTxns 参照）。
   const [hasMoreTxns, setHasMoreTxns] = useState(false);
   const [loadingMoreCases, setLoadingMoreCases] = useState(false);
-  const [loadingMoreTxns, setLoadingMoreTxns] = useState(false);
+  // 「交渉中」「成約済み」タブは同じ transactions 配列をフィルタして表示しているため、
+  // 追加取得したページが相手ステータスの取引ばかりだと片方のタブだけ「押しても増えない」
+  // ように見えていた（r6-verify N2）。ローディング状態はタブごとに分離し、loadMoreTxns 側で
+  // 押したタブに該当する取引が最低1件増えるか生データが尽きるまで自動で追いページする。
+  const [loadingMoreNegTxns, setLoadingMoreNegTxns] = useState(false);
+  const [loadingMoreDoneTxns, setLoadingMoreDoneTxns] = useState(false);
 
   // 入札確認モーダル
   const [modalLotId, setModalLotId] = useState<string | null>(null);
@@ -333,7 +341,7 @@ export default function OperatorDashboardPage() {
     setLoadingMoreCases(true);
     try {
       const res = await listOpenCases(token, { limit: LIST_DEFAULT_LIMIT, offset: cases?.length ?? 0 });
-      setCases((prev) => [...(prev ?? []), ...res]);
+      setCases((prev) => dedupeById([...(prev ?? []), ...res]));
       setHasMoreCases(res.length === LIST_DEFAULT_LIMIT);
     } catch (e) {
       setError(toDisplayMessage(e, "追加の読み込みに失敗しました"));
@@ -342,17 +350,38 @@ export default function OperatorDashboardPage() {
     }
   }
 
-  async function loadMoreTxns() {
-    if (!token || loadingMoreTxns) return;
-    setLoadingMoreTxns(true);
+  /** 「交渉中」「成約済み」タブ用の判定（負荷上限つきの自動追いページで使う）。 */
+  const TXN_KIND_MATCH: Record<"neg" | "done", (t: TransactionListItem) => boolean> = {
+    neg: (t) => t.status === "pending" || t.status === "visiting",
+    done: (t) => t.status === "completed",
+  };
+  /** 1回の「さらに読み込む」操作で追いページする上限（生データ500件相当・r6-verify N2）。 */
+  const MAX_AUTO_PAGES = 5;
+
+  async function loadMoreTxns(kind: "neg" | "done") {
+    const isBusy = kind === "neg" ? loadingMoreNegTxns : loadingMoreDoneTxns;
+    if (!token || isBusy) return;
+    const setBusy = kind === "neg" ? setLoadingMoreNegTxns : setLoadingMoreDoneTxns;
+    const matches = TXN_KIND_MATCH[kind];
+    setBusy(true);
     try {
-      const res = await listTransactions(token, { limit: LIST_DEFAULT_LIMIT, offset: transactions?.length ?? 0 });
-      setTransactions((prev) => [...(prev ?? []), ...res]);
-      setHasMoreTxns(res.length === LIST_DEFAULT_LIMIT);
+      let offset = transactions?.length ?? 0;
+      let gotMatch = false;
+      let more = true;
+      // 押したタブに該当する取引が1件も増えないまま「増えない」ように見えるのを防ぐため、
+      // 該当タブに一致する取引が増えるか生データが尽きるまで自動で追いページする。
+      for (let i = 0; i < MAX_AUTO_PAGES && more && !gotMatch; i++) {
+        const res = await listTransactions(token, { limit: LIST_DEFAULT_LIMIT, offset });
+        offset += res.length;
+        if (res.some(matches)) gotMatch = true;
+        setTransactions((prev) => dedupeById([...(prev ?? []), ...res]));
+        more = res.length === LIST_DEFAULT_LIMIT;
+      }
+      setHasMoreTxns(more);
     } catch (e) {
       setError(toDisplayMessage(e, "追加の読み込みに失敗しました"));
     } finally {
-      setLoadingMoreTxns(false);
+      setBusy(false);
     }
   }
 
@@ -625,8 +654,8 @@ export default function OperatorDashboardPage() {
             )}
             {hasMoreTxns ? (
               <div style={{ display: "flex", justifyContent: "center", padding: "16px 0" }}>
-                <button type="button" className="btn btn-ghost" onClick={loadMoreTxns} disabled={loadingMoreTxns}>
-                  {loadingMoreTxns ? "読み込み中…" : "さらに読み込む"}
+                <button type="button" className="btn btn-ghost" onClick={() => loadMoreTxns("neg")} disabled={loadingMoreNegTxns}>
+                  {loadingMoreNegTxns ? "読み込み中…" : "さらに読み込む"}
                 </button>
               </div>
             ) : null}
@@ -668,8 +697,8 @@ export default function OperatorDashboardPage() {
             )}
             {hasMoreTxns ? (
               <div style={{ display: "flex", justifyContent: "center", padding: "16px 0" }}>
-                <button type="button" className="btn btn-ghost" onClick={loadMoreTxns} disabled={loadingMoreTxns}>
-                  {loadingMoreTxns ? "読み込み中…" : "さらに読み込む"}
+                <button type="button" className="btn btn-ghost" onClick={() => loadMoreTxns("done")} disabled={loadingMoreDoneTxns}>
+                  {loadingMoreDoneTxns ? "読み込み中…" : "さらに読み込む"}
                 </button>
               </div>
             ) : null}

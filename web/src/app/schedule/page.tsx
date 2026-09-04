@@ -13,6 +13,7 @@ import {
   getTransaction,
   listMessages,
   listTransactions,
+  LIST_MAX_LIMIT,
   toDisplayMessage,
   type MessageOut,
   type TransactionDetail,
@@ -95,7 +96,7 @@ function SchedulePageInner() {
     let cancelled = false;
     (async () => {
       try {
-        const list = await listTransactions(token);
+        const list = await listTransactions(token, { limit: LIST_MAX_LIMIT, offset: 0 });
         const pending = list.find((t) => t.status === "pending");
         if (!cancelled) {
           if (pending) setTransactionId(pending.id);

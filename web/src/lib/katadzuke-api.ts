@@ -1435,6 +1435,23 @@ export interface ListPageParams {
   offset?: number;
 }
 
+/**
+ * 「さらに読み込む」で継ぎ足したリストを id で重複排除する（最初の出現を残す）。
+ * offset ページングは総件数を持たないため、ページ境界の前後で新規作成・削除が起きると
+ * 次ページが1件ずれて重複・欠落しうる（r6-verify N3）。重複表示は React の key 衝突にも
+ * つながるため、追記のたびにこれを通す。
+ */
+export function dedupeById<T extends { id: string }>(items: T[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const item of items) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    out.push(item);
+  }
+  return out;
+}
+
 function buildListPageQuery(params?: ListPageParams): string {
   const sp = new URLSearchParams();
   sp.set("limit", String(params?.limit ?? LIST_DEFAULT_LIMIT));

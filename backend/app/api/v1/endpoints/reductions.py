@@ -102,7 +102,8 @@ async def create_reduction(
         # 防げない。pending が2行残ると以後その判定により業者が恒久的に409で締め出される
         # ため、真の一意性は uq_reduction_requests_pending（0028 の部分一意索引）で担保し、
         # 違反はここで409へ変換する（bids.create_bid と同じ多層防御パターン）。
-        # 注: 部分一意索引は PostgreSQL 専用で SQLite のテストでは発火しない。
+        # 注: 部分一意索引（postgresql_where と sqlite_where を併記）は PostgreSQL・
+        # SQLite の双方で発火する。SQLite 用テストでも実際に IntegrityError を検証する。
         await session.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

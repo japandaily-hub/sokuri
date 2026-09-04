@@ -54,6 +54,16 @@ class Case(Base, TimestampMixin):
     """
 
     __tablename__ = "cases"
+    __table_args__ = (
+        # 同一ユーザー内で idempotency_key の重複作成を DB 制約で阻止する
+        # （r6-verify-fix M2）。in-memory の事前チェック(_find_idempotent_case_id)
+        # だけでは同時2リクエスト（二度押し・リトライ）を防げず、案件が2件
+        # 作られうる。NULL は標準SQLの一意制約セマンティクスにより対象外
+        # （idempotency_key 未指定の通常作成は何件でも共存できる）。
+        UniqueConstraint(
+            "user_id", "idempotency_key", name="uq_cases_user_id_idempotency_key"
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
 
@@ -89,8 +99,12 @@ class Case(Base, TimestampMixin):
     ai_failed_reason: Mapped[str | None] = mapped_column(String(255))
 
     # 冪等キー（クライアント発行 UUID）。プロキシタイムアウト由来の再送信で同一内容の
-    # 案件が二重作成されるのを防ぐ（r6 H-1）。直近 10 分・同一ユーザー内でのみ照合する
-    # ため DB の一意制約は張らない（古いキーの再利用を恒久的に拒否したくない）。
+    # 案件が二重作成されるのを防ぐ（r6 H-1）。直近 10 分・同一ユーザー内での照合は
+    # アプリ層（_find_idempotent_case_id）が担うが、真の一意性（同時2リクエストの
+    # 競合防止）は __table_args__ の uq_cases_user_id_idempotency_key が担保する
+    # （r6-verify-fix M2）。同一キーの恒久的な再利用拒否ではなく「同一ユーザーで
+    # 同じキーの行は高々1件」という不変条件であり、10分窓での既存案件返却
+    # （cases.py の create_case）と両立する。
     idempotency_key: Mapped[str | None] = mapped_column(String(64), index=True)
 
     # relations

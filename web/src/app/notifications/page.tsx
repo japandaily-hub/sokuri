@@ -37,6 +37,7 @@ import { useToken } from "@/components/kdz/Ui";
 import {
   listMyCases,
   listTransactions,
+  LIST_MAX_LIMIT,
   getMyProfile,
   requestLineReauthToken,
   unlinkLine,
@@ -124,7 +125,7 @@ function NotificationsContent() {
       setError(toDisplayMessage(e, "案件の取得に失敗しました"));
     }
     try {
-      setTransactions(await listTransactions(token));
+      setTransactions(await listTransactions(token, { limit: LIST_MAX_LIMIT, offset: 0 }));
     } catch (e) {
       setError((prev) => prev ?? toDisplayMessage(e, "取引の取得に失敗しました"));
     }

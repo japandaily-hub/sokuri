@@ -77,10 +77,22 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     app.state.db_engine = engine
 
+    # 起動時バックグラウンドタスクの強参照を保持する（r6-verify-fix N1）:
+    # asyncio のイベントループは Task を弱参照でしか持たないため、戻り値を
+    # 握らないまま実行すると途中で GC され黙って消えうる（CPython の既知の
+    # 落とし穴。app/services/alerts.py の _inflight_tasks と同じ対策を、
+    # lifespan のフレームが app 終了まで生存し続けることを利用してローカル
+    # 変数側で行う）。完了時は done コールバックで集合から取り除く。
+    _startup_tasks: set[asyncio.Task] = set()
+
     # Phase 4: バックグラウンドでチャネル・ルールを投入（冪等）
-    asyncio.create_task(_run_seed())
+    seed_task = asyncio.create_task(_run_seed())
+    _startup_tasks.add(seed_task)
+    seed_task.add_done_callback(_startup_tasks.discard)
     # r6-review H2 (b): pending 放置の案件を起動のたびに一括回収する。
-    asyncio.create_task(_run_stale_pending_ai_sweep())
+    sweep_task = asyncio.create_task(_run_stale_pending_ai_sweep())
+    _startup_tasks.add(sweep_task)
+    sweep_task.add_done_callback(_startup_tasks.discard)
 
     yield
 

@@ -353,6 +353,7 @@ async def verify_operator(
             status_code=status.HTTP_409_CONFLICT,
             detail="許可証画像が未提出のため承認できません。業者に許可証のアップロードを依頼してください。",
         )
+    prev_vendor_status = operator.vendor_status
     operator.verified_at = datetime.now(timezone.utc) if body.verified else None
     operator.vendor_status = "active" if body.verified else "pending"
     await session.commit()
@@ -361,13 +362,17 @@ async def verify_operator(
     # （approve_operator_application）とは別イベントで、ここが「いつ入札できるように
     # なったか」を業者が知る唯一の経路。ORMオブジェクトはBackgroundTaskへ渡さず、
     # プリミティブ値へ変換してから渡す（notify_dispatch の設計前提）。
-    background.add_task(
-        notify_dispatch.dispatch_operator_verified,
-        operator.line_user_id,
-        operator.contact_email,
-        operator.company_name,
-        body.verified,
-    )
+    # 入札可否（vendor_status）が実際に変わった時だけ送る（r6-verify-fix M4）:
+    # 既に active な業者への再承認・既に pending な業者への再却下など、状態不変の
+    # 再操作（誤操作・二重送信含む）で毎回同一内容の通知が重複して届くのを防ぐ。
+    if prev_vendor_status != operator.vendor_status:
+        background.add_task(
+            notify_dispatch.dispatch_operator_verified,
+            operator.line_user_id,
+            operator.contact_email,
+            operator.company_name,
+            body.verified,
+        )
     logger.info(
         "admin_operator_verify admin=%s operator=%s verified=%s", admin.id, operator.id, body.verified
     )
@@ -391,12 +396,15 @@ async def suspend_operator(
     operator = await session.get(Operator, operator_id)
     if operator is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Operator not found.")
+    prev_suspended = operator.is_suspended
     operator.is_suspended = body.suspended
     await session.commit()
     await session.refresh(operator)
-    if not body.suspended:
+    if prev_suspended and not body.suspended:
         # 解除のみ通知する（r6-verify-web H1）。停止時の理由開示は運用ポリシーの
         # 選択であり既定にしない一方、解除は本人が復帰を知る手段が他に無い。
+        # 実際に停止→解除へ状態が変わった時だけ送る（r6-verify-fix M4）:
+        # 既に解除済みの業者へ suspended=false を再送しても重複通知しない。
         background.add_task(
             notify_dispatch.dispatch_account_unsuspended,
             operator.line_user_id,
