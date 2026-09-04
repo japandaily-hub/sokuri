@@ -689,8 +689,11 @@ class TestPlaceholderEmailNotLeaked:
         )
         case = await _create_case(client, line_user_token)
 
+        # create_bid は notify_dispatch 経由になったため、メール送信関数そのものを
+        # サービス層でパッチして「メールは一切発火しない」ことを検証する
+        # （LINE Push はトークン未設定でスキップ→仮メール判定でメールも送らない）。
         with patch(
-            "app.api.v1.endpoints.bids.notify.send_bid_received", new=AsyncMock()
+            "app.services.notify.send_bid_received", new=AsyncMock()
         ) as send_mock:
             r = await client.post(
                 f"/api/v1/cases/{case['id']}/bids",
