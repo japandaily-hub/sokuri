@@ -443,7 +443,6 @@ export default function CreateCasePage() {
                           ))}
                         </div>
                       )}
-                      <p className="photo-count">案件合計 残り{Math.max(0, CASE_PHOTO_LIMIT - totalPhotoCount)}枚</p>
                     </div>
                   )}
                 </>
@@ -536,10 +535,6 @@ export default function CreateCasePage() {
                     ))}
                   </div>
                 )}
-                <p className="photo-count">
-                  この商品 {currentItem.photos.length}/{ITEM_PHOTO_LIMIT} 枚・案件合計 残り{Math.max(0, CASE_PHOTO_LIMIT - totalPhotoCount)}枚
-                </p>
-
                 <div className="photo-quality-hint">
                   <Ic name="spark" />
                   <div className="pqh-body">
