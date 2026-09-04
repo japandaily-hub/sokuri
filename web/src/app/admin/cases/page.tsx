@@ -127,7 +127,7 @@ export default function AdminCasesPage() {
             <StatusFilterBar options={STATUS_OPTIONS} value={statusFilter} onChange={changeStatus} />
           </div>
 
-          <div className="mt-4 overflow-x-auto">
+          <div className="mt-4 overflow-x-auto" tabIndex={0} role="region" aria-label="案件一覧">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
@@ -176,7 +176,7 @@ export default function AdminCasesPage() {
               <p className="py-6 text-center text-sm text-slate-500">該当する案件はありません。</p>
             ) : null}
             {busy ? (
-              <div className="flex items-center gap-2 py-3 text-sm text-slate-400">
+              <div className="flex items-center gap-2 py-3 text-sm text-slate-600">
                 <Spinner className="h-4 w-4" /> 読み込み中…
               </div>
             ) : null}

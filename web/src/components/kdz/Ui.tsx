@@ -90,16 +90,16 @@ const BADGE_STYLES: Record<string, string> = {
   open: "bg-sky-100 text-sky-700",
   bidding: "bg-amber-100 text-amber-700",
   closed: "bg-emerald-100 text-emerald-700",
-  cancelled: "bg-slate-200 text-slate-500",
-  draft: "bg-slate-100 text-slate-500",
+  cancelled: "bg-slate-200 text-slate-700",
+  draft: "bg-slate-100 text-slate-600",
   pending: "bg-amber-100 text-amber-700",
   visiting: "bg-sky-100 text-sky-700",
   completed: "bg-emerald-100 text-emerald-700",
   selected: "bg-emerald-100 text-emerald-700",
-  rejected: "bg-slate-200 text-slate-500",
+  rejected: "bg-slate-200 text-slate-700",
   approved: "bg-emerald-100 text-emerald-700",
-  unverified: "bg-slate-100 text-slate-500",
-  withdrawn: "bg-slate-200 text-slate-500",
+  unverified: "bg-slate-100 text-slate-600",
+  withdrawn: "bg-slate-200 text-slate-700",
 };
 
 export function StatusBadge({

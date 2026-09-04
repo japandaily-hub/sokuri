@@ -123,7 +123,7 @@
   margin-bottom: 28px;
 }
 .doc-warn strong {
-  color: var(--gold);
+  color: #8a5b00; /* --gold(#e5a323) は淡い背景と 2.0:1 で不足。AA 4.5:1 以上の濃い琥珀 */
 }
 
 /* フッターナビ */

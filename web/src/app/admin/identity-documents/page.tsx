@@ -236,7 +236,7 @@ export default function AdminIdentityDocumentsPage() {
             </div>
           </div>
 
-          <div className="mt-4 overflow-x-auto">
+          <div className="mt-4 overflow-x-auto" tabIndex={0} role="region" aria-label="本人確認書類一覧">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
@@ -326,9 +326,9 @@ export default function AdminIdentityDocumentsPage() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={frontUrl} alt="表面" className="max-h-[40vh] w-full object-contain" />
                 ) : imagesGone ? (
-                  <p className="p-4 text-center text-xs text-slate-400">{IMAGE_GONE_MESSAGE}</p>
+                  <p className="p-4 text-center text-xs text-slate-600">{IMAGE_GONE_MESSAGE}</p>
                 ) : (
-                  <p className="p-4 text-center text-xs text-slate-400">表面画像なし</p>
+                  <p className="p-4 text-center text-xs text-slate-600">表面画像なし</p>
                 )}
               </div>
               {selected.has_back ? (
@@ -339,9 +339,9 @@ export default function AdminIdentityDocumentsPage() {
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={backUrl} alt="裏面" className="max-h-[40vh] w-full object-contain" />
                   ) : imagesGone ? (
-                    <p className="p-4 text-center text-xs text-slate-400">{IMAGE_GONE_MESSAGE}</p>
+                    <p className="p-4 text-center text-xs text-slate-600">{IMAGE_GONE_MESSAGE}</p>
                   ) : (
-                    <p className="p-4 text-center text-xs text-slate-400">裏面画像なし</p>
+                    <p className="p-4 text-center text-xs text-slate-600">裏面画像なし</p>
                   )}
                 </div>
               ) : null}

@@ -264,7 +264,7 @@ export default function AdminOperatorApplicationsPage() {
             <StatusFilterBar options={STATUS_OPTIONS} value={statusFilter} onChange={changeStatus} />
           </div>
 
-          <div className="mt-4 overflow-x-auto">
+          <div className="mt-4 overflow-x-auto" tabIndex={0} role="region" aria-label="事前申込一覧">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
@@ -307,7 +307,7 @@ export default function AdminOperatorApplicationsPage() {
               <p className="py-6 text-center text-sm text-slate-500">該当する申込はありません。</p>
             ) : null}
             {busy ? (
-              <div className="flex items-center gap-2 py-3 text-sm text-slate-400">
+              <div className="flex items-center gap-2 py-3 text-sm text-slate-600">
                 <Spinner className="h-4 w-4" /> 読み込み中…
               </div>
             ) : null}
@@ -360,27 +360,27 @@ export default function AdminOperatorApplicationsPage() {
 
             <dl className="mt-4 grid grid-cols-1 gap-x-4 gap-y-2 text-sm sm:grid-cols-2">
               <div>
-                <dt className="text-xs text-slate-400">代表者名</dt>
+                <dt className="text-xs text-slate-600">代表者名</dt>
                 <dd className="text-slate-700">{selected.representative_name}</dd>
               </div>
               <div>
-                <dt className="text-xs text-slate-400">古物商許可番号</dt>
+                <dt className="text-xs text-slate-600">古物商許可番号</dt>
                 <dd className="text-slate-700">{selected.license_number}</dd>
               </div>
               <div className="sm:col-span-2">
-                <dt className="text-xs text-slate-400">法人登録住所</dt>
+                <dt className="text-xs text-slate-600">法人登録住所</dt>
                 <dd className="text-slate-700">{selected.registered_address}</dd>
               </div>
               <div>
-                <dt className="text-xs text-slate-400">担当者名</dt>
+                <dt className="text-xs text-slate-600">担当者名</dt>
                 <dd className="text-slate-700">{selected.contact_name}</dd>
               </div>
               <div>
-                <dt className="text-xs text-slate-400">電話番号</dt>
+                <dt className="text-xs text-slate-600">電話番号</dt>
                 <dd className="text-slate-700">{selected.contact_phone}</dd>
               </div>
               <div>
-                <dt className="text-xs text-slate-400">事業形態</dt>
+                <dt className="text-xs text-slate-600">事業形態</dt>
                 <dd className="text-slate-700">
                   {selected.business_type === "corp"
                     ? "法人"
@@ -390,30 +390,30 @@ export default function AdminOperatorApplicationsPage() {
                 </dd>
               </div>
               <div>
-                <dt className="text-xs text-slate-400">対応エリア</dt>
+                <dt className="text-xs text-slate-600">対応エリア</dt>
                 <dd className="text-slate-700">{selected.service_area ?? "—"}</dd>
               </div>
               <div className="sm:col-span-2">
-                <dt className="text-xs text-slate-400">取扱カテゴリ</dt>
+                <dt className="text-xs text-slate-600">取扱カテゴリ</dt>
                 <dd className="text-slate-700">{selected.categories ?? "—"}</dd>
               </div>
               <div>
-                <dt className="text-xs text-slate-400">インボイス番号</dt>
+                <dt className="text-xs text-slate-600">インボイス番号</dt>
                 <dd className="text-slate-700">{selected.invoice_number ?? "—"}</dd>
               </div>
               <div>
-                <dt className="text-xs text-slate-400">同意した規約バージョン</dt>
+                <dt className="text-xs text-slate-600">同意した規約バージョン</dt>
                 <dd className="text-slate-700">{selected.agreed_terms_version ?? "—"}</dd>
               </div>
               {selected.message ? (
                 <div className="sm:col-span-2">
-                  <dt className="text-xs text-slate-400">メッセージ</dt>
+                  <dt className="text-xs text-slate-600">メッセージ</dt>
                   <dd className="whitespace-pre-wrap text-slate-700">{selected.message}</dd>
                 </div>
               ) : null}
               {selected.status === "rejected" && selected.reject_reason ? (
                 <div className="sm:col-span-2">
-                  <dt className="text-xs text-slate-400">却下理由</dt>
+                  <dt className="text-xs text-slate-600">却下理由</dt>
                   <dd className="text-slate-700">{selected.reject_reason}</dd>
                 </div>
               ) : null}
@@ -477,7 +477,7 @@ export default function AdminOperatorApplicationsPage() {
                 </button>
               </div>
             ) : (
-              <p className="mt-4 border-t border-slate-100 pt-4 text-xs text-slate-400">
+              <p className="mt-4 border-t border-slate-100 pt-4 text-xs text-slate-600">
                 審査済み（
                 {selected.reviewed_at ? new Date(selected.reviewed_at).toLocaleString("ja-JP") : "—"}
                 ）のため操作できません。

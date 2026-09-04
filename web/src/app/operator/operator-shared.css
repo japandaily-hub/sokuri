@@ -63,12 +63,12 @@
   margin-bottom: 16px;
 }
 .op-alert.success { background: #eef7f0; color: #1f5c33; border-color: #b9dcc3; }
-.op-alert.warn { background: var(--warm); color: var(--gold); border: 1px solid var(--gold); }
+.op-alert.warn { background: var(--warm); color: var(--gold-text); border: 1px solid var(--gold); }
 .op-alert.error { background: rgba(215,0,53,.08); color: var(--danger); border: 1px solid var(--danger); }
 .op-alert.info { background: var(--pale); color: var(--body); border: 1px solid var(--line); }
 
 /* 減額申請中などの注意チップ（cases.css の .status-chip に無い amber バリアント） */
-.status-chip.warn { background: var(--warm); color: var(--gold); border: 1px solid var(--gold); }
+.status-chip.warn { background: var(--warm); color: var(--gold-text); border: 1px solid var(--gold); }
 /* 未読メッセージ件数バッジ（取引一覧カード。r6-flow M-3 対応） */
 .status-chip.unread { background: var(--primary); color: #fff; border: 1px solid var(--primary); }
 

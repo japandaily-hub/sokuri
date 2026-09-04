@@ -450,7 +450,7 @@ export default function AdminPage() {
               <li key={inv.id} className="flex items-center justify-between gap-2 py-2.5">
                 <div>
                   <p className="font-mono text-sm font-semibold text-slate-900">{inv.code}</p>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-600">
                     {inv.email ?? "宛先未指定"}
                     {inv.lot_name ? ` ・ lot: ${inv.lot_name}` : ""}
                     {" ・ "}
@@ -497,8 +497,9 @@ export default function AdminPage() {
           <div className="mt-3 space-y-2">
             <div className="flex gap-2">
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-slate-500">発行件数（1〜500）</label>
+                <label className="text-xs text-slate-500" htmlFor="admin-bulk-count">発行件数（1〜500）</label>
                 <input
+                  id="admin-bulk-count"
                   type="number"
                   min={1}
                   max={500}
@@ -508,8 +509,9 @@ export default function AdminPage() {
                 />
               </div>
               <div className="flex flex-1 flex-col gap-1">
-                <label className="text-xs text-slate-500">ロット名（任意・管理用）</label>
+                <label className="text-xs text-slate-500" htmlFor="admin-bulk-lot-name">ロット名（任意・管理用）</label>
                 <input
+                  id="admin-bulk-lot-name"
                   type="text"
                   value={bulkLotName}
                   onChange={(e) => setBulkLotName(e.target.value)}
@@ -596,7 +598,7 @@ export default function AdminPage() {
                 <li key={op.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
                   <div>
                     <p className="text-sm font-semibold text-slate-900">{op.company_name}</p>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-slate-600">
                       {op.contact_email}
                       {op.license_number ? ` ・ ${op.license_number}` : ""}
                     </p>
@@ -619,7 +621,7 @@ export default function AdminPage() {
                     </div>
                   </div>
                   {isDeleted ? (
-                    <p className="text-xs text-slate-400">退会済みのため操作できません</p>
+                    <p className="text-xs text-slate-600">退会済みのため操作できません</p>
                   ) : (
                     <div className="flex flex-wrap items-center gap-2">
                       <button
@@ -692,7 +694,7 @@ export default function AdminPage() {
             </div>
           ) : null}
           {cellDensity && cellDensity.length > 0 ? (
-            <div className="mt-4 overflow-x-auto">
+            <div className="mt-4 overflow-x-auto" tabIndex={0} role="region" aria-label="セル密度一覧">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
@@ -736,7 +738,7 @@ export default function AdminPage() {
           ) : cellDensity && cellDensity.length === 0 ? (
             <p className="mt-4 text-sm text-slate-500">直近30日に案件はありません。</p>
           ) : cellDensityError ? null : (
-            <div className="mt-4 flex items-center gap-2 text-sm text-slate-400">
+            <div className="mt-4 flex items-center gap-2 text-sm text-slate-600">
               <Spinner className="h-4 w-4" /> 読み込み中…
             </div>
           )}

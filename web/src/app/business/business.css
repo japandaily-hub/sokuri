@@ -119,7 +119,7 @@
 }
 .business-page .merit-tag.green { background: #e6f5ee; color: var(--green); }
 .business-page .merit-tag.blue { background: var(--pale); color: var(--blue); }
-.business-page .merit-tag.gold { background: var(--warm); color: var(--gold); }
+.business-page .merit-tag.gold { background: var(--warm); color: var(--gold-text); }
 
 /* フロー（業者視点） */
 .business-page .biz-flow {

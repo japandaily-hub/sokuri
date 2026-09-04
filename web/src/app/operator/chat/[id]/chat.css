@@ -60,7 +60,7 @@
   font-size: 11px;
   font-weight: 600;
   background: var(--warm);
-  color: var(--gold);
+  color: var(--gold-text);
   border: 1px solid var(--gold);
   padding: 3px 10px;
   border-radius: 0;
@@ -161,7 +161,7 @@
 }
 .opchat-page .status-negotiating { background: var(--pale); color: var(--green); }
 .opchat-page .status-waiting { background: var(--pale); color: var(--blue); }
-.opchat-page .status-scheduled { background: var(--warm); color: var(--gold); }
+.opchat-page .status-scheduled { background: var(--warm); color: var(--gold-text); }
 .opchat-page .case-id { font-size: 11px; color: var(--body-soft); margin-bottom: 4px; }
 .opchat-page .case-preview {
   font-size: 12.5px;
