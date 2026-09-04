@@ -111,8 +111,8 @@ export default function VendorDetailPage() {
                   </div>
                 ) : null}
                 <div className="biz-hero-badges">
-                  {profile.verified_at ? (
-                    <span className="biz-tag biz-tag-green">古物商許可済</span>
+                  {profile.is_approved ? (
+                    <span className="biz-tag biz-tag-green">運営審査済み</span>
                   ) : null}
                   {profile.accept_unsellable ? (
                     <span className="biz-tag biz-tag-blue">値がつかない物もOK</span>

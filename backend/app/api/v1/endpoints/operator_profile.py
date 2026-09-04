@@ -217,6 +217,7 @@ async def get_vendor_public_profile(
         operator_id=operator.id,
         company_name=operator.company_name,
         verified_at=operator.verified_at,
+        is_approved=operator.vendor_status == "active",
         areas=profile.areas or [],
         categories=profile.categories or [],
         strong_categories=profile.strong_categories or [],

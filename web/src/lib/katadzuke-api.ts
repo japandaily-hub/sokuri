@@ -416,6 +416,8 @@ export interface OperatorPublicProfile {
   operator_id: string;
   company_name: string;
   verified_at: string | null;
+  /** 運営承認済み（vendor_status === "active"）。公開バッジの根拠。 */
+  is_approved: boolean;
   areas: string[];
   categories: string[];
   strong_categories: string[];
@@ -546,6 +548,8 @@ export function signupOperator(payload: {
 // ユーザープロフィール
 // ---------------------------------------------------------------------------
 
+export type IdentityStatus = "unverified" | "pending" | "approved" | "rejected";
+
 /** GET/PUT /users/me/profile 共通のレスポンス形。 */
 export interface UserProfile {
   email: string;
@@ -558,6 +562,11 @@ export interface UserProfile {
   /** false の場合 LINE専用アカウント（パスワード未設定）。 */
   has_password: boolean;
   line_linked: boolean;
+  /** "YYYY-MM-DD"。古物営業法の本人確認・年齢確認に使用。 */
+  birth_date: string | null;
+  occupation: string | null;
+  identity_status: IdentityStatus;
+  has_bank_account: boolean;
 }
 
 export interface UpdateProfilePayload {
@@ -567,6 +576,9 @@ export interface UpdateProfilePayload {
   given_name_kana?: string | null;
   phone?: string | null;
   residence_area?: string | null;
+  /** "YYYY-MM-DD" */
+  birth_date?: string | null;
+  occupation?: string | null;
 }
 
 export interface ChangePasswordPayload {
@@ -585,6 +597,23 @@ export interface DeleteAccountPayload {
   password?: string | null;
   confirm: boolean;
 }
+
+/** 都道府県（47件・北海道〜沖縄の正式表記）。住所フォームの select の単一情報源。 */
+export const PREFECTURES = [
+  "北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県",
+  "茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県",
+  "新潟県", "富山県", "石川県", "福井県", "山梨県", "長野県", "岐阜県",
+  "静岡県", "愛知県", "三重県", "滋賀県", "京都府", "大阪府", "兵庫県",
+  "奈良県", "和歌山県", "鳥取県", "島根県", "岡山県", "広島県", "山口県",
+  "徳島県", "香川県", "愛媛県", "高知県", "福岡県", "佐賀県", "長崎県",
+  "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県",
+] as const;
+
+/** 職業（プロフィール「職業」select の選択肢）。 */
+export const OCCUPATIONS = [
+  "会社員", "公務員", "自営業・フリーランス", "経営者・役員",
+  "パート・アルバイト", "学生", "主婦・主夫", "無職", "年金受給者", "その他",
+] as const;
 
 /** お住まいのエリア（8トークン+日本語ラベル）。residence_area の単一情報源。 */
 export const RESIDENCE_AREAS = [
@@ -631,6 +660,294 @@ export function deleteMyAccount(
   return request("/users/me", {
     method: "DELETE",
     body: JSON.stringify(payload),
+    token,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 住所（古物営業法の本人確認・成約時開示に使用）
+// ---------------------------------------------------------------------------
+
+export interface AddressOut {
+  postal_code: string | null;
+  prefecture: string | null;
+  city: string | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  /** RESIDENCE_AREAS のトークン。住所保存時にバックエンド側で自動同期される。 */
+  residence_area: string | null;
+}
+
+export interface AddressUpdatePayload {
+  /** 7桁（ハイフン可）。 */
+  postal_code: string;
+  prefecture: string;
+  city: string;
+  address_line1: string;
+  address_line2?: string | null;
+}
+
+export function getMyAddress(token: string): Promise<AddressOut> {
+  return request("/users/me/address", { token });
+}
+
+export function updateMyAddress(
+  payload: AddressUpdatePayload,
+  token: string,
+): Promise<AddressOut> {
+  return request("/users/me/address", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+    token,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 振込口座（買取代金の受取先。業者には非開示）
+// ---------------------------------------------------------------------------
+
+export type BankAccountType = "普通" | "当座";
+
+export interface BankAccountOut {
+  has_bank_account: boolean;
+  bank_name: string | null;
+  branch_name: string | null;
+  account_type: BankAccountType | null;
+  /** 例 "***4567"。マスク済みのため一覧・確認画面にそのまま表示してよい。 */
+  account_number_masked: string | null;
+  account_holder_kana: string | null;
+  updated_at: string | null;
+}
+
+export interface BankAccountUpdatePayload {
+  bank_name: string;
+  branch_name: string;
+  account_type: BankAccountType;
+  /** 7桁の数字のみ。 */
+  account_number: string;
+  /** 全角カタカナ。 */
+  account_holder_kana: string;
+}
+
+export function getMyBankAccount(token: string): Promise<BankAccountOut> {
+  return request("/users/me/bank-account", { token });
+}
+
+export function updateMyBankAccount(
+  payload: BankAccountUpdatePayload,
+  token: string,
+): Promise<BankAccountOut> {
+  return request("/users/me/bank-account", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+    token,
+  });
+}
+
+export function deleteMyBankAccount(token: string): Promise<void> {
+  return request("/users/me/bank-account", { method: "DELETE", token });
+}
+
+// ---------------------------------------------------------------------------
+// 本人確認（古物営業法対応。1万円以上の買取で住所・氏名・職業・年齢確認が必要）
+// ---------------------------------------------------------------------------
+
+/** 書類種別の内部トークン。backend の doc_type と1:1対応する。 */
+export type IdentityDocType =
+  | "driver_license"
+  | "my_number_card"
+  | "passport"
+  | "residence_card"
+  | "health_insurance_card";
+
+export const IDENTITY_STATUS_LABEL: Record<IdentityStatus, string> = {
+  unverified: "未提出",
+  pending: "審査中",
+  approved: "承認済み",
+  rejected: "差し戻し",
+};
+
+/** 提出フォームの書類種別 select 選択肢（裏面要否・注記を含む）。この配列が唯一の情報源。 */
+export const IDENTITY_DOC_TYPES: {
+  id: IdentityDocType;
+  label: string;
+  backRequired: boolean;
+  note?: string;
+}[] = [
+  { id: "driver_license", label: "運転免許証", backRequired: true },
+  {
+    id: "my_number_card",
+    label: "マイナンバーカード",
+    backRequired: false,
+    note: "裏面（個人番号面）は送らないでください。表面のみご提出ください。",
+  },
+  { id: "passport", label: "パスポート", backRequired: false },
+  { id: "residence_card", label: "在留カード", backRequired: true },
+  {
+    id: "health_insurance_card",
+    label: "健康保険証",
+    backRequired: true,
+    note: "住所記載がない場合、承認できないことがあります。",
+  },
+];
+
+export interface IdentityOut {
+  status: IdentityStatus;
+  document_id: string | null;
+  doc_type: IdentityDocType | null;
+  submitted_at: string | null;
+  reviewed_at: string | null;
+  reject_reason: string | null;
+  has_back: boolean;
+}
+
+export function getMyIdentity(token: string): Promise<IdentityOut> {
+  return request("/users/me/identity", { token });
+}
+
+/**
+ * 本人確認書類を提出する（multipart/form-data）。
+ * request<T>() は Content-Type: application/json を固定注入するため使えず、
+ * uploadOperatorLicenseImage と同様に生 fetch で送る。
+ * 422: 生年月日未登録/18歳未満/裏面不足/非画像、409: 審査中または承認済み、
+ * 413/422: サイズ超過、429: リクエスト過多。
+ */
+export async function uploadIdentityDocument(
+  payload: { docType: IdentityDocType; front: File; back?: File | null },
+  token: string,
+): Promise<IdentityOut> {
+  const formData = new FormData();
+  formData.append("doc_type", payload.docType);
+  formData.append("front", payload.front);
+  if (payload.back) formData.append("back", payload.back);
+
+  let res: Response;
+  try {
+    res = await fetch(`${apiBase()}/users/me/identity-documents`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+  } catch (e) {
+    if (e instanceof KdzApiError) throw e;
+    throw new KdzNetworkError(e);
+  }
+  if (!res.ok) {
+    let message = `HTTP ${res.status}`;
+    try {
+      const body = (await res.json()) as { detail?: unknown };
+      if (typeof body.detail === "string") message = body.detail;
+    } catch {
+      /* JSON でないレスポンスは無視 */
+    }
+    throw new KdzApiError(res.status, message);
+  }
+  return (await res.json()) as IdentityOut;
+}
+
+/**
+ * 提出済み本人確認書類の画像を取得する（本人のみ・Blob）。
+ * <img src> による直参照はAuthorizationヘッダーを付けられないため不可。
+ * 呼び出し側で URL.createObjectURL → 表示後 URL.revokeObjectURL すること。
+ */
+export async function fetchMyIdentityDocumentBlob(
+  documentId: string,
+  side: "front" | "back",
+  token: string,
+): Promise<Blob> {
+  let res: Response;
+  try {
+    res = await fetch(
+      `${apiBase()}/users/me/identity-documents/${documentId}/file?side=${side}`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+  } catch (e) {
+    if (e instanceof KdzApiError) throw e;
+    throw new KdzNetworkError(e);
+  }
+  if (!res.ok) {
+    let message = `HTTP ${res.status}`;
+    try {
+      const body = (await res.json()) as { detail?: unknown };
+      if (typeof body.detail === "string") message = body.detail;
+    } catch {
+      /* JSON でないレスポンスは無視 */
+    }
+    throw new KdzApiError(res.status, message);
+  }
+  return await res.blob();
+}
+
+// ---------------------------------------------------------------------------
+// 管理: 本人確認書類の審査
+// ---------------------------------------------------------------------------
+
+export interface AdminIdentityDocument {
+  id: string;
+  user_id: string;
+  user_email: string;
+  user_name: string | null;
+  doc_type: IdentityDocType;
+  status: IdentityStatus;
+  submitted_at: string;
+  reviewed_at: string | null;
+  reject_reason: string | null;
+  has_back: boolean;
+}
+
+export function listIdentityDocumentsAdmin(
+  status: "pending" | "all",
+  token: string,
+): Promise<AdminIdentityDocument[]> {
+  return request(`/admin/identity-documents?status=${status}`, { token });
+}
+
+export async function fetchIdentityDocumentBlobAdmin(
+  documentId: string,
+  side: "front" | "back",
+  token: string,
+): Promise<Blob> {
+  let res: Response;
+  try {
+    res = await fetch(
+      `${apiBase()}/admin/identity-documents/${documentId}/file?side=${side}`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+  } catch (e) {
+    if (e instanceof KdzApiError) throw e;
+    throw new KdzNetworkError(e);
+  }
+  if (!res.ok) {
+    let message = `HTTP ${res.status}`;
+    try {
+      const body = (await res.json()) as { detail?: unknown };
+      if (typeof body.detail === "string") message = body.detail;
+    } catch {
+      /* JSON でないレスポンスは無視 */
+    }
+    throw new KdzApiError(res.status, message);
+  }
+  return await res.blob();
+}
+
+export function approveIdentityDocument(
+  documentId: string,
+  token: string,
+): Promise<AdminIdentityDocument> {
+  return request(`/admin/identity-documents/${documentId}/approve`, {
+    method: "PATCH",
+    token,
+  });
+}
+
+export function rejectIdentityDocument(
+  documentId: string,
+  rejectReason: string,
+  token: string,
+): Promise<AdminIdentityDocument> {
+  return request(`/admin/identity-documents/${documentId}/reject`, {
+    method: "PATCH",
+    body: JSON.stringify({ reject_reason: rejectReason }),
     token,
   });
 }

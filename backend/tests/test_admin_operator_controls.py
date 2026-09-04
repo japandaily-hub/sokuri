@@ -265,3 +265,23 @@ async def test_suspend_requires_admin_and_existing_operator(client: AsyncClient,
         headers=_auth(admin_token),
     )
     assert r.status_code == 422, r.text
+
+
+# ──────────────────────────── 公開プロフィールの承認バッジ ────────────────────────────
+
+
+async def test_public_profile_is_approved_follows_vendor_status(client: AsyncClient, db_session: AsyncSession):
+    admin_token = await _make_admin(client, db_session)
+    _, pending_id = await _signup_pending_operator(client, "ctl_public_pending@example.com")
+    _, active_id = await _signup_invited_operator(client, admin_token, "ctl_public_active@example.com")
+
+    r = await client.get(f"/api/v1/vendors/{pending_id}")
+    assert r.status_code == 200, r.text
+    assert r.json()["is_approved"] is False
+
+    r = await client.get(f"/api/v1/vendors/{active_id}")
+    assert r.status_code == 200, r.text
+    assert r.json()["is_approved"] is True
+    # 招待コード登録は verified_at が付かないが、承認済みバッジの根拠は vendor_status
+    assert r.json()["verified_at"] is None
+

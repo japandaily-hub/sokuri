@@ -146,6 +146,10 @@ class UserProfileOut(BaseModel):
     residence_area: str | None
     has_password: bool
     line_linked: bool
+    birth_date: date | None = None
+    occupation: str | None = None
+    identity_status: str = "unverified"
+    has_bank_account: bool = False
 
 
 class UserProfileUpdateRequest(BaseModel):
@@ -159,6 +163,10 @@ class UserProfileUpdateRequest(BaseModel):
     given_name_kana: str | None = Field(default=None, max_length=64)
     phone: str | None = Field(default=None, max_length=20)
     residence_area: ResidenceArea | None = None
+    # 既存フィールドと同じ「フルリプレース」方式（未送信=None は既存値のクリアを意味する）。
+    # phone / residence_area 等と挙動を揃える（QAレビュー指摘: 部分更新セマンティクスの混在防止）。
+    birth_date: date | None = None
+    occupation: str | None = Field(default=None, max_length=64)
 
     @field_validator("family_name_kana", "given_name_kana")
     @classmethod
@@ -205,6 +213,144 @@ class AccountDeleteRequest(BaseModel):
 
 class AccountDeleteResponse(BaseModel):
     detail: str
+
+
+# ──────────────────────────── マイページ: 住所 ────────────────────────────
+
+# 47都道府県（表記ゆれ防止のため固定リストで検証する）。
+PREFECTURES: tuple[str, ...] = (
+    "北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県",
+    "茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県",
+    "新潟県", "富山県", "石川県", "福井県", "山梨県", "長野県", "岐阜県",
+    "静岡県", "愛知県", "三重県", "滋賀県", "京都府", "大阪府", "兵庫県",
+    "奈良県", "和歌山県", "鳥取県", "島根県", "岡山県", "広島県", "山口県",
+    "徳島県", "香川県", "愛媛県", "高知県", "福岡県", "佐賀県", "長崎県",
+    "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県",
+)  # fmt: skip
+_PREFECTURE_SET = frozenset(PREFECTURES)
+# 都道府県 → residence_area の自動同期マップ（既存 ResidenceArea 定数と一致させる）。
+_PREFECTURE_TO_RESIDENCE_AREA: dict[str, str] = {
+    "東京都": "tokyo",
+    "神奈川県": "kanagawa",
+    "埼玉県": "saitama",
+    "千葉県": "chiba",
+    "大阪府": "osaka",
+    "愛知県": "aichi",
+    "福岡県": "fukuoka",
+}
+
+
+def prefecture_to_residence_area(prefecture: str) -> str:
+    """都道府県名から居住エリア（ResidenceArea）を導出する。該当なしは "other"。"""
+    return _PREFECTURE_TO_RESIDENCE_AREA.get(prefecture, "other")
+
+
+_POSTAL_CODE_DIGITS_RE = r"^\d{7}$"
+
+
+class UserAddressOut(BaseModel):
+    postal_code: str | None
+    prefecture: str | None
+    city: str | None
+    address_line1: str | None
+    address_line2: str | None
+    residence_area: str | None
+
+
+class UserAddressUpdateRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    postal_code: str = Field(min_length=1, max_length=16)
+    prefecture: str
+    city: str = Field(min_length=1, max_length=64)
+    address_line1: str = Field(min_length=1, max_length=255)
+    address_line2: str | None = Field(default=None, max_length=255)
+
+    @field_validator("postal_code")
+    @classmethod
+    def _normalize_postal_code(cls, v: str) -> str:
+        digits = v.replace("-", "").replace("ー", "").strip()
+        if not re.match(_POSTAL_CODE_DIGITS_RE, digits):
+            raise ValueError("郵便番号は数字7桁で入力してください。")
+        return digits
+
+    @field_validator("prefecture")
+    @classmethod
+    def _validate_prefecture(cls, v: str) -> str:
+        if v not in _PREFECTURE_SET:
+            raise ValueError("都道府県の指定が正しくありません。")
+        return v
+
+
+# ──────────────────────────── マイページ: 振込先口座 ────────────────────────────
+
+
+class UserBankAccountMaskedOut(BaseModel):
+    has_bank_account: bool
+    bank_name: str | None = None
+    branch_name: str | None = None
+    account_type: str | None = None
+    account_number_masked: str | None = None
+    account_holder_kana: str | None = None
+    updated_at: datetime | None = None
+
+
+class UserBankAccountUpdateRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    bank_name: str = Field(min_length=1, max_length=64)
+    branch_name: str = Field(min_length=1, max_length=64)
+    account_type: Literal["普通", "当座"]
+    account_number: str
+    account_holder_kana: str = Field(min_length=1, max_length=64)
+
+    @field_validator("account_number")
+    @classmethod
+    def _validate_account_number(cls, v: str) -> str:
+        if not re.match(r"^\d{7}$", v):
+            raise ValueError("口座番号は数字7桁で入力してください。")
+        return v
+
+    @field_validator("account_holder_kana")
+    @classmethod
+    def _validate_account_holder_kana(cls, v: str) -> str:
+        if not re.match(_KANA_RE, v) or v.strip() == "":
+            raise ValueError("口座名義（カナ）は全角カタカナで入力してください。")
+        return v
+
+
+# ──────────────────────────── マイページ: 本人確認 ────────────────────────────
+
+IdentityDocType = Literal[
+    "drivers_license", "my_number_card", "passport", "residence_card", "health_insurance_card"
+]
+
+
+class UserIdentityStatusOut(BaseModel):
+    status: str
+    document_id: uuid.UUID | None = None
+    doc_type: str | None = None
+    submitted_at: datetime | None = None
+    reviewed_at: datetime | None = None
+    reject_reason: str | None = None
+    has_back: bool = False
+
+
+class UserIdentityDocumentAdminOut(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    user_email: str
+    user_name: str | None
+    doc_type: str
+    status: str
+    submitted_at: datetime
+    reviewed_at: datetime | None
+    reject_reason: str | None
+    has_back: bool
+
+
+class IdentityDocumentRejectRequest(BaseModel):
+    reject_reason: str = Field(min_length=1, max_length=500)
 
 
 # ──────────────────────────── 写真アップロード ────────────────────────────
@@ -801,6 +947,9 @@ class OperatorPublicProfileOut(BaseModel):
     operator_id: uuid.UUID
     company_name: str
     verified_at: datetime | None
+    # 運営承認済み（vendor_status == "active"）。公開画面の「古物商許可済」バッジはこれを根拠にする
+    # （verified_at は招待コード登録だと付かない古い手動承認フィールドのため）。
+    is_approved: bool = False
     areas: list[str] = []
     categories: list[str] = []
     strong_categories: list[str] = []

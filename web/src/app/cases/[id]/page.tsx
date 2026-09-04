@@ -340,6 +340,11 @@ export default function UserCaseDetailPage() {
             </p>
           </div>
           <StatusBadge value={caseData.status} label={CASE_STATUS_LABEL[caseData.status]} />
+          {caseData.status === "cancelled" ? (
+            <div className="mt-3 w-full rounded-none border border-slate-200 bg-slate-50 p-3 text-sm leading-relaxed text-slate-600" role="status">
+              この出品は取り下げ済みです。届いていた入札はすべて自動でお断りになりました。再度依頼する場合は「出品する」から新しく出品してください。
+            </div>
+          ) : null}
         </div>
 
         {toAlbums(caseData).map((album) => {
