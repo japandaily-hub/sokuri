@@ -229,3 +229,6 @@ backend/*.sqlite3
 backend/uploads_storage/
 
 .vercel
+
+# 運営向けアラートの設定値（scripts/setup_alerts.py が読む。秘密情報のためコミット禁止）
+.env.alerts

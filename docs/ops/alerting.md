@@ -19,7 +19,22 @@
 
 LINE Notify は 2025年3月に終了しているため、Messaging API の別チャネルを使います。運営メンバーの LINE ユーザーIDは、運営用公式アカウントを友だち追加してもらい、Webhook の `follow` イベントか LINE Developers の「チャネル基本設定 > あなたのユーザーID」で取得します。
 
-## 設定場所
+## 最短の設定手順（1コマンド）
+
+1. `.env.alerts.example` を `.env.alerts` にコピーし、値を埋める（このファイルは gitignore 済み）。
+   - GitHub の Fine-grained PAT（対象: このリポジトリ、権限: Secrets と Actions を Read and write）
+   - Render の API キー
+   - 通知先（メール／LINE／Webhook のうち使うもの）
+2. 実行:
+   ```
+   backend\.venv\Scripts\python.exe scripts\setup_alerts.py
+   ```
+   値の検証（LINE トークン・Brevo キーの疎通込み）→ GitHub Secrets 登録 → Render 環境変数登録（自動再デプロイ）→ Actions「Uptime alert」をテスト通知付きで起動し結果を表示、まで自動で行います。`--dry-run` で登録前の確認だけもできます。
+3. メール／LINE／Webhook に「[カタヅケ監視][TEST] 疎通テスト」が届けば完了。
+
+人手で必要なのは「運営用 LINE 公式アカウントの作成（顧客向けとは別）」「PAT と API キーの発行」「`.env.alerts` への記入」の3点だけです。
+
+## 設定場所（手動で行う場合）
 
 - **GitHub Actions（外形監視）**: リポジトリの Settings > Secrets and variables > Actions に上記の変数を登録。
 - **Render（アプリ内監視）**: Render の Environment に同じ変数を登録（`render.yaml` の envVars は既存サービスに同期されないため、ダッシュボードで直接追加する）。加えて任意で `ALERT_COOLDOWN_SECONDS`（既定 600）、`ALERT_5XX_THRESHOLD`（既定 5）、`ALERT_5XX_WINDOW_SECONDS`（既定 300）。

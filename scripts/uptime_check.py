@@ -27,7 +27,15 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
+
+# Windows の cp932 コンソールでも日本語・絵文字を出力できるようにする（Actions/Linux では無害）
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:  # noqa: BLE001
+            pass
 
 BACKEND_URL = os.environ.get("BACKEND_URL", "https://sokuri-backend.onrender.com").rstrip("/")
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "https://sokuri.vercel.app").rstrip("/")
