@@ -24,7 +24,7 @@
 
 ## 現行ハッシュ
 - origin/main = 0b930b4（別セッションの uptime-alert 再登録。**r3 の 885f2ec・23b2471 を含めて push 済み → 本番 3 環境 success・/health commit=0b930b4・/readyz alembic_version=0025_user_suspend**。r3 は本番反映済み）。
-- main = 4c10d71（r4 回帰監査 3da71de＋docs）→ origin より 2 コミット先行（**r4 の push はユーザー判断＝本番デプロイ**）。
+- main = caaca3a（r5 最終回帰。r4 3da71de＋docs 2件を含む）→ origin より 4 コミット先行（**push はユーザー判断＝本番デプロイ。alembic 0026 を含む**）。本番ビルド（next build）と管理画面の実機確認は r5 の worktree で実施済み。
 - **注意: 別 Claude セッションが同じ作業ツリーで「業者の入札取り下げ」を廃止し「依頼者の出品取り下げ（cancel_case）」へ置換中（未コミット）。** 対象: backend bids.py/cases.py/case_lock.py/test_case_cancel.py、web cases/[id]/page.tsx・operator/cases/[id]/page.tsx・operator-shared.css・katadzuke-api.ts。これらは触らないこと。
   その方針だと 0019〜0021 の bid_withdrawals 監査テーブルと append-only トリガーは不要になる可能性がある（トリガーはテーブル DROP で自動消滅、関数 bid_withdrawals_reject_mutation は残るので DROP FUNCTION を migration に含めること）。
 
