@@ -50,11 +50,7 @@
 - なし（push はユーザー判断）。
 
 ## 次アクション
-- **P1（2026-09-04 起票・ユーザー指示）: 障害・異常時アラート基盤の構築 — 実装済み（外形監視 `.github/workflows/uptime-alert.yml` + `scripts/uptime_check.py`、アプリ内 `app/core/alert_middleware.py` + `app/services/alerts.py`、手順 `docs/ops/alerting.md`）。残り＝ユーザー作業: GitHub Secrets と Render 環境変数（ALERT_EMAILS / ALERT_LINE_CHANNEL_ACCESS_TOKEN / ALERT_LINE_USER_IDS / ALERT_WEBHOOK_URL / BREVO_API_KEY）の登録、運営用 LINE 公式アカウント（顧客向けとは別）の作成、Actions の Run workflow（force_notify=true）で疎通確認。** システム障害や業務上の異常が起きたら運営に自動で通知が届く仕組みを作る。
-  - 検知対象（案）: ①外形監視（/health・/readyz が非200 / commit 不一致 / 応答遅延）②バックエンドの 5xx・例外の急増（Render ログ or アプリ内エラーハンドラ）③Vercel/Render のデプロイ失敗 ④業務異常（AI解析の連続失敗、通知メール送信失敗、入札API の 4xx 急増、審査待ち業者の放置日数、減額申請の未回答日数）⑤DB 到達不能・alembic head 不一致 ⑥外部連携（Gemini 429/5xx、Brevo・LINE の送信失敗）
-  - 通知先（案）: メール（Brevo 既存）＋ LINE（既存 Messaging API）。重大度で分ける（Critical=即時、Warning=日次まとめ）。
-  - 実装案: 最小構成は GitHub Actions の cron（5分毎）で外形監視→失敗時に Brevo/LINE へ送信。アプリ側は FastAPI の例外ハンドラ／ミドルウェアで 5xx をカウントし閾値超過で notify.py 経由送信（再送抑制つき）。将来は Sentry 等の導入を検討。
-  - 完成条件: 監視項目ごとの検知条件・通知先・再送抑制が文書化され、疑似障害（health を意図的に落とす等）で通知が届くことを実機確認。
+- **P1: 障害・異常時アラート基盤 — 完了（2026-09-04）。** 外形監視 `.github/workflows/uptime-alert.yml`（5分毎）＋アプリ内 `app/core/alert_middleware.py`。通知先は運営用 LINE 公式アカウント「カタヅケ運営」（@854kzrrb・Channel ID 2011424972・顧客向け【公式】カタヅケとは別チャネル）。GitHub Secrets と Render 環境変数（ALERT_LINE_CHANNEL_ACCESS_TOKEN / ALERT_LINE_USER_IDS / ALERT_MAIL_FROM）は `scripts/setup_alerts.py` で登録済み、Actions の疎通テスト success、LINE push は HTTP 200 で到達確認。メール（Brevo）と Webhook は未設定（必要になったら `.env.alerts` に追記して同スクリプトを再実行）。GitHub PAT（katadzuke-alerts）は30日期限＝2026-10-04 に失効するが、登録済み Secrets はそのまま有効で監視は継続する（再登録時のみ再発行が必要）。
 - P1: 別セッションの cancel_case 置換が終わったら、本番で依頼者ログイン後の案件詳細に出品取り下げボタンが出ることを目視（業者ログインが必要な検証は Claude 側では不可＝パスワード入力禁止。ユーザー実施）。
 - P1': 完了。M-2 は REVOKE ではなく append-only トリガー（0021）で対応、本番適用済み。
 - P2: 完了（決定）。主色ブルーと現行の青×白素材は整合。再生成しない。
