@@ -29,6 +29,7 @@ import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Ic, type IcName } from "@/components/kdz/Icons";
 import { OperatorHeader } from "@/components/kdz/OperatorHeader";
+import { ApprovalPendingNotice } from "@/components/kdz/ApprovalPendingNotice";
 import { Spinner } from "@/components/Icon";
 import { useToken } from "@/components/kdz/Ui";
 import {
@@ -280,6 +281,7 @@ export default function OperatorDashboardPage() {
   const [transactions, setTransactions] = useState<TransactionListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [vendorStatus, setVendorStatus] = useState<string | null>(null);
+  const [hasLicense, setHasLicense] = useState<boolean | null>(null);
 
   // 入札確認モーダル
   const [modalLotId, setModalLotId] = useState<string | null>(null);
@@ -318,7 +320,10 @@ export default function OperatorDashboardPage() {
   useEffect(() => {
     if (!token) return;
     getOperatorProfile(token)
-      .then((p) => setVendorStatus(p.vendor_status))
+      .then((p) => {
+        setVendorStatus(p.vendor_status);
+        setHasLicense(p.license_image_uploaded_at != null);
+      })
       .catch(() => setVendorStatus("unknown"));
   }, [token]);
 
@@ -428,21 +433,7 @@ export default function OperatorDashboardPage() {
               {error}
             </div>
           ) : null}
-          {awaitingApproval ? (
-            <div
-              role="status"
-              style={{
-                marginBottom: 20,
-                padding: "12px 16px",
-                borderRadius: "var(--radius-s)",
-                background: "var(--pale)",
-                color: "var(--body)",
-                fontSize: 13,
-              }}
-            >
-              アカウントは承認待ちです。運営による審査完了後に入札できるようになります（案件の閲覧は承認前でも可能です）。
-            </div>
-          ) : null}
+          {awaitingApproval ? <ApprovalPendingNotice hasLicenseImage={hasLicense} /> : null}
 
           {/* ---------- サマリー帯（KPI） ---------- */}
           <div className="summary-bar">

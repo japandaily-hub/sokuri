@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Spinner } from "@/components/Icon";
 import { OperatorHeader } from "@/components/kdz/OperatorHeader";
+import { ApprovalPendingNotice } from "@/components/kdz/ApprovalPendingNotice";
 import { Ic } from "@/components/kdz/Icons";
 import { useToken } from "@/components/kdz/Ui";
 import {
@@ -116,6 +117,7 @@ export default function OperatorCasesPage() {
   const [cases, setCases] = useState<CaseMasked[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [vendorStatus, setVendorStatus] = useState<string | null>(null);
+  const [hasLicense, setHasLicense] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -129,7 +131,10 @@ export default function OperatorCasesPage() {
   useEffect(() => {
     if (!token) return;
     getOperatorProfile(token)
-      .then((p) => setVendorStatus(p.vendor_status))
+      .then((p) => {
+        setVendorStatus(p.vendor_status);
+        setHasLicense(p.license_image_uploaded_at != null);
+      })
       .catch(() => setVendorStatus("unknown"));
   }, [token]);
 
@@ -170,9 +175,7 @@ export default function OperatorCasesPage() {
           </div>
 
           {awaitingApproval ? (
-            <div className="op-alert warn">
-              アカウントは承認待ちです。運営による審査完了後に入札できるようになります（案件の閲覧は承認前でも可能です）。
-            </div>
+            <ApprovalPendingNotice hasLicenseImage={hasLicense} />
           ) : null}
           {error ? <div className="op-alert error">{error}</div> : null}
 

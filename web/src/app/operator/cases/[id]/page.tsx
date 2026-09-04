@@ -17,6 +17,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Spinner } from "@/components/Icon";
 import { OperatorHeader } from "@/components/kdz/OperatorHeader";
+import { ApprovalPendingNotice } from "@/components/kdz/ApprovalPendingNotice";
 import { Ic } from "@/components/kdz/Icons";
 import { useToken } from "@/components/kdz/Ui";
 import { DisclosureNotice } from "@/components/kdz/DisclosureNotice";
@@ -55,6 +56,7 @@ export default function OperatorCaseDetailPage() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [vendorStatus, setVendorStatus] = useState<string | null>(null);
+  const [hasLicense, setHasLicense] = useState<boolean | null>(null);
 
   const reload = useCallback(async () => {
     if (!token) return;
@@ -71,7 +73,10 @@ export default function OperatorCaseDetailPage() {
   useEffect(() => {
     if (!token) return;
     getOperatorProfile(token)
-      .then((p) => setVendorStatus(p.vendor_status))
+      .then((p) => {
+        setVendorStatus(p.vendor_status);
+        setHasLicense(p.license_image_uploaded_at != null);
+      })
       .catch(() => setVendorStatus("unknown"));
   }, [token]);
 
@@ -235,9 +240,7 @@ export default function OperatorCaseDetailPage() {
               <Spinner className="h-5 w-5 text-brand-600" />
             </div>
           ) : canBid && awaitingApproval ? (
-            <div className="op-alert info">
-              アカウントは承認待ちです。運営による審査完了後に入札できるようになります（案件の閲覧は承認前でも可能です）。
-            </div>
+            <ApprovalPendingNotice hasLicenseImage={hasLicense} />
           ) : canBid ? (
             <form className="form-card" onSubmit={submitBid}>
               <h2 style={{ fontFamily: "var(--head)", fontSize: 15, fontWeight: 400, color: "var(--navy)", marginBottom: 4, borderLeft: "2px solid var(--primary)", paddingLeft: 12 }}>
