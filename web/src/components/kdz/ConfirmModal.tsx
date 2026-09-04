@@ -56,9 +56,25 @@ export function ConfirmModal({
   const [password, setPassword] = useState("");
   const reasonMissing = withReason && reasonRequired && reason.trim() === "";
   const passwordMissing = withPassword && password === "";
+  /** 理由欄の上限。管理系エンドポイントの理由フィールドは概ね max_length=500（backend
+   *  schemas_katadzuke.py）のため、超過して 422 になるより先にクライアント側で防ぐ。 */
+  const REASON_MAX_LENGTH = 500;
+  /** パスワード欄の上限。signup/login と同じ max_length=128（backend schemas_katadzuke.py）。 */
+  const PASSWORD_MAX_LENGTH = 128;
+
+  function submit() {
+    if (busy || reasonMissing || passwordMissing) return;
+    onConfirm(withReason ? reason.trim() || null : null, withPassword ? password : undefined);
+  }
 
   const dialogRef = useRef<HTMLDivElement>(null);
   const cancelBtnRef = useRef<HTMLButtonElement>(null);
+  // Esc/背景クリックのイベントリスナーはマウント時に一度だけ登録するため、busy の最新値を
+  // 参照するには ref を使う（state を直接閉じ込めると初回マウント時点の値で固定されてしまう）。
+  const busyRef = useRef(busy);
+  useEffect(() => {
+    busyRef.current = busy;
+  }, [busy]);
 
   // マウント時: 開いた直前の要素を退避し、最初の操作可能要素（キャンセル）へフォーカスを移す。
   // アンマウント時: 退避しておいた要素へフォーカスを戻す（破壊的操作モーダルなので誤操作を防ぐため
@@ -72,9 +88,12 @@ export function ConfirmModal({
   }, []);
 
   // Esc で閉じる・Tab/Shift+Tab をダイアログ内に循環させる簡易フォーカストラップ。
+  // busy 中（送信処理の最中）は Esc での取消を無効化する（r8-fix-frontend4 L-1: in-flight の
+  // 結果表示が行き場を失う退会モーダル等の回帰防止）。Tab トラップ自体は busy 中も維持する。
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
+        if (busyRef.current) return;
         onCancel();
         return;
       }
@@ -102,7 +121,11 @@ export function ConfirmModal({
       aria-modal="true"
       aria-labelledby="kdzConfirmModalTitle"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      onClick={onCancel}
+      onClick={() => {
+        // busy 中（送信処理の最中）は背景クリックでの取消を無効化する（r8-fix-frontend4 L-1）。
+        if (busy) return;
+        onCancel();
+      }}
     >
       <div
         ref={dialogRef}
@@ -129,7 +152,11 @@ export function ConfirmModal({
               rows={2}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
+              maxLength={REASON_MAX_LENGTH}
             />
+            <p className="mt-1 text-xs text-slate-400">
+              個人情報や誹謗中傷は記載しないでください（残り{REASON_MAX_LENGTH - reason.length}文字）
+            </p>
             {reasonMissing ? (
               <p className="mt-1 text-xs text-red-600">理由を入力してください</p>
             ) : null}
@@ -144,9 +171,17 @@ export function ConfirmModal({
               id="kdzConfirmModalPassword"
               type="password"
               autoComplete="current-password"
+              maxLength={PASSWORD_MAX_LENGTH}
               className={`${inputBase} mt-1`}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => {
+                // Enter で確定（IME変換確定時の Enter は誤送信を招くため isComposing 中は除外）。
+                if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  submit();
+                }
+              }}
             />
             {passwordMissing ? (
               <p className="mt-1 text-xs text-red-600">パスワードを入力してください</p>
@@ -160,7 +195,7 @@ export function ConfirmModal({
           <button
             type="button"
             className={danger ? btnDanger : btnPrimary}
-            onClick={() => onConfirm(withReason ? reason.trim() || null : null, withPassword ? password : undefined)}
+            onClick={submit}
             disabled={busy || reasonMissing || passwordMissing}
           >
             {confirmLabel}

@@ -445,7 +445,11 @@ export default function OperatorTransactionPage() {
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
               rows={3}
+              maxLength={2000}
             />
+            <p className="modal-textarea-hint">
+              個人情報や誹謗中傷は記載しないでください（残り{2000 - cancelReason.length}文字）
+            </p>
             <div className="modal-actions">
               <button type="button" className="btn-modal-cancel" onClick={closeModal} disabled={busy}>
                 戻る

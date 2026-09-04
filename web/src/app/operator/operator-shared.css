@@ -355,6 +355,7 @@
   transition: border-color .2s;
 }
 .modal-textarea:focus { border-color: var(--blue); }
+.modal-textarea-hint { font-size: 11.5px; color: var(--body-soft); margin-top: 4px; line-height: 1.6; }
 
 /* ---------- 減額申請・キャンセル確認モーダル（B-2: window.confirm/prompt を置換） ---------- */
 .modal-overlay {

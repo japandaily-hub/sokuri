@@ -38,6 +38,9 @@ export interface OperatorOut {
   has_license_image: boolean;
   /** 業者都合でキャンセルした取引の累計件数（運営がキャンセル常習を検知する材料）。r8-fix-frontend2 M1 対応。 */
   cancel_count: number;
+  /** 退会（匿名化）済みの場合その日時。既定では一覧から除外されるが、include_deleted=true 時のみ
+   *  含まれて返る（r8-fix-frontend4: admin 一覧の退会バッジ・操作ボタン非表示判定に使用）。 */
+  deleted_at?: string | null;
 }
 
 export interface OperatorPublic {
@@ -1958,6 +1961,10 @@ export interface AdminListParams {
   status?: string;
   limit?: number;
   offset?: number;
+  /** true の場合、退会済み（匿名化済み・deleted_at 非null）業者も一覧に含める。
+   *  backend が対応するのは /admin/operators のみ（他エンドポイントは未対応の
+   *  クエリパラメータとして無視される）。既定は省略（backend 側の既定 false と同じ＝除外）。 */
+  includeDeleted?: boolean;
 }
 
 function buildAdminListQuery(params: AdminListParams): string {
@@ -1966,6 +1973,7 @@ function buildAdminListQuery(params: AdminListParams): string {
   if (params.status && params.status !== "all") sp.set("status", params.status);
   sp.set("limit", String(params.limit ?? ADMIN_LIST_DEFAULT_LIMIT));
   sp.set("offset", String(params.offset ?? 0));
+  if (params.includeDeleted) sp.set("include_deleted", "true");
   return sp.toString();
 }
 

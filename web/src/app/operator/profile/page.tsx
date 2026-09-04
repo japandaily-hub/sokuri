@@ -172,7 +172,9 @@ export default function OperatorProfilePage() {
     } catch (e) {
       // r8-review H-4 対応: 403 パスワード不一致 / 409 進行中の取引 / 429 レート制限を
       // 依頼者側（mypage/withdraw）と同じ語彙で区別して表示する。
-      if (e instanceof KdzApiError && e.status === 403) {
+      if (e instanceof KdzApiError && (e.status === 403 || e.status === 400)) {
+        // backend の誤パスワード応答は経路により 400/403 が混在する（r8-review 既知の非対称）。
+        // web 側は両方を同じ文言で扱い、依頼者側（mypage/withdraw）と体験を揃える（r8-fix-frontend4）。
         setWithdrawError(toDisplayMessage(e, "パスワードが正しくありません。"));
       } else if (e instanceof KdzApiError && e.status === 409) {
         setWithdrawError(toDisplayMessage(e, "進行中の取引があるため退会できません。"));

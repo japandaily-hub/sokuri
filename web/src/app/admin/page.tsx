@@ -77,6 +77,9 @@ export default function AdminPage() {
   const [operatorSearchInput, setOperatorSearchInput] = useState("");
   const [operatorSearchQuery, setOperatorSearchQuery] = useState("");
   const [operatorOffset, setOperatorOffset] = useState(0);
+  // r8-fix-frontend4: 退会済み業者は既定で一覧・counts から除外される（backend 既定 include_deleted=false）。
+  // 運営が「一覧から消えた業者」を判別できるよう、明示トグルで含める。
+  const [includeDeletedOperators, setIncludeDeletedOperators] = useState(false);
   const [inviteOffset, setInviteOffset] = useState(0);
 
   /** 事前申込の未審査（status==="received"）件数（ナビのバッジ用）。
@@ -151,7 +154,13 @@ export default function AdminPage() {
     const [invResult, opsResult, densityResult, appsResult] = await Promise.allSettled([
       adminListInvites({ limit: ADMIN_LIST_DEFAULT_LIMIT, offset: inviteOffset }, token),
       adminListOperators(
-        { status: statusFilter, q: operatorSearchQuery, limit: ADMIN_LIST_DEFAULT_LIMIT, offset: operatorOffset },
+        {
+          status: statusFilter,
+          q: operatorSearchQuery,
+          limit: ADMIN_LIST_DEFAULT_LIMIT,
+          offset: operatorOffset,
+          includeDeleted: includeDeletedOperators,
+        },
         token,
       ),
       adminGetCellDensity(token),
@@ -189,7 +198,7 @@ export default function AdminPage() {
     }
 
     setInitialLoadDone(true);
-  }, [token, inviteOffset, operatorOffset, statusFilter, operatorSearchQuery]);
+  }, [token, inviteOffset, operatorOffset, statusFilter, operatorSearchQuery, includeDeletedOperators]);
 
   useEffect(() => {
     void reload();
@@ -328,6 +337,11 @@ export default function AdminPage() {
   function runOperatorSearch() {
     setOperatorOffset(0);
     setOperatorSearchQuery(operatorSearchInput.trim());
+  }
+
+  function toggleIncludeDeletedOperators() {
+    setOperatorOffset(0);
+    setIncludeDeletedOperators((prev) => !prev);
   }
 
   function copyCode(code: string) {
@@ -561,12 +575,23 @@ export default function AdminPage() {
               検索
             </button>
           </div>
+          <label className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
+            <input
+              type="checkbox"
+              checked={includeDeletedOperators}
+              onChange={toggleIncludeDeletedOperators}
+            />
+            退会済みを含める
+          </label>
           <ul className="mt-4 divide-y divide-slate-100">
             {operators?.map((op) => {
               const statusInfo = VENDOR_STATUS_LABEL[op.vendor_status] ?? {
                 label: op.vendor_status,
                 badgeValue: "pending",
               };
+              // r8-fix-frontend4: 退会（匿名化）済み業者は backend 側が verify/suspend を 409 で
+              // 拒否するため、操作ボタン自体を出さずバッジで理由を示す（include_deleted=true 時のみ表示対象）。
+              const isDeleted = Boolean(op.deleted_at);
               return (
                 <li key={op.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
                   <div>
@@ -576,6 +601,7 @@ export default function AdminPage() {
                       {op.license_number ? ` ・ ${op.license_number}` : ""}
                     </p>
                     <div className="mt-1 flex gap-1.5">
+                      {isDeleted ? <StatusBadge value="cancelled" label="退会済み" /> : null}
                       <StatusBadge
                         value={statusInfo.badgeValue as "completed" | "pending" | "rejected"}
                         label={statusInfo.label}
@@ -592,43 +618,47 @@ export default function AdminPage() {
                       ) : null}
                     </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void openLicenseModal(op)}
-                      disabled={!op.has_license_image}
-                      className={btnSecondary}
-                    >
-                      許可証画像を確認
-                    </button>
-                    <div className="flex flex-col items-end gap-1">
+                  {isDeleted ? (
+                    <p className="text-xs text-slate-400">退会済みのため操作できません</p>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => openVerifyModal(op)}
-                        disabled={
-                          busy || op.is_suspended || (op.vendor_status !== "active" && !op.has_license_image)
-                        }
-                        className={op.vendor_status === "active" ? btnSecondary : btnPrimary}
+                        onClick={() => void openLicenseModal(op)}
+                        disabled={!op.has_license_image}
+                        className={btnSecondary}
                       >
-                        {op.vendor_status === "active" ? "承認を取消" : "承認する"}
+                        許可証画像を確認
                       </button>
-                      {op.is_suspended ? (
-                        <p className="text-xs text-red-600">停止中です。承認状態の変更は停止解除後に行ってください</p>
-                      ) : op.vendor_status !== "active" && !op.has_license_image ? (
-                        <p className="text-xs text-red-600">
-                          許可証画像が未提出のため承認できません
-                        </p>
-                      ) : null}
+                      <div className="flex flex-col items-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => openVerifyModal(op)}
+                          disabled={
+                            busy || op.is_suspended || (op.vendor_status !== "active" && !op.has_license_image)
+                          }
+                          className={op.vendor_status === "active" ? btnSecondary : btnPrimary}
+                        >
+                          {op.vendor_status === "active" ? "承認を取消" : "承認する"}
+                        </button>
+                        {op.is_suspended ? (
+                          <p className="text-xs text-red-600">停止中です。承認状態の変更は停止解除後に行ってください</p>
+                        ) : op.vendor_status !== "active" && !op.has_license_image ? (
+                          <p className="text-xs text-red-600">
+                            許可証画像が未提出のため承認できません
+                          </p>
+                        ) : null}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openSuspendModal(op)}
+                        disabled={busy}
+                        className={op.is_suspended ? btnPrimary : btnDanger}
+                      >
+                        {op.is_suspended ? "停止を解除" : "停止する"}
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => openSuspendModal(op)}
-                      disabled={busy}
-                      className={op.is_suspended ? btnPrimary : btnDanger}
-                    >
-                      {op.is_suspended ? "停止を解除" : "停止する"}
-                    </button>
-                  </div>
+                  )}
                 </li>
               );
             })}

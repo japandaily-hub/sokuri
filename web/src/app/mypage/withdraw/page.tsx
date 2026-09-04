@@ -135,7 +135,9 @@ export default function WithdrawPage() {
       await signOut({ redirect: false });
       setDone(true);
     } catch (e) {
-      if (e instanceof KdzApiError && e.status === 400) {
+      if (e instanceof KdzApiError && (e.status === 400 || e.status === 403)) {
+        // backend の誤パスワード応答は経路により 400/403 が混在する（r8-review 既知の非対称）。
+        // web 側は両方を同じ文言で扱い、ユーザー体験の分岐を作らない（r8-fix-frontend4）。
         setPwErr(toDisplayMessage(e, "パスワードが正しくありません。"));
       } else if (e instanceof KdzApiError && e.status === 409) {
         setDeleteError(toDisplayMessage(e, "進行中のお取引があるため退会できません。"));
