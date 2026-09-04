@@ -727,6 +727,8 @@ export interface BankAccountUpdatePayload {
   account_number: string;
   /** 全角カタカナ。 */
   account_holder_kana: string;
+  /** has_password === true のユーザーは必須（未入力→422、不一致→400）。LINE専用ユーザーは省略可。 */
+  current_password?: string | null;
 }
 
 export function getMyBankAccount(token: string): Promise<BankAccountOut> {
@@ -744,8 +746,19 @@ export function updateMyBankAccount(
   });
 }
 
-export function deleteMyBankAccount(token: string): Promise<void> {
-  return request("/users/me/bank-account", { method: "DELETE", token });
+/**
+ * 振込口座を削除する。has_password === true のユーザーは currentPassword が必須
+ * （未入力→422、不一致→400）。LINE専用ユーザー（has_password === false）は null を渡してよい。
+ */
+export function deleteMyBankAccount(
+  currentPassword: string | null,
+  token: string,
+): Promise<void> {
+  return request("/users/me/bank-account", {
+    method: "DELETE",
+    body: JSON.stringify({ current_password: currentPassword }),
+    token,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -754,7 +767,7 @@ export function deleteMyBankAccount(token: string): Promise<void> {
 
 /** 書類種別の内部トークン。backend の doc_type と1:1対応する。 */
 export type IdentityDocType =
-  | "driver_license"
+  | "drivers_license"
   | "my_number_card"
   | "passport"
   | "residence_card"
@@ -774,7 +787,7 @@ export const IDENTITY_DOC_TYPES: {
   backRequired: boolean;
   note?: string;
 }[] = [
-  { id: "driver_license", label: "運転免許証", backRequired: true },
+  { id: "drivers_license", label: "運転免許証", backRequired: true },
   {
     id: "my_number_card",
     label: "マイナンバーカード",

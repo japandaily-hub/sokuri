@@ -3,6 +3,7 @@
 /** 管理画面: 招待コード発行（単発/バルク）/ 業者承認 / セル密度監視（role=admin のみ）。 */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Spinner } from "@/components/Icon";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import {
@@ -294,7 +295,15 @@ export default function AdminPage() {
   return (
     <div className="admin-page">
       <AppHeader showBell={false} />
-      <PageShell title="管理画面" description="業者招待コードの発行・アカウント承認・セル密度を管理します。">
+      <PageShell
+        title="管理画面"
+        description="業者招待コードの発行・アカウント承認・セル密度を管理します。"
+        actions={
+          <Link href="/admin/identity-documents" className={btnSecondary}>
+            本人確認書類の審査へ
+          </Link>
+        }
+      >
       {error ? (
         <div className="mb-4">
           <Notice tone="error">{error}</Notice>

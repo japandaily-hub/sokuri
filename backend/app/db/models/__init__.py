@@ -37,6 +37,7 @@ from app.db.models.bid import Bid, BidWithdrawal
 from app.db.models.message import Message
 from app.db.models.transaction import Cancellation, ReductionRequest, Review, Transaction
 from app.db.models.user import User
+from app.db.models.user_identity_document import UserIdentityDocument
 from app.db.models.invite import Invite
 
 __all__ = [
@@ -70,5 +71,6 @@ __all__ = [
     "Review",
     "Cancellation",
     "User",
+    "UserIdentityDocument",
     "Invite",
 ]

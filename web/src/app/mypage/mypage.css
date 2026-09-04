@@ -153,6 +153,38 @@
   text-decoration: none;
 }
 
+/* 会員情報の入力状況カード */
+.member-status-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px 20px 4px;
+  margin-bottom: 20px;
+}
+.member-status-title {
+  font-family: var(--head);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--body-soft);
+  margin-bottom: 4px;
+}
+.member-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line-soft);
+  text-decoration: none;
+  color: inherit;
+}
+.member-status-row:last-child {
+  border-bottom: none;
+}
+.member-status-label {
+  font-size: 14px;
+  color: var(--navy);
+}
+
 /* タブ */
 .my-tabs {
   display: flex;

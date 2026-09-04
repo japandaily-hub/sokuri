@@ -6,21 +6,35 @@ import logging
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
+from typing import Literal
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
-from sqlalchemy import func, select, text
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi.responses import Response
+from sqlalchemy import func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_admin
 from app.core.crypto import decrypt_json
+from app.core.masking import mask_account_number
 from app.db.models.case import Case
 from app.db.models.invite import Invite
 from app.db.models.operator import Operator
 from app.db.models.operator_application import OperatorApplication
-from app.db.models.user import User
+from app.db.models.user import (
+    IDENTITY_STATUS_APPROVED,
+    IDENTITY_STATUS_REJECTED,
+    User,
+)
+from app.db.models.user_identity_document import (
+    DOCUMENT_STATUS_APPROVED,
+    DOCUMENT_STATUS_PENDING,
+    DOCUMENT_STATUS_REJECTED,
+    UserIdentityDocument,
+)
 from app.db.session import get_session
 from app.schemas_katadzuke import (
     BankAccountMaskedOut,
+    IdentityDocumentRejectRequest,
     InviteBulkCreateRequest,
     InviteBulkCreateResponse,
     InviteCreateRequest,
@@ -32,6 +46,7 @@ from app.schemas_katadzuke import (
     OperatorOut,
     OperatorSuspendRequest,
     OperatorVerifyRequest,
+    UserIdentityDocumentAdminOut,
 )
 from app.services import notify
 
@@ -52,13 +67,6 @@ async def _issue_unique_invite_code(session: AsyncSession) -> str:
     return code
 
 
-def _mask_account_number(account_number: str) -> str:
-    """口座番号の下4桁のみ残しマスクする。4桁以下はそのまま返さず全マスクする。"""
-    if len(account_number) <= 4:
-        return "*" * len(account_number)
-    return "*" * (len(account_number) - 4) + account_number[-4:]
-
-
 def _to_application_out(application: OperatorApplication) -> OperatorApplicationOut:
     bank_account_masked: BankAccountMaskedOut | None = None
     if application.bank_account_enc:
@@ -68,7 +76,7 @@ def _to_application_out(application: OperatorApplication) -> OperatorApplication
                 bank_name=decrypted["bank_name"],
                 branch_name=decrypted["branch_name"],
                 account_type=decrypted["account_type"],
-                account_number_masked=_mask_account_number(decrypted["account_number"]),
+                account_number_masked=mask_account_number(decrypted["account_number"]),
                 account_holder=decrypted["account_holder"],
             )
         except Exception as exc:
@@ -419,3 +427,273 @@ async def reject_operator_application(
         admin.id,
     )
     return _to_application_out(application)
+
+
+# ──────────────────────────── 依頼者の本人確認書類（審査） ────────────────────────────
+
+_IDENTITY_DOCUMENT_NOT_FOUND = HTTPException(
+    status_code=status.HTTP_404_NOT_FOUND, detail="本人確認書類が見つかりません。"
+)
+_IDENTITY_DOCUMENT_ALREADY_REVIEWED = HTTPException(
+    status_code=status.HTTP_409_CONFLICT, detail="この本人確認書類は既に審査済みです。"
+)
+_IDENTITY_DOCUMENT_ERASED = HTTPException(
+    status_code=status.HTTP_410_GONE, detail="この書類は退会により削除されています。"
+)
+
+
+async def _get_identity_document_or_404(
+    session: AsyncSession, document_id: uuid.UUID
+) -> UserIdentityDocument:
+    document = await session.get(UserIdentityDocument, document_id)
+    if document is None:
+        raise _IDENTITY_DOCUMENT_NOT_FOUND
+    return document
+
+
+@router.get(
+    "/admin/identity-documents",
+    response_model=list[UserIdentityDocumentAdminOut],
+    summary="依頼者の本人確認書類一覧（既定 status=pending）",
+)
+async def list_identity_documents(
+    status_filter: Literal["pending", "approved", "rejected", "all"] = Query(
+        default="pending", alias="status"
+    ),
+    admin: User = Depends(get_current_admin),
+    session: AsyncSession = Depends(get_session),
+) -> list[UserIdentityDocumentAdminOut]:
+    # BLOB本体（front_image_data/back_image_data）は一覧に一切含めない（deferred属性の
+    # 意図しないロードを避けるため、Core の列指定 select で必要な列のみ取得する）。
+    stmt = (
+        select(
+            UserIdentityDocument.id,
+            UserIdentityDocument.user_id,
+            User.email,
+            User.name,
+            UserIdentityDocument.doc_type,
+            UserIdentityDocument.status,
+            UserIdentityDocument.submitted_at,
+            UserIdentityDocument.reviewed_at,
+            UserIdentityDocument.reject_reason,
+            UserIdentityDocument.back_image_data.isnot(None),
+        )
+        .join(User, UserIdentityDocument.user_id == User.id)
+        # 退会（匿名化）済みユーザーの書類は審査対象外のため一覧から除外する
+        # （QA M-2。画像本体は退会時に既に消去済みだが、行・審査履歴は保持される
+        # ため JOIN だけでは自然には消えない）。
+        .where(User.deleted_at.is_(None))
+        .order_by(UserIdentityDocument.submitted_at.desc())
+    )
+    if status_filter != "all":
+        stmt = stmt.where(UserIdentityDocument.status == status_filter)
+
+    rows = (await session.execute(stmt)).all()
+    # PII本体（氏名・メール等）はログに書かず、監査に必要な操作主体・件数・
+    # フィルタ条件のみ記録する（M-3）。
+    logger.info(
+        "admin: 本人確認書類一覧を取得しました - status=%s count=%d admin_id=%s admin_email=%s",
+        status_filter,
+        len(rows),
+        admin.id,
+        admin.email,
+    )
+    return [
+        UserIdentityDocumentAdminOut(
+            id=row[0],
+            user_id=row[1],
+            user_email=row[2],
+            user_name=row[3],
+            doc_type=row[4],
+            status=row[5],
+            submitted_at=row[6],
+            reviewed_at=row[7],
+            reject_reason=row[8],
+            has_back=bool(row[9]),
+        )
+        for row in rows
+    ]
+
+
+@router.get(
+    "/admin/identity-documents/{document_id}/file",
+    summary="依頼者の本人確認書類の画像を取得（admin限定・アクセスをログ記録）",
+)
+async def get_identity_document_file_admin(
+    document_id: uuid.UUID,
+    side: Literal["front", "back"] = Query(...),
+    admin: User = Depends(get_current_admin),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    if side == "front":
+        columns = (UserIdentityDocument.front_image_data, UserIdentityDocument.front_image_content_type)
+    else:
+        columns = (UserIdentityDocument.back_image_data, UserIdentityDocument.back_image_content_type)
+    row = (
+        await session.execute(select(*columns).where(UserIdentityDocument.id == document_id))
+    ).first()
+    if row is None or row[0] is None:
+        raise _IDENTITY_DOCUMENT_NOT_FOUND
+    data, content_type = row
+    logger.info(
+        "admin: 本人確認書類を閲覧しました - document_id=%s side=%s admin_id=%s admin_email=%s",
+        document_id,
+        side,
+        admin.id,
+        admin.email,
+    )
+    return Response(
+        content=data,
+        media_type=content_type or "application/octet-stream",
+        headers={"Cache-Control": "private, no-store"},
+    )
+
+
+@router.patch(
+    "/admin/identity-documents/{document_id}/approve",
+    response_model=UserIdentityDocumentAdminOut,
+    summary="本人確認書類を承認する（pending以外は409）",
+)
+async def approve_identity_document(
+    document_id: uuid.UUID,
+    admin: User = Depends(get_current_admin),
+    session: AsyncSession = Depends(get_session),
+) -> UserIdentityDocumentAdminOut:
+    # front_image_data は deferred のため Core の列指定 select で明示取得する
+    # （operator_license.py と同じ理由）。退会（匿名化）で画像本体のみ消去された
+    # 書類は審査対象外として 410 で拒否する（QA M-2）。
+    row = (
+        await session.execute(
+            select(UserIdentityDocument.front_image_data.isnot(None)).where(
+                UserIdentityDocument.id == document_id
+            )
+        )
+    ).first()
+    if row is None:
+        raise _IDENTITY_DOCUMENT_NOT_FOUND
+    if not row[0]:
+        raise _IDENTITY_DOCUMENT_ERASED
+
+    # TOCTOU対策（security review M-2）: SELECTで確認してからORMで更新すると、
+    # 管理画面の多重クリックや複数管理者の同時操作で2回承認処理が走りうる。
+    # 「pendingである」ことを WHERE 条件に含めた条件付き UPDATE にすることで、
+    # 判定と更新をDB側でアトミックに行う（rowcount==0 なら既に審査済み）。
+    now = datetime.now(timezone.utc)
+    result = await session.execute(
+        update(UserIdentityDocument)
+        .where(
+            UserIdentityDocument.id == document_id,
+            UserIdentityDocument.status == DOCUMENT_STATUS_PENDING,
+        )
+        .values(status=DOCUMENT_STATUS_APPROVED, reviewed_by=admin.id, reviewed_at=now)
+    )
+    if result.rowcount == 0:
+        raise _IDENTITY_DOCUMENT_ALREADY_REVIEWED
+
+    document = await _get_identity_document_or_404(session, document_id)
+    user = await session.get(User, document.user_id)
+    if user is not None:
+        user.identity_status = IDENTITY_STATUS_APPROVED
+
+    await session.commit()
+    await session.refresh(document)
+
+    has_back = await session.scalar(
+        select(UserIdentityDocument.back_image_data.isnot(None)).where(
+            UserIdentityDocument.id == document.id
+        )
+    )
+    logger.info(
+        "admin: 本人確認書類を承認しました - document_id=%s user_id=%s admin_id=%s",
+        document.id,
+        document.user_id,
+        admin.id,
+    )
+    return UserIdentityDocumentAdminOut(
+        id=document.id,
+        user_id=document.user_id,
+        user_email=user.email if user is not None else "",
+        user_name=user.name if user is not None else None,
+        doc_type=document.doc_type,
+        status=document.status,
+        submitted_at=document.submitted_at,
+        reviewed_at=document.reviewed_at,
+        reject_reason=document.reject_reason,
+        has_back=bool(has_back),
+    )
+
+
+@router.patch(
+    "/admin/identity-documents/{document_id}/reject",
+    response_model=UserIdentityDocumentAdminOut,
+    summary="本人確認書類を却下する（pending以外は409）",
+)
+async def reject_identity_document(
+    document_id: uuid.UUID,
+    body: IdentityDocumentRejectRequest,
+    admin: User = Depends(get_current_admin),
+    session: AsyncSession = Depends(get_session),
+) -> UserIdentityDocumentAdminOut:
+    # approve_identity_document と同じ理由（front_image_data は deferred・
+    # 退会消去済みは審査対象外として410）。
+    row = (
+        await session.execute(
+            select(UserIdentityDocument.front_image_data.isnot(None)).where(
+                UserIdentityDocument.id == document_id
+            )
+        )
+    ).first()
+    if row is None:
+        raise _IDENTITY_DOCUMENT_NOT_FOUND
+    if not row[0]:
+        raise _IDENTITY_DOCUMENT_ERASED
+
+    # TOCTOU対策（security review M-2。approve_identity_document と同じ理由）。
+    now = datetime.now(timezone.utc)
+    result = await session.execute(
+        update(UserIdentityDocument)
+        .where(
+            UserIdentityDocument.id == document_id,
+            UserIdentityDocument.status == DOCUMENT_STATUS_PENDING,
+        )
+        .values(
+            status=DOCUMENT_STATUS_REJECTED,
+            reviewed_by=admin.id,
+            reviewed_at=now,
+            reject_reason=body.reject_reason,
+        )
+    )
+    if result.rowcount == 0:
+        raise _IDENTITY_DOCUMENT_ALREADY_REVIEWED
+
+    document = await _get_identity_document_or_404(session, document_id)
+    user = await session.get(User, document.user_id)
+    if user is not None:
+        user.identity_status = IDENTITY_STATUS_REJECTED
+
+    await session.commit()
+    await session.refresh(document)
+
+    has_back = await session.scalar(
+        select(UserIdentityDocument.back_image_data.isnot(None)).where(
+            UserIdentityDocument.id == document.id
+        )
+    )
+    logger.info(
+        "admin: 本人確認書類を却下しました - document_id=%s user_id=%s admin_id=%s",
+        document.id,
+        document.user_id,
+        admin.id,
+    )
+    return UserIdentityDocumentAdminOut(
+        id=document.id,
+        user_id=document.user_id,
+        user_email=user.email if user is not None else "",
+        user_name=user.name if user is not None else None,
+        doc_type=document.doc_type,
+        status=document.status,
+        submitted_at=document.submitted_at,
+        reviewed_at=document.reviewed_at,
+        reject_reason=document.reject_reason,
+        has_back=bool(has_back),
+    )

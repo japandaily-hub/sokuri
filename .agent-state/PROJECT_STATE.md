@@ -35,6 +35,17 @@
   M-1（operator-shared.css が /operator/transactions 系にも波及）は差分目視で「テーマ整合のみ」と判断、実機スクショ未実施。
 - alembic: 単一ヘッド（0020_bid_withdrawal_fk_restrict）。
 
+## 依頼者マイページ拡張（2026-09-04）
+- 実装済み・ローカルコミット済み・未 push: 本人情報（生年月日・職業）／住所（郵便番号〜建物名、都道府県→エリア自動同期）／
+  本人確認書類（運転免許証・マイナンバーカード表面のみ・パスポート・在留カード・健康保険証。DB BYTEA 保存・本人/admin のみ配信・
+  admin 審査 /admin/identity-documents）／振込口座（Fernet 暗号化・下4桁表示・パスワード再確認。LINE 専用ユーザーは
+  直近10分以内のトークンのみ許可・LINE Push + メール通知）／ダッシュボードの入力状況カード。
+- alembic: 0021（bid_withdrawals 追記専用トリガー）→ 0022（users PII 列）→ 0023（user_identity_documents）。
+- レビュー: セキュリティ High 1（口座変更の再認証なし）→ 是正、再レビューで LINE 専用ユーザーの穴 → step-up + 通知で是正。
+  QA Medium 4 → 全て対応。backend 651 passed、web tsc エラー0。
+- スコープ外（未実装）: eKYC 顔照合、業者への開示範囲変更、振込実行、admin による依頼者口座の復号開示、書類の法定保存期間バッチ。
+- 運用: 本番の APP_ENCRYPTION_KEY が Render に設定済みかは口座保存の実機で確認する（未設定なら 500）。
+
 ## 未解決ブロッカー
 - なし（push はユーザー判断）。
 
