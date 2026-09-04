@@ -13,8 +13,8 @@
  * 会社名・古物商許可番号・審査状況（vendor_status。verified_at は招待コード登録では
  * 更新されない旧・手動承認フィールドのため判定に使わない）は審査確定項目のため
  * 読み取り専用表示のみ（PUT には含めない）。編集可能項目（areas / categories /
- * strong_categories / staff_count / business_hours / intro_message / is_public /
- * show_stats / show_reviews / show_message / accept_unsellable）のみ保存対象。
+ * strong_categories / staff_count / business_hours / intro_message /
+ * show_message / accept_unsellable）のみ保存対象。評価・口コミは常時公開（非表示スイッチは撤去済み）。
  * 画像アップロードは今回もスコープ外（デモ挙動のまま）。
  */
 
@@ -64,11 +64,8 @@ const CATEGORIES: { id: string; name: string; icon: IcName }[] = [
 ];
 
 /* ---- 公開情報トグル（バックエンドフィールド名にマッピング） ---- */
-type ToggleKey = "showStats" | "showReviews" | "showMessage" | "acceptUnsellable" | "publicListed";
+type ToggleKey = "showMessage" | "acceptUnsellable";
 const TOGGLES: { key: ToggleKey; title: string; desc: string }[] = [
-  { key: "publicListed", title: "プロフィールを公開する", desc: "オフにすると入札先のユーザーにプロフィールが表示されません。" },
-  { key: "showStats", title: "実績数を公開する", desc: "成約実績・入札履行率・平均引き取り日数を表示します。" },
-  { key: "showReviews", title: "口コミを公開する", desc: "成約ユーザーからの評価・口コミを表示します。" },
   { key: "showMessage", title: "業者メッセージを公開する", desc: "自己紹介メッセージをプロフィール上部に表示します。" },
   { key: "acceptUnsellable", title: "値のつかない物もまとめて引き取る", desc: "「まとめて回収可」のバッジが付与され、一括出品の案件で選ばれやすくなります。" },
 ];
@@ -92,9 +89,6 @@ const EMPTY_STATE: ProfileState = {
   cats: {},
   strong: {},
   toggles: {
-    publicListed: true,
-    showStats: true,
-    showReviews: true,
     showMessage: true,
     acceptUnsellable: false,
   },
@@ -116,9 +110,6 @@ function toFormState(p: OperatorProfile): ProfileState {
     cats: Object.fromEntries(p.categories.map((c) => [c, true])),
     strong: Object.fromEntries(p.strong_categories.map((c) => [c, true])),
     toggles: {
-      publicListed: p.is_public,
-      showStats: p.show_stats,
-      showReviews: p.show_reviews,
       showMessage: p.show_message,
       acceptUnsellable: p.accept_unsellable,
     },
@@ -138,9 +129,6 @@ function toUpdatePayload(s: ProfileState) {
     staff_count: staffCount != null && Number.isFinite(staffCount) ? staffCount : null,
     business_hours: s.hours.trim() || null,
     intro_message: s.message.trim() || null,
-    is_public: s.toggles.publicListed,
-    show_stats: s.toggles.showStats,
-    show_reviews: s.toggles.showReviews,
     show_message: s.toggles.showMessage,
     accept_unsellable: s.toggles.acceptUnsellable,
   };
@@ -590,6 +578,9 @@ export default function OperatorProfilePage() {
                 <span className="head-sub">ユーザーへの見え方</span>
               </div>
               <div className="prof-card-body" style={{ paddingTop: 6, paddingBottom: 6 }}>
+                <p className="field-hint" style={{ margin: "8px 0 4px", fontSize: 13 }}>
+                  評価と口コミは、成約したユーザーからの投稿をそのまま常時公開しています（非表示にはできません）。
+                </p>
                 {TOGGLES.map((t) => {
                   const on = !!state.toggles[t.key];
                   return (

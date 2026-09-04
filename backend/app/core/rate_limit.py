@@ -77,6 +77,8 @@ class RateLimitConfig:
     # （既存フィールドはデフォルト無しのため、この2フィールドは末尾に追加する）。
     case_create_ip: RateLimitRule = RateLimitRule(10, 3600)
     case_create_account: RateLimitRule = RateLimitRule(10, 3600)
+    # 無認証の公開参照（業者一覧・公開プロフィール）。IP軸・全リクエストカウント。
+    public_read_ip: RateLimitRule = RateLimitRule(120, 60)
 
 
 class RateLimitStore(Protocol):

@@ -112,6 +112,9 @@ class OperatorPublicOut(BaseModel):
     company_name: str
     rating: float | None
     verified_at: datetime | None
+    # 口コミは常時公開（2026-09-04 決定）。入札一覧で「★平均 (件数)」と抜粋を出す。
+    review_count: int = 0
+    latest_review_comment: str | None = None
 
 
 class AuthTokenResponse(BaseModel):
@@ -697,7 +700,15 @@ class ReductionOut(BaseModel):
 class ReviewCreateRequest(BaseModel):
     transaction_id: uuid.UUID
     rating: int = Field(ge=1, le=5)
-    comment: str | None = Field(default=None, max_length=2000)
+    # 口コミ本文は無認証の公開プロフィール・業者一覧にそのまま掲載されるため、
+    # 他の自由入力（品目名・入札メッセージ・自己紹介文）と同じ無害化を必須にする
+    # （NFKC 正規化・制御文字除去・連絡先/URL 拒否。security review H-1 対応）。
+    comment: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("comment")
+    @classmethod
+    def _sanitize_comment(cls, v: str | None) -> str | None:
+        return _sanitize_free_text(v, max_length=1000, field_label="口コミ")
 
 
 class ReviewOut(BaseModel):
@@ -709,6 +720,15 @@ class ReviewOut(BaseModel):
     rating: int
     comment: str | None
     created_at: datetime
+    # 運営が非表示にした日時（公開プロフィール・集計から除外される）。
+    hidden_at: datetime | None = None
+
+
+class ReviewHideRequest(BaseModel):
+    """運営による口コミの非表示／再表示（admin 専用）。物理削除はせず論理削除で証跡を残す。"""
+
+    hidden: bool
+    reason: str | None = Field(default=None, max_length=200)
 
 
 class PublicReviewOut(BaseModel):
@@ -916,11 +936,10 @@ class OperatorProfileOut(BaseModel):
     staff_count: int | None = None
     business_hours: str | None = None
     intro_message: str | None = None
-    is_public: bool = True
-    show_stats: bool = True
-    show_reviews: bool = True
+    # is_public / show_stats / show_reviews は撤去（口コミ・評価は常時公開。DB列は残置）。
     show_message: bool = True
     accept_unsellable: bool = False
+    review_count: int = 0
     # 許可証画像のアップロード有無・時刻（BLOB本体は含めない）。
     license_image_uploaded_at: datetime | None = None
 
@@ -934,15 +953,29 @@ class OperatorProfileUpdateRequest(BaseModel):
     staff_count: int | None = Field(default=None, ge=0, le=100_000)
     business_hours: str | None = Field(default=None, max_length=255)
     intro_message: str | None = Field(default=None, max_length=500)
-    is_public: bool = True
-    show_stats: bool = True
-    show_reviews: bool = True
     show_message: bool = True
     accept_unsellable: bool = False
 
+    @field_validator("areas", "categories", "strong_categories")
+    @classmethod
+    def _validate_list_items(cls, v: list[str]) -> list[str]:
+        """公開一覧に無認証で載る項目のため、要素ごとに長さと連絡先/URL 混入を検査する
+        （security review M-3 対応。intro_message と同じガード）。"""
+        cleaned: list[str] = []
+        for item in v:
+            text = normalize_and_strip_control_chars(item)
+            if not text:
+                continue
+            if len(text) > 32:
+                raise ValueError("エリア・カテゴリは1件あたり32文字以内で指定してください。")
+            if contains_contact_info(text):
+                raise ValueError("エリア・カテゴリに電話番号・メールアドレス・URLは記載できません。")
+            cleaned.append(text)
+        return cleaned
+
 
 class OperatorPublicProfileOut(BaseModel):
-    """公開プロフィール（/vendors/{operator_id}）。show_* フラグに応じて項目を省く。"""
+    """公開プロフィール（/vendors/{operator_id}）。評価・口コミは常時公開。"""
 
     operator_id: uuid.UUID
     company_name: str
@@ -958,7 +991,22 @@ class OperatorPublicProfileOut(BaseModel):
     intro_message: str | None = None
     accept_unsellable: bool = False
     rating: float | None = None
-    reviews: list[PublicReviewOut] | None = None
+    review_count: int = 0
+    reviews: list[PublicReviewOut] = []
+
+
+class OperatorPublicListItemOut(BaseModel):
+    """業者一覧（GET /vendors）の1行。承認済み・停止中でない業者のみ。"""
+
+    operator_id: uuid.UUID
+    company_name: str
+    is_approved: bool = True
+    areas: list[str] = []
+    strong_categories: list[str] = []
+    accept_unsellable: bool = False
+    rating: float | None = None
+    review_count: int = 0
+    latest_review_comment: str | None = None
 
 
 # 前方参照の解決

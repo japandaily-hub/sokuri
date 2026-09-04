@@ -40,6 +40,10 @@ export interface OperatorPublic {
   company_name: string;
   rating: number | null;
   verified_at: string | null;
+  /** 顧客→業者レビューの件数（口コミは常時公開）。 */
+  review_count: number;
+  /** 最新の口コミ本文の抜粋（無ければ null）。 */
+  latest_review_comment: string | null;
 }
 
 export interface AuthTokenResponse {
@@ -325,11 +329,10 @@ export interface OperatorProfile {
   staff_count: number | null;
   business_hours: string | null;
   intro_message: string | null;
-  is_public: boolean;
-  show_stats: boolean;
-  show_reviews: boolean;
   show_message: boolean;
   accept_unsellable: boolean;
+  /** 顧客→業者レビューの件数。評価・口コミは常時公開。 */
+  review_count: number;
   /** 許可証画像の最終アップロード日時。未提出の場合 null。 */
   license_image_uploaded_at: string | null;
 }
@@ -341,9 +344,6 @@ export interface OperatorProfileUpdatePayload {
   staff_count: number | null;
   business_hours: string | null;
   intro_message: string | null;
-  is_public: boolean;
-  show_stats: boolean;
-  show_reviews: boolean;
   show_message: boolean;
   accept_unsellable: boolean;
 }
@@ -426,11 +426,29 @@ export interface OperatorPublicProfile {
   intro_message: string | null;
   accept_unsellable: boolean;
   rating: number | null;
-  reviews: PublicReview[] | null;
+  review_count: number;
+  reviews: PublicReview[];
 }
 
 export function getVendorPublicProfile(operatorId: string): Promise<OperatorPublicProfile> {
   return request(`/vendors/${operatorId}`);
+}
+
+/** 業者一覧（GET /vendors）の1行。承認済み・停止中でない業者のみ。個人情報は含まない。 */
+export interface VendorListItem {
+  operator_id: string;
+  company_name: string;
+  is_approved: boolean;
+  areas: string[];
+  strong_categories: string[];
+  accept_unsellable: boolean;
+  rating: number | null;
+  review_count: number;
+  latest_review_comment: string | null;
+}
+
+export function getVendors(): Promise<VendorListItem[]> {
+  return request(`/vendors`);
 }
 
 export interface InviteOut {

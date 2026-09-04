@@ -1634,9 +1634,6 @@ async def test_operator_profile_strong_categories_must_be_subset(
             "areas": ["東京都"],
             "categories": ["家電", "家具"],
             "strong_categories": ["家電", "書籍"],
-            "is_public": True,
-            "show_stats": True,
-            "show_reviews": True,
             "show_message": True,
             "accept_unsellable": False,
         },
@@ -1663,9 +1660,6 @@ async def test_operator_profile_intro_message_with_contact_info_rejected_422(
             "categories": ["家電"],
             "strong_categories": ["家電"],
             "intro_message": "ご相談はお電話ください 090-1234-5678 まで",
-            "is_public": True,
-            "show_stats": True,
-            "show_reviews": True,
             "show_message": True,
             "accept_unsellable": False,
         },
@@ -1696,9 +1690,6 @@ async def test_operator_profile_intro_message_without_contact_info_accepted(
             "categories": ["家電"],
             "strong_categories": ["家電"],
             "intro_message": "丁寧に対応いたします。よろしくお願いします。",
-            "is_public": True,
-            "show_stats": True,
-            "show_reviews": True,
             "show_message": True,
             "accept_unsellable": False,
         },
@@ -1724,9 +1715,6 @@ async def test_operator_profile_update_intro_message_key_omitted_succeeds(
             "areas": ["東京都"],
             "categories": ["家電"],
             "strong_categories": ["家電"],
-            "is_public": True,
-            "show_stats": True,
-            "show_reviews": True,
             "show_message": True,
             "accept_unsellable": False,
         },
@@ -1755,9 +1743,6 @@ async def test_operator_profile_update_ignores_verified_fields(
             "strong_categories": ["家電"],
             "business_hours": "9:00-18:00",
             "intro_message": "丁寧に対応します。",
-            "is_public": True,
-            "show_stats": True,
-            "show_reviews": True,
             "show_message": True,
             "accept_unsellable": True,
         },
@@ -1784,7 +1769,8 @@ async def test_operator_profile_first_access_auto_creates(
     assert r.status_code == 200
     data = r.json()
     assert data["areas"] == []
-    assert data["is_public"] is True
+    assert "is_public" not in data
+    assert data["review_count"] == 0
 
 
 async def test_vendor_public_profile_respects_show_flags(
@@ -1801,9 +1787,6 @@ async def test_vendor_public_profile_respects_show_flags(
             "categories": ["家電"],
             "strong_categories": ["家電"],
             "intro_message": "秘密のメッセージ",
-            "is_public": True,
-            "show_stats": True,
-            "show_reviews": True,
             "show_message": False,
             "accept_unsellable": False,
         },
@@ -1854,7 +1837,7 @@ async def test_vendor_public_profile_reviews_user_only_and_minimal_fields(
     assert "reviewer_type" not in reviews[0]
 
 
-async def test_vendor_public_profile_404_when_not_public(
+async def test_vendor_public_profile_visible_regardless_of_profile_settings(
     client: AsyncClient, db_session: AsyncSession
 ):
     admin_token = await _make_admin(client, db_session)
@@ -1867,17 +1850,17 @@ async def test_vendor_public_profile_404_when_not_public(
             "areas": [],
             "categories": [],
             "strong_categories": [],
-            "is_public": False,
-            "show_stats": True,
-            "show_reviews": True,
             "show_message": True,
             "accept_unsellable": False,
         },
         headers=_auth(op_token),
     )
 
+    # 口コミ・評価は常時公開（2026-09-04 決定）。旧 is_public=False 相当の設定でも 200。
     r = await client.get(f"/api/v1/vendors/{op_id}")
-    assert r.status_code == 404
+    assert r.status_code == 200
+    assert r.json()["reviews"] == []
+    assert r.json()["review_count"] == 0
 
 
 async def test_vendor_public_profile_default_public_when_profile_row_missing(
@@ -1932,3 +1915,140 @@ async def test_top_bid_amount_reflects_max_across_operators(
     r = await client.get(f"/api/v1/cases/{case['id']}", headers=_auth(op2_token))
     assert r.status_code == 200
     assert r.json()["top_bid_amount"] == 55000
+
+
+async def test_review_updates_operator_review_stats_and_bid_summary(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """顧客→業者レビュー投稿で operators.review_count / latest_review_comment が更新され、
+    入札一覧（BidOut.operator）と公開プロフィール・業者一覧に反映される。"""
+    admin_token = await _make_admin(client, db_session)
+    user_token = await _signup_user(client, "revstats_user@example.com")
+    op_token, op_id = await _verified_operator(
+        client, db_session, admin_token, "revstats_op@example.com", "集計株式会社"
+    )
+    _, txn_id = await _create_transaction(client, user_token, op_token)
+    r = await client.post(f"/api/v1/transactions/{txn_id}/complete", headers=_auth(user_token))
+    assert r.status_code == 200
+    r = await client.post(
+        "/api/v1/reviews",
+        json={"transaction_id": txn_id, "rating": 4, "comment": "  搬出が早くて助かりました  "},
+        headers=_auth(user_token),
+    )
+    assert r.status_code == 201, r.text
+    # 業者→顧客のレビューは集計に含めない
+    r = await client.post(
+        "/api/v1/reviews",
+        json={"transaction_id": txn_id, "rating": 1, "comment": "内部メモ"},
+        headers=_auth(op_token),
+    )
+    assert r.status_code == 201
+
+    r = await client.get(f"/api/v1/vendors/{op_id}")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["rating"] == 4.0
+    assert data["review_count"] == 1
+    assert len(data["reviews"]) == 1
+
+    # 2件目の案件で入札一覧に集計が載る
+    case2 = await _create_case(client, user_token)
+    r = await client.post(
+        f"/api/v1/cases/{case2['id']}/bids", json={"amount": 25000}, headers=_auth(op_token)
+    )
+    assert r.status_code == 201
+    r = await client.get(f"/api/v1/cases/{case2['id']}/bids", headers=_auth(user_token))
+    assert r.status_code == 200
+    op_summary = r.json()[0]["operator"]
+    assert op_summary["review_count"] == 1
+    assert op_summary["latest_review_comment"] == "搬出が早くて助かりました"
+
+    # 業者一覧
+    r = await client.get("/api/v1/vendors")
+    assert r.status_code == 200
+    row = next(v for v in r.json() if v["operator_id"] == op_id)
+    assert row["company_name"] == "集計株式会社"
+    assert row["review_count"] == 1
+    assert row["latest_review_comment"] == "搬出が早くて助かりました"
+    assert "contact_email" not in row and "license_number" not in row
+
+    # 運営が非表示にすると公開・集計から消え、再表示で戻る
+    review_id = data["reviews"][0]["id"]
+    r = await client.patch(
+        f"/api/v1/admin/reviews/{review_id}/hide",
+        json={"hidden": True, "reason": "第三者の個人情報を含むため"},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["hidden_at"] is not None
+    r = await client.get(f"/api/v1/vendors/{op_id}")
+    assert r.json()["reviews"] == []
+    assert r.json()["review_count"] == 0
+    assert r.json()["rating"] is None
+    r = await client.patch(
+        f"/api/v1/admin/reviews/{review_id}/hide", json={"hidden": False}, headers=_auth(admin_token)
+    )
+    assert r.status_code == 200
+    r = await client.get(f"/api/v1/vendors/{op_id}")
+    assert r.json()["review_count"] == 1 and r.json()["rating"] == 4.0
+    # 一般ユーザーは非表示操作できない
+    r = await client.patch(
+        f"/api/v1/admin/reviews/{review_id}/hide", json={"hidden": True}, headers=_auth(user_token)
+    )
+    assert r.status_code in (401, 403)
+
+
+async def test_review_comment_rejects_contact_info_and_profile_lists_reject_urls(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """口コミ本文と業者プロフィールのエリア/カテゴリは公開されるため、連絡先・URL を拒否する。"""
+    admin_token = await _make_admin(client, db_session)
+    user_token = await _signup_user(client, "revguard_user@example.com")
+    op_token, _ = await _verified_operator(
+        client, db_session, admin_token, "revguard_op@example.com", "ガード株式会社"
+    )
+    _, txn_id = await _create_transaction(client, user_token, op_token)
+    r = await client.post(f"/api/v1/transactions/{txn_id}/complete", headers=_auth(user_token))
+    assert r.status_code == 200
+    r = await client.post(
+        "/api/v1/reviews",
+        json={"transaction_id": txn_id, "rating": 5, "comment": "直接依頼は https://evil.example へ"},
+        headers=_auth(user_token),
+    )
+    assert r.status_code == 422
+    r = await client.put(
+        "/api/v1/operator/profile",
+        json={
+            "areas": ["東京都", "直通 090-1234-5678"],
+            "categories": [],
+            "strong_categories": [],
+            "show_message": True,
+            "accept_unsellable": False,
+        },
+        headers=_auth(op_token),
+    )
+    assert r.status_code == 422
+
+
+async def test_vendor_list_excludes_suspended(
+    client: AsyncClient, db_session: AsyncSession
+):
+    admin_token = await _make_admin(client, db_session)
+    _, active_id = await _verified_operator(
+        client, db_session, admin_token, "list_active@example.com", "掲載株式会社"
+    )
+    _, suspended_id = await _verified_operator(
+        client, db_session, admin_token, "list_susp@example.com", "停止株式会社"
+    )
+    r = await client.patch(
+        f"/api/v1/admin/operators/{suspended_id}/suspend",
+        json={"suspended": True},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 200, r.text
+
+    r = await client.get("/api/v1/vendors")
+    assert r.status_code == 200
+    ids = {v["operator_id"] for v in r.json()}
+    assert active_id in ids
+    assert suspended_id not in ids

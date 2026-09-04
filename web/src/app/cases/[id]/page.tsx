@@ -554,8 +554,13 @@ export default function UserCaseDetailPage() {
                       {b.operator?.rating != null ? (
                         <span className="ml-2 text-xs font-semibold text-amber-600">
                           ★ {b.operator.rating.toFixed(1)}
+                          <span className="ml-1 font-normal text-slate-500">
+                            （口コミ{b.operator.review_count}件）
+                          </span>
                         </span>
-                      ) : null}
+                      ) : (
+                        <span className="ml-2 text-xs text-slate-500">口コミはまだありません</span>
+                      )}
                       {topBidAmount != null && b.amount === topBidAmount && activeBids.length > 1 ? (
                         <span className="ml-2 rounded-none bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
                           {topBidCount > 1 ? "同額で最高額" : "最高額"}
@@ -569,6 +574,11 @@ export default function UserCaseDetailPage() {
                       >
                         業者のプロフィール・口コミを見る
                       </Link>
+                    ) : null}
+                    {b.operator?.latest_review_comment ? (
+                      <p className="mt-1 max-w-md text-xs leading-relaxed text-slate-500">
+                        最新の口コミ: 「{b.operator.latest_review_comment}」
+                      </p>
                     ) : null}
                     <p className="mt-0.5 text-lg font-semibold text-brand-700 tabular-nums">
                       {formatYen(b.amount)}

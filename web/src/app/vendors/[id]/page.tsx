@@ -77,7 +77,7 @@ export default function VendorDetailPage() {
   }
 
   const initial = profile.company_name.slice(0, 1);
-  const reviews = profile.reviews ?? [];
+  const reviews = profile.reviews;
 
   return (
     <div className="vendor-page">
@@ -85,12 +85,12 @@ export default function VendorDetailPage() {
 
       <main id="main">
         <div className="vendor-wrap">
-          {/* 案件一覧に戻る */}
-          <Link href="/mypage" className="vendor-back">
+          {/* 業者一覧に戻る */}
+          <Link href="/vendors" className="vendor-back">
             <svg viewBox="0 0 24 24">
               <path d="M19 12H5M11 6l-6 6 6 6" />
             </svg>
-            マイ案件一覧に戻る
+            登録業者一覧に戻る
           </Link>
 
           {/* ヒーロー */}
@@ -126,7 +126,7 @@ export default function VendorDetailPage() {
               <div className="biz-rating-row">
                 <div className="stars-big">{starString(profile.rating)}</div>
                 <div className="rating-num">{profile.rating.toFixed(1)}</div>
-                <div className="rating-count">（口コミ{reviews.length}件）</div>
+                <div className="rating-count">（口コミ{profile.review_count}件）</div>
               </div>
             ) : null}
 
@@ -170,7 +170,8 @@ export default function VendorDetailPage() {
               <svg viewBox="0 0 24 24">
                 <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
               </svg>
-              口コミ（{reviews.length}件）
+              口コミ（{profile.review_count}件
+              {profile.review_count > reviews.length ? `中 最新${reviews.length}件を表示` : ""}）
             </div>
 
             {reviews.length > 0 ? (
@@ -189,6 +190,12 @@ export default function VendorDetailPage() {
                     </div>
                   </div>
                   {rv.comment ? <div className="review-text">{rv.comment}</div> : null}
+                  <Link
+                    href={`/contact?subject=${encodeURIComponent(`口コミの報告（${rv.id}）`)}`}
+                    className="review-report"
+                  >
+                    この口コミを報告する
+                  </Link>
                 </div>
               ))
             ) : (

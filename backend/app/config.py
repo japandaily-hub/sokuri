@@ -127,6 +127,9 @@ class Settings(BaseSettings):
     rl_case_create_ip_max: int = 10
     rl_case_create_account_max: int = 10
     rl_case_create_window_sec: int = 3600
+    # 無認証の公開参照（GET /vendors, GET /vendors/{id}）。IP軸・全リクエストカウント。
+    rl_public_read_ip_max: int = 120
+    rl_public_read_window_sec: int = 60
     # InMemoryRateLimitStore のキー数ハードキャップ（メモリ枯渇防止）。
     # 10000 → 100000 に引き上げ（security review Medium-1）。1バケット数十
     # バイト規模のため 100000 件でも数MBで収まり、ハードキャップ到達自体を
@@ -168,6 +171,7 @@ class Settings(BaseSettings):
         "rl_line_ip_max",
         "rl_case_create_ip_max",
         "rl_case_create_account_max",
+        "rl_public_read_ip_max",
         mode="after",
     )
     @classmethod
@@ -183,6 +187,7 @@ class Settings(BaseSettings):
         "rl_signup_window_sec",
         "rl_line_window_sec",
         "rl_case_create_window_sec",
+        "rl_public_read_window_sec",
         mode="after",
     )
     @classmethod

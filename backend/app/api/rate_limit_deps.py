@@ -204,6 +204,7 @@ _SCOPE_MESSAGES: dict[str, str] = {
     "line_exchange": "リクエストが集中しています。しばらく時間をおいて再度お試しください。",
     "case_create": "案件の作成が集中しています。しばらく時間をおいて再度お試しください。",
     "case_cancel": "出品の取り下げの試行回数が上限に達しました。しばらく時間をおいて再度お試しください。",
+    "public_read": "リクエストが集中しています。しばらく時間をおいて再度お試しください。",
 }
 
 
@@ -236,6 +237,9 @@ def get_rate_limiter() -> RateLimiter:
         ),
         case_create_account=RateLimitRule(
             settings.rl_case_create_account_max, settings.rl_case_create_window_sec
+        ),
+        public_read_ip=RateLimitRule(
+            settings.rl_public_read_ip_max, settings.rl_public_read_window_sec
         ),
     )
     return RateLimiter(config=config)
@@ -398,6 +402,10 @@ def _scope_spec(scope: str, config: RateLimitConfig) -> _ScopeSpec:
         # 追加せず、既存の sensitive_account ルール — password_change/
         # account_delete と同一 — を流用する）。
         return _ScopeSpec(ip_rule=None, account_rule=config.sensitive_account, count_all=False)
+    if scope == "public_read":
+        # 無認証の公開参照（業者一覧・公開プロフィール）。DB 走査を伴うため IP 軸で
+        # 全リクエストをカウントする（security review M-2）。
+        return _ScopeSpec(ip_rule=config.public_read_ip, account_rule=None, count_all=True)
     raise ValueError(f"未知の rate limit scope です: {scope!r}")
 
 

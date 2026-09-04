@@ -19,6 +19,10 @@ class Operator(Base, TimestampMixin):
     contact_email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     rating: Mapped[Optional[float]] = mapped_column(Float)
+    # 顧客→業者レビューの集計（reviews.py で投稿時に再計算する非正規化列）。
+    # rating と同じ扱いで、入札一覧・業者一覧の表示用。
+    review_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    latest_review_comment: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     cancel_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_suspended: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
     invite_code: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)

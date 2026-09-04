@@ -1,0 +1,146 @@
+/* ============================================================
+   登録業者一覧ページ 固有CSS
+   共通クラス（.container .section .btn .field 等）は再定義しない。
+   全クラスを .vendors-page 配下にスコープし他ページへ漏れないようにする。
+   ============================================================ */
+
+.vendors-page {
+  min-height: 100vh;
+  background: var(--pale);
+}
+.vendors-page .vendors-wrap {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 20px 100px;
+}
+
+.vendors-page .vendors-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--body-soft);
+  text-decoration: none;
+  transition: color .2s;
+  margin-bottom: 16px;
+}
+.vendors-page .vendors-back:hover { color: var(--blue); }
+.vendors-page .vendors-back svg {
+  width: 15px; height: 15px;
+  fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+
+.vendors-page .vendors-title {
+  font-family: var(--head);
+  font-weight: 600;
+  font-size: 22px;
+  letter-spacing: .04em;
+  margin: 0 0 6px;
+}
+.vendors-page .vendors-lead {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--body-soft);
+  margin: 0 0 20px;
+}
+.vendors-page .vendors-loading {
+  display: flex;
+  justify-content: center;
+  padding: 48px 0;
+}
+.vendors-page .vendors-empty {
+  font-size: 13px;
+  color: var(--body-soft);
+  padding: 24px 0;
+}
+
+.vendors-page .vendors-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.vendors-page .vendor-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  padding: 16px 18px;
+}
+.vendors-page .vendor-row-main { min-width: 0; flex: 1; }
+.vendors-page .vendor-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.vendors-page .vendor-row-name {
+  font-family: var(--head);
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.vendors-page .vendor-row-name:hover { color: var(--blue); text-decoration: underline; }
+.vendors-page .vendor-tag {
+  display: inline-block;
+  font-size: 11px;
+  letter-spacing: .06em;
+  padding: 2px 8px;
+  border: 1px solid var(--green, #2f7d4f);
+  color: var(--green, #2f7d4f);
+  background: #fff;
+  border-radius: 0;
+  white-space: nowrap;
+}
+.vendors-page .vendor-tag-blue { border-color: var(--blue); color: var(--blue); }
+
+.vendors-page .vendor-row-rating {
+  margin-top: 6px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 13px;
+}
+.vendors-page .vendor-stars { color: #d4a017; letter-spacing: .05em; }
+.vendors-page .vendor-rating-num { font-weight: 600; font-variant-numeric: tabular-nums; }
+.vendors-page .vendor-rating-count { color: var(--body-soft); font-size: 12px; }
+
+.vendors-page .vendor-row-quote {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--ink);
+  border-left: 3px solid var(--line);
+  padding-left: 10px;
+  overflow-wrap: anywhere;
+}
+.vendors-page .vendor-row-meta {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--body-soft);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+.vendors-page .vendor-row-link {
+  flex: none;
+  align-self: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .vendors-page .vendor-row { flex-direction: column; gap: 10px; }
+  .vendors-page .vendor-row-link { align-self: flex-start; }
+}

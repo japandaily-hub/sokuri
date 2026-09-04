@@ -3,8 +3,10 @@
 審査確定項目（company_name, license_number, verified_at, vendor_status, rating等）は
 Operator 本体でのみ管理し、本エンドポイントの PUT では更新できない。
 編集可能項目（areas, categories, strong_categories, staff_count, business_hours,
-intro_message, is_public, show_stats, show_reviews, show_message, accept_unsellable）
+intro_message, show_message, accept_unsellable）
 は operator_profiles テーブルで管理する。
+評価・口コミは常時公開（2026-09-04 決定）。is_public / show_stats / show_reviews は
+API から撤去済み（列は残置・未参照）。
 
 閲覧・編集は vendor_status を問わず許可する（get_current_operator を使用）。
 チャット同様「承認待ちでも会話・プロフィール確認自体は可能」という方針に揃える
@@ -16,7 +18,7 @@ from __future__ import annotations
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,6 +39,7 @@ from app.schemas_katadzuke import (
     LineLinkUnlinkRequest,
     OperatorProfileOut,
     OperatorProfileUpdateRequest,
+    OperatorPublicListItemOut,
     OperatorPublicProfileOut,
     PublicReviewOut,
     ReauthTokenRequest,
@@ -97,11 +100,9 @@ def _to_profile_out(operator: Operator, profile: OperatorProfile) -> OperatorPro
         staff_count=profile.staff_count,
         business_hours=profile.business_hours,
         intro_message=profile.intro_message,
-        is_public=profile.is_public,
-        show_stats=profile.show_stats,
-        show_reviews=profile.show_reviews,
         show_message=profile.show_message,
         accept_unsellable=profile.accept_unsellable,
+        review_count=operator.review_count,
         license_image_uploaded_at=operator.license_image_uploaded_at,
     )
 
@@ -151,9 +152,6 @@ async def update_my_operator_profile(
     profile.staff_count = body.staff_count
     profile.business_hours = body.business_hours
     profile.intro_message = body.intro_message
-    profile.is_public = body.is_public
-    profile.show_stats = body.show_stats
-    profile.show_reviews = body.show_reviews
     profile.show_message = body.show_message
     profile.accept_unsellable = body.accept_unsellable
 
@@ -166,11 +164,12 @@ async def update_my_operator_profile(
 @router.get(
     "/vendors/{operator_id}",
     response_model=OperatorPublicProfileOut,
-    summary="業者公開プロフィール取得（is_public=false は404、show_*フラグに応じて項目を省く）",
+    summary="業者公開プロフィール取得（評価・口コミは常時公開。停止中の業者は404）",
 )
 async def get_vendor_public_profile(
     operator_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),
+    _rl: object = Depends(RateLimitGuard("public_read")),
 ) -> OperatorPublicProfileOut:
     operator = await session.get(Operator, operator_id)
     if operator is None or operator.is_suspended:
@@ -179,39 +178,32 @@ async def get_vendor_public_profile(
     profile = await session.get(OperatorProfile, operator_id)
     if profile is None:
         # プロフィール行は業者が自分のプロフィール画面を開いた時に遅延作成される。
-        # 既定は「公開」(is_public default=True) のため、行が無いだけの業者を 404 に
-        # しない（チャットの「プロフィールを見る」導線が壊れる）。既定値の仮想
-        # プロフィールとして扱う（GET で行は作成しない。SQLAlchemy の default は
-        # flush 時適用のため、ここでは明示的に既定値を渡す）。
+        # 行が無いだけの業者を 404 にしない（チャットの「プロフィールを見る」導線が
+        # 壊れる）。既定値の仮想プロフィールとして扱う（GET で行は作成しない）。
         profile = OperatorProfile(
             operator_id=operator_id,
-            is_public=True,
-            show_stats=True,
-            show_reviews=True,
             show_message=True,
             accept_unsellable=False,
         )
-    if not profile.is_public:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="業者が見つかりません。")
 
-    reviews_out: list[PublicReviewOut] | None = None
-    if profile.show_reviews:
-        rows = (
-            await session.scalars(
-                select(Review)
-                .join(Transaction, Review.transaction_id == Transaction.id)
-                .join(Bid, Transaction.bid_id == Bid.id)
-                .where(
-                    Bid.operator_id == operator_id,
-                    # 公開するのは「顧客→業者」の評価のみ。業者が顧客について
-                    # 書いたレビュー（reviewer_type="operator"）は公開しない。
-                    Review.reviewer_type == "user",
-                )
-                .order_by(Review.created_at.desc())
-                .limit(50)
+    # 口コミは常時公開（業者側の非表示スイッチは撤去済み）。
+    rows = (
+        await session.scalars(
+            select(Review)
+            .join(Transaction, Review.transaction_id == Transaction.id)
+            .join(Bid, Transaction.bid_id == Bid.id)
+            .where(
+                Bid.operator_id == operator_id,
+                # 公開するのは「顧客→業者」の評価のみ。業者が顧客について
+                # 書いたレビュー（reviewer_type="operator"）は公開しない。
+                Review.reviewer_type == "user",
+                Review.hidden_at.is_(None),
             )
-        ).all()
-        reviews_out = [PublicReviewOut.model_validate(r) for r in rows]
+            .order_by(Review.created_at.desc(), Review.id.desc())
+            .limit(50)
+        )
+    ).all()
+    reviews_out = [PublicReviewOut.model_validate(r) for r in rows]
 
     return OperatorPublicProfileOut(
         operator_id=operator.id,
@@ -225,9 +217,57 @@ async def get_vendor_public_profile(
         business_hours=profile.business_hours,
         intro_message=profile.intro_message if profile.show_message else None,
         accept_unsellable=profile.accept_unsellable,
-        rating=operator.rating if profile.show_stats else None,
+        rating=operator.rating,
+        review_count=operator.review_count,
         reviews=reviews_out,
     )
+
+
+@router.get(
+    "/vendors",
+    response_model=list[OperatorPublicListItemOut],
+    summary="業者一覧（承認済み・停止中でない業者。評価の高い順・件数順）",
+)
+async def list_vendors(
+    session: AsyncSession = Depends(get_session),
+    limit: int = Query(default=100, ge=1, le=200),
+    offset: int = Query(default=0, ge=0, le=1000),
+    _rl: object = Depends(RateLimitGuard("public_read")),
+) -> list[OperatorPublicListItemOut]:
+    """業者一覧。個人情報（連絡先・許可番号）は含めない。
+    並び順は「評価あり→評価の高い順→件数の多い順→登録の古い順」。
+
+    API は無認証（画面側 /vendors は middleware でユーザーログイン必須）。公開情報のみを
+    返す前提で、IP 軸のレート制限（public_read）と offset 上限で走査コストを抑える。"""
+    rows = (
+        await session.execute(
+            select(Operator, OperatorProfile)
+            .outerjoin(OperatorProfile, OperatorProfile.operator_id == Operator.id)
+            .where(Operator.vendor_status == "active", Operator.is_suspended.is_(False))
+            .order_by(
+                Operator.rating.is_(None),
+                Operator.rating.desc(),
+                Operator.review_count.desc(),
+                Operator.created_at.asc(),
+            )
+            .limit(limit)
+            .offset(offset)
+        )
+    ).all()
+    return [
+        OperatorPublicListItemOut(
+            operator_id=operator.id,
+            company_name=operator.company_name,
+            is_approved=True,
+            areas=(profile.areas if profile is not None else None) or [],
+            strong_categories=(profile.strong_categories if profile is not None else None) or [],
+            accept_unsellable=bool(profile.accept_unsellable) if profile is not None else False,
+            rating=operator.rating,
+            review_count=operator.review_count,
+            latest_review_comment=operator.latest_review_comment,
+        )
+        for operator, profile in rows
+    ]
 
 
 # ──────────────────────────── LINE連携（再認証トークン・連携解除） ────────────────────────────

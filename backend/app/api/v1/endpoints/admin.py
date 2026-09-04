@@ -13,10 +13,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_admin
 from app.core.crypto import decrypt_json
+from app.db.models.bid import Bid
 from app.db.models.case import Case
 from app.db.models.invite import Invite
 from app.db.models.operator import Operator
 from app.db.models.operator_application import OperatorApplication
+from app.db.models.transaction import Review, Transaction
 from app.db.models.user import User
 from app.db.session import get_session
 from app.schemas_katadzuke import (
@@ -32,8 +34,11 @@ from app.schemas_katadzuke import (
     OperatorOut,
     OperatorSuspendRequest,
     OperatorVerifyRequest,
+    ReviewHideRequest,
+    ReviewOut,
 )
 from app.services import notify
+from app.services.review_stats import recalc_operator_review_stats
 
 logger = logging.getLogger(__name__)
 
@@ -214,6 +219,37 @@ async def suspend_operator(
         "admin_operator_suspend admin=%s operator=%s suspended=%s", admin.id, operator.id, body.suspended
     )
     return OperatorOut.model_validate(operator)
+
+
+@router.patch("/admin/reviews/{review_id}/hide", response_model=ReviewOut)
+async def hide_review(
+    review_id: uuid.UUID,
+    body: ReviewHideRequest,
+    admin: User = Depends(get_current_admin),
+    session: AsyncSession = Depends(get_session),
+) -> ReviewOut:
+    """口コミを運営が非表示（hidden=true）／再表示（false）にする。
+
+    口コミは常時公開のため、誹謗中傷・第三者の個人情報・送信防止措置の申出への
+    対応経路として用意する（security review H-2）。物理削除はせず hidden_at で
+    論理削除し、公開プロフィール・一覧・集計（rating / review_count / 抜粋）から除外する。
+    """
+    review = await session.get(Review, review_id)
+    if review is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review not found.")
+    review.hidden_at = datetime.now(timezone.utc) if body.hidden else None
+    review.hidden_reason = (body.reason or None) if body.hidden else None
+    await session.flush()
+    txn = await session.get(Transaction, review.transaction_id)
+    bid = await session.get(Bid, txn.bid_id) if txn is not None else None
+    if review.reviewer_type == "user" and bid is not None:
+        await recalc_operator_review_stats(session, bid.operator_id)
+    await session.commit()
+    await session.refresh(review)
+    logger.info(
+        "admin_review_hide admin=%s review=%s hidden=%s", admin.id, review.id, body.hidden
+    )
+    return ReviewOut.model_validate(review)
 
 
 @router.get("/admin/cell-density")

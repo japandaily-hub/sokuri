@@ -7,15 +7,16 @@ reviewer_type はトークン種別から導出する（クライアント指定
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import Actor, get_current_actor
-from app.db.models.bid import Bid
 from app.db.models.transaction import Review, Transaction
 from app.db.session import get_session
 from app.schemas_katadzuke import ReviewCreateRequest, ReviewOut
+from app.services.review_stats import recalc_operator_review_stats
 
 router = APIRouter()
 
@@ -80,22 +81,20 @@ async def create_review(
     session.add(review)
     await session.flush()
 
-    # ユーザー → 業者評価なら operators.rating を平均で更新
+    # ユーザー → 業者評価なら operators の集計列（rating / review_count /
+    # latest_review_comment）を再計算する（正本は services/review_stats.py。
+    # 対象 operators 行を排他ロックしてから集計するため同時投稿でもずれない）。
     if reviewer_type == "user":
-        operator = txn.bid.operator if "operator" in txn.bid.__dict__ else None
-        avg_rating = await session.scalar(
-            select(func.avg(Review.rating))
-            .join(Transaction, Review.transaction_id == Transaction.id)
-            .join(Bid, Transaction.bid_id == Bid.id)
-            .where(Bid.operator_id == txn.bid.operator_id, Review.reviewer_type == "user")
-        )
-        if operator is None:
-            from app.db.models.operator import Operator
+        await recalc_operator_review_stats(session, txn.bid.operator_id)
 
-            operator = await session.get(Operator, txn.bid.operator_id)
-        if operator is not None and avg_rating is not None:
-            operator.rating = round(float(avg_rating), 2)
-
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        # uq_reviews_transaction_reviewer（同一取引・同一投稿者は1件）。アプリ層の
+        # 重複チェックをすり抜けた二重送信は 500 ではなく 409 にする（security review L-3）。
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="既にレビュー投稿済みです。"
+        ) from None
     await session.refresh(review)
     return ReviewOut.model_validate(review)

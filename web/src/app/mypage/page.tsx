@@ -347,6 +347,14 @@ export default function MyPage() {
             </Link>
           </div>
         </div>
+        <div className="user-card" style={{ marginBottom: 20, padding: "14px 20px" }}>
+          <div className="user-card-info" style={{ fontSize: 13, color: "var(--body-soft)" }}>
+            登録業者の評価と口コミは、成約したユーザーの投稿をそのまま公開しています。
+            <Link href="/vendors" style={{ marginLeft: 6, fontWeight: 600 }}>
+              登録業者一覧・口コミを見る →
+            </Link>
+          </div>
+        </div>
 
         {/* タブ */}
         <div className="my-tabs" role="tablist">

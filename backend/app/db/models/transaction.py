@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from datetime import date, datetime
 from typing import TYPE_CHECKING
 
@@ -110,6 +111,9 @@ class Review(Base, TimestampMixin):
     reviewer_type: Mapped[str] = mapped_column(String(32), nullable=False)  # 'user' | 'operator'
     rating: Mapped[int] = mapped_column(Integer, nullable=False)             # 1–5
     comment: Mapped[str | None] = mapped_column(Text)
+    # 運営による論理削除（公開・集計から除外。物理削除はせず証跡を残す）。
+    hidden_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    hidden_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     # relations
     transaction: Mapped[Transaction] = relationship(back_populates="reviews")
