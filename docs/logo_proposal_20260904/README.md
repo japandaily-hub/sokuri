@@ -49,3 +49,5 @@
 - 併せて差し替え: 未参照だった旧配色 `web/public/logo-icon.png`（→ A 512px）／`web/public/logo-katazuke.png`（→ 横長ロックアップ 1200×400）。
 - LINE 用に書き出し（ロゴ＋ネーム入り）: `png/line_profile_640.png`（プロフィール画像・円形トリミング前提で中央に配置）／`png/line_wide_1200x400.png`（リッチメニュー・カバー等の横長用）。書き出し元は `render_assets.html`（Playwright 要素スクリーンショット）。
 - 未対応: `web/src/app/apple-icon.tsx` は静的PNGに負けて未使用のまま残置（文字のみの旧デザイン）。LINE 公式アカウント側の画像アップロードは管理画面での手作業。
+- 2026-09-04 反映確認: コミット 80fb7eb を push → Vercel Production success。本番 `/icon.png` `/apple-icon.png` のバイト列がローカル新版と一致（md5 照合）。削除した `apple-icon.tsx` の旧ルート `/apple-icon` は 404。
+- LINE 公式アカウント【公式】カタヅケ（@112ohigj）のプロフィール画像を `line_profile_640.png` に変更し「公開」済み（管理画面の表示で確認。LINE 側の反映は数営業日かかる場合あり・1時間は再変更不可）。背景画像・リッチメニューは未設定（`line_wide_1200x400.png` を用意済み）。
