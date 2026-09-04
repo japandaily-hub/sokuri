@@ -8,7 +8,9 @@
  * ページ遷移のたびに N+1 リクエストを撃たないよう、判定結果は sessionStorage に
  * CACHE_TTL_MS だけキャッシュする（レート制限と体感速度への配慮）。
  * 取得に失敗しても画面は止めず、ドットを出さないまま console.warn するだけに留める。
- * 未ログイン時（401）は静かに無視する。
+ * 未ログイン時（401）は静かに無視する。backend JWT が失効している場合も、
+ * listTransactions/getTransaction に { decorative: true } を渡すことで
+ * 強制ログアウト後の画面遷移・文言表示を発生させない（r6-fix-frontend4）。
  */
 
 import { useEffect, useState } from "react";
@@ -80,17 +82,25 @@ export function AppHeaderBell() {
       try {
         // limit 200（r6-verify L5）。それでも直近のアクティブな取引が0件（＝先頭が
         // キャンセル済みで埋まっている等）の場合のみ、2ページ目まで読みに行く。
-        let txns = await listTransactions(token, { limit: LIST_MAX_LIMIT, offset: 0 });
+        // decorative: true — このベルは装飾的な付随情報であり、backend JWT が
+        // 失効していても強制ログアウト＋画面遷移を発生させてはならない
+        // （r6-fix-frontend4）。
+        const decorative = { decorative: true };
+        let txns = await listTransactions(token, { limit: LIST_MAX_LIMIT, offset: 0 }, decorative);
         let active = txns.filter((t) => t.status !== "cancelled").slice(0, MAX_CHECK);
         if (active.length === 0 && txns.length === LIST_MAX_LIMIT) {
-          const page2 = await listTransactions(token, { limit: LIST_MAX_LIMIT, offset: txns.length });
+          const page2 = await listTransactions(
+            token,
+            { limit: LIST_MAX_LIMIT, offset: txns.length },
+            decorative,
+          );
           txns = txns.concat(page2);
           active = txns.filter((t) => t.status !== "cancelled").slice(0, MAX_CHECK);
         }
         let found = false;
         for (const t of active) {
           if (cancelled) return;
-          const detail = await getTransaction(t.id, token);
+          const detail = await getTransaction(t.id, token, decorative);
           if (detail.unread_count > 0) {
             found = true;
             break;

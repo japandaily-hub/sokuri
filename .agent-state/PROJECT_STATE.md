@@ -3,6 +3,8 @@
 更新: 2026-09-04（Claude・r3 導線監査ループ）
 
 ## 現在フェーズ
+- **2026-09-05 第6周（r6・「問題なく使える」観点）をローカルコミット（1b72a06・f5ffdc5 ほか・未push）。** backend 堅牢性／web 品質・通知／一気通貫フローの3系統 finder＋独立検証3体→ backend 2系統＋web で実装→統合レビュー→再検証→残件修正。主な変更: `POST /cases` は即応答し AI 解析は BackgroundTasks（`ai_status` pending/done/failed・`idempotency_key`・10分超の遅延回収・起動時掃除）、engine の pool 明示、`/readyz` に `config`（bool）と `degraded_config`、通知送信失敗の alerts、業者 verify／停止解除／本人確認結果の通知、complete/cancel/confirm_schedule の行ロック（Case→Transaction）、cancel 冪等・減額 pending の一意制約（0028・重複は自動是正）、`idempotency_key` 一意（0029）、停止業者の入札は選定不可（`operator_suspended`）、退会時キャンセルを cancel_case と同手順に、`GET /cases`（業者）・`GET /transactions` に limit/offset＋web「さらに読み込む」、取引一覧の `unread_count`、canonical/sitemap、解析中ポーリング UI、減額履歴、停止業者バナー、ConfirmModal a11y、公開ページでの 401 は静かに signOut、`/vendors` を公開ルートに。ローカル実機: 公開20ルートを 375px でスイープ（横スクロール0・404/forbidden 正常）、API で案件作成 0.0s 応答→9s で done・冪等再送 200 を確認。pytest 789 / tsc 0 / eslint 0 error。
+  - 本番適用の注意: alembic 0027→0028→0029（0028 は重複行を自動是正）。push 後 `/readyz` で `alembic_version=0029_case_idempotency_unique` と `degraded_config` が空であることを確認。
 - **2026-09-04 第5周（r5・最終回帰）。** r4 追加分に絞った回帰で High 1（業者一覧の検索・状態絞込・件数バッジがページ内50件限定＝51件目以降の審査待ちが「0」）・Medium 7 → 修正: `GET /admin/operators` を status(Literal)/q(会社名・メール・許可番号)/limit/offset＋`{items,total,counts}`（pending 優先）へ、事前申込 approve の重複メール 409（大小文字非区別）、事前申込 q に許可番号・status Literal、`OperatorApplication.invite_code/operator_id`（alembic 0026）で本登録を追跡、ConfirmModal 内エラー表示に一本化、privacy にお問い合わせ種別、docstring 是正。独立検証で web/backend の契約不一致（pending_count vs counts）を捕捉→是正。**r4 コミット 3da71de の admin.py に前方参照（NameError）があり import 不能だった**（r5 で修正・未push だったため本番影響なし）。pytest 全件緑・tsc 0。
 - **2026-09-04 第4周（r4・回帰監査）をローカルコミット（3da71de・未push）。** 依頼者 0 件／業者 Medium 1／運営 High 1・Medium 2／横断 High 3・Medium 7 → 独立検証で REJECTED 1・重大度修正 3・追加 High 3（管理画面の無言 truncate・メール送信キー未設定の無言スキップ・業者規約版数の不一致）。修正: `/admin/operator-applications`（事前申込の審査画面）新設、業者・招待コード・本人確認書類一覧のページング、ConfirmModal 統一、`/operator/login` の既存セッション自動遷移＋callbackUrl 制限、admin ルートの認可負テスト30件、BREVO 未設定時の critical アラート（LINE 配送までテスト）、`GET /admin/operator-applications` を {items,total}＋status/q/received優先へ、規約改定日 2026-09-04・業者規約版数同期、本人確認目的／返信目安／プライバシー（お問い合わせ情報）の文言、招待テンプレ・事業計画書の「許可番号任意・承認1営業日」訂正。pytest 748 / tsc 0 / eslint 0 error。本番ビルド（`next build`）は worktree で検証中。
 - **2026-09-04 3視点導線監査 第3周（r3）をローカルコミット（885f2ec・未push）。** `/loop /strategy-agents` の自走。依頼者/業者/運営/横断（法務表記・通知文）の4系統 finder→独立検証（1:1）→実装→セキュリティ/QA レビュー3周→最終独立検証「合格（Critical/High 0）」。台帳は `.agent-state/audit/r3-*.md`（監査 r3-{user,vendor,operator,crosscut}、検証 r3-verify-*、実装 r3-impl-*、レビュー r3-review-*、修正 r3-fix-*）。pytest 714 / tsc 0 / eslint 0 error。ローカル実機（run_local_e2e + seed、worktree dev 3000）で新画面・文言・停止ゲート・/contact を確認済み。
@@ -24,7 +26,7 @@
 
 ## 現行ハッシュ
 - origin/main = 0b930b4（別セッションの uptime-alert 再登録。**r3 の 885f2ec・23b2471 を含めて push 済み → 本番 3 環境 success・/health commit=0b930b4・/readyz alembic_version=0025_user_suspend**。r3 は本番反映済み）。
-- main = caaca3a（r5 最終回帰。r4 3da71de＋docs 2件を含む）→ origin より 4 コミット先行（**push はユーザー判断＝本番デプロイ。alembic 0026 を含む**）。本番ビルド（next build）と管理画面の実機確認は r5 の worktree で実施済み。
+- main = r6 コミット（f5ffdc5 以降・本ファイル更新のコミットを含む）→ origin より 8 コミット以上先行（**push はユーザー判断＝本番デプロイ。alembic 0026〜0029 を含む**）。
 - **注意: 別 Claude セッションが同じ作業ツリーで「業者の入札取り下げ」を廃止し「依頼者の出品取り下げ（cancel_case）」へ置換中（未コミット）。** 対象: backend bids.py/cases.py/case_lock.py/test_case_cancel.py、web cases/[id]/page.tsx・operator/cases/[id]/page.tsx・operator-shared.css・katadzuke-api.ts。これらは触らないこと。
   その方針だと 0019〜0021 の bid_withdrawals 監査テーブルと append-only トリガーは不要になる可能性がある（トリガーはテーブル DROP で自動消滅、関数 bid_withdrawals_reject_mutation は残るので DROP FUNCTION を migration に含めること）。
 
@@ -56,7 +58,8 @@
 - なし（push はユーザー判断）。
 
 ## 次アクション
-- **P1（ユーザー）: r4・r5 分の push 可否の判断**（本番デプロイ。alembic 0026 を含む。push 後は /readyz で 0026 を確認）。~~r5 最終回帰~~（済）。自走ループは r5 で停止。~~r4 回帰監査~~（済・3da71de）
+- **P1（自動・次 wake）: r7。** r6 の大きな変更（背景化・ロック・ページング）に対する回帰監査＋業者・依頼者の実機 E2E（ローカル）。新規 High 0 で停止。
+- **P1（ユーザー）: r4〜r6 分の push 可否の判断**（本番デプロイ。alembic 0026〜0029 を含む。push 後は /readyz で 0029 と degraded_config を確認）。~~r4 回帰監査~~（済・3da71de）
 - **P1（ユーザー）: 本番 ADMIN_EMAILS の実値と、各アドレスの user 行・role=admin を `GET /admin/users?q=` で実測**（未登録アドレスが載っていれば即除外）。あわせて r3 で置いた仮定4件（支払経路＝当事者間精算／入札期間の上限なし／8%はβ期間請求なし／所在地＝横浜）を承認または差し戻し。
 - **P1: 障害・異常時アラート基盤 — 完了（2026-09-04）。** 外形監視 `.github/workflows/uptime-alert.yml`（5分毎）＋アプリ内 `app/core/alert_middleware.py`。通知先は運営用 LINE 公式アカウント「カタヅケ運営」（@854kzrrb・Channel ID 2011424972・顧客向け【公式】カタヅケとは別チャネル）。GitHub Secrets と Render 環境変数（ALERT_LINE_CHANNEL_ACCESS_TOKEN / ALERT_LINE_USER_IDS / ALERT_MAIL_FROM）は `scripts/setup_alerts.py` で登録済み、Actions の疎通テスト success、LINE push は HTTP 200 で到達確認。メール（Brevo）も設定済み: 宛先 katazuke.support@gmail.com、差出人 katazuke.support@gmail.com（Brevo で認証済み）、テスト送信は delivered を確認。**併せて本番の依頼者向けメールが BREVO_API_KEY 未設定で一度も送信されていなかった問題を解消**（Render に BREVO_API_KEY を登録し、MAIL_FROM を noreply@katadzuke.jp → katazuke.support@gmail.com に変更。katadzuke.jp のドメイン認証を Brevo で行えば noreply@ に戻せる）。Brevo の Authorised IPs は無効化済み（Actions/Render から送るため）。Webhook は未設定。GitHub PAT（katadzuke-alerts）は30日期限＝2026-10-04 に失効するが、登録済み Secrets はそのまま有効で監視は継続する（再登録時のみ再発行が必要）。
 - P1: 別セッションの cancel_case 置換が終わったら、本番で依頼者ログイン後の案件詳細に出品取り下げボタンが出ることを目視（業者ログインが必要な検証は Claude 側では不可＝パスワード入力禁止。ユーザー実施）。

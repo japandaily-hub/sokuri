@@ -6,6 +6,7 @@
  */
 
 import { signOut } from "next-auth/react";
+import { isProtectedRoutePath } from "./protected-routes";
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -535,6 +536,26 @@ export function apiBase(): string {
 // ループ検知はモジュール変数（フルページ遷移でリセットされる）ではなく
 // sessionStorage に発火時刻を永続化し、60秒以内に3回以上発火したら
 // signOut/遷移そのものを止めて案内だけ出す。
+//
+// r6-fix-frontend4 是正: NextAuth のセッション（cookie）は残っているが backend の
+// JWT が無効（7日期限切れ・退会・DB入れ替え等）な状態で公開ページ（/, /faq,
+// /vendors 等）を開くと、AppHeaderBell 等の「装飾的」な認証付き呼び出しが 401 を
+// 受け、以下がそのまま作動して訪問者を /login に強制送還し「セッションの有効期限が
+// 切れました」を出していた。公開ページで表示すべきものは何もログインを要さない
+// ため、これは誤検知の強制ログアウトである。
+// 是正後は2段構えにする。
+//  (1) パス判定: lib/protected-routes.ts の isProtectedRoutePath() で判定し、
+//      保護ルート（USER_PROTECTED_PATHS / OPERATOR系 / /admin）でなければ
+//      signOut({redirect:false}) でセッションだけ静かに破棄し、画面遷移も
+//      文言表示もしない（ヘッダー表示がログアウト状態に切り替わるのみ）。
+//      保護ルートでは従来どおり案内文言＋役割別ログイン画面への遷移を行う。
+//  (2) 呼び出し側判定: AppHeaderBell のような「装飾的」呼び出しは request() に
+//      { decorative: true } を渡すことで、保護ルート上であっても常に (1) の
+//      「静かに破棄するだけ」の分岐を強制される（ページの主要データではなく
+//      ヘッダー表示の付随情報でしかないため、保護ルートであっても強制遷移
+//      までは正当化されない）。signOut自体は sessionExpiredHandled による
+//      モジュールスコープの1回ガード（既存のループ検知キーを流用）で複数の
+//      装飾的呼び出しが同時に401しても1回に抑えられる。
 // ---------------------------------------------------------------------------
 
 export const SESSION_EXPIRED_MESSAGE =
@@ -595,13 +616,21 @@ export function clearRedirectLoopStorage(): void {
 
 /**
  * backend 401／停止アカウントの 403 を検知した際の共通後始末。
- * NextAuth の signOut を await し、成功した場合のみ役割別ログイン画面
- * （依頼者 /login・業者 /operator/login）または停止案内（/login?reason=suspended）
- * へ遷移する。signOut 失敗時・直近60秒に3回以上発火したループ検知時は遷移せず、
+ * NextAuth の signOut を await し、成功した場合は現在のパスに応じて分岐する。
+ *  - 保護ルート（isProtectedRoutePath === true）かつ decorative でない呼び出し:
+ *    従来どおり役割別ログイン画面（依頼者 /login・業者 /operator/login）または
+ *    停止案内（/login?reason=suspended）へ遷移し、案内文言を返す。
+ *  - それ以外（公開ページ、または decorative な呼び出し）:
+ *    画面遷移も文言表示もしない。セッションを静かに破棄するだけに留め、
+ *    空文字を返す（呼び出し元が誤って画面に表示しても空欄になるだけで、
+ *    誤検知の「セッション期限切れ」文言が出ないようにする）。
+ * signOut 失敗時・直近60秒に3回以上発火したループ検知時は遷移せず、
  * 呼び出し元にそのまま表示させる案内文言を返す。
  * サーバー側（SSR/RSC）実行時は window が無いため何もしない（fail-safe）。
  */
-async function handleSessionExpired(opts: { suspended?: boolean } = {}): Promise<string> {
+async function handleSessionExpired(
+  opts: { suspended?: boolean; decorative?: boolean } = {},
+): Promise<string> {
   const fallbackMessage = opts.suspended ? SESSION_SUSPENDED_MESSAGE : SESSION_EXPIRED_MESSAGE;
   if (typeof window === "undefined") return fallbackMessage;
   if (sessionExpiredHandled) return fallbackMessage;
@@ -614,6 +643,9 @@ async function handleSessionExpired(opts: { suspended?: boolean } = {}): Promise
   } catch {
     return SESSION_EXPIRED_STUCK_MESSAGE;
   }
+
+  const shouldRedirect = !opts.decorative && isProtectedRoutePath(window.location.pathname);
+  if (!shouldRedirect) return "";
 
   const isOperator = window.location.pathname.startsWith("/operator");
   if (opts.suspended) {
@@ -635,10 +667,10 @@ async function handleSessionExpired(opts: { suspended?: boolean } = {}): Promise
  */
 async function throwHttpError(
   res: Response,
-  opts?: { skipAuthRedirect?: boolean },
+  opts?: { skipAuthRedirect?: boolean; decorative?: boolean },
 ): Promise<never> {
   if (res.status === 401 && !opts?.skipAuthRedirect) {
-    const message = await handleSessionExpired();
+    const message = await handleSessionExpired({ decorative: opts?.decorative });
     throw new KdzApiError(401, message);
   }
   let message = `HTTP ${res.status}`;
@@ -656,7 +688,10 @@ async function throwHttpError(
     /* JSON でないレスポンスは無視 */
   }
   if (res.status === 403 && detailCode === "account_suspended" && !opts?.skipAuthRedirect) {
-    const suspendedMessage = await handleSessionExpired({ suspended: true });
+    const suspendedMessage = await handleSessionExpired({
+      suspended: true,
+      decorative: opts?.decorative,
+    });
     throw new KdzApiError(403, suspendedMessage);
   }
   throw new KdzApiError(res.status, message);
@@ -680,9 +715,9 @@ export function createTimeoutSignal(ms: number): AbortSignal {
 
 async function request<T>(
   path: string,
-  init?: RequestInit & { token?: string; skipAuthRedirect?: boolean },
+  init?: RequestInit & { token?: string; skipAuthRedirect?: boolean; decorative?: boolean },
 ): Promise<T> {
-  const { token, skipAuthRedirect, ...rest } = init ?? {};
+  const { token, skipAuthRedirect, decorative, ...rest } = init ?? {};
   let res: Response;
   try {
     res = await fetch(`${apiBase()}${path}`, {
@@ -698,7 +733,7 @@ async function request<T>(
     throw new KdzNetworkError(e);
   }
   if (!res.ok) {
-    await throwHttpError(res, { skipAuthRedirect });
+    await throwHttpError(res, { skipAuthRedirect, decorative });
   }
   if (res.status === 204) return undefined as T;
   try {
@@ -1551,15 +1586,28 @@ export function selectBid(
  * 切り詰める（r6 H-1）。総件数はレスポンスに含まれないため、取得件数が limit と
  * 一致する間は「さらに読み込む余地がある」と判断すること。
  */
-export function listTransactions(token: string, params?: ListPageParams): Promise<TransactionListItem[]> {
-  return request(`/transactions?${buildListPageQuery(params)}`, { token });
+/**
+ * opts.decorative: true の場合、401/403(account_suspended) を検知しても
+ * 強制ログアウト後の画面遷移・文言表示をしない（AppHeaderBell 等の装飾的な
+ * 呼び出し専用。r6-fix-frontend4）。
+ */
+export function listTransactions(
+  token: string,
+  params?: ListPageParams,
+  opts?: { decorative?: boolean },
+): Promise<TransactionListItem[]> {
+  return request(`/transactions?${buildListPageQuery(params)}`, { token, decorative: opts?.decorative });
 }
 
 export function getTransaction(
   transactionId: string,
   token: string,
+  opts?: { decorative?: boolean },
 ): Promise<TransactionDetail> {
-  return request(`/transactions/${encodeURIComponent(transactionId)}`, { token });
+  return request(`/transactions/${encodeURIComponent(transactionId)}`, {
+    token,
+    decorative: opts?.decorative,
+  });
 }
 
 export function completeTransaction(

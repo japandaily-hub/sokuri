@@ -2,7 +2,7 @@
  * ルート保護ミドルウェア — user / operator / admin の 3 区分。
  *
  * - /create, /cases/*, /mypage/*, /result/*, /applications/*,
- *   /notifications/*, /chat/*, /schedule/*, /review/*, /vendors/*
+ *   /notifications/*, /chat/*, /schedule/*, /review/*
  *                              : ユーザーのみ（role=admin は特権ユーザーとしてそのまま通過）
  * - /operator/*              : 業者のみ（/operator/login・/operator/signup は公開）
  * - /admin/*                 : role=admin のユーザーのみ
@@ -18,37 +18,27 @@
  * 取引情報は get_current_actor＋当事者スコープが遮断する。ミドルウェアに
  * vendor_status ゲートを足す変更は、この製品判断（2026-07-02確定）を覆すため不可。
  *
- * 重要: 保護対象パスは USER_PROTECTED / OPERATOR_PUBLIC（実行時判定）と
- * config.matcher（Next.js の静的リテラル制約でここでしか書けない）の
- * 2箇所に重複定義されている。matcher にマッチしないパスはこの関数自体が
- * 実行されないため、USER_PROTECTED 等に追加しても matcher の更新を忘れると
- * 保護が効かない（fail-open）。新規パス追加時は必ず両方を同時に更新すること。
+ * 重要: 保護対象パスは USER_PROTECTED_PATHS / OPERATOR_PUBLIC_PATHS
+ * （lib/protected-routes.ts・実行時判定）と config.matcher（Next.js の
+ * 静的リテラル制約でここでしか書けない）の2箇所に重複定義されている。
+ * matcher にマッチしないパスはこの関数自体が実行されないため、
+ * USER_PROTECTED_PATHS 等に追加しても matcher の更新を忘れると保護が
+ * 効かない（fail-open）。新規パス追加時は必ず両方を同時に更新すること。
+ * パス一覧自体は katadzuke-api.ts の401共通処理からも参照するため
+ * lib/protected-routes.ts に集約し、ここでは二重定義しない
+ * （r6-fix-frontend4）。
  */
 
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
-
-const OPERATOR_PUBLIC = ["/operator/login", "/operator/signup"];
-/** config.matcher と対で管理。新規パス追加時は下の matcher にも "/xxx/:path*" を追記すること。 */
-const USER_PROTECTED = [
-  "/create",
-  "/cases",
-  "/mypage",
-  "/result",
-  "/applications",
-  "/notifications",
-  "/chat",
-  "/schedule",
-  "/review",
-  "/vendors",
-];
+import { OPERATOR_PUBLIC_PATHS, USER_PROTECTED_PATHS } from "@/lib/protected-routes";
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
   const session = req.auth;
 
-  const isOperatorPublic = OPERATOR_PUBLIC.some((p) => pathname.startsWith(p));
-  const needsUser = USER_PROTECTED.some((p) => pathname.startsWith(p));
+  const isOperatorPublic = OPERATOR_PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+  const needsUser = USER_PROTECTED_PATHS.some((p) => pathname.startsWith(p));
   const needsOperator = pathname.startsWith("/operator") && !isOperatorPublic;
   const needsAdmin = pathname.startsWith("/admin");
 
@@ -103,7 +93,6 @@ export const config = {
     "/chat/:path*",
     "/schedule/:path*",
     "/review/:path*",
-    "/vendors/:path*",
     "/operator/:path*",
     "/admin/:path*",
   ],
