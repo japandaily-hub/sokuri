@@ -781,6 +781,11 @@ class TestConfigReadinessAlerts:
         import app.main as main_module
 
         monkeypatch.setattr(main_module, "engine", db_engine)
+        # テスト DB は create_all で alembic_version を持たないため、期待ヘッドの解決を
+        # None に固定してテーブル有無ベースの判定へ落とす（Linux CI では alembic.ini が
+        # 読めて 0032 が返り、alembic_version=None と不一致で 503 になっていた）。
+        from alembic.script import ScriptDirectory as _SD
+        monkeypatch.setattr(_SD, "get_current_head", lambda self: None)
         settings = get_settings()
         monkeypatch.setattr(settings, "alert_webhook_url", "")
         monkeypatch.setattr(settings, "alert_line_channel_access_token", "")
