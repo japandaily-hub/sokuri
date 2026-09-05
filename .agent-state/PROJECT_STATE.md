@@ -3,6 +3,7 @@
 更新: 2026-09-04（Claude・r3 導線監査ループ）
 
 ## 現在フェーズ
+- **2026-09-05 r4〜r10 を push（0b930b4→552500f）。本番反映を確認**: `/health commit=552500f`、`/readyz alembic_version=0032_contact_messages`（0026〜0032 が本番 PG に適用済み）、Vercel も新コードで公開17ルート 200・保護ルートは /login へ 307・404 正常。**`degraded_config: ["encryption_key"]`＝本番の `APP_ENCRYPTION_KEY` が未設定**（依頼者の振込口座保存・業者の事前申込の口座暗号化が 500 になる。Render ダッシュボードで設定が必要＝ユーザー作業）。brevo / line_push / alerts_line は true。
 - **2026-09-05 第10周（r10・3方向の総合再監査）をローカルコミット（b0bdada・43881b5・未push）。** 依頼者／業者／運営の3系統 finder（opus）→独立検証3体→ backend＋web 2系統で実装→統合レビュー（High 2）→修正→本番ビルドで実機確認。主な変更: `/create` の `capture` 属性削除（ギャラリー選択可・複数選択）、`/signup` の未送信項目撤去、住所47都道府県と出品4都県の関係を明示＋`POST /cases` の prefecture 4都県 Literal、金額・用語統一（成約金額／出品／取引）、キャンセル理由入力をモーダルへ、送信中 401/403 の非遷移案内（403 の account_suspended は停止案内）、依頼者・業者チャットにキャンセル理由、業者取引詳細に訪問確定日時・当事者間精算・完了主体（依頼者）の説明・減額の残回数、`/business` CTA の是正、入札フォームの検証と8%注記、今月の成約の定義、本人確認一覧を `{items,total,counts}`＋検索/絞込/ページング/提出時の運営通知、業者 pending の「許可証提出済み」内訳（停止除外）、依頼者一覧の退会/停止絞込、`/admin/contacts`（DB 保存 0032・対応済み・削除・退会時匿名化）、`/readyz` に `alerts_line`、`scripts/uptime_check.py` の通知全滅 exit 1 と `degraded_config` 警告、`docs/ops/admin-operations.md` 新設。**本番ビルドで `/mypage` の useSearchParams が Suspense 無しでプリレンダー失敗→修正（43881b5）。以後 push 前に必ず `next build` を通す。** pytest 855 / tsc 0 / eslint 0 error 0 warning。
   - 実機（本番ビルド）: /admin のバッジ（事前申込・お問い合わせ・許可証提出済み内訳）、/admin/contacts の対応済み操作、本人確認一覧の「全体」表示、業者取引詳細の精算/完了主体/残回数/訪問日時、/signup の項目、/create の capture 無し。
   - **push は自動モードの権限で拒否された**（`git push origin main`）。ユーザーが実行するか権限付与が必要。
@@ -35,7 +36,7 @@
   /health commit=ab37163、/readyz alembic_version=0020_bid_withdrawal_fk_restrict=expected_head。3環境（Vercel / sokuuri / Render）とも ab37163 で success。
 
 ## 現行ハッシュ
-- origin/main = 0b930b4（別セッションの uptime-alert 再登録。**r3 の 885f2ec・23b2471 を含めて push 済み → 本番 3 環境 success・/health commit=0b930b4・/readyz alembic_version=0025_user_suspend**。r3 は本番反映済み）。
+- origin/main = 552500f（r4〜r10 push 済み・本番反映済み・/readyz 0032）。
 - main = r6 コミット（f5ffdc5 以降・本ファイル更新のコミットを含む）→ origin より 8 コミット以上先行（**push はユーザー判断＝本番デプロイ。alembic 0026〜0029 を含む**）。
 - **注意: 別 Claude セッションが同じ作業ツリーで「業者の入札取り下げ」を廃止し「依頼者の出品取り下げ（cancel_case）」へ置換中（未コミット）。** 対象: backend bids.py/cases.py/case_lock.py/test_case_cancel.py、web cases/[id]/page.tsx・operator/cases/[id]/page.tsx・operator-shared.css・katadzuke-api.ts。これらは触らないこと。
   その方針だと 0019〜0021 の bid_withdrawals 監査テーブルと append-only トリガーは不要になる可能性がある（トリガーはテーブル DROP で自動消滅、関数 bid_withdrawals_reject_mutation は残るので DROP FUNCTION を migration に含めること）。
@@ -69,7 +70,8 @@
 
 ## 次アクション
 - ~~P1（自動）: r8 異常系~~（済・24f4ee7）／~~r9 a11y~~（済・9801f31）。自走はここで停止。
-- **P1（ユーザー）: r4〜r10 分の push**（`git push origin main`。本番デプロイ・alembic 0026〜0032。push 後に `/readyz` で `alembic_version=0032_contact_messages` と `degraded_config`（brevo / line_push / alerts_line が false なら Render の環境変数）を確認）。
+- ~~P1: r4〜r10 の push~~（済・552500f・本番反映確認済み）
+- **P1（ユーザー・本番ブロッカー）: Render に `APP_ENCRYPTION_KEY` を設定**（Fernet 鍵。`python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` で生成→Render ダッシュボード→再デプロイ→ `/readyz` の `degraded_config` が空になることを確認）。未設定の間は振込口座の保存と業者の事前申込が 500。
 - **P1（ユーザー）: r4〜r6 分の push 可否の判断**（本番デプロイ。alembic 0026〜0029 を含む。push 後は /readyz で 0029 と degraded_config を確認）。~~r4 回帰監査~~（済・3da71de）
 - **P1（ユーザー）: 本番 ADMIN_EMAILS の実値と、各アドレスの user 行・role=admin を `GET /admin/users?q=` で実測**（未登録アドレスが載っていれば即除外）。あわせて r3 で置いた仮定4件（支払経路＝当事者間精算／入札期間の上限なし／8%はβ期間請求なし／所在地＝横浜）を承認または差し戻し。
 - **P1: 障害・異常時アラート基盤 — 完了（2026-09-04）。** 外形監視 `.github/workflows/uptime-alert.yml`（5分毎）＋アプリ内 `app/core/alert_middleware.py`。通知先は運営用 LINE 公式アカウント「カタヅケ運営」（@854kzrrb・Channel ID 2011424972・顧客向け【公式】カタヅケとは別チャネル）。GitHub Secrets と Render 環境変数（ALERT_LINE_CHANNEL_ACCESS_TOKEN / ALERT_LINE_USER_IDS / ALERT_MAIL_FROM）は `scripts/setup_alerts.py` で登録済み、Actions の疎通テスト success、LINE push は HTTP 200 で到達確認。メール（Brevo）も設定済み: 宛先 katazuke.support@gmail.com、差出人 katazuke.support@gmail.com（Brevo で認証済み）、テスト送信は delivered を確認。**併せて本番の依頼者向けメールが BREVO_API_KEY 未設定で一度も送信されていなかった問題を解消**（Render に BREVO_API_KEY を登録し、MAIL_FROM を noreply@katadzuke.jp → katazuke.support@gmail.com に変更。katadzuke.jp のドメイン認証を Brevo で行えば noreply@ に戻せる）。Brevo の Authorised IPs は無効化済み（Actions/Render から送るため）。Webhook は未設定。GitHub PAT（katadzuke-alerts）は30日期限＝2026-10-04 に失効するが、登録済み Secrets はそのまま有効で監視は継続する（再登録時のみ再発行が必要）。
