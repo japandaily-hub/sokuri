@@ -50,10 +50,12 @@
 - **Render 無料 Web の 15 分スピンダウン** — 初回アクセス約 1 分待ち。ログ保持 7 日。
 - **render.yaml の envVars は既存サービスに反映されない** — 本番の値はダッシュボードで設定。
 - **並走セッション** — 担当ファイルを分ける。commit 前に `git diff --cached --stat` で自分の変更だけか確認。
+- **CI（`.github/workflows/ci.yml`）が赤なら push を止める** — backend の pytest／web の tsc・eslint・next build を push・PR で自動実行。赤のまま次の変更に進まない。
 - **bid_withdrawals を残置** — 機能は廃止済みだがテーブルとトリガー（0019〜0021）は本番に残る。消すなら DROP FUNCTION も migration に含める（証跡が消えるため要判断）。
 
 ## 完了（2026-08-31〜09-04）
 
+- [x] 09-05 第11周（r11）: CI（pytest/tsc/eslint/next build）と Playwright E2E 30 本を新設、本番の APP_ENCRYPTION_KEY 設定と反映確認
 - [x] 09-05 第10周（r10）: 3方向の総合再監査→写真のギャラリー選択・登録項目整理・出品エリア明示/検証・業者の訪問日時/精算/完了主体・減額残回数・本人確認/依頼者/お問い合わせ管理画面・運営手順書・外形監視の通知全滅検知（未push）
 - [x] 09-05 第9周（r9）: axe による WCAG AA 実測とコントラスト是正（--body-soft/--gold-text）、管理画面の label とスクロール領域（未push）
 - [x] 09-05 導線監査 第8周（r8・異常系）: 終了取引のガード、キャンセルの可視化、減額申請の回数制限、運営の強制終了、業者退会（再認証）、ログイン429/5xx文言、写真の事前検証、共通 ConfirmModal、purpose Literal（未push）

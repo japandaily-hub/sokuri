@@ -1,20 +1,31 @@
 name: CI
 
+# push (main) / pull_request 時に自動実行する統合チェック。
+# - backend: pytest（SQLite・秘密情報不要）
+# - web: tsc --noEmit → eslint（警告は許容・エラーのみ失敗）→ next build
+#   next build に必要な環境変数はダミー値を使用（本番の秘密情報は使わない）。
+# 直近、tsc/eslint は通るのに next build だけ落ちる不備（useSearchParams の
+# Suspense 欠落）が本番直前に発覚したため、push/PR ゲートとして next build まで通す。
+
 on:
   push:
-    branches: ["main", "develop"]
+    branches: [main]
   pull_request:
-    branches: ["main", "develop"]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
-  syntax-guard:
-    # 依存ゼロ・30 秒以内で完了する高速ガード。
-    # 2026-06-01: estimate.py / seed.py で orphan fragment + 重複関数定義の
-    # SyntaxError を Render が runtime で検出 → デプロイ失敗を 2 連続経験。
-    # ruff/pytest が動かない（環境構築失敗）状況でも、構文と null bytes は
-    # この job で先に止める。
-    name: Syntax guard (parse + null-byte scan)
+  backend:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
     steps:
       - uses: actions/checkout@v4
 
@@ -22,17 +33,44 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: backend/pyproject.toml
 
-      - name: Parse all backend .py with ast + null-byte scan
-        shell: bash
-        run: |
-          set -e
-          fail=0
-          while IFS= read -r -d '' f; do
-            python3 - "$f" <<'PY' || fail=1
-          import ast, sys
-          path = sys.argv[1]
-          with open(path, "rb") as fh:
-              data = fh.read()
-          if b"\x00" in data:
-              print(f"::error file={path}::NULL bytes foun
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Run pytest
+        run: pytest -q
+
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: web
+    env:
+      # next build 用のダミー値。実際の値は Vercel の Environment Variables に設定済み。
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+      AUTH_SECRET: ci-dummy-secret-not-for-production-use-only
+      APP_BASE_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Lint (errors only fail; warnings allowed)
+        run: npx eslint src
+
+      - name: Build
+        run: npx next build

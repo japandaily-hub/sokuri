@@ -36,6 +36,7 @@
   ],
   "exclude": [
     "node_modules",
-    "_archive"
+    "_archive",
+    "e2e"
   ]
 }
