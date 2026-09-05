@@ -71,7 +71,7 @@
 ## 次アクション
 - ~~P1（自動）: r8 異常系~~（済・24f4ee7）／~~r9 a11y~~（済・9801f31）。自走はここで停止。
 - ~~P1: r4〜r10 の push~~（済・552500f・本番反映確認済み）
-- **P1（ユーザー・本番ブロッカー）: Render に `APP_ENCRYPTION_KEY` を設定**（Fernet 鍵。`python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` で生成→Render ダッシュボード→再デプロイ→ `/readyz` の `degraded_config` が空になることを確認）。未設定の間は振込口座の保存と業者の事前申込が 500。
+- ~~P1: Render に `APP_ENCRYPTION_KEY` を設定~~（済・2026-09-05 Claude が `.env.alerts` の RENDER_API_KEY で Render API から設定し再デプロイ。**鍵の正本は Render の環境変数のみ＝運営は Render ダッシュボードから控えを保管すること。紛失すると保存済みの口座情報は復号不能**）。
 - **P1（ユーザー）: r4〜r6 分の push 可否の判断**（本番デプロイ。alembic 0026〜0029 を含む。push 後は /readyz で 0029 と degraded_config を確認）。~~r4 回帰監査~~（済・3da71de）
 - **P1（ユーザー）: 本番 ADMIN_EMAILS の実値と、各アドレスの user 行・role=admin を `GET /admin/users?q=` で実測**（未登録アドレスが載っていれば即除外）。あわせて r3 で置いた仮定4件（支払経路＝当事者間精算／入札期間の上限なし／8%はβ期間請求なし／所在地＝横浜）を承認または差し戻し。
 - **P1: 障害・異常時アラート基盤 — 完了（2026-09-04）。** 外形監視 `.github/workflows/uptime-alert.yml`（5分毎）＋アプリ内 `app/core/alert_middleware.py`。通知先は運営用 LINE 公式アカウント「カタヅケ運営」（@854kzrrb・Channel ID 2011424972・顧客向け【公式】カタヅケとは別チャネル）。GitHub Secrets と Render 環境変数（ALERT_LINE_CHANNEL_ACCESS_TOKEN / ALERT_LINE_USER_IDS / ALERT_MAIL_FROM）は `scripts/setup_alerts.py` で登録済み、Actions の疎通テスト success、LINE push は HTTP 200 で到達確認。メール（Brevo）も設定済み: 宛先 katazuke.support@gmail.com、差出人 katazuke.support@gmail.com（Brevo で認証済み）、テスト送信は delivered を確認。**併せて本番の依頼者向けメールが BREVO_API_KEY 未設定で一度も送信されていなかった問題を解消**（Render に BREVO_API_KEY を登録し、MAIL_FROM を noreply@katadzuke.jp → katazuke.support@gmail.com に変更。katadzuke.jp のドメイン認証を Brevo で行えば noreply@ に戻せる）。Brevo の Authorised IPs は無効化済み（Actions/Render から送るため）。Webhook は未設定。GitHub PAT（katadzuke-alerts）は30日期限＝2026-10-04 に失効するが、登録済み Secrets はそのまま有効で監視は継続する（再登録時のみ再発行が必要）。

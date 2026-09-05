@@ -16,7 +16,7 @@
 10. [ ] **本番の BREVO_API_KEY／LINE アラート設定の実値確認** — 未設定だと申込・成約通知が届かない。r4 でキー未設定時に critical アラート（LINE）を出すようにしたが、LINE 側も未設定なら無音。
 11. [ ] **手数料8%の税区分（税込／税別）を決める** — 規約・特商法表記に未記載。
 12. [x] r4〜r10 分を push（09-05・552500f・/readyz 0032 確認）
-13. [ ] **本番の `APP_ENCRYPTION_KEY` を設定する（最優先・現在 500 の機能あり）** — `/readyz` の `degraded_config` に `encryption_key`。Fernet 鍵を生成して Render ダッシュボードに設定→再デプロイ→`/readyz` で `degraded_config: []` と `degraded_config: []` を確認（brevo / line_push / gemini / encryption_key が false なら Render の環境変数を設定）。事前申込一覧・業者一覧の API は応答形式が変わるため web と backend は同時反映（同一コミットなので通常の push で揃う）。
+13. [x] 本番の `APP_ENCRYPTION_KEY` を設定（09-05・Render API 経由）。**Render ダッシュボードで値を控えて安全な場所に保管してください**（紛失すると口座情報が復号不能）。 と `degraded_config: []` を確認（brevo / line_push / gemini / encryption_key が false なら Render の環境変数を設定）。事前申込一覧・業者一覧の API は応答形式が変わるため web と backend は同時反映（同一コミットなので通常の push で揃う）。
 13. [ ] **/contact の実受信確認** — 本番で1通送り、ADMIN_EMAILS 宛に届くこと（Brevo）を確認。届かなければ ADMIN_EMAILS か MAIL 設定。
 
 ## 02 課題・構想（決めてから着手）
