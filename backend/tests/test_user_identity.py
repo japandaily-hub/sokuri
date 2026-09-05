@@ -360,8 +360,12 @@ class TestAdminReview:
             "/api/v1/admin/identity-documents", headers=_auth(admin_token)
         )
         assert r_list.status_code == 200
-        ids = [d["id"] for d in r_list.json()]
+        # r10 O-M1: 応答は {items,total,counts}（従来は素の list）。
+        list_body = r_list.json()
+        ids = [d["id"] for d in list_body["items"]]
         assert document_id in ids
+        assert list_body["total"] == 1
+        assert list_body["counts"]["pending"] == 1
 
         r_approve = await client.patch(
             f"/api/v1/admin/identity-documents/{document_id}/approve", headers=_auth(admin_token)
@@ -491,8 +495,12 @@ class TestAdminDeletedUserDocuments:
             headers=_auth(admin_token),
         )
         assert r_list.status_code == 200
-        ids = [d["id"] for d in r_list.json()]
+        list_body = r_list.json()
+        ids = [d["id"] for d in list_body["items"]]
         assert document_id not in ids
+        # total / counts も一覧と同じ除外条件（退会済みは審査対象外）で数える。
+        assert list_body["total"] == 0
+        assert list_body["counts"] == {"pending": 0, "approved": 0, "rejected": 0}
 
     async def test_approve_erased_document_returns_410(
         self, client: AsyncClient, db_session: AsyncSession

@@ -46,6 +46,10 @@ export default function AdminUsersPage() {
   const [qInput, setQInput] = useState("");
   const [q, setQ] = useState("");
   const [offset, setOffset] = useState(0);
+  // r10 O-M5: 退会済み（匿名化済み）ユーザーは backend 既定で一覧から除外され、
+  // 停止中だけを抜き出す手段も無かった。/admin の業者一覧と同じ明示トグルで切り替える。
+  const [includeDeleted, setIncludeDeleted] = useState(false);
+  const [suspendedOnly, setSuspendedOnly] = useState(false);
 
   const [suspendTarget, setSuspendTarget] = useState<AdminUserListItem | null>(null);
   const [roleTarget, setRoleTarget] = useState<RoleActionTarget | null>(null);
@@ -58,7 +62,10 @@ export default function AdminUsersPage() {
     if (!token) return;
     setBusy(true);
     try {
-      const res = await adminListUsers({ q, limit: ADMIN_LIST_DEFAULT_LIMIT, offset }, token);
+      const res = await adminListUsers(
+        { q, limit: ADMIN_LIST_DEFAULT_LIMIT, offset, includeDeleted, suspended: suspendedOnly },
+        token,
+      );
       setData(res);
       setError(null);
     } catch (e) {
@@ -66,7 +73,7 @@ export default function AdminUsersPage() {
     } finally {
       setBusy(false);
     }
-  }, [token, q, offset]);
+  }, [token, q, offset, includeDeleted, suspendedOnly]);
 
   useEffect(() => {
     void reload();
@@ -178,6 +185,33 @@ export default function AdminUsersPage() {
             </button>
           </div>
 
+          {/* r10 O-M5: トグル変更時は offset を 0 に戻す（絞り込み後の総件数より大きい
+              offset が残ると「該当なし」に見えるため）。 */}
+          <div className="mt-2 flex flex-wrap gap-4">
+            <label className="flex items-center gap-1.5 text-xs text-slate-500">
+              <input
+                type="checkbox"
+                checked={includeDeleted}
+                onChange={(e) => {
+                  setOffset(0);
+                  setIncludeDeleted(e.target.checked);
+                }}
+              />
+              退会済みを含む
+            </label>
+            <label className="flex items-center gap-1.5 text-xs text-slate-500">
+              <input
+                type="checkbox"
+                checked={suspendedOnly}
+                onChange={(e) => {
+                  setOffset(0);
+                  setSuspendedOnly(e.target.checked);
+                }}
+              />
+              停止中のみ
+            </label>
+          </div>
+
           <div className="mt-4 overflow-x-auto" tabIndex={0} role="region" aria-label="依頼者一覧">
             <table className="w-full text-sm">
               <thead>
@@ -192,7 +226,11 @@ export default function AdminUsersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {data?.items.map((u) => (
+                {data?.items.map((u) => {
+                  // r10 O-M5: 退会（匿名化）済みユーザーは停止／昇格の対象外（backend が 409 で拒否）。
+                  // 業者一覧（/admin）と同じく、操作ボタンを出さずバッジで理由を示す。
+                  const isDeleted = Boolean(u.deleted_at);
+                  return (
                   <tr key={u.id}>
                     <td className="py-2 pr-4">
                       <CopyableId id={u.id} />
@@ -204,7 +242,9 @@ export default function AdminUsersPage() {
                     </td>
                     <td className="py-2 pr-4 text-right">{u.case_count}</td>
                     <td className="py-2 pr-4">
-                      {u.role === "admin" ? (
+                      {isDeleted ? (
+                        <StatusBadge value="cancelled" label="退会済み" />
+                      ) : u.role === "admin" ? (
                         <StatusBadge value="approved" label="admin" />
                       ) : u.is_suspended ? (
                         <StatusBadge value="cancelled" label="停止中" />
@@ -213,6 +253,9 @@ export default function AdminUsersPage() {
                       )}
                     </td>
                     <td className="py-2 text-right">
+                      {isDeleted ? (
+                        <p className="text-xs text-slate-600">退会済みのため操作できません</p>
+                      ) : (
                       <div className="flex justify-end gap-2">
                         {u.email !== myEmail && u.role === "user" && !u.is_suspended ? (
                           <button
@@ -254,9 +297,11 @@ export default function AdminUsersPage() {
                           </button>
                         )}
                       </div>
+                      )}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
             {data && data.items.length === 0 ? (

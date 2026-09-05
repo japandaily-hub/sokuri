@@ -627,6 +627,9 @@ export default function ProfileEditPage() {
                 ))}
               </select>
               {prefErr ? <div className="field-error">{prefErr}</div> : null}
+              <p className="field-hint">
+                ※ 出品（訪問買取）の対応エリアは東京都・千葉県・埼玉県・神奈川県です。
+              </p>
             </div>
             <div className={`field${cityErr ? " has-error" : ""}`}>
               <label htmlFor="inp-city">

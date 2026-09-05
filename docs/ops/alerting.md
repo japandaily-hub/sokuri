@@ -47,14 +47,19 @@ LINE Notify は 2025年3月に終了しているため、Messaging API の別チ
 - `/readyz`: HTTP 200 かつ `status == "ready"`、`db == "ok"`、`schema.alembic_version == schema.expected_head`
 - フロント `/`: HTTP 200 かつ `<title>` を含む
 - 応答時間 > `SLOW_MS`（既定 8000ms）は Warning
+- `/readyz` の `degraded_config`（本番必須設定のうち未充足のキー名。`encryption_key` / `brevo` / `line_push` / `gemini` / `admin_emails` / `frontend_base_url` / `alerts_line`）が **非空なら Warning**。API は 200 ready のままなので障害（Critical）とは別軸で扱います。`/readyz` 自体が NG の実行では判定をスキップし、「解消した」と誤検知しません。
+  `config.alerts_webhook` は bool として引き続き返りますが、`degraded_config`（Warning 対象）からは除外しています。運営向けアラートは LINE / メール / Webhook の代替経路を持ち、Webhook 未設定は障害通知の劣化を意味しないためです（r10 fix）。
 
 状態遷移で通知します（毎回は送りません）。
 - up → down: `[CRITICAL] 障害検知`
 - down 継続: `ALERT_REPEAT_EVERY`（既定 12 回＝約1時間）ごとに再通知
 - down → up: `[RECOVERED] 復旧しました`
 - 応答遅延（Warning）も遷移型: 遅くなった時に 1 回、通常速度に戻った時に `[INFO] 解消` を 1 回。遅い間の再送はしない
+- `degraded_config` も遷移型: 未充足キーの集合が**変化した時だけ** `[WARNING] 本番必須設定の未充足`、空に戻った時に `[INFO] 解消` を 1 回
 - **正常時は何も送らない**（5分毎のチェック結果はメールされず、Actions の Step Summary にだけ残る）
 - 状態は `actions/cache` で持ち回します（キャッシュが消えた場合は「初回検知」として再通知されるだけで、取りこぼしはありません）。
+
+**通知の死活（デッドマンスイッチ）**: 通知が必要だったのに全チャネル（メール / LINE / Webhook）で送信に失敗した実行は、Step Summary に `**通知全滅**` を書いて **終了コード 1** で終わります（Actions が赤くなり、GitHub の workflow 失敗メールが最後の砦になります）。従来は常に 0 で終了し、Step Summary も正常時と同じ「通知: なし」だったため、`ALERT_LINE_CHANNEL_ACCESS_TOKEN` の失効・Brevo の Authorised IPs 制限・Secrets の消失で**障害通知が 1 通も届かないのに Actions は緑のまま**でした。正常時（通知が不要な実行）は `notify()` を一度も呼ばないため、この判定には掛かりません。
 
 ### アプリ内監視（`app/core/alert_middleware.py`）
 - 未処理例外: 1件で即通知（`key = unhandled:<path>`、同じパスはクールダウン中は再送しない）。例外はそのまま再送出され、既定の 500 応答は変わりません。

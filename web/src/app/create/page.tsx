@@ -15,7 +15,7 @@ import Link from "next/link";
 import { Ic, type IcName } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
 import { useToken } from "@/components/kdz/Ui";
-import { createCase, uploadCasePhoto, toDisplayMessage, createTimeoutSignal, KdzNetworkError } from "@/lib/katadzuke-api";
+import { createCase, uploadCasePhoto, toDisplayMessage, createTimeoutSignal, KdzApiError, KdzNetworkError } from "@/lib/katadzuke-api";
 import { CASE_PURPOSES } from "@/lib/case-labels";
 import "./create.css";
 
@@ -117,6 +117,9 @@ export default function CreateCasePage() {
   const [floorNumber, setFloorNumber] = useState<string>("");
   const [hasElevator, setHasElevator] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // r10-review M5 是正: 403 を一律セッション切れ扱いすると account_suspended（利用停止）の
+  // ケースが誤案内になるため、専用フラグで案内文を出し分ける。
+  const [accountSuspended, setAccountSuspended] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState("");
   /**
@@ -374,6 +377,7 @@ export default function CreateCasePage() {
     }
     setSubmitting(true);
     setError(null);
+    setAccountSuspended(false);
     try {
       const itemPayloads: { name?: string; sort_order: number; photos: { storage_key: string; sort_order: number }[] }[] = [];
 
@@ -386,7 +390,9 @@ export default function CreateCasePage() {
           setProgress(`商品 ${i + 1}/${items.length} の写真をアップロード中… (${j + 1}/${item.photos.length})`);
           let key = photo.uploadedKey;
           if (!key) {
-            const presign = await uploadCasePhoto(photo.file, token);
+            // r10 M9: 401/403 で signOut・画面遷移されると撮影済み写真・入力内容が失われるため、
+            // ここでは自動後始末を止め、下の catch で画面内メッセージのみ表示する。
+            const presign = await uploadCasePhoto(photo.file, token, { skipAuthRedirect: true });
             key = presign.storage_key;
             setItems((prev) =>
               prev.map((it) =>
@@ -407,7 +413,7 @@ export default function CreateCasePage() {
         setProgress(`まとめ撮影の写真をアップロード中… (${i + 1}/${loosePhotos.length})`);
         let key = photo.uploadedKey;
         if (!key) {
-          const presign = await uploadCasePhoto(photo.file, token);
+          const presign = await uploadCasePhoto(photo.file, token, { skipAuthRedirect: true });
           key = presign.storage_key;
           setLoosePhotos((prev) => prev.map((p) => (p.id === photo.id ? { ...p, uploadedKey: key } : p)));
         }
@@ -442,6 +448,7 @@ export default function CreateCasePage() {
         { ...casePayload, idempotency_key: idempotencyKeyRef.current ?? undefined },
         token,
         createTimeoutSignal(60_000),
+        { skipAuthRedirect: true },
       );
       // 送信成功後は次回の送信（別案件の新規作成）に備えてキーを破棄する。
       idempotencyKeyRef.current = null;
@@ -452,10 +459,24 @@ export default function CreateCasePage() {
       const isTimeout =
         err instanceof KdzNetworkError &&
         (err.cause as { name?: string } | null | undefined)?.name === "TimeoutError";
+      // r10 M9: uploadCasePhoto/createCase に skipAuthRedirect を渡しているため、
+      // 401/403 でも signOut・画面遷移は発生しない。ここで検知し、撮影済み写真・
+      // 入力内容を保持したまま再送信を促す専用メッセージへ差し替える。
+      // r10-review M5 是正: 403 のうち detail.code === "account_suspended"（利用停止）は
+      // セッション切れではないため専用の停止案内に振り分ける。
+      const isSuspended =
+        err instanceof KdzApiError && err.status === 403 && err.code === "account_suspended";
+      const isSessionExpired =
+        !isSuspended && err instanceof KdzApiError && (err.status === 401 || err.status === 403);
+      setAccountSuspended(isSuspended);
       setError(
-        isTimeout
-          ? "送信に時間がかかっています。しばらくしてからマイページをご確認ください。同じ内容で再送信しても重複登録されません"
-          : toDisplayMessage(err, "送信に失敗しました。もう一度お試しください。"),
+        isSuspended
+          ? null
+          : isTimeout
+            ? "送信に時間がかかっています。しばらくしてからマイページをご確認ください。同じ内容で再送信しても重複登録されません"
+            : isSessionExpired
+              ? "セッションの有効期限が切れました。別のタブでログインし直してから、もう一度送信してください（写真と入力内容はこの画面に残ります）"
+              : toDisplayMessage(err, "送信に失敗しました。もう一度お試しください。"),
       );
       setSubmitting(false);
       setProgress("");
@@ -499,6 +520,19 @@ export default function CreateCasePage() {
 
       <main id="main">
         <div className="flow-wrap">
+          {accountSuspended ? (
+            <div className="auth-error" role="alert" style={{ marginBottom: 16 }}>
+              <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: "none", stroke: "var(--danger)", strokeWidth: 2, strokeLinecap: "round", flexShrink: 0 }}>
+                <circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" />
+              </svg>
+              <span>
+                このアカウントは利用停止中のため送信できません。お問い合わせ窓口までご連絡ください。
+                <Link href="/contact" style={{ marginLeft: 4, textDecoration: "underline" }}>
+                  お問い合わせはこちら
+                </Link>
+              </span>
+            </div>
+          ) : null}
           {error && (
             <div className="auth-error" role="alert" style={{ marginBottom: 16 }}>
               <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: "none", stroke: "var(--danger)", strokeWidth: 2, strokeLinecap: "round", flexShrink: 0 }}>
@@ -575,7 +609,6 @@ export default function CreateCasePage() {
                           ref={looseInputRef}
                           type="file"
                           accept="image/jpeg,image/png,image/webp"
-                          capture="environment"
                           multiple
                           className="sr-only"
                           onChange={handleLooseFileChange}
@@ -661,7 +694,6 @@ export default function CreateCasePage() {
                     ref={itemInputRef}
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
-                    capture="environment"
                     multiple
                     className="sr-only"
                     onChange={handleItemFileChange}
@@ -740,7 +772,10 @@ export default function CreateCasePage() {
           {step === 2 && (
             <div>
               <h2 className="step-title">住居情報を入力</h2>
-              <p className="step-desc">番地・建物名は業者決定まで公開されません（市区町村までを業者に提示します）。</p>
+              <p className="step-desc">
+                番地・建物名は業者決定まで公開されません（市区町村までを業者に提示します）。
+                出品の対応エリアは東京都・神奈川県・埼玉県・千葉県の4都県のみです。
+              </p>
               <div className="form-card">
                 <div className="field-row">
                   <div className="field">
@@ -879,15 +914,28 @@ export default function CreateCasePage() {
                 </button>
               )}
               {step < STEPS.length - 1 ? (
-                <button type="button" className="btn-flow-next" onClick={() => canNext() && setStep((s) => s + 1)} disabled={!canNext()}>
-                  次へ<Ic name="arrow" />
-                </button>
+                step === 2 ? (
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                    <button type="button" className="btn-flow-next" onClick={() => canNext() && setStep((s) => s + 1)} disabled={!canNext()}>
+                      次へ<Ic name="arrow" />
+                    </button>
+                    {!canNext() && (
+                      <p className="field-error" style={{ margin: 0 }} role="status">
+                        市区町村を入力してください
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <button type="button" className="btn-flow-next" onClick={() => canNext() && setStep((s) => s + 1)} disabled={!canNext()}>
+                    次へ<Ic name="arrow" />
+                  </button>
+                )
               ) : (
                 <button type="button" className="btn-flow-next" onClick={submit} disabled={submitting}>
                   {submitting ? (
                     <><span className="spinning">↻</span> {progress || "送信中…"}</>
                   ) : (
-                    <>この内容で依頼する<Ic name="arrow" /></>
+                    <>この内容で出品する<Ic name="arrow" /></>
                   )}
                 </button>
               )}

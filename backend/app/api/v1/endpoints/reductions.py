@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_operator, get_current_user
+from app.core.limits import MAX_REDUCTION_REQUESTS_PER_TRANSACTION
 from app.db.models.bid import Bid
 from app.db.models.case import Case
 from app.db.models.operator import Operator
@@ -32,7 +33,9 @@ from app.services.case_lock import lock_transaction_rows
 router = APIRouter()
 
 # 1取引あたりの減額申請の上限回数（却下後に1回だけ再申請できる）。r8-M3 対応。
-_MAX_REDUCTION_REQUESTS = 2
+# r10 V-M4 で core/limits.py へ移設（成約詳細 API も同じ値を返すため）。
+# 既存の参照名は互換のため残す。
+_MAX_REDUCTION_REQUESTS = MAX_REDUCTION_REQUESTS_PER_TRANSACTION
 
 _TXN_LOAD = (
     selectinload(Transaction.case),

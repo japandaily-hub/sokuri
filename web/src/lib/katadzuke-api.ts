@@ -201,6 +201,13 @@ export interface TransactionListItem {
   initial_amount: number;
   final_amount: number | null;
   visit_date: string | null;
+  /**
+   * confirmSchedule で設定される訪問時間帯（例: "10:00-12:00"）。未確定時は null。
+   * [推測] backend の TransactionListItem に本フィールドが追加されるまでは undefined
+   * のまま届く想定（r10 対応）。formatVisitSchedule(visit_date, visit_time_slot) に
+   * そのまま渡せば、未対応期間中も visit_date のみの表示にフォールバックする。
+   */
+  visit_time_slot?: string | null;
   created_at: string;
   purpose: string;
   prefecture: string;
@@ -275,6 +282,15 @@ export interface TransactionDetail extends TransactionOut {
   /** limited業者が落札した場合、admin承認待ちで住所非開示中 */
   awaiting_approval: boolean;
   reduction_requests: ReductionOut[];
+  /**
+   * この取引でこれまでに送信済みの減額申請の件数（却下・取り下げ分も含む累計）。
+   * 業者側フォームの「残り n 回」表示に使う（r10 M4）。
+   * r10 H2 是正: backend 未反映の環境では応答に含まれない場合があるため optional 化。
+   * 未定義時の扱いは getReductionQuota() に委ねる（既定上限・残り不明）。
+   */
+  reduction_request_count?: number;
+  /** 1取引あたりの減額申請の上限回数（backend 側の固定値。現行 2）。r10 H2: 同上の理由で optional。 */
+  reduction_request_limit?: number;
   reviews: ReviewOut[];
   /** 相手が送信し、自分がまだ既読にしていないメッセージ数。 */
   unread_count: number;
@@ -292,6 +308,27 @@ export interface TransactionDetail extends TransactionOut {
   cancellation: TransactionCancellation | null;
   /** 落札業者が退会済みか（依頼者・業者双方の画面で取引継続不可の判定に使う）。r8-fix-frontend5 対応。 */
   operator_deleted: boolean;
+}
+
+/** reduction_request_limit が backend から未取得の場合に使う既定の上限回数。r10 H2 対応。 */
+export const REDUCTION_REQUEST_DEFAULT_LIMIT = 2;
+
+/**
+ * 減額申請の上限・残り回数を算出する（依頼者側・業者側の両画面で共通利用）。
+ * reduction_request_count/limit が未定義（backend 未反映等）の場合、上限は既定値とし、
+ * 残り回数は「不明」（null）として返す。呼び出し側は remaining===0 の場合のみ上限到達扱いにし、
+ * null の場合は申請フォームを消さない（r10 H2 対応）。
+ */
+export function getReductionQuota(txn: {
+  reduction_request_count?: number;
+  reduction_request_limit?: number;
+}): { limit: number; remaining: number | null } {
+  const limit = txn.reduction_request_limit ?? REDUCTION_REQUEST_DEFAULT_LIMIT;
+  const remaining =
+    txn.reduction_request_count != null && txn.reduction_request_limit != null
+      ? Math.max(0, limit - txn.reduction_request_count)
+      : null;
+  return { limit, remaining };
 }
 
 // ---------------------------------------------------------------------------
@@ -543,6 +580,8 @@ export class KdzApiError extends Error {
   constructor(
     public readonly status: number,
     message: string,
+    /** backend の detail.code（例: "account_suspended"）。存在する場合のみ設定される。 */
+    public readonly code?: string,
   ) {
     super(message);
     this.name = "KdzApiError";
@@ -738,9 +777,9 @@ async function throwHttpError(
       suspended: true,
       decorative: opts?.decorative,
     });
-    throw new KdzApiError(403, suspendedMessage);
+    throw new KdzApiError(403, suspendedMessage, "account_suspended");
   }
-  throw new KdzApiError(res.status, message);
+  throw new KdzApiError(res.status, message, detailCode);
 }
 
 /**
@@ -1166,12 +1205,28 @@ export interface AdminIdentityDocument {
   has_back: boolean;
 }
 
+/** 本人確認書類一覧の絞り込み状態（"all" は絞り込みなし。unverified は提出物が無い状態なので含めない）。 */
+export type AdminIdentityStatusFilter = "pending" | "approved" | "rejected" | "all";
+
+/**
+ * 本人確認書類一覧のレスポンス（r10 O-M1〜M3: 従来の素の配列から
+ * `{items,total,counts}` へ変更。counts は q/status の絞り込みに関わらず常に
+ * 全体の状態別件数を返し、/admin トップの審査待ちバッジを正確に保つ）。
+ */
+export interface AdminIdentityDocumentListResponse {
+  items: AdminIdentityDocument[];
+  total: number;
+  counts: { pending: number; approved: number; rejected: number };
+}
+
 export function listIdentityDocumentsAdmin(
-  status: "pending" | "all",
-  params: { limit?: number; offset?: number },
+  params: { status?: AdminIdentityStatusFilter; q?: string; limit?: number; offset?: number },
   token: string,
-): Promise<AdminIdentityDocument[]> {
-  const sp = new URLSearchParams({ status });
+): Promise<AdminIdentityDocumentListResponse> {
+  const sp = new URLSearchParams();
+  if (params.status && params.status !== "all") sp.set("status", params.status);
+  else sp.set("status", "all");
+  if (params.q && params.q.trim()) sp.set("q", params.q.trim());
   sp.set("limit", String(params.limit ?? ADMIN_LIST_DEFAULT_LIMIT));
   sp.set("offset", String(params.offset ?? 0));
   return request(`/admin/identity-documents?${sp.toString()}`, { token });
@@ -1445,6 +1500,13 @@ export const MAX_PHOTO_UPLOAD_BYTES = 10 * 1024 * 1024;
 export async function uploadCasePhoto(
   file: File,
   token: string,
+  /**
+   * true の場合、401/403 を受けても signOut・画面遷移を行わない（r10 M9）。
+   * create/page.tsx のように、失敗時に入力内容・撮影済み写真を画面に残したまま
+   * 再送信させたい呼び出し元向け。省略時は従来どおり throwHttpError の既定動作
+   * （セッション失効の自動後始末）に従う。
+   */
+  opts?: { skipAuthRedirect?: boolean },
 ): Promise<PresignResponse> {
   // r8-fix-frontend2 H4 是正: 非対応形式（HEIC 等）を "image/jpeg" と偽って送ると
   // backend のマジックバイト判定で必ず 415 になり、原因不明の失敗として再試行を招く。
@@ -1469,6 +1531,7 @@ export async function uploadCasePhoto(
     method: "POST",
     body: JSON.stringify({ filename: file.name, content_type: contentType }),
     token,
+    skipAuthRedirect: opts?.skipAuthRedirect,
   });
 
   let res: Response;
@@ -1490,7 +1553,7 @@ export async function uploadCasePhoto(
   // r8-fix-frontend2 H4 是正: 従来は 401 以外の全エラーを汎用文言に潰していたため、
   // 413/415/422 の backend detail（サイズ超過・非対応形式・空ファイル等）が
   // 一切表示されなかった。throwHttpError に一本化し detail をそのまま出す。
-  if (!res.ok) await throwHttpError(res);
+  if (!res.ok) await throwHttpError(res, { skipAuthRedirect: opts?.skipAuthRedirect });
   return presign;
 }
 
@@ -1516,8 +1579,16 @@ export function createCase(
   payload: CaseCreatePayload,
   token: string,
   signal?: AbortSignal,
+  /** true の場合、401/403 を受けても signOut・画面遷移を行わない（r10 M9・uploadCasePhoto と同旨）。 */
+  opts?: { skipAuthRedirect?: boolean },
 ): Promise<CaseOut> {
-  return request("/cases", { method: "POST", body: JSON.stringify(payload), token, signal });
+  return request("/cases", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    token,
+    signal,
+    skipAuthRedirect: opts?.skipAuthRedirect,
+  });
 }
 
 export function listMyCases(token: string): Promise<CaseOut[]> {
@@ -1815,6 +1886,12 @@ export interface AdminOperatorListResponse {
     active: number;
     rejected: number;
     suspended: number;
+    /**
+     * pending のうち古物商許可証を提出済み＝すぐ審査に着手できる件数（r10 O-M4）。
+     * pending 全体には「申し込んだが許可証未提出で運営が動けない」業者が混ざるため、
+     * バッジに「うち許可証提出済み n」を併記して着手可能な母数を区別する。
+     */
+    pending_with_license: number;
   };
 }
 
@@ -1965,6 +2042,9 @@ export interface AdminListParams {
    *  backend が対応するのは /admin/operators のみ（他エンドポイントは未対応の
    *  クエリパラメータとして無視される）。既定は省略（backend 側の既定 false と同じ＝除外）。 */
   includeDeleted?: boolean;
+  /** true の場合、停止中（is_suspended=true）のアカウントのみに絞り込む。
+   *  backend が対応するのは /admin/users のみ（r10 O-M5）。false/未指定は絞り込みなし。 */
+  suspended?: boolean;
 }
 
 function buildAdminListQuery(params: AdminListParams): string {
@@ -1974,6 +2054,7 @@ function buildAdminListQuery(params: AdminListParams): string {
   sp.set("limit", String(params.limit ?? ADMIN_LIST_DEFAULT_LIMIT));
   sp.set("offset", String(params.offset ?? 0));
   if (params.includeDeleted) sp.set("include_deleted", "true");
+  if (params.suspended) sp.set("suspended", "true");
   return sp.toString();
 }
 
@@ -2004,6 +2085,12 @@ export interface AdminUserListItem {
   suspended_at: string | null;
   created_at: string;
   case_count: number;
+  /**
+   * 退会（匿名化）済みの場合のみ非null。[推測] backend の AdminUserListItem に本フィールドが
+   * 追加されるまでは undefined のままとなり、行バッジが出ないだけで他の表示には影響しない
+   * （include_deleted=true を選んだ運営が「どれが退会済みか」を判別するための任意フィールド）。
+   */
+  deleted_at?: string | null;
 }
 
 export interface AdminUserListResponse {
@@ -2012,10 +2099,56 @@ export interface AdminUserListResponse {
 }
 
 export function adminListUsers(
-  params: Pick<AdminListParams, "q" | "limit" | "offset">,
+  params: Pick<AdminListParams, "q" | "limit" | "offset" | "includeDeleted" | "suspended">,
   token: string,
 ): Promise<AdminUserListResponse> {
   return request(`/admin/users?${buildAdminListQuery(params)}`, { token });
+}
+
+// ---------------------------------------------------------------------------
+// 管理: お問い合わせ（/contact の受信箱。r10 O-M6 対応）
+// ---------------------------------------------------------------------------
+
+/** 受信済みのお問い合わせ1件。handled_at が非null なら対応済み。 */
+export interface AdminContactMessage {
+  id: string;
+  name: string;
+  email: string;
+  category: string;
+  message: string;
+  created_at: string;
+  handled_at: string | null;
+}
+
+export interface AdminContactListResponse {
+  items: AdminContactMessage[];
+  total: number;
+}
+
+/**
+ * お問い合わせ一覧。handled を省略すると全件、false で未対応のみ、true で対応済みのみ。
+ * total は handled の絞り込みを反映した件数（未対応バッジは handled=false&limit=1 の total を使う）。
+ */
+export function adminListContacts(
+  params: { handled?: boolean; limit?: number; offset?: number },
+  token: string,
+): Promise<AdminContactListResponse> {
+  const sp = new URLSearchParams();
+  if (params.handled !== undefined) sp.set("handled", params.handled ? "true" : "false");
+  sp.set("limit", String(params.limit ?? ADMIN_LIST_DEFAULT_LIMIT));
+  sp.set("offset", String(params.offset ?? 0));
+  return request(`/admin/contacts?${sp.toString()}`, { token });
+}
+
+/** お問い合わせを対応済みにする（冪等。既に対応済みなら handled_at はそのまま返る）。 */
+export function adminHandleContact(
+  contactId: string,
+  token: string,
+): Promise<{ id: string; handled_at: string }> {
+  return request(`/admin/contacts/${encodeURIComponent(contactId)}/handle`, {
+    method: "PATCH",
+    token,
+  });
 }
 
 export interface AdminUserSuspendResponse {

@@ -193,7 +193,6 @@ function NotificationsContent() {
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modal]);
 
   function openModal(kind: LineModalKind, e: React.MouseEvent<HTMLButtonElement>) {

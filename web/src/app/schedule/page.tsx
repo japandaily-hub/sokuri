@@ -340,7 +340,7 @@ function SchedulePageInner() {
               </div>
             </div>
             <div className="biz-amount">
-              <div className="label">成約買取額</div>
+              <div className="label">成約金額</div>
               <div className="amount">¥{yen(vendorAmount)}</div>
             </div>
           </div>
@@ -479,7 +479,7 @@ function SchedulePageInner() {
               <span className="confirm-val">{vendorName}</span>
             </div>
             <div className="confirm-row">
-              <span className="confirm-lbl">買取額</span>
+              <span className="confirm-lbl">成約金額</span>
               <span className="confirm-val">¥{yen(vendorAmount)}</span>
             </div>
             <div className="confirm-row">

@@ -21,6 +21,7 @@ import { Spinner } from "@/components/Icon";
 import { OperatorHeader } from "@/components/kdz/OperatorHeader";
 import { useToken } from "@/components/kdz/Ui";
 import { formatPurposeLabel } from "@/lib/case-labels";
+import { formatVisitSchedule } from "@/lib/categories";
 import { DisclosureNotice } from "@/components/kdz/DisclosureNotice";
 import {
   CANCELLED_BY_LABEL,
@@ -31,6 +32,7 @@ import {
   createReduction,
   createReview,
   formatYen,
+  getReductionQuota,
   getTransaction,
   photoSrc,
   toDisplayMessage,
@@ -86,7 +88,6 @@ export default function OperatorTransactionPage() {
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modal]);
 
   const reload = useCallback(async () => {
@@ -132,7 +133,7 @@ export default function OperatorTransactionPage() {
       <div className="case-detail-page">
         <OperatorHeader active="transactions" />
         <div className="op-wrap narrow">
-          <div className="op-alert error">{error ?? "成約情報が見つかりません。"}</div>
+          <div className="op-alert error">{error ?? "取引情報が見つかりません。"}</div>
         </div>
       </div>
     );
@@ -143,6 +144,13 @@ export default function OperatorTransactionPage() {
   const myReview = txn.reviews.find((r) => r.reviewer_type === "operator");
   const active = txn.status === "pending" || txn.status === "visiting";
   const disclosed = Boolean(txn.address) && !txn.awaiting_approval;
+  // r10 H1 是正: 確定した訪問日程が業者UIではチャットのスクロールバックにしか無く、
+  // 取引詳細・一覧から追えなかった。依頼者側（cases/[id]）と同じ formatVisitSchedule で出す。
+  const visitSchedule = formatVisitSchedule(txn.visit_date, txn.visit_time_slot);
+  // r10 M4 是正: 減額申請の残り回数（backend の上限に達すると 409 になるため事前に示す）。
+  // r10 H2 是正: count/limit が未定義（backend 未反映）だと Math.max(0, NaN) となり
+  // フォームごと消えていたため、getReductionQuota() で既定上限・残り不明フォールバックする。
+  const { limit: reductionLimit, remaining: reductionRemaining } = getReductionQuota(txn);
 
   function openReductionModal(e: React.FormEvent) {
     e.preventDefault();
@@ -174,10 +182,13 @@ export default function OperatorTransactionPage() {
             <div className="listing-info">
               <div className="listing-title">{formatPurposeLabel(txn.case?.purpose, "片付け案件")}</div>
               <div className="listing-meta">
-                落札額 {formatYen(txn.initial_amount)}
+                成約金額 {formatYen(txn.initial_amount)}
                 {txn.final_amount != null && txn.final_amount !== txn.initial_amount
                   ? ` → 確定額 ${formatYen(txn.final_amount)}`
                   : ""}
+              </div>
+              <div className="listing-meta">
+                訪問日時 {visitSchedule ? visitSchedule : "未確定（チャットで日程を提案してください）"}
               </div>
             </div>
             <div className={`listing-status-badge ${txn.status === "completed" ? "badge-active" : txn.status === "cancelled" ? "badge-done" : "badge-waiting"}`}>
@@ -188,6 +199,23 @@ export default function OperatorTransactionPage() {
           <div className="op-card">
             <DisclosureNotice viewer="operator" disclosed={disclosed} awaitingApproval={txn.awaiting_approval} />
           </div>
+
+          {/* r10 H2・H3 是正: 依頼者側には「代金は業者とチャットで調整」「完了確定は依頼者が行う」と
+              案内されているのに、業者側には精算方法も完了確定の主体もどこにも書かれていなかった。
+              成約直後に必ず目に入る位置（開示カード直下）へ置く。キャンセル済みでは出さない。 */}
+          {txn.status !== "cancelled" ? (
+            <div className="op-card">
+              <h2>成約後の進め方</h2>
+              <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.85, marginTop: 8 }}>
+                <strong style={{ color: "var(--navy)" }}>買取代金は依頼者と直接精算します</strong>
+                （現金またはお振込み。方法はチャットで調整。カタヅケは送金を仲介しません）。
+              </p>
+              <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.85, marginTop: 8 }}>
+                <strong style={{ color: "var(--navy)" }}>作業完了は依頼者が確定します。</strong>
+                訪問・引き取り後、依頼者にチャットで完了確定を依頼してください。
+              </p>
+            </div>
+          ) : null}
 
           {/* r8-fix-frontend2 H2 是正: キャンセルの理由が相手方に一切届かなかった問題への対応。
               誰が・なぜ・いつキャンセルしたかを表示する。 */}
@@ -275,11 +303,19 @@ export default function OperatorTransactionPage() {
               </ul>
             )}
 
-            {active && !pendingReduction ? (
+            {active && !pendingReduction && reductionRemaining !== 0 ? (
               <form onSubmit={openReductionModal} style={{ marginTop: txn.reduction_requests.length > 0 ? 18 : 4 }}>
                 <p style={{ fontSize: 13, color: "var(--body-soft)", marginBottom: 14, lineHeight: 1.8 }}>
                   現地確認の結果、物量・状態が想定と異なる場合のみ申請してください。現在の金額:{" "}
                   <strong style={{ color: "var(--navy)" }}>{formatYen(currentAmount)}</strong>
+                  <br />
+                  {/* r10 M4 是正: 上限に達してから 409 で弾かれるのではなく、事前に残数を示す。
+                      r10 H2 是正: count/limit 未取得時は「不明」と表示し、フォームは消さない。 */}
+                  申請できる残り回数:{" "}
+                  <strong style={{ color: "var(--navy)" }}>
+                    {reductionRemaining === null ? "不明" : `${reductionRemaining}回`}
+                  </strong>
+                  （上限{reductionLimit}回）
                 </p>
                 <div className="field">
                   <label htmlFor="reductionAmount">
@@ -319,7 +355,14 @@ export default function OperatorTransactionPage() {
               </form>
             ) : null}
             {pendingReduction ? <div className="op-alert warn" style={{ marginTop: 14, marginBottom: 0 }}>お客様の回答待ちの申請があります。</div> : null}
-            {!active ? <p style={{ fontSize: 13, color: "var(--body-soft)", marginTop: 8 }}>この成約では申請できません。</p> : null}
+            {/* r10 M4 是正: 上限到達時はフォームを出さず、出せない理由を明示する。 */}
+            {active && !pendingReduction && reductionRemaining === 0 ? (
+              <p style={{ fontSize: 13, color: "var(--body-soft)", marginTop: 8, lineHeight: 1.8 }}>
+                減額申請は1取引につき{reductionLimit}回までです。上限に達しているため、これ以上申請できません。
+                金額の相談が必要な場合はチャットでお客様とお話しください。
+              </p>
+            ) : null}
+            {!active ? <p style={{ fontSize: 13, color: "var(--body-soft)", marginTop: 8 }}>この取引では申請できません。</p> : null}
           </div>
 
           {/* ===== キャンセル ===== */}
@@ -340,7 +383,7 @@ export default function OperatorTransactionPage() {
                 className="btn"
                 style={{ border: "1.5px solid var(--danger)", color: "var(--danger)", background: "#fff" }}
               >
-                この成約をキャンセルする
+                この取引をキャンセルする
               </button>
             </div>
           )}

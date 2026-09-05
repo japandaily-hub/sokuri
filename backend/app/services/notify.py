@@ -243,6 +243,26 @@ async def send_operator_application_admin_alert(to_email: str, company_name: str
     )
 
 
+async def send_identity_submitted_admin_alert(to_email: str) -> bool:
+    """④' 依頼者の本人確認書類の新規提出通知（admin宛。r10 O-M1）。
+
+    提出者の氏名・メール・書類種別は**一切含めない**。宛先は運営だが、経路は
+    Brevo（第三者）を通り、件名・本文はメールボックス検索・転送で拡散しうるため、
+    本人確認という機微な文脈で PII を載せる利得が無い（管理画面で照合できる）。
+    ``send_operator_application_admin_alert`` と同型の1宛先1通・戻り値 bool。
+    """
+    settings = get_settings()
+    url = f"{settings.frontend_base_url}/admin/identity-documents"
+    return await _send(
+        to_email,
+        "【カタヅケ管理】本人確認書類の提出がありました",
+        _wrap(
+            "<p>依頼者から本人確認書類の提出がありました。管理画面から審査してください。</p>"
+            f'<p><a href="{html.escape(url, quote=True)}">本人確認書類の審査へ</a></p>'
+        ),
+    )
+
+
 async def send_operator_application_approved(to_email: str, company_name: str, invite_code: str) -> bool:
     """⑤ 業者事前申込の承認通知（申込者宛・招待コード案内）。"""
     settings = get_settings()
@@ -294,7 +314,13 @@ async def send_reduction_decided(to_email: str, transaction_id: str, approved: b
 
 
 async def send_transaction_cancelled(to_email: str, transaction_id: str, recipient_party: str) -> bool:
-    """成約キャンセル通知（相手方宛・ADD-1対応）。"""
+    """成約キャンセル通知（相手方宛・ADD-1対応）。
+
+    r10 O-H-1: リンク先は ``/chat/{id}``（依頼者）/ ``/operator/transactions/{id}``
+    （業者）のままとし、キャンセル理由は web 側が当該画面に描画する
+    （API は ``TransactionDetailOut.cancellation`` で既に返済み）。メール本文には
+    当事者入力の自由文を載せず、「どこで読めるか」だけを案内する。
+    """
     settings = get_settings()
     path = (
         f"/chat/{transaction_id}"
@@ -307,7 +333,8 @@ async def send_transaction_cancelled(to_email: str, transaction_id: str, recipie
         "【カタヅケ】成約がキャンセルされました",
         _wrap(
             "<p>進行中だった成約が、相手方によりキャンセルされました。</p>"
-            f'<p><a href="{url}">詳細を確認する</a></p>'
+            "<p>キャンセルの理由は、下のリンク先の画面でご確認いただけます。</p>"
+            f'<p><a href="{url}">詳細と理由を確認する</a></p>'
         ),
     )
 
@@ -318,8 +345,10 @@ async def send_transaction_cancelled_by_admin(
     """運営による成約の強制終了の通知（当事者双方宛・r8-M5）。
 
     「相手方により」ではなく運営の判断である旨を明示する（当事者が相手を誤解し、
-    直接連絡・トラブル化するのを防ぐ）。理由は画面（成約詳細の cancellation）で
-    確認してもらう（メール本文には運営入力の自由文を載せない）。
+    直接連絡・トラブル化するのを防ぐ）。理由は画面（依頼者はチャット画面、業者は
+    成約詳細の cancellation）で確認してもらう（メール本文には運営入力の自由文を
+    載せない）。r10 O-H-1: 着地先は変更せず、本文で「理由はその画面で読める」ことを
+    明示する（web 側がチャット画面に理由を描画する）。
     """
     settings = get_settings()
     path = (
@@ -333,6 +362,7 @@ async def send_transaction_cancelled_by_admin(
         "【カタヅケ】成約が運営によりキャンセルされました",
         _wrap(
             "<p>進行中だった成約が、運営の判断によりキャンセルされました。</p>"
+            "<p>キャンセルの理由は、下のリンク先の画面でご確認いただけます。</p>"
             f'<p><a href="{url}">詳細と理由を確認する</a></p>'
         ),
     )

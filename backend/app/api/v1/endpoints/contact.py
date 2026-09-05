@@ -39,12 +39,16 @@ from __future__ import annotations
 
 import logging
 import time
+import uuid
 from collections import deque
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.rate_limit_deps import RateLimitGuard
 from app.config import get_settings
+from app.db.models.contact_message import ContactMessage
+from app.db.session import get_session
 from app.schemas_katadzuke import ContactCreateRequest, ContactCreateResponse
 from app.services import alerts, notify
 
@@ -152,6 +156,7 @@ async def create_contact(
     body: ContactCreateRequest,
     background: BackgroundTasks,
     request: Request,
+    session: AsyncSession = Depends(get_session),
     # security review N-2対応: /cases と scope名を分離した専用スコープ（IP軸・
     # アカウント軸とも10req/3600s）を使う。数値ルールは case_create を流用するが
     # バケット実体は独立する（_scope_spec の "contact" 分岐を参照）。
@@ -191,12 +196,51 @@ async def create_contact(
         )
         raise _contact_cap_exceeded(retry_after_seconds)
 
+    # r10 O-M6: メール送信の前に DB へ保存する（受信台帳）。従来はメールのみで、
+    # ADMIN_EMAILS 未設定・Brevo 障害・迷惑メール振り分けのいずれか一つで問い合わせが
+    # 痕跡ゼロで消えていた（依頼者には 202 が返るため誰も気づけない）。
+    # 保存失敗でもメール送信と 202 は維持する（速報経路を道連れにしない。
+    # 「片方でも届く」方が問い合わせの取りこぼしより損失が小さい）。
+    contact_id: uuid.UUID | None = None
+    try:
+        contact_message = ContactMessage(
+            name=body.name,
+            email=str(body.email),
+            category=body.category,
+            message=body.message,
+        )
+        session.add(contact_message)
+        await session.commit()
+        contact_id = contact_message.id
+    except Exception as exc:  # noqa: BLE001 -- 保存失敗でメール送信を止めない
+        await session.rollback()
+        # 本文・氏名・メールは PII のためログに出さない（例外種別と要旨のみ）。
+        logger.error(
+            "contact: お問い合わせの保存に失敗しました（メール送信は継続） - %s: %s",
+            type(exc).__name__,
+            str(exc)[:200],
+            exc_info=True,
+        )
+        alerts.fire_and_forget(
+            alerts.send_alert(
+                "/contact の DB 保存に失敗しています",
+                "お問い合わせの受信台帳（contact_messages）への保存が失敗しました。"
+                "メール通知は継続していますが、管理画面の一覧には現れません。"
+                f"直近のエラー: {type(exc).__name__}: {str(exc)[:200]}",
+                severity="warning",
+                key="contact-persist-failed",
+            )
+        )
+
     admin_emails = get_settings().admin_emails
     if not admin_emails:
         # 依頼者には「届かなかった」と見せない（202のまま）代わりに、運用ログで
         # 検知可能にする（ADMIN_EMAILS未設定時に問い合わせが黙って消える事故を防ぐ）。
+        # r10 O-M6 以降は DB に残るため、この経路でも管理画面から回収できる。
         logger.warning(
-            "contact: ADMIN_EMAILS が未設定のため、問い合わせメールを送信できません。"
+            "contact: ADMIN_EMAILS が未設定のため、問い合わせメールを送信できません"
+            "（受信台帳への保存は contact_id=%s）。",
+            contact_id,
         )
         return ContactCreateResponse(ok=True)
 

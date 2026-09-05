@@ -416,11 +416,16 @@ export default function OperatorDashboardPage() {
   );
 
   const now = new Date();
-  /** 今月の成約件数 = visiting + completed（キャンセルは除外）。金額は completed のみ合計。 */
+  /**
+   * 今月の落札件数 = 今月成約した取引のうちキャンセル以外（pending/visiting/completed）。
+   * r10 M2 是正: 旧実装は pending（訪問日調整中）を除外していたため、落札直後の取引が
+   * すべて pending である新規業者に「0件」と表示され、同じ取引を数えている「交渉中」カードと
+   * 同一画面内で矛盾していた。金額は completed のみ合計する（確定額が出るのは完了時のため）。
+   */
   const thisMonthActive = useMemo(
     () =>
       (transactions ?? []).filter((t) => {
-        if (t.status !== "visiting" && t.status !== "completed") return false;
+        if (t.status === "cancelled") return false;
         const d = new Date(t.created_at);
         return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
       }),
@@ -531,13 +536,17 @@ export default function OperatorDashboardPage() {
               <div className="sum-sub">訪問日調整中・訪問予定</div>
             </div>
             <div className="sum-card">
-              <div className="sum-label">今月の成約</div>
+              {/* r10 M2 是正: 「今月の成約」は隣の「交渉中」と母集団が重なり読み手を混乱させたため、
+                  落札（成約が成立した時点）を数える指標であることを見出しで明示する。
+                  r10-review M3 是正: 「今月の落札」は他画面の「成約」表記と揺れて紛らわしいため、
+                  集計基準（落札日基準・キャンセル除く）を見出しに明記する。 */}
+              <div className="sum-label">今月の成約（落札日基準・キャンセル除く）</div>
               <div className="sum-val">
                 {thisMonthActive.length}
                 <span>件</span>
               </div>
               <div className="sum-sub">
-                買取総額 ¥{yen(thisMonthAmount)}（うち完了{thisMonthDoneCount}件）
+                うち完了{thisMonthDoneCount}件・成約額 ¥{yen(thisMonthAmount)}（完了分のみ）
               </div>
             </div>
             <div className="sum-card">
@@ -623,7 +632,7 @@ export default function OperatorDashboardPage() {
                 <p>
                   現在交渉中の取引はありません。
                   <br />
-                  落札状況は「取引」ページからご確認いただけます。
+                  成約した取引は「取引」ページからご確認いただけます。
                 </p>
               </div>
             ) : (
@@ -666,7 +675,7 @@ export default function OperatorDashboardPage() {
             {doneTxns.length === 0 ? (
               <div className="empty-state">
                 <Ic name="check" />
-                <p>成約済みの案件はまだありません。</p>
+                <p>成約済みの取引はまだありません。</p>
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>

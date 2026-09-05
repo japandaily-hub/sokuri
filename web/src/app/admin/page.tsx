@@ -27,11 +27,13 @@ import {
   adminCreateInvite,
   adminGetCellDensity,
   adminGetOperatorLicenseImage,
+  adminListContacts,
   adminListInvites,
   adminListOperatorApplications,
   adminListOperators,
   adminSuspendOperator,
   adminVerifyOperator,
+  listIdentityDocumentsAdmin,
   toDisplayMessage,
   type AdminOperatorListResponse,
   type CellDensityRow,
@@ -87,6 +89,13 @@ export default function AdminPage() {
    *  （r4-fix-frontend2 M4: 先頭ページ内カウントの近似表示から backend 側の正確な総件数に切替）。 */
   const [pendingApplications, setPendingApplications] = useState<number | null>(null);
   const [pendingApplicationsError, setPendingApplicationsError] = useState<string | null>(null);
+
+  /** 本人確認書類の審査待ち件数（r10 O-M1）。counts.pending は絞り込みに依らない全体の内訳。 */
+  const [pendingIdentityDocs, setPendingIdentityDocs] = useState<number | null>(null);
+  const [pendingIdentityDocsError, setPendingIdentityDocsError] = useState<string | null>(null);
+  /** 未対応のお問い合わせ件数（r10 O-M6）。handled=false&limit=1 の total を使う。 */
+  const [unhandledContacts, setUnhandledContacts] = useState<number | null>(null);
+  const [unhandledContactsError, setUnhandledContactsError] = useState<string | null>(null);
 
   const [suspendTarget, setSuspendTarget] = useState<OperatorOut | null>(null);
   // r5-fix-frontend M-2: 失敗時にモーダルを閉じず、ConfirmModal の error prop へ表示する
@@ -147,57 +156,86 @@ export default function AdminPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  // r4-fix-frontend2 M1: 4本を Promise.allSettled にし、1本の5xxで画面全体が
+  // r4-fix-frontend2 M1: 6本を Promise.allSettled にし、1本の5xxで画面全体が
   // 不能にならないようにする。各区画は自分の結果だけを見て自分の error state を更新する。
   const reload = useCallback(async () => {
     if (!token) return;
-    const [invResult, opsResult, densityResult, appsResult] = await Promise.allSettled([
-      adminListInvites({ limit: ADMIN_LIST_DEFAULT_LIMIT, offset: inviteOffset }, token),
-      adminListOperators(
-        {
-          status: statusFilter,
-          q: operatorSearchQuery,
-          limit: ADMIN_LIST_DEFAULT_LIMIT,
-          offset: operatorOffset,
-          includeDeleted: includeDeletedOperators,
-        },
-        token,
-      ),
-      adminGetCellDensity(token),
-      adminListOperatorApplications({ status: "received", limit: 1, offset: 0 }, token),
-    ]);
+    // r10-review H1 是正: 以下のブロックで（旧応答形式との不整合等により）同期的に例外が
+    // 投げられると reload() の Promise が reject し、void reload() 経由の呼び出しでは
+    // 未処理のまま setInitialLoadDone(true) に到達しなくなる（/admin が永久スピナー）。
+    // finally で必ず解除する。
+    try {
+      const [invResult, opsResult, densityResult, appsResult, identityResult, contactsResult] =
+        await Promise.allSettled([
+          adminListInvites({ limit: ADMIN_LIST_DEFAULT_LIMIT, offset: inviteOffset }, token),
+          adminListOperators(
+            {
+              status: statusFilter,
+              q: operatorSearchQuery,
+              limit: ADMIN_LIST_DEFAULT_LIMIT,
+              offset: operatorOffset,
+              includeDeleted: includeDeletedOperators,
+            },
+            token,
+          ),
+          adminGetCellDensity(token),
+          adminListOperatorApplications({ status: "received", limit: 1, offset: 0 }, token),
+          // r10 O-M1 / O-M6: 件数バッジ専用の最小取得（limit=1）。本文は各専用画面で読む。
+          listIdentityDocumentsAdmin({ status: "pending", limit: 1, offset: 0 }, token),
+          adminListContacts({ handled: false, limit: 1, offset: 0 }, token),
+        ]);
 
-    if (invResult.status === "fulfilled") {
-      setInvites(invResult.value);
-      setInviteError(null);
-    } else {
-      setInviteError(toDisplayMessage(invResult.reason, "招待コードの取得に失敗しました"));
+      if (invResult.status === "fulfilled") {
+        setInvites(invResult.value);
+        setInviteError(null);
+      } else {
+        setInviteError(toDisplayMessage(invResult.reason, "招待コードの取得に失敗しました"));
+      }
+
+      if (opsResult.status === "fulfilled") {
+        setOperatorsData(opsResult.value);
+        setOperatorListError(null);
+      } else {
+        setOperatorListError(toDisplayMessage(opsResult.reason, "業者アカウントの取得に失敗しました"));
+      }
+
+      if (densityResult.status === "fulfilled") {
+        setCellDensity(densityResult.value);
+        setCellDensityError(null);
+      } else {
+        setCellDensityError(toDisplayMessage(densityResult.reason, "セル密度の取得に失敗しました"));
+      }
+
+      if (appsResult.status === "fulfilled") {
+        setPendingApplications(appsResult.value.total);
+        setPendingApplicationsError(null);
+      } else {
+        setPendingApplicationsError(
+          toDisplayMessage(appsResult.reason, "事前申込件数の取得に失敗しました"),
+        );
+      }
+
+      if (identityResult.status === "fulfilled") {
+        // r10-review H1 是正: 旧応答形式（配列）等で counts が無い場合に備え optional chaining。
+        setPendingIdentityDocs(identityResult.value?.counts?.pending ?? null);
+        setPendingIdentityDocsError(null);
+      } else {
+        setPendingIdentityDocsError(
+          toDisplayMessage(identityResult.reason, "本人確認の審査待ち件数の取得に失敗しました"),
+        );
+      }
+
+      if (contactsResult.status === "fulfilled") {
+        setUnhandledContacts(contactsResult.value.total);
+        setUnhandledContactsError(null);
+      } else {
+        setUnhandledContactsError(
+          toDisplayMessage(contactsResult.reason, "未対応のお問い合わせ件数の取得に失敗しました"),
+        );
+      }
+    } finally {
+      setInitialLoadDone(true);
     }
-
-    if (opsResult.status === "fulfilled") {
-      setOperatorsData(opsResult.value);
-      setOperatorListError(null);
-    } else {
-      setOperatorListError(toDisplayMessage(opsResult.reason, "業者アカウントの取得に失敗しました"));
-    }
-
-    if (densityResult.status === "fulfilled") {
-      setCellDensity(densityResult.value);
-      setCellDensityError(null);
-    } else {
-      setCellDensityError(toDisplayMessage(densityResult.reason, "セル密度の取得に失敗しました"));
-    }
-
-    if (appsResult.status === "fulfilled") {
-      setPendingApplications(appsResult.value.total);
-      setPendingApplicationsError(null);
-    } else {
-      setPendingApplicationsError(
-        toDisplayMessage(appsResult.reason, "事前申込件数の取得に失敗しました"),
-      );
-    }
-
-    setInitialLoadDone(true);
   }, [token, inviteOffset, operatorOffset, statusFilter, operatorSearchQuery, includeDeletedOperators]);
 
   useEffect(() => {
@@ -407,8 +445,30 @@ export default function AdminPage() {
             <Link href="/admin/users" className={btnSecondary}>
               依頼者一覧へ
             </Link>
+            {/* r10 O-M1 是正: 審査待ちの本人確認書類が /admin トップから見えず、
+                個別画面を開くまで滞留に気付けなかった。事前申込バッジと同型で出す。 */}
             <Link href="/admin/identity-documents" className={btnSecondary}>
               本人確認書類の審査へ
+              {pendingIdentityDocs !== null && pendingIdentityDocs > 0 ? (
+                <span className="ml-1.5 rounded-none bg-red-600 px-1.5 py-0.5 text-xs font-semibold text-white">
+                  {pendingIdentityDocs}
+                </span>
+              ) : null}
+              {pendingIdentityDocsError ? (
+                <span className="ml-1.5 text-xs font-normal text-red-600">件数取得失敗</span>
+              ) : null}
+            </Link>
+            {/* r10 O-M6 是正: お問い合わせの受信箱への導線と未対応件数。 */}
+            <Link href="/admin/contacts" className={btnSecondary}>
+              お問い合わせへ
+              {unhandledContacts !== null && unhandledContacts > 0 ? (
+                <span className="ml-1.5 rounded-none bg-red-600 px-1.5 py-0.5 text-xs font-semibold text-white">
+                  {unhandledContacts}
+                </span>
+              ) : null}
+              {unhandledContactsError ? (
+                <span className="ml-1.5 text-xs font-normal text-red-600">件数取得失敗</span>
+              ) : null}
             </Link>
           </div>
         }
@@ -562,6 +622,13 @@ export default function AdminPage() {
             ) : null}
             <StatusFilterBar options={operatorStatusOptions} value={statusFilter} onChange={changeOperatorStatus} />
           </div>
+          {/* r10 O-M4 是正: pending には「申し込んだが許可証未提出で運営が着手できない」業者が
+              混ざるため、pending だけでは実際に審査できる件数が読めなかった。内訳を併記する。 */}
+          {c ? (
+            <p className="mt-2 text-xs text-slate-500">
+              pending {c.pending}件（うち許可証提出済み {c.pending_with_license}件＝いま審査に着手できる件数）
+            </p>
+          ) : null}
           <div className="mt-3 flex gap-2">
             <input
               type="text"

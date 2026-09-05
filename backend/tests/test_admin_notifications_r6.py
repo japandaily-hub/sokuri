@@ -468,6 +468,9 @@ def test_config_readiness_flags_are_bool_only(monkeypatch):
         "gemini",
         "admin_emails",
         "frontend_base_url",
+        # r10 O-H3: 運営向けアラートの LINE / Webhook 経路（services/alerts.py）。
+        "alerts_line",
+        "alerts_webhook",
     }
     assert all(isinstance(v, bool) for v in flags.values())
     # conftest が有効な APP_ENCRYPTION_KEY を注入しているので True。

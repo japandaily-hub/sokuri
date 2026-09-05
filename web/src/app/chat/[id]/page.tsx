@@ -22,6 +22,7 @@ import { Ic } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
 import { useToken } from "@/components/kdz/Ui";
 import {
+  CANCELLED_BY_LABEL,
   confirmSchedule as apiConfirmSchedule,
   getTransaction,
   KdzApiError,
@@ -361,7 +362,7 @@ export default function ChatPage() {
                   </div>
                 </div>
                 <div className="peer-bid-chip">
-                  <div className="peer-bid-label">成約額</div>
+                  <div className="peer-bid-label">成約金額</div>
                   <div className="peer-bid-amount">
                     ¥{(detail?.final_amount ?? detail?.initial_amount ?? 0).toLocaleString()}
                   </div>
@@ -387,10 +388,43 @@ export default function ChatPage() {
                   この業者は退会したため、この取引は進められません。キャンセルして新しく出品してください
                 </div>
               ) : isClosed ? (
-                <div className="line-banner" role="status">
-                  <span className="line-dot" aria-hidden="true" />
-                  この取引は終了しています（{detail ? TXN_STATUS_LABEL[detail.status] : ""}）。新しいメッセージは送信できません。
-                </div>
+                <>
+                  <div className="line-banner" role="status">
+                    <span className="line-dot" aria-hidden="true" />
+                    この取引は終了しています（{detail ? TXN_STATUS_LABEL[detail.status] : ""}）。新しいメッセージは送信できません。
+                  </div>
+                  {/* r10-O-H-1 是正: キャンセル（当事者間・運営による強制終了とも）の理由が
+                      業者側の /operator/transactions/[id] にしか表示されておらず、依頼者は
+                      通知メールで「理由を確認」と案内されても確認先が無かった。cases/[id] と
+                      同じ部品・語彙で表示する。 */}
+                  {detail?.cancellation ? (
+                    <div
+                      style={{
+                        margin: "0 20px 12px",
+                        borderRadius: 0,
+                        border: "1px solid var(--line)",
+                        background: "var(--pale, #f7f7f5)",
+                        padding: 12,
+                        fontSize: 13,
+                        lineHeight: 1.6,
+                        color: "var(--body)",
+                      }}
+                      role="status"
+                    >
+                      <p style={{ fontWeight: 600, margin: 0 }}>
+                        キャンセル: {CANCELLED_BY_LABEL[detail.cancellation.cancelled_by]}による
+                      </p>
+                      <p style={{ marginTop: 4, fontSize: 12, color: "var(--body-soft)" }}>
+                        {new Date(detail.cancellation.cancelled_at).toLocaleString("ja-JP")}
+                      </p>
+                      {detail.cancellation.reason ? (
+                        <p style={{ marginTop: 4, wordBreak: "break-word" }}>理由: {detail.cancellation.reason}</p>
+                      ) : (
+                        <p style={{ marginTop: 4, color: "var(--body-soft)" }}>理由の記載なし</p>
+                      )}
+                    </div>
+                  ) : null}
+                </>
               ) : (
                 <div className="line-banner">
                   <span className="line-dot" aria-hidden="true" />

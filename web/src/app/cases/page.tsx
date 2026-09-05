@@ -50,10 +50,10 @@ export default function MyCasesPage() {
       <AppHeader />
       <PageShell
       title="マイ案件"
-      description="依頼した片付け案件の一覧です。"
+      description="出品した片付け案件の一覧です。"
       actions={
         <a href="/create" className={btnPrimary}>
-          新しく依頼する
+          新しく出品する
         </a>
       }
     >
@@ -62,7 +62,7 @@ export default function MyCasesPage() {
         <Card className="text-center">
           <p className="text-sm text-slate-500">まだ案件がありません。</p>
           <a href="/create" className={`${btnPrimary} mt-4`}>
-            最初の依頼をつくる
+            最初の出品をする
           </a>
         </Card>
       ) : null}

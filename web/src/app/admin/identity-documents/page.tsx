@@ -23,6 +23,7 @@ import {
 } from "@/components/kdz/Ui";
 import { AdminPagination } from "../_components/AdminPagination";
 import { ConfirmModal } from "../_components/ConfirmModal";
+import { StatusFilterBar } from "../_components/StatusFilterBar";
 import {
   ADMIN_LIST_DEFAULT_LIMIT,
   listIdentityDocumentsAdmin,
@@ -34,7 +35,17 @@ import {
   IDENTITY_STATUS_LABEL,
   IDENTITY_DOC_TYPES,
   type AdminIdentityDocument,
+  type AdminIdentityDocumentListResponse,
+  type AdminIdentityStatusFilter,
 } from "@/lib/katadzuke-api";
+
+/** 状態フィルタの選択肢（件数は backend の counts＝絞り込みに依らない全体の内訳を出す）。 */
+const STATUS_OPTIONS: { value: AdminIdentityStatusFilter; label: string }[] = [
+  { value: "pending", label: "審査待ち" },
+  { value: "approved", label: "承認済み" },
+  { value: "rejected", label: "差し戻し" },
+  { value: "all", label: "すべて" },
+];
 
 /** 画像取得が 404/410 の場合、退会等で画像が削除済みであることを示す固定文言。 */
 const IMAGE_GONE_MESSAGE = "画像は削除されています（退会済み）";
@@ -45,10 +56,15 @@ function docTypeLabel(id: string): string {
 
 export default function AdminIdentityDocumentsPage() {
   const { token, loading } = useToken();
-  const [statusFilter, setStatusFilter] = useState<"pending" | "all">("pending");
-  const [docs, setDocs] = useState<AdminIdentityDocument[] | null>(null);
+  const [statusFilter, setStatusFilter] = useState<AdminIdentityStatusFilter>("pending");
+  // r10 O-M1〜M3: backend が {items,total,counts} を返す契約に変更されたため、
+  // 素の配列ではなくレスポンス全体を保持する（total でページング、counts で状態別バッジ）。
+  const [data, setData] = useState<AdminIdentityDocumentListResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // 検索は他の admin 一覧（/admin/cases・/admin/users）と同じ qInput（入力中）/q（実行済み）方式。
+  const [qInput, setQInput] = useState("");
+  const [q, setQ] = useState("");
 
   const [selected, setSelected] = useState<AdminIdentityDocument | null>(null);
   const [frontUrl, setFrontUrl] = useState<string | null>(null);
@@ -79,10 +95,9 @@ export default function AdminIdentityDocumentsPage() {
   const reload = useCallback(async () => {
     if (!token) return;
     try {
-      setDocs(
+      setData(
         await listIdentityDocumentsAdmin(
-          statusFilter,
-          { limit: ADMIN_LIST_DEFAULT_LIMIT, offset },
+          { status: statusFilter, q, limit: ADMIN_LIST_DEFAULT_LIMIT, offset },
           token,
         ),
       );
@@ -90,15 +105,20 @@ export default function AdminIdentityDocumentsPage() {
     } catch (e) {
       setError(toDisplayMessage(e, "取得に失敗しました"));
     }
-  }, [token, statusFilter, offset]);
+  }, [token, statusFilter, q, offset]);
 
   useEffect(() => {
     void reload();
   }, [reload]);
 
-  function changeStatusFilter(next: "pending" | "all") {
+  function changeStatusFilter(next: AdminIdentityStatusFilter) {
     setOffset(0);
     setStatusFilter(next);
+  }
+
+  function runSearch() {
+    setOffset(0);
+    setQ(qInput.trim());
   }
 
   async function openDetail(doc: AdminIdentityDocument) {
@@ -186,6 +206,21 @@ export default function AdminIdentityDocumentsPage() {
     }
   }
 
+  const docs = data?.items ?? null;
+  const counts = data?.counts;
+  // r10-review M4 是正: この件数は絞り込みに依らない「全体」の内訳であり、絞り込み結果の件数
+  // （一覧下部の AdminPagination が data.total で表示）とは別物と誤読されていたため、
+  // ラベルに「全体」を明記する（例: 「審査待ち（全体 37）」）。
+  const statusOptions = STATUS_OPTIONS.map((o) => {
+    const count =
+      o.value === "all"
+        ? counts
+          ? counts.pending + counts.approved + counts.rejected
+          : undefined
+        : counts?.[o.value];
+    return { value: o.value, label: count !== undefined ? `${o.label}（全体 ${count}）` : o.label };
+  });
+
   if (loading || (!docs && !error)) {
     return (
       <div className="admin-page">
@@ -218,22 +253,27 @@ export default function AdminIdentityDocumentsPage() {
         <Card>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-normal text-slate-900">提出一覧</h2>
-            <div className="flex gap-2">
-              {(["pending", "all"] as const).map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => changeStatusFilter(s)}
-                  className={`rounded-none px-3 py-1.5 text-xs font-medium transition-colors ${
-                    statusFilter === s
-                      ? "bg-brand-600 text-white"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
-                >
-                  {s === "pending" ? "審査待ち" : "すべて"}
-                </button>
-              ))}
-            </div>
+            {/* r10 O-M2: 承認済み・差し戻しも絞り込めるようにし、件数は counts（絞り込みに
+                依らない全体の内訳）で常に正確に出す。 */}
+            <StatusFilterBar options={statusOptions} value={statusFilter} onChange={changeStatusFilter} />
+          </div>
+
+          {/* r10 O-M3: 件数が増えると目的の提出者に辿り着けなかったため検索を追加する。 */}
+          <div className="mt-3 flex gap-2">
+            <input
+              type="text"
+              value={qInput}
+              onChange={(e) => setQInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") runSearch();
+              }}
+              className={inputBase}
+              placeholder="メール／氏名（部分一致）で検索"
+              aria-label="本人確認書類の検索"
+            />
+            <button type="button" onClick={runSearch} className={`${btnPrimary} shrink-0`}>
+              検索
+            </button>
           </div>
 
           <div className="mt-4 overflow-x-auto" tabIndex={0} role="region" aria-label="本人確認書類一覧">
@@ -276,12 +316,12 @@ export default function AdminIdentityDocumentsPage() {
               <p className="py-6 text-center text-sm text-slate-500">該当する提出はありません。</p>
             ) : null}
           </div>
-          {docs ? (
+          {data ? (
             <AdminPagination
-              total={null}
+              total={data.total}
               limit={ADMIN_LIST_DEFAULT_LIMIT}
               offset={offset}
-              itemCount={docs.length}
+              itemCount={data.items.length}
               onPrev={() => setOffset(Math.max(0, offset - ADMIN_LIST_DEFAULT_LIMIT))}
               onNext={() => setOffset(offset + ADMIN_LIST_DEFAULT_LIMIT)}
             />

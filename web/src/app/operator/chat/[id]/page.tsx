@@ -23,6 +23,7 @@ import { Ic } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
 import { useToken } from "@/components/kdz/Ui";
 import {
+  CANCELLED_BY_LABEL,
   TXN_STATUS_LABEL,
   getTransaction,
   KdzApiError,
@@ -394,6 +395,26 @@ export default function OperatorChatPage() {
               {isClosed ? (
                 <div style={{ padding: "8px 20px", fontSize: 12.5, color: "var(--body-soft)" }} role="status">
                   この取引は終了しています。メッセージの送信・日程提案はできません。
+                </div>
+              ) : null}
+
+              {/* r10 O-H-1 是正: 取引詳細には出ているキャンセルの記録（誰が・なぜ・いつ）が
+                  チャットには一切出ず、相手が突然応答しなくなったようにしか見えなかった。 */}
+              {detail?.status === "cancelled" && detail.cancellation ? (
+                <div
+                  style={{
+                    padding: "8px 20px",
+                    fontSize: 12.5,
+                    color: "var(--body-soft)",
+                    wordBreak: "break-word",
+                    overflowWrap: "anywhere",
+                  }}
+                  role="status"
+                >
+                  キャンセル: {CANCELLED_BY_LABEL[detail.cancellation.cancelled_by]}による（
+                  {new Date(detail.cancellation.cancelled_at).toLocaleString("ja-JP")}）
+                  <br />
+                  {detail.cancellation.reason ? `理由: ${detail.cancellation.reason}` : "理由の記載なし"}
                 </div>
               ) : null}
 

@@ -42,6 +42,12 @@ _WEAK_JWT_SECRETS = {"dev-secret-change-me", "change-me-to-random-64-hex"}
 #: 内容が変化した時だけ記録する。``None`` は「まだ一度も記録していない」を表す。
 _logged_degraded_config: list[str] | None = None
 
+#: ``degraded_config``（/readyz の Warning 対象）から除外する ``_config_readiness`` のキー（r10 fix）。
+#: 運営向けアラートは LINE / メール / Webhook の代替経路を持ち、Webhook を使わない運用でも
+#: 障害通知そのものは成立するため、``alerts_webhook`` 未設定を「劣化」とは扱わない
+#: （``config`` の bool 表示自体は維持し、運用判断の材料としては残す）。
+_DEGRADED_CONFIG_EXEMPT_KEYS: frozenset[str] = frozenset({"alerts_webhook"})
+
 
 async def _run_seed() -> None:
     """バックグラウンドでチャネルシードを実行する。失敗してもサーバーは継続する。"""
@@ -124,6 +130,12 @@ def _config_readiness(settings: Settings) -> dict[str, bool]:
     - ``gemini``: GOOGLE_API_KEY。未設定だと案件の AI 解析が常にフォールバック文に落ちる。
     - ``admin_emails``: ADMIN_EMAILS。未設定だと新規登録で admin が付与されない。
     - ``frontend_base_url``: 本番で localhost のままだと通知メール内リンクが全て壊れる。
+    - ``alerts_line`` / ``alerts_webhook``: 運営向けアラート（services/alerts.py）の
+      LINE / Webhook 経路。未設定だと障害通知が**メール1本のみ**に縮退し、
+      Brevo が落ちた瞬間にアラート基盤ごと沈黙する（r10 O-H3）。メール側は
+      既存の ``brevo`` が同一キーを見ているため、ここでは残る2経路を可視化する。
+      ``_send_line`` はトークンと宛先の**両方**が揃って初めて送信するため、
+      片方だけの設定は False（＝使えない）と判定する。
     """
     try:
         from cryptography.fernet import Fernet
@@ -144,6 +156,10 @@ def _config_readiness(settings: Settings) -> dict[str, bool]:
         "gemini": bool(settings.google_api_key),
         "admin_emails": bool(settings.admin_emails),
         "frontend_base_url": frontend_ok,
+        "alerts_line": bool(
+            settings.alert_line_channel_access_token and settings.alert_line_user_ids
+        ),
+        "alerts_webhook": bool(settings.alert_webhook_url),
     }
 
 
@@ -313,7 +329,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # 起動中断や 503 にすると「業者申込だけ 500」が「API 全断」へ悪化するため、
         # ここでの目的はあくまで外形監視からの可視化に限定する。
         config_flags = _config_readiness(settings)
-        degraded_config = sorted(k for k, ok in config_flags.items() if not ok)
+        # r10 fix: alerts_webhook は LINE/メールという代替経路が既にあるため、
+        # 未設定であっても運用上の劣化ではない（3経路すべて必須ではない）。
+        # config には bool を出し続けるが、degraded_config（Warning 対象）からは除外する。
+        degraded_config = sorted(
+            k for k, ok in config_flags.items() if not ok and k not in _DEGRADED_CONFIG_EXEMPT_KEYS
+        )
         # ログは起動後の初回と「内容が変化した時」だけ（r7 M-3）。payload は毎回返す。
         global _logged_degraded_config
         if degraded_config != _logged_degraded_config:

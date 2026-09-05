@@ -6,7 +6,7 @@ import re
 import unicodedata
 import uuid
 from datetime import date, datetime, timedelta
-from typing import Annotated, Literal
+from typing import Annotated, Literal, get_args
 
 from pydantic import (
     BaseModel,
@@ -18,7 +18,12 @@ from pydantic import (
     model_validator,
 )
 
-from app.core.limits import MAX_ITEMS_PER_CASE, MAX_PHOTOS_PER_CASE, MAX_PHOTOS_PER_ITEM
+from app.core.limits import (
+    MAX_ITEMS_PER_CASE,
+    MAX_PHOTOS_PER_CASE,
+    MAX_PHOTOS_PER_ITEM,
+    MAX_REDUCTION_REQUESTS_PER_TRANSACTION,
+)
 from app.db.models.enums import ItemCondition
 from app.services.message_guard import contains_contact_info
 from app.services.text_sanitize import normalize_and_strip_control_chars
@@ -122,6 +127,11 @@ class OperatorListCounts(BaseModel):
     active: int
     rejected: int
     suspended: int
+    # pending かつ許可証画像が提出済み＝「いま承認できる」件数（r10 O-M4）。
+    # verify_operator は has_license_image が偽だと 409 で弾くため、pending 件数
+    # だけでは運営が「何件処理できるか」を判断できず、409 を踏んで初めて
+    # 提出待ちだと分かる（審査待ちバッジが減らない原因の切り分け不能）。
+    pending_with_license: int = 0
 
 
 class OperatorListResponse(BaseModel):
@@ -412,6 +422,33 @@ class UserIdentityDocumentAdminOut(BaseModel):
     has_back: bool
 
 
+class IdentityDocumentListCounts(BaseModel):
+    """GET /admin/identity-documents の ``counts``（status/q 絞込に関わらない全件内訳）。
+
+    OperatorListCounts と同型の契約（status も q も反映しない全件内訳）。バッジは
+    「いま審査待ちが何件あるか」を常に示す必要があり、検索中だけ数が変わると
+    絞込の解除忘れで審査漏れが起きる。退会済みユーザーの書類は一覧と同じ条件で
+    除外する（審査対象外のため、バッジに出すと永久に減らない件数になる）。
+    """
+
+    pending: int
+    approved: int
+    rejected: int
+
+
+class UserIdentityDocumentAdminListResponse(BaseModel):
+    """r10 O-M1〜M3: 一覧応答を list から {items,total,counts} へ変更する。
+
+    従来は素の list を返しており、web は総件数を知る術がなかったため
+    (1) 審査待ちの総数をバッジに出せない (2) Pager が末尾を越えて空ページに着地し
+    「審査待ち0件」と誤読される、の2つが同時に起きていた。
+    """
+
+    items: list[UserIdentityDocumentAdminOut]
+    total: int
+    counts: IdentityDocumentListCounts
+
+
 class IdentityDocumentRejectRequest(BaseModel):
     reject_reason: str = Field(min_length=1, max_length=500)
 
@@ -579,9 +616,20 @@ CasePurpose = Literal[
 ]
 
 
+# 対応エリア（クローズドβの提供範囲）。案件の投稿はこの4都県に限定する（r10 ADD-M10）。
+# 圏外の案件を受け付けると、入札0件のまま滞留して依頼者を待たせるだけになるため、
+# 「作成時に422で弾いて対応エリアを明示する」方が損失が小さい。値・順序は web 側の
+# 都県セレクトと一致させること（片側だけ増やすと 422 が UI から説明できなくなる）。
+# NOTE: 住所（UserAddressUpdateRequest.prefecture）は47都道府県のまま。居住地は
+# 対応エリア外でもよく、制限が要るのは「訪問先」だけであるため。
+ServiceAreaPrefecture = Literal["東京都", "千葉県", "埼玉県", "神奈川県"]
+#: 選択肢の列挙（web への提示・テスト用）。Literal から導出し、二重定義のズレを構造的に防ぐ。
+SERVICE_AREA_PREFECTURES: tuple[str, ...] = get_args(ServiceAreaPrefecture)
+
+
 class CaseCreateRequest(BaseModel):
     purpose: CasePurpose
-    prefecture: str = Field(min_length=1, max_length=32)
+    prefecture: ServiceAreaPrefecture
     city: str = Field(min_length=1, max_length=64)
     address_detail: str | None = None
     housing_type: str | None = Field(default=None, max_length=32)
@@ -750,6 +798,14 @@ class TransactionDetailOut(TransactionOut):
     reduction_requests: list[ReductionOut] = []
     reviews: list[ReviewOut] = []
     unread_count: int = 0
+    # 減額申請の消費回数と上限（r10 V-M4）。業者側は「あと何回申請できるか」を
+    # 事前に知らないと、2回目の却下後に初めて 409 で行き止まりを知ることになる。
+    # 依頼者側にも同じ値を返し「相手はもう申請できない」を可視化する。
+    # reduction_requests は却下済みも含む全件のため len と一致するが、web が
+    # 配列長から独自に導出すると将来の除外条件（取り下げ等）とズレるため、
+    # サーバー側の確定値として明示的に返す。
+    reduction_request_count: int = 0
+    reduction_request_limit: int = MAX_REDUCTION_REQUESTS_PER_TRANSACTION
     # 落札業者が利用停止中か（依頼者側にのみ意味がある。業者側は 403 の
     # detail.code=account_suspended で自身の停止を知れるため）。r6-flow H-2 対応。
     operator_suspended: bool = False
@@ -781,6 +837,8 @@ class TransactionListItem(BaseModel):
     initial_amount: int
     final_amount: int | None
     visit_date: date | None
+    # 訪問時間帯（例: "午前"）。日程確定前は None（一覧でも詳細と同じ契約にする。r10 fix）。
+    visit_time_slot: str | None = None
     created_at: datetime
     purpose: str
     prefecture: str
@@ -975,6 +1033,9 @@ class AdminUserListItem(BaseModel):
     suspended_at: datetime | None = None
     created_at: datetime
     case_count: int
+    # 退会済み（匿名化済み）かどうかを web 側が判別できるように公開する（r10 fix）。
+    # include_deleted=true で取得した行のうち、どれが退会済みかを一覧上で示すために必要。
+    deleted_at: datetime | None = None
 
 
 class AdminUserListResponse(BaseModel):
@@ -1316,6 +1377,37 @@ class ContactCreateRequest(BaseModel):
 
 class ContactCreateResponse(BaseModel):
     ok: bool = True
+
+
+class AdminContactListItem(BaseModel):
+    """GET /admin/contacts の1件（r10 O-M6）。
+
+    問い合わせ本文は運営が読むためのものであり、admin 認証済みの応答にのみ含める
+    （PII を含みうるためログには一切書かない。admin.py の監査ログ方針を踏襲）。
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    email: str
+    category: str
+    message: str
+    created_at: datetime
+    handled_at: datetime | None
+    handled_by_admin_id: uuid.UUID | None
+
+
+class AdminContactListResponse(BaseModel):
+    items: list[AdminContactListItem]
+    total: int
+
+
+class AdminContactHandleResponse(BaseModel):
+    """PATCH /admin/contacts/{id}/handle の応答（対応済みの確定時刻のみ返す）。"""
+
+    id: uuid.UUID
+    handled_at: datetime
 
 
 # 前方参照の解決

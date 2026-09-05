@@ -38,6 +38,16 @@ import {
   type CaseMasked,
 } from "@/lib/katadzuke-api";
 
+/**
+ * 入札額の許容範囲・刻み。ダッシュボード（operator/page.tsx）と同一値・同一文言に揃える
+ * （r10 M1: 詳細画面だけ「0円より大きい」しか検証しておらず、1,000円未満や刻み違反が
+ *  backend の 422 で初めて弾かれていた）。backend は le=100_000_000。
+ */
+const BID_MIN = 1000;
+const BID_MAX = 100_000_000;
+const BID_STEP = 1000;
+const BID_RANGE_HINT = "入札額は1,000円〜1億円の範囲で1,000円単位で入力してください";
+
 /** 自社入札ステータスのチップCSSクラス（operator-shared.css の .status-chip バリアント）。 */
 const BID_STATUS_CHIP_CLASS: Record<BidStatus, string> = {
   selected: "bidding",
@@ -90,8 +100,14 @@ export default function OperatorCaseDetailPage() {
     e.preventDefault();
     if (!token || busy) return;
     const value = Number(amount);
-    if (!Number.isFinite(value) || value <= 0) {
-      setError("有効な金額を入力してください。");
+    if (
+      !Number.isFinite(value) ||
+      !Number.isInteger(value) ||
+      value < BID_MIN ||
+      value > BID_MAX ||
+      value % BID_STEP !== 0
+    ) {
+      setError(BID_RANGE_HINT);
       return;
     }
     setBusy(true);
@@ -218,7 +234,9 @@ export default function OperatorCaseDetailPage() {
           {/* ===== 入札フォーム / 自社入札状況 ===== */}
           {bidDone ? (
             <div className="op-alert success" role="status">
-              入札を受け付けました。お客様が業者を選ぶまでお待ちください（結果はLINE連携済みならLINE、未連携ならメールでお知らせします）。
+              {/* r10 M5 是正: 業者アカウントに LINE 連携は無い（LINE通知は依頼者側の機能）。
+                  実際の通知経路は登録メールアドレスのみ。 */}
+              入札を受け付けました。お客様が業者を選ぶまでお待ちください（結果は登録メールアドレスにお知らせします）。
             </div>
           ) : null}
           {caseData.my_bid ? (
@@ -267,13 +285,24 @@ export default function OperatorCaseDetailPage() {
                     id="bidAmount"
                     type="number"
                     required
-                    min={1000}
-                    step={1000}
+                    min={BID_MIN}
+                    max={BID_MAX}
+                    step={BID_STEP}
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="50000"
+                    aria-describedby="bidAmountHint"
                   />
                 </div>
+                {/* r10 M1 是正: ダッシュボードの入札フォームにだけあった手数料注記・範囲ヒントを
+                    詳細画面にも同文言で置く（同じ操作なのに条件の説明が片方に無かった）。 */}
+                <p id="bidAmountHint" style={{ fontSize: 12, color: "var(--body-soft)", marginTop: 6, lineHeight: 1.8 }}>
+                  成約時のみ買取額の8%が手数料
+                  <br />
+                  ※サービス開始当初（β期間）は手数料を請求しません。請求開始の際は事前にメールでお知らせします。
+                  <br />
+                  <span style={{ fontSize: 11.5 }}>{BID_RANGE_HINT}</span>
+                </p>
               </div>
               <div className="field">
                 <label htmlFor="bidMessage">

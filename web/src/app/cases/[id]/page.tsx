@@ -40,6 +40,7 @@ import {
   deleteCasePhoto,
   formatYen,
   getCase,
+  getReductionQuota,
   getTransaction,
   listBids,
   photoSrc,
@@ -60,13 +61,18 @@ const EDITABLE_CASE_STATUSES = new Set(["draft", "open"]);
 /** 出品取り下げを許可する案件ステータス（backend の cancel_case と同条件）。 */
 const CANCELLABLE_CASE_STATUSES = new Set(["open", "bidding"]);
 
-/** window.confirm の代わりに表示する ConfirmModal の内容（r8-fix-frontend）。 */
+/** window.confirm の代わりに表示する ConfirmModal の内容（r8-fix-frontend）。
+ *  r10-M8 是正: 取り下げ・キャンセルの理由入力は window.prompt をやめ、withReason/reasonRequired で
+ *  ConfirmModal に統合する（onConfirm が入力済みの理由を受け取る）。 */
 type ConfirmState = {
   title: string;
   message: string;
   confirmLabel: string;
   danger?: boolean;
-  onConfirm: () => void;
+  withReason?: boolean;
+  reasonRequired?: boolean;
+  reasonLabel?: string;
+  onConfirm: (reason: string | null) => void;
 } | null;
 
 export default function UserCaseDetailPage() {
@@ -405,6 +411,8 @@ export default function UserCaseDetailPage() {
   const topBidAmount = activeBids.length > 0 ? Math.max(...activeBids.map((b) => b.amount)) : null;
   const topBidCount = activeBids.filter((b) => b.amount === topBidAmount).length;
   const pendingReduction = txn?.reduction_requests.find((r) => r.status === "pending");
+  // r10 M2 是正: 業者側にしか出ていなかった申請上限・残り回数を依頼者側にも表示する。
+  const reductionQuota = txn ? getReductionQuota(txn) : null;
   const myReview = txn?.reviews.find((r) => r.reviewer_type === "user");
 
   return (
@@ -434,18 +442,19 @@ export default function UserCaseDetailPage() {
             </p>
           </div>
           <StatusBadge value={caseData.status} label={CASE_STATUS_LABEL[caseData.status]} />
-          {caseData.status === "cancelled" ? (
-            <div className="mt-3 w-full rounded-none border border-slate-200 bg-slate-50 p-3 text-sm leading-relaxed text-slate-600" role="status">
-              {/* r8-fix-frontend2 M2/ADD-1 是正: 成約後キャンセル（txn が存在）と
-                  出品の取り下げ（txn が存在しない）で経緯が異なるため文言を分岐する。
-                  従来は成約キャンセルにも「取り下げ済み」「入札を自動でお断り」という
-                  事実に反する文言が出ていた。 */}
-              {txn
-                ? "取引はキャンセルされました。必要であれば新しく出品してください。"
-                : "この出品は取り下げ済みです。届いていた入札はすべて自動でお断りになりました。再度依頼する場合は「出品する」から新しく出品してください。"}
-            </div>
-          ) : null}
         </div>
+        {caseData.status === "cancelled" ? (
+          <div className="mt-3 w-full rounded-none border border-slate-200 bg-slate-50 p-3 text-sm leading-relaxed text-slate-600" role="status">
+            {/* r8-fix-frontend2 M2/ADD-1 是正: 成約後キャンセル（txn が存在）と
+                出品の取り下げ（txn が存在しない）で経緯が異なるため文言を分岐する。
+                従来は成約キャンセルにも「取り下げ済み」「入札を自動でお断り」という
+                事実に反する文言が出ていた。
+                r10-M1 是正: flex 行の子だった案内ブロックを行の外へ移し、375px で潰れないようにする。 */}
+            {txn
+              ? "取引はキャンセルされました。必要であれば新しく出品してください。"
+              : "この出品は取り下げ済みです。届いていた入札はすべて自動でお断りになりました。再度依頼する場合は「出品する」から新しく出品してください。"}
+          </div>
+        ) : null}
 
         {toAlbums(caseData).map((album) => {
           const item = album.id ? (caseData.items?.find((it) => it.id === album.id) ?? null) : null;
@@ -749,17 +758,17 @@ export default function UserCaseDetailPage() {
                 disabled={busy}
                 onClick={() => {
                   if (!token) return;
-                  // prompt の「キャンセル」（null）は取り下げ自体の中止。空文字は理由なしで続行。
-                  const reason = window.prompt("取り下げ理由（任意）");
-                  if (reason === null) return;
                   setConfirmState({
                     title: "出品を取り下げますか？",
                     message: "出品を取り下げますか？付いている入札はすべて無効になり、元に戻せません。",
                     confirmLabel: "取り下げる",
                     danger: true,
-                    onConfirm: () => {
+                    withReason: true,
+                    reasonRequired: true,
+                    reasonLabel: "取り下げ理由",
+                    onConfirm: (reason) => {
                       setConfirmState(null);
-                      void act(() => cancelCase(caseId, reason === "" ? null : reason, token));
+                      void act(() => cancelCase(caseId, reason, token));
                     },
                   });
                 }}
@@ -784,7 +793,7 @@ export default function UserCaseDetailPage() {
                 成約: {txn.operator?.company_name ?? "業者"}
               </h2>
               <p className="mt-1 text-sm text-slate-500">
-                落札額 {formatYen(txn.initial_amount)}
+                成約金額 {formatYen(txn.initial_amount)}
                 {txn.final_amount != null && txn.final_amount !== txn.initial_amount
                   ? ` → 確定額 ${formatYen(txn.final_amount)}`
                   : ""}
@@ -855,6 +864,15 @@ export default function UserCaseDetailPage() {
               ) : null}
             </div>
           )}
+
+          {/* r10 M2 是正: 業者側にのみ表示されていた申請上限・残り回数を依頼者側にも明示する
+              （成約後・キャンセル前のみ意味を持つため active な状態でのみ表示）。 */}
+          {reductionQuota && (txn.status === "pending" || txn.status === "visiting") ? (
+            <p className="mt-4 text-xs text-slate-500">
+              業者の申請は1つの取引につき{reductionQuota.limit}回まで
+              {reductionQuota.remaining !== null ? `（残り${reductionQuota.remaining}回）` : ""}
+            </p>
+          ) : null}
 
           {/* 減額申請の履歴（承認・却下済みを含む全件。r6-flow M-4 対応。
               ラベル定義は operator/transactions/[id]/page.tsx と共通の
@@ -963,13 +981,15 @@ export default function UserCaseDetailPage() {
                 type="button"
                 disabled={busy}
                 onClick={() => {
-                  const reason = window.prompt("キャンセル理由（任意）") ?? null;
                   setConfirmState({
                     title: "本当にキャンセルしますか？",
                     message: "本当にキャンセルしますか？案件ごと終了し、入札は戻せません。理由は業者に共有されます。",
                     confirmLabel: "キャンセルする",
                     danger: true,
-                    onConfirm: () => {
+                    withReason: true,
+                    reasonRequired: true,
+                    reasonLabel: "キャンセル理由",
+                    onConfirm: (reason) => {
                       setConfirmState(null);
                       void act(() => cancelTransaction(txn.id, reason, token!));
                     },
@@ -990,9 +1010,21 @@ export default function UserCaseDetailPage() {
           {/* レビュー */}
           {txn.status === "completed" &&
             (myReview ? (
-              <Notice tone="success">
-                レビュー投稿済み（★{myReview.rating}）ありがとうございました。
-              </Notice>
+              <div>
+                <Notice tone="success">
+                  レビュー投稿済み（★{myReview.rating}）ありがとうございました。
+                </Notice>
+                {/* r10-M7 是正: 評価投稿後の導線が「← マイ案件一覧へ」1本しか無く行き止まりだったため、
+                    /review と同型の「マイページへ」「また出品する」を並べる。 */}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link href="/mypage" className={btnSecondary}>
+                    マイページへ
+                  </Link>
+                  <Link href="/create" className={btnPrimary}>
+                    また出品する
+                  </Link>
+                </div>
+              </div>
             ) : (
               <div className="mt-4 rounded-none border border-slate-200 p-4">
                 <p className="font-normal text-slate-900">業者を評価する</p>
@@ -1056,6 +1088,9 @@ export default function UserCaseDetailPage() {
         message={confirmState.message}
         confirmLabel={confirmState.confirmLabel}
         danger={confirmState.danger}
+        withReason={confirmState.withReason}
+        reasonRequired={confirmState.reasonRequired}
+        reasonLabel={confirmState.reasonLabel}
         busy={busy}
         onCancel={() => setConfirmState(null)}
         onConfirm={confirmState.onConfirm}

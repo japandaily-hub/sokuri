@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import Actor, get_current_actor
+from app.core.limits import MAX_REDUCTION_REQUESTS_PER_TRANSACTION
 from app.db.models.bid import Bid
 from app.db.models.case import Case, CaseItem
 from app.db.models.message import Message
@@ -118,6 +119,7 @@ async def list_transactions(
             initial_amount=t.initial_amount,
             final_amount=t.final_amount,
             visit_date=t.visit_date,
+            visit_time_slot=t.visit_time_slot,
             created_at=t.created_at,
             purpose=t.case.purpose,
             prefecture=t.case.prefecture,
@@ -320,6 +322,10 @@ async def get_transaction(
     out.case = build_case_masked_out(case)
     out.operator = OperatorPublicOut.model_validate(txn.bid.operator)
     out.reduction_requests = [ReductionOut.model_validate(r) for r in txn.reduction_requests]
+    # 減額申請の消費回数と上限（r10 V-M4）。reductions.py の 409 判定と
+    # 同じ定数（core/limits.py）を返し、web が自前のリテラルを持たないようにする。
+    out.reduction_request_count = len(txn.reduction_requests)
+    out.reduction_request_limit = MAX_REDUCTION_REQUESTS_PER_TRANSACTION
     out.reviews = [ReviewOut.model_validate(r) for r in txn.reviews]
 
     if txn.status != "cancelled":

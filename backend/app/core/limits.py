@@ -17,3 +17,9 @@ MAX_PHOTOS_PER_ITEM = 12
 # （2026-09-04 引き上げ）。AI 解析の Gemini 呼び出しは summary.py の予算（案件あたり 8 回・
 # 商品あたり 2 枚・ungrouped 4 枚）で別途上限があり、写真枚数に比例して増えない。
 MAX_PHOTOS_PER_CASE = 150
+
+# 1取引あたりの減額申請の上限回数（却下後に1回だけ再申請できる。r8-M3）。
+# reductions.py の 409 判定と TransactionDetailOut.reduction_request_limit の
+# 単一の出所にする（web が「あと何回申請できるか」を自前のリテラルで持つと、
+# 上限を変えた瞬間に画面と API が食い違う）。r10 V-M4 対応。
+MAX_REDUCTION_REQUESTS_PER_TRANSACTION = 2

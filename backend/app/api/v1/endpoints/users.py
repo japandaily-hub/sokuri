@@ -29,6 +29,7 @@ from app.core.security import (
 )
 from app.db.models.bid import BID_STATUS_PENDING, BID_STATUS_REJECTED, Bid
 from app.db.models.case import Case
+from app.db.models.contact_message import ContactMessage
 from app.db.models.transaction import Cancellation, Transaction
 from app.db.models.user import User
 from app.db.models.user_identity_document import UserIdentityDocument
@@ -646,6 +647,22 @@ async def delete_my_account(
         # それ以外（取引なし／キャンセル済み取引）は居住地PIIを退会時に除去する。
         if txn is None or txn.status != "completed":
             case.address_detail = None
+
+    original_email_norm = user.email.strip().lower()
+
+    # r10-review M1: privacy:110 の削除請求対応。contact_messages は認証不要の
+    # 公開フォーム由来で本人以外も投稿しうるため物理削除はせず、退会と同じ
+    # 「匿名化」方針（email 一致のみで足りる規模・admin_list_contacts の一覧
+    # 表示に穴を開けない）で name/email/message を置換する。
+    await session.execute(
+        update(ContactMessage)
+        .where(func.lower(ContactMessage.email) == original_email_norm)
+        .values(
+            name=f"deleted-{user.id}",
+            email=f"deleted-{user.id}@deleted.katazuke.internal",
+            message="[削除済み]",
+        )
+    )
 
     user.email = f"deleted-{user.id}@deleted.katazuke.internal"
     user.name = None

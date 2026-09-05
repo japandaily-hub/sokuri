@@ -3,7 +3,7 @@
 「LINEで通知を受け取る」と「LINEで続ける（ログイン）」を動かすための設定。
 値を貼る場所は **Vercel（画面側）** と **Render（サーバー側）**、値の出どころは **LINE Developers の2チャネル**。
 
-現状（2026-09-04 時点）: Vercel の `LINE_CLIENT_ID` / `LINE_CLIENT_SECRET` は設定済み。Render は `LINE_CLIENT_ID` 未設定（exchange が 503）・`LINE_CHANNEL_ACCESS_TOKEN` 未設定。
+現状（2026-09-05 時点）: Vercel の `LINE_CLIENT_ID` / `LINE_CLIENT_SECRET` は設定済み。Render の `LINE_CLIENT_ID` も設定済み（exchange が 503→401 に変わったことで確認）。`LINE_CHANNEL_ACCESS_TOKEN`（Push 用）は外形から確認できないため未検証＝本番の `/readyz` の `config.line_push` が true かで判定する（false なら未設定）。
 
 ## 1. LINE Developers でプロバイダーと2チャネル
 - https://developers.line.biz/console/

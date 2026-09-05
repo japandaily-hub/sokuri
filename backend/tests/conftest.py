@@ -33,6 +33,7 @@ import app.db.models.assessment
 import app.db.models.defect
 # カタヅケ
 import app.db.models.case
+import app.db.models.contact_message
 import app.db.models.operator
 import app.db.models.operator_application
 import app.db.models.operator_profile

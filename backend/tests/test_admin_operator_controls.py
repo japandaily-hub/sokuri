@@ -324,6 +324,9 @@ async def test_list_operators_status_q_total_counts(client: AsyncClient, db_sess
         "active": 1,
         "rejected": 0,
         "suspended": 1,
+        # r10 O-M4: pending かつ許可証画像あり＝いま承認できる件数。
+        # 事前申込経由の pending 業者は許可証未提出のため 0。
+        "pending_with_license": 0,
     }
 
     # status=pending

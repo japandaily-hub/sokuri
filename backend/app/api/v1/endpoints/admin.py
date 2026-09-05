@@ -20,6 +20,7 @@ from app.core.crypto import decrypt_json
 from app.db.models.bid import Bid
 from app.core.masking import mask_account_number
 from app.db.models.case import Case
+from app.db.models.contact_message import ContactMessage
 from app.db.models.invite import Invite
 from app.db.models.operator import Operator
 from app.db.models.operator_application import OperatorApplication
@@ -39,6 +40,9 @@ from app.db.session import get_session
 from app.schemas_katadzuke import (
     AdminCaseListItem,
     AdminCaseListResponse,
+    AdminContactHandleResponse,
+    AdminContactListItem,
+    AdminContactListResponse,
     AdminTransactionCancelRequest,
     AdminTransactionCancelResponse,
     AdminTransactionListItem,
@@ -47,6 +51,7 @@ from app.schemas_katadzuke import (
     AdminUserListResponse,
     AdminUserRoleResponse,
     BankAccountMaskedOut,
+    IdentityDocumentListCounts,
     IdentityDocumentRejectRequest,
     InviteBulkCreateRequest,
     InviteBulkCreateResponse,
@@ -64,6 +69,7 @@ from app.schemas_katadzuke import (
     OperatorVerifyRequest,
     ReviewHideRequest,
     ReviewOut,
+    UserIdentityDocumentAdminListResponse,
     UserIdentityDocumentAdminOut,
     UserSuspendRequest,
     UserSuspendResponse,
@@ -310,6 +316,23 @@ async def list_operators(
                 func.sum(case((Operator.is_suspended.is_(True), 1), else_=0)).label(
                     "suspended_cnt"
                 ),
+                # r10 O-M4/M6: 「いま承認できる件数」= pending かつ許可証画像あり
+                # かつ停止中でない。判定は verify_operator の 409 ゲート
+                # （has_license_image ＝ license_image_uploaded_at の非NULL）と
+                # 同一式に、停止中は承認操作自体が無意味なため is_suspended 除外を
+                # 加える（r10-review M6: 停止中の pending が「いま承認できる」に
+                # 混入していた）。BLOB 本体（license_image_data）ではなく
+                # タイムスタンプ列を見るため、deferred な BYTEA を読み出すことはない。
+                func.sum(
+                    case(
+                        (
+                            Operator.license_image_uploaded_at.isnot(None)
+                            & Operator.is_suspended.is_(False),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("with_license_cnt"),
             )
             .where(*deleted_condition)
             .group_by(Operator.vendor_status)
@@ -318,10 +341,13 @@ async def list_operators(
     counts_by_status: dict[str, int] = {"pending": 0, "limited": 0, "active": 0, "rejected": 0}
     total_all = 0
     total_suspended = 0
-    for vendor_status_value, cnt, suspended_cnt in counts_rows:
+    pending_with_license = 0
+    for vendor_status_value, cnt, suspended_cnt, with_license_cnt in counts_rows:
         cnt = int(cnt or 0)
         total_all += cnt
         total_suspended += int(suspended_cnt or 0)
+        if vendor_status_value == "pending":
+            pending_with_license = int(with_license_cnt or 0)
         if vendor_status_value in counts_by_status:
             counts_by_status[vendor_status_value] = cnt
     counts = OperatorListCounts(
@@ -331,6 +357,7 @@ async def list_operators(
         active=counts_by_status["active"],
         rejected=counts_by_status["rejected"],
         suspended=total_suspended,
+        pending_with_license=pending_with_license,
     )
 
     pending_first = case((Operator.vendor_status == "pending", 0), else_=1)
@@ -848,6 +875,11 @@ async def admin_list_users(
         default=False,
         description="true の場合、退会済み（匿名化済み・deleted_at 非null）ユーザーも含める。既定は除外。",
     ),
+    suspended: bool | None = Query(
+        default=None,
+        description="true=停止中のみ / false=停止中以外のみ / 省略=絞り込まない"
+        "（業者一覧の status=suspended と同じ軸を依頼者側にも用意する）。",
+    ),
     admin: User = Depends(get_current_admin),
     session: AsyncSession = Depends(get_session),
 ) -> AdminUserListResponse:
@@ -855,6 +887,11 @@ async def admin_list_users(
     # （個人情報は既に匿名化済みだが、運営の日常オペレーション上はノイズになるため）。
     # include_deleted=true で明示的に含められるようにする。
     conditions = [] if include_deleted else [User.deleted_at.is_(None)]
+    # r10 O-M5: 停止中の絞り込み（業者一覧の status=suspended と対称）。停止解除の
+    # 依頼を受けた運営が「いま停止中の依頼者」を一覧で特定できないと、ID を教えて
+    # もらう以外に対象を見つける手段が無かった。None（省略）は絞り込まない。
+    if suspended is not None:
+        conditions.append(User.is_suspended.is_(suspended))
     q_norm = (q or "").strip()
     if q_norm:
         # security review M-3: ilike は escape 付きで無害化する。QA H-2対応:
@@ -910,12 +947,18 @@ async def admin_list_users(
             suspended_at=u.suspended_at,
             created_at=u.created_at,
             case_count=case_counts.get(u.id, 0),
+            deleted_at=u.deleted_at,
         )
         for u in users
     ]
 
     logger.info(
-        "admin: 依頼者一覧を取得しました - count=%d total=%d admin_id=%s", len(items), total or 0, admin.id
+        "admin: 依頼者一覧を取得しました - count=%d total=%d include_deleted=%s suspended=%s admin_id=%s",
+        len(items),
+        total or 0,
+        include_deleted,
+        suspended,
+        admin.id,
     )
     return AdminUserListResponse(items=items, total=int(total or 0))
 
@@ -1357,18 +1400,79 @@ async def _get_identity_document_or_404(
 
 @router.get(
     "/admin/identity-documents",
-    response_model=list[UserIdentityDocumentAdminOut],
-    summary="依頼者の本人確認書類一覧（既定 status=pending）",
+    response_model=UserIdentityDocumentAdminListResponse,
+    summary="依頼者の本人確認書類一覧（既定 status=pending・{items,total,counts}）",
 )
 async def list_identity_documents(
     status_filter: Literal["pending", "approved", "rejected", "all"] = Query(
         default="pending", alias="status"
     ),
+    q: str | None = Query(
+        default=None, max_length=255, description="依頼者のメール/氏名の部分一致"
+    ),
     limit: int = Query(default=_DEFAULT_LIST_LIMIT, ge=1, le=_MAX_LIST_LIMIT),
     offset: int = Query(default=0, ge=0),
     admin: User = Depends(get_current_admin),
     session: AsyncSession = Depends(get_session),
-) -> list[UserIdentityDocumentAdminOut]:
+) -> UserIdentityDocumentAdminListResponse:
+    """r10 O-M1〜M3: 応答を list から ``{items,total,counts}`` へ変更（web 同時切替）。
+
+    - ``total``: 現在の絞込（status/q）に一致する全件数。web の Pager が末尾を
+      越えて空ページに着地し「審査待ち0件」と誤読される事故を防ぐ。
+    - ``counts``: 絞込に関わらない全件内訳（``list_operators`` の counts と同型）。
+      バッジ表示用。退会済みユーザーの書類は一覧と同じ条件で除外する。
+    - ``q``: 依頼者のメール・氏名の部分一致（``admin_list_users`` と同じく
+      ``_escape_ilike_value`` で無害化する）。
+    - 並びは ``submitted_at desc, id desc``。単独キーだと同時刻の行がページング
+      境界で重複・欠落しうる（QA M3 の横展開）。
+    """
+    q_norm = (q or "").strip()
+    # 一覧・total・counts で共通の基底条件（JOIN 済みの User に対する述語）。
+    # 退会（匿名化）済みユーザーの書類は審査対象外のため全経路で除外する
+    # （QA M-2。画像本体は退会時に既に消去済みだが、行・審査履歴は保持される
+    # ため JOIN だけでは自然には消えない）。
+    base_conditions: list = [User.deleted_at.is_(None)]
+    if q_norm:
+        # security review M-3 と同方針: ilike はエスケープ付きで無害化する。
+        escaped_q = _escape_ilike_value(q_norm)
+        base_conditions.append(
+            or_(
+                User.email.ilike(f"%{escaped_q}%", escape="\\"),
+                User.name.ilike(f"%{escaped_q}%", escape="\\"),
+            )
+        )
+    list_conditions = list(base_conditions)
+    if status_filter != "all":
+        list_conditions.append(UserIdentityDocument.status == status_filter)
+
+    total = await session.scalar(
+        select(func.count())
+        .select_from(UserIdentityDocument)
+        .join(User, UserIdentityDocument.user_id == User.id)
+        .where(*list_conditions)
+    )
+
+    # 内訳は status/q の絞込に関わらない全件（list_operators の counts と同じ契約）。
+    # バッジは「いま審査待ちが何件あるか」を常に示す必要があり、検索中だけ数が
+    # 変わると絞込の解除忘れで審査漏れが起きる。3値を1クエリの GROUP BY で取り、
+    # 値ごとの個別 count（N+1）を避ける。
+    counts_rows = (
+        await session.execute(
+            select(UserIdentityDocument.status, func.count())
+            .join(User, UserIdentityDocument.user_id == User.id)
+            .where(User.deleted_at.is_(None))
+            .group_by(UserIdentityDocument.status)
+        )
+    ).all()
+    counts_by_status = {
+        DOCUMENT_STATUS_PENDING: 0,
+        DOCUMENT_STATUS_APPROVED: 0,
+        DOCUMENT_STATUS_REJECTED: 0,
+    }
+    for status_value, cnt in counts_rows:
+        if status_value in counts_by_status:
+            counts_by_status[status_value] = int(cnt or 0)
+
     # BLOB本体（front_image_data/back_image_data）は一覧に一切含めない（deferred属性の
     # 意図しないロードを避けるため、Core の列指定 select で必要な列のみ取得する）。
     stmt = (
@@ -1385,41 +1489,52 @@ async def list_identity_documents(
             UserIdentityDocument.back_image_data.isnot(None),
         )
         .join(User, UserIdentityDocument.user_id == User.id)
-        # 退会（匿名化）済みユーザーの書類は審査対象外のため一覧から除外する
-        # （QA M-2。画像本体は退会時に既に消去済みだが、行・審査履歴は保持される
-        # ため JOIN だけでは自然には消えない）。
-        .where(User.deleted_at.is_(None))
-        .order_by(UserIdentityDocument.submitted_at.desc())
+        .where(*list_conditions)
+        # r10 O-M2: submitted_at は同時刻の複数行がありうる単独キーのため、
+        # limit/offset のページングで並び順が不定になりうる（行の重複・欠落）。
+        # id を tie-breaker として付ける（admin_list_users と同型の是正）。
+        .order_by(UserIdentityDocument.submitted_at.desc(), UserIdentityDocument.id.desc())
+        .limit(limit)
+        .offset(offset)
     )
-    if status_filter != "all":
-        stmt = stmt.where(UserIdentityDocument.status == status_filter)
-    stmt = stmt.limit(limit).offset(offset)
 
     rows = (await session.execute(stmt)).all()
     # PII本体（氏名・メール等）はログに書かず、監査に必要な操作主体・件数・
-    # フィルタ条件のみ記録する（M-3）。
+    # フィルタ条件のみ記録する（M-3）。検索語 q も自由文＝PII になりうるため、
+    # 値ではなく「指定の有無」だけを残す。
     logger.info(
-        "admin: 本人確認書類一覧を取得しました - status=%s count=%d admin_id=%s admin_email=%s",
+        "admin: 本人確認書類一覧を取得しました - status=%s q_specified=%s count=%d total=%d "
+        "admin_id=%s admin_email=%s",
         status_filter,
+        bool(q_norm),
         len(rows),
+        total or 0,
         admin.id,
         admin.email,
     )
-    return [
-        UserIdentityDocumentAdminOut(
-            id=row[0],
-            user_id=row[1],
-            user_email=row[2],
-            user_name=row[3],
-            doc_type=row[4],
-            status=row[5],
-            submitted_at=row[6],
-            reviewed_at=row[7],
-            reject_reason=row[8],
-            has_back=bool(row[9]),
-        )
-        for row in rows
-    ]
+    return UserIdentityDocumentAdminListResponse(
+        items=[
+            UserIdentityDocumentAdminOut(
+                id=row[0],
+                user_id=row[1],
+                user_email=row[2],
+                user_name=row[3],
+                doc_type=row[4],
+                status=row[5],
+                submitted_at=row[6],
+                reviewed_at=row[7],
+                reject_reason=row[8],
+                has_back=bool(row[9]),
+            )
+            for row in rows
+        ],
+        total=int(total or 0),
+        counts=IdentityDocumentListCounts(
+            pending=counts_by_status[DOCUMENT_STATUS_PENDING],
+            approved=counts_by_status[DOCUMENT_STATUS_APPROVED],
+            rejected=counts_by_status[DOCUMENT_STATUS_REJECTED],
+        ),
+    )
 
 
 @router.get(
@@ -1624,4 +1739,127 @@ async def reject_identity_document(
         reviewed_at=document.reviewed_at,
         reject_reason=document.reject_reason,
         has_back=bool(has_back),
+    )
+
+
+# ──────────────────────────── お問い合わせ（受信台帳） ────────────────────────────
+
+_CONTACT_NOT_FOUND = HTTPException(
+    status_code=status.HTTP_404_NOT_FOUND, detail="お問い合わせが見つかりません。"
+)
+
+
+@router.get(
+    "/admin/contacts",
+    response_model=AdminContactListResponse,
+    summary="お問い合わせ一覧（未対応/対応済みで絞込・新しい順）",
+)
+async def admin_list_contacts(
+    handled: bool | None = Query(
+        default=None,
+        description="true=対応済みのみ / false=未対応のみ / 省略=全件。",
+    ),
+    limit: int = Query(default=_ADMIN_CASE_TXN_DEFAULT_LIMIT, ge=1, le=_ADMIN_CASE_TXN_MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
+    admin: User = Depends(get_current_admin),
+    session: AsyncSession = Depends(get_session),
+) -> AdminContactListResponse:
+    """r10 O-M6: ``POST /contact`` の受信台帳を運営が読むための一覧。
+
+    メール通知（既存）は速報、この一覧は取りこぼしのない台帳という役割分担。
+    絞込は ``handled_at`` の NULL 判定のみ（複合索引
+    ``ix_contact_messages_handled_at_created_at`` がそのまま効く）。
+    """
+    conditions: list = []
+    if handled is not None:
+        conditions.append(
+            ContactMessage.handled_at.isnot(None)
+            if handled
+            else ContactMessage.handled_at.is_(None)
+        )
+
+    total = await session.scalar(
+        select(func.count()).select_from(ContactMessage).where(*conditions)
+    )
+    rows = (
+        await session.scalars(
+            select(ContactMessage)
+            .where(*conditions)
+            # created_at 単独だと同時刻の行がページング境界で重複・欠落しうる
+            # （admin_list_users と同型の tie-breaker）。
+            .order_by(ContactMessage.created_at.desc(), ContactMessage.id.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+    ).all()
+
+    # 本文・氏名・メールは PII のためログに書かない（件数と絞込条件のみ）。
+    logger.info(
+        "admin: お問い合わせ一覧を取得しました - handled=%s count=%d total=%d admin_id=%s",
+        handled,
+        len(rows),
+        total or 0,
+        admin.id,
+    )
+    return AdminContactListResponse(
+        items=[AdminContactListItem.model_validate(r) for r in rows],
+        total=int(total or 0),
+    )
+
+
+@router.patch(
+    "/admin/contacts/{contact_id}/handle",
+    response_model=AdminContactHandleResponse,
+    summary="お問い合わせを対応済みにする（冪等・最初の対応者を保持）",
+)
+async def admin_handle_contact(
+    contact_id: uuid.UUID,
+    admin: User = Depends(get_current_admin),
+    session: AsyncSession = Depends(get_session),
+) -> AdminContactHandleResponse:
+    """対応済みフラグを立てる。既に対応済みなら**上書きせず** 200 で現状を返す。
+
+    冪等にするのは、運営が複数人になった際の二度押し・同時押しで
+    「最初に対応した人・時刻」が後勝ちで消えると監査の意味が無くなるため
+    （409 にしないのは、web 側で「もう対応済みです」を出す以上の実益が無く、
+    一覧の再読込だけで解消する状態のため）。
+    """
+    contact = await session.get(ContactMessage, contact_id)
+    if contact is None:
+        raise _CONTACT_NOT_FOUND
+    if contact.handled_at is None:
+        contact.handled_at = datetime.now(timezone.utc)
+        contact.handled_by_admin_id = admin.id
+        await session.commit()
+        await session.refresh(contact)
+        logger.info(
+            "admin: お問い合わせを対応済みにしました - contact_id=%s admin_id=%s",
+            contact.id,
+            admin.id,
+        )
+    return AdminContactHandleResponse(id=contact.id, handled_at=contact.handled_at)
+
+
+@router.delete(
+    "/admin/contacts/{contact_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="お問い合わせを削除する（privacy:110 の削除請求対応・監査ログあり）",
+)
+async def admin_delete_contact(
+    contact_id: uuid.UUID,
+    admin: User = Depends(get_current_admin),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    """r10-review M1: contact_messages に削除 API が無く privacy:110（削除請求）に
+    応えられない指摘への対応。物理削除し、対応者を監査ログ（構造化ログ）に残す。
+    """
+    contact = await session.get(ContactMessage, contact_id)
+    if contact is None:
+        raise _CONTACT_NOT_FOUND
+    await session.delete(contact)
+    await session.commit()
+    logger.info(
+        "admin: お問い合わせを削除しました - contact_id=%s admin_id=%s",
+        contact_id,
+        admin.id,
     )

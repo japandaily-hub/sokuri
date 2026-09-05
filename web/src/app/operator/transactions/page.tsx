@@ -16,6 +16,7 @@ import { OperatorHeader } from "@/components/kdz/OperatorHeader";
 import { Ic } from "@/components/kdz/Icons";
 import { useToken } from "@/components/kdz/Ui";
 import { formatPurposeLabel } from "@/lib/case-labels";
+import { formatVisitSchedule } from "@/lib/categories";
 import {
   LIST_DEFAULT_LIMIT,
   TXN_STATUS_LABEL,
@@ -76,7 +77,7 @@ export default function OperatorTransactionsPage() {
           <div className="op-head">
             <div>
               <h1>取引一覧</h1>
-              <p>落札した案件の進行状況です。</p>
+              <p>成約した取引の進行状況です。</p>
             </div>
             <Link href="/operator/cases" className="btn btn-ghost">
               案件一覧へ
@@ -95,8 +96,8 @@ export default function OperatorTransactionsPage() {
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M4 7h16M4 12h16M4 17h10" />
               </svg>
-              <h3>落札した案件はまだありません</h3>
-              <p>案件一覧から入札すると、落札後にここへ表示されます。</p>
+              <h3>成約した取引はまだありません</h3>
+              <p>案件一覧から入札すると、成約後にここへ表示されます。</p>
             </div>
           ) : (
             <div className="txn-list">
@@ -105,11 +106,16 @@ export default function OperatorTransactionsPage() {
                   <div className="txn-row-info">
                     <div className="txn-row-title">{formatPurposeLabel(t.purpose)}</div>
                     <div className="txn-row-meta">
-                      {t.prefecture} {t.city} ・ 落札額 {formatYen(t.initial_amount)}
+                      {t.prefecture} {t.city} ・ 成約額 {formatYen(t.initial_amount)}
                       {t.final_amount != null && t.final_amount !== t.initial_amount
                         ? ` → 確定 ${formatYen(t.final_amount)}`
                         : ""}
                       ・ {new Date(t.created_at).toLocaleDateString("ja-JP")}
+                    </div>
+                    {/* r10 H1 是正: 訪問確定日がチャットのスクロールバックにしか無く一覧から追えなかった。
+                        r10 対応: 一覧の TransactionListItem に visit_time_slot が加わったため時間帯も併記する。 */}
+                    <div className="txn-row-meta">
+                      訪問日 {t.visit_date ? formatVisitSchedule(t.visit_date, t.visit_time_slot) : "未確定"}
                     </div>
                   </div>
                   <div className="txn-row-right">

@@ -16,7 +16,15 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    status,
+)
 from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +32,7 @@ from starlette.datastructures import UploadFile as StarletteUploadFile
 
 from app.api.deps import get_current_user
 from app.api.rate_limit_deps import RateLimitGuard
+from app.config import get_settings
 from app.db.models.user import (
     IDENTITY_STATUS_APPROVED,
     IDENTITY_STATUS_PENDING,
@@ -38,6 +47,7 @@ from app.db.models.user_identity_document import (
 )
 from app.db.session import get_session
 from app.schemas_katadzuke import UserIdentityStatusOut
+from app.services import notify
 from app.services.storage import MAX_UPLOAD_BYTES, sniff_image_ext
 
 logger = logging.getLogger(__name__)
@@ -166,6 +176,7 @@ async def get_my_identity_status(
 )
 async def submit_identity_document(
     request: Request,
+    background: BackgroundTasks,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
     _rl: object = Depends(RateLimitGuard("identity_submit")),
@@ -303,6 +314,19 @@ async def submit_identity_document(
             detail="本人確認書類の保存に失敗しました。時間をおいて再度お試しください。",
         ) from exc
     await session.refresh(document)
+
+    # r10 O-M1: 提出は admin が能動的に一覧を見に行かない限り気づけず、審査待ちが
+    # 滞留していた（依頼者側は「審査中」のまま待たされ続ける）。業者の事前申込
+    # （send_operator_application_admin_alert）と同じく ADMIN_EMAILS 宛に1通ずつ
+    # 送る。LINE 併用の notify_dispatch は依頼者・業者本人向けの経路であり、
+    # 運営宛の内部通知は経由させない（宛先解決の前提が異なる）。
+    admin_emails = get_settings().admin_emails
+    if not admin_emails:
+        logger.warning(
+            "user_identity: ADMIN_EMAILS が未設定のため、本人確認書類の提出通知を送信できません。"
+        )
+    for admin_email in admin_emails:
+        background.add_task(notify.send_identity_submitted_admin_alert, admin_email)
 
     return UserIdentityStatusOut(
         status=user.identity_status,

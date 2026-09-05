@@ -20,10 +20,12 @@ import "./mypage.css";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Spinner } from "@/components/Icon";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import { Ic } from "@/components/kdz/Icons";
 import { caseItemsLabel, formatPurposeLabel } from "@/lib/case-labels";
+import { formatVisitSchedule } from "@/lib/categories";
 import { StatusBadge, useToken } from "@/components/kdz/Ui";
 import {
   LIST_MAX_LIMIT,
@@ -46,15 +48,16 @@ type TabKey = "all" | "active" | "done";
  * タブ分類とサマリー集計で共有する唯一の判定ロジック。
  * 「進行中」= closed/cancelled を除く全ステータス（draft/open/bidding）。
  * 「成約済み」= closed（業者決定済み）または cancelled。
- * 「入札受付中」サマリーは進行中のうち、まだ業者が決まっていない
- * （open/bidding）かつ bid_count>0 のもののみをカウントする
- * （closed は成約済みタブに分類されるため、入札受付中サマリーからは除外）。
+ * 「入札受付中」サマリーは status==="open" の案件数（r10-M5 是正: 従来は
+ * (open|bidding) かつ bid_count>0 を母数にしており、同じ画面のステータス
+ * チップ（status==="open" を無条件に「入札受付中」と表示）と定義がずれ、
+ * 出品直後・入札0件の案件でチップとサマリーの表示が矛盾していた。
+ * チップ側の定義に合わせ、bid_count を問わない status 基準に統一する）。
  */
 const DONE_STATUSES: CaseStatus[] = ["closed", "cancelled"];
 const isActiveCase = (c: CaseOut): boolean => !DONE_STATUSES.includes(c.status);
 const isDoneCase = (c: CaseOut): boolean => DONE_STATUSES.includes(c.status);
-const isBiddingCase = (c: CaseOut): boolean =>
-  (c.status === "open" || c.status === "bidding") && c.bid_count > 0;
+const isBiddingCase = (c: CaseOut): boolean => c.status === "open";
 
 function statusChipInfo(c: CaseOut): { label: string; cls: string } {
   if (c.status === "cancelled") return { label: "キャンセル", cls: "done" };
@@ -64,8 +67,21 @@ function statusChipInfo(c: CaseOut): { label: string; cls: string } {
   return { label: "下書き", cls: "negotiating" };
 }
 
-/** 出品カード（実データ版）。unreadCount は成約後の取引に紐づく未読チャット件数（無ければ undefined）。 */
-function LotCard({ c, unreadCount }: { c: CaseOut; unreadCount?: number }) {
+/**
+ * 出品カード（実データ版）。
+ * unreadCount: 成約後の取引に紐づく未読チャット件数（無ければ undefined）。
+ * visitInfo: 訪問日時（"9月10日（水） 10:00-12:00" 等）。訪問予定のある取引
+ *   （status===pending/visiting）が紐づく場合のみ渡される（r10 対応）。
+ */
+function LotCard({
+  c,
+  unreadCount,
+  visitInfo,
+}: {
+  c: CaseOut;
+  unreadCount?: number;
+  visitInfo?: string;
+}) {
   const { label, cls } = statusChipInfo(c);
   const isDone = c.status === "closed" || c.status === "cancelled";
   return (
@@ -106,6 +122,12 @@ function LotCard({ c, unreadCount }: { c: CaseOut; unreadCount?: number }) {
               <Ic name="clock" />
               {new Date(c.created_at).toLocaleDateString("ja-JP")}出品
             </span>
+            {visitInfo ? (
+              <span className="lot-meta-item">
+                <Ic name="clock" />
+                訪問日 {visitInfo}
+              </span>
+            ) : null}
           </div>
         </div>
 
@@ -162,7 +184,15 @@ function EmptyState({ title, sub }: { title: string; sub?: string }) {
 export default function MyPage() {
   const { data: sessionData } = useSession();
   const { token, loading } = useToken();
+  const searchParams = useSearchParams();
   const [tab, setTab] = useState<TabKey>("all");
+
+  // r10-M4 是正: サマリー3枚（入札受付中/交渉中/成約済み）が全て絞り込みなしの /cases へ
+  // 飛び、押した数字の中身に辿り着けなかったため、同一ページ内のタブへ `?tab=` で絞り込む。
+  useEffect(() => {
+    const t = searchParams.get("tab");
+    if (t === "all" || t === "active" || t === "done") setTab(t);
+  }, [searchParams]);
 
   const [cases, setCases] = useState<CaseOut[] | null>(null);
   const [transactions, setTransactions] = useState<TransactionListItem[] | null>(null);
@@ -230,6 +260,19 @@ export default function MyPage() {
     const map = new Map<string, number>();
     for (const t of transactions ?? []) {
       if (t.unread_count > 0) map.set(t.case_id, t.unread_count);
+    }
+    return map;
+  }, [transactions]);
+  /**
+   * 案件ID → 訪問日時の表示文字列（r10 対応）。
+   * 訪問予定が意味を持つのは日程調整中〜訪問前（status===pending/visiting）の取引のみ。
+   * 完了・キャンセル済みの案件では出品カードに訪問日を出す必要がないため対象外にする。
+   */
+  const visitInfoByCaseId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const t of transactions ?? []) {
+      if (t.status !== "pending" && t.status !== "visiting") continue;
+      map.set(t.case_id, t.visit_date ? formatVisitSchedule(t.visit_date, t.visit_time_slot) : "未確定");
     }
     return map;
   }, [transactions]);
@@ -332,15 +375,15 @@ export default function MyPage() {
 
         {/* サマリー帯 */}
         <div className="my-summary">
-          <Link href="/cases" className="sum-card active-card" style={{ textDecoration: "none" }}>
+          <Link href="/mypage?tab=active" className="sum-card active-card" style={{ textDecoration: "none" }}>
             <div className="sum-label">入札受付中</div>
             <div className="sum-val">
               {biddingCount}
               <span>件</span>
             </div>
-            <div className="sum-sub">入札が届いています</div>
+            <div className="sum-sub">業者からの入札を受付中です</div>
           </Link>
-          <Link href="/cases" className="sum-card" style={{ textDecoration: "none" }}>
+          <Link href="/mypage?tab=done" className="sum-card" style={{ textDecoration: "none" }}>
             <div className="sum-label">交渉中</div>
             <div className="sum-val">
               {negotiatingCount}
@@ -348,7 +391,7 @@ export default function MyPage() {
             </div>
             <div className="sum-sub">訪問日調整中を含む</div>
           </Link>
-          <Link href="/cases" className="sum-card" style={{ textDecoration: "none" }}>
+          <Link href="/mypage?tab=done" className="sum-card" style={{ textDecoration: "none" }}>
             <div className="sum-label">成約済み</div>
             <div className="sum-val">
               {completedTxns.length}
@@ -434,7 +477,7 @@ export default function MyPage() {
         {tab === "all" ? (
           <div className="lot-list">
             {(cases ?? []).length ? (
-              (cases ?? []).map((c) => <LotCard key={c.id} c={c} unreadCount={unreadByCaseId.get(c.id)} />)
+              (cases ?? []).map((c) => <LotCard key={c.id} c={c} unreadCount={unreadByCaseId.get(c.id)} visitInfo={visitInfoByCaseId.get(c.id)} />)
             ) : (
               <EmptyState title="まだ出品がありません" sub="最初の出品をしてみましょう。" />
             )}
@@ -445,7 +488,7 @@ export default function MyPage() {
         {tab === "active" ? (
           <div className="lot-list">
             {activeLots.length ? (
-              activeLots.map((c) => <LotCard key={c.id} c={c} unreadCount={unreadByCaseId.get(c.id)} />)
+              activeLots.map((c) => <LotCard key={c.id} c={c} unreadCount={unreadByCaseId.get(c.id)} visitInfo={visitInfoByCaseId.get(c.id)} />)
             ) : (
               <EmptyState title="進行中の出品はありません" sub="新しく出品してみましょう。" />
             )}
@@ -456,7 +499,7 @@ export default function MyPage() {
         {tab === "done" ? (
           <div className="lot-list">
             {doneLots.length ? (
-              doneLots.map((c) => <LotCard key={c.id} c={c} unreadCount={unreadByCaseId.get(c.id)} />)
+              doneLots.map((c) => <LotCard key={c.id} c={c} unreadCount={unreadByCaseId.get(c.id)} visitInfo={visitInfoByCaseId.get(c.id)} />)
             ) : (
               <EmptyState title="成約済みの出品はありません" />
             )}

@@ -30,6 +30,7 @@ from app.db.models.routing import RoutingRule
 
 # ── カタヅケ（クローズドβ） ──────────────────────────────────────
 from app.db.models.case import Case, CaseItem, CasePhoto
+from app.db.models.contact_message import ContactMessage
 from app.db.models.operator import Operator
 from app.db.models.operator_application import OperatorApplication
 from app.db.models.operator_profile import OperatorProfile
@@ -60,6 +61,7 @@ __all__ = [
     "Case",
     "CaseItem",
     "CasePhoto",
+    "ContactMessage",
     "Operator",
     "OperatorApplication",
     "OperatorProfile",

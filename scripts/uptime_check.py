@@ -6,6 +6,7 @@
   2. BACKEND_URL/readyz  … 200 かつ status=ready・db=ok・alembic_version == expected_head
   3. FRONTEND_URL/       … 200 かつ HTML に <title> がある（Vercel の 5xx / 空応答を検出）
   4. 応答時間が SLOW_MS（既定 8000ms）を超えたら Warning
+  5. /readyz の degraded_config（本番必須設定の未充足）が非空なら Warning（r10 O-H2）
 
 状態遷移で通知する（毎回は送らない）:
   - 直前状態 up → 今回 down: Critical「障害検知」
@@ -18,7 +19,13 @@
   BREVO_API_KEY + ALERT_EMAILS（カンマ区切り）+ ALERT_MAIL_FROM
   ALERT_LINE_CHANNEL_ACCESS_TOKEN + ALERT_LINE_USER_IDS（カンマ区切り。顧客向けとは別の公式アカウント）
   ALERT_WEBHOOK_URL（Slack / Discord Incoming Webhook）
-終了コード: 常に 0（監視ジョブ自体を赤くしない。障害は通知で伝える）。GitHub の Step Summary に結果を書く。
+終了コード（r10 ADD-H1 で変更）:
+  0 … 正常、または「通知が必要で、少なくとも1チャネルへ送信できた」
+  1 … 通知が必要だったのに**全チャネルで送信に失敗した**（＝障害を検知したのに運営へ何も届いていない）
+      GitHub Actions の実行を赤くし、workflow 失敗メールを最後の砦にする。
+      従来は常に 0 かつ Step Summary が「通知: なし」となり、正常時と文字列が完全に一致していたため、
+      ALERT_LINE トークン失効・Brevo の Authorised IPs 制限・Secrets 消失を誰も検知できなかった。
+GitHub の Step Summary に結果を書く。
 """
 from __future__ import annotations
 
@@ -28,7 +35,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 # Windows の cp932 コンソールでも日本語・絵文字を出力できるようにする（Actions/Linux では無害）
 for _stream in (sys.stdout, sys.stderr):
@@ -52,6 +59,9 @@ class CheckResult:
     ok: bool
     detail: str
     ms: int
+    #: /readyz の degraded_config（本番必須設定のうち未充足のキー名）。
+    #: 他のチェックでは常に空。ok=True でも非空になりうる（設定不備は 200 ready のまま）。
+    degraded_config: list[str] = field(default_factory=list)
 
 
 def _fetch(url: str) -> tuple[int, bytes, int]:
@@ -82,11 +92,17 @@ def check_readyz() -> CheckResult:
         schema = data.get("schema") or {}
         head_ok = (not schema) or schema.get("alembic_version") == schema.get("expected_head")
         ok = status == 200 and data.get("status") == "ready" and data.get("db") == "ok" and head_ok
+        # 設定不備（BREVO_API_KEY 失効・ADMIN_EMAILS 未設定・アラート経路の欠落等）は
+        # /readyz が意図的に status=ready のまま返すため、ok 判定には含めず別軸で扱う
+        # （ここで NG にすると「API 全断」と「設定1件の欠落」が同じ Critical になる）。
+        degraded_config = [str(k) for k in (data.get("degraded_config") or [])]
         detail = (
             f"HTTP {status} status={data.get('status')} db={data.get('db')} "
             f"alembic={schema.get('alembic_version')} expected={schema.get('expected_head')}"
         )
-        return CheckResult("backend /readyz", ok, detail, ms)
+        if degraded_config:
+            detail += f" degraded_config={','.join(degraded_config)}"
+        return CheckResult("backend /readyz", ok, detail, ms, degraded_config)
     except Exception as e:  # noqa: BLE001
         return CheckResult("backend /readyz", False, f"到達不能: {type(e).__name__}: {e}", TIMEOUT_S * 1000)
 
@@ -178,7 +194,8 @@ def write_summary(lines: list[str]) -> None:
 
 
 def main() -> int:
-    results = [check_health(), check_readyz(), check_frontend()]
+    readyz = check_readyz()
+    results = [check_health(), readyz, check_frontend()]
     failures = [r for r in results if not r.ok]
     slow = [r for r in results if r.ok and r.ms > SLOW_MS]
     now = time.strftime("%Y-%m-%d %H:%M:%S %Z")
@@ -191,6 +208,8 @@ def main() -> int:
     body_lines = [f"- {r.name}: {r.detail}（{r.ms}ms）" for r in results]
     body = "\n".join(body_lines)
     sent: list[str] = []
+    # 通知が必要だったか（＝notify() を1回以上呼んだか）。全滅判定に使う（ADD-H1）。
+    notify_attempted = False
 
     if failures:
         state["down_runs"] = int(state.get("down_runs", 0)) + 1
@@ -202,6 +221,7 @@ def main() -> int:
         if first or repeat:
             names = "、".join(r.name for r in failures)
             title = "障害検知" if first else f"障害継続中（{state['down_runs']}回目の確認）"
+            notify_attempted = True
             sent = notify(
                 f"[カタヅケ監視][CRITICAL] {title}: {names}",
                 f"🚨【Critical】カタヅケ監視 {title}\n発生: {state.get('since')}\n\n{body}\n\n"
@@ -209,28 +229,82 @@ def main() -> int:
             )
     else:
         if state.get("down"):
+            notify_attempted = True
             sent = notify(
                 "[カタヅケ監視][RECOVERED] 復旧しました",
                 f"✅ カタヅケ監視 復旧\n障害発生: {state.get('since')} → 復旧確認: {now}\n\n{body}",
             )
         was_slow = bool(state.get("slow"))
-        state = {"down": False, "down_runs": 0, "since": None, "slow": bool(slow)}
+        # degraded_config の遷移判定は down/up と独立の軸のため、state を作り直す際も
+        # 直前値を引き継ぐ（引き継がないと復旧のたびに「設定不備が新たに発生した」と
+        # 誤検知して毎回 Warning が飛ぶ）。
+        state = {
+            "down": False,
+            "down_runs": 0,
+            "since": None,
+            "slow": bool(slow),
+            "degraded_config": list(state.get("degraded_config") or []),
+        }
         # 遅延も状態遷移でのみ通知する（遅い間ずっと毎回送らない）
         if slow and not was_slow:
             names = "、".join(f"{r.name}({r.ms}ms)" for r in slow)
+            notify_attempted = True
             sent += notify(
                 f"[カタヅケ監視][WARNING] 応答遅延: {names}",
                 f"⚠️【Warning】応答が遅くなっています（しきい値 {SLOW_MS}ms）\n\n{body}",
             )
         elif was_slow and not slow:
+            notify_attempted = True
             sent += notify(
                 "[カタヅケ監視][INFO] 応答遅延が解消しました",
                 f"✅ 応答速度が通常に戻りました（しきい値 {SLOW_MS}ms）\n\n{body}",
             )
 
+    # ── 本番必須設定の未充足（r10 O-H2）─────────────────────────────
+    # /readyz は設定不備でも status=ready を返す設計のため、up/down とは独立の軸として
+    # 「変化した時だけ」Warning を出す（毎回送ると通知疲れで本物の障害が埋もれる）。
+    # 到達不能で degraded_config を取得できなかった実行（readyz が NG）は、「解消した」と
+    # 誤検知しないよう遷移判定そのものをスキップし、直前値を据え置く。
+    prev_degraded = sorted(state.get("degraded_config") or [])
+    if readyz.ok:
+        current_degraded = sorted(readyz.degraded_config)
+        if current_degraded != prev_degraded:
+            notify_attempted = True
+            if current_degraded:
+                sent += notify(
+                    f"[カタヅケ監視][WARNING] 本番必須設定の未充足: {'、'.join(current_degraded)}",
+                    f"⚠️【Warning】/readyz の degraded_config が非空です\n"
+                    f"未充足: {', '.join(current_degraded)}\n"
+                    f"（直前: {', '.join(prev_degraded) if prev_degraded else 'なし'}）\n\n"
+                    "API は稼働していますが、該当機能（メール通知・LINE Push・AI 解析・"
+                    "アラート経路など）は無言でスキップされます。"
+                    "Render の環境変数を確認してください。",
+                )
+            else:
+                sent += notify(
+                    "[カタヅケ監視][INFO] 本番必須設定の未充足が解消しました",
+                    f"✅ /readyz の degraded_config が空になりました"
+                    f"（直前: {', '.join(prev_degraded)}）",
+                )
+        state["degraded_config"] = current_degraded
+    else:
+        state["degraded_config"] = prev_degraded
+
     save_state(state)
     status = "DOWN" if state.get("down") else ("UP(遅延)" if state.get("slow") else "UP")
     lines += ["", f"状態: {status} / 通知: {', '.join(sent) if sent else 'なし'}"]
+    # ADD-H1: 通知が必要だったのに1チャネルも送れなかった実行を、正常時（通知不要で
+    # 「通知: なし」）と機械的に区別する。exit 1 で Actions を赤くし、GitHub の
+    # workflow 失敗メールを最後の砦にする。
+    if notify_attempted and not sent:
+        lines += [
+            "",
+            "**通知全滅**: 通知が必要でしたが、全チャネル（メール/LINE/Webhook）で"
+            "送信に失敗しました。Secrets（BREVO_API_KEY / ALERT_EMAILS / ALERT_LINE_* / "
+            "ALERT_WEBHOOK_URL）と各サービスの稼働状況を確認してください。",
+        ]
+        write_summary(lines)
+        return 1
     write_summary(lines)
     return 0
 

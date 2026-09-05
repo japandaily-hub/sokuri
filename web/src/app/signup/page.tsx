@@ -2,30 +2,17 @@
 
 /** ユーザー新規登録（新デザイン・3ステップ）。
  *  既存の配線を維持: signupUser() → signIn("user-credentials") → /create。
- *  エリア/利用目的は UI 収集のみ（バックエンド signupUser は email/password/name のみ受領＝将来拡張）。 */
+ *  r10-H3 是正: エリア/利用目的は backend signupUser（email/password/name のみ受領）に送信されず
+ *  破棄されていたため、フォームごと削除した（説明文と誤認を招く確認表示も併せて撤去）。 */
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { signupUser, toDisplayMessage, clearRedirectLoopStorage } from "@/lib/katadzuke-api";
 import { Ic } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
 import { PasswordField, LineAuthButton } from "@/components/kdz/auth";
 import "./signup.css";
-
-const AREAS: { key: string; label: string }[] = [
-  { key: "tokyo", label: "東京都" },
-  { key: "kanagawa", label: "神奈川県" },
-  { key: "saitama", label: "埼玉県" },
-  { key: "chiba", label: "千葉県" },
-  { key: "osaka", label: "大阪府" },
-  { key: "aichi", label: "愛知県" },
-  { key: "fukuoka", label: "福岡県" },
-  { key: "other", label: "その他" },
-];
-const AREA_LABEL = Object.fromEntries(AREAS.map((a) => [a.key, a.label]));
-const ROLE_LABEL: Record<string, string> = { seller: "売りたい・片付けたい", buyer: "業者として入札" };
 
 const STEPS = ["アカウント", "プロフィール", "確認", "完了"];
 
@@ -56,14 +43,11 @@ function PwStrength({ value }: { value: string }) {
 }
 
 export default function SignupPage() {
-  const router = useRouter();
   const [step, setStep] = useState(1);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [password2, setPassword2] = useState("");
   const [name, setName] = useState("");
-  const [area, setArea] = useState("");
-  const [role, setRole] = useState("");
   const [agree1, setAgree1] = useState(false);
   const [agree2, setAgree2] = useState(false);
 
@@ -95,8 +79,6 @@ export default function SignupPage() {
   function validateStep2(): boolean {
     let ok = true;
     if (!name.trim()) { setErr("name", "お名前を入力してください"); ok = false; } else setErr("name", null);
-    if (!area) { setErr("area", "エリアを選択してください"); ok = false; } else setErr("area", null);
-    if (!role) { setErr("role", "利用目的を選択してください"); ok = false; } else setErr("role", null);
     return ok;
   }
 
@@ -108,7 +90,6 @@ export default function SignupPage() {
       setBusy(true);
       setAuthErr(null);
       try {
-        // バックエンドは email/password/name のみ受領（area/role は将来拡張用にUI収集のみ）
         await signupUser({ email, password, name: name || undefined });
         const res = await signIn("user-credentials", { email, password, redirect: false });
         if (res?.error) throw new Error("登録後のログインに失敗しました。");
@@ -192,7 +173,7 @@ export default function SignupPage() {
           {step === 2 && (
             <div>
               <h2 className="step-title">プロフィールを設定する</h2>
-              <p className="step-desc">あなたのエリアと利用目的を教えてください。適切な業者をマッチングするために使用します。</p>
+              <p className="step-desc">出品時にお呼びする、お名前を入力してください。</p>
 
               <div className="form-card">
                 <div className={`field${errs.name ? " has-error" : ""}`}>
@@ -200,42 +181,11 @@ export default function SignupPage() {
                   <input type="text" id="inp-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="山田 花子" autoComplete="name" />
                   {errs.name && <div className="field-error">{errs.name}</div>}
                 </div>
-                <div className="field" style={{ marginBottom: 0 }}>
-                  <label>お住まいのエリア<span className="req">必須</span></label>
-                  <div className="area-grid">
-                    {AREAS.map((a) => (
-                      <button type="button" key={a.key} className={`area-chip${area === a.key ? " selected" : ""}`} onClick={() => { setArea(a.key); setErr("area", null); }}>
-                        {a.label}
-                      </button>
-                    ))}
-                  </div>
-                  {errs.area && <div className="field-error" style={{ marginTop: 8 }}>{errs.area}</div>}
-                </div>
               </div>
 
-              <div className="form-card">
-                <div className="field" style={{ marginBottom: 0 }}>
-                  <label>ご利用目的<span className="req">必須</span></label>
-                  <div className="role-grid">
-                    <button type="button" className={`role-card${role === "seller" ? " selected" : ""}`} onClick={() => { setRole("seller"); setErr("role", null); }}>
-                      <span className="rc-ic"><Ic name="house" /></span>
-                      <span className="rc-title">売りたい・片付けたい</span>
-                      <span className="rc-sub">不用品や遺品の買取・整理をお願いしたい方</span>
-                    </button>
-                    <button type="button" className={`role-card${role === "buyer" ? " selected" : ""}`} onClick={() => { setRole("buyer"); setErr("role", null); }}>
-                      <span className="rc-ic"><Ic name="bag" /></span>
-                      <span className="rc-title">業者として入札したい</span>
-                      <span className="rc-sub">出品された物件に入札・買取参加したい業者</span>
-                    </button>
-                  </div>
-                  {errs.role && <div className="field-error" style={{ marginTop: 8 }}>{errs.role}</div>}
-                  {role === "buyer" && (
-                    <div className="hint-banner" style={{ marginTop: 12, marginBottom: 0 }}>
-                      <Ic name="shield" className="hint-ic" />
-                      <span>業者としての参加は<Link href="/business" style={{ color: "var(--blue)", fontWeight: 600 }}>業者登録（審査制）</Link>からも可能です。</span>
-                    </div>
-                  )}
-                </div>
+              <div className="hint-banner">
+                <Ic name="shield" className="hint-ic" />
+                <span>業者としてのご登録は<Link href="/business" style={{ color: "var(--blue)", fontWeight: 600 }}>業者登録（審査制）</Link>からお願いします。</span>
               </div>
             </div>
           )}
@@ -258,14 +208,6 @@ export default function SignupPage() {
               <div className="form-card">
                 <div className="confirm-row"><span className="lbl">メールアドレス</span><span className="val">{email}</span></div>
                 <div className="confirm-row"><span className="lbl">お名前</span><span className="val">{name}</span></div>
-                <div className="confirm-row"><span className="lbl">エリア</span><span className="val">{AREA_LABEL[area] || area}</span></div>
-                <div className="confirm-row"><span className="lbl">利用目的</span><span className="val">{ROLE_LABEL[role] || role}</span></div>
-                {role === "buyer" && (
-                  <div className="hint-banner warn" style={{ marginTop: 12, marginBottom: 0 }}>
-                    <Ic name="shield" className="hint-ic" />
-                    <span>※この登録では入札はできません。業者としてのご利用は<Link href="/business" style={{ fontWeight: 600 }}>/business からの登録（審査制）</Link>が必要です。</span>
-                  </div>
-                )}
                 <div className="confirm-row"><span className="lbl">登録費用</span><span className="val" style={{ color: "var(--green)" }}>完全無料</span></div>
               </div>
 
@@ -293,6 +235,7 @@ export default function SignupPage() {
               <div className="done-circle"><Ic name="check-circle" /></div>
               <h2>登録が完了しました。</h2>
               <p>カタヅケへようこそ。<br />さっそく不用品を撮って、<br />業者からの見積もりを受け取りましょう。</p>
+              <p style={{ fontSize: 12.5, color: "var(--body-soft)" }}>対応エリアは東京・千葉・埼玉・神奈川です。</p>
               <div className="done-actions">
                 <Link href="/create" className="btn btn-primary btn-lg">
                   さっそく出品してみる<Ic name="arrow" />
