@@ -17,7 +17,7 @@
 
 import "./mypage.css";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -181,7 +181,7 @@ function EmptyState({ title, sub }: { title: string; sub?: string }) {
   );
 }
 
-export default function MyPage() {
+function MyPageContent() {
   const { data: sessionData } = useSession();
   const { token, loading } = useToken();
   const searchParams = useSearchParams();
@@ -507,5 +507,14 @@ export default function MyPage() {
         ) : null}
       </main>
     </div>
+  );
+}
+
+/** useSearchParams（?tab=）を使うため Suspense 境界で包む（本番ビルドの静的プリレンダー要件。他ページと同型）。 */
+export default function MyPage() {
+  return (
+    <Suspense fallback={null}>
+      <MyPageContent />
+    </Suspense>
   );
 }
