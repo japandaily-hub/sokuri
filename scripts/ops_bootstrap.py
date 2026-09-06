@@ -11,6 +11,7 @@
     3. RENDER_API_KEY … GitHub Secret へ（key-check / key-restore が Render API を叩くため）
     4. OPS_PROBE_CONTACT_EMAIL … --probe-email の値を Render 環境変数へ（運営自身のプローブ問い合わせの差出人）
     5. --deploy 指定時のみ Render の再デプロイを起動（環境変数の追加は Render が自動で再デプロイするため通常不要）
+    6. 実証: Actions「Ops cron」を job=daily で起動し、完了（success）まで待って結果を表示（--no-verify で省略）
 
 認証情報・鍵はこのプロセス内でしか使わず、ファイルにも標準出力にも残さない（表示は文字数のみ）。
 """
@@ -21,6 +22,7 @@ import argparse
 import os
 import secrets
 import sys
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from setup_alerts import (  # noqa: E402
@@ -35,6 +37,9 @@ from setup_alerts import (  # noqa: E402
     seal,
     warn,
 )
+
+
+OPS_WORKFLOW_FILE = "ops-cron.yml"
 
 
 def desc(value: str) -> str:
@@ -123,6 +128,7 @@ def main() -> int:
         action="store_true",
         help="手順3（暗号鍵の控えを GitHub Secret へ置く）を飛ばす。控えだけ後で別途この手順を実行する場合に使う",
     )
+    ap.add_argument("--no-verify", action="store_true", help="最後の実証（Actions の daily 起動と完了待ち）を行わない")
     args = ap.parse_args()
 
     values = read_env_file(ENV_FILE)
@@ -180,8 +186,55 @@ def main() -> int:
         (ok if st in (200, 201) else fail)(f"Render 再デプロイ → HTTP {st}")
         all_ok &= st in (200, 201)
 
+    if all_ok and not args.dry_run and not args.no_verify:
+        all_ok &= verify_via_actions(gh_token, args.probe_email != "")
+
     print("完了" if all_ok else "一部失敗（上の ❌ を確認）")
     return 0 if all_ok else 1
+
+
+def verify_via_actions(token: str, wait_render: bool) -> bool:
+    """Actions「Ops cron」を job=daily で起動し、完了まで待って結果を表示する（初期設定の実証）。
+
+    Render は環境変数の変更で自動再デプロイするため、``OPS_JOB_TOKEN`` を新規登録した直後は
+    backend がまだ旧設定で動いている。/health の commit が変わらないので、ここでは固定で
+    90 秒待ってから起動する（再デプロイが長引いた場合は daily が 403 で失敗し、通知が届く。
+    その場合は Actions から手動で再実行すればよい）。
+    """
+    print("6) 実証（Actions「Ops cron」job=daily を起動して完了を待つ）")
+    if wait_render:
+        print("  … Render の再デプロイを 90 秒待ちます")
+        time.sleep(90)
+    h = github_headers(token)
+    st, _ = http(
+        "POST",
+        f"https://api.github.com/repos/{REPO}/actions/workflows/{OPS_WORKFLOW_FILE}/dispatches",
+        headers=h,
+        body={"ref": "main", "inputs": {"job": "daily"}},
+    )
+    if st != 204:
+        fail(f"ワークフローの起動に失敗（HTTP {st}）。Actions から手動で job=daily を実行してください")
+        return False
+    ok("起動しました。完了を待ちます（最大 12 分）")
+    deadline = time.time() + 12 * 60
+    run = None
+    while time.time() < deadline:
+        time.sleep(15)
+        st, body = http(
+            "GET",
+            f"https://api.github.com/repos/{REPO}/actions/workflows/{OPS_WORKFLOW_FILE}/runs?event=workflow_dispatch&per_page=1",
+            headers=h,
+        )
+        runs = (body or {}).get("workflow_runs") if st == 200 and isinstance(body, dict) else None
+        if runs:
+            run = runs[0]
+            if run.get("status") == "completed":
+                break
+    if not run or run.get("status") != "completed":
+        warn("完了を確認できませんでした（Actions の画面で結果を確認してください）")
+        return False
+    (ok if run.get("conclusion") == "success" else fail)(f"daily → {run.get('conclusion')}  {run.get('html_url')}")
+    return run.get("conclusion") == "success"
 
 
 if __name__ == "__main__":
