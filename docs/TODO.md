@@ -17,7 +17,7 @@
 11. [x] **手数料8%の税区分（税込／税別）を決める** — 決定（2026-09-06）: 税別・消費税を別途加算。legal/terms/business/faq/operator 全表示（「買取金額の8%（税別・消費税を別途加算）」）に反映済み。
 12. [x] r4〜r10 分を push（09-05・552500f・/readyz 0032 確認）
 13. [x] 本番の `APP_ENCRYPTION_KEY` を設定（09-05・Render API 経由）。**Render ダッシュボードで値を控えて安全な場所に保管してください**（紛失すると口座情報が復号不能）。 と `degraded_config: []` を確認（brevo / line_push / gemini / encryption_key が false なら Render の環境変数を設定）。事前申込一覧・業者一覧の API は応答形式が変わるため web と backend は同時反映（同一コミットなので通常の push で揃う）。
-13. [ ] **/contact の実受信確認** — 本番で1通送り、ADMIN_EMAILS 宛に届くこと（Brevo）を確認。届かなければ ADMIN_EMAILS か MAIL 設定。
+13. [x] **/contact の実受信確認**（09-06）— 本番 `POST /contact` → Brevo 経由で ADMIN_EMAILS の2宛先（ko.13.hei@gmail.com / ko.13.hei+kdzadmin@gmail.com）に 17:01 JST 受信（INBOX・重要・迷惑判定なし）を Gmail で確認。差出人は Brevo の仕様で `katazuke.support@…brevosend.com` に書き換わる（gmail.com 差出人の DMARC 対策・送信者認証は済み）。独自ドメインを Brevo で DKIM 認証すれば `noreply@katadzuke.jp` に戻せる。**残: `/admin/contacts` の当該テスト行（氏名「カタヅケ運営（自動確認）」）を「対応済み」にする（要 admin ログイン）。**
 
 ## 02 課題・構想（決めてから着手）
 
@@ -46,8 +46,8 @@
 
 ## 04 運用上の注意
 
-- **Docker Desktop の復旧（2026-09-06）** — PG 同時実行検証中にエージェントが `%LOCALAPPDATA%\docker-secrets-engine` と `%LOCALAPPDATA%\Dockerun` を `*.stale-<epoch>` へ退避したため起動時に Secrets Engine エラー。Docker Desktop を Quit → 退避フォルダを元の名前に戻す（または空の `docker-secrets-engine` フォルダを作る）→ 再起動。`%APPDATA%\Docker\settings-store.json` の `EnableDockerAI` も false に変更済み（不要なら戻す）。
-- **暗号鍵の控え** — `APP_ENCRYPTION_KEY` は Render ダッシュボード（sokuri-backend → Environment）から値を控えて保管する（Claude 側からのファイル保存は権限で不可）。
+- ~~Docker Desktop の復旧（2026-09-06）~~ **復旧済み（09-06 19:18）。真因は退避フォルダではなく、Claude のサンドボックス配下の子プロセスとして Docker Desktop を起動すると前回の Unix ソケット残骸（`Dockerun\*`・`docker-secrets-engine\engine.sock`）を削除できず（Error 1920）クラッシュすること。** Windows シェル経由（`explorer.exe "…\Docker Desktop.exe"` またはスタートメニュー）で起動すれば自力で削除して正常起動する。今後の PG 検証では Docker を Claude の Bash/PowerShell から直接起動しない。残骸: `%LOCALAPPDATA%\docker-secrets-engine.stale-*`・`%LOCALAPPDATA%\Dockerun.stale-*`（空フォルダ3つ・無害・手動削除可）。`%APPDATA%\Docker\settings-store.json` の `EnableDockerAI` はエージェントが false にした（Docker AI を使うなら true に戻す）。
+- **暗号鍵の控え（ユーザー作業・唯一の未完）** — `APP_ENCRYPTION_KEY` は Render ダッシュボード（sokuri-backend → Environment）から値を控えてパスワードマネージャ等に保管する。Claude 側からは Render API で値を取得して DPAPI 暗号化ファイルへ保存する案も含め、秘密鍵のローカル保存が自動モードの権限で2回拒否された（09-06）。
 
 - **Render 無料 PostgreSQL の 30 日期限** — 期限前に有料化（$7/月〜）か Neon/Supabase へ移行。当面は 30 日ごとに作り直し。
 - **Render 無料 Web の 15 分スピンダウン** — 初回アクセス約 1 分待ち。ログ保持 7 日。
