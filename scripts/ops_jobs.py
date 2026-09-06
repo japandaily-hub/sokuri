@@ -181,7 +181,9 @@ def _check_hourly_runs() -> list[str]:
     if st != 200 or not isinstance(body, dict):
         return [f"毎時ジョブの実行履歴を取得できません（GitHub API HTTP {st}）"]
     success = failed = 0
+    total_schedule_runs = 0
     for run in body.get("workflow_runs", []):
+        total_schedule_runs += 1
         created = run.get("created_at", "")
         try:
             ts = time.mktime(time.strptime(created, "%Y-%m-%dT%H:%M:%SZ")) - time.timezone
@@ -193,11 +195,14 @@ def _check_hourly_runs() -> list[str]:
             success += 1
         else:
             failed += 1
-    print(f"{'✅' if failed == 0 and success >= HOURLY_SUCCESS_MIN_PER_DAY else '⚠️'} ops-cron(24h): success={success} failed={failed}")
+    print(f"{'✅' if failed == 0 and success >= HOURLY_SUCCESS_MIN_PER_DAY else '⚠️'} ops-cron(24h): success={success} failed={failed} history={total_schedule_runs}")
     out: list[str] = []
     if failed:
         out.append(f"直近24時間で Ops cron の失敗が {failed} 回（Actions のログを確認）")
-    if success < HOURLY_SUCCESS_MIN_PER_DAY:
+    if total_schedule_runs < HOURLY_SUCCESS_MIN_PER_DAY:
+        # 導入初日（スケジュール実行の履歴がまだ 24 回に満たない）は回数判定を保留する。
+        print(f"⏭️ スケジュール実行の履歴が {total_schedule_runs} 回のため回数判定は保留（翌日から有効）")
+    elif success < HOURLY_SUCCESS_MIN_PER_DAY:
         out.append(
             f"直近24時間の Ops cron 成功が {success} 回（下限 {HOURLY_SUCCESS_MIN_PER_DAY}）。"
             "スケジュールが止まっている可能性（ワークフローの無効化・リポジトリの休眠・GitHub 側の遅延）。"
@@ -215,12 +220,22 @@ def job_daily() -> int:
     if st != 200:
         problems.append(f"admin-audit → HTTP {st}: {str(body)[:200]}")
     else:
-        ng = [e for e in body.get("entries", []) if not e.get("ok")]
-        print(f"{'✅' if body.get('ok') else '❌'} admin-audit: entries={len(body.get('entries', []))} ng={len(ng)} active_admins={body.get('active_admin_count')}")
+        entries = body.get("entries", [])
+        ng = [e for e in entries if not e.get("ok")]
+        print(f"{'✅' if body.get('ok') else '❌'} admin-audit: entries={len(entries)} ng={len(ng)} active_admins={body.get('active_admin_count')}")
+        # ADMIN_EMAILS は運営自身のアドレス（render.yaml にも記載）なので、どの項目が不合格かを
+        # ログと通知に出す。顧客の個人情報は含まれない。
+        for e in entries:
+            state = "未登録" if not e.get("registered") else ("停止中" if e.get("suspended") else f"role={e.get('role')}")
+            print(f"   {'✅' if e.get('ok') else '❌'} {e.get('email')}: {state}")
         if not body.get("ok"):
+            detail = "、".join(
+                f"{e.get('email')}（{'未登録' if not e.get('registered') else ('停止中' if e.get('suspended') else 'role=' + str(e.get('role')))}）"
+                for e in ng
+            ) or "ADMIN_EMAILS が空"
             problems.append(
-                f"ADMIN_EMAILS の棚卸しで不整合 {len(ng)} 件（有効な管理者 {body.get('active_admin_count')} 人）。"
-                "未登録は ADMIN_EMAILS から外すか、登録後に管理画面で『管理者にする』。"
+                f"ADMIN_EMAILS の棚卸しで不整合: {detail}（有効な管理者 {body.get('active_admin_count')} 人）。"
+                "未登録は ADMIN_EMAILS から外すか、本人が登録後に管理画面で『管理者にする』。"
             )
 
     # ② プローブ問い合わせを対応済みへ

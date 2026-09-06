@@ -10,7 +10,8 @@
        （鍵の正本は Render・控えは GitHub の2系統。週次 key-check が一致を照合し、消失時は key-restore で書き戻す）
     3. RENDER_API_KEY … GitHub Secret へ（key-check / key-restore が Render API を叩くため）
     4. OPS_PROBE_CONTACT_EMAIL … --probe-email の値を Render 環境変数へ（運営自身のプローブ問い合わせの差出人）
-    5. --deploy 指定時のみ Render の再デプロイを起動（環境変数の追加は Render が自動で再デプロイするため通常不要）
+    5. Render に環境変数を書いたら再デプロイを起動して live まで待つ（API 経由の env-vars 変更は
+       ダッシュボードと違い自動再デプロイされない。--deploy で書き込みが無くても強制起動）
     6. 実証: Actions「Ops cron」を job=daily で起動し、完了（success）まで待って結果を表示（--no-verify で省略）
 
 認証情報・鍵はこのプロセス内でしか使わず、ファイルにも標準出力にも残さない（表示は文字数のみ）。
@@ -122,7 +123,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--dry-run", action="store_true", help="何も書き込まず、やることだけ表示")
     ap.add_argument("--probe-email", default="", help="Render の OPS_PROBE_CONTACT_EMAIL に設定する差出人")
-    ap.add_argument("--deploy", action="store_true", help="最後に Render の再デプロイを起動する")
+    ap.add_argument("--deploy", action="store_true", help="Render への書き込みが無くても再デプロイを起動する")
     ap.add_argument(
         "--skip-escrow",
         action="store_true",
@@ -149,6 +150,7 @@ def main() -> int:
     ok(f"GitHub リポジトリ: {REPO}")
 
     all_ok = True
+    wrote_render = False  # Render の環境変数を書いたら最後に必ず再デプロイする
 
     print("2) OPS_JOB_TOKEN（運営ジョブの共有トークン）")
     token = render_get_env(render_key, svc_id, "OPS_JOB_TOKEN")
@@ -158,6 +160,7 @@ def main() -> int:
         token = secrets.token_urlsafe(32)
         ok("新しいトークンを生成")
         all_ok &= render_put_env(render_key, svc_id, "OPS_JOB_TOKEN", token, args.dry_run)
+        wrote_render = True
     all_ok &= github_put_secret(gh_token, pub, "OPS_JOB_TOKEN", token, args.dry_run)
 
     print("3) APP_ENCRYPTION_KEY の控え（GitHub Secret APP_ENCRYPTION_KEY_ESCROW）")
@@ -176,35 +179,55 @@ def main() -> int:
 
     print("5) OPS_PROBE_CONTACT_EMAIL（プローブ問い合わせの差出人）")
     if args.probe_email:
-        all_ok &= render_put_env(render_key, svc_id, "OPS_PROBE_CONTACT_EMAIL", args.probe_email, args.dry_run)
+        current = render_get_env(render_key, svc_id, "OPS_PROBE_CONTACT_EMAIL")
+        if current == args.probe_email:
+            ok("Render OPS_PROBE_CONTACT_EMAIL は設定済み（変更なし）")
+        else:
+            all_ok &= render_put_env(render_key, svc_id, "OPS_PROBE_CONTACT_EMAIL", args.probe_email, args.dry_run)
+            wrote_render = True
     else:
         current = render_get_env(render_key, svc_id, "OPS_PROBE_CONTACT_EMAIL")
         (ok if current else warn)(f"--probe-email 未指定のため変更なし（現在: {'設定済み' if current else '未設定'}）")
 
-    if args.deploy and not args.dry_run:
+    # Render の env-vars API は（ダッシュボードと違い）再デプロイを起動しない。書き込んだ値を
+    # backend に読み込ませるには deploys を明示的に叩く必要がある（実測 2026-09-06: 90 秒待っても
+    # 旧プロセスのままで daily が 403 になった）。Render 側に何か書いたら必ずデプロイする。
+    render_written = wrote_render or args.deploy
+    deploy_id = None
+    if render_written and not args.dry_run:
         st, body = http("POST", f"https://api.render.com/v1/services/{svc_id}/deploys", headers={"Authorization": f"Bearer {render_key}"}, body={"clearCache": "do_not_clear"})
-        (ok if st in (200, 201) else fail)(f"Render 再デプロイ → HTTP {st}")
+        deploy_id = (body or {}).get("id") if isinstance(body, dict) else None
+        (ok if st in (200, 201) else fail)(f"Render 再デプロイを起動 → HTTP {st}")
         all_ok &= st in (200, 201)
 
     if all_ok and not args.dry_run and not args.no_verify:
-        all_ok &= verify_via_actions(gh_token, args.probe_email != "")
+        if deploy_id:
+            all_ok &= wait_render_deploy(render_key, svc_id, deploy_id)
+        all_ok &= verify_via_actions(gh_token)
 
     print("完了" if all_ok else "一部失敗（上の ❌ を確認）")
     return 0 if all_ok else 1
 
 
-def verify_via_actions(token: str, wait_render: bool) -> bool:
-    """Actions「Ops cron」を job=daily で起動し、完了まで待って結果を表示する（初期設定の実証）。
+def wait_render_deploy(api_key: str, svc_id: str, deploy_id: str, max_wait: int = 10 * 60) -> bool:
+    """起動した Render デプロイが live になるまで待つ（backend が新しい環境変数で起動した保証）。"""
+    print("6) Render の再デプロイ完了を待つ（最大 10 分）")
+    h = {"Authorization": f"Bearer {api_key}"}
+    deadline = time.time() + max_wait
+    status = "unknown"
+    while time.time() < deadline:
+        time.sleep(15)
+        st, body = http("GET", f"https://api.render.com/v1/services/{svc_id}/deploys/{deploy_id}", headers=h)
+        status = (body or {}).get("status", "unknown") if st == 200 and isinstance(body, dict) else f"HTTP {st}"
+        if status in ("live", "build_failed", "update_failed", "canceled", "deactivated"):
+            break
+    (ok if status == "live" else fail)(f"デプロイ状態: {status}")
+    return status == "live"
 
-    Render は環境変数の変更で自動再デプロイするため、``OPS_JOB_TOKEN`` を新規登録した直後は
-    backend がまだ旧設定で動いている。/health の commit が変わらないので、ここでは固定で
-    90 秒待ってから起動する（再デプロイが長引いた場合は daily が 403 で失敗し、通知が届く。
-    その場合は Actions から手動で再実行すればよい）。
-    """
-    print("6) 実証（Actions「Ops cron」job=daily を起動して完了を待つ）")
-    if wait_render:
-        print("  … Render の再デプロイを 90 秒待ちます")
-        time.sleep(90)
+
+def verify_via_actions(token: str) -> bool:
+    """Actions「Ops cron」を job=daily で起動し、完了まで待って結果を表示する（初期設定の実証）。"""
+    print("7) 実証（Actions「Ops cron」job=daily を起動して完了を待つ）")
     h = github_headers(token)
     st, _ = http(
         "POST",
