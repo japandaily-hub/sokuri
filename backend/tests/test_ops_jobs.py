@@ -10,7 +10,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import AsyncIterator
 from unittest.mock import AsyncMock, patch
 
@@ -20,6 +20,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.endpoints import admin as admin_endpoint
 from app.api.v1.router import api_router
 from app.config import get_settings
 from app.core.security import create_access_token, hash_password
@@ -28,7 +29,8 @@ from app.db.models.user import User
 from app.db.session import get_session
 from app.services import notify
 
-OPS_TOKEN = "ops-test-token-0123456789"
+#: 本番想定は ``secrets.token_urlsafe(32)``（43文字）。最小長 32 を満たす固定値。
+OPS_TOKEN = "ops-test-token-0123456789-abcdefghijklmnop"
 
 
 def create_test_app(session: AsyncSession) -> FastAPI:
@@ -88,15 +90,22 @@ async def _make_user(
 
 
 async def _make_contact(
-    db_session: AsyncSession, email: str, *, handled: bool = False
+    db_session: AsyncSession,
+    email: str,
+    *,
+    handled: bool = False,
+    name: str = "カタヅケ運営（自動確認）",
+    age: timedelta | None = None,
 ) -> ContactMessage:
     contact = ContactMessage(
-        name="テスト",
+        name=name,
         email=email,
         category="other",
         message="本文",
         handled_at=datetime.now(timezone.utc) if handled else None,
     )
+    if age is not None:
+        contact.created_at = datetime.now(timezone.utc) - age
     db_session.add(contact)
     await db_session.commit()
     await db_session.refresh(contact)
@@ -134,6 +143,15 @@ async def test_ops_token_header_is_disabled_when_unset(
     assert r.status_code == 403
 
 
+async def test_ops_token_shorter_than_minimum_is_treated_as_unset(
+    client: AsyncClient, monkeypatch
+):
+    """弱い（短い）トークンを設定しても機械経路は開かない。"""
+    monkeypatch.setattr(get_settings(), "ops_job_token", "short-token")
+    r = await client.post("/api/v1/admin/jobs/reminders", headers=_ops("short-token"))
+    assert r.status_code == 403
+
+
 async def test_admin_jwt_still_works_and_user_jwt_is_rejected(
     client: AsyncClient, db_session: AsyncSession, ops_token: str
 ):
@@ -149,6 +167,52 @@ async def test_admin_jwt_still_works_and_user_jwt_is_rejected(
     ):
         r = await client.post("/api/v1/admin/jobs/reminders", headers=_auth(admin_token))
     assert r.status_code == 200, r.text
+
+
+async def test_ops_token_mismatches_alert_after_threshold(
+    client: AsyncClient, ops_token: str, monkeypatch
+):
+    """不一致が閾値に達したら運営へ warning（値は本文に載せない）。"""
+    from app.api import deps
+
+    monkeypatch.setattr(deps, "_ops_token_mismatch_count", 0)
+    fired: list = []
+
+    def _capture(coro) -> None:
+        fired.append(coro)
+        coro.close()
+
+    with patch("app.services.alerts.fire_and_forget", side_effect=_capture), patch(
+        "app.services.alerts.send_alert", new_callable=AsyncMock
+    ) as send:
+        for _ in range(deps.OPS_JOB_TOKEN_MISMATCH_ALERT_THRESHOLD):
+            r = await client.post(
+                "/api/v1/admin/jobs/reminders",
+                headers=_ops("wrong-token-wrong-token-wrong-token"),
+            )
+            assert r.status_code == 403
+    assert len(fired) == 1
+    assert send.call_args.kwargs["key"] == "ops_token_mismatch"
+    assert "wrong-token" not in send.call_args.args[1]
+
+
+async def test_key_fingerprint_returns_digest_not_key(
+    client: AsyncClient, ops_token: str, monkeypatch
+):
+    import hashlib
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "app_encryption_key", "fake-key-value-for-test")
+    r = await client.post("/api/v1/admin/jobs/key-fingerprint", headers=_ops())
+    assert r.status_code == 200, r.text
+    assert r.json() == {
+        "configured": True,
+        "sha256": hashlib.sha256(b"fake-key-value-for-test").hexdigest(),
+    }
+    assert "fake-key-value" not in r.text
+    monkeypatch.setattr(settings, "app_encryption_key", "")
+    r = await client.post("/api/v1/admin/jobs/key-fingerprint", headers=_ops())
+    assert r.json() == {"configured": False, "sha256": None}
 
 
 async def test_ops_token_does_not_open_other_admin_endpoints(
@@ -242,6 +306,11 @@ async def test_handle_probes_marks_only_probe_sender(
     probe2 = await _make_contact(db_session, "PROBE@example.com")
     already = await _make_contact(db_session, "probe@example.com", handled=True)
     customer = await _make_contact(db_session, "customer@example.com")
+    # 同じアドレスでも氏名が完全一致しなければ実際の相談として残す（部分一致も不可）
+    same_addr_real = await _make_contact(db_session, "probe@example.com", name="山田 太郎")
+    same_addr_partial = await _make_contact(db_session, "probe@example.com", name="運営（自動確認）")
+    # 7 日より古い行は触らない
+    too_old = await _make_contact(db_session, "probe@example.com", age=timedelta(days=8))
     before = already.handled_at
 
     r = await client.post("/api/v1/admin/jobs/contacts/handle-probes", headers=_ops())
@@ -257,6 +326,9 @@ async def test_handle_probes_marks_only_probe_sender(
     assert rows[probe1.id].handled_by_admin_id is None
     assert rows[probe2.id].handled_at is not None
     assert rows[customer.id].handled_at is None
+    assert rows[same_addr_real.id].handled_at is None
+    assert rows[same_addr_partial.id].handled_at is None
+    assert rows[too_old.id].handled_at is None
     assert rows[already.id].handled_at == before
 
     # 冪等: 2回目は 0 件
@@ -309,12 +381,13 @@ class _FakeClient:
         return _FakeResponse(f"<msg-{len(_FakeClient.calls)}@test>")
 
 
-async def test_mail_probe_returns_message_ids(
+async def test_mail_probe_returns_message_ids_and_throttles_repeat(
     client: AsyncClient, ops_token: str, monkeypatch
 ):
     settings = get_settings()
     monkeypatch.setattr(settings, "brevo_api_key", "test-key")
     monkeypatch.setattr(settings, "admin_emails_raw", "a@example.com,b@example.com")
+    monkeypatch.setattr(admin_endpoint, "_mail_probe_last_sent_at", None)
     _FakeClient.calls = []
     monkeypatch.setattr(notify.httpx, "AsyncClient", _FakeClient)
 
@@ -324,9 +397,16 @@ async def test_mail_probe_returns_message_ids(
         "sent": True,
         "message_ids": ["<msg-1@test>", "<msg-2@test>"],
         "recipients": 2,
+        "throttled": False,
     }
     assert [c["to"][0]["email"] for c in _FakeClient.calls] == ["a@example.com", "b@example.com"]
     assert all("到達プローブ" in c["subject"] for c in _FakeClient.calls)
+
+    # 連打しても 20 時間以内は送らない（無料枠の食い潰し防止）
+    r = await client.post("/api/v1/admin/jobs/mail-probe", headers=_ops())
+    assert r.status_code == 200
+    assert r.json() == {"sent": False, "message_ids": [], "recipients": 2, "throttled": True}
+    assert len(_FakeClient.calls) == 2
 
 
 async def test_mail_probe_without_brevo_key_reports_not_sent(
@@ -335,10 +415,11 @@ async def test_mail_probe_without_brevo_key_reports_not_sent(
     settings = get_settings()
     monkeypatch.setattr(settings, "brevo_api_key", "")
     monkeypatch.setattr(settings, "admin_emails_raw", "a@example.com")
+    monkeypatch.setattr(admin_endpoint, "_mail_probe_last_sent_at", None)
     monkeypatch.setattr(notify, "_brevo_missing_key_alerted", True)
     r = await client.post("/api/v1/admin/jobs/mail-probe", headers=_ops())
     assert r.status_code == 200
-    assert r.json() == {"sent": False, "message_ids": [], "recipients": 1}
+    assert r.json() == {"sent": False, "message_ids": [], "recipients": 1, "throttled": False}
 
 
 async def test_send_returns_bool_and_send_raw_returns_id(monkeypatch):

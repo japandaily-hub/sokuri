@@ -3,10 +3,16 @@ name: Ops cron
 # 自動運用（r13）。残っていた運営の手作業を定期ジョブに置き換える。詳細は docs/ops/admin-operations.md。
 #   毎時 7 分       hourly    … Render を起こしてリマインド処理（訪問日超過 / 入札ゼロ放置）を1周
 #   毎日 18:00 UTC  daily     … ADMIN_EMAILS 棚卸し / プローブ問い合わせの対応済み化 /
-#   （03:00 JST）               メール到達プローブ（Brevo で delivered まで追跡）/ 前日のバウンス集計
-#   毎週月 19:00 UTC key-check … 本番 APP_ENCRYPTION_KEY と GitHub Secrets の控えを SHA-256 で照合
-#   手動             key-restore … /readyz が鍵未設定のときだけ控えから Render へ書き戻して再デプロイ
-# 失敗は運営へ通知（LINE / メール / Webhook）。正常時は通知しない。
+#   （03:00 JST）               メール到達プローブ（Brevo で delivered まで追跡）/ 前日のバウンス集計 /
+#                               毎時ジョブが直近24時間に実際に回った回数の照合（欠測検知）
+#   毎週月 19:00 UTC key-check … 本番 APP_ENCRYPTION_KEY のダイジェスト（backend が返す）と GitHub Secrets の
+#                               控えを照合（値は出さない・Render API キー不要）
+#   手動             key-restore … /readyz が鍵未設定で、かつ Render の値が空のときだけ控えを書き戻して再デプロイ
+#                                 （設定済みの鍵を上書きする経路はワークフローに置かない＝不可逆操作の排除）
+# 失敗は運営へ通知（LINE / メール / Webhook）。スクリプトに到達する前の失敗（checkout・Python 準備・
+# タイムアウト）も末尾の notify-failure ジョブが拾う。正常時は通知しない。
+# 最小権限: ops には OPS_JOB_TOKEN と通知系、key-check には OPS_JOB_TOKEN と控え、key-restore にだけ
+# RENDER_API_KEY を渡す。入力値はシェルへ直接展開せず env 経由で参照する（式インジェクション対策）。
 # 必要な Secrets: OPS_JOB_TOKEN, RENDER_API_KEY, APP_ENCRYPTION_KEY_ESCROW（scripts/ops_bootstrap.py で登録）
 #   ＋ 通知系（uptime-alert.yml と共通）: BREVO_API_KEY, ALERT_EMAILS, ALERT_MAIL_FROM,
 #   ALERT_LINE_CHANNEL_ACCESS_TOKEN, ALERT_LINE_USER_IDS, ALERT_WEBHOOK_URL
@@ -24,44 +30,106 @@ on:
         default: "daily"
         type: choice
         options: [hourly, daily, key-check, key-restore]
-      force:
-        description: "key-restore のみ: true で条件を無視して控えで上書き"
-        required: false
-        default: "false"
 
 permissions:
   contents: read
+  actions: read
 
+# 全スケジュールを1つの列に直列化する（18:07 の hourly と daily が同時に Render を叩かない）。
 concurrency:
-  group: ops-cron-${{ github.event_name == 'schedule' && github.event.schedule || github.event.inputs.job }}
+  group: ops-cron
   cancel-in-progress: false
 
 jobs:
-  run:
+  select:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      job: ${{ steps.pick.outputs.job }}
+    steps:
+      - name: Pick job from schedule or input
+        id: pick
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
+          INPUT_JOB: ${{ github.event.inputs.job }}
+        run: |
+          case "$EVENT_NAME:$SCHEDULE" in
+            "schedule:7 * * * *")  job=hourly ;;
+            "schedule:0 18 * * *") job=daily ;;
+            "schedule:0 19 * * 1") job=key-check ;;
+            *)
+              case "$INPUT_JOB" in
+                hourly|daily|key-check|key-restore) job="$INPUT_JOB" ;;
+                *) echo "unknown job: $INPUT_JOB"; exit 1 ;;
+              esac ;;
+          esac
+          echo "job=$job" >> "$GITHUB_OUTPUT"
+          echo "selected: $job"
+
+  ops:
+    needs: select
+    if: ${{ needs.select.outputs.job == 'hourly' || needs.select.outputs.job == 'daily' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Run ${{ needs.select.outputs.job }}
+        env:
+          JOB: ${{ needs.select.outputs.job }}
+          BACKEND_URL: https://sokuri-backend.onrender.com
+          OPS_JOB_TOKEN: ${{ secrets.OPS_JOB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          ALERT_EMAILS: ${{ secrets.ALERT_EMAILS }}
+          ALERT_MAIL_FROM: ${{ secrets.ALERT_MAIL_FROM }}
+          ALERT_LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.ALERT_LINE_CHANNEL_ACCESS_TOKEN }}
+          ALERT_LINE_USER_IDS: ${{ secrets.ALERT_LINE_USER_IDS }}
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+        run: python scripts/ops_jobs.py "$JOB"
 
-      - name: Select job
-        id: select
-        run: |
-          case "${{ github.event_name }}:${{ github.event.schedule }}" in
-            schedule:"7 * * * *")  echo "job=hourly"    >> "$GITHUB_OUTPUT" ;;
-            schedule:"0 18 * * *") echo "job=daily"     >> "$GITHUB_OUTPUT" ;;
-            schedule:"0 19 * * 1") echo "job=key-check" >> "$GITHUB_OUTPUT" ;;
-            *)                     echo "job=${{ github.event.inputs.job }}" >> "$GITHUB_OUTPUT" ;;
-          esac
-
-      - name: Run ${{ steps.select.outputs.job }}
+  key-check:
+    needs: select
+    if: ${{ needs.select.outputs.job == 'key-check' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run key-check
         env:
           BACKEND_URL: https://sokuri-backend.onrender.com
           OPS_JOB_TOKEN: ${{ secrets.OPS_JOB_TOKEN }}
+          APP_ENCRYPTION_KEY_ESCROW: ${{ secrets.APP_ENCRYPTION_KEY_ESCROW }}
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          ALERT_EMAILS: ${{ secrets.ALERT_EMAILS }}
+          ALERT_MAIL_FROM: ${{ secrets.ALERT_MAIL_FROM }}
+          ALERT_LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.ALERT_LINE_CHANNEL_ACCESS_TOKEN }}
+          ALERT_LINE_USER_IDS: ${{ secrets.ALERT_LINE_USER_IDS }}
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+        run: python scripts/ops_jobs.py key-check
+
+  key-restore:
+    needs: select
+    if: ${{ needs.select.outputs.job == 'key-restore' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run key-restore (writes only when the production key is empty)
+        env:
+          BACKEND_URL: https://sokuri-backend.onrender.com
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           RENDER_SERVICE_ID: srv-d8enmu0g4nts73a43dhg
           APP_ENCRYPTION_KEY_ESCROW: ${{ secrets.APP_ENCRYPTION_KEY_ESCROW }}
@@ -71,9 +139,37 @@ jobs:
           ALERT_LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.ALERT_LINE_CHANNEL_ACCESS_TOKEN }}
           ALERT_LINE_USER_IDS: ${{ secrets.ALERT_LINE_USER_IDS }}
           ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+        run: python scripts/ops_jobs.py key-restore
+
+  # スクリプト到達前の失敗（ジョブ選択・checkout・Python 準備・タイムアウト）を運営へ通知する。
+  # スクリプト自身の失敗は fail() が既に通知しているため二重になるが、欠測より重複を選ぶ。
+  notify-failure:
+    needs: [select, ops, key-check, key-restore]
+    if: ${{ always() && contains(needs.*.result, 'failure') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Notify
+        env:
+          JOB: ${{ needs.select.outputs.job }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          ALERT_EMAILS: ${{ secrets.ALERT_EMAILS }}
+          ALERT_MAIL_FROM: ${{ secrets.ALERT_MAIL_FROM }}
+          ALERT_LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.ALERT_LINE_CHANNEL_ACCESS_TOKEN }}
+          ALERT_LINE_USER_IDS: ${{ secrets.ALERT_LINE_USER_IDS }}
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
         run: |
-          if [ "${{ steps.select.outputs.job }}" = "key-restore" ] && [ "${{ github.event.inputs.force }}" = "true" ]; then
-            python scripts/ops_jobs.py key-restore --force
-          else
-            python scripts/ops_jobs.py "${{ steps.select.outputs.job }}"
-          fi
+          python - <<'PY'
+          import os, sys
+          sys.path.insert(0, "scripts")
+          from uptime_check import notify
+          job = os.environ.get("JOB") or "(選択失敗)"
+          sent = notify("[カタヅケ運用] Ops cron が失敗しました", f"❌ Ops cron（{job}）がスクリプト到達前または実行中に失敗しました。\n{os.environ.get('RUN_URL')}")
+          print("sent:", sent)
+          PY

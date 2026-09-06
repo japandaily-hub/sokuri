@@ -12,13 +12,12 @@
     4. OPS_PROBE_CONTACT_EMAIL … --probe-email の値を Render 環境変数へ（運営自身のプローブ問い合わせの差出人）
     5. --deploy 指定時のみ Render の再デプロイを起動（環境変数の追加は Render が自動で再デプロイするため通常不要）
 
-認証情報・鍵はこのプロセス内でしか使わず、ファイルにも標準出力にも残さない（表示は SHA-256 の先頭8桁のみ）。
+認証情報・鍵はこのプロセス内でしか使わず、ファイルにも標準出力にも残さない（表示は文字数のみ）。
 """
 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import os
 import secrets
 import sys
@@ -38,8 +37,9 @@ from setup_alerts import (  # noqa: E402
 )
 
 
-def sha8(value: str) -> str:
-    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:8]
+def desc(value: str) -> str:
+    """値を出さずに長さだけ示す（ログ・端末に指紋も残さない）。"""
+    return f"{len(value)} 文字"
 
 
 # ──────────────────────────── Render ────────────────────────────
@@ -71,13 +71,14 @@ def render_get_env(api_key: str, svc_id: str, key: str) -> str | None:
 
 def render_put_env(api_key: str, svc_id: str, key: str, value: str, dry_run: bool) -> bool:
     if dry_run:
-        ok(f"[dry-run] Render {key} を登録（sha256 {sha8(value)}…）")
+        ok(f"[dry-run] Render {key} を登録（{desc(value)}）")
         return True
     st, body = http("PUT", f"https://api.render.com/v1/services/{svc_id}/env-vars/{key}", headers={"Authorization": f"Bearer {api_key}"}, body={"value": value})
     if st in (200, 201):
-        ok(f"Render {key} を登録（sha256 {sha8(value)}…）")
+        ok(f"Render {key} を登録（{desc(value)}）")
         return True
-    fail(f"Render {key} の登録に失敗（HTTP {st}: {body}）")
+    # 応答本文は出さない（送信値がエコーされる可能性を排除）
+    fail(f"Render {key} の登録に失敗（HTTP {st}）")
     return False
 
 
@@ -94,7 +95,7 @@ def github_public_key(token: str) -> dict | None:
 
 def github_put_secret(token: str, pub: dict, name: str, value: str, dry_run: bool) -> bool:
     if dry_run:
-        ok(f"[dry-run] GitHub Secret {name} を登録（sha256 {sha8(value)}…）")
+        ok(f"[dry-run] GitHub Secret {name} を登録（{desc(value)}）")
         return True
     st, body = http(
         "PUT",
@@ -103,9 +104,9 @@ def github_put_secret(token: str, pub: dict, name: str, value: str, dry_run: boo
         body={"encrypted_value": seal(pub["key"], value), "key_id": pub["key_id"]},
     )
     if st in (201, 204):
-        ok(f"GitHub Secret {name} を登録（{'作成' if st == 201 else '更新'}・sha256 {sha8(value)}…）")
+        ok(f"GitHub Secret {name} を登録（{'作成' if st == 201 else '更新'}・{desc(value)}）")
         return True
-    fail(f"GitHub Secret {name} の登録に失敗（HTTP {st}: {body}）")
+    fail(f"GitHub Secret {name} の登録に失敗（HTTP {st}: {str(body)[:120]}）")
     return False
 
 
@@ -117,6 +118,11 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true", help="何も書き込まず、やることだけ表示")
     ap.add_argument("--probe-email", default="", help="Render の OPS_PROBE_CONTACT_EMAIL に設定する差出人")
     ap.add_argument("--deploy", action="store_true", help="最後に Render の再デプロイを起動する")
+    ap.add_argument(
+        "--skip-escrow",
+        action="store_true",
+        help="手順3（暗号鍵の控えを GitHub Secret へ置く）を飛ばす。控えだけ後で別途この手順を実行する場合に使う",
+    )
     args = ap.parse_args()
 
     values = read_env_file(ENV_FILE)
@@ -141,7 +147,7 @@ def main() -> int:
     print("2) OPS_JOB_TOKEN（運営ジョブの共有トークン）")
     token = render_get_env(render_key, svc_id, "OPS_JOB_TOKEN")
     if token:
-        ok(f"Render に設定済みのトークンを再利用（sha256 {sha8(token)}…）")
+        ok(f"Render に設定済みのトークンを再利用（{desc(token)}）")
     else:
         token = secrets.token_urlsafe(32)
         ok("新しいトークンを生成")
@@ -149,12 +155,15 @@ def main() -> int:
     all_ok &= github_put_secret(gh_token, pub, "OPS_JOB_TOKEN", token, args.dry_run)
 
     print("3) APP_ENCRYPTION_KEY の控え（GitHub Secret APP_ENCRYPTION_KEY_ESCROW）")
-    enc = render_get_env(render_key, svc_id, "APP_ENCRYPTION_KEY")
-    if not enc:
-        fail("Render に APP_ENCRYPTION_KEY がありません（先に設定してください）")
-        all_ok = False
+    if args.skip_escrow:
+        warn("--skip-escrow のため飛ばしました（週次 key-check が『控え未登録』を通知し続けます。後で本スクリプトを --skip-escrow 無しで実行）")
     else:
-        all_ok &= github_put_secret(gh_token, pub, "APP_ENCRYPTION_KEY_ESCROW", enc, args.dry_run)
+        enc = render_get_env(render_key, svc_id, "APP_ENCRYPTION_KEY")
+        if not enc:
+            fail("Render に APP_ENCRYPTION_KEY がありません（先に設定してください）")
+            all_ok = False
+        else:
+            all_ok &= github_put_secret(gh_token, pub, "APP_ENCRYPTION_KEY_ESCROW", enc, args.dry_run)
 
     print("4) RENDER_API_KEY（GitHub Secret・key-check / key-restore 用）")
     all_ok &= github_put_secret(gh_token, pub, "RENDER_API_KEY", render_key, args.dry_run)

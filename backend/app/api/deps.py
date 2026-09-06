@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import secrets
 import uuid
 from dataclasses import dataclass
@@ -13,12 +14,49 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
+from app.core.log_throttle import ThrottledLogger
 from app.core.security import decode_access_token
 from app.db.models.operator import Operator
 from app.db.models.user import User
 from app.db.session import get_session
 
+logger = logging.getLogger(__name__)
+
 _bearer = HTTPBearer(auto_error=False)
+
+#: ``OPS_JOB_TOKEN`` に要求する最小長。``secrets.token_urlsafe(32)``（43文字・256bit）を
+#: 想定し、短い値は「未設定」として扱う（弱いトークンで機械経路が開くのを防ぐ）。
+OPS_JOB_TOKEN_MIN_LENGTH = 32
+#: 不一致がこの回数（プロセス内累計）に達したら運営へ warning アラート（総当たり・設定ずれの検知）。
+OPS_JOB_TOKEN_MISMATCH_ALERT_THRESHOLD = 5
+_ops_token_too_short_throttle = ThrottledLogger()
+_ops_token_mismatch_throttle = ThrottledLogger()
+_ops_token_mismatch_count = 0
+
+
+def _note_ops_token_mismatch() -> None:
+    """不一致を数え、閾値で運営へアラート（値は記録しない。alerts 側のクールダウンで連打抑止）。"""
+    global _ops_token_mismatch_count
+    _ops_token_mismatch_count += 1
+    _ops_token_mismatch_throttle.emit(
+        lambda: logger.warning(
+            "ops: X-Ops-Token が一致しないリクエストがありました（累計 %s 回・値は記録しない）",
+            _ops_token_mismatch_count,
+        )
+    )
+    if _ops_token_mismatch_count >= OPS_JOB_TOKEN_MISMATCH_ALERT_THRESHOLD:
+        from app.services import alerts  # 循環 import 回避のため遅延 import
+
+        alerts.fire_and_forget(
+            alerts.send_alert(
+                "運営ジョブの共有トークン不一致が続いています",
+                f"X-Ops-Token の不一致が累計 {_ops_token_mismatch_count} 回になりました。"
+                "GitHub Secrets と Render の OPS_JOB_TOKEN のずれ、または第三者の探索の可能性があります。"
+                "ずれなら scripts/ops_bootstrap.py で再登録、探索なら Render 側でトークンを変更してください。",
+                severity="warning",
+                key="ops_token_mismatch",
+            )
+        )
 
 _CRED_EXC = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
@@ -207,15 +245,26 @@ async def get_ops_or_admin(
     - それ以外は従来どおり管理者 JWT（``get_current_admin`` と同じ判定）→ ``User`` を返す。
 
     トークン未設定時はヘッダ経路そのものを無効にする（空文字同士の一致で素通りさせない）。
+    ``OPS_JOB_TOKEN_MIN_LENGTH`` 未満の値も未設定扱い（総当たりに耐える長さを強制）。
     比較は ``secrets.compare_digest`` でタイミング差を出さない。**冪等な定期処理にしか
     付けない**こと——一覧閲覧や停止・昇格などの個別操作は引き続き JWT 限定（自動運用・r13）。
-    ヘッダが不一致のときはトークン値をログに残さず、JWT 判定へフォールバックする
-    （管理者が誤った古いトークンを送ってもログインしていれば動く）。
+    ヘッダが不一致のときはトークン値をログに残さず（不一致があった事実だけを 60 秒
+    スロットリングで warning）、JWT 判定へフォールバックする（管理者が誤った古い
+    トークンを送ってもログインしていれば動く）。
     """
     expected = get_settings().ops_job_token
     if x_ops_token is not None and expected:
-        if secrets.compare_digest(x_ops_token.encode("utf-8"), expected.encode("utf-8")):
+        if len(expected) < OPS_JOB_TOKEN_MIN_LENGTH:
+            _ops_token_too_short_throttle.emit(
+                lambda: logger.warning(
+                    "ops: OPS_JOB_TOKEN が %s 文字未満のため無効として扱います（機械経路は閉じたまま）",
+                    OPS_JOB_TOKEN_MIN_LENGTH,
+                )
+            )
+        elif secrets.compare_digest(x_ops_token.encode("utf-8"), expected.encode("utf-8")):
             return None
+        else:
+            _note_ops_token_mismatch()
     if credentials is None or not credentials.credentials:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

@@ -10,10 +10,13 @@
                 ② 運営自身のプローブ問い合わせを対応済みへ
                 ③ メール到達プローブ: 送信 → Brevo のイベント API で delivered まで追跡
                 ④ Brevo の前日集計でバウンス・ブロック・エラーがあれば通知
-    key-check   本番の APP_ENCRYPTION_KEY（Render）と GitHub Secrets の控え（ESCROW）が
-                一致しているかを SHA-256 で照合（値は出力しない）。
+    key-check   本番の APP_ENCRYPTION_KEY と GitHub Secrets の控え（ESCROW）が一致しているかを
+                SHA-256 で照合（backend の /admin/jobs/key-fingerprint を使う＝Render API キー不要。
+                値は出力しない）。
     key-restore /readyz が「暗号鍵未設定」で、かつ Render 側の値が空のときだけ、控えから
-                Render へ書き戻して再デプロイする（--force で条件を無視）。
+                Render へ書き戻して再デプロイする。--force（ローカル実行専用。ワークフローからは
+                渡さない）で条件を無視して上書きできるが、設定済みの鍵を別の値で上書きすると
+                保存済みデータが復号不能になるため通常は使わない。
 
 失敗は運営へ通知（LINE / メール / Webhook・scripts/uptime_check.py の notify）し exit 1。
 値そのものを標準出力に出さない（トークン・鍵・メールアドレスの列挙を避ける）。
@@ -22,8 +25,9 @@
   BACKEND_URL                 既定 https://sokuri-backend.onrender.com
   OPS_JOB_TOKEN               backend の OPS_JOB_TOKEN と同じ値（X-Ops-Token）
   BREVO_API_KEY               Brevo（イベント照会・通知メール）
-  RENDER_API_KEY / RENDER_SERVICE_ID   key-check / key-restore（既定 service は sokuri-backend）
-  APP_ENCRYPTION_KEY_ESCROW   GitHub Secrets に置いた暗号鍵の控え
+  RENDER_API_KEY / RENDER_SERVICE_ID   key-restore のみ（既定 service は sokuri-backend）
+  APP_ENCRYPTION_KEY_ESCROW   GitHub Secrets に置いた暗号鍵の控え（key-check / key-restore）
+  GITHUB_TOKEN / GITHUB_REPOSITORY     daily の「毎時ジョブが実際に回っているか」の照合（Actions が自動付与）
   ALERT_*                     通知先（uptime_check.notify と同じ）
 """
 
@@ -55,6 +59,10 @@ BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
 RENDER_API_KEY = os.environ.get("RENDER_API_KEY", "")
 RENDER_SERVICE_ID = os.environ.get("RENDER_SERVICE_ID", "srv-d8enmu0g4nts73a43dhg")
 ESCROW = os.environ.get("APP_ENCRYPTION_KEY_ESCROW", "")
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+GITHUB_REPOSITORY = os.environ.get("GITHUB_REPOSITORY", "japandaily-hub/sokuri")
+#: daily が「毎時ジョブが直近24時間に何回成功したか」を照合する下限（24 回中・起動遅延を許容）。
+HOURLY_SUCCESS_MIN_PER_DAY = 20
 
 #: Brevo のイベント種別のうち「配送されなかった」と判定するもの
 _BREVO_FAILURE_EVENTS = {"hardBounces", "hard_bounce", "blocked", "error", "invalid", "spam"}
@@ -111,10 +119,6 @@ def render(method: str, path: str, *, body: dict | None = None):
     return http(method, f"https://api.render.com/v1{path}", headers={"Authorization": f"Bearer {RENDER_API_KEY}"}, body=body)
 
 
-def sha8(value: str) -> str:
-    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:8]
-
-
 def fail(title: str, body: str) -> int:
     """運営へ通知して exit code 1 を返す（通知先未設定でも stdout には残す）。"""
     print(f"❌ {title}\n{body}")
@@ -160,6 +164,47 @@ def _poll_brevo_delivery(message_ids: list[str]) -> tuple[list[str], list[str], 
     return delivered, failed, pending
 
 
+def _check_hourly_runs() -> list[str]:
+    """直近24時間の schedule 起動のうち成功が下限未満／失敗ありなら要対応として返す。
+
+    Actions 自体が止まった（ワークフロー無効化・失敗・キュー詰まり）ケースは、ジョブ内の
+    通知では検知できない。GitHub API で実行履歴を数えて「欠測」を可視化する。
+    """
+    if not GITHUB_TOKEN:
+        return ["GITHUB_TOKEN が無いため毎時ジョブの実行履歴を照合できません"]
+    since = time.time() - 24 * 3600
+    st, body = http(
+        "GET",
+        f"https://api.github.com/repos/{GITHUB_REPOSITORY}/actions/workflows/ops-cron.yml/runs?event=schedule&per_page=60",
+        headers={"Authorization": f"Bearer {GITHUB_TOKEN}", "X-GitHub-Api-Version": "2022-11-28"},
+    )
+    if st != 200 or not isinstance(body, dict):
+        return [f"毎時ジョブの実行履歴を取得できません（GitHub API HTTP {st}）"]
+    success = failed = 0
+    for run in body.get("workflow_runs", []):
+        created = run.get("created_at", "")
+        try:
+            ts = time.mktime(time.strptime(created, "%Y-%m-%dT%H:%M:%SZ")) - time.timezone
+        except ValueError:
+            continue
+        if ts < since or run.get("status") != "completed":
+            continue
+        if run.get("conclusion") == "success":
+            success += 1
+        else:
+            failed += 1
+    print(f"{'✅' if failed == 0 and success >= HOURLY_SUCCESS_MIN_PER_DAY else '⚠️'} ops-cron(24h): success={success} failed={failed}")
+    out: list[str] = []
+    if failed:
+        out.append(f"直近24時間で Ops cron の失敗が {failed} 回（Actions のログを確認）")
+    if success < HOURLY_SUCCESS_MIN_PER_DAY:
+        out.append(
+            f"直近24時間の Ops cron 成功が {success} 回（下限 {HOURLY_SUCCESS_MIN_PER_DAY}）。"
+            "スケジュールが止まっている可能性（ワークフローの無効化・リポジトリの休眠・GitHub 側の遅延）。"
+        )
+    return out
+
+
 def job_daily() -> int:
     problems: list[str] = []
     if not wake_backend():
@@ -189,6 +234,8 @@ def job_daily() -> int:
     st, body = post_job("mail-probe")
     if st != 200:
         problems.append(f"mail-probe → HTTP {st}: {str(body)[:200]}")
+    elif body.get("throttled"):
+        print("⏭️ mail-probe: 直近20時間以内に送信済みのため今回は送信せず（追跡もスキップ）")
     elif not body.get("sent"):
         problems.append(f"メール到達プローブを送れません（recipients={body.get('recipients')}）。BREVO_API_KEY / ADMIN_EMAILS / Brevo の日次上限を確認。")
     elif not BREVO_API_KEY:
@@ -201,6 +248,9 @@ def job_daily() -> int:
                 f"メール到達プローブ: 送信 {len(body.get('message_ids', []))} 通のうち配送確認 {len(delivered)}・"
                 f"失敗 {len(failed)}・5分以内に未確定 {len(pending)}。Brevo の送信者認証・受信側のブロック・無料枠を確認。"
             )
+
+    # ⑤ 毎時ジョブが本当に回っているか（「実行されなかった」を検知する唯一の経路）
+    problems.extend(_check_hourly_runs())
 
     # ④ 前日集計（受理後の破棄検知）
     if BREVO_API_KEY:
@@ -239,22 +289,23 @@ def _readyz_degraded() -> tuple[int, list[str]]:
 
 
 def job_key_check() -> int:
-    if not RENDER_API_KEY:
-        return fail("鍵の照合ができません", "RENDER_API_KEY（GitHub Secrets）が未設定")
+    """本番の鍵ダイジェスト（backend が返す）と控えのダイジェストを照合する。Render API は使わない。"""
     if not ESCROW:
         return fail("暗号鍵の控えがありません", "GitHub Secrets の APP_ENCRYPTION_KEY_ESCROW が未設定。scripts/ops_bootstrap.py を実行して登録してください。")
-    st, live = _render_env("APP_ENCRYPTION_KEY")
-    if st != 200:
-        return fail("Render の環境変数を取得できません", f"GET env-vars/APP_ENCRYPTION_KEY → HTTP {st}")
-    if not live:
-        return fail("本番の暗号鍵が空です", "Render の APP_ENCRYPTION_KEY が未設定。Actions「Ops cron」を job=key-restore で実行すると控えから復元します。")
-    if hashlib.sha256(live.encode()).digest() != hashlib.sha256(ESCROW.encode()).digest():
+    if not wake_backend():
+        return fail("backend が起きません（/health 非200が90秒継続）", f"{BACKEND_URL}/health")
+    st, body = post_job("key-fingerprint")
+    if st != 200 or not isinstance(body, dict):
+        return fail("本番の鍵ダイジェストを取得できません", f"POST /admin/jobs/key-fingerprint → HTTP {st}")
+    if not body.get("configured"):
+        return fail("本番の暗号鍵が空です", "APP_ENCRYPTION_KEY が未設定。Actions「Ops cron」を job=key-restore で実行すると控えから復元します。")
+    if body.get("sha256") != hashlib.sha256(ESCROW.encode("utf-8")).hexdigest():
         return fail(
             "暗号鍵の控えが本番と一致しません",
-            f"Render sha256={sha8(live)}… / 控え sha256={sha8(ESCROW)}…。本番の鍵が変わったなら控えを更新（ops_bootstrap.py）、"
-            "意図せず変わったなら復元前に保存済みデータの復号可否を確認してください。",
+            "本番の APP_ENCRYPTION_KEY と GitHub Secrets の控えが別の値です。本番の鍵を意図して変えたなら"
+            " scripts/ops_bootstrap.py で控えを更新、意図せず変わったなら復元前に保存済みデータの復号可否を確認してください。",
         )
-    print(f"✅ key-check: 一致（sha256 {sha8(live)}…）")
+    print("✅ key-check: 本番と控えは一致")
     return 0
 
 
@@ -271,13 +322,14 @@ def job_key_restore(force: bool) -> int:
         if "encryption_key" not in degraded:
             print("⏭️ /readyz は鍵未設定を報告していないため復元しません（--force で強制）")
             return 0
-    st, body = render("PUT", f"/services/{RENDER_SERVICE_ID}/env-vars/APP_ENCRYPTION_KEY", body={"value": ESCROW})
+    st, _body = render("PUT", f"/services/{RENDER_SERVICE_ID}/env-vars/APP_ENCRYPTION_KEY", body={"value": ESCROW})
     if st not in (200, 201):
-        return fail("鍵の書き戻しに失敗", f"PUT env-vars/APP_ENCRYPTION_KEY → HTTP {st}: {str(body)[:200]}")
+        # 応答本文は出さない（Render がエラー時に送信値をエコーする可能性を排除）
+        return fail("鍵の書き戻しに失敗", f"PUT env-vars/APP_ENCRYPTION_KEY → HTTP {st}")
     st, body = render("POST", f"/services/{RENDER_SERVICE_ID}/deploys", body={"clearCache": "do_not_clear"})
     deploy_note = f"deploy → HTTP {st}" + (f" id={body.get('id')}" if isinstance(body, dict) else "")
-    print(f"✅ key-restore: 書き戻し完了（sha256 {sha8(ESCROW)}…）/ {deploy_note}")
-    notify("[カタヅケ運用] 暗号鍵を控えから復元しました", f"Render の APP_ENCRYPTION_KEY を GitHub Secrets の控えから書き戻しました（sha256 {sha8(ESCROW)}…）。{deploy_note}")
+    print(f"✅ key-restore: 書き戻し完了 / {deploy_note}")
+    notify("[カタヅケ運用] 暗号鍵を控えから復元しました", f"Render の APP_ENCRYPTION_KEY を GitHub Secrets の控えから書き戻しました。{deploy_note}")
     return 0
 
 
@@ -289,6 +341,11 @@ def main() -> int:
     ap.add_argument("job", choices=["hourly", "daily", "key-check", "key-restore"])
     ap.add_argument("--force", action="store_true", help="key-restore: 条件を無視して控えで上書きする")
     args = ap.parse_args()
+    if args.job in ("hourly", "daily", "key-check") and not OPS_JOB_TOKEN:
+        # 初期設定（scripts/ops_bootstrap.py）前はスケジュールが毎時失敗通知を出し続けるだけなので、
+        # 未設定は「スキップ」として静かに終える（設定後の欠測は daily ⑤ が検知する）。
+        print("⏭️ OPS_JOB_TOKEN が未設定のためスキップ（scripts/ops_bootstrap.py で初期設定してください）")
+        return 0
     if args.job == "hourly":
         return job_hourly()
     if args.job == "daily":

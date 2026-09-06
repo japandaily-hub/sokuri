@@ -89,7 +89,7 @@ jobs:
       # 次回起動時に拡幅する）ため、2回流す。2回目で head に到達しなければ失敗。
       - name: Apply real migrations
         run: |
-          python scripts/pg_alembic_upgrade.py upgrade head || true
+          python scripts/pg_alembic_upgrade.py upgrade head || echo "::notice::1回目の upgrade が失敗（新規 DB では 0008 で想定内）。2回目で head 到達を判定します"
           python scripts/pg_alembic_upgrade.py upgrade head
 
       - name: Start API on PostgreSQL (:8001)

@@ -796,6 +796,14 @@ class MailProbeResult(BaseModel):
     sent: bool
     message_ids: list[str]
     recipients: int = Field(ge=0, description="送信を試みた宛先数（ADMIN_EMAILS の件数）")
+    throttled: bool = Field(default=False, description="間隔制限（直近送信から20時間未満）で送らなかった")
+
+
+class KeyFingerprintResult(BaseModel):
+    """``POST /admin/jobs/key-fingerprint`` の結果（鍵そのものは返さない）。"""
+
+    configured: bool
+    sha256: str | None = Field(default=None, description="APP_ENCRYPTION_KEY の SHA-256（未設定なら None）")
 
 
 # ──────────────────────────── 成約 ────────────────────────────

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import secrets
 import uuid
@@ -61,6 +62,7 @@ from app.schemas_katadzuke import (
     InviteBulkCreateResponse,
     InviteCreateRequest,
     InviteOut,
+    KeyFingerprintResult,
     MailProbeResult,
     OperatorApplicationApproveResponse,
     OperatorApplicationBankAccountRevealOut,
@@ -1903,6 +1905,15 @@ async def run_reminder_job(
     return ReminderJobResult(**result)
 
 
+#: プローブ問い合わせと判定する氏名（差出人メール一致との AND 条件・完全一致）。
+OPS_PROBE_CONTACT_NAME = "カタヅケ運営（自動確認）"
+#: プローブ問い合わせとして自動処理する受信からの猶予（これより古い行は触らない）。
+OPS_PROBE_CONTACT_MAX_AGE = timedelta(days=7)
+#: メール到達プローブの最短送信間隔（日次ジョブ想定・連打で無料枠を食い潰さない）。
+MAIL_PROBE_MIN_INTERVAL = timedelta(hours=20)
+_mail_probe_last_sent_at: datetime | None = None
+
+
 @router.post(
     "/admin/jobs/admin-audit",
     response_model=AdminAuditResult,
@@ -1988,22 +1999,28 @@ async def run_contact_probe_handle_job(
     admin: User | None = Depends(get_ops_or_admin),
     session: AsyncSession = Depends(get_session),
 ) -> ContactProbeHandleResult:
-    """``OPS_PROBE_CONTACT_EMAIL`` からの未対応問い合わせを対応済みにする（冪等）。
+    """``OPS_PROBE_CONTACT_EMAIL`` からの未対応プローブ問い合わせを対応済みにする（冪等）。
 
     到達確認のために運営が公開フォームへ送った行が「未対応」バッジに残り続けるのを
-    防ぐ。対象は差出人メールの完全一致（大文字小文字無視）だけで、未設定なら何もしない
-    （実顧客を誤って対応済みにしない側に倒す）。``handled_by_admin_id`` は NULL＝機械処理。
+    防ぐ。対象は「差出人メールの完全一致（大文字小文字無視）」**かつ**「氏名が
+    ``OPS_PROBE_CONTACT_NAME`` と完全一致」**かつ**「受信から ``OPS_PROBE_CONTACT_MAX_AGE``
+    以内」の行だけ。公開フォームは差出人を検証しないため、同じアドレス（運営の共有
+    エイリアス等）から実際の相談が来ても氏名が違えば触らない。未設定なら何もしない。
+    ``handled_by_admin_id`` は NULL＝機械処理。
     """
     probe = get_settings().ops_probe_contact_email.strip().lower()
     if not probe:
         return ContactProbeHandleResult(handled=0, probe_email=None)
+    now = datetime.now(timezone.utc)
     result = await session.execute(
         update(ContactMessage)
         .where(
             func.lower(ContactMessage.email) == probe,
+            ContactMessage.name == OPS_PROBE_CONTACT_NAME,
             ContactMessage.handled_at.is_(None),
+            ContactMessage.created_at >= now - OPS_PROBE_CONTACT_MAX_AGE,
         )
-        .values(handled_at=datetime.now(timezone.utc), handled_by_admin_id=None)
+        .values(handled_at=now, handled_by_admin_id=None)
     )
     await session.commit()
     handled = int(result.rowcount or 0)
@@ -2030,8 +2047,25 @@ async def run_mail_probe_job(
     ``messageId`` を Brevo のイベント API で「delivered」まで追い、届かなければ
     運営へ通知する。BREVO_API_KEY 未設定・送信失敗は例外にせず ``sent=false`` で返す
     （notify 側が既に alerts を発火している）。
+
+    連打対策: 直近の**送信試行**から ``MAIL_PROBE_MIN_INTERVAL`` 未満は送らず
+    ``throttled=true`` を返す（トークン漏えい時に無料枠 300 通/日を食い潰され、依頼者・
+    業者向けの実通知まで止まる横展開を防ぐ）。時刻は送信の成否に関わらず試行前に
+    記録する（失敗が続く間も無制限に試行させない）。プロセス内の時刻なので再起動で
+    リセットされるが、日次ジョブの用途には十分。
     """
+    global _mail_probe_last_sent_at
+    now = datetime.now(timezone.utc)
     recipients = get_settings().admin_emails
+    if (
+        _mail_probe_last_sent_at is not None
+        and now - _mail_probe_last_sent_at < MAIL_PROBE_MIN_INTERVAL
+    ):
+        logger.info("admin: メール到達プローブは間隔制限中のため送信しません")
+        return MailProbeResult(
+            sent=False, message_ids=[], recipients=len(recipients), throttled=True
+        )
+    _mail_probe_last_sent_at = now
     ids = await notify.send_mail_probe(recipients) if recipients else []
     logger.info(
         "admin: メール到達プローブ - recipients=%s sent=%s by=%s",
@@ -2040,4 +2074,28 @@ async def run_mail_probe_job(
         admin.id if admin is not None else "ops-token",
     )
     return MailProbeResult(sent=bool(ids), message_ids=ids, recipients=len(recipients))
+
+
+@router.post(
+    "/admin/jobs/key-fingerprint",
+    response_model=KeyFingerprintResult,
+    summary="暗号鍵の設定有無と SHA-256（控えとの照合用・値は返さない）",
+)
+async def run_key_fingerprint_job(
+    admin: User | None = Depends(get_ops_or_admin),
+) -> KeyFingerprintResult:
+    """``APP_ENCRYPTION_KEY`` の SHA-256 を返す（週次の控え照合・自動運用 r13）。
+
+    GitHub Actions 側は控え（Secrets）の SHA-256 と突き合わせるだけで済み、Render の
+    アカウント全体に効く API キーを週次ジョブへ配る必要が無くなる。鍵は 256bit の
+    乱数（Fernet）なのでダイジェストから逆算・総当たりは現実的でない。
+    """
+    key = get_settings().app_encryption_key
+    digest = hashlib.sha256(key.encode("utf-8")).hexdigest() if key else None
+    logger.info(
+        "admin: 暗号鍵フィンガープリント照会 - configured=%s by=%s",
+        bool(key),
+        admin.id if admin is not None else "ops-token",
+    )
+    return KeyFingerprintResult(configured=bool(key), sha256=digest)
 
