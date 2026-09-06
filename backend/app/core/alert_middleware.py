@@ -20,24 +20,37 @@ logger = logging.getLogger(__name__)
 _EXCLUDED_PATHS = {"/health", "/readyz"}
 
 
+def _now() -> float:
+    """単調時計。テストで差し替えられるよう関数で間接化する（time.monotonic を直接パッチすると asyncio が止まる）。"""
+    return time.monotonic()
+
+
 class ServerErrorAlertMiddleware:
     """Starlette の BaseHTTPMiddleware を使わない素の ASGI 実装（ストリーミング応答と相性が良い）。"""
 
     def __init__(self, app) -> None:  # noqa: ANN001 -- ASGI app
         self.app = app
         self._events: deque[float] = deque()
+        #: 5xx バーストを通知済みで、まだ「収まった」通知を送っていない間 True。
+        self._burst_active = False
+        self._burst_started_at: float | None = None
+        self._last_5xx_at: float | None = None
 
     def _record_5xx(self, path: str) -> None:
         if path in _EXCLUDED_PATHS:
             return
         settings = get_settings()
-        now = time.monotonic()
+        now = _now()
         window = settings.alert_5xx_window_seconds
         self._events.append(now)
+        self._last_5xx_at = now
         while self._events and now - self._events[0] > window:
             self._events.popleft()
         count = len(self._events)
         if count >= settings.alert_5xx_threshold:
+            if not self._burst_active:
+                self._burst_active = True
+                self._burst_started_at = now
             alerts.fire_and_forget(
                 alerts.send_alert(
                     "5xx 応答が急増しています",
@@ -48,11 +61,40 @@ class ServerErrorAlertMiddleware:
                 )
             )
 
+    def _check_burst_recovered(self) -> None:
+        """バースト通知後、window 秒間 5xx が 1 件も無ければ「収まった」を 1 回だけ通知する。
+
+        リクエストが来た時にしか評価しないが、外形監視が /health を 5 分毎に叩くので
+        トラフィックが無くても復旧通知は遅くとも次の監視ピングで出る。
+        """
+        if not self._burst_active or self._last_5xx_at is None:
+            return
+        settings = get_settings()
+        now = _now()
+        window = settings.alert_5xx_window_seconds
+        if now - self._last_5xx_at < window:
+            return
+        quiet_for = int(now - self._last_5xx_at)
+        lasted = int(self._last_5xx_at - (self._burst_started_at or self._last_5xx_at))
+        self._burst_active = False
+        self._burst_started_at = None
+        self._events.clear()
+        alerts.fire_and_forget(
+            alerts.send_alert(
+                "5xx 応答の急増が収まりました",
+                f"直近 {quiet_for} 秒間、5xx 応答はありません（急増は約 {lasted} 秒続きました）。",
+                severity="info",
+                key="5xx-burst-recovered",
+            )
+        )
+
     async def __call__(self, scope, receive, send) -> None:  # noqa: ANN001 -- ASGI signature
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
         path = scope.get("path", "")
+        # 復旧判定は監視用パス（/health 等）を含む全リクエストで行う（5xx の集計だけ除外する）。
+        self._check_burst_recovered()
         status_holder: dict[str, int] = {}
 
         async def send_wrapper(message) -> None:  # noqa: ANN001

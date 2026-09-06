@@ -64,6 +64,7 @@ LINE Notify は 2025年3月に終了しているため、Messaging API の別チ
 ### アプリ内監視（`app/core/alert_middleware.py`）
 - 未処理例外: 1件で即通知（`key = unhandled:<path>`、同じパスはクールダウン中は再送しない）。例外はそのまま再送出され、既定の 500 応答は変わりません。
 - 5xx バースト: 直近 `ALERT_5XX_WINDOW_SECONDS` 秒間に `ALERT_5XX_THRESHOLD` 件以上の 5xx（例外由来を含む）で通知（`key = 5xx-burst`）。
+- 5xx バーストの収束: バースト通知後、`ALERT_5XX_WINDOW_SECONDS` 秒間 5xx が 1 件も無ければ `[RECOVERED] 5xx 応答の急増が収まりました` を 1 回だけ送る（`key = 5xx-burst-recovered`）。判定はリクエスト到来時（/health のピング含む）に行うため、遅くとも次の外形監視ピングで出る。
 - `/health` と `/readyz` 自身の失敗は集計しません（外形監視が拾うため）。
 - クールダウンはプロセス内メモリです。複数インスタンス時はインスタンス数ぶん届く可能性がありますが、取りこぼしよりは許容します。
 

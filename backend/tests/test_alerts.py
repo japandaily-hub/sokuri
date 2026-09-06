@@ -138,3 +138,56 @@ async def test_middleware_alerts_on_unhandled_exception_and_burst(monkeypatch: p
     assert "unhandled:/boom" in keys
     assert "5xx-burst" in keys
     assert not any(k and "/health" in k for k in keys)
+    # バーストが続いている間は「収まった」通知は出ない
+    assert "5xx-burst-recovered" not in keys
+
+
+async def test_middleware_notifies_once_when_burst_recovers(monkeypatch: pytest.MonkeyPatch):
+    """バースト通知後、window 秒間 5xx が無ければ復旧通知を 1 回だけ送る。"""
+    sent: list[tuple[str, str | None, str]] = []
+
+    async def fake_send_alert(title: str, body: str, *, severity: str = "critical", key: str | None = None) -> bool:
+        sent.append((title, key, severity))
+        return True
+
+    monkeypatch.setattr(alerts, "send_alert", fake_send_alert)
+
+    from app.core import alert_middleware as mw
+
+    clock = {"now": 1_000.0}
+    monkeypatch.setattr(mw, "_now", lambda: clock["now"])
+
+    app = _build_app()
+    async with AsyncClient(transport=ASGITransport(app=app, raise_app_exceptions=False), base_url="http://test") as client:
+        for _ in range(3):
+            await client.get("/boom")
+        await asyncio.sleep(0.05)
+        assert [k for _, k, _ in sent].count("5xx-burst") == 1
+
+        # window（300秒）未満しか経っていない → まだ復旧扱いにしない（/health のピングでも同じ）
+        clock["now"] += 100
+        await client.get("/health")
+        await asyncio.sleep(0.05)
+        assert "5xx-burst-recovered" not in [k for _, k, _ in sent]
+
+        # window を超えて 5xx が無い → 復旧通知（severity=info）を 1 回
+        clock["now"] += 250
+        await client.get("/health")
+        await asyncio.sleep(0.05)
+        recovered = [s for s in sent if s[1] == "5xx-burst-recovered"]
+        assert len(recovered) == 1
+        assert recovered[0][2] == "info"
+
+        # その後の正常リクエストでは再送しない
+        clock["now"] += 1000
+        await client.get("/fine")
+        await asyncio.sleep(0.05)
+        assert [k for _, k, _ in sent].count("5xx-burst-recovered") == 1
+
+
+async def test_send_alert_info_severity_uses_recovered_tag():
+    """severity=info は件名 [RECOVERED]・本文 ✅ タグになる。"""
+    ok = await alerts.send_alert("復旧テスト", "本文", severity="info", key="t")
+    assert ok
+    payloads = [body for _, body in _FakeClient.calls]
+    assert any("✅【Recovered】" in (p.get("text") or "") for p in payloads)

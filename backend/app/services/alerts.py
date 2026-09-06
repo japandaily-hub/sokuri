@@ -24,7 +24,10 @@ from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-Severity = Literal["critical", "warning"]
+#: info は「復旧・解消」の知らせ（件名タグは RECOVERED）。
+Severity = Literal["critical", "warning", "info"]
+_SEVERITY_TAG: dict[str, str] = {"critical": "🚨【Critical】", "warning": "⚠️【Warning】", "info": "✅【Recovered】"}
+_SEVERITY_SUBJECT: dict[str, str] = {"critical": "CRITICAL", "warning": "WARNING", "info": "RECOVERED"}
 
 _BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/email"
 _LINE_PUSH_ENDPOINT = "https://api.line.me/v2/bot/message/push"
@@ -56,7 +59,7 @@ def reset_state_for_tests() -> None:
 
 
 def _format_text(title: str, body: str, severity: Severity) -> str:
-    tag = "🚨【Critical】" if severity == "critical" else "⚠️【Warning】"
+    tag = _SEVERITY_TAG.get(severity, _SEVERITY_TAG["warning"])
     settings = get_settings()
     env = settings.app_env
     commit = settings.render_git_commit[:7] if settings.render_git_commit else "-"
@@ -156,7 +159,7 @@ async def send_alert(
         _state.last_sent_at[dedupe_key] = now
 
     text = _format_text(title, body, severity)
-    subject = f"[カタヅケ監視][{severity.upper()}] {title}"
+    subject = f"[カタヅケ監視][{_SEVERITY_SUBJECT.get(severity, severity.upper())}] {title}"
     logger.warning("alerts: %s", text.replace("\n", " | "))
     # 3チャネルは**同時**に走らせる（直列にしない）。アラートの主因の1つが
     # 「Brevo が枠切れ・キー失効でメールを送れない」ことであり（r6 H-3）、
