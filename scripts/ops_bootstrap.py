@@ -13,6 +13,7 @@
     5. Render に環境変数を書いたら再デプロイを起動して live まで待つ（API 経由の env-vars 変更は
        ダッシュボードと違い自動再デプロイされない。--deploy で書き込みが無くても強制起動）
     6. 実証: Actions「Ops cron」を job=daily で起動し、完了（success）まで待って結果を表示（--no-verify で省略）
+    ※ --admin-emails ADDR[,ADDR] を付けると Render の ADMIN_EMAILS を置き換える（棚卸しの是正用。再デプロイ＋実証まで自動）
 
 認証情報・鍵はこのプロセス内でしか使わず、ファイルにも標準出力にも残さない（表示は文字数のみ）。
 """
@@ -130,6 +131,11 @@ def main() -> int:
         help="手順3（暗号鍵の控えを GitHub Secret へ置く）を飛ばす。控えだけ後で別途この手順を実行する場合に使う",
     )
     ap.add_argument("--no-verify", action="store_true", help="最後の実証（Actions の daily 起動と完了待ち）を行わない")
+    ap.add_argument(
+        "--admin-emails",
+        default="",
+        help="Render の ADMIN_EMAILS をこの値（カンマ区切り）に置き換える。日次の棚卸しで未登録が検出されたときの是正用",
+    )
     args = ap.parse_args()
 
     values = read_env_file(ENV_FILE)
@@ -188,6 +194,17 @@ def main() -> int:
     else:
         current = render_get_env(render_key, svc_id, "OPS_PROBE_CONTACT_EMAIL")
         (ok if current else warn)(f"--probe-email 未指定のため変更なし（現在: {'設定済み' if current else '未設定'}）")
+
+    if args.admin_emails:
+        print("5b) ADMIN_EMAILS の是正（棚卸しで未登録が出たアドレスを外す／登録済み管理者だけにする）")
+        wanted = ",".join(e.strip() for e in args.admin_emails.split(",") if e.strip())
+        current = render_get_env(render_key, svc_id, "ADMIN_EMAILS") or ""
+        if current == wanted:
+            ok("Render ADMIN_EMAILS は既にその値（変更なし）")
+        else:
+            all_ok &= render_put_env(render_key, svc_id, "ADMIN_EMAILS", wanted, args.dry_run)
+            wrote_render = True
+            warn("render.yaml の ADMIN_EMAILS も同じ値に揃えてコミットしてください（既存サービスには同期されないが、正本として）")
 
     # Render の env-vars API は（ダッシュボードと違い）再デプロイを起動しない。書き込んだ値を
     # backend に読み込ませるには deploys を明示的に叩く必要がある（実測 2026-09-06: 90 秒待っても

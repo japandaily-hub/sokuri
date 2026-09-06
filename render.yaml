@@ -55,7 +55,7 @@ services:
       - key: JWT_SECRET
         generateValue: true            # Render が安全なランダム値を自動生成
       - key: ADMIN_EMAILS
-        value: "ko.13.hei@gmail.com,ko.13.hei+kdzadmin@gmail.com"   # 後者は動作検証用probe管理者（gmailエイリアス）
+        value: "ko.13.hei@gmail.com"   # 未登録の検証用エイリアス（+kdzadmin）は 2026-09-06 の棚卸しジョブで検出し除外。管理者の追加は管理画面「管理者にする」で行う
       - key: STORAGE_DIR
         value: /tmp/uploads            # Free plan はエフェメラル（β許容）
       - key: BREVO_API_KEY
