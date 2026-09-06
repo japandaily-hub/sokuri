@@ -15,7 +15,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import get_current_admin
+from app.api.deps import get_current_admin, get_ops_or_admin
+from app.config import get_settings
 from app.core.crypto import decrypt_json
 from app.db.models.bid import Bid
 from app.core.masking import mask_account_number
@@ -38,6 +39,8 @@ from app.db.models.user_identity_document import (
 )
 from app.db.session import get_session
 from app.schemas_katadzuke import (
+    AdminAuditEntry,
+    AdminAuditResult,
     AdminCaseListItem,
     AdminCaseListResponse,
     AdminContactHandleResponse,
@@ -51,12 +54,14 @@ from app.schemas_katadzuke import (
     AdminUserListResponse,
     AdminUserRoleResponse,
     BankAccountMaskedOut,
+    ContactProbeHandleResult,
     IdentityDocumentListCounts,
     IdentityDocumentRejectRequest,
     InviteBulkCreateRequest,
     InviteBulkCreateResponse,
     InviteCreateRequest,
     InviteOut,
+    MailProbeResult,
     OperatorApplicationApproveResponse,
     OperatorApplicationBankAccountRevealOut,
     OperatorApplicationListResponse,
@@ -1873,7 +1878,7 @@ async def admin_delete_contact(
     summary="リマインド定期処理の手動実行（訪問日超過 / 入札ゼロ放置）",
 )
 async def run_reminder_job(
-    admin: User = Depends(get_current_admin),
+    admin: User | None = Depends(get_ops_or_admin),
     session: AsyncSession = Depends(get_session),
 ) -> ReminderJobResult:
     """``main.py`` の1時間毎ループと同じ処理をその場で1周走らせる（r12 決定3）。
@@ -1883,13 +1888,156 @@ async def run_reminder_job(
     送信済み判定は DB 列（``transactions.overdue_reminded_at`` /
     ``cases.no_bid_reminded_at``）に集約されているため、定期ループと同時に
     走っても・連打しても同一の宛先へ二重に通知は飛ばない（2回目以降は 0 件）。
+
+    認可は ``get_ops_or_admin``（管理者 JWT または ``X-Ops-Token``）。Render Free は
+    無通信でスピンダウンし、プロセス内の毎時ループごと止まるため、GitHub Actions の
+    定期ジョブから本エンドポイントを叩いて「起こす＋回す」を兼ねる（自動運用 r13）。
     """
     result = await run_reminders(session)
     logger.info(
         "admin: リマインドを手動実行しました - admin_id=%s overdue=%s no_bid=%s",
-        admin.id,
+        admin.id if admin is not None else "ops-token",
         result["overdue"],
         result["no_bid"],
     )
     return ReminderJobResult(**result)
+
+
+@router.post(
+    "/admin/jobs/admin-audit",
+    response_model=AdminAuditResult,
+    summary="ADMIN_EMAILS の棚卸し（登録済み・role=admin・非停止を照合）",
+)
+async def run_admin_audit_job(
+    admin: User | None = Depends(get_ops_or_admin),
+    session: AsyncSession = Depends(get_session),
+) -> AdminAuditResult:
+    """``ADMIN_EMAILS`` の各アドレスが「登録済みの有効な管理者」かを DB で照合する。
+
+    未登録のアドレスは、有効 admin が不在になった瞬間に「そのアドレスで signup すると
+    admin になる」経路（r3 で不在時限定に絞った自動付与）を生かしてしまうため、
+    運用ルールとして棚卸しを義務付けていた（TODO 01-6）。日次ジョブで機械化し、
+    不合格は critical アラート（本文にアドレスは載せず件数のみ）で運営へ届ける。
+    """
+    settings = get_settings()
+    emails = settings.admin_emails
+    entries: list[AdminAuditEntry] = []
+    if emails:
+        rows = (
+            await session.execute(
+                select(User).where(
+                    func.lower(User.email).in_(emails), User.deleted_at.is_(None)
+                )
+            )
+        ).scalars().all()
+        by_email = {u.email.lower(): u for u in rows}
+        for email in emails:
+            user = by_email.get(email)
+            if user is None:
+                entries.append(AdminAuditEntry(email=email, registered=False, ok=False))
+                continue
+            entries.append(
+                AdminAuditEntry(
+                    email=email,
+                    registered=True,
+                    role=user.role,
+                    suspended=bool(user.is_suspended),
+                    ok=(user.role == "admin" and not user.is_suspended),
+                )
+            )
+    active_admin_count = int(
+        (
+            await session.execute(
+                select(func.count())
+                .select_from(User)
+                .where(
+                    User.role == "admin",
+                    User.deleted_at.is_(None),
+                    User.is_suspended.is_(False),
+                )
+            )
+        ).scalar_one()
+    )
+    ok = bool(entries) and all(e.ok for e in entries) and active_admin_count > 0
+    if not ok:
+        ng = [e for e in entries if not e.ok]
+        await alerts.send_alert(
+            "ADMIN_EMAILS の棚卸しで不整合",
+            f"ADMIN_EMAILS {len(entries)} 件のうち {len(ng)} 件が未登録・非admin・停止中のいずれかです"
+            f"（有効な管理者 {active_admin_count} 人）。未登録のアドレスは ADMIN_EMAILS から外すか、"
+            "本人に登録してもらい管理画面で『管理者にする』を実行してください。",
+            severity="critical",
+            key="admin_audit_failed",
+        )
+    logger.info(
+        "admin: ADMIN_EMAILS 棚卸し - ok=%s entries=%s active_admins=%s by=%s",
+        ok,
+        len(entries),
+        active_admin_count,
+        admin.id if admin is not None else "ops-token",
+    )
+    return AdminAuditResult(ok=ok, active_admin_count=active_admin_count, entries=entries)
+
+
+@router.post(
+    "/admin/jobs/contacts/handle-probes",
+    response_model=ContactProbeHandleResult,
+    summary="運営自身のプローブ問い合わせを機械的に対応済みへ",
+)
+async def run_contact_probe_handle_job(
+    admin: User | None = Depends(get_ops_or_admin),
+    session: AsyncSession = Depends(get_session),
+) -> ContactProbeHandleResult:
+    """``OPS_PROBE_CONTACT_EMAIL`` からの未対応問い合わせを対応済みにする（冪等）。
+
+    到達確認のために運営が公開フォームへ送った行が「未対応」バッジに残り続けるのを
+    防ぐ。対象は差出人メールの完全一致（大文字小文字無視）だけで、未設定なら何もしない
+    （実顧客を誤って対応済みにしない側に倒す）。``handled_by_admin_id`` は NULL＝機械処理。
+    """
+    probe = get_settings().ops_probe_contact_email.strip().lower()
+    if not probe:
+        return ContactProbeHandleResult(handled=0, probe_email=None)
+    result = await session.execute(
+        update(ContactMessage)
+        .where(
+            func.lower(ContactMessage.email) == probe,
+            ContactMessage.handled_at.is_(None),
+        )
+        .values(handled_at=datetime.now(timezone.utc), handled_by_admin_id=None)
+    )
+    await session.commit()
+    handled = int(result.rowcount or 0)
+    if handled:
+        logger.info(
+            "admin: プローブ問い合わせを対応済みにしました - handled=%s by=%s",
+            handled,
+            admin.id if admin is not None else "ops-token",
+        )
+    return ContactProbeHandleResult(handled=handled, probe_email=probe)
+
+
+@router.post(
+    "/admin/jobs/mail-probe",
+    response_model=MailProbeResult,
+    summary="メール到達プローブを運営宛に送る（Brevo messageId を返す）",
+)
+async def run_mail_probe_job(
+    admin: User | None = Depends(get_ops_or_admin),
+) -> MailProbeResult:
+    """``ADMIN_EMAILS`` 宛にプローブメールを1通ずつ送り、Brevo の ``messageId`` を返す。
+
+    受理（201）と実配送は別なので、呼び出し側（GitHub Actions の日次ジョブ）が
+    ``messageId`` を Brevo のイベント API で「delivered」まで追い、届かなければ
+    運営へ通知する。BREVO_API_KEY 未設定・送信失敗は例外にせず ``sent=false`` で返す
+    （notify 側が既に alerts を発火している）。
+    """
+    recipients = get_settings().admin_emails
+    ids = await notify.send_mail_probe(recipients) if recipients else []
+    logger.info(
+        "admin: メール到達プローブ - recipients=%s sent=%s by=%s",
+        len(recipients),
+        len(ids),
+        admin.id if admin is not None else "ops-token",
+    )
+    return MailProbeResult(sent=bool(ids), message_ids=ids, recipients=len(recipients))
 

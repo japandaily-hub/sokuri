@@ -122,6 +122,14 @@ class Settings(BaseSettings):
     # 未設定時（β運用）はスキーマ未達の間のみ誰でも閲覧可（接続文字列はリダクト済）。
     # 設定すると ?token=<値> が一致するリクエストにのみ添付される（正式リリース時に設定推奨）。
     diag_token: str = ""
+    # 運営ジョブ（/admin/jobs/*）を GitHub Actions 等の機械実行から叩くための共有トークン
+    # （ヘッダ ``X-Ops-Token``）。未設定時はヘッダ経路が無効で、従来どおり管理者 JWT のみ。
+    # 対象は冪等な定期処理だけで、一覧閲覧や個別操作の管理 API には適用しない（自動運用・r13）。
+    ops_job_token: str = ""
+    # メール到達確認などで運営自身が公開フォームへ送る「プローブ」の差出人メール。
+    # /admin/jobs/contacts/handle-probes がこのアドレスからの未対応問い合わせを
+    # 機械的に対応済みへ倒す。未設定なら何もしない（誤って実顧客を対応済みにしない）。
+    ops_probe_contact_email: str = ""
     # CORS で許可するオリジン（カンマ区切り）。未設定時は frontend_base_url とローカル開発用ポートを許可する。
     allowed_origins_raw: str = Field(default="", alias="ALLOWED_ORIGINS")
     # 実行環境（"development" | "production"）。本番起動時の fail-open ガードに使用する。

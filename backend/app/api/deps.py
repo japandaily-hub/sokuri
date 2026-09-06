@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+import secrets
 import uuid
 from dataclasses import dataclass
 from datetime import timezone
 
 import jwt as pyjwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.core.security import decode_access_token
 from app.db.models.operator import Operator
 from app.db.models.user import User
@@ -191,6 +193,36 @@ async def get_current_admin(
             detail="Admin access required.",
         )
     return user
+
+
+async def get_ops_or_admin(
+    x_ops_token: str | None = Header(default=None, alias="X-Ops-Token"),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    session: AsyncSession = Depends(get_session),
+) -> User | None:
+    """運営ジョブ（/admin/jobs/*）専用の認可。共有トークンか管理者 JWT のどちらかで通す。
+
+    - ``X-Ops-Token`` ヘッダが ``OPS_JOB_TOKEN`` と一致 → ``None`` を返す（機械実行。
+      GitHub Actions の定期ジョブなど、人のログインを介さない経路）。
+    - それ以外は従来どおり管理者 JWT（``get_current_admin`` と同じ判定）→ ``User`` を返す。
+
+    トークン未設定時はヘッダ経路そのものを無効にする（空文字同士の一致で素通りさせない）。
+    比較は ``secrets.compare_digest`` でタイミング差を出さない。**冪等な定期処理にしか
+    付けない**こと——一覧閲覧や停止・昇格などの個別操作は引き続き JWT 限定（自動運用・r13）。
+    ヘッダが不一致のときはトークン値をログに残さず、JWT 判定へフォールバックする
+    （管理者が誤った古いトークンを送ってもログインしていれば動く）。
+    """
+    expected = get_settings().ops_job_token
+    if x_ops_token is not None and expected:
+        if secrets.compare_digest(x_ops_token.encode("utf-8"), expected.encode("utf-8")):
+            return None
+    if credentials is None or not credentials.credentials:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required.",
+        )
+    user = await get_current_user(credentials, session)
+    return await get_current_admin(user)
 
 
 async def get_current_operator(

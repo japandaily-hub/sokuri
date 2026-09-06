@@ -759,6 +759,45 @@ class ReminderJobResult(BaseModel):
     no_bid: int = Field(ge=0, description="入札ゼロ放置リマインドを送った案件数")
 
 
+class AdminAuditEntry(BaseModel):
+    """``ADMIN_EMAILS`` の1アドレスに対する照合結果（自動運用 r13）。"""
+
+    email: str
+    registered: bool = Field(description="users 行が存在する（退会済みは False）")
+    role: str | None = Field(default=None, description="登録済みならその role")
+    suspended: bool = Field(default=False, description="運営による利用停止中")
+    ok: bool = Field(description="登録済み・role=admin・非停止のすべてを満たす")
+
+
+class AdminAuditResult(BaseModel):
+    """``POST /admin/jobs/admin-audit`` の結果。
+
+    ``ok`` は「ADMIN_EMAILS の全アドレスが登録済みの有効な管理者」かつ「有効な
+    管理者が1人以上いる」。未登録アドレスが残ると、有効 admin 不在時に限り
+    そのアドレスの新規登録が自動で admin になる経路（r3 で限定済み）が生きるため、
+    棚卸しを機械化して不合格時はアラートする。
+    """
+
+    ok: bool
+    active_admin_count: int = Field(ge=0)
+    entries: list[AdminAuditEntry]
+
+
+class ContactProbeHandleResult(BaseModel):
+    """``POST /admin/jobs/contacts/handle-probes`` の結果。"""
+
+    handled: int = Field(ge=0, description="今回対応済みにした件数")
+    probe_email: str | None = Field(default=None, description="対象にしたプローブ差出人（未設定なら None）")
+
+
+class MailProbeResult(BaseModel):
+    """``POST /admin/jobs/mail-probe`` の結果。``message_ids`` を Brevo イベント API で追う。"""
+
+    sent: bool
+    message_ids: list[str]
+    recipients: int = Field(ge=0, description="送信を試みた宛先数（ADMIN_EMAILS の件数）")
+
+
 # ──────────────────────────── 成約 ────────────────────────────
 
 

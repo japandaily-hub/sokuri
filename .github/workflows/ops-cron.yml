@@ -1,0 +1,79 @@
+name: Ops cron
+
+# 自動運用（r13）。残っていた運営の手作業を定期ジョブに置き換える。詳細は docs/ops/admin-operations.md。
+#   毎時 7 分       hourly    … Render を起こしてリマインド処理（訪問日超過 / 入札ゼロ放置）を1周
+#   毎日 18:00 UTC  daily     … ADMIN_EMAILS 棚卸し / プローブ問い合わせの対応済み化 /
+#   （03:00 JST）               メール到達プローブ（Brevo で delivered まで追跡）/ 前日のバウンス集計
+#   毎週月 19:00 UTC key-check … 本番 APP_ENCRYPTION_KEY と GitHub Secrets の控えを SHA-256 で照合
+#   手動             key-restore … /readyz が鍵未設定のときだけ控えから Render へ書き戻して再デプロイ
+# 失敗は運営へ通知（LINE / メール / Webhook）。正常時は通知しない。
+# 必要な Secrets: OPS_JOB_TOKEN, RENDER_API_KEY, APP_ENCRYPTION_KEY_ESCROW（scripts/ops_bootstrap.py で登録）
+#   ＋ 通知系（uptime-alert.yml と共通）: BREVO_API_KEY, ALERT_EMAILS, ALERT_MAIL_FROM,
+#   ALERT_LINE_CHANNEL_ACCESS_TOKEN, ALERT_LINE_USER_IDS, ALERT_WEBHOOK_URL
+
+on:
+  schedule:
+    - cron: "7 * * * *"
+    - cron: "0 18 * * *"
+    - cron: "0 19 * * 1"
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "実行するジョブ"
+        required: true
+        default: "daily"
+        type: choice
+        options: [hourly, daily, key-check, key-restore]
+      force:
+        description: "key-restore のみ: true で条件を無視して控えで上書き"
+        required: false
+        default: "false"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ops-cron-${{ github.event_name == 'schedule' && github.event.schedule || github.event.inputs.job }}
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Select job
+        id: select
+        run: |
+          case "${{ github.event_name }}:${{ github.event.schedule }}" in
+            schedule:"7 * * * *")  echo "job=hourly"    >> "$GITHUB_OUTPUT" ;;
+            schedule:"0 18 * * *") echo "job=daily"     >> "$GITHUB_OUTPUT" ;;
+            schedule:"0 19 * * 1") echo "job=key-check" >> "$GITHUB_OUTPUT" ;;
+            *)                     echo "job=${{ github.event.inputs.job }}" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Run ${{ steps.select.outputs.job }}
+        env:
+          BACKEND_URL: https://sokuri-backend.onrender.com
+          OPS_JOB_TOKEN: ${{ secrets.OPS_JOB_TOKEN }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: srv-d8enmu0g4nts73a43dhg
+          APP_ENCRYPTION_KEY_ESCROW: ${{ secrets.APP_ENCRYPTION_KEY_ESCROW }}
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          ALERT_EMAILS: ${{ secrets.ALERT_EMAILS }}
+          ALERT_MAIL_FROM: ${{ secrets.ALERT_MAIL_FROM }}
+          ALERT_LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.ALERT_LINE_CHANNEL_ACCESS_TOKEN }}
+          ALERT_LINE_USER_IDS: ${{ secrets.ALERT_LINE_USER_IDS }}
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+        run: |
+          if [ "${{ steps.select.outputs.job }}" = "key-restore" ] && [ "${{ github.event.inputs.force }}" = "true" ]; then
+            python scripts/ops_jobs.py key-restore --force
+          else
+            python scripts/ops_jobs.py "${{ steps.select.outputs.job }}"
+          fi

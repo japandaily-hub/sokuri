@@ -63,6 +63,18 @@ def is_deleted_account_email(email: str | None) -> bool:
 
 
 async def _send(to_email: str, subject: str, html: str) -> bool:
+    """1通送る（成否のみ）。既存呼び出し元との互換のため bool を保つ。"""
+    return (await _send_raw(to_email, subject, html)) is not None
+
+
+async def _send_raw(to_email: str, subject: str, html: str) -> str | None:
+    """1通送り、Brevo の ``messageId`` を返す（失敗・未設定時は ``None``）。
+
+    ``messageId`` は Brevo の送信イベント API（``GET /v3/smtp/statistics/events``）で
+    「受理後に実際に配送されたか」を後追い照合する鍵になる（自動運用のメール到達
+    プローブ・r13）。応答に ``messageId`` が無い異常系は空文字を返し、送信成功
+    （``None`` でない）とだけ扱う。
+    """
     settings = get_settings()
     if not settings.brevo_api_key:
         logger.error("notify: BREVO_API_KEY 未設定のため送信スキップ - %s / %s", to_email, subject)
@@ -79,7 +91,7 @@ async def _send(to_email: str, subject: str, html: str) -> bool:
                     key="notify_brevo_api_key_missing",
                 )
             )
-        return False
+        return None
     payload = {
         "sender": {"email": settings.mail_from, "name": settings.mail_from_name},
         "to": [{"email": to_email}],
@@ -94,7 +106,11 @@ async def _send(to_email: str, subject: str, html: str) -> bool:
                 headers={"api-key": settings.brevo_api_key},
             )
             res.raise_for_status()
-        return True
+        try:
+            message_id = res.json().get("messageId")
+        except Exception:  # noqa: BLE001 -- 本文が JSON でない/空でも送信自体は成功
+            message_id = None
+        return str(message_id) if message_id else ""
     except Exception as exc:
         # 実行時の送信失敗（Brevo 無料枠 300通/日 到達の 429・キー失効の 401・
         # 送信ドメイン未認証の 402 等）は、従来 logger.error のみで運営に届かず
@@ -113,7 +129,7 @@ async def _send(to_email: str, subject: str, html: str) -> bool:
                 key="notify_brevo_send_failed",
             )
         )
-        return False
+        return None
 
 
 def _wrap(body: str) -> str:
@@ -125,6 +141,30 @@ def _wrap(body: str) -> str:
         "このメールはカタヅケ運営事務局（神奈川県横浜市）から自動送信されています。"
         "お問い合わせ: katazuke.info@gmail.com</p></div>"
     )
+
+
+async def send_mail_probe(to_emails: list[str]) -> list[str]:
+    """メール到達プローブ（運営宛・自動運用 r13）。宛先ごとの ``messageId`` を返す。
+
+    定期ジョブ ``POST /admin/jobs/mail-probe`` から呼ばれ、返った ID を Brevo の
+    イベント API で「delivered」まで追う。Brevo 受理（201）と実配送は別であり、
+    無料枠上限・送信者認証切れ・受信側ブロックは受理後に起きる（r10 の意図的未対応
+    「受理後の破棄検知」を機械化）。送信できなかった宛先は結果に含めない。
+    """
+    ids: list[str] = []
+    for to_email in to_emails:
+        message_id = await _send_raw(
+            to_email,
+            "[カタヅケ監視] メール到達プローブ",
+            _wrap(
+                "<p>これは自動運用ジョブによるメール到達確認です。対応は不要です。</p>"
+                "<p>このメールが届いていれば、依頼者・業者向けの通知メールも同じ経路で"
+                "配送できています。</p>"
+            ),
+        )
+        if message_id is not None:
+            ids.append(message_id)
+    return ids
 
 
 async def send_case_created(to_email: str, case_id: str) -> bool:
