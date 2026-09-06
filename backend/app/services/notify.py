@@ -22,6 +22,8 @@ from app.services import alerts
 logger = logging.getLogger(__name__)
 
 _BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/email"
+#: 送信失敗アラートの key（復旧通知 resolve_alert と対で使う）。
+_BREVO_SEND_FAILED_KEY = "notify_brevo_send_failed"
 # BREVO_API_KEY 未設定スキップの運営アラートを、プロセス内で最初の1回だけ発火するためのフラグ。
 _brevo_missing_key_alerted = False
 
@@ -110,6 +112,16 @@ async def _send_raw(to_email: str, subject: str, html: str) -> str | None:
             message_id = res.json().get("messageId")
         except Exception:  # noqa: BLE001 -- 本文が JSON でない/空でも送信自体は成功
             message_id = None
+        # 送信失敗の warning を出していた場合は「復旧」を1回送る（is_active で先に判定し、
+        # 通常時に毎送信で Task を作らない）。
+        if alerts.is_active(_BREVO_SEND_FAILED_KEY):
+            alerts.fire_and_forget(
+                alerts.resolve_alert(
+                    _BREVO_SEND_FAILED_KEY,
+                    "メール送信が復旧しました（Brevo）",
+                    "Brevo へのメール送信が再び成功しました。失敗していた間の通知は再送されません。",
+                )
+            )
         return str(message_id) if message_id else ""
     except Exception as exc:
         # 実行時の送信失敗（Brevo 無料枠 300通/日 到達の 429・キー失効の 401・
@@ -126,7 +138,7 @@ async def _send_raw(to_email: str, subject: str, html: str) -> str | None:
                 "APIキー失効、送信ドメインの認証切れ等が考えられます。"
                 f"直近のエラー: {type(exc).__name__}: {str(exc)[:200]}",
                 severity="warning",
-                key="notify_brevo_send_failed",
+                key=_BREVO_SEND_FAILED_KEY,
             )
         )
         return None

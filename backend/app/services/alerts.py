@@ -37,6 +37,9 @@ _ALERT_TEXT_MAX = 1800  # LINE の 1 メッセージ上限(5000)より十分小�
 @dataclass
 class _State:
     last_sent_at: dict[str, float] = field(default_factory=dict)
+    #: critical / warning を送った（またはクールダウンで抑制した）key の集合。
+    #: ``resolve_alert`` が「復旧」を送る根拠になる（発報していないものの復旧は送らない）。
+    active: set[str] = field(default_factory=set)
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
@@ -54,8 +57,30 @@ def _truncate(text: str, limit: int = _ALERT_TEXT_MAX) -> str:
 
 
 def reset_state_for_tests() -> None:
-    """テスト専用: クールダウン状態を初期化する。"""
+    """テスト専用: クールダウン状態と発報中の key を初期化する。"""
     _state.last_sent_at.clear()
+    _state.active.clear()
+
+
+def is_active(key: str) -> bool:
+    """その key の異常アラートが発報中（復旧をまだ送っていない）か。"""
+    return key in _state.active
+
+
+async def resolve_alert(key: str, title: str, body: str) -> bool:
+    """異常が解消したことを運営へ知らせる（severity=info・件名タグ RECOVERED）。
+
+    ``send_alert`` で同じ ``key`` の critical / warning を発報していた場合にだけ送る。
+    発報していない（＝運営が異常を知らされていない）状態で復旧だけ届くのはノイズなので
+    送らない。戻り値は「復旧通知を出したか」。プロセス内メモリなので再起動後は発報
+    履歴が消え、再起動前の異常に対する復旧通知は出ない（次に異常→復旧した時から有効）。
+    """
+    async with _state.lock:
+        if key not in _state.active:
+            return False
+        _state.active.discard(key)
+    await send_alert(title, body, severity="info", key=f"{key}:recovered")
+    return True
 
 
 def _format_text(title: str, body: str, severity: Severity) -> str:
@@ -152,6 +177,10 @@ async def send_alert(
     dedupe_key = key or title
     now = time.monotonic()
     async with _state.lock:
+        # 異常（critical / warning）は「発報中」として記録する。クールダウンで抑制した場合も
+        # 異常自体は続いているので記録する（後で resolve_alert が復旧を送れるように）。
+        if severity != "info":
+            _state.active.add(dedupe_key)
         last = _state.last_sent_at.get(dedupe_key)
         if last is not None and now - last < settings.alert_cooldown_seconds:
             logger.info("alerts: クールダウン中のため抑制 - key=%s", dedupe_key)

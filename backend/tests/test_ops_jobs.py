@@ -283,6 +283,94 @@ async def test_admin_audit_flags_unregistered_non_admin_and_suspended(
     assert "example.com" not in alert.await_args.args[1]
 
 
+async def test_alerts_resolve_only_after_active_alert(monkeypatch):
+    """resolve_alert は同じ key の異常を発報した後だけ復旧（info）を送る。"""
+    from app.services import alerts
+
+    alerts.reset_state_for_tests()
+    sent: list[tuple] = []
+
+    async def _capture(title, body, *, severity="critical", key=None):
+        sent.append((severity, key))
+        return True
+
+    # 発報していない状態では復旧を送らない
+    assert await alerts.resolve_alert("k1", "復旧", "本文") is False
+    assert alerts.is_active("k1") is False
+
+    # 異常を発報（通知チャネル未設定でも「発報中」として記録される）
+    await alerts.send_alert("異常", "本文", severity="warning", key="k1")
+    assert alerts.is_active("k1") is True
+    # クールダウン中の再発報でも発報中は維持される
+    await alerts.send_alert("異常", "本文", severity="warning", key="k1")
+    assert alerts.is_active("k1") is True
+
+    monkeypatch.setattr(alerts, "send_alert", _capture)
+    assert await alerts.resolve_alert("k1", "復旧", "本文") is True
+    assert sent == [("info", "k1:recovered")]
+    assert alerts.is_active("k1") is False
+    # 2回目は送らない（復旧は1回だけ）
+    assert await alerts.resolve_alert("k1", "復旧", "本文") is False
+    assert len(sent) == 1
+    alerts.reset_state_for_tests()
+
+
+async def test_admin_audit_sends_recovery_after_previous_failure(
+    client: AsyncClient, db_session: AsyncSession, ops_token: str, monkeypatch
+):
+    """不整合→是正の順で実行すると、是正後に1回だけ復旧通知が出る。"""
+    from app.services import alerts
+
+    alerts.reset_state_for_tests()
+    await _make_user(db_session, "boss2@example.com", role="admin")
+    monkeypatch.setattr(get_settings(), "admin_emails_raw", "boss2@example.com,ghost@example.com")
+    with patch("app.services.alerts._send_line", new_callable=AsyncMock, return_value=True), patch(
+        "app.services.alerts._send_webhook", new_callable=AsyncMock, return_value=False
+    ), patch("app.services.alerts._send_email", new_callable=AsyncMock, return_value=False):
+        r = await client.post("/api/v1/admin/jobs/admin-audit", headers=_ops())
+        assert r.json()["ok"] is False
+        assert alerts.is_active("admin_audit_failed") is True
+
+        # 是正: 未登録アドレスを外す
+        monkeypatch.setattr(get_settings(), "admin_emails_raw", "boss2@example.com")
+        with patch("app.services.alerts.send_alert", new_callable=AsyncMock) as send:
+            r = await client.post("/api/v1/admin/jobs/admin-audit", headers=_ops())
+            assert r.json()["ok"] is True
+            assert send.await_count == 1
+            assert send.await_args.kwargs == {"severity": "info", "key": "admin_audit_failed:recovered"}
+            assert "正常に戻りました" in send.await_args.args[0]
+            # 続けて正常でも復旧は再送しない
+            r = await client.post("/api/v1/admin/jobs/admin-audit", headers=_ops())
+            assert send.await_count == 1
+    alerts.reset_state_for_tests()
+
+
+async def test_mail_send_success_resolves_previous_send_failure(monkeypatch):
+    """Brevo 送信失敗の warning を出した後に送信が成功したら、復旧通知を1回スケジュールする。"""
+    from app.services import alerts
+
+    alerts.reset_state_for_tests()
+    settings = get_settings()
+    monkeypatch.setattr(settings, "brevo_api_key", "test-key")
+    _FakeClient.calls = []
+    monkeypatch.setattr(notify.httpx, "AsyncClient", _FakeClient)
+    fired: list = []
+
+    def _capture(coro) -> None:
+        fired.append(coro)
+        coro.close()
+
+    with patch("app.services.alerts.fire_and_forget", side_effect=_capture):
+        # 発報していない状態の成功では何もしない
+        assert await notify._send("x@example.com", "件名", "<p>本文</p>") is True
+        assert fired == []
+        # 失敗を発報した状態にしてから成功させる
+        await alerts.send_alert("失敗", "本文", severity="warning", key=notify._BREVO_SEND_FAILED_KEY)
+        assert await notify._send("x@example.com", "件名", "<p>本文</p>") is True
+        assert len(fired) == 1
+    alerts.reset_state_for_tests()
+
+
 async def test_admin_audit_fails_when_admin_emails_empty(
     client: AsyncClient, ops_token: str, monkeypatch
 ):

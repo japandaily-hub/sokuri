@@ -1980,6 +1980,13 @@ async def run_admin_audit_job(
             severity="critical",
             key="admin_audit_failed",
         )
+    else:
+        # 直前まで不整合を発報していた場合だけ「復旧」を送る（発報していなければ何もしない）。
+        await alerts.resolve_alert(
+            "admin_audit_failed",
+            "ADMIN_EMAILS の棚卸しが正常に戻りました",
+            f"ADMIN_EMAILS {len(entries)} 件すべてが登録済みの有効な管理者です（有効な管理者 {active_admin_count} 人）。",
+        )
     logger.info(
         "admin: ADMIN_EMAILS 棚卸し - ok=%s entries=%s active_admins=%s by=%s",
         ok,

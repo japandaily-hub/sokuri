@@ -351,6 +351,46 @@ def job_key_restore(force: bool) -> int:
 # ──────────────────────────── main ────────────────────────────
 
 
+STATE_FILE = os.environ.get("OPS_STATE_FILE", ".ops_state.json")
+
+
+def _load_state() -> dict:
+    try:
+        with open(STATE_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:  # noqa: BLE001 -- 初回・キャッシュ未復元は「前回正常」とみなす
+        return {"failed": False, "since": None}
+
+
+def _save_state(state: dict) -> None:
+    try:
+        with open(STATE_FILE, "w", encoding="utf-8") as f:
+            json.dump(state, f, ensure_ascii=False)
+    except Exception as e:  # noqa: BLE001
+        print(f"state save failed: {type(e).__name__}: {e}", file=sys.stderr)
+
+
+def _track_recovery(job: str, code: int) -> None:
+    """前回失敗→今回成功なら復旧通知を送る（状態は Actions のキャッシュで持ち回す）。
+
+    失敗のたびの通知は fail() が出す。ここでは「失敗が続いていたものが直った」を1回だけ知らせる。
+    """
+    state = _load_state()
+    now = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
+    if code != 0:
+        if not state.get("failed"):
+            state = {"failed": True, "since": now}
+        _save_state(state)
+        return
+    if state.get("failed"):
+        sent = notify(
+            f"[カタヅケ運用][RECOVERED] {job} が正常に戻りました",
+            f"✅ Ops cron（{job}）が正常に戻りました。\n失敗開始: {state.get('since')} → 復旧確認: {now}",
+        )
+        print(f"✅ recovered: notified={sent or 'none'}")
+    _save_state({"failed": False, "since": None})
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("job", choices=["hourly", "daily", "key-check", "key-restore"])
@@ -361,13 +401,12 @@ def main() -> int:
         # 未設定は「スキップ」として静かに終える（設定後の欠測は daily ⑤ が検知する）。
         print("⏭️ OPS_JOB_TOKEN が未設定のためスキップ（scripts/ops_bootstrap.py で初期設定してください）")
         return 0
-    if args.job == "hourly":
-        return job_hourly()
-    if args.job == "daily":
-        return job_daily()
-    if args.job == "key-check":
-        return job_key_check()
-    return job_key_restore(args.force)
+    if args.job == "key-restore":
+        return job_key_restore(args.force)
+    runner = {"hourly": job_hourly, "daily": job_daily, "key-check": job_key_check}[args.job]
+    code = runner()
+    _track_recovery(args.job, code)
+    return code
 
 
 if __name__ == "__main__":
