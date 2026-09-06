@@ -6,10 +6,13 @@
 
 from __future__ import annotations
 
+import logging
 from functools import lru_cache
 
 from pydantic import Field, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -102,6 +105,15 @@ class Settings(BaseSettings):
     # 5xx バースト検知: 直近 window 秒間に threshold 件以上でアラート
     alert_5xx_threshold: int = 5
     alert_5xx_window_seconds: int = 300
+    # ── リマインド定期処理（services/reminders.py・main.py の lifespan ループ）──
+    # 訪問日超過 / 入札ゼロ放置の通知を1時間毎に流す背景ループの ON/OFF（REMINDERS_ENABLED）。
+    # 既定 true。障害時に「通知だけ止める」手段を残すためのキルスイッチで、false でも
+    # POST /admin/jobs/reminders による手動実行は可能なままにしてある。
+    reminders_enabled: bool = True
+    # 背景ループの実行間隔（秒・REMINDER_INTERVAL_SECONDS）。既定 3600（1時間）。
+    # リマインドの粒度は「日」単位のため、間隔を短くしても送信量は増えない
+    # （送信済みマーカー overdue_reminded_at / no_bid_reminded_at で冪等）。
+    reminder_interval_seconds: int = 3600
     # LINE Login チャネル ID（フロントの LINE_CLIENT_ID と同一値）。
     # /auth/line/exchange でアクセストークンの発行元チャネルを検証（audience 検証）するために使用する。
     # 未設定時は LINE ログイン機能自体を未構成とみなし 503 を返す（セキュリティ上、検証をスキップしない）。
@@ -251,6 +263,24 @@ class Settings(BaseSettings):
         floor = 0 if info.field_name == "db_max_overflow" else 1
         if v < floor:
             raise ValueError(f"{info.field_name} は{floor}以上の整数である必要があります。")
+        return v
+
+    @field_validator("reminder_interval_seconds", mode="after")
+    @classmethod
+    def _clamp_reminder_interval_seconds(cls, v: int) -> int:
+        """REMINDER_INTERVAL_SECONDS は最低 60 秒へ切り上げる（r12-review M-6）。
+
+        0 や負値を設定すると ``asyncio.sleep`` が即座に返り、背景ループが
+        DB とイベントループを占有し続ける（通知自体は送信済みマーカーで冪等なため
+        通知量は増えないが、毎周 2 本のクエリを無制限に撃ち続ける）。
+        起動を失敗させないのは、通知の掘り起こしという補助機能の設定ミスで
+        API 全体を落とさないため（誤設定は下限にクリップして警告に留める）。
+        """
+        if v < 60:
+            logger.warning(
+                "REMINDER_INTERVAL_SECONDS=%s は小さすぎるため 60 秒に切り上げます。", v
+            )
+            return 60
         return v
 
     @field_validator("gemini_max_concurrent_calls", mode="after")

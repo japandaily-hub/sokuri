@@ -275,6 +275,43 @@ async def dispatch_bid_received(
 
 
 @_best_effort
+async def dispatch_visit_overdue(
+    line_user_id: str | None,
+    email: str | None,
+    transaction_id: str,
+    recipient_party: Literal["user", "operator"],
+) -> None:
+    """訪問日超過リマインド（当事者宛・r12 決定3）。LINE優先・未連携/失敗時はメール。
+
+    二重送信の防止は呼び出し元（services/reminders.py）が
+    ``transactions.overdue_reminded_at`` で担保する。ここでは行わない
+    （dispatch_message_received のメモリ台帳と違い、DB に永続する印を使うため
+     プロセス再起動・複数インスタンスでも重複しない）。
+    """
+    if line_user_id:
+        ok = await line_notify.push_visit_overdue(line_user_id, transaction_id, recipient_party)
+        if ok:
+            return
+    if not email or notify.is_placeholder_email(email):
+        return
+    await notify.send_visit_overdue(email, transaction_id, recipient_party)
+
+
+@_best_effort
+async def dispatch_no_bid_reminder(
+    line_user_id: str | None, email: str | None, case_id: str
+) -> None:
+    """入札ゼロ放置リマインド（依頼者宛・r12 決定3）。LINE優先・未連携/失敗時はメール。"""
+    if line_user_id:
+        ok = await line_notify.push_no_bid_reminder(line_user_id, case_id)
+        if ok:
+            return
+    if not email or notify.is_placeholder_email(email):
+        return
+    await notify.send_no_bid_reminder(email, case_id)
+
+
+@_best_effort
 async def dispatch_message_received(
     line_user_id: str | None,
     transaction_id: str,

@@ -18,7 +18,7 @@
    https://sokuri.vercel.app/operator/signup
 2. 招待コードを入力: 【{招待コード}】
 3. 会社名・古物商許可番号（必須）・メールアドレス・パスワードを設定して登録
-4. 案件の閲覧は登録直後から可能です。入札は運営の承認後（通常3営業日以内）にできるようになります。承認には古物商許可証の画像提出が必要です（業者プロフィール https://sokuri.vercel.app/operator/profile から提出）
+4. 案件の閲覧・入札は運営の承認後（通常3営業日以内）に可能になります（許可証提出前・審査中は案件一覧・詳細とも閲覧できません）。承認には古物商許可証の画像提出が必要です（業者プロフィール https://sokuri.vercel.app/operator/profile から提出）
 
 ■ ご利用の流れ
 - 案件一覧（https://sokuri.vercel.app/operator/cases）に、片付け案件が

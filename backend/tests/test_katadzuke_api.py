@@ -337,11 +337,13 @@ async def test_create_case_rejects_unknown_purpose_422(client: AsyncClient):
     assert r.status_code == 422, r.text
 
 
-async def test_unverified_operator_can_list_cases_but_not_bid(
+async def test_unverified_operator_cannot_list_cases(
     client: AsyncClient, db_session: AsyncSession
 ):
-    """vendor_status=pending の業者は案件一覧の閲覧は可能（200）。
-    入札不可は別途 test_pending_operator_cannot_bid で検証する。
+    """vendor_status=pending の業者は案件一覧を閲覧できない（403 approval_required）。
+
+    r12 決定1（プライバシー優先）で従来の「閲覧可・入札不可」の非対称を撤去した。
+    承認後に 200 へ変わることは tests/test_r12_backend_fixes.py で検証する。
     """
     from app.core.security import create_access_token
     from app.db.models.operator import Operator
@@ -360,7 +362,8 @@ async def test_unverified_operator_can_list_cases_but_not_bid(
 
     op_token = create_access_token(pending_op.id, "operator", "operator")
     r = await client.get("/api/v1/cases", headers=_auth(op_token))
-    assert r.status_code == 200
+    assert r.status_code == 403
+    assert r.json()["detail"]["code"] == "approval_required"
 
 
 async def test_operator_case_view_masks_address(
@@ -854,7 +857,7 @@ async def test_case_create_rejects_invalid_storage_key(client: AsyncClient):
 
 
 async def test_open_operator_registration(client: AsyncClient, db_session: AsyncSession):
-    """招待コードなしでオープン登録 → vendor_status=pending → 案件閲覧は可・入札は403。"""
+    """招待コードなしでオープン登録 → vendor_status=pending → 案件閲覧も入札も403（r12 決定1）。"""
     r = await client.post(
         "/api/v1/auth/operator/signup",
         json={
@@ -874,7 +877,8 @@ async def test_open_operator_registration(client: AsyncClient, db_session: Async
     case = await _create_case(client, user_token)
 
     r = await client.get("/api/v1/cases", headers=_auth(op_token))
-    assert r.status_code == 200
+    assert r.status_code == 403
+    assert r.json()["detail"]["code"] == "approval_required"
 
     r = await client.post(
         f"/api/v1/cases/{case['id']}/bids",
@@ -906,7 +910,7 @@ async def test_invited_operator_gets_active(client: AsyncClient, db_session: Asy
 
 
 async def test_pending_operator_cannot_bid(client: AsyncClient, db_session: AsyncSession):
-    """pending業者（未承認）は案件閲覧は可能だが入札は403でブロックされる。"""
+    """pending業者（未承認）は案件の閲覧も入札も403でブロックされる（r12 決定1）。"""
     r = await client.post(
         "/api/v1/auth/operator/signup",
         json={
@@ -924,11 +928,13 @@ async def test_pending_operator_cannot_bid(client: AsyncClient, db_session: Asyn
     user_token = await _signup_user(client, "user_for_pending@example.com")
     case = await _create_case(client, user_token)
 
-    # 閲覧は許可される
+    # 閲覧もブロックされる（承認前に他人の自宅写真・所在地を見せない）
     r = await client.get("/api/v1/cases", headers=_auth(pending_op_token))
-    assert r.status_code == 200
+    assert r.status_code == 403
+    assert r.json()["detail"]["code"] == "approval_required"
     r = await client.get(f"/api/v1/cases/{case['id']}", headers=_auth(pending_op_token))
-    assert r.status_code == 200
+    assert r.status_code == 403
+    assert r.json()["detail"]["code"] == "approval_required"
 
     # 入札はブロックされる（エラーメッセージは日本語で承認待ちである旨を伝える）
     r = await client.post(
@@ -2247,10 +2253,10 @@ async def test_vendor_public_profile_default_public_when_profile_row_missing(
     assert await db_session.get(OperatorProfile, _uuid.UUID(op_id)) is None
 
 
-# ── 最高入札額 ──
+# ── 他社入札額の非開示（r12 決定2。旧「最高入札額」テストを反転） ──
 
 
-async def test_top_bid_amount_reflects_max_across_operators(
+async def test_other_operators_bid_amount_is_not_disclosed(
     client: AsyncClient, db_session: AsyncSession
 ):
     admin_token = await _make_admin(client, db_session)
@@ -2268,14 +2274,22 @@ async def test_top_bid_amount_reflects_max_across_operators(
     )
     assert r.status_code == 201
 
+    # 業者向け一覧・詳細は件数のみを返し、他社の提示額（55000）は一切含まない。
     r = await client.get("/api/v1/cases", headers=_auth(op1_token))
     assert r.status_code == 200
     target = next(c for c in r.json() if c["id"] == case["id"])
-    assert target["top_bid_amount"] == 55000
+    assert "top_bid_amount" not in target
+    assert target["bid_count"] == 2
+    assert target["my_bid"]["amount"] == 40000
+    assert "55000" not in r.text
 
     r = await client.get(f"/api/v1/cases/{case['id']}", headers=_auth(op2_token))
     assert r.status_code == 200
-    assert r.json()["top_bid_amount"] == 55000
+    body = r.json()
+    assert "top_bid_amount" not in body
+    assert body["bid_count"] == 2
+    assert body["my_bid"]["amount"] == 55000
+    assert "40000" not in r.text
 
 
 async def test_review_updates_operator_review_stats_and_bid_summary(

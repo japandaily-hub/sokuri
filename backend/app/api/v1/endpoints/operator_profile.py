@@ -482,13 +482,19 @@ async def delete_my_operator_account(
     operator.line_user_id = None
     operator.deleted_at = datetime.now(timezone.utc)
 
+    # rollback は Session 内の全 ORM インスタンスを expire するため、except 節で
+    # operator.id へ触ると遅延ロード（SELECT）が走り、非同期では MissingGreenlet に
+    # なって本来のエラーが握り潰される（r12 横展開: PG 同時実行検証で cases.py に
+    # 見つかった同型バグ。commit 前に値を写し取っておく）。
+    deleted_operator_id = operator.id
+
     try:
         await session.commit()
     except Exception as exc:
         await session.rollback()
         logger.error(
             "operator/me delete: 退会処理のコミットに失敗 - operator_id=%s - %s",
-            operator.id,
+            deleted_operator_id,
             exc,
             exc_info=True,
         )

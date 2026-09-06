@@ -28,6 +28,8 @@ from app.core.client_ip import (
 )
 from app.api.v1.endpoints.cases import sweep_stale_pending_ai
 from app.db.session import engine, get_background_session_factory
+from app.services import alerts
+from app.services.reminders import run_reminders
 from app.services.seed import seed_channels_and_rules
 
 logger = logging.getLogger(__name__)
@@ -84,6 +86,45 @@ async def _run_stale_pending_ai_sweep() -> None:
         )
 
 
+async def _run_reminder_loop(settings: Settings) -> None:
+    """リマインド定期処理（r12 決定3）を ``REMINDER_INTERVAL_SECONDS`` 毎に回す。
+
+    設計上の判断:
+    - **起動直後に1回走らせてから待つ**。Render 無料枠はアイドルでスピンダウンし、
+      次のリクエストで起動し直されるため「起動→スリープ→(スピンダウン)」の順だと
+      ループが1周も完了しないまま落ち続けうる。処理は送信済みマーカーで冪等なので、
+      再デプロイの度に走っても通知は重複しない。
+    - **毎周ごとに新しいセッションを開いて即閉じる**（``get_background_session_factory``）。
+      リクエストスコープのセッションを跨いで持たない・1時間の待機中に DB 接続を
+      借りたままにしない、という cases.py の AI 解析と同じ規約（r7 H-1）。
+    - **例外は握って運営アラート（warning）に落とす**。通知の掘り起こしが失敗しても
+      本体の API を巻き込まない。``CancelledError``（シャットダウン）だけは再送出する。
+    """
+    while True:
+        try:
+            async with get_background_session_factory()() as session:
+                result = await run_reminders(session)
+            logger.info(
+                "reminders: 定期実行完了 - overdue=%s no_bid=%s",
+                result["overdue"],
+                result["no_bid"],
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # noqa: BLE001 -- 定期ループを1回の失敗で終わらせない
+            logger.error("reminders: 定期実行に失敗（次周期で再試行） - %s", exc, exc_info=True)
+            alerts.fire_and_forget(
+                alerts.send_alert(
+                    "リマインド定期処理が失敗しました",
+                    "訪問日超過・入札ゼロ放置のリマインドが1周分スキップされました。"
+                    f"次の周期で自動再試行します。直近のエラー: {type(exc).__name__}: {str(exc)[:200]}",
+                    severity="warning",
+                    key="reminders_loop_failed",
+                )
+            )
+        await asyncio.sleep(settings.reminder_interval_seconds)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """起動時: DB エンジンを app.state に格納し、シードをバックグラウンドで起動。
@@ -111,7 +152,27 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     _startup_tasks.add(sweep_task)
     sweep_task.add_done_callback(_startup_tasks.discard)
 
+    # r12 決定3: リマインドの定期ループ。REMINDERS_ENABLED=false で完全に止められる
+    # （キルスイッチ。停止中も POST /admin/jobs/reminders の手動実行は生きている）。
+    settings = get_settings()
+    reminder_task: asyncio.Task | None = None
+    if settings.reminders_enabled:
+        reminder_task = asyncio.create_task(_run_reminder_loop(settings))
+        _startup_tasks.add(reminder_task)
+        reminder_task.add_done_callback(_startup_tasks.discard)
+    else:
+        logger.info("reminders: REMINDERS_ENABLED=false のため定期ループを起動しません。")
+
     yield
+
+    # 常駐ループは明示的に停止する（cancel しないとシャットダウンが
+    # sleep の残り時間ぶん待たされる／未完了タスク警告が出る）。
+    if reminder_task is not None:
+        reminder_task.cancel()
+        try:
+            await reminder_task
+        except asyncio.CancelledError:
+            pass
 
     await engine.dispose()
 

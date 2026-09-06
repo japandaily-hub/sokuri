@@ -35,6 +35,7 @@ import { useToken } from "@/components/kdz/Ui";
 import {
   KdzApiError,
   LIST_DEFAULT_LIMIT,
+  OPERATOR_CASE_VIEW_STATUSES,
   TXN_STATUS_LABEL,
   createBid,
   dedupeById,
@@ -76,7 +77,11 @@ const catIcon = (name: string): IcName => CAT_ICON[name] ?? "box";
 
 const yen = (n: number) => n.toLocaleString("ja-JP");
 
-type LotStatus = "none" | "winning" | "outbid";
+/**
+ * 「winning/outbid」（他社の最高額との比較）は他社入札額が非開示のため判定不能。
+ * 自社入札の状態（selected=落札）のみを表示する。
+ */
+type LotStatus = "none" | "bid" | "won";
 
 /** CaseMasked をカード表示用の形にフロント側でマッピングしたもの。 */
 type Lot = {
@@ -84,7 +89,6 @@ type Lot = {
   area: string;
   purpose: string;
   count: number;
-  topBid: number | null;
   myBid: number | null;
   bidCount: number;
   status: LotStatus;
@@ -95,17 +99,12 @@ type Lot = {
 
 function toLot(c: CaseMasked): Lot {
   const myBidAmount = c.my_bid?.amount ?? null;
-  const topBid = c.top_bid_amount ?? myBidAmount;
-  let status: LotStatus = "none";
-  if (myBidAmount != null) {
-    status = topBid != null && myBidAmount < topBid ? "outbid" : "winning";
-  }
+  const status: LotStatus = c.my_bid?.status === "selected" ? "won" : myBidAmount != null ? "bid" : "none";
   return {
     id: c.id,
     area: `${c.prefecture} ${c.city}`,
     purpose: c.purpose,
     count: c.photos.length,
-    topBid,
     myBid: myBidAmount,
     bidCount: c.bid_count,
     status,
@@ -137,28 +136,24 @@ function LotCard({
 }) {
   const [draft, setDraft] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
+  // 承認前の業者は案件写真が403になりうる（決定1）。壊れた画像アイコンを出さず空表示にする。
+  const [photoErr, setPhotoErr] = useState(false);
 
-  const statusTag =
-    lot.status === "winning" ? (
-      <span className="lot-tag green">入札首位</span>
-    ) : lot.status === "outbid" ? (
-      <span className="lot-tag red">入札順位外</span>
-    ) : null;
+  const statusTag = lot.status === "won" ? <span className="lot-tag green">落札</span> : null;
 
   return (
-    <div
-      className={`lot-card${lot.status === "winning" ? " winning" : lot.status === "outbid" ? " outbid" : ""}`}
-    >
+    <div className={`lot-card${lot.status === "won" ? " winning" : ""}`}>
       <div className="lot-card-inner">
         {/* 写真グリッド（実アセット未投入 or 1枚のみの場合はカテゴリアイコンでフォールバック） */}
         <div className="lot-photos">
-          {lot.photoUrl ? (
+          {lot.photoUrl && !photoErr ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={photoSrc(lot.photoUrl)}
               alt=""
               className="lot-photo"
               style={{ gridRow: "1 / 3", objectFit: "cover", width: "100%", height: "100%" }}
+              onError={() => setPhotoErr(true)}
             />
           ) : (
             <div className="lot-photo" style={{ gridRow: "1 / 3" }}>
@@ -194,15 +189,8 @@ function LotCard({
           </div>
         </div>
 
-        {/* 入札エリア */}
+        {/* 入札エリア（他社の入札額は非開示のため、自社の状況のみを表示） */}
         <div className="lot-bid-area">
-          <div>
-            <div className="current-top">現在の最高入札</div>
-            <div className="current-amount">
-              {lot.topBid != null ? yen(lot.topBid) : "—"}
-              <span>円</span>
-            </div>
-          </div>
           {lot.myBid ? (
             <div className="my-bid-row">
               自社入札 <strong>¥{yen(lot.myBid)}</strong>
@@ -256,7 +244,9 @@ function LotCard({
               <p className="bid-hint" style={validationError ? { color: "var(--danger)" } : undefined}>
                 {validationError ?? (
                   <>
-                    成約時のみ買取額の8%が手数料
+                    他社の入札額は表示されません（自社の提示額のみ）
+                    <br />
+                    成約時のみ買取額の8%（税別・消費税を別途加算）が手数料
                     <br />
                     ※サービス開始当初（β期間）は手数料を請求しません。請求開始の際は事前にメールでお知らせします。
                     <br />
@@ -287,6 +277,8 @@ export default function OperatorDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [vendorStatus, setVendorStatus] = useState<string | null>(null);
   const [hasLicense, setHasLicense] = useState<boolean | null>(null);
+  // 403 approval_required を受けたら、profile 取得の成否に関わらず案内を出す（r12 M-3）。
+  const [approvalRequired, setApprovalRequired] = useState(false);
   // ページング（r6 H-1）: backend が既定100件で切り詰めるため、取得件数が limit と
   // 一致する間は「さらに読み込む」余地があると判断する（総件数は応答に含まれない）。
   const [hasMoreCases, setHasMoreCases] = useState(false);
@@ -321,7 +313,15 @@ export default function OperatorDashboardPage() {
       setCases(res);
       setHasMoreCases(res.length === LIST_DEFAULT_LIMIT);
     } catch (e) {
-      setError(toDisplayMessage(e, "案件の取得に失敗しました"));
+      // 審査中（pending/rejected）業者への 403 は ApprovalPendingNotice（vendorStatus 由来）が
+      // 既に案内しているため、重複する赤いエラー文言は出さない。「空の一覧」として扱い、
+      // isLoading（!cases && !error で判定）が無限スピナーのまま止まらない事態を避ける。
+      if (e instanceof KdzApiError && e.code === "approval_required") {
+        setCases([]);
+        setApprovalRequired(true);
+      } else {
+        setError(toDisplayMessage(e, "案件の取得に失敗しました"));
+      }
     }
     try {
       const res = await listTransactions(token, { limit: LIST_DEFAULT_LIMIT, offset: 0 });
@@ -399,12 +399,15 @@ export default function OperatorDashboardPage() {
   }, [token]);
 
   const statusLoading = vendorStatus === null;
-  const awaitingApproval = !statusLoading && vendorStatus !== "active" && vendorStatus !== "unknown";
+  // limited は閲覧可（backend OPERATOR_CASE_VIEW_STATUSES と対称、r12 M-1）。
+  // 403 approval_required を受けている場合は profile 取得の成否に関わらず案内を出す（r12 M-3）。
+  const awaitingApproval =
+    approvalRequired ||
+    (!statusLoading && vendorStatus !== "unknown" && !OPERATOR_CASE_VIEW_STATUSES.includes(vendorStatus));
   const canBid = !statusLoading && (vendorStatus === "active" || vendorStatus === "unknown");
 
   const lots = useMemo(() => (cases ?? []).map(toLot), [cases]);
   const biddingLots = lots.filter((l) => l.myBid != null);
-  const winningLots = biddingLots.filter((l) => l.status === "winning");
   const doneTxns = useMemo(
     () => (transactions ?? []).filter((t) => t.status === "completed"),
     [transactions],
@@ -515,7 +518,9 @@ export default function OperatorDashboardPage() {
               {error}
             </div>
           ) : null}
-          {awaitingApproval ? <ApprovalPendingNotice hasLicenseImage={hasLicense} /> : null}
+          {awaitingApproval ? (
+            <ApprovalPendingNotice hasLicenseImage={hasLicense} vendorStatus={vendorStatus} />
+          ) : null}
 
           {/* ---------- サマリー帯（KPI） ---------- */}
           <div className="summary-bar">
@@ -525,7 +530,6 @@ export default function OperatorDashboardPage() {
                 {biddingLots.length}
                 <span>件</span>
               </div>
-              <div className="sum-sub">うち首位 {winningLots.length}件</div>
             </div>
             <div className="sum-card">
               <div className="sum-label">交渉中</div>
@@ -583,7 +587,7 @@ export default function OperatorDashboardPage() {
               <span className="filter-count">{lots.length}件</span>
             </div>
 
-            {lots.length === 0 ? (
+            {awaitingApproval ? null : lots.length === 0 ? (
               <div className="empty-state">
                 <Ic name="box" />
                 <p>現在、入札可能な案件はありません。</p>

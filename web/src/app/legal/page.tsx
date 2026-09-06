@@ -111,7 +111,7 @@ export default function LegalPage() {
             <tr>
               <th>業者手数料</th>
               <td>
-                成約時に登録業者が支払う手数料：<strong>買取金額の8%</strong>
+                成約時に登録業者が支払う手数料：<strong>買取金額の8%（税別・消費税を別途加算）</strong>
                 <br />
                 <span className="note">
                   ※ 登録・掲載・入札費用は業者も無料です。

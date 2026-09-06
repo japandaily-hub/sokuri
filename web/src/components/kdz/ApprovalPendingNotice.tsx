@@ -17,7 +17,27 @@ const boxStyle: React.CSSProperties = {
   lineHeight: 1.75,
 };
 
-export function ApprovalPendingNotice({ hasLicenseImage }: { hasLicenseImage: boolean | null }) {
+export function ApprovalPendingNotice({
+  hasLicenseImage,
+  vendorStatus,
+}: {
+  hasLicenseImage: boolean | null;
+  /** 分かっていれば渡す（"rejected" のみ専用文言に切り替える。未取得/不明なら審査中の文言を出す）。 */
+  vendorStatus?: string | null;
+}) {
+  if (vendorStatus === "rejected") {
+    return (
+      <div className="op-alert warn" style={boxStyle} role="status">
+        <strong>審査の結果、ご登録を承認できませんでした。</strong>
+        <br />
+        お心当たりがない場合は
+        <Link href="/contact" style={{ textDecoration: "underline", fontWeight: 600 }}>
+          お問い合わせ
+        </Link>
+        ください。
+      </div>
+    );
+  }
   if (hasLicenseImage === false) {
     return (
       <div className="op-alert warn" style={boxStyle} role="status">
@@ -26,13 +46,13 @@ export function ApprovalPendingNotice({ hasLicenseImage }: { hasLicenseImage: bo
         <Link href="/operator/profile" style={{ textDecoration: "underline", fontWeight: 600 }}>
           プロフィールから許可証の画像をアップロード
         </Link>
-        すると運営が審査を開始します（通常3営業日以内）。承認後に入札できるようになります。案件の閲覧は承認前でも可能です。
+        すると運営が審査を開始します（通常3営業日以内）。承認されると案件を閲覧・入札できるようになります。
       </div>
     );
   }
   return (
     <div className="op-alert warn" style={boxStyle} role="status">
-      許可証を確認中です。運営による審査完了（通常3営業日以内）後に入札できるようになります。案件の閲覧は承認前でも可能です。
+      許可証を確認中です。運営の承認（通常3営業日以内）後に案件を閲覧・入札できるようになります。
     </div>
   );
 }

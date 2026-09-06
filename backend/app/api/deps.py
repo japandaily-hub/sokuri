@@ -118,6 +118,40 @@ def assert_operator_not_suspended(operator: Operator) -> None:
         )
 
 
+# ── 案件閲覧ゲート（r12 決定1・プライバシー優先）────────────────────────────
+# 案件は「他人の自宅の写真・所在地・生活実態」という高機微データの集合であり、
+# 運営が実在性を確認していない業者（vendor_status="pending"／"rejected"）へ
+# 開示してよい情報ではない。従来は cases.py 側に「pending にも公開案件を見せる」
+# 分岐（閲覧可・入札不可の非対称）を置いていたが、審査に通らない相手にまで
+# 依頼者の資産情報が渡る設計そのものが不適当なため撤去し、閲覧も承認後に限定する。
+#
+# ``account_suspended``（停止中）とは別コードにする。停止は「一度承認された業者が
+# 事後に止められた」状態で、web 側の導線（解除依頼の問い合わせ）が異なるため。
+OPERATOR_APPROVAL_REQUIRED_DETAIL: dict[str, str] = {
+    "code": "approval_required",
+    "message": "運営の承認後に案件を閲覧できます。",
+}
+
+#: 案件の閲覧を許可する vendor_status。"limited" は入札不可のレガシー値だが、
+#: 「一度は運営が実在性を確認した」区分のため閲覧は許可する（入札は
+#: get_verified_operator が active のみに絞る）。
+OPERATOR_CASE_VIEW_STATUSES: frozenset[str] = frozenset({"active", "limited"})
+
+
+def assert_operator_case_access(operator: Operator) -> None:
+    """未承認業者（pending / rejected 等）の案件閲覧を 403 で止める。
+
+    停止中の判定を先に行い ``account_suspended`` を優先する（停止中の active 業者に
+    ``approval_required`` を返すと、web が「承認待ち」という誤った案内を出すため）。
+    """
+    assert_operator_not_suspended(operator)
+    if operator.vendor_status not in OPERATOR_CASE_VIEW_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=OPERATOR_APPROVAL_REQUIRED_DETAIL,
+        )
+
+
 def get_current_user_claims(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
 ) -> dict:
@@ -185,8 +219,9 @@ async def get_verified_operator(
 
     全業者は admin 承認必須。vendor_status="active" の業者のみ許可する
     （"pending"=未承認、"limited"=レガシー値のいずれも入札不可）。
-    案件の閲覧はこのゲートを経由しない別ゲート（get_current_actor等）で
-    pending でも許可している点に注意（意図的な非対称: 閲覧可・入札不可）。
+    案件の**閲覧**はこれより一段緩い ``assert_operator_case_access``
+    （active / limited を許可）で判定する（r12 決定1: 従来 pending にも
+    公開案件を見せていた分岐は撤去済み）。
     """
     if operator.vendor_status != "active":
         raise HTTPException(
@@ -235,3 +270,55 @@ async def get_current_actor(
         assert_operator_not_suspended(operator)
         return Actor(typ="operator", operator=operator)
     raise _CRED_EXC
+
+
+async def get_case_viewer_actor(
+    actor: Actor = Depends(get_current_actor),
+) -> Actor:
+    """案件系エンドポイント（一覧・詳細・入札一覧）の共通閲覧ゲート（r12 決定1）。
+
+    依頼者・運営は従来どおり素通し、業者のみ ``assert_operator_case_access`` を適用する。
+    個々のハンドラで vendor_status を判定すると新規エンドポイント追加時に漏れるため、
+    Depends 側に一本化する（``cases.py`` / ``bids.py`` から共用）。
+    """
+    if actor.typ == "operator":
+        assert actor.operator is not None
+        assert_operator_case_access(actor.operator)
+    return actor
+
+
+async def get_optional_operator(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    session: AsyncSession = Depends(get_session),
+) -> Operator | None:
+    """Authorization ヘッダがあれば業者を解決する「任意認証」（無ければ None）。
+
+    ``GET /files/{storage_key}``（無認証の capability URL。``<img>`` から Authorization
+    ヘッダ無しで叩かれる前提のため必須認証にはできない）に案件写真の閲覧ゲートを
+    後付けするための依存。トークンが無い・壊れている・依頼者トークンである場合は
+    ``None`` を返して従来どおりの配信に委ねる（既存の無認証配信を 401 化しない）。
+    業者トークンとして正当に解決できた場合のみ、停止・未承認のゲートを適用できる。
+
+    セッションは ``Depends`` で受けるが、``AsyncSession`` の生成自体は DB 接続を
+    借りない（最初のクエリ発行時に初めてチェックアウトされる）。したがって
+    トークンを持たない大多数の画像リクエストではプール消費がゼロのままになる。
+    """
+    if credentials is None or not credentials.credentials:
+        return None
+    try:
+        payload = decode_access_token(credentials.credentials)
+    except pyjwt.PyJWTError:
+        return None
+    if payload.get("purpose") is not None or payload.get("typ") != "operator":
+        return None
+    subject = payload.get("sub")
+    if not subject:
+        return None
+    try:
+        operator_id = uuid.UUID(str(subject))
+    except ValueError:
+        return None
+    operator = await session.get(Operator, operator_id)
+    if operator is None or operator.deleted_at is not None:
+        return None
+    return operator

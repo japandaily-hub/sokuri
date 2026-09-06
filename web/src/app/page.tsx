@@ -421,7 +421,7 @@ export default function HomePage() {
                 <p>顧客と業者、双方に無駄がない。だから長く続く。<br />一括出品への入札で、効率的な仕入れルートを開拓できます。<br />※ サービス開始当初（β期間）は手数料を請求しません。請求開始の際は事前にメールでお知らせします。</p>
                 <div className="biz-banner-tags">
                   <span className="biz-tag">初期費用・月額費用 無料</span>
-                  <span className="biz-tag">成約時8%のみ</span>
+                  <span className="biz-tag">成約時8%（税別）のみ</span>
                   <span className="biz-tag">下見なし・一斉架電なし</span>
                   <span className="biz-tag">古物商許可が必要</span>
                 </div>

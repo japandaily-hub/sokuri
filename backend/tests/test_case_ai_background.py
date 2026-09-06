@@ -400,6 +400,10 @@ async def test_operator_case_list_supports_limit_and_offset(
         select(Operator).where(Operator.contact_email == "list_op@example.com")
     )
     assert operator is not None
+    # r12 決定1: 案件一覧は承認済み（active/limited）業者のみ。ページングの検証が
+    # 目的のため、承認済みへ昇格させてから叩く。
+    operator.vendor_status = "active"
+    await db_session.commit()
 
     r = await client.get("/api/v1/cases?limit=2", headers=_auth(op_token))
     assert r.status_code == 200, r.text
@@ -415,7 +419,9 @@ async def test_operator_case_list_supports_limit_and_offset(
     assert {c["id"] for c in page1} | {c["id"] for c in page2} == set(created_ids)
 
 
-async def test_operator_case_list_rejects_limit_over_max(client: AsyncClient):
+async def test_operator_case_list_rejects_limit_over_max(
+    client: AsyncClient, db_session: AsyncSession
+):
     """limit の上限（200）超過は 422 で弾く（無制限クエリへの退行防止）。"""
     r = await client.post(
         "/api/v1/auth/operator/signup",
@@ -429,6 +435,15 @@ async def test_operator_case_list_rejects_limit_over_max(client: AsyncClient):
     )
     assert r.status_code == 201, r.text
     op_token = r.json()["access_token"]
+    # r12 決定1 の閲覧ゲートは Depends 側で解決されるため、未承認業者では
+    # クエリ検証（422）に到達せず 403 になる。ここで見たいのは limit 上限の
+    # バリデーションなので、承認済みに昇格させてから叩く。
+    operator = await db_session.scalar(
+        select(Operator).where(Operator.contact_email == "limit_op@example.com")
+    )
+    assert operator is not None
+    operator.vendor_status = "active"
+    await db_session.commit()
 
     r = await client.get("/api/v1/cases?limit=201", headers=_auth(op_token))
     assert r.status_code == 422

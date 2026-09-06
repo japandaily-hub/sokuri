@@ -63,6 +63,8 @@ export default function OperatorCaseDetailPage() {
 
   const [caseData, setCaseData] = useState<CaseMasked | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** backend detail.code。approval_required の場合は raw エラー文言の代わりに ApprovalPendingNotice を出す（決定1）。 */
+  const [errorCode, setErrorCode] = useState<string | undefined>(undefined);
   const [amount, setAmount] = useState("");
   const [bidDone, setBidDone] = useState(false);
   const [message, setMessage] = useState("");
@@ -74,8 +76,10 @@ export default function OperatorCaseDetailPage() {
     if (!token) return;
     try {
       setCaseData(await getCaseMasked(caseId, token));
+      setErrorCode(undefined);
     } catch (e) {
       setError(toDisplayMessage(e, "取得に失敗しました"));
+      setErrorCode(e instanceof KdzApiError ? e.code : undefined);
     }
   }, [caseId, token]);
 
@@ -145,7 +149,12 @@ export default function OperatorCaseDetailPage() {
       <div className="case-detail-page">
         <OperatorHeader active="cases" />
         <div className="op-wrap narrow">
-          <div className="op-alert error">{error ?? "案件が見つかりません。"}</div>
+          {errorCode === "approval_required" ? (
+            // 決定1: 審査中（pending/rejected）業者への 403 は raw エラーの代わりにこの案内を出す。
+            <ApprovalPendingNotice hasLicenseImage={hasLicense} vendorStatus={vendorStatus} />
+          ) : (
+            <div className="op-alert error">{error ?? "案件が見つかりません。"}</div>
+          )}
         </div>
       </div>
     );
@@ -169,7 +178,14 @@ export default function OperatorCaseDetailPage() {
               {caseData.photos.slice(0, 2).map((p) => (
                 <div className="listing-thumb" key={p.id}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={photoSrc(p.url)} alt="" />
+                  <img
+                    src={photoSrc(p.url)}
+                    alt=""
+                    onError={(e) => {
+                      // 決定1: 写真取得が403等で失敗した場合は壊れた画像アイコンを出さず空表示にする。
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
                 </div>
               ))}
               {caseData.photos.length > 2 ? (
@@ -218,7 +234,15 @@ export default function OperatorCaseDetailPage() {
               <div className="op-photo-grid">
                 {album.photos.map((p) => (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={photoSrc(p.url)} alt="" key={p.id} />
+                  <img
+                    src={photoSrc(p.url)}
+                    alt=""
+                    key={p.id}
+                    onError={(e) => {
+                      // 決定1: 写真取得が403等で失敗した場合は壊れた画像アイコンを出さず空表示にする。
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
                 ))}
               </div>
             </div>
@@ -266,7 +290,7 @@ export default function OperatorCaseDetailPage() {
               <Spinner className="h-5 w-5 text-brand-600" />
             </div>
           ) : canBid && awaitingApproval ? (
-            <ApprovalPendingNotice hasLicenseImage={hasLicense} />
+            <ApprovalPendingNotice hasLicenseImage={hasLicense} vendorStatus={vendorStatus} />
           ) : canBid ? (
             <form className="form-card" onSubmit={submitBid}>
               <h2 style={{ fontFamily: "var(--head)", fontSize: 15, fontWeight: 400, color: "var(--navy)", marginBottom: 4, borderLeft: "2px solid var(--primary)", paddingLeft: 12 }}>
@@ -297,7 +321,9 @@ export default function OperatorCaseDetailPage() {
                 {/* r10 M1 是正: ダッシュボードの入札フォームにだけあった手数料注記・範囲ヒントを
                     詳細画面にも同文言で置く（同じ操作なのに条件の説明が片方に無かった）。 */}
                 <p id="bidAmountHint" style={{ fontSize: 12, color: "var(--body-soft)", marginTop: 6, lineHeight: 1.8 }}>
-                  成約時のみ買取額の8%が手数料
+                  他社の入札額は表示されません（自社の提示額のみ）
+                  <br />
+                  成約時のみ買取額の8%（税別・消費税を別途加算）が手数料
                   <br />
                   ※サービス開始当初（β期間）は手数料を請求しません。請求開始の際は事前にメールでお知らせします。
                   <br />

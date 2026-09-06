@@ -299,13 +299,19 @@ async def submit_identity_document(
     session.add(document)
     locked_user.identity_status = IDENTITY_STATUS_PENDING
 
+    # rollback は Session 内の全 ORM インスタンスを expire するため、except 節で
+    # user.id へ触ると遅延ロード（SELECT）が走り、非同期では MissingGreenlet に
+    # なって本来のエラーが握り潰される（r12 横展開: PG 同時実行検証で cases.py に
+    # 見つかった同型バグ。commit 前に値を写し取っておく）。
+    user_id = user.id
+
     try:
         await session.commit()
     except Exception as exc:
         await session.rollback()
         logger.error(
             "user_identity: 本人確認書類の保存に失敗 - user_id=%s - %s",
-            user.id,
+            user_id,
             exc,
             exc_info=True,
         )

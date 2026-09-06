@@ -100,6 +100,20 @@ export class Api {
     return data.access_token;
   }
 
+  /** 招待コード無しで業者を自己登録する（審査中＝pending の使い捨て口座を作る用途）。 */
+  async signupOperator(account: Account, companyName = "E2E 審査中商店"): Promise<void> {
+    const res = await this.ctx.post(`${API_URL}/auth/operator/signup`, {
+      data: {
+        company_name: companyName,
+        email: account.email,
+        password: account.password,
+        license_number: "東京都公安委員会 第300000000001号",
+        agreed: true,
+      },
+    });
+    await expectJson(res, 201);
+  }
+
   async loginOperator(account: Account): Promise<OperatorSession> {
     const res = await this.ctx.post(`${API_URL}/auth/operator/login`, {
       data: { email: account.email, password: account.password },

@@ -165,12 +165,18 @@ async def _mark_withdrawn(db_session: AsyncSession, bid_id: str) -> None:
     await db_session.commit()
 
 
-# ──────────────────────────── 集計（bid_count / top_bid_amount からの除外） ────────────────────────────
+# ──────────────────────────── 集計（bid_count からの除外） ────────────────────────────
 
 
-async def test_withdrawn_bid_excluded_from_bid_count_and_top_bid_amount(
+async def test_withdrawn_bid_excluded_from_bid_count(
     client: AsyncClient, db_session: AsyncSession
 ):
+    """取り下げ済み入札は依頼者・業者いずれの bid_count からも除外される。
+
+    r12 決定2 で top_bid_amount（他社を含む最高入札額）は応答から削除したため、
+    ここでは件数のみを検証する（他社額の非開示自体は
+    tests/test_r12_backend_fixes.py が担保する）。
+    """
     admin_token = await _make_admin(client, db_session)
     user_token = await _signup_user(client)
     op1_token, _ = await _verified_operator(client, db_session, admin_token, "op1@example.com", "A社")
@@ -183,7 +189,8 @@ async def test_withdrawn_bid_excluded_from_bid_count_and_top_bid_amount(
     assert r.json()["bid_count"] == 2
 
     r = await client.get(f"/api/v1/cases/{case['id']}", headers=_auth(op1_token))
-    assert r.json()["top_bid_amount"] == 55000
+    assert r.status_code == 200
+    assert r.json()["bid_count"] == 2
 
     # 最高額(55000)を提示していたop2の入札が過去にwithdrawnになっているケースを再現。
     await _mark_withdrawn(db_session, bid2["id"])
@@ -196,7 +203,7 @@ async def test_withdrawn_bid_excluded_from_bid_count_and_top_bid_amount(
     r = await client.get(f"/api/v1/cases/{case['id']}", headers=_auth(op1_token))
     assert r.status_code == 200
     body = r.json()
-    assert body["top_bid_amount"] == 40000
+    assert "top_bid_amount" not in body
     assert body["bid_count"] == 1
 
 

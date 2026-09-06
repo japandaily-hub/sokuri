@@ -165,11 +165,6 @@ export interface CaseMasked {
   photos: CasePhoto[];
   bid_count: number;
   my_bid: BidOut | null;
-  /**
-   * 現在の最高入札額（バックエンド並行実装中のため optional）。
-   * 未対応の間は undefined/null のまま届く想定で、フロントは「—」等にフォールバックする。
-   */
-  top_bid_amount?: number | null;
   /** バックエンド並行実装中のため optional。未対応の間は undefined のまま届く想定。 */
   items?: CaseItemOut[];
   item_count?: number;
@@ -1600,6 +1595,13 @@ export function listMyCases(token: string): Promise<CaseOut[]> {
 /** 一覧のページング既定値（backend の既定100・上限200と一致させる。r6 H-1）。 */
 export const LIST_DEFAULT_LIMIT = 100;
 export const LIST_MAX_LIMIT = 200;
+
+/**
+ * 案件の閲覧を許可する vendor_status（backend api/deps.py の OPERATOR_CASE_VIEW_STATUSES と対称）。
+ * "limited" は入札不可のレガシー値だが、案件一覧・詳細の閲覧は許可される（r12 M-1）。
+ * pending/rejected はこの集合に含めず、閲覧側は 403 approval_required で弾かれる。
+ */
+export const OPERATOR_CASE_VIEW_STATUSES: readonly string[] = ["active", "limited"];
 
 export interface ListPageParams {
   limit?: number;

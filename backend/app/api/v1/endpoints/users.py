@@ -294,13 +294,19 @@ async def update_my_bank_account(
     )
     user.bank_account_updated_at = datetime.now(timezone.utc)
 
+    # rollback は Session 内の全 ORM インスタンスを expire するため、except 節で
+    # user.id へ触ると遅延ロード（SELECT）が走り、非同期では MissingGreenlet に
+    # なって本来のエラーが握り潰される（r12 横展開: PG 同時実行検証で cases.py に
+    # 見つかった同型バグ。commit 前に値を写し取っておく）。
+    user_id = user.id
+
     try:
         await session.commit()
     except Exception as exc:
         await session.rollback()
         logger.error(
             "users/me/bank-account PUT: 保存に失敗 - user_id=%s - %s",
-            user.id,
+            user_id,
             exc,
             exc_info=True,
         )
@@ -340,13 +346,19 @@ async def delete_my_bank_account(
     user.bank_account_enc = None
     user.bank_account_updated_at = None
 
+    # rollback は Session 内の全 ORM インスタンスを expire するため、except 節で
+    # user.id へ触ると遅延ロード（SELECT）が走り、非同期では MissingGreenlet に
+    # なって本来のエラーが握り潰される（r12 横展開: PG 同時実行検証で cases.py に
+    # 見つかった同型バグ。commit 前に値を写し取っておく）。
+    user_id = user.id
+
     try:
         await session.commit()
     except Exception as exc:
         await session.rollback()
         logger.error(
             "users/me/bank-account DELETE: 削除に失敗 - user_id=%s - %s",
-            user.id,
+            user_id,
             exc,
             exc_info=True,
         )
@@ -701,13 +713,19 @@ async def delete_my_account(
         )
     )
 
+    # rollback は Session 内の全 ORM インスタンスを expire するため、except 節で
+    # user.id へ触ると遅延ロード（SELECT）が走り、非同期では MissingGreenlet に
+    # なって本来のエラーが握り潰される（r12 横展開: PG 同時実行検証で cases.py に
+    # 見つかった同型バグ。commit 前に値を写し取っておく）。
+    user_id = user.id
+
     try:
         await session.commit()
     except Exception as exc:
         await session.rollback()
         logger.error(
             "users/me delete: 退会処理のコミットに失敗 - user_id=%s - %s",
-            user.id,
+            user_id,
             exc,
             exc_info=True,
         )

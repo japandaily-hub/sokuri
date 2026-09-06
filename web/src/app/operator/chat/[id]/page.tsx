@@ -562,7 +562,7 @@ export default function OperatorChatPage() {
                 無く実額に意味がない（URISK-2）ため、完了前後にかかわらず買取額の8%の
                 予定額のみを一貫して表示し、直下の注記と正面から矛盾しないようにする。 */}
             <div className="dp-row">
-              <span className="lbl">手数料予定額（買取額の8%）</span>
+              <span className="lbl">手数料予定額（買取額の8%・税別）</span>
               <span className="val">
                 {yen(Math.round((detail?.final_amount ?? detail?.initial_amount ?? 0) * 0.08))}
               </span>

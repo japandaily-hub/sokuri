@@ -11,10 +11,12 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Boolean,
+    DateTime,
     ForeignKey,
     ForeignKeyConstraint,
     Index,
@@ -63,6 +65,16 @@ class Case(Base, TimestampMixin):
         UniqueConstraint(
             "user_id", "idempotency_key", name="uq_cases_user_id_idempotency_key"
         ),
+        # 入札ゼロ放置リマインドの抽出用（alembic 0033）。定期ループは常に
+        # 「no_bid_reminded_at IS NULL かつ status='open' かつ created_at < 閾値」で
+        # 引くため、送信済み行を索引から外す部分索引にして走査対象を未送信分へ抑える。
+        Index(
+            "ix_cases_no_bid_reminder",
+            "status",
+            "created_at",
+            postgresql_where=text("no_bid_reminded_at IS NULL"),
+            sqlite_where=text("no_bid_reminded_at IS NULL"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
@@ -84,6 +96,10 @@ class Case(Base, TimestampMixin):
     floor_plan: Mapped[str | None] = mapped_column(String(32))     # "1K" / "3LDK" etc
     floor_number: Mapped[int | None] = mapped_column(Integer)
     has_elevator: Mapped[bool | None] = mapped_column(Boolean)
+
+    # 入札ゼロ放置リマインド（services/reminders.py）の送信済みマーカー。NULL = 未送信。
+    # transactions.overdue_reminded_at と同じ二重送信防止の役割（alembic 0033 / r12 決定3）。
+    no_bid_reminded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Gemini Vision が生成した案件サマリー
     ai_summary: Mapped[str | None] = mapped_column(Text)

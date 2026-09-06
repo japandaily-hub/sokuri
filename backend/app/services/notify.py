@@ -202,6 +202,46 @@ async def send_schedule_confirmed(to_email: str, transaction_id: str, visit_date
     )
 
 
+async def send_visit_overdue(
+    to_email: str, transaction_id: str, recipient_party: str
+) -> bool:
+    """訪問予定日を過ぎても完了確定されていない成約のリマインド（当事者宛・r12 決定3）。
+
+    r12-review H-3: 依頼者側の遷移先は ``/chat/{id}``（web に ``/transactions/{id}``
+    は存在しない）。r10 O-H-1 の統一から漏れていた1箇所。
+    """
+    settings = get_settings()
+    if recipient_party == "user":
+        url = f"{settings.frontend_base_url}/chat/{transaction_id}"
+        body = (
+            "<p>作業が終わっていれば完了確定を、"
+            "まだなら業者とチャットで日程を確認してください。</p>"
+        )
+    else:
+        url = f"{settings.frontend_base_url}/operator/transactions/{transaction_id}"
+        body = "<p>依頼者に完了確定を依頼してください。</p>"
+    return await _send(
+        to_email,
+        "【カタヅケ】訪問予定日を過ぎています",
+        _wrap(body + f'<p><a href="{url}">成約詳細を確認する</a></p>'),
+    )
+
+
+async def send_no_bid_reminder(to_email: str, case_id: str) -> bool:
+    """入札が付かないまま放置されている案件のリマインド（依頼者宛・r12 決定3）。"""
+    settings = get_settings()
+    url = f"{settings.frontend_base_url}/cases/{case_id}"
+    return await _send(
+        to_email,
+        "【カタヅケ】まだ入札がありません",
+        _wrap(
+            "<p>まだ入札がありません。"
+            "写真の追加や品目の見直しで入札が付きやすくなります。</p>"
+            f'<p><a href="{url}">案件を見直す</a></p>'
+        ),
+    )
+
+
 async def send_bank_account_changed(to_email: str, action: str) -> bool:
     """振込先口座の登録・変更・削除を本人へ通知する（security review M-1）。
 

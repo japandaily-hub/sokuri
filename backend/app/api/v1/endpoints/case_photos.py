@@ -12,7 +12,14 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import FileResponse
 
-from app.api.deps import get_current_user
+from app.api.deps import (
+    OPERATOR_APPROVAL_REQUIRED_DETAIL,
+    OPERATOR_CASE_VIEW_STATUSES,
+    SUSPENDED_ACCOUNT_DETAIL,
+    get_current_user,
+    get_optional_operator,
+)
+from app.db.models.operator import Operator
 from app.db.models.user import User
 from app.schemas_katadzuke import PresignRequest, PresignResponse
 from app.services import storage
@@ -120,7 +127,39 @@ async def upload(
 
 
 @router.get("/files/{storage_key}", summary="写真の配信")
-async def serve_file(storage_key: str) -> FileResponse:
+async def serve_file(
+    storage_key: str,
+    operator: Operator | None = Depends(get_optional_operator),
+) -> FileResponse:
+    """保存済み画像を配信する（従来どおり無認証の capability URL）。
+
+    r12 決定1 の多層防御: 未承認・停止中の業者が **自分の業者トークンを付けて**
+    画像を取得することを禁じる。一次防御はあくまで
+    ``GET /cases`` / ``GET /cases/{id}`` の 403（未承認業者は storage_key 自体を
+    受け取れない）であり、ここは「以前見えていた URL を控えていた」「他経路で
+    storage_key を得た」場合の残余リスクを削るための二次防御。
+
+    r12-review L-1: 判定に「その key が案件写真かどうか」を混ぜない。混ぜると
+    403（案件写真である）／404・200（そうでない）の差が、未承認業者にとって
+    **任意の storage_key が案件写真かを判別できるオラクル**になる。トークンを
+    付けている以上その業者は未承認だと分かっているので、key の素性に関わらず
+    一律 403 にするのが素直（正規の閲覧経路は承認後にトークン無しの ``<img>``
+    ／承認済みトークンで従来どおり通る）。副次的に DB クエリも不要になり、
+    この経路は完全に O(1)（無トークンの ``<img>``・依頼者・承認済み業者も
+    従来どおり DB を一切引かない）。
+    """
+    if operator is not None and (
+        operator.is_suspended or operator.vendor_status not in OPERATOR_CASE_VIEW_STATUSES
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                SUSPENDED_ACCOUNT_DETAIL
+                if operator.is_suspended
+                else OPERATOR_APPROVAL_REQUIRED_DETAIL
+            ),
+        )
+
     path = storage.file_path(storage_key)
     if path is None:
         raise HTTPException(

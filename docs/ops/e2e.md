@@ -93,3 +93,52 @@ $env:RL_CASE_CREATE_IP_MAX="200"; $env:RL_CASE_CREATE_ACCOUNT_MAX="200"
 - **`retries: 0`。** 落ちたら実挙動の問題として扱う。リトライで隠さない。
 - **前提は API・確認は UI。** シードの ID は決め打ちせず、ログイン後に API から引く。
 - 2 プロジェクト（`desktop` 1280px / `mobile` 375px）で同じシナリオを流す。chromium のみ。
+
+## PG 同時実行チェックの手順
+
+Playwright の E2E（SQLite）とは別枠の検証。**SQLite では `SELECT ... FOR UPDATE` が no-op**
+のため、行ロック（`app/services/case_lock.py`）・部分一意索引（0028）・冪等の複合一意（0029）は
+pytest では実証できない。実 PostgreSQL を立てて同時リクエストで確かめる。
+
+```bash
+# 1) PG を起動（使い捨て。ホスト 55432）
+docker run -d --name kdz-pg -e POSTGRES_PASSWORD=kdz -e POSTGRES_DB=kdz -p 55432:5432 postgres:16
+
+# 2) 実マイグレーションを当てる（backend/ を cwd にすること）
+cd backend
+DATABASE_URL=postgresql+asyncpg://postgres:kdz@127.0.0.1:55432/kdz \
+  .venv/Scripts/python.exe scripts/pg_alembic_upgrade.py
+#    ↑ 初回は 0008 で必ず失敗する（alembic_version が VARCHAR(32) で作られるため）。
+#      alembic/env.py が次回起動時に VARCHAR(255) へ拡幅するので、もう一度同じコマンドを流す。
+#    ↑ 素の `alembic -c alembic.ini` は日本語コメントで cp932 エラーになる。alembic は ini を
+#      encoding="locale" で読むため PYTHONUTF8=1 では回避できない（PEP 686）。上のラッパを使う。
+
+# 3) API を PG 接続で :8001 に起動（RATE_LIMIT_ENABLED=false・ADMIN_EMAILS 設定込み）
+.venv/Scripts/python.exe scripts/run_pg_e2e.py
+
+# 4) 別シェルで同時実行チェック（各シナリオ 3 ラウンド）
+.venv/Scripts/python.exe scripts/pg_concurrency_check.py
+
+# 5) 後片付け
+docker rm -f kdz-pg
+```
+
+検証シナリオと不変条件（`scripts/pg_concurrency_check.py`）:
+
+| # | 同時に撃つもの | 期待する応答 | DB 側の不変条件 |
+| --- | --- | --- | --- |
+| S1 | 同一案件への `select_bid` × 2 業者 | `[201, 409]` | `transactions=1` / `selected` 入札=1 |
+| S2 | `DELETE /operator/me` と `select_bid` | 片方のみ成功 | 退会済み業者に進行中成約が 0 |
+| S3 | 同一取引への減額申請 × 3 | `[201, 409, 409]` | `pending` 減額=1（部分一意索引） |
+| S4 | 取引キャンセル × 2 | `[200, 409]` | `cancellations`=1 行 |
+| S5 | 同一 `idempotency_key` の `POST /cases` × 2 | `[200, 201]` | 案件=1 件 |
+| S6 | 運営の強制終了と依頼者の `complete` | 片方のみ成功 | status と `cancellations` が矛盾しない |
+
+**このチェックで落ちたら実バグとして扱う**（実際 r12 で `create_case` の 500 を検出した。
+`.agent-state/audit/r12-pg-concurrency.md` 参照）。反復回数は `KDZ_ROUNDS`、接続先は
+`KDZ_API_BASE` / `KDZ_PG_DSN` で変えられる。アカウントは実行ごとに新規作成するため再実行可能。
+
+> Docker Desktop が `initializing Inference manager` / `Secrets Engine` のソケットエラーで
+> 起動しない場合は、`%LOCALAPPDATA%\Docker\run` と `%LOCALAPPDATA%\docker-secrets-engine` を
+> リネームで退避してから起動し直す（孤児 unix ソケットが残ると毎回クラッシュする）。
+> 復旧後にプロセスを force kill するとまた孤児が残るので注意。

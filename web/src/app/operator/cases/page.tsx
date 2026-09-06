@@ -21,7 +21,9 @@ import { Ic } from "@/components/kdz/Icons";
 import { useToken } from "@/components/kdz/Ui";
 import {
   CASE_STATUS_LABEL,
+  KdzApiError,
   LIST_DEFAULT_LIMIT,
+  OPERATOR_CASE_VIEW_STATUSES,
   dedupeById,
   formatYen,
   getOperatorProfile,
@@ -64,7 +66,14 @@ function LotCard({ c }: { c: CaseMasked }) {
             thumbPhotos.map((p) => (
               <div className="lot-thumb-img" key={p.id}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={photoSrc(p.url)} alt="" />
+                <img
+                  src={photoSrc(p.url)}
+                  alt=""
+                  onError={(e) => {
+                    // 決定1: 写真取得が403等で失敗した場合は壊れた画像アイコンを出さず空表示にする。
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
               </div>
             ))
           ) : (
@@ -120,6 +129,8 @@ export default function OperatorCasesPage() {
   const [error, setError] = useState<string | null>(null);
   const [vendorStatus, setVendorStatus] = useState<string | null>(null);
   const [hasLicense, setHasLicense] = useState<boolean | null>(null);
+  // 403 approval_required を受けたら、profile 取得の成否に関わらず案内を出す（r12 M-3）。
+  const [approvalRequired, setApprovalRequired] = useState(false);
   // ページング（r6 H-1）: backend が既定100件で切り詰めるため、取得件数が limit と
   // 一致する間は「さらに読み込む」余地があると判断する（総件数は応答に含まれない）。
   const [hasMore, setHasMore] = useState(false);
@@ -132,7 +143,17 @@ export default function OperatorCasesPage() {
         setCases(res);
         setHasMore(res.length === LIST_DEFAULT_LIMIT);
       })
-      .catch((e) => setError(toDisplayMessage(e, "取得に失敗しました")));
+      .catch((e) => {
+        // 審査中（pending/rejected）業者への 403 は ApprovalPendingNotice（vendorStatus 由来）が
+        // 既に案内しているため、重複する赤いエラー文言は出さない。「空の一覧」として扱い、
+        // spinner 判定（!cases && !error）が無限スピナーのまま止まらない事態を避ける。
+        if (e instanceof KdzApiError && e.code === "approval_required") {
+          setCases([]);
+          setApprovalRequired(true);
+        } else {
+          setError(toDisplayMessage(e, "取得に失敗しました"));
+        }
+      });
   }, [token]);
 
   async function loadMore() {
@@ -162,7 +183,11 @@ export default function OperatorCasesPage() {
   }, [token]);
 
   const statusLoading = vendorStatus === null;
-  const awaitingApproval = !statusLoading && vendorStatus !== "active" && vendorStatus !== "unknown";
+  // limited は閲覧可（backend OPERATOR_CASE_VIEW_STATUSES と対称、r12 M-1）。
+  // 403 approval_required を受けている場合は profile 取得の成否に関わらず案内を出す（r12 M-3）。
+  const awaitingApproval =
+    approvalRequired ||
+    (!statusLoading && vendorStatus !== "unknown" && !OPERATOR_CASE_VIEW_STATUSES.includes(vendorStatus));
 
   // 絞り込み（クライアント側）: 都道府県 / 未入札のみ。件数が増えた時に目的の案件へ辿り着きやすくする。
   const [prefFilter, setPrefFilter] = useState<string>("all");
@@ -198,66 +223,70 @@ export default function OperatorCasesPage() {
           </div>
 
           {awaitingApproval ? (
-            <ApprovalPendingNotice hasLicenseImage={hasLicense} />
-          ) : null}
-          {error ? <div className="op-alert error">{error}</div> : null}
-
-          {cases && cases.length > 0 ? (
-            <div className="lot-filters" role="group" aria-label="案件の絞り込み">
-              <label className="lot-filter">
-                <span>エリア</span>
-                <select value={prefFilter} onChange={(e) => setPrefFilter(e.target.value)}>
-                  <option value="all">すべて（{cases.length}件）</option>
-                  {prefectures.map((p) => (
-                    <option key={p} value={p}>
-                      {p}（{cases.filter((c) => c.prefecture === p).length}件）
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="lot-filter lot-filter-check">
-                <input type="checkbox" checked={onlyUnbid} onChange={(e) => setOnlyUnbid(e.target.checked)} />
-                <span>未入札の案件のみ</span>
-              </label>
-              <span className="lot-filter-count">{visibleCases.length}件を表示</span>
-            </div>
-          ) : null}
-          {hasMore ? (
-            <p className="lot-filter-empty" style={{ marginTop: -4, marginBottom: 12 }}>
-              ※ エリア・未入札の絞り込みは、現在読み込み済みの{cases?.length ?? 0}件が対象です。
-            </p>
-          ) : null}
-
-          {loading || (!cases && !error) ? (
-            <div style={{ display: "flex", justifyContent: "center", padding: "60px 0" }}>
-              <Spinner className="h-6 w-6 text-brand-600" />
-            </div>
-          ) : cases && cases.length === 0 ? (
-            <div className="empty-state">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M4 7h16M4 12h16M4 17h10" />
-              </svg>
-              <h3>現在、入札可能な案件はありません</h3>
-              <p>新しい案件が出品されると、ここに表示されます。</p>
-            </div>
+            // 決定1: 審査中（pending/rejected）業者は一覧の代わりにこの案内のみを大きく表示する。
+            <ApprovalPendingNotice hasLicenseImage={hasLicense} vendorStatus={vendorStatus} />
           ) : (
-            <div className="lot-list">
-              {visibleCases.map((c) => (
-                <LotCard c={c} key={c.id} />
-              ))}
-              {visibleCases.length === 0 ? (
-                <p className="lot-filter-empty">条件に合う案件はありません。絞り込みを変更してください。</p>
-              ) : null}
-            </div>
-          )}
+            <>
+              {error ? <div className="op-alert error">{error}</div> : null}
 
-          {hasMore ? (
-            <div style={{ display: "flex", justifyContent: "center", padding: "16px 0" }}>
-              <button type="button" className="btn btn-ghost" onClick={loadMore} disabled={loadingMore}>
-                {loadingMore ? "読み込み中…" : "さらに読み込む"}
-              </button>
-            </div>
-          ) : null}
+              {cases && cases.length > 0 ? (
+                <div className="lot-filters" role="group" aria-label="案件の絞り込み">
+                  <label className="lot-filter">
+                    <span>エリア</span>
+                    <select value={prefFilter} onChange={(e) => setPrefFilter(e.target.value)}>
+                      <option value="all">すべて（{cases.length}件）</option>
+                      {prefectures.map((p) => (
+                        <option key={p} value={p}>
+                          {p}（{cases.filter((c) => c.prefecture === p).length}件）
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="lot-filter lot-filter-check">
+                    <input type="checkbox" checked={onlyUnbid} onChange={(e) => setOnlyUnbid(e.target.checked)} />
+                    <span>未入札の案件のみ</span>
+                  </label>
+                  <span className="lot-filter-count">{visibleCases.length}件を表示</span>
+                </div>
+              ) : null}
+              {hasMore ? (
+                <p className="lot-filter-empty" style={{ marginTop: -4, marginBottom: 12 }}>
+                  ※ エリア・未入札の絞り込みは、現在読み込み済みの{cases?.length ?? 0}件が対象です。
+                </p>
+              ) : null}
+
+              {loading || (!cases && !error) ? (
+                <div style={{ display: "flex", justifyContent: "center", padding: "60px 0" }}>
+                  <Spinner className="h-6 w-6 text-brand-600" />
+                </div>
+              ) : cases && cases.length === 0 ? (
+                <div className="empty-state">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 7h16M4 12h16M4 17h10" />
+                  </svg>
+                  <h3>現在、入札可能な案件はありません</h3>
+                  <p>新しい案件が出品されると、ここに表示されます。</p>
+                </div>
+              ) : (
+                <div className="lot-list">
+                  {visibleCases.map((c) => (
+                    <LotCard c={c} key={c.id} />
+                  ))}
+                  {visibleCases.length === 0 ? (
+                    <p className="lot-filter-empty">条件に合う案件はありません。絞り込みを変更してください。</p>
+                  ) : null}
+                </div>
+              )}
+
+              {hasMore ? (
+                <div style={{ display: "flex", justifyContent: "center", padding: "16px 0" }}>
+                  <button type="button" className="btn btn-ghost" onClick={loadMore} disabled={loadingMore}>
+                    {loadingMore ? "読み込み中…" : "さらに読み込む"}
+                  </button>
+                </div>
+              ) : null}
+            </>
+          )}
         </div>
       </main>
     </div>

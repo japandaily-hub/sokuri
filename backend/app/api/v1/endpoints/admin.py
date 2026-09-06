@@ -67,6 +67,7 @@ from app.schemas_katadzuke import (
     OperatorOut,
     OperatorSuspendRequest,
     OperatorVerifyRequest,
+    ReminderJobResult,
     ReviewHideRequest,
     ReviewOut,
     UserIdentityDocumentAdminListResponse,
@@ -76,6 +77,7 @@ from app.schemas_katadzuke import (
 )
 from app.services import alerts, notify, notify_dispatch
 from app.services.case_lock import lock_transaction_rows
+from app.services.reminders import run_reminders
 from app.services.review_stats import recalc_operator_review_stats
 
 # admin 一覧系 API 共通の既定/上限（M2対応）。既存 web 呼び出し（クエリ省略時）が
@@ -1863,3 +1865,31 @@ async def admin_delete_contact(
         contact_id,
         admin.id,
     )
+
+
+@router.post(
+    "/admin/jobs/reminders",
+    response_model=ReminderJobResult,
+    summary="リマインド定期処理の手動実行（訪問日超過 / 入札ゼロ放置）",
+)
+async def run_reminder_job(
+    admin: User = Depends(get_current_admin),
+    session: AsyncSession = Depends(get_session),
+) -> ReminderJobResult:
+    """``main.py`` の1時間毎ループと同じ処理をその場で1周走らせる（r12 決定3）。
+
+    用途は (1) 実装・設定変更後の動作確認、(2) ``REMINDERS_ENABLED=false`` で
+    定期ループを止めている間の手動運用、(3) ループが落ちた際の穴埋め。
+    送信済み判定は DB 列（``transactions.overdue_reminded_at`` /
+    ``cases.no_bid_reminded_at``）に集約されているため、定期ループと同時に
+    走っても・連打しても同一の宛先へ二重に通知は飛ばない（2回目以降は 0 件）。
+    """
+    result = await run_reminders(session)
+    logger.info(
+        "admin: リマインドを手動実行しました - admin_id=%s overdue=%s no_bid=%s",
+        admin.id,
+        result["overdue"],
+        result["no_bid"],
+    )
+    return ReminderJobResult(**result)
+

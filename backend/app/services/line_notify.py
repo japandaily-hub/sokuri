@@ -191,6 +191,40 @@ async def push_schedule_confirmed(line_user_id: str, transaction_id: str, visit_
     )
 
 
+async def push_visit_overdue(
+    line_user_id: str, transaction_id: str, recipient_party: Literal["user", "operator"]
+) -> bool:
+    """訪問予定日を過ぎても完了確定されていない成約のリマインド（当事者宛・r12 決定3）。
+
+    r12-review H-3: 依頼者側の遷移先は ``/chat/{id}``。web に ``/transactions/{id}``
+    は存在せず（依頼者の成約詳細＝チャット画面が正）、r10 O-H-1 で他の依頼者向け
+    通知は既に ``/chat/{id}`` へ統一済み。ここだけ取り残されて 404 になっていた。
+    """
+    settings = get_settings()
+    if recipient_party == "user":
+        url = f"{settings.frontend_base_url}/chat/{transaction_id}"
+        body = "作業が終わっていれば完了確定を、まだなら業者とチャットで日程を確認してください。"
+    else:
+        url = f"{settings.frontend_base_url}/operator/transactions/{transaction_id}"
+        body = "依頼者に完了確定を依頼してください。"
+    return await _push(
+        line_user_id,
+        f"【カタヅケ】訪問予定日を過ぎています。\n{body}\n{url}",
+    )
+
+
+async def push_no_bid_reminder(line_user_id: str, case_id: str) -> bool:
+    """入札が付かないまま放置されている案件のリマインド（依頼者宛・r12 決定3）。"""
+    settings = get_settings()
+    url = f"{settings.frontend_base_url}/cases/{case_id}"
+    return await _push(
+        line_user_id,
+        "【カタヅケ】まだ入札がありません。"
+        "写真の追加や品目の見直しで入札が付きやすくなります。\n"
+        f"{url}",
+    )
+
+
 async def push_bid_received(
     line_user_id: str, case_id: str, company_name: str, amount: int
 ) -> bool:

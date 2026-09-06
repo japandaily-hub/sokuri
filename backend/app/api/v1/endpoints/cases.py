@@ -29,7 +29,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import Actor, get_current_actor, get_current_user
+from app.api.deps import Actor, get_case_viewer_actor, get_current_user
 from app.api.rate_limit_deps import RateLimitGuard
 from app.db.models.bid import BID_STATUS_PENDING, BID_STATUS_REJECTED, BID_STATUS_WITHDRAWN, Bid
 from app.db.models.case import (
@@ -371,12 +371,12 @@ def _to_masked_out(case: Case, my_operator_id: uuid.UUID | None = None) -> CaseM
     # 取り下げ済み入札は依頼者・業者いずれの集計からも除外する（_to_case_out と同じ理由）。
     out.bid_count = sum(1 for b in case.bids if b.status != BID_STATUS_WITHDRAWN)
     out.my_bid = my_bid
-    # 最高入札額（自社入札を含む全業者の最高額。取り下げ済みは除く）。入札が無ければ None。
-    # 秘匿しない方針（確定済み製品判断）のため全業者に開示する。
-    out.top_bid_amount = max(
-        (bid.amount for bid in case.bids if bid.status != BID_STATUS_WITHDRAWN),
-        default=None,
-    )
+    # r12 決定2: 他社の入札額（旧 top_bid_amount）は業者へ一切返さない。
+    # 他社提示額が見える場を運営すると「古物の売買の competitive な媒介＝古物競り
+    # あっせん業」の該当性が上がるため、競り性の外形（他社額・順位・首位判定）を
+    # 応答から落とす。件数（bid_count）と自社入札（my_bid）は、依頼者側の反応が
+    # 分かる最小限の情報として維持する。CaseMaskedOut からもフィールドごと削除
+    # 済みのため、ここで再設定すると ValidationError になる（復活防止の型ガード）。
     return out
 
 
@@ -532,6 +532,12 @@ async def create_case(
     )
 
     session.add(case)
+    # ``session.rollback()`` は ``expire_on_commit=False`` と無関係に**全インスタンスを
+    # 失効させる**ため、下の except 節で ``user.id`` に触れると同期の遅延ロードが走り、
+    # 非同期エンジンでは MissingGreenlet（＝500）になる（PG 実機の同時実行チェック
+    # r12-S5 で顕在化。SQLite では接続チェックアウトに IO が要らず偶然素通りしていた）。
+    # commit 前にプリミティブへ写し取る既存規約（bids.py / reductions.py）へ揃える。
+    user_id = user.id
     try:
         await session.commit()
     except IntegrityError as exc:
@@ -545,12 +551,12 @@ async def create_case(
         # 200で返す（存在しない場合のみ409へフォールバック）。
         if body.idempotency_key and "idempotency_key" in str(getattr(exc, "orig", exc)).lower():
             existing_case_id = await _find_idempotent_case_id(
-                session, user.id, body.idempotency_key
+                session, user_id, body.idempotency_key
             )
             if existing_case_id is not None:
                 logger.info(
                     "cases: 冪等キー競合(DB制約)により既存案件を返却 - user_id=%s case_id=%s",
-                    user.id,
+                    user_id,
                     existing_case_id,
                 )
                 response.status_code = status.HTTP_200_OK
@@ -595,7 +601,7 @@ async def create_case(
     summary="案件一覧（ユーザー: 自分の案件 / 業者: 入札可能案件）",
 )
 async def list_cases(
-    actor: Actor = Depends(get_current_actor),
+    actor: Actor = Depends(get_case_viewer_actor),
     session: AsyncSession = Depends(get_session),
     limit: int = Query(
         _OPERATOR_LIST_DEFAULT_LIMIT,
@@ -629,9 +635,9 @@ async def list_cases(
         return [_to_case_out(c) for c in cases]
 
     assert actor.operator is not None
-    # 案件の「閲覧」は vendor_status を問わず許可する（pending/limited/active いずれも可）。
-    # 入札のみ get_verified_operator（vendor_status == "active"）で別途ブロックする。
-    # is_suspended（アカウント停止）は get_current_actor 側で既に弾かれている。
+    # 未承認（pending / rejected）業者は get_case_viewer_actor が 403 approval_required で
+    # 既に弾いている（r12 決定1。従来の「pending にも公開案件を見せる」分岐は撤去）。
+    # is_suspended（アカウント停止）も同ゲートが account_suspended で弾く。
     cases = (
         await session.scalars(
             select(Case)
@@ -653,7 +659,7 @@ async def list_cases(
 )
 async def get_case(
     case_id: uuid.UUID,
-    actor: Actor = Depends(get_current_actor),
+    actor: Actor = Depends(get_case_viewer_actor),
     session: AsyncSession = Depends(get_session),
 ) -> CaseOut | CaseMaskedOut:
     case = await _get_case(session, case_id)
@@ -670,7 +676,7 @@ async def get_case(
         return _to_case_out(case)
 
     assert actor.operator is not None
-    # 一覧同様、閲覧は vendor_status を問わず許可する（入札は別ゲートでブロック）。
+    # 一覧同様、未承認・停止中は get_case_viewer_actor が 403 で弾いている（r12 決定1）。
     return _to_masked_out(case, actor.operator.id)
 
 

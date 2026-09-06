@@ -40,6 +40,18 @@ class Transaction(Base, TimestampMixin):
     """
 
     __tablename__ = "transactions"
+    __table_args__ = (
+        # 訪問日超過リマインドの抽出用（alembic 0033）。ReductionRequest の
+        # uq_reduction_requests_pending と同じ部分索引パターンで、走査対象を
+        # 「未リマインド」の行だけに限定する。
+        Index(
+            "ix_transactions_overdue_reminder",
+            "status",
+            "visit_date",
+            postgresql_where=text("overdue_reminded_at IS NULL"),
+            sqlite_where=text("overdue_reminded_at IS NULL"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     case_id: Mapped[uuid.UUID] = mapped_column(
@@ -61,6 +73,10 @@ class Transaction(Base, TimestampMixin):
     # チャットの既読ポインタ（当事者双方）。相手が送った未読メッセージ数の算出に用いる。
     user_last_read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     operator_last_read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # 訪問日超過リマインド（services/reminders.py）の送信済みマーカー。NULL = 未送信。
+    # 「送ったか」をこの列でしか判定しないことで、定期ループが何度回っても
+    # 当事者へ通知が二重に飛ばない（alembic 0033 / r12 決定3）。
+    overdue_reminded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # relations
     case: Mapped[Case] = relationship(back_populates="transaction")

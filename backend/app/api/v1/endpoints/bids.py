@@ -10,7 +10,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import Actor, get_current_actor, get_current_user, get_verified_operator
+from app.api.deps import (
+    Actor,
+    get_case_viewer_actor,
+    get_current_user,
+    get_verified_operator,
+)
 from app.db.models.bid import (
     BID_STATUS_PENDING,
     BID_STATUS_REJECTED,
@@ -80,7 +85,7 @@ def _bid_out(bid: Bid) -> BidOut:
 )
 async def list_bids(
     case_id: uuid.UUID,
-    actor: Actor = Depends(get_current_actor),
+    actor: Actor = Depends(get_case_viewer_actor),
     session: AsyncSession = Depends(get_session),
 ) -> list[BidOut]:
     case = await _get_case(session, case_id)
@@ -101,6 +106,8 @@ async def list_bids(
         return [_bid_out(b) for b in case.bids]
 
     assert actor.operator is not None
+    # r12 決定2: 業者へ返すのは自社入札のみ（他社の amount・順位は一切返さない）。
+    # 未承認・停止中の業者は get_case_viewer_actor が 403 で弾いている（r12 決定1）。
     return [_bid_out(b) for b in case.bids if b.operator_id == actor.operator.id]
 
 

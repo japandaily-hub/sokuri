@@ -716,7 +716,10 @@ class CaseMaskedOut(BaseModel):
     photo_count: int = 0
     bid_count: int = 0
     my_bid: BidOut | None = None
-    top_bid_amount: int | None = None
+    # NOTE(r12 決定2): 旧 ``top_bid_amount``（他社を含む最高入札額）は削除した。
+    # 他社の提示額・順位を業者へ見せる = 競り（競争入札）の外形そのもので、
+    # 古物競りあっせん業の該当性を押し上げるため。web 側もダッシュボードの
+    # 「うち首位 n 件」表示を撤去済み。件数（bid_count）と自社入札（my_bid）のみ返す。
 
 
 # ──────────────────────────── 入札 ────────────────────────────
@@ -743,6 +746,17 @@ class BidOut(BaseModel):
     # 一覧から除外はせず旗を立てる方式にした（除外すると入札が黙って消え、
     # 依頼者からは「入札が減った」ようにしか見えないため）。r6-flow ADD-1 対応。
     operator_suspended: bool = False
+
+
+class ReminderJobResult(BaseModel):
+    """``POST /admin/jobs/reminders`` の実行結果（r12 決定3）。
+
+    件数は「リマインド対象として処理し、送信済みマーカーを立てた件数」。
+    2回目以降の実行が 0 になるのが正常（マーカーにより冪等）。
+    """
+
+    overdue: int = Field(ge=0, description="訪問日超過リマインドを送った成約数")
+    no_bid: int = Field(ge=0, description="入札ゼロ放置リマインドを送った案件数")
 
 
 # ──────────────────────────── 成約 ────────────────────────────
