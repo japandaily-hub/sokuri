@@ -46,6 +46,9 @@
 
 ## 04 運用上の注意
 
+- **Docker Desktop の復旧（2026-09-06）** — PG 同時実行検証中にエージェントが `%LOCALAPPDATA%\docker-secrets-engine` と `%LOCALAPPDATA%\Dockerun` を `*.stale-<epoch>` へ退避したため起動時に Secrets Engine エラー。Docker Desktop を Quit → 退避フォルダを元の名前に戻す（または空の `docker-secrets-engine` フォルダを作る）→ 再起動。`%APPDATA%\Docker\settings-store.json` の `EnableDockerAI` も false に変更済み（不要なら戻す）。
+- **暗号鍵の控え** — `APP_ENCRYPTION_KEY` は Render ダッシュボード（sokuri-backend → Environment）から値を控えて保管する（Claude 側からのファイル保存は権限で不可）。
+
 - **Render 無料 PostgreSQL の 30 日期限** — 期限前に有料化（$7/月〜）か Neon/Supabase へ移行。当面は 30 日ごとに作り直し。
 - **Render 無料 Web の 15 分スピンダウン** — 初回アクセス約 1 分待ち。ログ保持 7 日。
 - **render.yaml の envVars は既存サービスに反映されない** — 本番の値はダッシュボードで設定。
@@ -55,6 +58,7 @@
 
 ## 完了（2026-08-31〜09-04）
 
+- [x] 09-06 第12周（r12）: 審査中業者の閲覧制限・入札額非開示・リマインド・税別表記・PG 同時実行実証（79f8e57）
 - [x] 09-05 第11周（r11）: CI（pytest/tsc/eslint/next build）と Playwright E2E 30 本を新設、本番の APP_ENCRYPTION_KEY 設定と反映確認
 - [x] 09-05 第10周（r10）: 3方向の総合再監査→写真のギャラリー選択・登録項目整理・出品エリア明示/検証・業者の訪問日時/精算/完了主体・減額残回数・本人確認/依頼者/お問い合わせ管理画面・運営手順書・外形監視の通知全滅検知（未push）
 - [x] 09-05 第9周（r9）: axe による WCAG AA 実測とコントラスト是正（--body-soft/--gold-text）、管理画面の label とスクロール領域（未push）
