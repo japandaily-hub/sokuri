@@ -96,7 +96,7 @@ $env:RL_CASE_CREATE_IP_MAX="200"; $env:RL_CASE_CREATE_ACCOUNT_MAX="200"
 
 ## PG 同時実行チェックの手順
 
-Playwright の E2E（SQLite）とは別枠の検証。**SQLite では `SELECT ... FOR UPDATE` が no-op**
+Playwright の E2E（SQLite）とは別枠の検証。（E2E は 2026-09-07 時点で 36 本: 08 に「他社入札額の匿名開示」「入札額の引き上げ」を追加。`E2E_SCREENSHOT_DIR` を指定すると引き上げ後の業者画面を保存する。）**SQLite では `SELECT ... FOR UPDATE` が no-op**
 のため、行ロック（`app/services/case_lock.py`）・部分一意索引（0028）・冪等の複合一意（0029）は
 pytest では実証できない。実 PostgreSQL を立てて同時リクエストで確かめる。
 

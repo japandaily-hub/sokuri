@@ -716,16 +716,32 @@ class CaseMaskedOut(BaseModel):
     photo_count: int = 0
     bid_count: int = 0
     my_bid: BidOut | None = None
-    # NOTE(r12 決定2): 旧 ``top_bid_amount``（他社を含む最高入札額）は削除した。
-    # 他社の提示額・順位を業者へ見せる = 競り（競争入札）の外形そのもので、
-    # 古物競りあっせん業の該当性を押し上げるため。web 側もダッシュボードの
-    # 「うち首位 n 件」表示を撤去済み。件数（bid_count）と自社入札（my_bid）のみ返す。
+    # NOTE(r12 決定2 → 2026-09-07 ユーザー決定で開示へ転換): 他社の最高入札額
+    # （匿名・金額のみ）を業者へ開示する。ただし社名・コメント・業者IDは非開示の
+    # まま（入札一覧側の BidOut.is_mine=False 分と同じマスク方針。business.py 側の
+    # 「競り性の外形を出さない」方針からは後退するが、ユーザーの明示判断による
+    # 方針転換のため、匿名化のみを残して額そのものは返す）。
+    top_bid_amount: int | None = None
+    # 自社が現在の最高額以上か（自社入札が無ければ None。同額は自社を首位扱い）。
+    is_top_bidder: bool | None = None
 
 
 # ──────────────────────────── 入札 ────────────────────────────
 
 
 class BidCreateRequest(BaseModel):
+    amount: int = Field(gt=0, le=100_000_000)
+    message: str | None = Field(default=None, max_length=2000)
+
+
+class BidUpdateRequest(BaseModel):
+    """自社入札の引き上げ（``PATCH /cases/{case_id}/bids/me``）。
+
+    価格競争を成立させるため一意制約（1案件1業者1入札）は維持したまま、
+    自社の入札額を現在額より高い金額へ何度でも引き上げられるようにする
+    （下げは不可・封印入札のまま。エンドポイント側で amount <= 現在額 を409にする）。
+    """
+
     amount: int = Field(gt=0, le=100_000_000)
     message: str | None = Field(default=None, max_length=2000)
 
@@ -739,13 +755,22 @@ class BidOut(BaseModel):
     message: str | None
     status: str
     created_at: datetime
+    updated_at: datetime
     operator: OperatorPublicOut | None = None
     transaction_id: uuid.UUID | None = None
+    # 引き上げ回数（PATCH /cases/{case_id}/bids/me）。0=まだ引き上げていない。
+    revision_count: int = 0
     # 入札業者が運営により利用停止中か（web 契約: true の入札は選択不可として扱い
     # 「この業者は現在利用停止中です。運営にお問い合わせください。」を表示する）。
     # 一覧から除外はせず旗を立てる方式にした（除外すると入札が黙って消え、
     # 依頼者からは「入札が減った」ようにしか見えないため）。r6-flow ADD-1 対応。
     operator_suspended: bool = False
+    # 業者向け入札一覧（GET /cases/{id}/bids）で「自社の入札か」を示す
+    # （2026-09-07 決定: 他社分も金額を開示するため、閲覧側で自社/他社を
+    # 判別できるようフラグを追加。他社分は operator/message/transaction_id を
+    # None に落として返す＝匿名開示。依頼者・admin 向け応答では常に False の
+    # ままで意味を持たない）。
+    is_mine: bool = False
 
 
 class ReminderJobResult(BaseModel):

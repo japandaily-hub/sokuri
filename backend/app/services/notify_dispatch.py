@@ -275,6 +275,31 @@ async def dispatch_bid_received(
 
 
 @_best_effort
+async def dispatch_bid_updated(
+    line_user_id: str | None,
+    email: str | None,
+    case_id: str,
+    company_name: str,
+    old_amount: int,
+    new_amount: int,
+) -> None:
+    """入札額の引き上げ通知（依頼者宛）。LINE優先・失敗/未連携時はメールにフォールバック。
+
+    dispatch_bid_received と同じ理由で、仮メール判定はここへ集約する
+    （LINE連携済みなら仮メールでも LINE には届けるため）。
+    """
+    if line_user_id:
+        ok = await line_notify.push_bid_updated(
+            line_user_id, case_id, company_name, old_amount, new_amount
+        )
+        if ok:
+            return
+    if not email or notify.is_placeholder_email(email):
+        return
+    await notify.send_bid_updated(email, case_id, company_name, old_amount, new_amount)
+
+
+@_best_effort
 async def dispatch_visit_overdue(
     line_user_id: str | None,
     email: str | None,

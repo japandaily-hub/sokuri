@@ -5,14 +5,19 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
+from datetime import datetime, timezone
+
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
+    DateTime,
     ForeignKey,
+    Integer,
     String,
     Text,
     UniqueConstraint,
     Uuid,
+    func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -44,6 +49,11 @@ class Bid(Base, TimestampMixin):
 
     1 案件につき 1 業者 1 入札のみ（uq_bids_case_operator 制約）。取り下げ
     （withdrawn）後の再入札も同じ理由で拒否される（意図的な仕様。設計確定済み）。
+
+    価格競争を働かせるため、pending 状態の間は自社の入札額を現在額より
+    高い金額へ何度でも引き上げられる（``PATCH /cases/{case_id}/bids/me``）。
+    下げる方向の変更は許可しない（封印入札のまま。設計確定済み）。引き上げの
+    都度 ``revision_count`` を加算し、変遷を ``BidAmountHistory`` に記録する。
     """
 
     __tablename__ = "bids"
@@ -75,6 +85,12 @@ class Bid(Base, TimestampMixin):
     message: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(
         String(32), nullable=False, default=BID_STATUS_PENDING, index=True
+    )
+    # 自社入札の引き上げ回数（PATCH /cases/{case_id}/bids/me）。都度 bid_amount_history
+    # を COUNT するとN+1・案件詳細一覧のたびに走査コストが乗るため、非正規化カウンタ
+    # として持つ（既存本番行への影響を避けるため server_default で0埋め。alembic 0034）。
+    revision_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
     )
 
     # relations
@@ -123,3 +139,38 @@ class BidWithdrawal(Base, TimestampMixin):
     # 指摘対応。多層防御）。
     company_name: Mapped[str] = mapped_column(String(255), nullable=False)
     amount: Mapped[int] = mapped_column(BigInteger, nullable=False)  # 円（取り下げ時点の入札額）
+
+
+class BidAmountHistory(Base):
+    """入札額の引き上げ履歴（追記専用・1回の引き上げにつき1レコード）。
+
+    ``PATCH /cases/{case_id}/bids/me`` による引き上げの都度、更新前後の
+    金額・メッセージを記録する（bid_withdrawals と同じ理由で、bids 行の
+    updated_at だけでは「いつ・いくらからいくらへ」の変遷が追えないため）。
+
+    ``bid_id`` は ON DELETE CASCADE（bid_withdrawals とは異なり RESTRICT に
+    していない）: これは不正調査の唯一の記録ではなく、生きている bids 行に
+    付随する参考情報という位置づけのため、親（bids→cases/operators）の
+    削除に追随して消えてよい（alembic 0034 コメント参照）。
+    """
+
+    __tablename__ = "bid_amount_history"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    bid_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("bids.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    old_amount: Mapped[int] = mapped_column(BigInteger, nullable=False)  # 円
+    new_amount: Mapped[int] = mapped_column(BigInteger, nullable=False)  # 円
+    old_message: Mapped[str | None] = mapped_column(Text)
+    new_message: Mapped[str | None] = mapped_column(Text)
+    # server_default=func.now()（DB側でも埋める。alembic 0034 のDDLと一致させる
+    # ことが本体、本番のNotNullViolationを防ぐ唯一の担保）に加え、Python側
+    # default も併記する（多層防御。create_all を使うテスト環境で server_default
+    # のフェッチが働かない構成に切り替わっても NOT NULL 違反を起こさないため）。
+    changed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        server_default=func.now(),
+    )

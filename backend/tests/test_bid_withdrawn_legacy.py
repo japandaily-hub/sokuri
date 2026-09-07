@@ -171,11 +171,11 @@ async def _mark_withdrawn(db_session: AsyncSession, bid_id: str) -> None:
 async def test_withdrawn_bid_excluded_from_bid_count(
     client: AsyncClient, db_session: AsyncSession
 ):
-    """取り下げ済み入札は依頼者・業者いずれの bid_count からも除外される。
+    """取り下げ済み入札は依頼者・業者いずれの bid_count / top_bid_amount からも除外される。
 
-    r12 決定2 で top_bid_amount（他社を含む最高入札額）は応答から削除したため、
-    ここでは件数のみを検証する（他社額の非開示自体は
-    tests/test_r12_backend_fixes.py が担保する）。
+    2026-09-07 決定で top_bid_amount（他社を含む最高入札額）は業者へ開示される
+    ようになったため、ここでは withdrawn 除外後の値も検証する（金額の匿名開示
+    自体は tests/test_r12_backend_fixes.py が担保する）。
     """
     admin_token = await _make_admin(client, db_session)
     user_token = await _signup_user(client)
@@ -203,7 +203,8 @@ async def test_withdrawn_bid_excluded_from_bid_count(
     r = await client.get(f"/api/v1/cases/{case['id']}", headers=_auth(op1_token))
     assert r.status_code == 200
     body = r.json()
-    assert "top_bid_amount" not in body
+    # 取り下げ済み(55000)は最高額の算定から除外され、残る自社の40000が最高額になる。
+    assert body["top_bid_amount"] == 40000
     assert body["bid_count"] == 1
 
 

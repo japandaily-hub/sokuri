@@ -209,6 +209,23 @@ async def send_bid_received(to_email: str, case_id: str, company_name: str, amou
     )
 
 
+async def send_bid_updated(
+    to_email: str, case_id: str, company_name: str, old_amount: int, new_amount: int
+) -> bool:
+    """②' 入札額の引き上げ通知（ユーザー宛）。"""
+    settings = get_settings()
+    url = f"{settings.frontend_base_url}/cases/{case_id}"
+    return await _send(
+        to_email,
+        "【カタヅケ】入札額が更新されました",
+        _wrap(
+            f"<p><strong>{html.escape(company_name)}</strong> の入札額が更新されました。</p>"
+            f"<p>{old_amount:,} 円 → <strong>{new_amount:,} 円</strong></p>"
+            f'<p><a href="{url}">入札一覧を確認する</a></p>'
+        ),
+    )
+
+
 async def send_bid_selected(to_email: str, transaction_id: str, amount: int) -> bool:
     """③ 落札通知（業者宛）。"""
     settings = get_settings()

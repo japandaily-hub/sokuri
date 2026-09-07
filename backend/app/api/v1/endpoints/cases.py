@@ -40,6 +40,7 @@ from app.db.models.case import (
     CaseItem,
     CasePhoto,
 )
+from app.db.models.operator import Operator
 from app.db.models.transaction import Cancellation
 from app.db.models.user import User
 from app.db import session as db_session_module
@@ -358,25 +359,55 @@ def _to_case_out(case: Case) -> CaseOut:
     return out
 
 
-def _to_masked_out(case: Case, my_operator_id: uuid.UUID | None = None) -> CaseMaskedOut:
+def _to_masked_out(case: Case, my_operator: Operator | None = None) -> CaseMaskedOut:
     out = build_case_masked_out(case)
     my_bid = None
-    if my_operator_id is not None:
+    if my_operator is not None:
         for bid in case.bids:
-            if bid.operator_id == my_operator_id:
+            if bid.operator_id == my_operator.id:
                 my_bid = BidOut.model_validate(bid)
                 if bid.status == "selected" and bid.transaction is not None:
                     my_bid.transaction_id = bid.transaction.id
+                # bids.py の list_bids と同じ契約: 自社分には is_mine=True を
+                # 明示する（Bid ORM に is_mine 属性が無いため既定値の False の
+                # ままにならないよう、model_validate 後に上書きする）。
+                my_bid.is_mine = True
                 break
     # 取り下げ済み入札は依頼者・業者いずれの集計からも除外する（_to_case_out と同じ理由）。
-    out.bid_count = sum(1 for b in case.bids if b.status != BID_STATUS_WITHDRAWN)
+    live_bids = [b for b in case.bids if b.status != BID_STATUS_WITHDRAWN]
+    out.bid_count = len(live_bids)
     out.my_bid = my_bid
-    # r12 決定2: 他社の入札額（旧 top_bid_amount）は業者へ一切返さない。
-    # 他社提示額が見える場を運営すると「古物の売買の competitive な媒介＝古物競り
-    # あっせん業」の該当性が上がるため、競り性の外形（他社額・順位・首位判定）を
-    # 応答から落とす。件数（bid_count）と自社入札（my_bid）は、依頼者側の反応が
-    # 分かる最小限の情報として維持する。CaseMaskedOut からもフィールドごと削除
-    # 済みのため、ここで再設定すると ValidationError になる（復活防止の型ガード）。
+    # 2026-09-07 決定（r12 決定2からの方針転換）: 他社の最高入札額を業者へ開示する
+    # （社名・コメント・業者IDは非開示のまま匿名で金額のみ）。list_bids 側の
+    # is_mine 分岐と同じ方針転換。入札が無ければ None、自社入札の有無に応じて
+    # is_top_bidder（自社額 >= 最高額）を算出する。
+    #
+    # security review Medium指摘対応:
+    # - 案件が open/bidding を離れた（closed/cancelled 等）後は落札額の事後
+    #   開示になるため非開示にする（bids.py list_bids の disclose_others と
+    #   同じ判断基準）。
+    # - vendor_status="active" の業者のみへ開示する（"limited" は価格競争の
+    #   当事者ではない）。
+    # - 停止中・退会済み業者の入札は select_bid でも選べないため、「幻の最高額」
+    #   を作らないよう最高額算出の母集団から除外する（bid_count には含めたまま）。
+    case_is_active = case.status in ("open", "bidding")
+    disclose_top_bid = (
+        case_is_active and my_operator is not None and my_operator.vendor_status == "active"
+    )
+    disclosable_bids = [
+        b for b in live_bids if not b.operator.is_suspended and b.operator.deleted_at is None
+    ]
+    if disclose_top_bid and disclosable_bids:
+        out.top_bid_amount = max(b.amount for b in disclosable_bids)
+        # QA M3対応: 取り下げ済みの自社入札は最高額の母集団（live_bids）に入らないため、
+        # それを基準に「首位」と判定しない（表示用の my_bid 自体は取り下げ済みでも返す）。
+        if my_bid is not None and my_bid.status != BID_STATUS_WITHDRAWN:
+            out.is_top_bidder = my_bid.amount >= out.top_bid_amount
+        else:
+            out.is_top_bidder = None
+    else:
+        out.top_bid_amount = None
+        out.is_top_bidder = None
     return out
 
 
@@ -650,7 +681,7 @@ async def list_cases(
             .offset(offset)
         )
     ).all()
-    return [_to_masked_out(c, actor.operator.id) for c in cases]
+    return [_to_masked_out(c, actor.operator) for c in cases]
 
 
 @router.get(
@@ -677,7 +708,7 @@ async def get_case(
 
     assert actor.operator is not None
     # 一覧同様、未承認・停止中は get_case_viewer_actor が 403 で弾いている（r12 決定1）。
-    return _to_masked_out(case, actor.operator.id)
+    return _to_masked_out(case, actor.operator)
 
 
 @router.post(

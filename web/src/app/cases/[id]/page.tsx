@@ -713,6 +713,11 @@ export default function UserCaseDetailPage() {
                     ) : null}
                     <p className="mt-0.5 text-lg font-semibold text-brand-700 tabular-nums">
                       {formatYen(b.amount)}
+                      {b.revision_count > 0 ? (
+                        <span className="ml-2 rounded-none bg-slate-100 px-2 py-0.5 text-xs font-normal text-slate-500 align-middle">
+                          更新あり（{b.revision_count}回）
+                        </span>
+                      ) : null}
                     </p>
                     {b.message ? (
                       <p className="mt-1 max-w-md text-sm leading-relaxed text-slate-600">

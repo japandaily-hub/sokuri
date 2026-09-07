@@ -440,8 +440,16 @@ async def test_full_flow_bid_select_reduction_complete_review(
     assert len(bids) == 2
     assert all(b["operator"]["company_name"] for b in bids)
 
+    # 業者向け（op1）: 2026-09-07 決定で他社分も金額のみ匿名開示される（社名は非開示）。
     r = await client.get(f"/api/v1/cases/{case_id}/bids", headers=_auth(op1_token))
-    assert len(r.json()) == 1
+    op1_bids = r.json()
+    assert len(op1_bids) == 2
+    op1_own = next(b for b in op1_bids if b["is_mine"])
+    op1_other = next(b for b in op1_bids if not b["is_mine"])
+    assert op1_own["operator"]["company_name"] == "片付けA社"
+    assert op1_other["operator"] is None
+    assert op1_other["amount"] == 65000
+    assert "片付けB社" not in r.text
 
     r = await client.post(
         f"/api/v1/cases/{case_id}/bids/{bid1['id']}/select", headers=_auth(op1_token)
@@ -2256,9 +2264,10 @@ async def test_vendor_public_profile_default_public_when_profile_row_missing(
 # ── 他社入札額の非開示（r12 決定2。旧「最高入札額」テストを反転） ──
 
 
-async def test_other_operators_bid_amount_is_not_disclosed(
+async def test_other_operators_bid_amount_is_disclosed_anonymously(
     client: AsyncClient, db_session: AsyncSession
 ):
+    """2026-09-07 決定: 他社の入札額は開示するが、社名は非開示のまま。"""
     admin_token = await _make_admin(client, db_session)
     user_token = await _signup_user(client, "topbid_user@example.com")
     op1_token, _ = await _verified_operator(client, db_session, admin_token, "topbid_op1@example.com", "A社")
@@ -2274,22 +2283,37 @@ async def test_other_operators_bid_amount_is_not_disclosed(
     )
     assert r.status_code == 201
 
-    # 業者向け一覧・詳細は件数のみを返し、他社の提示額（55000）は一切含まない。
+    # 業者向け一覧・詳細は他社の最高額（55000）を top_bid_amount として開示するが、
+    # 他社の社名は現れない（自社分は my_bid.operator 経由で自社名のみ見える）。
     r = await client.get("/api/v1/cases", headers=_auth(op1_token))
     assert r.status_code == 200
     target = next(c for c in r.json() if c["id"] == case["id"])
-    assert "top_bid_amount" not in target
+    assert target["top_bid_amount"] == 55000
+    assert target["is_top_bidder"] is False
     assert target["bid_count"] == 2
     assert target["my_bid"]["amount"] == 40000
-    assert "55000" not in r.text
+    assert "B社" not in r.text  # 他社(B社)の社名は非開示
+    assert "A社" in r.text  # 自社(A社)は my_bid.operator 経由で見える
 
     r = await client.get(f"/api/v1/cases/{case['id']}", headers=_auth(op2_token))
     assert r.status_code == 200
     body = r.json()
-    assert "top_bid_amount" not in body
+    assert body["top_bid_amount"] == 55000
+    assert body["is_top_bidder"] is True
     assert body["bid_count"] == 2
     assert body["my_bid"]["amount"] == 55000
-    assert "40000" not in r.text
+    assert "A社" not in r.text  # 他社(A社)の社名は非開示
+    assert "B社" in r.text  # 自社(B社)は my_bid.operator 経由で見える
+
+    # 入札一覧: 他社分は金額のみ・社名なし。自社分は社名込みで見える。
+    r = await client.get(f"/api/v1/cases/{case['id']}/bids", headers=_auth(op1_token))
+    assert r.status_code == 200
+    bids = {b["amount"]: b for b in r.json()}
+    assert bids[55000]["is_mine"] is False
+    assert bids[55000]["operator"] is None
+    assert bids[40000]["is_mine"] is True
+    assert bids[40000]["operator"]["company_name"] == "A社"
+    assert "B社" not in r.text
 
 
 async def test_review_updates_operator_review_stats_and_bid_summary(

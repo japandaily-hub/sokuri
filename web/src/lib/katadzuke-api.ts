@@ -169,6 +169,14 @@ export interface CaseMasked {
   items?: CaseItemOut[];
   item_count?: number;
   photo_count?: number;
+  /**
+   * 他社を含む最高入札額（2026-09-07 方針転換: 他社の入札額は匿名で開示する。
+   * 社名・コメントは非開示のまま）。入札が無ければ null。
+   * バックエンド並行実装中のため optional。未対応の間は undefined のまま届く想定。
+   */
+  top_bid_amount?: number | null;
+  /** 自社入札があり、それが現在の最高額であれば true。自社入札が無ければ null。 */
+  is_top_bidder?: boolean | null;
 }
 
 export interface BidOut {
@@ -182,11 +190,27 @@ export interface BidOut {
   /** selected の場合のみ: 成約 ID（落札管理への導線） */
   transaction_id: string | null;
   /**
+   * 業者向け一覧（GET /cases/{id}/bids）で自社の入札かどうか。true の場合のみ
+   * operator・message・transaction_id が中身を持つ。false（他社分）は匿名化のため
+   * それらが null で届く（amount・status・created_at・updated_at・revision_count は開示）。
+   * バックエンド並行実装中のため optional。未対応の間は undefined のまま届く想定
+   * （その場合は自社分のみが返る旧挙動として扱い、is_mine 前提の表示は出さない）。
+   */
+  is_mine?: boolean;
+  /**
    * 入札業者が運営により利用停止中か。true の入札は選択不可として扱い
    * 「この業者は現在利用停止中です。運営にお問い合わせください。」を表示する
    * （一覧からは除外されず旗が立つ方式。r6-flow ADD-1）。
    */
   operator_suspended: boolean;
+  /**
+   * 入札額の引き上げ回数（初期0）。業者は自分の入札額を、成約が決まるまで
+   * 現在額より高い金額へ何度でも引き上げられる（下げは不可）。
+   * updateMyBid() 成功のたびに backend 側でインクリメントされる。
+   */
+  revision_count: number;
+  /** 入札の最終更新日時（新規作成時は created_at と同値、引き上げ後は更新される）。 */
+  updated_at: string;
 }
 
 export interface TransactionListItem {
@@ -1691,6 +1715,12 @@ export function addCaseItemPhoto(
 // 入札
 // ---------------------------------------------------------------------------
 
+/**
+ * 入札一覧。依頼者本人トークン: 取り下げ済みを除く全件。業者トークン: 取り下げ済みを
+ * 除く全件が amount 降順で返る（2026-09-07 方針転換）。自社分は is_mine: true で
+ * 全フィールド、他社分は is_mine: false で operator・message・transaction_id が
+ * null（匿名化。社名・コメントは非開示、金額は開示）。
+ */
 export function listBids(caseId: string, token: string): Promise<BidOut[]> {
   return request(`/cases/${encodeURIComponent(caseId)}/bids`, { token });
 }
@@ -1702,6 +1732,24 @@ export function createBid(
 ): Promise<BidOut> {
   return request(`/cases/${encodeURIComponent(caseId)}/bids`, {
     method: "POST",
+    body: JSON.stringify(payload),
+    token,
+  });
+}
+
+/**
+ * 自社の入札額を引き上げる（案件1件につき1入札の枠内で、金額は何度でも現在額より
+ * 高い方向にのみ変更できる。下げることはできない）。
+ * 404: 自社入札が存在しない / 409: 案件が受付外・入札が pending 以外・amount が現在額以下
+ * （detail は日本語メッセージ） / 422: message に連絡先が含まれる。
+ */
+export function updateMyBid(
+  caseId: string,
+  payload: { amount: number; message?: string | null },
+  token: string,
+): Promise<BidOut> {
+  return request(`/cases/${encodeURIComponent(caseId)}/bids/me`, {
+    method: "PATCH",
     body: JSON.stringify(payload),
     token,
   });

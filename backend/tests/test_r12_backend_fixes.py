@@ -4,8 +4,11 @@
 - 決定1: 未承認業者（vendor_status=pending / rejected）の案件閲覧を 403
          ``approval_required`` で止める（一覧・詳細・入札一覧・案件写真配信）。
          停止中は従来どおり ``account_suspended``。
-- 決定2: 業者向け応答から他社の入札額・順位を落とす（``top_bid_amount`` 廃止・
-         入札一覧は自社分のみ）。依頼者・運営は従来どおり全件見える。
+- 決定2: 業者向け応答から他社の入札額・順位を落とす方針だったが、2026-09-07に
+         ユーザー決定で開示へ転換。他社分は金額のみ匿名開示（社名・コメント・
+         業者IDは非開示のまま）。入札一覧に自社/他社判別用の ``is_mine`` を追加し、
+         案件詳細には他社最高額 ``top_bid_amount`` と自社が首位かの
+         ``is_top_bidder`` を追加した。依頼者・運営は従来どおり全件見える。
 - 決定3: リマインド定期処理（訪問日超過 / 入札ゼロ放置）の対象抽出と
          二重送信防止、``POST /admin/jobs/reminders`` の手動実行。
 
@@ -200,20 +203,30 @@ async def test_case_photo_delivery_blocks_unapproved_operator_token(
     assert r.status_code == 200
 
 
-# ──────────────────────── 決定2: 他社入札額の非開示 ────────────────────────
+# ──────────────────── 決定2 → 2026-09-07 方針転換: 他社入札額の匿名開示 ────────────────────
 
 
-async def test_operator_bid_list_hides_other_operators_amount(
+async def test_operator_bid_list_shows_other_operators_amount_anonymously(
     client: AsyncClient, db_session: AsyncSession
 ):
-    """業者向け入札一覧は自社入札のみ。他社の額は本文のどこにも現れない。"""
+    """業者向け入札一覧は全件（取り下げ済み除く）を amount 降順で返す。
+
+    他社分は amount は見えるが operator/message/transaction_id は非開示（匿名）。
+    自社分のみ ``is_mine=True`` かつ全フィールド（operator込み）が見える。
+    """
     user, user_token = await _make_user(db_session, "bidlist_owner@example.com")
     case = await _make_case(db_session, user, status="bidding")
     op1, op1_token = await _make_operator(db_session, "bidlist_op1@example.com", company="A社")
     op2, _ = await _make_operator(db_session, "bidlist_op2@example.com", company="B社")
     db_session.add_all(
         [
-            Bid(case_id=case.id, operator_id=op1.id, amount=40000, status="pending"),
+            Bid(
+                case_id=case.id,
+                operator_id=op1.id,
+                amount=40000,
+                status="pending",
+                message="A社からのメッセージ",
+            ),
             Bid(case_id=case.id, operator_id=op2.id, amount=55000, status="pending"),
         ]
     )
@@ -221,26 +234,65 @@ async def test_operator_bid_list_hides_other_operators_amount(
 
     r = await client.get(f"/api/v1/cases/{case.id}/bids", headers=_auth(op1_token))
     assert r.status_code == 200, r.text
-    assert [b["amount"] for b in r.json()] == [40000]
-    assert "55000" not in r.text
+    body = r.json()
+    # amount 降順（他社の55000が先頭）
+    assert [b["amount"] for b in body] == [55000, 40000]
+    other, mine = body[0], body[1]
+    assert other["is_mine"] is False
+    assert other["operator"] is None
+    assert other["message"] is None
+    assert other["transaction_id"] is None
+    assert mine["is_mine"] is True
+    assert mine["operator"]["company_name"] == "A社"
+    assert mine["message"] == "A社からのメッセージ"
+    # 社名・コメントはどこにも露出しない（金額のみ開示）
+    assert "B社" not in r.text
+    assert "A社からのメッセージ" in r.text  # 自社分としては見える
 
-    # 依頼者側は従来どおり全件（他社額も含む）見える
+    # 依頼者側は従来どおり全件（社名込み）見える
     r = await client.get(f"/api/v1/cases/{case.id}/bids", headers=_auth(user_token))
     assert r.status_code == 200, r.text
-    assert sorted(b["amount"] for b in r.json()) == [40000, 55000]
+    owner_body = r.json()
+    assert sorted(b["amount"] for b in owner_body) == [40000, 55000]
+    assert all(b["operator"] is not None for b in owner_body)
+    assert "B社" in r.text
 
 
-async def test_case_masked_out_has_no_top_bid_amount(
+async def test_operator_bid_list_hides_withdrawn_bids_from_other_operators(
     client: AsyncClient, db_session: AsyncSession
 ):
-    """業者向け案件詳細に順位・他社額の手がかり（top_bid_amount）を返さない。
+    """取り下げ済み入札は他社にも自社にも一覧へ現れない。"""
+    user, _ = await _make_user(db_session, "bidlist_withdrawn_owner@example.com")
+    case = await _make_case(db_session, user, status="bidding")
+    op1, op1_token = await _make_operator(db_session, "withdrawn_op1@example.com", company="A社")
+    op2, _ = await _make_operator(db_session, "withdrawn_op2@example.com", company="B社")
+    db_session.add_all(
+        [
+            Bid(case_id=case.id, operator_id=op1.id, amount=40000, status="pending"),
+            Bid(case_id=case.id, operator_id=op2.id, amount=99000, status="withdrawn"),
+        ]
+    )
+    await db_session.commit()
 
-    自社入札（my_bid）と件数（bid_count）は維持する。
+    r = await client.get(f"/api/v1/cases/{case.id}/bids", headers=_auth(op1_token))
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert len(body) == 1
+    assert body[0]["amount"] == 40000
+    assert "99000" not in r.text
+
+
+async def test_case_masked_out_exposes_top_bid_amount_and_top_bidder_flag(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """業者向け案件詳細は他社最高額（top_bid_amount）と自社が首位かを開示する。
+
+    自社入札（my_bid）と件数（bid_count）も維持する。社名は含まれない。
     """
     user, _ = await _make_user(db_session, "masked_owner@example.com")
     case = await _make_case(db_session, user, status="bidding")
     op1, op1_token = await _make_operator(db_session, "masked_op1@example.com", company="A社")
-    op2, _ = await _make_operator(db_session, "masked_op2@example.com", company="B社")
+    op2, op2_token = await _make_operator(db_session, "masked_op2@example.com", company="B社")
     db_session.add_all(
         [
             Bid(case_id=case.id, operator_id=op1.id, amount=40000, status="pending"),
@@ -249,13 +301,185 @@ async def test_case_masked_out_has_no_top_bid_amount(
     )
     await db_session.commit()
 
+    # 劣位側（op1）: 自社40000 < 他社最高99000 → is_top_bidder=False
     r = await client.get(f"/api/v1/cases/{case.id}", headers=_auth(op1_token))
     assert r.status_code == 200, r.text
     body = r.json()
-    assert "top_bid_amount" not in body
     assert body["bid_count"] == 2
+    assert body["top_bid_amount"] == 99000
     assert body["my_bid"]["amount"] == 40000
+    assert body["is_top_bidder"] is False
+    assert "B社" not in r.text  # 社名は非開示のまま
+
+    # 首位側（op2）: 自社99000 >= 他社最高99000（=自社自身）→ is_top_bidder=True
+    r = await client.get(f"/api/v1/cases/{case.id}", headers=_auth(op2_token))
+    assert r.status_code == 200, r.text
+    body2 = r.json()
+    assert body2["top_bid_amount"] == 99000
+    assert body2["is_top_bidder"] is True
+
+
+async def test_case_masked_out_my_bid_marks_is_mine(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """案件詳細（業者向け）の my_bid には is_mine=True が明示される。"""
+    user, _ = await _make_user(db_session, "mybid_ismine_owner@example.com")
+    case = await _make_case(db_session, user, status="bidding")
+    op1, op1_token = await _make_operator(db_session, "mybid_ismine_op1@example.com", company="A社")
+    db_session.add(Bid(case_id=case.id, operator_id=op1.id, amount=40000, status="pending"))
+    await db_session.commit()
+
+    r = await client.get(f"/api/v1/cases/{case.id}", headers=_auth(op1_token))
+    assert r.status_code == 200, r.text
+    assert r.json()["my_bid"]["is_mine"] is True
+
+
+async def test_requester_case_out_unaffected_by_bid_disclosure_change(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """依頼者向け案件応答（CaseOut）に top_bid_amount / is_top_bidder / is_mine は現れない。"""
+    user, user_token = await _make_user(db_session, "requester_unaffected@example.com")
+    case = await _make_case(db_session, user, status="bidding")
+    op1, _ = await _make_operator(db_session, "req_unaffected_op1@example.com", company="A社")
+    db_session.add(Bid(case_id=case.id, operator_id=op1.id, amount=40000, status="pending"))
+    await db_session.commit()
+
+    r = await client.get(f"/api/v1/cases/{case.id}", headers=_auth(user_token))
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert "top_bid_amount" not in body
+    assert "is_top_bidder" not in body
+    assert body["bid_count"] == 1
+
+    r = await client.get(f"/api/v1/cases/{case.id}/bids", headers=_auth(user_token))
+    assert r.status_code == 200, r.text
+    assert r.json()[0]["operator"]["company_name"] == "A社"
+
+
+# ──────────────── security review 是正: 落札額の事後開示・開示先の限定 ────────────────
+
+
+async def test_closed_case_hides_other_bids_and_top_bid_from_operator(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """案件が closed になった後は、業者へは自社分のみ・top_bid_amount/is_top_bidder は None。
+
+    落札確定後に他社額を開示すると「落札額の事後開示」になるため（security review
+    Medium指摘対応）。
+    """
+    user, _ = await _make_user(db_session, "closed_owner@example.com")
+    case = await _make_case(db_session, user, status="bidding")
+    op1, op1_token = await _make_operator(db_session, "closed_op1@example.com", company="A社")
+    op2, _ = await _make_operator(db_session, "closed_op2@example.com", company="B社")
+    db_session.add_all(
+        [
+            Bid(case_id=case.id, operator_id=op1.id, amount=40000, status="pending"),
+            Bid(case_id=case.id, operator_id=op2.id, amount=99000, status="selected"),
+        ]
+    )
+    await db_session.commit()
+    case.status = "closed"
+    await db_session.commit()
+
+    r = await client.get(f"/api/v1/cases/{case.id}/bids", headers=_auth(op1_token))
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert len(body) == 1
+    assert body[0]["is_mine"] is True
     assert "99000" not in r.text
+    assert "B社" not in r.text
+
+    r = await client.get(f"/api/v1/cases/{case.id}", headers=_auth(op1_token))
+    assert r.status_code == 200, r.text
+    detail = r.json()
+    assert detail["top_bid_amount"] is None
+    assert detail["is_top_bidder"] is None
+    assert detail["bid_count"] == 2  # 件数の集計自体は従来どおり
+
+
+async def test_limited_vendor_status_operator_sees_only_own_bid(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """vendor_status="limited" の業者は閲覧できるが、他社分は非開示（自社分のみ）。
+
+    security review Medium指摘対応: 他社金額の開示先は vendor_status="active" のみ。
+    """
+    user, _ = await _make_user(db_session, "limited_owner@example.com")
+    case = await _make_case(db_session, user, status="bidding")
+    limited_op, limited_token = await _make_operator(
+        db_session, "limited_op@example.com", vendor_status="limited", company="限定社"
+    )
+    active_op, _ = await _make_operator(
+        db_session, "limited_active_op@example.com", company="有効社"
+    )
+    db_session.add_all(
+        [
+            Bid(case_id=case.id, operator_id=limited_op.id, amount=30000, status="pending"),
+            Bid(case_id=case.id, operator_id=active_op.id, amount=90000, status="pending"),
+        ]
+    )
+    await db_session.commit()
+
+    r = await client.get(f"/api/v1/cases/{case.id}/bids", headers=_auth(limited_token))
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert len(body) == 1
+    assert body[0]["is_mine"] is True
+    assert "90000" not in r.text
+
+    r = await client.get(f"/api/v1/cases/{case.id}", headers=_auth(limited_token))
+    assert r.status_code == 200, r.text
+    detail = r.json()
+    assert detail["top_bid_amount"] is None
+    assert detail["is_top_bidder"] is None
+    assert detail["bid_count"] == 2
+
+
+async def test_suspended_and_deleted_operator_bids_excluded_from_top_bid_disclosure(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """停止中・退会済み業者の入札は、他社への開示対象・top_bid_amount の算出から除外する。
+
+    select_bid でも選択できない入札を「幻の最高額」として見せない
+    （security review Medium指摘対応）。bid_count には引き続き含まれる。
+    """
+    user, _ = await _make_user(db_session, "phantom_owner@example.com")
+    case = await _make_case(db_session, user, status="bidding")
+    viewer, viewer_token = await _make_operator(
+        db_session, "phantom_viewer@example.com", company="閲覧社"
+    )
+    suspended_op, _ = await _make_operator(
+        db_session, "phantom_suspended@example.com", company="停止社"
+    )
+    deleted_op, _ = await _make_operator(
+        db_session, "phantom_deleted@example.com", company="退会社"
+    )
+    suspended_op.is_suspended = True
+    deleted_op.deleted_at = datetime.now(timezone.utc)
+    db_session.add_all(
+        [
+            Bid(case_id=case.id, operator_id=viewer.id, amount=10000, status="pending"),
+            Bid(case_id=case.id, operator_id=suspended_op.id, amount=99000, status="pending"),
+            Bid(case_id=case.id, operator_id=deleted_op.id, amount=88000, status="pending"),
+        ]
+    )
+    await db_session.commit()
+
+    r = await client.get(f"/api/v1/cases/{case.id}/bids", headers=_auth(viewer_token))
+    assert r.status_code == 200, r.text
+    body = r.json()
+    # 自社分のみが残り、停止・退会業者の分は開示対象から除外される。
+    assert [b["is_mine"] for b in body] == [True]
+    assert "99000" not in r.text
+    assert "88000" not in r.text
+
+    r = await client.get(f"/api/v1/cases/{case.id}", headers=_auth(viewer_token))
+    assert r.status_code == 200, r.text
+    detail = r.json()
+    # 停止・退会業者を除いた自社分（10000）のみが母集団のため、自社が首位になる。
+    assert detail["top_bid_amount"] == 10000
+    assert detail["is_top_bidder"] is True
+    assert detail["bid_count"] == 3  # 件数の集計自体は従来どおり（除外しない）
 
 
 # ──────────────────────── 決定3: リマインド定期処理 ────────────────────────

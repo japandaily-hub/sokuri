@@ -23,3 +23,13 @@ MAX_PHOTOS_PER_CASE = 150
 # 単一の出所にする（web が「あと何回申請できるか」を自前のリテラルで持つと、
 # 上限を変えた瞬間に画面と API が食い違う）。r10 V-M4 対応。
 MAX_REDUCTION_REQUESTS_PER_TRANSACTION = 2
+
+# 自社入札の引き上げ（PATCH /cases/{case_id}/bids/me）に必要な最小引き上げ幅（円）。
+# web 側の入力刻みと一致させる。1円単位の無意味な引き上げ連打（通知の増幅・
+# bid_amount_history の膨張）を防ぐ（security review 指摘対応）。
+BID_RAISE_MIN_STEP = 1000
+
+# 1入札あたりの引き上げ回数の上限。無制限だと同一入札に対する通知
+# （dispatch_bid_updated）の連打と bid_amount_history の無制限な行数増加を
+# 招くため、DoS・通知疲れ対策として上限を設ける（security review 指摘対応）。
+MAX_BID_REVISIONS = 20

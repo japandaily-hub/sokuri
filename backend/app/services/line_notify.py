@@ -241,6 +241,21 @@ async def push_bid_received(
     )
 
 
+async def push_bid_updated(
+    line_user_id: str, case_id: str, company_name: str, old_amount: int, new_amount: int
+) -> bool:
+    """入札額の引き上げ通知（依頼者宛）。"""
+    settings = get_settings()
+    url = f"{settings.frontend_base_url}/cases/{case_id}"
+    # push_bid_received と同じ理由（業者名は信頼できない差し込み値のため1行へ正規化）。
+    safe_company_name = _sanitize_inline(company_name)
+    return await _push(
+        line_user_id,
+        f"【カタヅケ】入札額が更新されました。\n{safe_company_name}："
+        f"{old_amount:,} 円 → {new_amount:,} 円\n{url}",
+    )
+
+
 async def push_message_received(
     line_user_id: str, transaction_id: str, recipient_party: Literal["user", "operator"]
 ) -> bool:

@@ -114,6 +114,18 @@ function LotCard({ c }: { c: CaseMasked }) {
               入札 {c.bid_count} 件（他社）
             </div>
           ) : null}
+          {c.top_bid_amount != null ? (
+            <div className="lot-meta-item" style={{ marginTop: 4 }}>
+              <span className={`status-chip ${c.is_top_bidder ? "live" : "negotiating"}`}>
+                最高額 {formatYen(c.top_bid_amount)}
+                {c.my_bid ? (c.is_top_bidder ? "・自社が最高額" : "・他社が上回り中") : ""}
+              </span>
+            </div>
+          ) : c.top_bid_amount === null && c.bid_count === 0 ? (
+            <div className="lot-meta-item" style={{ marginTop: 4 }}>
+              <span className="status-chip done">入札なし</span>
+            </div>
+          ) : null}
         </div>
         <div className="lot-action" aria-hidden="true">
           <Ic name="arrow" />

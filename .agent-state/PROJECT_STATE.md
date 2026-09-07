@@ -3,6 +3,7 @@
 更新: 2026-09-04（Claude・r3 導線監査ループ）
 
 ## 現在フェーズ
+- **2026-09-07 入札の方針転換（ユーザー決定）**: ①業者は案件が受付中（open/bidding）の間、自社の入札額を **1,000 円以上・最大 20 回まで引き上げ可**（下げ・取り下げ後の再入札は不可のまま）＝`PATCH /cases/{id}/bids/me`・alembic 0034 `bid_amount_history`＋`bids.revision_count`・引き上げ通知（LINE→メール）②**他社の入札額を業者へ匿名開示**（社名・コメント・業者IDは非開示。開示先は active 業者のみ、受付終了後は自社分のみ、停止中/退会業者の入札は最高額から除外）＝r12 決定2 を撤回。web: 引き上げフォーム（ConfirmModal・コメントのプリフィル）・入札状況カード（最高額/自社が最高か/他社の匿名リスト）・一覧とダッシュボードの最高額チップ・「1回のみ」文言の全面是正。セキュリティレビュー（opus）で Critical 1（0034 の changed_at NOT NULL・本番で PATCH 全件 500 になる欠陥）＋High 3 → 是正・QA で閉塞確認。pytest 912・E2E 36/36（08 を新方針へ更新＋引き上げの E2E 追加）。**法務: 古物競りあっせん業の該当性が上がる → TODO 01-8 を優先度上昇**。
 - **2026-09-06 第13周（r13・自動運用）を push（823ce55→a549cf5→1c89314・本番反映済み・CI 緑）。** 残っていた手作業を GitHub Actions「Ops cron」に置換: `X-Ops-Token`（`get_ops_or_admin`・/admin/jobs/* 限定・最小長32・不一致5回で warning）／新ジョブ `admin-audit`（ADMIN_EMAILS 棚卸し→critical）・`contacts/handle-probes`（差出人＋氏名完全一致＋7日以内）・`mail-probe`（Brevo messageId を返す・20h 間隔）・`key-fingerprint`（鍵の SHA-256）／`scripts/ops_jobs.py`（hourly=リマインド・daily=監査/プローブ/Brevo 配送追跡/前日バウンス/毎時ジョブの欠測検知・key-check=控え照合・key-restore=空のときだけ書き戻し）／`ci.yml` に PostgreSQL 16 サービスで `pg_concurrency_check.py`（success 確認）。独立レビュー2周（security opus → High 3 修正 → QA opus で閉塞確認・新規 Medium 5 を全て対応）。**未完はユーザーの1コマンド `scripts/ops_bootstrap.py`（トークン生成・鍵の控え・Secrets 登録・実証）のみ**＝Claude からの実行は権限で拒否。Agent の実装委任も拒否されたためリーダー直営で実装。
 - **2026-09-06 第12周（r12・残課題のリーダー決定）をコミット（79f8e57）。** 決定: ①審査中（pending/rejected）業者は承認まで案件一覧/詳細/入札/写真を閲覧不可（403 `approval_required`・limited は可）②他社の入札額・順位は業者に非開示（`top_bid_amount` 撤去・件数と自社入札のみ）③訪問日超過・入札ゼロのリマインド（0033・毎時ループ＋`POST /admin/jobs/reminders`・claim→commit→通知・既存行は埋め戻し）④手数料は「8%（税別・消費税を別途加算）」⑤文言の仮定4件は実装整合のまま確定⑥法務2点は文言で非断定化＋入札額非開示で該当性を低減（弁護士確認は任意）。Docker PostgreSQL 16 で同時実行 6 シナリオを実証し、rollback 後の ORM 属性参照バグ（PG のみで 500）を 6 箇所修正。統合レビュー（High 3）→修正→E2E 34 本全通過。本番 `/contact` に実送信して 202（Brevo 経路）。
   - できなかったこと: `APP_ENCRYPTION_KEY` のローカル控え保存（DPAPI 暗号化案も拒否）・本番 DB の直接照合。**09-06 追記: Docker Desktop は復旧済み**（真因＝サンドボックス配下で起動すると前回の Unix ソケット残骸を削除できない Error 1920。`explorer.exe` 経由の通常起動で自力回復。退避フォルダは無関係）。**Brevo 実受信を Gmail で確認**（ADMIN_EMAILS の2宛先に 17:01 JST 到達・差出人は brevosend.com への書き換え＝仕様）。`/admin/contacts` のテスト行の「対応済み」化は admin ログインが必要（Chrome の既存セッションは非 admin で /forbidden）。
@@ -107,3 +108,8 @@
 | 2026-09-04 | r4: 事前申込一覧 API を配列→{items,total} に破壊的変更（web 同時切替） | バッジ・フィルタが最新100件内のみで古い未審査が埋没 | received 優先ソート・status/q・total を追加 |
 | 2026-09-04 | 業者規約版数 CURRENT_OPERATOR_TERMS_VERSION を 2026-09-04 に更新（再同意ゲート無しを確認） | 公開規約の改定日と同意証跡の版が不一致 | 既存業者への告知・再同意は法務確認事項として TODO 01 |
 | 2026-09-04 | r5 で自走ループを停止 | 回帰周の新規 High が「直前周で追加したコードの隣接」に収束し、独立検証でも新次元の欠陥が出なくなった（較正台帳の打ち止め条件） | 残りはユーザー判断事項（push・仮定4件・法務・環境実値） |
+
+## 2026-09-07 人の森向け構想書 最終仕上げ（Claude）
+- md 校正73箇所適用、docx 再生成、新デッキ pptx（38枚）`docs/vision_katazuke_for_hitonomori_20260907_presentation.pptx`
+- Google スライド ID 1L6GM-_EIUUtB463HrGySolQGhuDYftydqXIOyMQ8SNo／Google ドキュメント ID 1nJgcS3lWN3s9OTwSWxVcwby85zhfHZ4ETB_RCSp_KLw（いずれもマイドライブ直下。docs フォルダは毎時ミラーで Google ネイティブ文書が消えるため置かない）
+- 詳細は memory: katazuke-hitonomori-deck-v2-20260907

@@ -78,8 +78,9 @@ const catIcon = (name: string): IcName => CAT_ICON[name] ?? "box";
 const yen = (n: number) => n.toLocaleString("ja-JP");
 
 /**
- * 「winning/outbid」（他社の最高額との比較）は他社入札額が非開示のため判定不能。
- * 自社入札の状態（selected=落札）のみを表示する。
+ * 自社入札の状態（selected=落札）のみを表示する。他社の最高額との比較（自社が
+ * 最高額かどうか）は topBidAmount/isTopBidder（匿名開示・2026-09-07 方針転換）で
+ * 別途 LotCard 内に表示する。
  */
 type LotStatus = "none" | "bid" | "won";
 
@@ -95,6 +96,10 @@ type Lot = {
   photoUrl: string | null;
   /** 品目の要約（例:「ソファ、テーブル ほか1点」）。無ければ案件IDの先頭8桁で代替。 */
   itemsLabel: string;
+  /** 他社を含む最高額（匿名開示・2026-09-07 方針転換）。backend 未対応の間は undefined。 */
+  topBidAmount?: number | null;
+  /** 自社入札があり、それが最高額なら true。backend 未対応の間は undefined。 */
+  isTopBidder?: boolean | null;
 };
 
 function toLot(c: CaseMasked): Lot {
@@ -110,6 +115,8 @@ function toLot(c: CaseMasked): Lot {
     status,
     photoUrl: c.photos[0]?.url ?? null,
     itemsLabel: caseItemsLabel(c) ?? c.id.slice(0, 8),
+    topBidAmount: c.top_bid_amount,
+    isTopBidder: c.is_top_bidder,
   };
 }
 
@@ -187,9 +194,21 @@ function LotCard({
               <strong>{lot.bidCount}</strong>社が入札中
             </span>
           </div>
+          {lot.topBidAmount != null ? (
+            <div className="lot-meta" style={{ marginTop: 4 }}>
+              <span className={`status-chip ${lot.isTopBidder ? "live" : "negotiating"}`}>
+                最高額 ¥{yen(lot.topBidAmount)}
+                {lot.myBid ? (lot.isTopBidder ? "・自社が最高額" : "・他社が上回り中") : ""}
+              </span>
+            </div>
+          ) : lot.topBidAmount === null && lot.bidCount === 0 ? (
+            <div className="lot-meta" style={{ marginTop: 4 }}>
+              <span className="status-chip done">入札なし</span>
+            </div>
+          ) : null}
         </div>
 
-        {/* 入札エリア（他社の入札額は非開示のため、自社の状況のみを表示） */}
+        {/* 入札エリア（他社の入札額は匿名で開示。社名・コメントは非開示） */}
         <div className="lot-bid-area">
           {lot.myBid ? (
             <div className="my-bid-row">
@@ -197,9 +216,14 @@ function LotCard({
             </div>
           ) : null}
           {lot.myBid ? (
-            // 入札は1案件につき1回のみ（更新APIは存在しない）。フォームは出さず案内のみ表示する。
+            // 金額の引き上げは案件詳細の専用フォームでのみ行う（一覧では現在額の案内とリンクのみ）。
             <div className="bid-form">
-              <p className="bid-hint">入札済み（¥{yen(lot.myBid)}）。入札は1案件につき1回のみです。</p>
+              <p className="bid-hint">
+                入札済み（¥{yen(lot.myBid)}）。案件詳細から金額を引き上げられます
+              </p>
+              <Link href={`/operator/cases/${lot.id}`} className="btn btn-ghost btn-block" style={{ marginTop: 8 }}>
+                案件詳細へ
+              </Link>
             </div>
           ) : statusLoading ? null : !canBid ? (
             <div className="bid-form">
@@ -244,7 +268,7 @@ function LotCard({
               <p className="bid-hint" style={validationError ? { color: "var(--danger)" } : undefined}>
                 {validationError ?? (
                   <>
-                    他社の入札額は表示されません（自社の提示額のみ）
+                    他社の入札額は匿名で表示されます（社名・コメントは非開示）
                     <br />
                     成約時のみ買取額の8%（税別・消費税を別途加算）が手数料
                     <br />
