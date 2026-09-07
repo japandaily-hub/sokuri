@@ -11,11 +11,15 @@
 
 databases:
   - name: sokuri-db
-    databaseName: sokuri
+    databaseName: sokuri_jwd3   # 2026-09-01 に作り直した本番 DB の実名（Render が付与した接尾辞込み）。
+                                #   作成後は変更不可のため、実態と違う値を書くと Blueprint 同期が error になる。
     user: sokuri
-    plan: free          # ⚠️ Free PostgreSQL は【作成後30日で期限切れ→接続不能】+14日猶予後に
-                        #    データごと削除される（render.com/docs/free）。旧コメント「90日無期限」は
-                        #    誤り。本番継続には期限前に有料化 or 外部PG移行 or 定期再作成が必須。
+    plan: basic_256mb  # 2026-09-01 に有料プラン（Basic 256MB・1GB disk・期限切れなし）へ移行済み。
+                       #   旧 free プランは【作成後30日で期限切れ→接続不能】+14日猶予後にデータごと削除
+                       #   （render.com/docs/free）。有料 DB を free に戻す同期は Render が拒否するため、
+                       #   2026-09-01〜09-06 の Blueprint 同期はこの行が free のままで error になっていた
+                       #   （Gmail「Blueprint Sync Failed for sokuri」）。plan を変えるときは dashboard で
+                       #   先に変更し、本ファイルは実態に追従させること。
     region: oregon
     ipAllowList: []     # 内部接続のみ（Render Web Service からの接続を許可）
 
