@@ -1,0 +1,42 @@
+name: Render sync
+
+# render.yaml を含む push のあと、Render Blueprint の同期結果を確認して運営へ通知する。
+# Render は同期失敗のメールは送るが復旧は送らないため、失敗 [FAILED] と復旧 [RECOVERED] を
+# 運営の LINE／メールへ同じ経路で届ける（正常時は通知しない）。実体は scripts/render_sync_check.py。
+# 必要な Secrets: RENDER_API_KEY（ops-cron の key-restore と共通）＋ 通知系（uptime-alert.yml と共通）。
+
+on:
+  push:
+    branches: [main]
+    paths: [render.yaml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: render-sync
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check Blueprint sync result
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          HEAD_SHA: ${{ github.event_name == 'push' && github.sha || '' }}
+          WAIT_SECONDS: "180"
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          ALERT_EMAILS: ${{ secrets.ALERT_EMAILS }}
+          ALERT_MAIL_FROM: ${{ secrets.ALERT_MAIL_FROM }}
+          ALERT_LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.ALERT_LINE_CHANNEL_ACCESS_TOKEN }}
+          ALERT_LINE_USER_IDS: ${{ secrets.ALERT_LINE_USER_IDS }}
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+        run: python scripts/render_sync_check.py

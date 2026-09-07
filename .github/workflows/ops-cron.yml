@@ -170,6 +170,8 @@ jobs:
 
   # スクリプト到達前の失敗（ジョブ選択・checkout・Python 準備・タイムアウト）を運営へ通知する。
   # スクリプト自身の失敗は fail() が既に通知しているため二重になるが、欠測より重複を選ぶ。
+  # あわせて失敗状態（.ops_state.json の failed=true）を保存しておき、スクリプト到達前に落ちた場合でも
+  # 次回の成功で _track_recovery が [RECOVERED] を1回送れるようにする（復旧連絡の欠測を無くす）。
   notify-failure:
     needs: [select, ops, key-check, key-restore]
     if: ${{ always() && contains(needs.*.result, 'failure') }}
@@ -200,3 +202,31 @@ jobs:
           sent = notify("[カタヅケ運用] Ops cron が失敗しました", f"❌ Ops cron（{job}）がスクリプト到達前または実行中に失敗しました。\n{os.environ.get('RUN_URL')}")
           print("sent:", sent)
           PY
+      - name: Restore previous state
+        if: ${{ needs.select.result == 'success' }}
+        uses: actions/cache/restore@v4
+        with:
+          path: .ops_state.json
+          key: ops-state-${{ needs.select.outputs.job }}-${{ github.run_id }}-nf
+          restore-keys: |
+            ops-state-${{ needs.select.outputs.job }}-
+      - name: Mark job as failed for recovery tracking
+        if: ${{ needs.select.result == 'success' }}
+        run: |
+          python - <<'PY'
+          import json, time
+          try:
+              state = json.load(open('.ops_state.json', encoding='utf-8'))
+          except Exception:
+              state = {}
+          if not state.get('failed'):
+              state = {'failed': True, 'since': time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}
+          json.dump(state, open('.ops_state.json', 'w', encoding='utf-8'), ensure_ascii=False)
+          print('state:', state)
+          PY
+      - name: Save state
+        if: ${{ needs.select.result == 'success' }}
+        uses: actions/cache/save@v4
+        with:
+          path: .ops_state.json
+          key: ops-state-${{ needs.select.outputs.job }}-${{ github.run_id }}-nf

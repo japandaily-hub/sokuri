@@ -18,6 +18,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read   # notify が直前の実行結果（失敗→復旧）を照合するため
 
 jobs:
   backend:
@@ -140,3 +141,37 @@ jobs:
 
       - name: Build
         run: npx next build
+
+  # 失敗 → 復旧を運営へ通知する。GitHub は失敗メールしか送らないため、LINE／メールへ
+  # 「[FAILED]」と「[RECOVERED]」を同じ経路で届ける（正常時は通知しない）。
+  # 直前の結論は GitHub API の実行履歴から引く（状態のキャッシュ不要）。実体は scripts/run_transition_notify.py。
+  # concurrency の打ち切り（cancelled）は失敗にも復旧にも数えない。
+  notify:
+    needs: [backend, pg-concurrency, web]
+    if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && !contains(needs.*.result, 'cancelled') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Notify failure / recovery
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          WORKFLOW_FILE: ci.yml
+          BRANCH: main
+          LABEL: "CI（pytest / PG 同時実行 / tsc・eslint・next build）"
+          RESULT: ${{ contains(needs.*.result, 'failure') && 'failure' || 'success' }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_NUMBER: ${{ github.run_number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          HEAD_SHA: ${{ github.sha }}
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          ALERT_EMAILS: ${{ secrets.ALERT_EMAILS }}
+          ALERT_MAIL_FROM: ${{ secrets.ALERT_MAIL_FROM }}
+          ALERT_LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.ALERT_LINE_CHANNEL_ACCESS_TOKEN }}
+          ALERT_LINE_USER_IDS: ${{ secrets.ALERT_LINE_USER_IDS }}
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+        run: python scripts/run_transition_notify.py
