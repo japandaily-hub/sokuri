@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     template: "%s | カタヅケ",
   },
   description:
-    "家じゅうの不用品を、まとめて撮って待つだけ。登録業者が買取総額で競い合い、連絡が来るのはあなたが選んだ1社だけ。値がつかない物もまとめて回収。営業電話に追われない、家まるごとの片付け買取マッチング。",
+    "家じゅうの不用品を、1点ずつ撮って、あとは待つだけ。登録業者が買取総額で競い合い、連絡が来るのはあなたが選んだ1社だけ。値がつかない物もまとめて回収。営業電話に追われない、家まるごとの片付け買取マッチング。",
   keywords: [
     "片付け 買取",
     "不用品 買取",
@@ -52,13 +52,13 @@ export const metadata: Metadata = {
     siteName: "カタヅケ",
     title: "カタヅケ｜家まるごと、まとめて片付け買取",
     description:
-      "まとめて撮って待つだけ。業者が買取総額で競い合います。連絡は選んだ1社だけ。値がつかない物もまとめて回収。",
+      "1点ずつ撮って、あとは待つだけ。業者が買取総額で競い合います。連絡は選んだ1社だけ。値がつかない物もまとめて回収。",
     images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "カタヅケ｜家まるごと片付け買取" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "カタヅケ｜家まるごと、まとめて片付け買取",
-    description: "まとめて撮って待つだけ。業者が買取総額で競い合います。連絡は選んだ1社だけ。",
+    description: "1点ずつ撮って、あとは待つだけ。業者が買取総額で競い合います。連絡は選んだ1社だけ。",
     images: ["/opengraph-image"],
   },
   robots: {
@@ -95,7 +95,7 @@ const WEBSITE_LD = {
   url: SITE_URL,
   inLanguage: "ja-JP",
   description:
-    "家じゅうの不用品を、まとめて撮って待つだけ。登録業者が買取総額で競い合う片付け買取マッチング。",
+    "家じゅうの不用品を、1点ずつ撮って、あとは待つだけ。登録業者が買取総額で競い合う片付け買取マッチング。",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

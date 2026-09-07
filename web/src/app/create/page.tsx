@@ -103,7 +103,7 @@ export default function CreateCasePage() {
   const [mode, setMode] = useState<Step1Mode>({ kind: "list" });
   const [items, setItems] = useState<DraftItem[]>([]);
   const [loosePhotos, setLoosePhotos] = useState<DraftPhoto[]>([]);
-  const [showLooseSection, setShowLooseSection] = useState(false);
+  const [showLooseSection] = useState(false);
   const [checkedHints, setCheckedHints] = useState<Set<string>>(new Set());
   const looseInputRef = useRef<HTMLInputElement>(null);
   const itemInputRef = useRef<HTMLInputElement>(null);
@@ -591,11 +591,6 @@ export default function CreateCasePage() {
                     >
                       <Ic name="camera" />＋ 商品を追加
                     </button>
-                    {!looseVisible && (
-                      <button type="button" className="btn-loose-toggle" onClick={() => setShowLooseSection(true)}>
-                        まとめて撮る（商品を分けない）
-                      </button>
-                    )}
                   </div>
 
                   {looseVisible && (

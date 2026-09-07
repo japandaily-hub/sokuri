@@ -29,7 +29,7 @@ const FAQ_ITEMS = [
 ];
 
 const STEPS: { n: string; en: string; icon: IcName; h: string; p: string; img: string }[] = [
-  { n: "1", en: "SHOOT", icon: "camera", h: "まとめて撮る", p: "家じゅうの不用品を1点ずつ撮影。写真と品目をまとめて登録するだけで出品完了です。", img: "step-1.png" },
+  { n: "1", en: "SHOOT", icon: "camera", h: "1点ずつ撮る", p: "家じゅうの不用品を1点ずつ撮影。写真と品目をまとめて登録するだけで出品完了です。", img: "step-1.png" },
   { n: "2", en: "WAIT", icon: "scan", h: "査定が届く", p: "買取業者があなたの出品した商品に入札。あなたは待つだけで査定が集まります。", img: "step-2.png" },
   { n: "3", en: "CHOOSE", icon: "scale", h: "査定を見比べて選ぶ", p: "届いた査定を一覧で見比べて、納得の1社を選ぶだけ。選ぶまで、業者から連絡は来ません。", img: "step-3.png" },
   { n: "4", en: "DONE", icon: "truck", h: "引き取りに来てもらう", p: "成立した業者がまとめて引き取りに。玄関先で渡すだけで、片付け完了です。", img: "step-4.png" },
@@ -60,7 +60,7 @@ export default function HomePage() {
                 <span className="hl">動けない</span>あなたへ。
               </h1>
               <p className="hero-sub">
-                家じゅうの不用品を、<strong>まとめて撮って待つだけ</strong>。登録業者が<span className="mk">買取総額</span>で競い合い、値がつかない物もまとめて引き取ります。営業電話に追われることはありません。
+                家じゅうの不用品を、<strong>1点ずつ撮って、あとは待つだけ</strong>。登録業者が<span className="mk">買取総額</span>で競い合い、値がつかない物もまとめて引き取ります。営業電話に追われることはありません。
               </p>
               <ul className="hero-trust">
                 {/* eslint-disable @next/next/no-img-element */}
@@ -130,7 +130,7 @@ export default function HomePage() {
                 <div className="emp-body"><h3>そもそも、何から手をつければ</h3><p>売れる物・売れない物、仕分けの基準がわからない。家まるごととなると、考えるだけで腰が重くなります。</p></div>
               </Reveal>
             </div>
-            <div className="turn"><p>カタヅケなら、その「めんどう」を<span className="accent">まとめて撮るだけ</span>に変えます。</p></div>
+            <div className="turn"><p>カタヅケなら、その「めんどう」を<span className="accent">撮って待つだけ</span>に変えます。</p></div>
           </div>
         </section>
         </div>
@@ -377,7 +377,7 @@ export default function HomePage() {
               <span className="eyebrow">私たちについて</span>
               <h2>「片付けたい」を、<br />めんどうで終わらせない。</h2>
               <p>片付けが進まないのは、やる気の問題ではありません。出品の手間、営業電話の不安、何から手をつけるかの迷い。その一つひとつが、最初の一歩を重くしています。</p>
-              <p>カタヅケは、それを「まとめて撮るだけ」に変えるために生まれました。業者が競い、値がつかない物まで引き取り、連絡は選んだ1社だけ。あなたが背負うものを、できる限り減らします。</p>
+              <p>カタヅケは、それを「撮って待つだけ」に変えるために生まれました。業者が競い、値がつかない物まで引き取り、連絡は選んだ1社だけ。あなたが背負うものを、できる限り減らします。</p>
               <p>カタヅケが目指すのは、顧客と業者を結ぶ、無駄のない場所です。<strong>顧客・業者・社会の三者に喜びと安心を</strong>。それが、カタヅケの根にある考え方です。</p>
               <p className="founder-sign"><span>カタヅケ 運営事務局</span>顧客にも業者にも、社会にも。三方よしの場所をつくります。</p>
             </Reveal>

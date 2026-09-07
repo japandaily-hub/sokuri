@@ -383,7 +383,7 @@ export default function ExamplesPage() {
             <div className="cases-cta-inner">
               <h2>あなたの家の不用品、いくらになる？</h2>
               <p>
-                まとめて撮って、業者に競ってもらうだけ。
+                1点ずつ撮って、業者に競ってもらうだけ。
                 <br />
                 出品・査定・お断りまで、ユーザーの費用は一切無料です。
               </p>
