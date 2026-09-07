@@ -113,7 +113,7 @@ export default function ContactPage() {
           {/* LINE 優先案内 */}
           <div className="line-first">
             <div className="line-first-body">
-              <strong>片付けを始めるなら、LINEが最短です</strong>
+              <strong>片付けを始めるなら、<br className="sp-br" />LINEが最短です</strong>
               <p>
                 査定・出品のご依頼はLINEから。友だち追加するだけで、すぐに出品をはじめられます。
               </p>

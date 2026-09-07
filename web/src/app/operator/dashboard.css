@@ -24,10 +24,10 @@
 /* ---------- タブ ---------- */
 .op-dash .dash-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 0;
   border-bottom: 2px solid var(--line);
   margin-bottom: 28px;
-  overflow-x: auto;
 }
 .op-dash .dash-tab {
   padding: 10px 20px;
@@ -437,7 +437,8 @@
   .op-dash .dash-wrap { padding: 20px 16px 60px; }
 }
 
-/* 600px以上ではタブを折り返し、横スクロールバーを出さない（狭幅はスクロール維持） */
-@media (min-width: 600px) {
-  .op-dash .dash-tabs { flex-wrap: wrap; overflow-x: visible; }
+/* スマホ幅では横スクロールにすると 3 つ目のタブが「交」で切れて壊れて見える（モバイル監査
+   2026-09-07）。全幅で折り返し、狭幅は余白を詰めて 2 段に収める。 */
+@media (max-width: 599px) {
+  .op-dash .dash-tab { padding: 10px 12px; font-size: 13.5px; }
 }

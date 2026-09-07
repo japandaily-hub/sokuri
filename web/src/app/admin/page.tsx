@@ -517,7 +517,7 @@ export default function AdminPage() {
                     {new Date(inv.created_at).toLocaleDateString("ja-JP")}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex shrink-0 items-center gap-2">
                   {inv.used_at ? (
                     <StatusBadge value="rejected" label="使用済み" />
                   ) : (
@@ -526,7 +526,7 @@ export default function AdminPage() {
                       <button
                         type="button"
                         onClick={() => copyCode(inv.code)}
-                        className={btnSecondary}
+                        className={`${btnSecondary} whitespace-nowrap`}
                       >
                         {copied === inv.code ? "コピー済" : "コピー"}
                       </button>
@@ -762,7 +762,7 @@ export default function AdminPage() {
           ) : null}
           {cellDensity && cellDensity.length > 0 ? (
             <div className="mt-4 overflow-x-auto" tabIndex={0} role="region" aria-label="セル密度一覧">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[720px] text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
                     <th className="pb-2 pr-4">都道府県</th>

@@ -114,12 +114,16 @@ function LotCard({ c }: { c: CaseMasked }) {
               入札 {c.bid_count} 件（他社）
             </div>
           ) : null}
+          {/* モバイル幅（375px）で 1 チップに詰めるとカード右端からはみ出すため、金額と
+              自社の位置づけを別チップにして折り返せるようにする（モバイル監査 2026-09-07）。 */}
           {c.top_bid_amount != null ? (
-            <div className="lot-meta-item" style={{ marginTop: 4 }}>
-              <span className={`status-chip ${c.is_top_bidder ? "live" : "negotiating"}`}>
-                最高額 {formatYen(c.top_bid_amount)}
-                {c.my_bid ? (c.is_top_bidder ? "・自社が最高額" : "・他社が上回り中") : ""}
-              </span>
+            <div className="lot-meta-item" style={{ marginTop: 4, flexWrap: "wrap", gap: 4 }}>
+              <span className="status-chip negotiating">最高額 {formatYen(c.top_bid_amount)}</span>
+              {c.my_bid ? (
+                <span className={`status-chip ${c.is_top_bidder ? "live" : "warn"}`}>
+                  {c.is_top_bidder ? "自社が最高額" : "他社が上回り中"}
+                </span>
+              ) : null}
             </div>
           ) : c.top_bid_amount === null && c.bid_count === 0 ? (
             <div className="lot-meta-item" style={{ marginTop: 4 }}>

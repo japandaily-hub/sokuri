@@ -436,7 +436,7 @@ export default function OperatorCaseDetailPage() {
                         <li key={b.id}>
                           他社 ¥{formatYen(b.amount).replace("円", "")}
                           {b.revision_count > 0 ? `（引き上げ ${b.revision_count} 回）` : ""}
-                          ・更新 {new Date(b.updated_at).toLocaleString("ja-JP")}
+                          ・更新 {new Date(b.updated_at).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                         </li>
                       ))}
                     </ul>
@@ -630,7 +630,9 @@ export default function OperatorCaseDetailPage() {
                 {busy ? "送信中…" : "この金額で入札する"}
               </button>
             </form>
-          ) : (
+          ) : caseData.status === "open" || caseData.status === "bidding" ? null : (
+            // 自社入札済みで受付中のときは上に「自社の入札」「引き上げ」が出ているため、
+            // この案内は「受付を終えた案件」にだけ出す（モバイル監査で二重表示を検出）。
             <div className="op-alert info">この案件は入札を受け付けていません。</div>
           )}
 

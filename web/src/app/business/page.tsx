@@ -271,7 +271,7 @@ export default function BusinessPage() {
           <div className="container">
             <span className="eyebrow">買取業者の方へ</span>
             <h1>
-              まとめ買取の仕入れルートを、
+              まとめ買取の<br className="sp-br" />仕入れルートを、
               <br />
               <span className="hl">カタヅケ</span>で開拓する。
             </h1>

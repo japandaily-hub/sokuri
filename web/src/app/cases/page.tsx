@@ -82,7 +82,7 @@ export default function MyCasesPage() {
                   ) : (
                     <div className="h-16 w-16 shrink-0 rounded-none bg-slate-100" />
                   )}
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-normal text-slate-900">{formatPurposeLabel(c.purpose)}</p>
                     <p className="mt-0.5 text-xs text-slate-500">
                       {c.prefecture} {c.city} / {c.floor_plan ?? "間取り未設定"}

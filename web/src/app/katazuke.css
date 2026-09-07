@@ -278,6 +278,13 @@ section:has(> .vt){position:relative;}
 .assure-item b{display:block;font-family:var(--head);font-weight:600;font-size:15px;color:var(--ink);line-height:1.6;}
 .assure-item span{font-size:12px;color:var(--body-soft);}
 @media(max-width:860px){.assure .container{grid-template-columns:repeat(2,1fr);gap:16px 18px;}}
+/* スマホ幅（375px）では 2 列だと見出しが「登録事業者 / のみ」「連絡先は成 / 立後に開示」と
+   語の途中で折れる（モバイル監査 2026-09-07）。1 列に落として横長カードにし、語を切らない。 */
+@media(max-width:520px){
+  .assure .container{grid-template-columns:1fr;gap:12px;}
+  .assure-item .ai{width:48px;height:48px;flex:none;}
+  .assure-item b{font-size:14.5px;}
+}
 
 /* ============================================================
    共感（悩み）— 枠も面も持たない。区切りは余白のみ

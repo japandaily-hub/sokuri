@@ -111,7 +111,7 @@ export function StatusBadge({
 }) {
   return (
     <span
-      className={`inline-flex items-center rounded-none px-2.5 py-1 text-xs font-semibold ${
+      className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-none px-2.5 py-1 text-xs font-semibold ${
         BADGE_STYLES[value] ?? "bg-slate-100 text-slate-600"
       }`}
     >

@@ -82,3 +82,11 @@
   margin-bottom: 32px;
 }
 .back-link:hover { text-decoration: underline; }
+
+/* スマホ幅では 3 列の表が 1 文字ずつ縦に折れて読めない（モバイル監査 2026-09-07）。
+   表を横スクロールにして列幅を確保する。 */
+@media (max-width: 640px) {
+  .legal-body table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .legal-body table thead, .legal-body table tbody { display: table; width: 100%; min-width: 600px; }
+  .legal-body th { white-space: nowrap; }
+}

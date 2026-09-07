@@ -690,7 +690,7 @@ export default function UserCaseDetailPage() {
                           </span>
                         </span>
                       ) : (
-                        <span className="ml-2 text-xs text-slate-500">口コミはまだありません</span>
+                        <span className="ml-2 inline-block whitespace-nowrap text-xs text-slate-500">口コミはまだありません</span>
                       )}
                       {topBidAmount != null && b.amount === topBidAmount && activeBids.length > 1 ? (
                         <span className="ml-2 rounded-none bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">

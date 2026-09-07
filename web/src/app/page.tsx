@@ -164,7 +164,7 @@ export default function HomePage() {
           <div className="container">
             <Reveal className="scta-inner">
               <div className="scta-text">
-                <strong>まず1枚、撮るだけ。今日から始められます。</strong>
+                <strong>まず1枚、撮るだけ。<br className="sp-br" />今日から始められます。</strong>
                 <span>登録・査定・お断りまですべて無料</span>
               </div>
               <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-line btn-lg">
@@ -184,7 +184,7 @@ export default function HomePage() {
               </Reveal>
               <Reveal className="bundle-copy" delay={1}>
                 <span className="eyebrow">まとめ売り</span>
-                <h2>まとめて出すほど、<span style={{ color: "var(--primary)" }}>有利</span>になる。</h2>
+                <h2>まとめて出すほど、<br className="sp-br" /><span style={{ color: "var(--primary)" }}>有利</span>になる。</h2>
                 <p className="lead">カタヅケは<span className="mk">家まるごと</span>の片付け向け。1点ずつではなく、たまった不用品をまとめて査定に出すほど、買取総額が伸びやすく、値がつかない物まで一緒に手放せます。</p>
               </Reveal>
             </div>
@@ -289,7 +289,7 @@ export default function HomePage() {
           <div className="container">
             <div className="section-head">
               <span className="eyebrow">安心の仕組み</span>
-              <h2>はじめてでも、安心して任せられる</h2>
+              <h2>はじめてでも、<br className="sp-br" />安心して任せられる</h2>
               <p className="sub">「知らない業者は不安」を解消するために。カタヅケは、参加する業者とあなたの情報の扱いに、きちんと線を引いています。</p>
             </div>
             <div className="trust-grid">
@@ -401,7 +401,7 @@ export default function HomePage() {
         {/* ============ 最終CTA ============ */}
         <section className="section final" id="contact">
           <div className="container">
-            <h2>今日、その「片付けたい」を動かす</h2>
+            <h2>今日、その<br className="sp-br" />「片付けたい」を動かす</h2>
             <p>まずは1枚、撮ってみることから。LINEで友だち追加すれば、すぐに出品をはじめられます。登録・査定は無料です。</p>
             <div className="final-cta">
               <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-line btn-lg"><Ic name="chat" />LINEではじめる<Ic name="arrow" /></Link>

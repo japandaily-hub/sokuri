@@ -142,3 +142,10 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* スマホ幅だけ有効な改行。見出しが語の途中で折れるのを防ぐ（モバイル監査 2026-09-07。
+   page.tsx・business・contact で <br className="sp-br"> として使用。定義が無く全幅で改行していた）。 */
+.sp-br { display: none; }
+@media (max-width: 640px) {
+  .sp-br { display: inline; }
+}

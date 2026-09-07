@@ -142,3 +142,19 @@ docker rm -f kdz-pg
 > 起動しない場合は、`%LOCALAPPDATA%\Docker\run` と `%LOCALAPPDATA%\docker-secrets-engine` を
 > リネームで退避してから起動し直す（孤児 unix ソケットが残ると毎回クラッシュする）。
 > 復旧後にプロセスを force kill するとまた孤児が残るので注意。
+
+## モバイル表示の視覚監査（スクリーンショット収集）
+
+`web/e2e/99-mobile-audit.spec.ts` は通常の `npm run e2e` では自動スキップされる。`E2E_AUDIT_DIR` を指定して
+実行すると、公開ページ・依頼者・業者・運営の主要画面を 375px 幅で撮影し（長いページは 1,400px ごとに分割）、
+改行・折返し・余白のバランス確認に使える。スクロール連動の表示（`.rv`）と遅延読込画像は強制表示にして撮る。
+
+```bash
+cd web
+E2E_AUDIT_DIR=C:/tmp/shots E2E_BASE_URL=http://localhost:3100 npx playwright test e2e/99-mobile-audit.spec.ts --project=mobile
+```
+
+2026-09-07 の監査で直した型: ステータスチップの縦折れ（`StatusBadge` を nowrap に）、運営の表が 375px に
+押し込まれて 1 文字ずつ折れる（`min-w-[…]`＋横スクロール）、見出しが語の途中で折れる（`sp-br` を定義し、
+スマホ幅だけ改行）、業者ダッシュボードのタブが横スクロールで欠ける（折り返しに変更）、トップページの
+安心ポイント 2 列→1 列、プライバシーポリシーの表を横スクロールに。
