@@ -61,8 +61,13 @@ RENDER_SERVICE_ID = os.environ.get("RENDER_SERVICE_ID", "srv-d8enmu0g4nts73a43dh
 ESCROW = os.environ.get("APP_ENCRYPTION_KEY_ESCROW", "")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 GITHUB_REPOSITORY = os.environ.get("GITHUB_REPOSITORY", "japandaily-hub/sokuri")
-#: daily が「毎時ジョブが直近24時間に何回成功したか」を照合する下限（24 回中・起動遅延を許容）。
-HOURLY_SUCCESS_MIN_PER_DAY = 20
+#: daily が「Ops cron のスケジュール実行が直近24時間に何回成功したか」を照合する下限。
+#: 設計上は毎時（24 回）だが、GitHub の schedule はこのリポジトリでは 2〜6 時間間隔でしか起動しない
+#: （2026-09-04〜09-07 実測: 1 日 4〜6 回。uptime-alert の */5 も同じ）。20 のままだと毎日「止まっている」と
+#: 誤報するため、ここは「完全に止まった」を検知する下限（3）にする（INC-2026-09-08-2）。実際の回数は
+#: 毎回ログに出す。毎時の厳密な実行が必要なら外部スケジューラ（cron-job.org / UptimeRobot 等）から
+#: workflow_dispatch を叩く（運営判断・docs/ops/incidents.md 未収束の教訓）。
+HOURLY_SUCCESS_MIN_PER_DAY = int(os.environ.get("OPS_CRON_MIN_SUCCESS_PER_DAY", "3"))
 
 #: Brevo のイベント種別のうち「配送されなかった」と判定するもの
 _BREVO_FAILURE_EVENTS = {"hardBounces", "hard_bounce", "blocked", "error", "invalid", "spam"}
@@ -143,22 +148,32 @@ def job_hourly() -> int:
 # ──────────────────────────── daily ────────────────────────────
 
 
+#: 直近の配送失敗理由（Brevo の reason）。通知本文で原因を直接示すために保持する（INC-2026-09-08-1）。
+_last_probe_failure_reasons: list[str] = []
+
+
 def _poll_brevo_delivery(message_ids: list[str]) -> tuple[list[str], list[str], list[str]]:
-    """messageId ごとに delivered / 失敗 / 未確定 を分ける（最大5分）。"""
+    """messageId ごとに delivered / 失敗 / 未確定 を分ける（最大5分）。失敗理由は _last_probe_failure_reasons へ。"""
     pending = list(message_ids)
     delivered: list[str] = []
     failed: list[str] = []
+    _last_probe_failure_reasons.clear()
     deadline = time.time() + _BREVO_POLL_SECONDS
     while pending and time.time() < deadline:
         for mid in list(pending):
             st, body = brevo("GET", f"/smtp/statistics/events?days=2&limit=50&messageId={urllib.parse.quote(mid, safe='')}")
-            events = {e.get("event") for e in (body or {}).get("events", [])} if st == 200 and isinstance(body, dict) else set()
+            raw_events = (body or {}).get("events", []) if st == 200 and isinstance(body, dict) else []
+            events = {e.get("event") for e in raw_events}
             if "delivered" in events:
                 delivered.append(mid)
                 pending.remove(mid)
             elif events & _BREVO_FAILURE_EVENTS:
                 failed.append(mid)
                 pending.remove(mid)
+                for e in raw_events:
+                    reason = str(e.get("reason") or "").strip()
+                    if e.get("event") in _BREVO_FAILURE_EVENTS and reason and reason not in _last_probe_failure_reasons:
+                        _last_probe_failure_reasons.append(reason[:200])
         if pending:
             time.sleep(_BREVO_POLL_INTERVAL)
     return delivered, failed, pending
@@ -195,7 +210,10 @@ def _check_hourly_runs() -> list[str]:
             success += 1
         else:
             failed += 1
-    print(f"{'✅' if failed == 0 and success >= HOURLY_SUCCESS_MIN_PER_DAY else '⚠️'} ops-cron(24h): success={success} failed={failed} history={total_schedule_runs}")
+    print(
+        f"{'✅' if failed == 0 and success >= HOURLY_SUCCESS_MIN_PER_DAY else '⚠️'} ops-cron(24h): "
+        f"success={success} failed={failed} history={total_schedule_runs}（設計 24 回/日・GitHub の遅延で実測 4〜6 回/日）"
+    )
     out: list[str] = []
     if failed:
         out.append(f"直近24時間で Ops cron の失敗が {failed} 回（Actions のログを確認）")
@@ -206,6 +224,7 @@ def _check_hourly_runs() -> list[str]:
         out.append(
             f"直近24時間の Ops cron 成功が {success} 回（下限 {HOURLY_SUCCESS_MIN_PER_DAY}）。"
             "スケジュールが止まっている可能性（ワークフローの無効化・リポジトリの休眠・GitHub 側の遅延）。"
+            "Actions → Ops cron を手動実行して復帰するか確認。"
         )
     return out
 
@@ -262,6 +281,13 @@ def job_daily() -> int:
             problems.append(
                 f"メール到達プローブ: 送信 {len(body.get('message_ids', []))} 通のうち配送確認 {len(delivered)}・"
                 f"失敗 {len(failed)}・5分以内に未確定 {len(pending)}。Brevo の送信者認証・受信側のブロック・無料枠を確認。"
+                + (" Brevo の理由: " + " / ".join(_last_probe_failure_reasons) if _last_probe_failure_reasons else "")
+                + (
+                    "（『sender ... is not valid』なら Render の MAIL_FROM を Brevo の認証済み送信者にする"
+                    "＝python scripts/render_env.py set MAIL_FROM <認証済みアドレス>）"
+                    if any("not valid" in r for r in _last_probe_failure_reasons)
+                    else ""
+                )
             )
 
     # ⑤ 毎時ジョブが本当に回っているか（「実行されなかった」を検知する唯一の経路）

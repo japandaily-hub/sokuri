@@ -2,6 +2,10 @@
 """外形監視（GitHub Actions の cron から実行）。標準ライブラリのみ。
 
 チェック内容:
+  0. スリープ復帰待ち … 最初に BACKEND_URL/health を WAKE_TIMEOUT_S（既定 90 秒）まで待つ。Render 無料枠は
+     15 分無通信で停止し、復帰（alembic 実行＋起動）に 25〜35 秒かかる。復帰待ちをせずに 25 秒で判定すると
+     「起動中」を「障害」と誤判定して DOWN が続く（INC-2026-09-08-2: 9/5〜9/7 に 15 回連続の誤検知）。
+     復帰にかかった時間は Summary と通知本文に出すが、障害・遅延とは扱わない（無料枠の仕様）。
   1. BACKEND_URL/health  … 200 かつ {"status":"ok"}
   2. BACKEND_URL/readyz  … 200 かつ status=ready・db=ok・alembic_version == expected_head
   3. FRONTEND_URL/       … 200 かつ HTML に <title> がある（Vercel の 5xx / 空応答を検出）
@@ -50,6 +54,10 @@ FRONTEND_URL = os.environ.get("FRONTEND_URL", "https://sokuri.vercel.app").rstri
 STATE_FILE = os.environ.get("STATE_FILE", ".uptime_state.json")
 SLOW_MS = int(os.environ.get("SLOW_MS", "8000"))
 TIMEOUT_S = int(os.environ.get("TIMEOUT_S", "25"))
+#: スリープ復帰待ちの上限。Render 無料枠のコールドスタート（alembic ＋ 起動）は 25〜35 秒（2026-09 実測）。
+WAKE_TIMEOUT_S = int(os.environ.get("WAKE_TIMEOUT_S", "90"))
+#: これ以上かかった復帰は Summary に「コールドスタート」として記録する（通知はしない）。
+COLD_START_MS = int(os.environ.get("COLD_START_MS", "3000"))
 REPEAT_EVERY = int(os.environ.get("ALERT_REPEAT_EVERY", "12"))
 
 
@@ -64,15 +72,29 @@ class CheckResult:
     degraded_config: list[str] = field(default_factory=list)
 
 
-def _fetch(url: str) -> tuple[int, bytes, int]:
+def _fetch(url: str, timeout: int | None = None) -> tuple[int, bytes, int]:
     started = time.monotonic()
     req = urllib.request.Request(url, headers={"User-Agent": "katadzuke-uptime/1.0"})
     try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT_S) as res:
+        with urllib.request.urlopen(req, timeout=timeout or TIMEOUT_S) as res:
             body = res.read()
             return res.status, body, int((time.monotonic() - started) * 1000)
     except urllib.error.HTTPError as e:
         return e.code, e.read() or b"", int((time.monotonic() - started) * 1000)
+
+
+def wake_backend() -> tuple[bool, int, str]:
+    """スリープ中の backend を起こし、(起きたか, 所要ms, 詳細) を返す。
+
+    判定には使わない（続く check_health / check_readyz が判定する）。ここで待たないと、
+    復帰に 25 秒超かかる無料枠では最初のリクエストがタイムアウトし「障害」と誤判定される。
+    """
+    try:
+        status, body, ms = _fetch(f"{BACKEND_URL}/health", timeout=WAKE_TIMEOUT_S)
+        data = json.loads(body or b"{}")
+        return status == 200 and data.get("status") == "ok", ms, f"HTTP {status}"
+    except Exception as e:  # noqa: BLE001
+        return False, WAKE_TIMEOUT_S * 1000, f"{type(e).__name__}: {e}"
 
 
 def check_health() -> CheckResult:
@@ -194,6 +216,8 @@ def write_summary(lines: list[str]) -> None:
 
 
 def main() -> int:
+    woke, wake_ms, wake_detail = wake_backend()
+    cold_start = woke and wake_ms >= COLD_START_MS
     readyz = check_readyz()
     results = [check_health(), readyz, check_frontend()]
     failures = [r for r in results if not r.ok]
@@ -205,7 +229,12 @@ def main() -> int:
     for r in results:
         lines.append(f"| {r.name} | {'OK' if r.ok else '**NG**'} | {r.ms} | {r.detail} |")
 
-    body_lines = [f"- {r.name}: {r.detail}（{r.ms}ms）" for r in results]
+    wake_line = (
+        f"スリープ復帰: {wake_ms}ms（コールドスタート・無料枠の仕様。障害ではない）" if cold_start
+        else (f"復帰待ち: 失敗（{wake_detail}）" if not woke else f"復帰待ち: {wake_ms}ms（稼働中）")
+    )
+    lines += ["", wake_line]
+    body_lines = [f"- {r.name}: {r.detail}（{r.ms}ms）" for r in results] + [f"- {wake_line}"]
     body = "\n".join(body_lines)
     sent: list[str] = []
     # 通知が必要だったか（＝notify() を1回以上呼んだか）。全滅判定に使う（ADD-H1）。

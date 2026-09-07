@@ -65,7 +65,11 @@ services:
       - key: BREVO_API_KEY
         sync: false                    # dashboard で手動入力（未設定なら送信スキップ）
       - key: MAIL_FROM
-        value: "noreply@katadzuke.jp"
+        value: "katazuke.support@gmail.com"   # Brevo で「認証済み送信者」のアドレスのみ使える（INC-2026-09-08-1）。
+                                               # noreply@katadzuke.jp は未認証のため 2026-09-07 から Brevo が全通を拒否
+                                               # （API は 201 を返すが配送されない）。katadzuke.jp を Brevo でドメイン認証
+                                               # （DKIM/DMARC）したら noreply@katadzuke.jp に戻してよい。値の変更は dashboard
+                                               # か scripts/render_env.py で（Blueprint の envVars は既存サービスへ同期されない）。
       - key: FRONTEND_BASE_URL
         value: "https://sokuri.vercel.app"
       - key: APP_ENV

@@ -28,7 +28,7 @@ Claude / Codex はセッション開始時に本ファイルの「原則」と�
 | Render 同期の失敗/復旧 | Blueprint 同期 error → [FAILED]、success に戻る → [RECOVERED] | `scripts/render_sync_check.py` + `render-sync.yml` | render.yaml の push 後 |
 | CI の失敗/復旧 | main の CI 失敗 → [FAILED]、直前失敗→今回成功 → [RECOVERED] | `scripts/run_transition_notify.py` + `ci.yml` の `notify` | push (main) ごと |
 | Ops cron の失敗/復旧 | 日次/毎時ジョブの失敗 → 通知、正常に戻る → [RECOVERED]（到達前失敗も状態保存） | `scripts/ops_jobs.py` `_track_recovery` + `ops-cron.yml` `notify-failure` | 毎時 / 日次 |
-| 外形監視の down/up | /health /readyz /frontend の障害と復旧、degraded_config | `scripts/uptime_check.py` + `uptime-alert.yml` | 5分毎 |
+| 外形監視の down/up | /health /readyz /frontend の障害と復旧、degraded_config。スリープ復帰（90 秒まで）を待ってから判定 | `scripts/uptime_check.py` + `uptime-alert.yml` | 5分毎（設計）・実測 2〜6 時間毎 |
 | 通知の対ガード（メタ） | 失敗を通知する経路・スクリプトに復旧側が無ければ CI が落ちる | `backend/tests/test_alert_pairing.py` | pytest（CI） |
 | 判定ロジックのテスト | 失敗/復旧/正常/cancelled の判定と drift 比較 | `backend/tests/test_alert_transitions.py`・`test_render_drift.py` | pytest（CI） |
 | Ops cron 欠測検知 | 毎時ジョブが24時間で下限回数回っていない | `ops_jobs.py` daily ⑤ | 日次 |
@@ -37,6 +37,8 @@ Claude / Codex はセッション開始時に本ファイルの「原則」と�
 
 | ID | 日付 | 通知元 / 症状 | 根本原因 | 対処 | 再発防止ガード | 状態 |
 |---|---|---|---|---|---|---|
+| INC-2026-09-08-1 | 2026-09-07〜 | Ops cron daily「メール到達プローブ 失敗 1」「Brevo 配送不能 2 件」（9/8 06:26 JST・LINE＋メール） | Brevo が差出人 `noreply@katadzuke.jp` を「未認証の送信者」として拒否（9/7 16:11 JST の本人確認書類の管理者通知から）。認証済み送信者は gmail の2件のみで、katadzuke.jp のドメイン認証も無い。API は 201 を返すためアプリ側は成功扱い＝日次プローブだけが検知 | Render の `MAIL_FROM` を認証済みの `katazuke.support@gmail.com` へ（Claude の API 呼び出しは権限で拒否→`scripts/render_env.py` を用意しユーザー実行）。render.yaml も追従 | プローブの通知に Brevo の reason と対処コマンドを表示（ops_jobs）／恒久策は katadzuke.jp のドメイン認証（DKIM/DMARC・ユーザー作業） | **open（MAIL_FROM 変更待ち）** |
+| INC-2026-09-08-2 | 2026-09-05〜09-08 | 外形監視 CRITICAL「backend /readyz 到達不能 TimeoutError」（9/7 14:58 JST）・その後 RECOVERED が来ない | Render 無料枠はスリープから復帰に 25〜35 秒かかる（alembic ＋ 起動）。監視は復帰待ちをせず 25 秒で /readyz を判定していたため、スリープ中に来た検査は必ず DOWN＝9/5 18:29 JST から 15 回連続の誤検知。さらに GitHub の schedule が 2〜6 時間間隔でしか起動せず（設計 5 分毎・毎時）、バックエンドがほぼ常にスリープ状態 | 手動実行（run #34）で UP に戻り RECOVERED を自動送信。uptime_check に「復帰待ち（/health を 90 秒まで）」を追加しコールドスタートを障害と区別。Ops cron の回数下限を実態（3/日）に | `test_uptime_check.py`（32 秒の復帰を障害にしない／DOWN→UP で復旧通知）／未収束: GitHub cron の遅延は外部スケジューラ（UptimeRobot / cron-job.org）でしか解けない＝運営判断 | closed（監視側）・open（GitHub cron 遅延） |
 | INC-2026-09-07-1 | 2026-09-01〜09-07 | Render メール「Blueprint Sync Failed for sokuri」（9/1・9/6） | 本番 DB を 9/1 に dashboard で有料 basic_256mb・実名 `sokuri_jwd3` で作り直したのに、render.yaml が `plan: free` / `databaseName: sokuri` のまま。Render は有料→free の変更と DB 名の変更を受け付けず同期が error。デプロイは autoDeploy で通るため6日間気づかず | render.yaml を実態に追従（642e6d3）→ 同期 success・in_sync | Render drift 検査（週次＋push 後）／同期の失敗・復旧通知 | closed |
 | INC-2026-09-07-2 | 2026-09-04〜09-07 | Gmail に失敗通知（Render 同期・CI・Ops cron）は届くが、解消しても復旧の連絡が来ない | 失敗の通知元（Render・GitHub）が復旧を送らない設計で、こちら側にも対になる復旧通知が無かった。Ops cron の復旧通知は 9/6 の失敗より後に実装 | 3件の解消を手動で notify()（9/7 15:40 JST）。CI notify ジョブ・render-sync.yml・Ops cron 到達前失敗の状態保存を実装（9053474） | 通知の対ガード（`test_alert_pairing.py`）／判定テスト | closed |
 | INC-2026-09-06-1 | 2026-09-06 | GitHub「Run failed: Ops cron」（5cb0dd5・d698de6・手動実行） | 初期設定（ops_bootstrap）の途中で手動実行したため、OPS_JOB_TOKEN 未反映の 403 → 続いて ADMIN_EMAILS の未登録エイリアスを棚卸しが検出（設計どおりの検出） | エイリアスを ADMIN_EMAILS から除外（c5df8ba）。以後の定期実行は success | 棚卸しは正常動作。初期設定中の手動実行は「Render 反映→GitHub Secret→実証」の順を `ops_bootstrap.py` が担う（手順書 `admin-operations.md`） | closed |
@@ -44,6 +46,8 @@ Claude / Codex はセッション開始時に本ファイルの「原則」と�
 | INC-2026-07-A | 2026-07 | 本番全断（alembic） | `alembic_version` VARCHAR(32) に 46 字のリビジョン ID が入らず毎回ロールバック | env.py で拡幅（f6dd33f） | `/readyz` の alembic_version＝expected_head 照合（外形監視） | closed |
 
 ## 未収束の教訓（ガード化できていないもの）
+- **GitHub Actions の schedule はこのリポジトリでは 2〜6 時間間隔でしか起動しない**（2026-09-04〜09-08 実測。`*/5` も `7 * * * *` も同じ）。外形監視は「5 分毎」ではなく「1 日 4〜6 回」しか動いておらず、毎時のリマインド／keep-warm も同様。バックエンド（Render 無料枠）はほぼ常にスリープしている。解決策は外部スケジューラ: ① UptimeRobot（無料・5 分毎に /health を監視＝keep-warm 兼用・メール通知）または cron-job.org で `https://sokuri-backend.onrender.com/health` を 10 分毎に叩く（秘密不要）② GitHub の `workflow_dispatch` を外部 cron から叩く（PAT を外部サービスへ預ける判断が要る）。運営判断待ち。
+- **Brevo の差出人は「認証済み送信者」か「認証済みドメイン」のアドレスだけ。** アプリの `MAIL_FROM` を変えるときは Brevo 側の認証を先に確認する。katadzuke.jp を使うなら Brevo でドメイン認証（DNS に DKIM/DMARC）が必要。
 
 - Render の Blueprint `envVars` は既存サービスへ同期されない（2026-07-18 実測）。本番で効かせたい既定値は `backend/start.sh` の export か dashboard。drift 検査はキーの有無を見るが、値の一致は見ない（秘密を扱わないため）。値のズレは `/readyz` の `config` / `degraded_config` で間接的に検知する。
 - Render 同期エラーの本文は API に出ない。通知には dashboard の Blueprint ページを添える。
