@@ -18,6 +18,7 @@ GitHub は失敗時に「Run failed」メールを送るが、復旧時には何
   GITHUB_TOKEN / GITHUB_REPOSITORY   Actions が自動付与（permissions: actions: read が必要）
   WORKFLOW_FILE   例 ci.yml
   BRANCH          例 main
+  EVENT           直前の実行を同じ種別に絞る（例 push）。空なら schedule / workflow_dispatch / push を区別しない
   RUN_ID / RUN_NUMBER / RUN_URL / HEAD_SHA
   RESULT          success | failure（needs.*.result から決める）
   LABEL           通知に出す表示名（例「CI（テスト・ビルド）」）
@@ -51,11 +52,11 @@ for _stream in (sys.stdout, sys.stderr):
 _DECISIVE = ("success", "failure")
 
 
-def fetch_previous_runs(repo: str, workflow_file: str, branch: str, token: str, *, per_page: int = 20) -> list[dict]:
-    """同じワークフロー・ブランチ・push の完了済み実行を新しい順で返す（失敗時は空）。"""
+def fetch_previous_runs(repo: str, workflow_file: str, branch: str, token: str, *, per_page: int = 20, event: str = "") -> list[dict]:
+    """同じワークフロー・ブランチの完了済み実行を新しい順で返す（event 指定時はその種別だけ。失敗時は空）。"""
     url = (
         f"https://api.github.com/repos/{repo}/actions/workflows/{workflow_file}/runs"
-        f"?branch={branch}&event=push&status=completed&per_page={per_page}"
+        f"?branch={branch}&status=completed&per_page={per_page}" + (f"&event={event}" if event else "")
     )
     req = urllib.request.Request(
         url,
@@ -95,6 +96,7 @@ def main() -> int:
     token = os.environ.get("GITHUB_TOKEN", "")
     workflow_file = os.environ.get("WORKFLOW_FILE", "ci.yml")
     branch = os.environ.get("BRANCH", "main")
+    event = os.environ.get("EVENT", "")
     result = os.environ.get("RESULT", "success")
     run_number = int(os.environ.get("RUN_NUMBER") or 0)
     run_url = os.environ.get("RUN_URL", "")
@@ -102,7 +104,7 @@ def main() -> int:
     label = os.environ.get("LABEL") or workflow_file
     dry = os.environ.get("DRY_RUN") == "1"
 
-    runs = fetch_previous_runs(repo, workflow_file, branch, token) if token else []
+    runs = fetch_previous_runs(repo, workflow_file, branch, token, event=event) if token else []
     kind, prev, since = decide(result, run_number, runs)
     prev_desc = f"#{prev.get('run_number')} {prev.get('conclusion')}" if prev else "なし"
     print(f"result={result} run#{run_number} prev={prev_desc} → {kind}")

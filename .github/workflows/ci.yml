@@ -162,6 +162,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           WORKFLOW_FILE: ci.yml
           BRANCH: main
+          EVENT: push
           LABEL: "CI（pytest / PG 同時実行 / tsc・eslint・next build）"
           RESULT: ${{ contains(needs.*.result, 'failure') && 'failure' || 'success' }}
           RUN_ID: ${{ github.run_id }}

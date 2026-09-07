@@ -1,18 +1,25 @@
 name: Render sync
 
-# render.yaml を含む push のあと、Render Blueprint の同期結果を確認して運営へ通知する。
-# Render は同期失敗のメールは送るが復旧は送らないため、失敗 [FAILED] と復旧 [RECOVERED] を
-# 運営の LINE／メールへ同じ経路で届ける（正常時は通知しない）。実体は scripts/render_sync_check.py。
+# render.yaml と Render の「宣言 vs 実態」を守る（docs/ops/incidents.md INC-2026-09-07-1 の再発防止）。
+#   1. sync  … render.yaml を含む push のあと Blueprint 同期の結果を確認し、失敗 [FAILED] / 復旧 [RECOVERED] を通知
+#              （Render 自身は失敗メールしか送らない）。実体は scripts/render_sync_check.py。
+#   2. drift … render.yaml の宣言（DB plan / databaseName / region、サービス設定、env キー）と Render API の実態を
+#              突き合わせ、ズレたら失敗にする。push 後・毎週月曜 20:00 UTC・手動。実体は scripts/render_drift_check.py。
+#   3. notify … drift の結果を直前の実行と照合し、[FAILED] / [RECOVERED] を対にして運営へ通知
+#              （scripts/run_transition_notify.py・正常時は通知しない）。
 # 必要な Secrets: RENDER_API_KEY（ops-cron の key-restore と共通）＋ 通知系（uptime-alert.yml と共通）。
 
 on:
   push:
     branches: [main]
     paths: [render.yaml]
+  schedule:
+    - cron: "0 20 * * 1"
   workflow_dispatch:
 
 permissions:
   contents: read
+  actions: read   # notify が直前の実行結果（失敗→復旧）を照合するため
 
 concurrency:
   group: render-sync
@@ -21,22 +28,45 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 8
+    env:
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+      ALERT_EMAILS: ${{ secrets.ALERT_EMAILS }}
+      ALERT_MAIL_FROM: ${{ secrets.ALERT_MAIL_FROM }}
+      ALERT_LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.ALERT_LINE_CHANNEL_ACCESS_TOKEN }}
+      ALERT_LINE_USER_IDS: ${{ secrets.ALERT_LINE_USER_IDS }}
+      ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Check Blueprint sync result
+      - name: Install PyYAML (drift check parses render.yaml)
+        run: pip install --quiet "pyyaml>=6"
+
+      - name: Check Blueprint sync result (push only)
+        if: ${{ github.event_name == 'push' }}
         env:
-          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-          HEAD_SHA: ${{ github.event_name == 'push' && github.sha || '' }}
+          HEAD_SHA: ${{ github.sha }}
           WAIT_SECONDS: "180"
-          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
-          ALERT_EMAILS: ${{ secrets.ALERT_EMAILS }}
-          ALERT_MAIL_FROM: ${{ secrets.ALERT_MAIL_FROM }}
-          ALERT_LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.ALERT_LINE_CHANNEL_ACCESS_TOKEN }}
-          ALERT_LINE_USER_IDS: ${{ secrets.ALERT_LINE_USER_IDS }}
-          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
         run: python scripts/render_sync_check.py
+
+      - name: Check render.yaml vs Render drift
+        id: drift
+        run: python scripts/render_drift_check.py
+
+      - name: Notify drift failure / recovery
+        if: ${{ always() && steps.drift.outcome != 'skipped' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          WORKFLOW_FILE: render-sync.yml
+          BRANCH: main
+          LABEL: "Render 設定の突き合わせ（render.yaml と Render の実態）"
+          RESULT: ${{ steps.drift.outcome == 'success' && 'success' || 'failure' }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_NUMBER: ${{ github.run_number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          HEAD_SHA: ${{ github.sha }}
+        run: python scripts/run_transition_notify.py
