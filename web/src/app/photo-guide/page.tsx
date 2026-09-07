@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 
 /** メリットバーのチップ */
 const MERITS = [
-  "1点ずつ撮らなくてOK",
+  "1点ずつ撮って、まとめて1件に",
   "スマホで十分",
   "最大150枚まで追加できる",
   "写真が多いほど評価しやすい",
@@ -27,9 +27,9 @@ const STEPS: { h: string; p: string; tip: string }[] = [
     tip: "フラッシュより自然光のほうがきれいに映ります",
   },
   {
-    h: "床・机に並べて全体写真を撮る",
-    p: "出品する商品すべてが映る「引きの写真」を1〜2枚撮りましょう。業者はまずこの1枚で商品の量を把握します。",
-    tip: "段ボールや袋の中のものは出して並べると評価が上がります",
+    h: "1点ずつ、全体が映るように撮る",
+    p: "商品は1点ずつ撮影します。まず品物全体が映る「引きの写真」を1枚撮りましょう。撮った写真は自動的に1つのアルバムにまとまり、業者はそれを見て量と状態を把握します。",
+    tip: "段ボールや袋の中のものは出して、1点ずつ撮ると評価が上がります",
   },
   {
     h: "正面だけでなく全方位から撮る",
@@ -56,7 +56,7 @@ const STEPS: { h: string; p: string; tip: string }[] = [
 /** 高評価につながる撮影のポイント（アイコンは Icons.tsx の近似に置換） */
 const POINTS: { icon: IcName; h: string; p: string }[] = [
   { icon: "sun", h: "明るく撮る", p: "照明を増やす、窓の近くで撮るなど明るさを確保。暗い写真は業者が敬遠しがちです。" },
-  { icon: "crop", h: "全体と詳細の両方を撮る", p: "引きの全体写真＋気になる品のアップ写真。この組み合わせが最も評価されます。" },
+  { icon: "crop", h: "全体と詳細の両方を撮る", p: "1点ごとに、全体が映る引きの写真＋気になる部分のアップ写真。この組み合わせが最も評価されます。" },
   { icon: "tag", h: "ブランドロゴ・型番シール・タグは接写で", p: "メーカーロゴや型番シール、製造タグがくっきり読めるアップ写真があると、業者が価格を調べやすくなり高い入札につながります。" },
   { icon: "box", h: "付属品も一緒に撮る", p: "箱・リモコン・充電器・説明書など付属品があれば一緒に撮影。買取額がアップします。" },
   { icon: "check-circle", h: "動作状態を伝える", p: "電源が入る家電は電源ON状態の写真を。動作確認済みは買取額が大きく変わります。" },
@@ -116,14 +116,14 @@ export default function PhotoGuidePage() {
 
       <div className="section">
         <div className="container">
-          {/* ============ 1. まとめて並べて撮る（良い例・悪い例） ============ */}
+          {/* ============ 1. 一品ずつ撮る（良い例・悪い例） ============ */}
           <div className="guide-section" id="basics">
             <div className="guide-section-head">
               <div className="guide-section-num">1</div>
               <div>
-                <h2>まとめて並べて撮る</h2>
+                <h2>一品ずつ、全体が映るように撮る</h2>
                 <p>
-                  床や机の上に品物を並べて、全体が映るように引いて撮りましょう。業者は出品された商品の全体像を見て入札額を決めます。
+                  品物は1点ずつ撮影します。1枚の写真に1つの品物だけを、全体が映るように収めましょう。撮った写真はまとめて1つのアルバムになり、業者はそれを見て買取総額を決めます。
                 </p>
               </div>
             </div>
@@ -134,16 +134,16 @@ export default function PhotoGuidePage() {
                   <div className="compare-photo-illus">
                     <svg viewBox="0 0 200 150" width="200" height="150" aria-hidden="true">
                       <rect x="10" y="10" width="180" height="130" rx="8" fill="#f0f7ff" />
-                      <rect x="20" y="25" width="40" height="30" rx="4" fill="#90caf9" />
-                      <rect x="70" y="25" width="35" height="40" rx="4" fill="#a5d6a7" />
-                      <rect x="115" y="20" width="30" height="25" rx="3" fill="#ffcc80" />
-                      <rect x="155" y="28" width="25" height="22" rx="3" fill="#ce93d8" />
-                      <rect x="20" y="65" width="55" height="35" rx="4" fill="#80deea" />
-                      <rect x="85" y="75" width="40" height="25" rx="4" fill="#ef9a9a" />
-                      <rect x="135" y="60" width="45" height="45" rx="4" fill="#fff9c4" />
-                      <path d="M100 8 L100 14" stroke="#f0b429" strokeWidth="2.5" strokeLinecap="round" />
-                      <path d="M120 5 L118 11" stroke="#f0b429" strokeWidth="2" strokeLinecap="round" />
-                      <path d="M80 5 L82 11" stroke="#f0b429" strokeWidth="2" strokeLinecap="round" />
+                      <ellipse cx="100" cy="118" rx="58" ry="7" fill="#dbe7f5" />
+                      <rect x="52" y="48" width="96" height="58" rx="10" fill="#90caf9" />
+                      <rect x="40" y="62" width="20" height="44" rx="8" fill="#64b5f6" />
+                      <rect x="140" y="62" width="20" height="44" rx="8" fill="#64b5f6" />
+                      <rect x="60" y="86" width="80" height="18" rx="6" fill="#bbdefb" />
+                      <rect x="52" y="104" width="12" height="12" rx="2" fill="#5c8bc4" />
+                      <rect x="136" y="104" width="12" height="12" rx="2" fill="#5c8bc4" />
+                      <path d="M100 22 L100 30" stroke="#f0b429" strokeWidth="2.5" strokeLinecap="round" />
+                      <path d="M120 24 L117 31" stroke="#f0b429" strokeWidth="2" strokeLinecap="round" />
+                      <path d="M80 24 L83 31" stroke="#f0b429" strokeWidth="2" strokeLinecap="round" />
                       <circle cx="170" cy="130" r="12" fill="#4ade80" />
                       <path d="M164 130 L168 134 L176 126" stroke="#fff" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
@@ -151,7 +151,7 @@ export default function PhotoGuidePage() {
                 </div>
                 <div className="compare-label">
                   <span className="compare-label-badge">良い例</span>
-                  <p>品物を並べ、全体が映るように撮影。明るい場所で背景がすっきりしている。</p>
+                  <p>1枚に1品。品物全体が映り、明るい場所で背景がすっきりしている。</p>
                 </div>
               </div>
 
@@ -172,7 +172,7 @@ export default function PhotoGuidePage() {
                 </div>
                 <div className="compare-label">
                   <span className="compare-label-badge">悪い例</span>
-                  <p>暗くて見えにくい。品物が重なっていて何があるか分からない。</p>
+                  <p>複数の品物を1枚に詰め込み、暗くて重なっていて何があるか分からない。</p>
                 </div>
               </div>
             </div>
@@ -264,7 +264,7 @@ export default function PhotoGuidePage() {
             <div className="guide-cta-inner">
               <h2>準備ができたら、さっそく出品しよう</h2>
               <p>
-                まとめて並べて撮るだけ。1点ずつ売る手間も、しつこい営業電話もありません。
+                1点ずつ撮って、まとめて出すだけ。1点ずつ売る手間も、しつこい営業電話もありません。
                 <br />
                 出品・査定・お断りまで、ユーザーの費用は一切無料です。
               </p>
