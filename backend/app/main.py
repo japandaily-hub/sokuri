@@ -297,7 +297,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(api_router, prefix="/api/v1")
 
-    @app.get("/health", tags=["System"], summary="ヘルスチェック")
+    # HEAD も受ける: UptimeRobot 等の外形監視は HEAD で叩くことがあり、GET 専用だと 405 で「Down」誤判定になる
+    # （INC-2026-09-08-2 追記・2026-09-08 実測）。Starlette は GET ルートに HEAD を自動付与しないため明示する。
+    @app.api_route("/health", methods=["GET", "HEAD"], tags=["System"], summary="ヘルスチェック")
     async def health() -> dict[str, str | None]:
         """liveness プローブ。稼働中ビルドのコミットSHA短縮形（先頭7桁）を併せて返す。
 
@@ -308,7 +310,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         commit = settings.render_git_commit[:7] if settings.render_git_commit else None
         return {"status": "ok", "commit": commit}
 
-    @app.get("/readyz", tags=["System"], summary="レディネスチェック（DB到達性+スキーマ状態込み）")
+    @app.api_route("/readyz", methods=["GET", "HEAD"], tags=["System"], summary="レディネスチェック（DB到達性+スキーマ状態込み）")
     async def readyz(token: str | None = None) -> JSONResponse:
         """liveness(/health) と分離した readiness プローブ。
 

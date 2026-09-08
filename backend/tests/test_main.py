@@ -99,6 +99,16 @@ async def test_health_returns_status_and_commit_keys():
     assert "commit" in data
 
 
+async def test_health_and_readyz_accept_head_for_external_monitors():
+    """UptimeRobot 等は HEAD で叩く。GET 専用だと 405 で「Down」誤判定（2026-09-08 実測）。"""
+    app = create_app(Settings(_env_file=None))
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        assert (await client.head("/health")).status_code == 200
+        assert (await client.get("/health")).status_code == 200
+        r = await client.head("/readyz")
+        assert r.status_code in (200, 503)  # DB 到達性次第。405 でないことが要点
+
+
 async def test_health_commit_is_none_when_render_git_commit_unset():
     """RENDER_GIT_COMMIT 未設定（ローカル開発等）では commit は None。"""
     settings = Settings(_env_file=None)
