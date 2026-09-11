@@ -32,6 +32,7 @@ Claude / Codex はセッション開始時に本ファイルの「原則」と�
 | 外形監視の down/up | /health /readyz /frontend の障害と復旧、degraded_config。スリープ復帰（90 秒まで）を待ってから判定 | `scripts/uptime_check.py` + `uptime-alert.yml` | 5分毎（設計）・実測 2〜6 時間毎 |
 | 通知の対ガード（メタ） | 失敗を通知する経路・スクリプトに復旧側が無ければ CI が落ちる | `backend/tests/test_alert_pairing.py` | pytest（CI） |
 | 判定ロジックのテスト | 失敗/復旧/正常/cancelled の判定と drift 比較 | `backend/tests/test_alert_transitions.py`・`test_render_drift.py` | pytest（CI） |
+| アラート宛先の照合 | 運営アラート（[CRITICAL]/[RECOVERED]）の宛先に管理者が入っているか。失敗と復旧が別の受信箱に散ると未解決に見える | `ops_jobs.check_alert_recipients` + `backend/tests/test_ops_cron_cadence.py` | 日次 / pytest |
 | Ops cron 欠測検知 | スケジュール実行の成功が24時間で下限未満（＝止まっている）。過去の失敗回数は積まない＝自己増殖ループにしない | `ops_jobs.py` daily ⑤ + `backend/tests/test_ops_cron_cadence.py` | 日次 / pytest |
 | 外形監視の HEAD 対応 | `/health` `/readyz` が HEAD を受ける（UptimeRobot は HEAD で叩く。GET 専用だと 405＝Down 誤判定） | `backend/tests/test_main.py` | pytest（CI） |
 
@@ -39,6 +40,7 @@ Claude / Codex はセッション開始時に本ファイルの「原則」と�
 
 | ID | 日付 | 通知元 / 症状 | 根本原因 | 対処 | 再発防止ガード | 状態 |
 |---|---|---|---|---|---|---|
+| INC-2026-09-11-3 | 2026-09-04〜09-11 | 「失敗の通知は来るのに復旧が来ない」状態が続く（運営の体感） | 通知先の不一致。GitHub の「Run failed」と UptimeRobot は運営のメイン受信箱 `ko.13.hei@gmail.com` に届くが、こちらの `notify()`（[CRITICAL] / [RECOVERED] / 日次ジョブの要対応）は `ALERT_EMAILS` = `katazuke.support@gmail.com` にしか届いていなかった。LINE には両方届くのでメールだけ片側が欠けていた | `ALERT_EMAILS` に `ko.13.hei@gmail.com` を追加（GitHub Secrets と `.env.alerts` の両方）。テスト送信で両アドレスへの delivered を Brevo で実測 | 日次ジョブ ①-2 で「管理者アドレスが ALERT_EMAILS に含まれるか」を照合（`ops_jobs.check_alert_recipients`・`test_ops_cron_cadence.py` 4 件） | closed |
 | INC-2026-09-11-1 | 2026-09-08〜09-11 | GitHub「Run failed: Ops cron」が 3 晩連続（9/8 21:02・9/9 20:51・9/10 20:45 UTC）＋ LINE／メールに「日次ジョブで要対応の項目」 | **自己増殖ループ。** `_check_hourly_runs` が「直近24時間に Ops cron の失敗が n 回」を要対応に積んでいたため、前日の失敗そのものが翌日の daily を失敗させ、その失敗をさらに翌日が検知する。起点は 9/7 の Brevo 差出人拒否（INC-2026-09-08-1・9/8 に解消済み）で、真因が消えたあとも 3 晩通知が届き続けた。9/9・9/10 の要対応項目は「失敗が 1 回」の 1 行のみ | 失敗回数を要対応から外し、ログ表示だけに変更（個々の失敗は発生時に fail()・notify-failure・GitHub メールが通知済みで重複）。欠測検知（成功回数が下限未満）は維持 | `backend/tests/test_ops_cron_cadence.py`（過去の失敗だけでは要対応にしない／スケジュール停止は検知する） | closed（9/11 16:20 JST 修正後の判定を実 GitHub 履歴＝同じ入力に対して実行し「要対応なし」を確認。16:38 JST の手動実行 #41 で `daily: all clear`・`recovered: notified=['email','line']`） |
 | INC-2026-09-11-2 | 2026-09-08〜09-11 | UptimeRobot「Monitor is DOWN: カタヅケ API (backend)」（9/8 13:23 JST）。以後 3 日間 UP 通知が来ない | UptimeRobot は HEAD で監視するが、`/health` `/readyz` が GET 専用で 405 を返していた。修正は 9/8 にコミット済み（a88756d）だったが **push されず本番に反映されていなかった**。台帳で INC-2026-09-08-2 を closed にした時点で本番反映を確認していなかったのが判断ミス | a88756d を本番へ反映（`@app.api_route(methods=["GET","HEAD"])`）。UptimeRobot が UP に復帰 | `backend/tests/test_main.py::test_health_and_readyz_accept_head_for_external_monitors`／運用面は原則 5（下記）を追加 | closed（9/11 16:40 JST 本番 8e98f7e 反映後に HEAD `/health` `/readyz` とも 200 を実測、本番ログで UptimeRobot の HEAD 検査が 200 を受領、16:50 JST に「Monitor is UP」メールを確認） |
 | INC-2026-09-08-1 | 2026-09-07〜 | Ops cron daily「メール到達プローブ 失敗 1」「Brevo 配送不能 2 件」（9/8 06:26 JST・LINE＋メール） | Brevo が差出人 `noreply@katadzuke.jp` を「未認証の送信者」として拒否（9/7 16:11 JST の本人確認書類の管理者通知から）。認証済み送信者は gmail の2件のみで、katadzuke.jp のドメイン認証も無い。API は 201 を返すためアプリ側は成功扱い＝日次プローブだけが検知 | Render の `MAIL_FROM` を認証済みの `katazuke.support@gmail.com` へ（Claude の API 呼び出しは権限で拒否→`scripts/render_env.py` を用意しユーザー実行）。render.yaml も追従 | プローブの通知に Brevo の reason と対処コマンドを表示（ops_jobs）／恒久策は katadzuke.jp のドメイン認証（DKIM/DMARC・ユーザー作業） | closed（9/8 12:xx JST ユーザーが `render_env.py set MAIL_FROM` を実行→13:23 JST に本番 /contact 経由のメールが katazuke.support@gmail.com 差出人で delivered を確認） |
@@ -51,6 +53,7 @@ Claude / Codex はセッション開始時に本ファイルの「原則」と�
 
 ## 未収束の教訓（ガード化できていないもの）
 - **GitHub Actions の schedule はこのリポジトリでは 2〜6 時間間隔でしか起動しない**（2026-09-04〜09-08 実測。`*/5` も `7 * * * *` も同じ）。外形監視は「5 分毎」ではなく「1 日 4〜6 回」しか動いておらず、毎時のリマインド／keep-warm も同様。バックエンド（Render 無料枠）はほぼ常にスリープしている。2026-09-08 に ① UptimeRobot（無料プラン・5 分毎）で `https://sokuri-backend.onrender.com/health` と `https://sokuri.vercel.app/` を監視開始＝keep-warm 兼外部監視（ダウン・復旧は UptimeRobot からメール）。GitHub 側の定期実行は依然 2〜6 時間間隔なので、GitHub 経由の検知・リマインドは「日に数回」の粒度と割り切る。毎時が必須になったら ② 外部 cron から `workflow_dispatch`（PAT を外部に預ける判断が要る）。
+- **通知は「同じ出来事の失敗と復旧が同じ受信箱に届く」ように配線する。** 失敗は GitHub / UptimeRobot から、復旧は自前の `notify()` から届くため、宛先がズレると運営には「復旧が来ない＝未解決」に見える（INC-2026-09-11-3）。現在の宛先はメール `ALERT_EMAILS` = katazuke.support@gmail.com と ko.13.hei@gmail.com、LINE は運営用公式アカウント。
 - **Brevo の差出人は「認証済み送信者」か「認証済みドメイン」のアドレスだけ。** アプリの `MAIL_FROM` を変えるときは Brevo 側の認証を先に確認する。katadzuke.jp を使うなら Brevo でドメイン認証（DNS に DKIM/DMARC）が必要。
 
 - Render の Blueprint `envVars` は既存サービスへ同期されない（2026-07-18 実測）。本番で効かせたい既定値は `backend/start.sh` の export か dashboard。drift 検査はキーの有無を見るが、値の一致は見ない（秘密を扱わないため）。値のズレは `/readyz` の `config` / `degraded_config` で間接的に検知する。

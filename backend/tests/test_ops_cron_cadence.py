@@ -68,3 +68,26 @@ def test_missing_token_is_reported(monkeypatch):
     monkeypatch.setattr(ops_jobs, "GITHUB_TOKEN", "")
     problems = ops_jobs._check_hourly_runs()
     assert problems and "GITHUB_TOKEN" in problems[0]
+
+
+# ──────────────── アラート宛先の照合（INC-2026-09-11-3） ────────────────
+
+
+def test_alert_recipients_must_include_admins():
+    """管理者が宛先に無ければ要対応（失敗だけ届き復旧が別受信箱＝未解決に見える）。"""
+    problems = ops_jobs.check_alert_recipients({"admin@example.com"}, "ops@example.com")
+    assert problems and "ALERT_EMAILS" in problems[0]
+    assert "admin@example.com" not in problems[0]  # アドレスは通知文に出さない
+
+
+def test_alert_recipients_ok_when_admin_included():
+    assert ops_jobs.check_alert_recipients({"Admin@example.com"}, "ops@example.com, admin@example.com") == []
+
+
+def test_alert_recipients_reports_empty_destination():
+    problems = ops_jobs.check_alert_recipients({"admin@example.com"}, "")
+    assert problems and "未設定" in problems[0]
+
+
+def test_alert_recipients_silent_without_admins():
+    assert ops_jobs.check_alert_recipients(set(), "") == []

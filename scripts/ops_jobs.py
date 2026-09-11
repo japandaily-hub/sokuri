@@ -7,6 +7,7 @@
                 Render Free は無通信でスピンダウンし、プロセス内の毎時ループごと止まるため
                 外から叩く。
     daily       ① ADMIN_EMAILS の棚卸し（未登録・非admin・停止中があれば通知）
+                ①-2 運営アラートの宛先（ALERT_EMAILS）に管理者が入っているかの照合
                 ② 運営自身のプローブ問い合わせを対応済みへ
                 ③ メール到達プローブ: 送信 → Brevo のイベント API で delivered まで追跡
                 ④ Brevo の前日集計でバウンス・ブロック・エラーがあれば通知
@@ -179,6 +180,28 @@ def _poll_brevo_delivery(message_ids: list[str]) -> tuple[list[str], list[str], 
     return delivered, failed, pending
 
 
+def check_alert_recipients(admin_emails: set[str], alert_emails: str) -> list[str]:
+    """運営アラートの宛先に管理者が入っているかを照合する（INC-2026-09-11-3）。
+
+    GitHub の「Run failed」は管理者の受信箱へ届くのに、こちらの [CRITICAL]/[RECOVERED] は
+    ALERT_EMAILS にしか届かない。両者がズレていると「失敗だけ来て復旧が来ない」＝運営には
+    未解決に見える（2026-09-04〜09-11 に実発生）。アドレスそのものは通知文に出さない。
+    """
+    if not admin_emails:
+        return []
+    to = {a.strip().lower() for a in (alert_emails or "").split(",") if a.strip()}
+    if not to:
+        return ["運営アラートの宛先（ALERT_EMAILS）が未設定です。障害・復旧の通知がメールで届きません。"]
+    missing = {e for e in admin_emails if e and e.lower() not in to}
+    if missing:
+        return [
+            f"運営アラートの宛先に管理者 {len(missing)} 件が含まれていません。"
+            "失敗通知（GitHub）は届くのに復旧通知が別の受信箱にしか届かず、未解決に見えます。"
+            "GitHub Secrets の ALERT_EMAILS に管理者アドレスを追加してください。"
+        ]
+    return []
+
+
 def _check_hourly_runs() -> list[str]:
     """直近24時間の schedule 起動のうち成功が下限未満／失敗ありなら要対応として返す。
 
@@ -251,6 +274,12 @@ def job_daily() -> int:
         for e in entries:
             state = "未登録" if not e.get("registered") else ("停止中" if e.get("suspended") else f"role={e.get('role')}")
             print(f"   {'✅' if e.get('ok') else '❌'} {e.get('email')}: {state}")
+        # ①-2 アラート宛先の照合（失敗と復旧が同じ受信箱に届くこと）
+        problems.extend(
+            check_alert_recipients(
+                {str(e.get("email", "")) for e in entries}, os.environ.get("ALERT_EMAILS", "")
+            )
+        )
         if not body.get("ok"):
             detail = "、".join(
                 f"{e.get('email')}（{'未登録' if not e.get('registered') else ('停止中' if e.get('suspended') else 'role=' + str(e.get('role')))}）"
