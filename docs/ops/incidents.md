@@ -9,6 +9,7 @@ Claude / Codex はセッション開始時に本ファイルの「原則」と�
 2. **宣言と実態は機械で突き合わせる。** 人がダッシュボードで変えた値（プラン・名前・環境変数）は設定ファイルとズレる。ズレは定期検査で検出し、通知する（人の記憶に頼らない）。
 3. **教訓はテストかワークフローにする。** 「注意する」「覚えておく」は再発防止ではない。同じ失敗をしたら CI が赤くなる形にする（例: `backend/tests/test_alert_pairing.py`・`test_render_drift.py`）。
 4. **台帳は1障害1行以上。** 症状・根本原因・対処・再発防止ガード・状態を書く。「原因不明のまま復旧」も状態 `open` として残す。
+5. **`closed` にするのは本番に反映され、実測で直ったことを確認したあと。** ローカルのコミットやテスト緑は「直った」ではない。未 push のまま `closed` にすると、直したつもりの障害が通知を出し続ける（INC-2026-09-11-2 で実発生。3 日間 Down のまま）。`git log origin/main..HEAD` が空であること、`/health` の commit が期待値であることまで見る。
 
 ## 対応手順（チェックリスト）
 
@@ -31,12 +32,15 @@ Claude / Codex はセッション開始時に本ファイルの「原則」と�
 | 外形監視の down/up | /health /readyz /frontend の障害と復旧、degraded_config。スリープ復帰（90 秒まで）を待ってから判定 | `scripts/uptime_check.py` + `uptime-alert.yml` | 5分毎（設計）・実測 2〜6 時間毎 |
 | 通知の対ガード（メタ） | 失敗を通知する経路・スクリプトに復旧側が無ければ CI が落ちる | `backend/tests/test_alert_pairing.py` | pytest（CI） |
 | 判定ロジックのテスト | 失敗/復旧/正常/cancelled の判定と drift 比較 | `backend/tests/test_alert_transitions.py`・`test_render_drift.py` | pytest（CI） |
-| Ops cron 欠測検知 | 毎時ジョブが24時間で下限回数回っていない | `ops_jobs.py` daily ⑤ | 日次 |
+| Ops cron 欠測検知 | スケジュール実行の成功が24時間で下限未満（＝止まっている）。過去の失敗回数は積まない＝自己増殖ループにしない | `ops_jobs.py` daily ⑤ + `backend/tests/test_ops_cron_cadence.py` | 日次 / pytest |
+| 外形監視の HEAD 対応 | `/health` `/readyz` が HEAD を受ける（UptimeRobot は HEAD で叩く。GET 専用だと 405＝Down 誤判定） | `backend/tests/test_main.py` | pytest（CI） |
 
 ## 台帳
 
 | ID | 日付 | 通知元 / 症状 | 根本原因 | 対処 | 再発防止ガード | 状態 |
 |---|---|---|---|---|---|---|
+| INC-2026-09-11-1 | 2026-09-08〜09-11 | GitHub「Run failed: Ops cron」が 3 晩連続（9/8 21:02・9/9 20:51・9/10 20:45 UTC）＋ LINE／メールに「日次ジョブで要対応の項目」 | **自己増殖ループ。** `_check_hourly_runs` が「直近24時間に Ops cron の失敗が n 回」を要対応に積んでいたため、前日の失敗そのものが翌日の daily を失敗させ、その失敗をさらに翌日が検知する。起点は 9/7 の Brevo 差出人拒否（INC-2026-09-08-1・9/8 に解消済み）で、真因が消えたあとも 3 晩通知が届き続けた。9/9・9/10 の要対応項目は「失敗が 1 回」の 1 行のみ | 失敗回数を要対応から外し、ログ表示だけに変更（個々の失敗は発生時に fail()・notify-failure・GitHub メールが通知済みで重複）。欠測検知（成功回数が下限未満）は維持 | `backend/tests/test_ops_cron_cadence.py`（過去の失敗だけでは要対応にしない／スケジュール停止は検知する） | closed |
+| INC-2026-09-11-2 | 2026-09-08〜09-11 | UptimeRobot「Monitor is DOWN: カタヅケ API (backend)」（9/8 13:23 JST）。以後 3 日間 UP 通知が来ない | UptimeRobot は HEAD で監視するが、`/health` `/readyz` が GET 専用で 405 を返していた。修正は 9/8 にコミット済み（a88756d）だったが **push されず本番に反映されていなかった**。台帳で INC-2026-09-08-2 を closed にした時点で本番反映を確認していなかったのが判断ミス | a88756d を本番へ反映（`@app.api_route(methods=["GET","HEAD"])`）。UptimeRobot が UP に復帰 | `backend/tests/test_main.py::test_health_and_readyz_accept_head_for_external_monitors`／運用面は原則 5（下記）を追加 | closed |
 | INC-2026-09-08-1 | 2026-09-07〜 | Ops cron daily「メール到達プローブ 失敗 1」「Brevo 配送不能 2 件」（9/8 06:26 JST・LINE＋メール） | Brevo が差出人 `noreply@katadzuke.jp` を「未認証の送信者」として拒否（9/7 16:11 JST の本人確認書類の管理者通知から）。認証済み送信者は gmail の2件のみで、katadzuke.jp のドメイン認証も無い。API は 201 を返すためアプリ側は成功扱い＝日次プローブだけが検知 | Render の `MAIL_FROM` を認証済みの `katazuke.support@gmail.com` へ（Claude の API 呼び出しは権限で拒否→`scripts/render_env.py` を用意しユーザー実行）。render.yaml も追従 | プローブの通知に Brevo の reason と対処コマンドを表示（ops_jobs）／恒久策は katadzuke.jp のドメイン認証（DKIM/DMARC・ユーザー作業） | closed（9/8 12:xx JST ユーザーが `render_env.py set MAIL_FROM` を実行→13:23 JST に本番 /contact 経由のメールが katazuke.support@gmail.com 差出人で delivered を確認） |
 | INC-2026-09-08-2 | 2026-09-05〜09-08 | 外形監視 CRITICAL「backend /readyz 到達不能 TimeoutError」（9/7 14:58 JST）・その後 RECOVERED が来ない | Render 無料枠はスリープから復帰に 25〜35 秒かかる（alembic ＋ 起動）。監視は復帰待ちをせず 25 秒で /readyz を判定していたため、スリープ中に来た検査は必ず DOWN＝9/5 18:29 JST から 15 回連続の誤検知。さらに GitHub の schedule が 2〜6 時間間隔でしか起動せず（設計 5 分毎・毎時）、バックエンドがほぼ常にスリープ状態 | 手動実行（run #34）で UP に戻り RECOVERED を自動送信。uptime_check に「復帰待ち（/health を 90 秒まで）」を追加しコールドスタートを障害と区別。Ops cron の回数下限を実態（3/日）に | `test_uptime_check.py`（32 秒の復帰を障害にしない／DOWN→UP で復旧通知）／未収束: GitHub cron の遅延は外部スケジューラ（UptimeRobot / cron-job.org）でしか解けない＝運営判断 | closed（9/8 13:20 JST UptimeRobot 無料プランに「カタヅケ API (backend)」= /health と「カタヅケ フロント (Vercel)」を 5 分間隔・メール通知で追加＝keep-warm 兼外部監視。GitHub cron の遅延自体は残るが、バックエンドが常時稼働になりコールドスタート誤検知は構造的に消える。復帰待ち版の初回実行 run #38 は UP・RECOVERED 送信済み） |
 | INC-2026-09-07-1 | 2026-09-01〜09-07 | Render メール「Blueprint Sync Failed for sokuri」（9/1・9/6） | 本番 DB を 9/1 に dashboard で有料 basic_256mb・実名 `sokuri_jwd3` で作り直したのに、render.yaml が `plan: free` / `databaseName: sokuri` のまま。Render は有料→free の変更と DB 名の変更を受け付けず同期が error。デプロイは autoDeploy で通るため6日間気づかず | render.yaml を実態に追従（642e6d3）→ 同期 success・in_sync | Render drift 検査（週次＋push 後）／同期の失敗・復旧通知 | closed |

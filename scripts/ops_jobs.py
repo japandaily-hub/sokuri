@@ -215,8 +215,12 @@ def _check_hourly_runs() -> list[str]:
         f"success={success} failed={failed} history={total_schedule_runs}（設計 24 回/日・GitHub の遅延で実測 4〜6 回/日）"
     )
     out: list[str] = []
-    if failed:
-        out.append(f"直近24時間で Ops cron の失敗が {failed} 回（Actions のログを確認）")
+    # 失敗回数は**要対応に積まない**（INC-2026-09-11-1）。個々の失敗はその場で fail() と
+    # ワークフローの notify-failure・GitHub の失敗メールが通知済みで、翌日の再掲は重複。
+    # それ以上に、ここへ積むと「前日に失敗があった」こと自体で daily が失敗し、その失敗を
+    # 翌日がまた検知する自己増殖ループになり、人が介入しない限り永久に復旧しない
+    # （2026-09-08〜09-10 に実発生。9/8 の真因 = Brevo 差出人拒否は 9/8 に解消済みだったのに、
+    #   3 晩連続で「Run failed: Ops cron」が届き続けた）。回数はログにだけ残す。
     if total_schedule_runs < HOURLY_SUCCESS_MIN_PER_DAY:
         # 導入初日（スケジュール実行の履歴がまだ 24 回に満たない）は回数判定を保留する。
         print(f"⏭️ スケジュール実行の履歴が {total_schedule_runs} 回のため回数判定は保留（翌日から有効）")
