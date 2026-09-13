@@ -519,6 +519,10 @@ section:has(> .vt){position:relative;}
 .faq-q .chev{margin-left:auto;color:var(--body-soft);transition:transform .3s;font-size:18px;}
 .faq-item.open .chev{transform:rotate(180deg);color:var(--primary);}
 .faq-a{max-height:0;overflow:hidden;transition:max-height .35s var(--ease);}
+/* /faq（.faq-page）の開閉は faq.css が grid-template-rows 0fr→1fr で行う。
+   その場合ここの max-height:0 が効き続け、open でも高さ 0 にクリップされて回答が1問も出ない。
+   トップの <FaqAccordion> は inline の max-height を当てるので上の規則はそのまま残す。 */
+.faq-page .faq-a{max-height:none;}
 .faq-a-inner{padding:0 4px 22px 36px;font-size:15px;color:var(--body);line-height:1.9;}
 
 /* ============================================================

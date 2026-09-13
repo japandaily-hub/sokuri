@@ -26,6 +26,15 @@
 /* 4ステップ帯は番号＋文字のみ（アイコンは「ご利用の流れ」で 220px 大判に集約） */
 .hero .hw-ic{display:none;}
 
+/* モバイルは flex-wrap だと「1 撮る / 2 業者が競う / 3 見比べて選ぶ」で 1 行が埋まり、
+   「4 引き取り完了」だけが 2 行目に落ちて 4 工程が一続きに読めない（ラウンド3 実測）。
+   2×2 に固定して 4 項目を均等に見せる。矢印は行をまたぐと向きが意味を失うので畳む
+   （核は 480px 以下で畳んでいるが、折返しは 500px 付近から始まるため 560px まで広げる）。 */
+@media(max-width:560px){
+  .hero .hero-how{display:grid;grid-template-columns:repeat(2,1fr);gap:12px 14px;}
+  .hero .hw-arr{display:none;}
+}
+
 @media(max-width:859px){
   /* 写真を h1 の直後・本文の前に繰り上げる。
      .hero-copy の箱を display:contents で外し、hero-grid 直下の flex 項目として order を付ける。 */
@@ -44,14 +53,19 @@
 }
 
 /* ============================================================
-   #2 ASSURE — 帯の高さを 1.4 倍にし、3D アイコンを枠に入れて輪郭を戻す
+   #2 ASSURE — 帯の高さを 1.4 倍にし、行頭は 56px チップ＋線アイコン
    ============================================================ */
+/* ラウンド2 実測: 1024px の 3D レンダーを 56px 枠へ contain で縮小すると、
+   被写体（白い電話・白い盾）と枠地（--pale-2）がほぼ同色になり空箱に見えた。
+   BRIEF §4-15「3D は 112px 以上の枠でしか使わない」に従い線アイコン .ic へ戻す。
+   枠の見た目は katazuke.css の .assure-item .ai 本来の定義
+   （56/48px・--pale 面・--primary 罫・place-items:center・color:--primary）をそのまま使うので、
+   ここでは寸法・面・罫を上書きしない。アイコンの実寸だけを決める。 */
 .assure .container{padding-block:40px;}
-.assure-item .ai{width:56px;height:56px;background:var(--pale-2);border:1px solid var(--line);}
-.assure-item .ai img{object-fit:contain;padding:7px;}
+.assure-item .ai .ic{font-size:26px;stroke-width:1.4;}
 @media(max-width:520px){
   .assure .container{padding-block:30px;}
-  .assure-item .ai{width:48px;height:48px;}
+  .assure-item .ai .ic{font-size:22px;}
 }
 
 /* ============================================================
@@ -67,7 +81,11 @@
 /* ============================================================
    #4 ご利用の流れ — 既存 3D アイコンを 1 辺 220px の白枠で大きく見せる
    ============================================================ */
-#flow .step-photo{aspect-ratio:1/1;max-width:220px;margin-inline:auto;background:#fff;}
+/* 地は指定しない。contain の枠は素材に焼かれた淡青の地（how-* = rgb(238,241,250)）と枠の地が違うと
+   「枠の中にもう一枚ずれた四角」が浮くため、katazuke-pages.css の
+   `.img-frame--contain{background:var(--pale)}` に揃える（ラウンド3 指摘）。
+   ここで #fff を書くと 2 階層セレクタの特異度で共有定義に勝ってしまうので、意図的に空けている。 */
+#flow .step-photo{aspect-ratio:1/1;max-width:220px;margin-inline:auto;}
 #flow .step-photo img{object-fit:contain;padding:clamp(10px,1.6vw,18px);}
 #flow .step-body{text-align:center;}
 @media(max-width:859px){
@@ -75,13 +93,34 @@
 }
 
 /* ============================================================
-   #6 #7 BUNDLE / AUCTION — 3D 図版を白地・1px 枠に入れて輪郭を出す
+   #6 #7 BUNDLE / AUCTION — 3D 図版を 1px 枠に入れて輪郭を出す
    生成 AR（1536x864 = 16:9）に表示 AR を合わせる
+   地は #flow と同じ理由で指定しない（共有の .img-frame--contain に合わせ、二重枠を出さない）
    ============================================================ */
 .bundle .bundle-figure,
-.auction .auc-figure{aspect-ratio:16/9;background:#fff;}
+.auction .auc-figure{aspect-ratio:16/9;}
 .bundle .bundle-figure img,
 .auction .auc-figure img{object-fit:contain;padding:clamp(10px,2vw,22px);}
+
+/* まとめ売り 3 枚の行頭チップ。3D レンダー（1024px）を 72px 枠へ縮小すると青い塊にしか見えず、
+   assure 4 チップ・trust 3 項だけが線アイコンで、ここだけ画質が落ちて見えた（ラウンド3 指摘）。
+   チップの寸法・語彙を assure（.ai）／trust（.ti-ic）／cats-note（.cn-ic）と同じ 56px に揃える。
+   .ic の width/height は px で明示する（.ic の width:1em は font-size の継承元によって揺れるため）。 */
+.bundle .bundle-c .bc-ic{width:56px;height:56px;}
+.bundle .bundle-c .bc-ic .ic{width:26px;height:26px;font-size:26px;stroke:currentColor;stroke-width:1.4;}
+
+/* 裁定 7（BRIEF §4-7）— 縦書き `.vt` は据え置くが「地の模様」まで沈める。
+   核の .vt は #333・34px で立つため、h2 と同文だと見出しが縦横で二度描かれて崩れに見えた。
+   文言は page.tsx 側で節のラベルへ短縮済み。ここでは色を --line 相当へ落とし、
+   一回り小さくし、本文（.container）より下に重なり順を固定する。
+   核の .vt は @media(min-width:1280px) 内にあるため、同じ条件・より高い特異度で上書きする。 */
+@media(min-width:1280px){
+  .bundle .vt,.auction .vt{color:var(--line);font-size:23px;letter-spacing:.14em;z-index:0;}
+  /* 1文字目だけ主色に跳ねる核の装飾も、沈めた地色に合わせる */
+  .bundle .vt::first-letter,.auction .vt::first-letter{color:inherit;}
+  /* .container が静的配置のままだと、後から塗られる絶対配置の .vt が本文の上に乗る */
+  .bundle>.container,.auction>.container{position:relative;z-index:1;}
+}
 
 /* ============================================================
    #8 引き渡し — .media-split（左画像 3:2 / 右テキスト）
@@ -94,20 +133,42 @@
 .scenes .scene-img{aspect-ratio:1/1;}
 @media(max-width:859px){
   .scenes .scenes-grid{grid-template-columns:repeat(2,1fr);max-width:none;margin-inline:0;gap:clamp(22px,4vw,32px);}
+  /* 見出しの既定 text-wrap:balance（katazuke.css の h1〜h3）は、2 列で列幅が 170px 前後になると
+     行数を均すために「新居に持って／いかない物を」「家族で、ま／とめて整理」と文節の途中で割る。
+     均等割りを解除し、対応ブラウザでは文節単位で折り返させる（BRIEF §2.1 の 2×2 は維持）。
+     word-break:auto-phrase は未対応ブラウザでは無視され、通常の折返しに戻るだけ。 */
+  .scenes .scene-body h3,#flow .step-body h3{text-wrap:wrap;word-break:auto-phrase;}
 }
 
 /* ============================================================
    #10 安心の仕組み — .media-split。左に大判、右に 3 項目の縦リスト
    ============================================================ */
 .trust .trust-split{--ms-img:44fr;--ms-txt:56fr;margin-top:clamp(28px,4vw,44px);align-items:start;}
-.trust .trust-hero{aspect-ratio:4/3;max-width:520px;margin-inline:auto;background:#fff;}
+/* width:100% は装飾ではなく load-bearing。
+   .trust-hero は .media-split（grid）の直下の項目で、margin-inline:auto を持つ。
+   grid/flex の項目に inline 方向の auto マージンが付くと justify-self の stretch が無効になり、
+   幅は shrink-to-fit で決まる。この枠の中身（.img-frame img）は position:absolute なので
+   shrink-to-fit の内容幅は 0 になり、枠は「1px 罫だけの 2x2px の点」に潰れていた
+   （ラウンド2 実測: 幅 1.77px・列の中央 x=400 に点が 1 つだけ。デスクトップで左半分が空白に見えた原因）。
+   幅を明示すれば max-width:520px と margin-inline:auto が本来の「上限つき中央寄せ」として効く。
+   同じ対処は .biz-banner-media で既に取っている。
+   面は #fff をやめ .img-frame 既定の --pale-2＋1px --line に戻す（BRIEF §1.5「白面の上では地を --pale-2」）。
+   trust-illus-1 の地は rgb(239,242,252) で --pale-2 とほぼ同色のため、継ぎ目は出ず
+   padding 分の余白が台紙（マット）として読める。 */
+.trust .trust-hero{aspect-ratio:4/3;width:100%;max-width:520px;margin-inline:auto;}
 .trust .trust-hero img{object-fit:contain;padding:clamp(12px,2vw,24px);}
 .trust .trust-list{display:flex;flex-direction:column;gap:clamp(24px,3vw,34px);}
-.trust .trust-item{display:grid;grid-template-columns:64px minmax(0,1fr);gap:18px;align-items:start;}
-/* 先頭の項目は左の大判が図版を兼ねるため、行頭アイコンを持たない */
-.trust .trust-item--lead{grid-template-columns:minmax(0,1fr);}
-.trust .ti-ic{width:64px;height:64px;}
-.trust .ti-ic img{padding:6px;}
+/* 3 項とも同じ 56px チップ + 本文の 2 列に載せる。1 項目だけアイコン枠を欠くと、
+   見出しと本文の行頭が項目ごとにずれて未完成に見えた（ラウンド1 指摘）。
+   チップの語彙は帯（.assure-item .ai）と揃える＝--pale 面・--primary 罫・線アイコン。
+   3D レンダーを 64px 枠に縮小した前案は灰色のにじみにしかならなかった（BRIEF §4-15）。 */
+.trust .trust-item{display:grid;grid-template-columns:56px minmax(0,1fr);gap:18px;align-items:start;}
+.trust .ti-ic{width:56px;height:56px;flex:none;display:grid;place-items:center;
+  background:var(--pale);border:1px solid var(--primary);color:var(--primary);}
+/* width/height を明示するのは load-bearing。katazuke-pages.css の共有 `.trust-item svg{width:13px;height:13px}`
+   （ヒーロー下の信頼バッジ用）が同名クラス経由でここにも効き、.ic の width:1em（特異度 0,1,0）に勝って
+   26px 指定が 13px に潰れていた（ラウンド2 実測）。px で上書きして 56px チップの中で 26px に据える。 */
+.trust .ti-ic .ic{width:26px;height:26px;font-size:26px;stroke:currentColor;stroke-width:1.4;}
 .trust .ti-body h3{font-size:18px;color:var(--ink);}
 .trust .ti-body p{font-size:15px;color:var(--body);margin-top:8px;line-height:1.9;}
 @media(max-width:859px){
@@ -139,6 +200,17 @@
 @media(max-width:1100px){.cats-grid{grid-template-columns:repeat(3,1fr);}}
 @media(max-width:859px){.cats-grid{grid-template-columns:repeat(2,1fr);}}
 
+/* カテゴリ下の注記ボックス。行頭の 56px 枠に 512px の 3D 素材を敷いていたのをやめ、
+   assure／trust／bundle と同じ線アイコンに揃える（ラウンド3 指摘・BRIEF §4-15）。 */
+#cats .cats-note .cn-ic .ic{width:26px;height:26px;font-size:26px;stroke:currentColor;stroke-width:1.4;}
+@media(max-width:859px){
+  /* 横並びのままだと 56px チップ＋16px gap＋左右 26px の内側余白で本文が 230px 前後まで痩せ、
+     見出しが十数字で折り返して行数が伸びる。モバイルはチップを上に逃がして本文を全幅に戻す。 */
+  #cats .cats-note{display:block;}
+  #cats .cats-note .cn-ic{margin-bottom:12px;}
+  #cats .cats-note .cn-body p{margin-top:8px;}
+}
+
 /* ============================================================
    #13 運営者メッセージ — 人物写真を撤去し、静物 3:2 を右に置く
    ============================================================ */
@@ -152,6 +224,11 @@
 /* ============================================================
    #15 最終CTA — 写真帯には見出しだけ。緑ボタンは帯の直下の白面に置く
    ============================================================ */
+/* 帯の見出しだけが左寄せ、直下の本文・ボタン・注記が中央寄せで、ひとつの訴求ブロックに軸が
+   2 本できていた（ラウンド3 指摘）。ページ全体が中央寄せ構成なので帯側を中央に寄せて軸を 1 本にする。
+   共有クラス .hero-band__copy は他ページ（左寄せ前提）に影響させないため、この帯だけに限定する。 */
+.hero-band#contact .hero-band__copy{text-align:center;}
+
 .final-actions{background:#fff;text-align:center;
   padding:clamp(36px,5vw,56px) 0 clamp(48px,6vw,80px);}
 .final-actions p{font-size:16px;color:var(--body);max-width:34em;margin-inline:auto;line-height:2;}
@@ -165,6 +242,10 @@
 /* ============================================================
    #14 業者向けバナー — 左テキスト／右画像の 2 カラムに密度を上げる
    ============================================================ */
+/* 面は --pale（#eef3ff）から --pale-2 へ。BRIEF §1.1「--pale の大面積使用は廃止方向」。
+   このページの面のリズムを 白 →--pale-2（料金）→ 白 →--pale-2（FAQ）→ 写真帯 → 白 →--pale-2（業者バナー）
+   の 4 値に揃える（ラウンド3 指摘。なお .fee／#faq は既に .bg-pale＝--pale-2、.fee-card も既に白＋1px 罫）。 */
+.biz-banner{background:var(--pale-2);}
 .biz-banner .biz-banner-inner{display:grid;
   grid-template-columns:minmax(0,1fr) minmax(0,300px);
   gap:clamp(28px,4vw,56px);align-items:center;}

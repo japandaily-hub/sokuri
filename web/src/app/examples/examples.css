@@ -54,11 +54,14 @@
 .stats-lbl { font-family: var(--ui); font-size: 13px; color: var(--body-soft); margin-top: 6px; font-weight: 600; }
 
 /* ---------- フィルター（マークアップ不変・sticky） ---------- */
+/* sticky の top は .header（sticky・z-index:60・高さ 72px + 1px 罫）の下端に合わせる。
+   top:0 のままだと追従位置がヘッダーと同じになり、z-index の低いこちらが下に隠れて
+   スクロール中はフィルターを押せない。 */
 .filter-bar {
   padding: 14px 0;
   border-bottom: 1px solid var(--line);
   position: sticky;
-  top: 0;
+  top: 73px;
   background: #fff;
   z-index: 20;
 }
@@ -85,11 +88,14 @@
 .filter-count { margin-left: auto; font-family: var(--ui); font-size: 13px; color: var(--body-soft); white-space: nowrap; }
 
 /* ---------- 事例（1カラム・画像と本文の2カラム組） ---------- */
+/* 末尾の余白は「最終カードの下パディング」＋「グリッドの下マージン」＋「注記の上パディング」で
+   三重に取られ、PC で 130px 前後の穴になる（一覧が途中で終わったように見える）。
+   区切りは注記側の上パディング 1 段に任せ、グリッドの下マージンは持たせない。 */
 .cases-grid {
   display: grid;
   grid-template-columns: 1fr;
   gap: 0;
-  margin-bottom: clamp(28px, 4vw, 40px);
+  margin-bottom: 0;
 }
 
 /* .case-card は .media-split（共有部品）と併用する。display/列比はここで書かない */
@@ -97,7 +103,15 @@
   padding-block: clamp(36px, 5vw, 64px);
   border-top: 1px solid var(--line-soft);
 }
+/* .media-split の既定 align-items:center を上書きして天を揃える。
+   画像列（3:2 の主役＋1:1 の小2枚）と本文列は丈が揃わないため、center のままだと
+   カードごとに見出しの開始位置が上下にばらつき、左右交互のリズムが読めない。
+   start にすると余りが常に列の下に集まり、カードの切り替わりが 1px 罫と一致する。 */
+.case-card.media-split { align-items: start; }
 .cases-grid > .case-card:first-child { border-top: 0; padding-top: clamp(24px, 3vw, 36px); }
+/* 最終カードの下は次のカードが来ないので、カード間と同じ丈は要らない。
+   注記の上パディングと合わせて 1 段ぶんの間合いにする */
+.cases-grid > .case-card:last-child { padding-bottom: clamp(20px, 2.5vw, 28px); }
 
 .case-media { display: flex; flex-direction: column; gap: 10px; }
 .case-thumbs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -263,9 +277,24 @@
 
   .case-card { padding-block: clamp(28px, 7vw, 44px); }
   .case-media { gap: 10px; }
+  /* 1カラムになるモバイルでは「何の事例か」を写真より先に読ませる。
+     .media-split は 859px 以下で 1 列になるので、.case-body の箱を display:contents で解いて
+     カード直下の並びに order を当てる（タグ行→人物→成約額→写真→コメント）。
+     860px 以上の左右交互配置（.media-split--rev）には一切触れない。 */
+  .case-card.media-split { row-gap: 18px; }
+  .case-body { display: contents; }
+  .case-cats { order: 1; }
+  .case-persona { order: 2; }
+  .case-amount-box { order: 3; }
+  .case-media { order: 4; }
+  .case-quote { order: 5; }
   /* 主役画像だけ .sp-bleed で画面端まで。小2枚は本文と同じ内寄せに保つ */
   .case-thumbs { margin-top: 2px; }
   .case-amount { font-size: 30px; }
+}
+@media (max-width: 600px) {
+  /* .header の高さがこの幅から 60px + 1px 罫になる（katazuke.css）。追従位置を合わせる */
+  .filter-bar { top: 61px; }
 }
 @media (max-width: 480px) {
   .stats-bar-inner { gap: 16px 10px; }

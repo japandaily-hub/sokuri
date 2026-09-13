@@ -64,9 +64,11 @@ export default function OgImage() {
           </div>
         </div>
 
-        {/* 旧OGのピル「AI査定 × リユース」を直角・緑細枠チップとして保持（文言不変） */}
+        {/* 旧OGのピルを直角・細枠チップとして保持。文言は「AI査定」→「写真査定」。
+            AI を主語にした査定は実装に無く（CONSTRAINTS §3・BRIEF §4.1）、本文も
+            「写真と品目から」で統一しているため、OG だけ残すと誇張表示になる。 */}
         <div style={{ display: "flex", position: "absolute", top: "72px", right: "80px", border: "1px solid #1447e0", color: "#1447e0", fontSize: "22px", fontWeight: 400, padding: "8px 20px", letterSpacing: "0.08em" }}>
-          AI査定 × リユース
+          写真査定 × リユース
         </div>
 
         {/* Middle: headline */}
@@ -149,7 +151,7 @@ export default function OgImage() {
               background: "#ffffff",
             }}
           >
-            AI査定
+            写真で査定
           </div>
           <div
             style={{

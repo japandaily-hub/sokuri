@@ -7,11 +7,21 @@
    859px 以下はカード積みにする（BRIEF §2.10）。 */
 
 /* 帯直下の見出しブロック（法務3ページ共通の構え）。本文 .legal-body と同じ 760px 幅に揃える */
+/* r3 レビュー: 見出し下の罫が /terms・/privacy だけ額いっぱい（frame 幅）に引かれ、
+   /legal（.doc-meta の下罫＝本文カラム幅）と揃っていなかった。罫を本文カラム幅
+   （.legal-body と同じ 760px − 左右 24px）に合わせる。罫は ::after で content box 幅に
+   引く（__inner に border を置くと padding の外側 = 760px になり本文の h2 罫より広い）。 */
 .legal-head {
-  padding: clamp(26px, 4vw, 44px) 0 clamp(20px, 3vw, 30px);
-  border-bottom: 1px solid var(--line);
+  padding: clamp(26px, 4vw, 44px) 0 0;
 }
 .legal-head__inner { max-width: 760px; margin: 0 auto; padding-inline: 24px; }
+.legal-head__inner::after {
+  content: "";
+  display: block;
+  height: 1px;
+  background: var(--line);
+  margin-top: clamp(20px, 3vw, 30px);
+}
 .legal-head__en {
   display: block; font-family: var(--en); font-weight: 600; font-size: 11.5px;
   letter-spacing: .18em; text-transform: uppercase; color: var(--primary);
@@ -65,6 +75,31 @@
   border-collapse: collapse;
   margin-bottom: 20px;
   font-size: 14px;
+  /* r1 レビュー: auto レイアウトだと第3列に幅を持っていかれ、第1・2列が約 78px まで
+     潰れて「アカウント/情報」「お問い合わせフォーム送/信時」のように語中で 2〜3 行に
+     割れていた（9行中7行）。表の実幅は常に 760-48=712px（859px 以下はカード積みに
+     切り替わるため、この幅より狭くならない）なので、列幅を固定して配分し直す。
+     20%=142px / 29%=206px（内側はそれぞれ右 padding 16px を引いた 126px / 190px）。
+     第1列の最長「プロフィール情報」「お問い合わせ情報」= 8字 112px、
+     第2列の最長「お問い合わせフォーム送信時」= 13字 182px がいずれも1行に収まる。 */
+  table-layout: fixed;
+}
+.legal-body.privacy-body th:nth-child(1),
+.legal-body.privacy-body td:nth-child(1) { width: 20%; }
+.legal-body.privacy-body th:nth-child(2),
+.legal-body.privacy-body td:nth-child(2) { width: 29%; }
+.legal-body.privacy-body th:nth-child(3),
+.legal-body.privacy-body td:nth-child(3) { width: 51%; }
+/* 第1・2列は短いラベルなので語中で折らない。keep-all だけだと収まらない値が
+   はみ出すため、overflow-wrap を最後の逃げ道として併記する
+   （「振込口座情報（ユーザー）」は括弧の前で折れて 2 行になる）。 */
+.legal-body.privacy-body th:nth-child(1),
+.legal-body.privacy-body td:nth-child(1),
+.legal-body.privacy-body th:nth-child(2),
+.legal-body.privacy-body td:nth-child(2) {
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  line-break: strict;
 }
 .legal-body.privacy-body th {
   background: none;
@@ -90,9 +125,12 @@
 .legal-body.privacy-body td:last-child { padding-right: 0; }
 .legal-body.privacy-body .collect-type { color: var(--ink); font-weight: 600; }
 
+/* 本文の補足注記。r3 レビュー: --warm/--gold は状態色であり、本文の補足に使うと
+   青・濃紺で統一した面に暖色が1点だけ混じる。法務3ページで注記の地と罫を
+   1種（淡青＋青の左罫）に揃える（/terms .legal-body .note と同値）。 */
 .legal-body .note {
-  background: var(--warm);
-  border-left: 3px solid var(--gold);
+  background: var(--pale-2);
+  border-left: 3px solid var(--blue);
   padding: 14px 18px;
   border-radius: 0;
   font-size: 13.5px;
@@ -113,6 +151,14 @@
   margin-bottom: 32px;
 }
 .back-link:hover { text-decoration: underline; }
+/* r1 レビュー: 戻り導線が第1条の直前にあると本文の流れを断ち切る。読み終えた位置＝
+   本文末尾に置く（/terms も同じ扱い。/legal は元から戻り導線を持たない）。 */
+.legal-foot {
+  margin-top: clamp(40px, 5vw, 56px);
+  padding-top: 24px;
+  border-top: 1px solid var(--line-soft);
+}
+.legal-foot .back-link { margin-bottom: 0; }
 
 /* 3 列の表はスマホ幅で 1 文字ずつ縦に折れて読めない（モバイル監査 2026-09-07）。
    横スクロールではなくカード積みにして、各セルに項目名（data-label）を添える。
@@ -135,6 +181,14 @@
     margin-bottom: 14px;
   }
   .legal-body.privacy-body tbody tr:last-child { margin-bottom: 0; }
+  /* カード積みでは各セルが display:block になるため、デスクトップの列幅（%）を必ず戻す。
+     戻し忘れると1行目のセルがカード幅の 20% になって潰れる。 */
+  .legal-body.privacy-body th:nth-child(1),
+  .legal-body.privacy-body td:nth-child(1),
+  .legal-body.privacy-body th:nth-child(2),
+  .legal-body.privacy-body td:nth-child(2),
+  .legal-body.privacy-body th:nth-child(3),
+  .legal-body.privacy-body td:nth-child(3) { width: auto; }
   .legal-body.privacy-body td {
     padding: 0;
     border: 0;

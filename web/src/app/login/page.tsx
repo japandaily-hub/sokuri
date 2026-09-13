@@ -7,42 +7,11 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn, signOut, useSession } from "next-auth/react";
-import { AuthBar, Field, PasswordField, LineAuthButton } from "@/components/kdz/auth";
+import { AuthBar, Field, PasswordField, LineAuthButton, TrustRow } from "@/components/kdz/auth";
 import { safeInternalPath } from "@/lib/safe-path";
 import { clearRedirectLoopStorage } from "@/lib/katadzuke-api";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-/** 信頼行。共通 TrustRow（components/kdz/auth.tsx）の3項目めは「無料ログイン」だが、
- *  無料なのはログインではなく登録・利用そのものなので、認証2ページではこちらを使う
- *  （BRIEF §2.5「無料ログイン」→「登録・利用は無料」）。 */
-function AuthTrustRow() {
-  return (
-    <div className="trust-row">
-      <div className="trust-item">
-        <svg viewBox="0 0 24 24">
-          <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z" />
-          <path d="M9 12l2 2 4-4" />
-        </svg>
-        SSL暗号化通信
-      </div>
-      <div className="trust-item">
-        <svg viewBox="0 0 24 24">
-          <rect x="5" y="11" width="14" height="10" rx="2" />
-          <path d="M8 11V7a4 4 0 018 0v4" />
-        </svg>
-        プライバシー保護
-      </div>
-      <div className="trust-item">
-        <svg viewBox="0 0 24 24">
-          <circle cx="12" cy="12" r="9" />
-          <path d="M9 12l2 2 4-4" />
-        </svg>
-        登録・利用は無料
-      </div>
-    </div>
-  );
-}
 
 function LoginForm() {
   const router = useRouter();
@@ -275,7 +244,7 @@ function LoginForm() {
               </button>
             </form>
 
-            <AuthTrustRow />
+            <TrustRow />
           </div>
 
           <div className="auth-switch">

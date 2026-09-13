@@ -3,22 +3,40 @@
    （共通クラス .container/.section/.eyebrow/.btn/.hero-band 等は katazuke.css /
     katazuke-pages.css の正典を使用。ここはデザイン handoff の contact.html <style>
     固有分のみ。共通 .field と衝突しないよう、フォーム系は .contact-wrap 配下にスコープする。）
-   v2: 淡青グラデのページヒーローを廃し、無文字の写真帯（.hero-band--slim --quiet --pos-r）＋
-   帯直下の白小箱 .ct-head に置き換え。LINE ブロックは白地・上下 1px、入力欄は白地＋1px --line、
+   v2: 淡青グラデのページヒーローを廃し、無文字の写真帯（.hero-band--fixed --quiet --pos-r。
+   r1 レビューで --slim=240px から法務3ページと同じ 160px へ）＋帯直下の見出しブロック
+   .ct-head に置き換え。LINE ブロックは白地・上下 1px、入力欄は白地＋1px --line、
    フォームの外枠カードは --pale-2（BRIEF §2.9）。
    ============================================================ */
 
-/* 帯直下の白小箱（h1 と /faq 導線） */
+/* 帯直下の見出しブロック（h1 と /faq 導線）。
+   r1 レビュー: 1px の囲みが付くと「ページ見出し」ではなく「カード1枚」に見え、
+   帯 → 箱 → フォーム外枠と囲みが3重に続く。囲みは持たせず（r2 で下ヘアラインも撤去。
+   区切りは余白1段）、左端は下のフォーム（.contact-wrap = .container 内の 720px）と
+   同じ縦のラインに載せる。 */
+/* 左右の余白は .ct-head__box 側だけが持つ（.ct-head にも置くと 560px 以下で
+   二重に効き、フォームカード（.container の 18px）と左端がずれる）。 */
 .ct-head {
-  padding: clamp(28px, 4vw, 44px) 24px clamp(8px, 1.5vw, 16px);
+  padding: clamp(28px, 4vw, 44px) 0 0;
 }
 .ct-head__box {
   max-width: 720px;
   margin: 0 auto;
-  background: #fff;
-  border: 1px solid var(--line);
-  padding: clamp(24px, 4vw, 40px);
+  background: none;
+  border: 0;
+  /* r2 レビュー: この下罫と LINE ブロック上端の罫が約 80px 離れて2本並び、
+     間が「中身のない空箱」に見えていた。罫は LINE ブロック側の上下 1px
+     （面の額縁として対で効いている方）を残し、見出しブロックの下罫は外す。
+     区切りは .ct-head + .section の余白 1 段だけで取る。 */
+  /* 左右 24px は .container の --container-pad と同値。これで h1 の左端が
+     フォームカードの左端に揃う（従来は箱の内側 40px でずれていた）。 */
+  padding: 0 24px;
 }
+/* 見出しブロック → LINE ブロックの間隔。共通の .section.tight（48〜80px）に
+   見出し側の下パディングが積み上がると2本の罫の間が空いて見えるため、
+   ここで 1 段（32〜56px）に揃える。.ct-head は /contact にしか無いので
+   この上書きは他ルートへ波及しない。 */
+.ct-head + .section.tight { padding-top: clamp(32px, 5vw, 56px); }
 .ct-head__en {
   display: block;
   font-family: var(--en);
@@ -43,10 +61,10 @@
   margin-top: 14px;
   line-height: 1.9;
 }
+/* /faq 導線。ここに罫は入れない（短い間隔に 2 本の罫が並ぶと囲みが
+   重なって見える・r1/r2 レビュー） */
 .ct-head__faq {
-  margin-top: 10px;
-  padding-top: 14px;
-  border-top: 1px solid var(--line-soft);
+  margin-top: 18px;
   font-size: 14px;
 }
 .ct-head__faq a {
@@ -56,19 +74,24 @@
 }
 .ct-head__faq a::after { content: " →"; text-decoration: none; }
 
-/* LINE優先CTA（白地・上下 1px。緑ボタンの周囲に 24px 以上の白余白を確保する） */
+/* LINE優先CTA（白地・上下 1px。緑ボタンの周囲に 24px 以上の白余白を確保する）。
+   r1 レビュー: flex + align-items:center だと見出しがボタンに押されて
+   「…メールで返/信」と語中で折れ、「信」1文字が孤立していた。
+   grid minmax(0,1fr) auto で本文列を可能な限り広く取り（実測で約 60:40）、
+   天揃えにしてボタンを見出し1行目の高さに合わせる。 */
 .line-first {
   background: #fff;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   border-radius: var(--radius);
   padding: clamp(28px, 4vw, 40px) 0;
-  display: flex;
-  align-items: center;
-  gap: clamp(24px, 4vw, 40px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: clamp(24px, 4vw, 48px);
   margin-bottom: 48px;
 }
-.line-first-body { flex: 1; }
+.line-first-body { min-width: 0; }
 .line-first-body strong {
   display: block;
   font-family: var(--head);
@@ -76,13 +99,21 @@
   color: var(--navy);
   font-weight: 600;
   margin-bottom: 6px;
+  /* 折り返しは読点「、」の位置だけに許す（語中で割らない）。列が極端に狭い場合の
+     はみ出しは overflow-wrap が最後の逃げ道として吸収する。 */
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  line-break: strict;
+  text-wrap: balance;
+  max-width: 24em;
 }
 .line-first-body p {
   font-size: 14.5px;
   color: var(--body-soft);
   line-height: 1.75;
 }
-.line-first .btn { flex-shrink: 0; margin: 8px 0; }
+/* 見出し1行目の天と揃える（grid の align-items:start ＋ 明朝の行送り分の 4px） */
+.line-first .btn { align-self: start; margin: 4px 0 0; }
 
 /* フォームカード */
 .contact-wrap {
@@ -119,6 +150,12 @@
 /* フォームフィールド（共通 .field を contact-wrap 配下で上書き） */
 .contact-wrap .field { margin-bottom: 24px; }
 .contact-wrap .field:last-of-type { margin-bottom: 0; }
+/* r3 レビュー（モバイルの縦リズムが不均一）: .field-row の2つ目の .field は
+   :last-of-type（親 .field-row の中で最後の div）に一致して下マージンが 0 になっていた。
+   その結果 390px で段組みが縦に畳まれると「お名前→フリガナ = 24px + row-gap 16px = 40px」
+   「フリガナ→メールアドレス = 0px」となり、ラベルが直前の入力枠にくっついて見えていた。
+   行内のフィールドにも他と同じ 24px を持たせ、間隔を1値（24px）に統一する。 */
+.contact-wrap .field-row .field { margin-bottom: 24px; }
 .contact-wrap .field label {
   display: block;
   font-size: 14px;
@@ -180,7 +217,9 @@
   box-shadow: 0 0 0 3px rgba(215, 0, 53, .12);
 }
 .contact-wrap .field textarea { resize: vertical; min-height: 160px; }
-.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+/* フォーム系はファイル冒頭の方針どおり .contact-wrap 配下にスコープする
+   （/business・/create にも .field-row があるため、素の .field-row で書かない）。 */
+.contact-wrap .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
 /* セレクトラッパー */
 .select-wrap { position: relative; }
@@ -265,7 +304,10 @@
   color: var(--blue);
   font-size: 32px;
 }
-.thanks h3 {
+/* r3 レビュー: 見出しレベルが h1 → h3 と飛んでいたため h2 に変更（見え方は据え置き。
+   グローバルの h1〜h5 は同一の基底スタイルなので font-size 以外は変わらない）。
+   送信後にフォーカスを送る先なので tabIndex=-1 を付けている（:focus-visible のリングは残す）。 */
+.thanks h2 {
   font-size: 22px;
   color: var(--navy);
   margin-bottom: 12px;
@@ -297,12 +339,16 @@
 
 /* レスポンシブ */
 @media (max-width: 680px) {
-  .line-first { flex-direction: column; align-items: stretch; gap: 24px; padding: 28px 0; }
-  .line-first .btn { margin: 0; }
-  .field-row { grid-template-columns: 1fr; }
+  .line-first { grid-template-columns: minmax(0, 1fr); align-items: stretch; gap: 24px; padding: 28px 0; }
+  .line-first-body strong { max-width: none; }
+  .line-first .btn { margin: 0; align-self: stretch; }
+  /* 縦に畳んだ行の間隔は各 .field の margin-bottom（24px）だけで取り、
+     row-gap を足さない。これでフォーム全体が 24px 一定の縦リズムになる。 */
+  .contact-wrap .field-row { grid-template-columns: 1fr; row-gap: 0; column-gap: 0; }
   .form-card { padding: 28px 20px; }
 }
 @media (max-width: 560px) {
-  .ct-head { padding-inline: 18px; }
-  .ct-head__box { padding: 22px 18px; }
+  /* .container の --container-pad が 18px に落ちる幅。箱の左右も 18px に合わせる
+     （下パディングは持たない。間隔は .ct-head + .section 側の 1 段で取る） */
+  .ct-head__box { padding: 0 18px; }
 }

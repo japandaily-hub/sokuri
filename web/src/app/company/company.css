@@ -9,6 +9,9 @@
 
 /* ---------- ヒーロー（.hero-band--tall.hero-band--headline） ---------- */
 /* 見出しのみを中央に白抜き。本文・注記は帯に乗せない（veil .55 のため） */
+/* 見出しは共有部品の flex align-items:center で既に光学中心にある。ここで詰めるのは
+   帯の総高だけ（見出し2行に対して 480px は地の面積が勝ちすぎるため 420px 上限に落とす）。 */
+.co-band.hero-band--tall { min-height: clamp(320px, 34vw, 420px); }
 .co-band .hero-band__copy { text-align: center; padding-block: clamp(28px, 4vw, 40px); }
 
 /* ---------- 本文ラッパ ---------- */
@@ -29,18 +32,15 @@
 /* ---------- セクション ---------- */
 .about-section { margin-bottom: clamp(44px, 6vw, 64px); }
 .about-section:last-of-type { margin-bottom: clamp(44px, 6vw, 64px); }
-.section-badge {
-  display: inline-block;
+/* 章ラベルは共有の .eyebrow（ダッシュ＋1px 罫）に統一。1px 囲みチップは廃止し、
+   トップ／撮影ガイド／業者向けと同じ書式にそろえる。中身が英字のため、
+   デザイン正典の英字ラベル書式（var(--en) 600 uppercase）だけを重ねる。 */
+.about-section .eyebrow {
   font-family: var(--en);
   font-size: 12px;
   font-weight: 600;
-  letter-spacing: .16em;
+  letter-spacing: .14em;
   text-transform: uppercase;
-  color: var(--primary);
-  background: #fff;
-  padding: 4px 12px;
-  border-radius: 0;
-  border: 1px solid var(--line);
   margin-bottom: 12px;
 }
 .about-section h2 {
@@ -89,6 +89,16 @@
 }
 .company-table td a { color: var(--primary); text-decoration: underline; text-underline-offset: .2em; }
 
+/* 表の直下に置く開示請求の導線（/legal に既出の事実の案内のみ。新しい事実は書かない） */
+.about-section .about-disclose {
+  margin-top: 14px;
+  font-family: var(--ui);
+  font-size: 13px;
+  line-height: 1.85;
+  color: var(--body-soft);
+}
+.about-section .about-disclose a { color: var(--primary); text-decoration: underline; text-underline-offset: .2em; }
+
 /* ---------- 理念引用（白地＋左 3px 青罫。灰色面は使わない） ---------- */
 .mission-card {
   background: #fff;
@@ -118,6 +128,17 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: clamp(18px, 3vw, 28px);
 }
+/* 3カラムのときは「枠・見出し・本文・事実の1文」の4行を親グリッドで共有し（subgrid）、
+   本文の行数差が事実の1文の上罫の高さ差になるのを止める。行の高さは3列の最大に揃うので
+   罫は横一直線、余りは各カードの下端に集まる（ラウンド2 実測: 罫が 3本とも別の高さだった）。
+   subgrid 非対応時は本文3行ぶんの min-height で近似する。 */
+@media (min-width: 860px) {
+  .values-grid { grid-template-rows: auto auto auto auto; row-gap: 0; }
+  .value-card { display: grid; grid-row: span 4; grid-template-rows: subgrid; row-gap: 0; }
+  @supports not (grid-template-rows: subgrid) {
+    .value-card > p:not(.value-fact) { min-height: 5.6em; }
+  }
+}
 .value-card {
   background: #fff;
   border-radius: 0;
@@ -125,8 +146,13 @@
   padding: 0;
   min-width: 0;
 }
-/* .img-frame--pale .img-frame--1x1 を最大 260px に収める（白面の上の枠） */
-.value-img { width: 100%; max-width: 260px; margin-bottom: 14px; }
+/* .img-frame--pale .img-frame--1x1（白面の上の枠）。幅上限は3カラムのときだけ掛ける。
+   1カラムに畳んだあとも 260px のままだと、本文（段の全幅）に対して枠だけが左に小さく残り、
+   カードの右辺が段差になって面として読めなくなる（ラウンド2 実測: 枠 220px / 本文 345px）。 */
+.value-img { width: 100%; margin-bottom: 14px; }
+@media (min-width: 860px) {
+  .value-img { max-width: 260px; }
+}
 .value-card strong {
   font-family: var(--serif);
   font-size: 16px;
@@ -186,7 +212,6 @@
 /* ---------- レスポンシブ（共有部品と同じ 859px で折り返す） ---------- */
 @media (max-width: 859px) {
   .values-grid { grid-template-columns: 1fr; gap: clamp(24px, 5vw, 32px); }
-  .value-img { max-width: 220px; }
 }
 @media (max-width: 700px) {
   .about-wrap { padding-inline: 18px; }

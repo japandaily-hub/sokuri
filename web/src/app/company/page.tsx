@@ -36,7 +36,7 @@ const VALUES: { img: string; title: string; body: string; fact: React.ReactNode 
   {
     img: "co-value-clear",
     title: "透明性",
-    body: "入札価格・手数料・評価情報をすべて公開。ユーザーが納得して判断できる環境を作ります。",
+    body: "入札価格・手数料・評価情報をユーザーに公開します。納得して判断できる環境を作ります。",
     fact: "ユーザーの費用は0円です。業者から受け取る手数料は、条件とあわせて業者向けページに公開しています。",
   },
   {
@@ -54,7 +54,7 @@ const VALUES: { img: string; title: string; body: string; fact: React.ReactNode 
   {
     img: "co-value-cycle",
     title: "サーキュラーエコノミー",
-    body: "まだ使えるものを廃棄ではなく再流通へ。環境負荷を減らす経済の循環に貢献します。",
+    body: "まだ使えるものを廃棄ではなく、再流通に回す仕組みにします。",
     fact: "引き取られた品物は、古物商許可を受けた登録業者を通じて中古品として再流通します。",
   },
 ];
@@ -98,9 +98,12 @@ export default function CompanyPage() {
           </p>
         </div>
 
-        {/* ============ 運営者情報テーブル（現行のまま） ============ */}
+        {/* ============ 運営者情報テーブル（掲載項目は現行のまま） ============
+            表の直下に開示請求の導線のみを置く。代表者名・番地・電話番号の扱いは
+            /legal（特定商取引法に基づく表記）に既出の事実をそのまま案内するだけで、
+            新しい事実・期限・理由は書かない（掲載可否はユーザー確認待ちのため）。 */}
         <div className="about-section">
-          <span className="section-badge">COMPANY</span>
+          <span className="eyebrow">COMPANY</span>
           <h2>運営者情報</h2>
           <div className="company-table-wrap">
             <table className="company-table">
@@ -114,11 +117,18 @@ export default function CompanyPage() {
               </tbody>
             </table>
           </div>
+          <p className="about-disclose">
+            代表者名・詳細な住所（番地等）・電話番号は、
+            <Link href="/legal">特定商取引法に基づく表記</Link>
+            のとおり、ご請求があれば遅滞なく開示します。ご請求は
+            <Link href="/contact">お問い合わせ</Link>
+            の「事業者情報の開示請求」からお送りください。
+          </p>
         </div>
 
         {/* ============ 私たちが大切にすること ============ */}
         <div className="about-section">
-          <span className="section-badge">VALUES</span>
+          <span className="eyebrow">VALUES</span>
           <h2>私たちが大切にすること</h2>
           <div className="values-grid">
             {VALUES.map((v) => (

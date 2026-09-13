@@ -42,12 +42,19 @@
 /* ---------- ガイドセクション ---------- */
 .guide-section { margin-bottom: clamp(56px, 8vw, 88px); }
 .guide-section:last-child { margin-bottom: 0; }
+/* 番号バッジは「見出し行の中だけ」でオフセットする。flex で h2 とリードをまとめて内側へ送ると、
+   1つの節の中に左端が2本（見出し・リードの 60px と、直下の画像・チップの 0px）できて
+   視線の起点が定まらない（ラウンド3 指摘）。中間の無名 div を display:contents で畳み、
+   バッジ・見出し・リードを親グリッドに直接並べて、リード以降を container 左端にそろえる。 */
 .guide-section-head {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  column-gap: 16px;
+  row-gap: 10px;
   margin-bottom: 28px;
 }
+.guide-section-head > div:not(.guide-section-num) { display: contents; }
 .guide-section-num {
   width: 44px; height: 44px;
   border-radius: 0;
@@ -61,8 +68,11 @@
   justify-content: center;
   flex-shrink: 0;
 }
-.guide-section-head h2 { font-size: clamp(18px, 2.5vw, 24px); color: var(--ink); margin-bottom: 4px; }
-.guide-section-head p { font-size: 14px; color: var(--body-soft); line-height: 1.7; }
+/* 見出しはバッジ（44px 角）に対して光学中心にそろえる。行間は親の row-gap が持つ */
+.guide-section-head h2 { font-size: clamp(18px, 2.5vw, 24px); color: var(--ink); margin-bottom: 0; align-self: center; }
+/* リードは 2行目に落として左端を container にそろえる。段の全幅だと1行が長すぎるので
+   手順リストの本文（.shoot-step-body p）と同じ 46em で折る */
+.guide-section-head p { grid-column: 1 / -1; max-width: 46em; font-size: 14px; color: var(--body-soft); line-height: 1.7; }
 
 /* 注記（買取額の決まり方・写り込み注意）。打消しは本文と同一視野に置く */
 .pg-note {
@@ -80,10 +90,13 @@
   gap: clamp(16px, 3vw, 28px);
 }
 .compare-card { min-width: 0; }
+/* 2枚のキャプションは行数が 1行／2行で割れるため、min-height で脚の高さを固定し
+   良い例・避けたい例の下端をそろえる（バッジ列は auto、文は残り幅） */
 .compare-label {
   padding: 14px 0 0;
-  display: flex;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
   gap: 10px;
 }
 .compare-label-badge {
@@ -100,7 +113,8 @@
 }
 .compare-label-badge.is-good { background: var(--marker); }
 .compare-label-badge.is-bad { background: var(--pale-2); border: 1px solid var(--line); }
-.compare-label p { font-size: 13.5px; color: var(--body); line-height: 1.8; }
+/* min-height はこの p 自身の 2行ぶん（line-height 1.8 × 2）。片方が1行でも脚がそろう */
+.compare-label p { font-size: 13.5px; color: var(--body); line-height: 1.8; min-height: 3.6em; }
 
 /* ---------- 撮影の手順（番号＋文のリスト。画像なし） ---------- */
 .limit-chips {
@@ -154,11 +168,29 @@
 }
 .shoot-step-body .tip .ic { width: 14px; height: 14px; flex-shrink: 0; margin-top: 3px; }
 
-/* ---------- ポイント（zig-zag の .media-split ×3 ＋ ヘアラインリスト） ---------- */
+/* ---------- ポイント（zig-zag の .media-split ×3 ＋ ヘアラインリスト） ----------
+   生成 AR は 1024x1024 のため表示 AR は 1:1 のまま（§1.5 表示AR＝生成AR）。
+   ラウンド2 で「本文の下に空白が残る」を画像側の縮小（36fr・枠幅 300px 上限）で受けたが、
+   ラウンド3 実測では画像列が列幅を使い切らず、枠 約270px に対して本文 約620px の非対称と、
+   画像と本文のあいだの使われない帯が残った（BRIEF §2.2 表 #4 は画像 48% を指定）。
+   縮めるのではなく列比を正典に戻し（44:56）、max-width を外して列を埋め、
+   行の高さを決めるのは画像なので本文は align-items:center で行の中心にそろえる。
+   組の間隔は画像が大きくなったぶん広げて、章のリズムを「大きい四角＋間」で作る。 */
 .tip-splits {
   display: flex;
   flex-direction: column;
-  gap: clamp(36px, 6vw, 72px);
+  gap: clamp(28px, 4vw, 48px);
+}
+.tip-split {
+  --ms-img: 44fr;
+  --ms-txt: 56fr;
+  align-items: center;
+  gap: clamp(24px, 3.5vw, 44px);
+}
+/* 2カラムのときだけ。859px 以下は .sp-bleed（負マージンで額の内側いっぱい）が幅を持つため触らない */
+@media (min-width: 860px) {
+  .tip-split > .img-frame { width: 100%; max-width: none; }
+  .tip-splits { gap: clamp(48px, 6vw, 72px); }
 }
 .tip-copy { min-width: 0; }
 .tip-num {
@@ -239,7 +271,9 @@
 
 /* ---------- レスポンシブ（共有部品と同じ 859px で折り返す） ---------- */
 @media (max-width: 859px) {
-  .compare-grid { grid-template-columns: 1fr; gap: clamp(24px, 6vw, 36px); }
+  /* 390px 実測で 24px。.sp-bleed の2枚が縦に接して1枚の長い写真に見え、
+     良い例／避けたい例の対比が弱まるため、左右はフルブリードのまま縦だけ 32px 以上あける */
+  .compare-grid { grid-template-columns: 1fr; gap: clamp(32px, 8vw, 44px); }
   .cat-guide-grid { grid-template-columns: repeat(2, 1fr); }
   .shoot-step { gap: 12px; }
   .shoot-step-num { font-size: 17px; min-width: 2.2em; }

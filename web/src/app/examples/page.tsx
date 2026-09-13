@@ -71,7 +71,7 @@ const CASES: CaseItem[] = [
     cats: ["家電・PC", "カメラ", "ブランド品"],
     count: 14,
     quote:
-      "引越し前に使わない家電やカメラをまとめて出品。個別に売るより楽で、思ったより高い金額がついてびっくりしました。",
+      "引越し前に使わない家電やカメラをまとめて出品。1点ずつ売る手間がなく、1回の撮影で引き取りまで終わりました。",
     lot: "ex-lot-moving",
     lotAlt: "引越しのモデルケース。新居に持っていかない家具と箱をまとめたイメージ",
     thumbs: ["cat-camera", "cat-brand"],
@@ -88,7 +88,7 @@ const CASES: CaseItem[] = [
     cats: ["ブランド品", "時計", "衣類・靴"],
     count: 11,
     quote:
-      "ブランド品を10点ほど。1点ずつメルカリに出すのが億劫で試してみたら、まとめての評価で思いがけない金額に。何より、選ぶまで業者から連絡が来ないのが助かりました。",
+      "ブランド品を10点ほど。1点ずつフリマアプリに出すのが億劫で試してみたら、撮影から引き取りまで1回で片付きました。何より、選ぶまで業者から連絡が来ないのが助かりました。",
     lot: "ex-lot-closet",
     lotAlt: "断捨離のモデルケース。衣類や小物をまとめたイメージ",
     thumbs: ["cat-brand", "cat-fashion"],
@@ -174,7 +174,9 @@ function CaseCard({ c, index }: { c: CaseItem; index: number }) {
       className={`case-card media-split${index % 2 === 1 ? " media-split--rev" : ""}`}
     >
       <div className="case-media">
-        <div className="img-frame img-frame--3x2 sp-bleed">
+        {/* data-label: 画像が未着・失敗のとき枠中央に品目名を出す（共有 .img-frame[data-label]::before）。
+            画像が届けば img が上に乗って隠れる */}
+        <div className="img-frame img-frame--3x2 sp-bleed" data-label={c.tag}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`/img/v2/${c.lot}.webp`}

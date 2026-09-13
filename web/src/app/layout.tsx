@@ -5,7 +5,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 import { KdzIconSprite } from "@/components/kdz/Icons";
 import { SiteChrome } from "@/components/kdz/SiteChrome";
-import { ScrollProgress } from "@/components/kdz/interactions";
+import { BrokenImageGuard, ScrollProgress } from "@/components/kdz/interactions";
 
 /** 書体は next/font/google でビルド時に自己ホストする（外部オリジンへの実行時リクエストをゼロにし、
  *  CSP/SRI 不在の攻撃面と訪問者IPの第三者送信を同時に消す）。CSS 側は katazuke.css の
@@ -130,6 +130,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         {/* デザイン共通の SVG アイコンスプライト（一度だけ） */}
         <KdzIconSprite />
         <ScrollProgress />
+        {/* 装飾画像（alt=""）の取得失敗時に壊れ画像アイコンを残さないための保険 */}
+        <BrokenImageGuard />
 
         <Providers>
           <SiteChrome>{children}</SiteChrome>
@@ -140,13 +142,13 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           id="ld-organization"
           type="application/ld+json"
           strategy="afterInteractive"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(ORG_LD).replace(/</g, "\u003c") }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(ORG_LD).replace(/</g, "\\u003c") }}
         />
         <Script
           id="ld-website"
           type="application/ld+json"
           strategy="afterInteractive"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(WEBSITE_LD).replace(/</g, "\u003c") }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(WEBSITE_LD).replace(/</g, "\\u003c") }}
         />
       </body>
     </html>

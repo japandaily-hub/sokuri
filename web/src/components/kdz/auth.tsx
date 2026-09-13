@@ -61,19 +61,26 @@ const EYE_OFF = (
   </>
 );
 
-/** パスワード入力（表示/非表示トグル付き）。値は親が制御。 */
+/** パスワード入力（表示/非表示トグル付き）。値は親が制御。
+ *  QA H2 是正: 素の `<input type="password" required minLength={8}>` から本部品へ移した際に
+ *  required / minLength が落ちていた。required は既定 true（パスワード欄は全画面で必須）、
+ *  minLength は新規作成の画面だけが渡す（ログインは既存の短いパスワードを弾かないため既定なし）。 */
 export function PasswordField({
   id,
   value,
   onChange,
   placeholder = "8文字以上",
   autoComplete = "current-password",
+  required = true,
+  minLength,
 }: {
   id: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   autoComplete?: string;
+  required?: boolean;
+  minLength?: number;
 }) {
   const [show, setShow] = useState(false);
   return (
@@ -85,6 +92,8 @@ export function PasswordField({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         autoComplete={autoComplete}
+        required={required}
+        minLength={minLength}
       />
       <button
         type="button"
@@ -132,7 +141,9 @@ export function LineAuthButton({
   );
 }
 
-/** 信頼行（SSL / プライバシー / 無料）。 */
+/** 信頼行（SSL / プライバシー / 無料）。認証4画面で共用する。
+ *  QA M1 是正: 3項目めは「無料ログイン」だったが、無料なのはログインではなく登録・利用そのもの
+ *  （BRIEF §2.5）。/login・/signup にあった同内容のローカル複製はこの共通部品に統合した。 */
 export function TrustRow() {
   return (
     <div className="trust-row">
@@ -155,7 +166,7 @@ export function TrustRow() {
           <circle cx="12" cy="12" r="9" />
           <path d="M9 12l2 2 4-4" />
         </svg>
-        無料ログイン
+        登録・利用は無料
       </div>
     </div>
   );

@@ -61,24 +61,36 @@ export function SiteFooter() {
 
 /**
  * モバイル追従CTA（デザイン .dock）。860px 以下で表示。
- * ヒーロー CTA（.hero-cta）が画面内にある間は同じ導線が二重に見えるため .dock--hidden で隠す（BRIEF §1.8）。
+ * ヒーロー CTA（.hero-cta）とページ内の LINE ボタン（.btn-line）のいずれかが画面内にある間は
+ * 同じ緑が上下に二枚並ぶため .dock--hidden で隠す（BRIEF §1.8／/contact で二重表示を実測）。
  * 対象が無いページでは常時表示。表示/非表示のみなので reduced-motion でも動作させる。
  * ルート遷移でリセットするため SiteChrome 側は key={pathname} で再マウントする（effect 内 setState を避ける）。
  */
 export function Dock({ href = "/login?callbackUrl=%2Fcreate", label = "LINEで無料ではじめる" }: { href?: string; label?: string }) {
-  const [heroCtaInView, setHeroCtaInView] = useState(false);
+  const [ctaInView, setCtaInView] = useState(false);
   useEffect(() => {
-    const target = document.querySelector(".hero-cta");
-    if (!target || !("IntersectionObserver" in window)) return;
+    if (!("IntersectionObserver" in window)) return;
+    // .dock 自身の中の .btn-line は対象外（自分を見て自分を隠す無限往復を避ける）
+    const targets = Array.from(
+      document.querySelectorAll<HTMLElement>(".hero-cta, .btn-line")
+    ).filter((el) => !el.closest(".dock"));
+    if (targets.length === 0) return;
+    const inView = new Set<Element>();
     const io = new IntersectionObserver(
-      (entries) => setHeroCtaInView(entries[entries.length - 1].isIntersecting),
+      (entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) inView.add(e.target);
+          else inView.delete(e.target);
+        });
+        setCtaInView(inView.size > 0);
+      },
       { threshold: 0 }
     );
-    io.observe(target);
+    targets.forEach((t) => io.observe(t));
     return () => io.disconnect();
   }, []);
   return (
-    <div className={`dock${heroCtaInView ? " dock--hidden" : ""}`}>
+    <div className={`dock${ctaInView ? " dock--hidden" : ""}`}>
       <Link href={href} className="btn btn-line">
         <Ic name="chat" />
         {label}

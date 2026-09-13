@@ -110,12 +110,14 @@ export default function HomePage() {
         {/* ============ 信頼の根拠（帯） ============ */}
         <section className="assure" aria-label="サービスの安心ポイント">
           <div className="container">
-            {/* eslint-disable @next/next/no-img-element */}
-            <div className="assure-item"><span className="ai img-frame img-frame--1x1 img-frame--pale img-frame--contain"><img src="/img/real/assure-shield.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span><span><b>登録事業者のみ</b><span>古物商許可を確認</span></span></div>
-            <div className="assure-item"><span className="ai img-frame img-frame--1x1 img-frame--pale img-frame--contain"><img src="/img/real/assure-lock.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span><span><b>連絡先は成立後に開示</b><span>氏名・電話は渡りません</span></span></div>
-            <div className="assure-item"><span className="ai img-frame img-frame--1x1 img-frame--pale img-frame--contain"><img src="/img/real/assure-phone.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span><span><b>一斉架電なし</b><span>連絡は選んだ1社だけ</span></span></div>
-            <div className="assure-item"><span className="ai img-frame img-frame--1x1 img-frame--pale img-frame--contain"><img src="/img/real/assure-pin.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span><span><b>東京・千葉・埼玉・神奈川</b><span>順次エリア拡大中</span></span></div>
-            {/* eslint-enable @next/next/no-img-element */}
+            {/* 行頭は既存の線アイコン .ic。3D レンダー（1024px 素材）を 56px 枠に縮小すると
+                被写体と枠地が同色になり空箱に見えるため（ラウンド2 実測・BRIEF §4-15
+                「3D は 112px 以上の枠でしか使わない」）、.assure-item .ai 本来の
+                「--pale 面＋--primary 罫＋currentColor の線画」に戻す。 */}
+            <div className="assure-item"><span className="ai"><Ic name="shield" /></span><span><b>登録事業者のみ</b><span>古物商許可を確認</span></span></div>
+            <div className="assure-item"><span className="ai"><Ic name="lock" /></span><span><b>連絡先は成立後に開示</b><span>氏名・電話は渡りません</span></span></div>
+            <div className="assure-item"><span className="ai"><Ic name="phone" /></span><span><b>一斉架電なし</b><span>連絡は選んだ1社だけ</span></span></div>
+            <div className="assure-item"><span className="ai"><Ic name="pin" /></span><span><b>東京・千葉・埼玉・神奈川</b><span>順次エリア拡大中</span></span></div>
           </div>
         </section>
 
@@ -187,7 +189,8 @@ export default function HomePage() {
 
         {/* ============ BUNDLE ============ */}
         <section className="section bundle" id="bundle">
-          <span className="vt" aria-hidden="true">まとめて出すほど、有利になる。</span>
+          {/* 縦書きの柱は節のラベルに徹する。h2 と同文だと見出しが縦横で二度読みになる（裁定7） */}
+          <span className="vt" aria-hidden="true">まとめ売り</span>
           <div className="container">
             <div className="bundle-lead">
               <Reveal className="bundle-figure img-frame img-frame--contain">
@@ -201,22 +204,22 @@ export default function HomePage() {
               </Reveal>
             </div>
             <div className="bundle-grid">
+              {/* 行頭は線アイコン .ic。1024px の 3D レンダーを 56〜72px 枠へ縮めると被写体がにじみ、
+                  同じページの assure / trust / cats-note のチップだけ画質が落ちて見えた（ラウンド3 指摘）。
+                  BRIEF §4-15「3D は 112px 以上の枠でしか使わない」に従い、チップの語彙を帯・安心の仕組みと揃える。 */}
               <Reveal as="article" className="bundle-c">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <span className="bc-ic"><img src="/img/real/bundle-up.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span>
+                <span className="bc-ic"><Ic name="trend" /></span>
                 <h3>数が多いほど、総額が伸びやすい</h3>
-                <p>業者は「まとめ買い」を望むため、点数が増えるほど買取総額の条件が良くなりやすい。1点ずつ売るより、まとめたほうがお得です。</p>
+                <p>業者は「まとめ買い」を望むため、点数が増えるほど買取総額の条件が良くなりやすい。1点ずつ売るより、まとめて出したほうが業者は仕入れやすくなります。</p>
               </Reveal>
               <Reveal as="article" className="bundle-c key" delay={1}>
                 <span className="bc-badge">ここがポイント</span>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <span className="bc-ic"><img src="/img/real/bundle-bag.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span>
+                <span className="bc-ic"><Ic name="bag" /></span>
                 <h3>値がつかない物も、まとめて回収</h3>
                 <p>業者は1点ごとではなく<strong className="mk">出品した商品すべてに対する買取総額で入札</strong>します。だから単体では値がつきにくい物も、他の商品と一緒に引き取り。「これは売れないかも」も、一緒に手放せます。</p>
               </Reveal>
               <Reveal as="article" className="bundle-c" delay={2}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <span className="bc-ic"><img src="/img/real/bundle-camera.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span>
+                <span className="bc-ic"><Ic name="box" /></span>
                 <h3>仕分け・分別は不要</h3>
                 <p>ジャンルが混ざっていてもOK。家じゅうの「どうしよう」を、思いついた物から撮ってまとめるだけ。あとは業者がまとめて査定します。</p>
               </Reveal>
@@ -227,7 +230,7 @@ export default function HomePage() {
 
         {/* ============ AUCTION ============ */}
         <section className="section auction" id="auction">
-          <span className="vt" aria-hidden="true">業者が買取総額で競うから、高くなりやすい。</span>
+          <span className="vt" aria-hidden="true">入札のしくみ</span>
           <div className="container">
             <div className="section-head">
               <span className="eyebrow">入札のしくみ</span>
@@ -241,7 +244,7 @@ export default function HomePage() {
               </Reveal>
               <ol className="auc-steps">
                 <li><span className="an">1</span><div><h4>連絡先を伏せて出品内容が届く</h4><p>業者に届くのは、写真・品目・地域（都道府県・市区町村）・住居情報などの出品内容のみ。あなたのお名前・電話・詳細住所は伏せたままです。</p></div></li>
-                <li><span className="an">2</span><div><h4>登録業者が買取総額で入札</h4><p>複数の業者が、出品した商品すべてに対して買取総額を提示。競争で総額が引き上げられます。</p></div></li>
+                <li><span className="an">2</span><div><h4>登録業者が買取総額で入札</h4><p>複数の業者が、出品した商品すべてに対して買取総額を提示します。提示された総額は、すべて一覧で見比べられます。</p></div></li>
                 <li><span className="an">3</span><div><h4>連絡が来るのは選んだ1社だけ</h4><p>選ぶまで、業者はあなたに連絡できません。選ばなかった業者には自動でお断りが入り、営業電話の一斉架電はありません。</p></div></li>
                 <li><span className="an">4</span><div><h4>あなたは選んで、引き取りを待つだけ</h4><p>提示を見比べて1社を選択。成立後に連絡先を開示し、引き取り日時を決めます。</p></div></li>
               </ol>
@@ -315,21 +318,19 @@ export default function HomePage() {
                 <img src="/img/real/trust-illus-1.webp" alt="登録事業者の古物商許可を確認するイメージ" width={1024} height={768} loading="lazy" decoding="async" />
               </Reveal>
               <Reveal className="trust-list" delay={1}>
-                <article className="trust-item trust-item--lead">
+                {/* 行頭アイコンは帯（.assure-item .ai）と同じ 56px チップ＋線アイコンに統一。
+                    1024px の 3D レンダーを 64px 枠へ縮小すると灰色のにじみにしか見えず、
+                    3 項の行頭も揃わなかった（ラウンド2 実測・BRIEF §4-15）。 */}
+                <article className="trust-item">
+                  <span className="ti-ic"><Ic name="shield" /></span>
                   <div className="ti-body"><h3>登録制の事業者のみ</h3><p>査定に参加するのは登録された買取事業者だけ。古物営業に必要な古物商許可を、登録時・取引前に確認します。</p></div>
                 </article>
                 <article className="trust-item">
-                  <span className="ti-ic img-frame img-frame--1x1 img-frame--pale img-frame--contain">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/img/real/trust-illus-2.webp" alt="" width={1024} height={768} loading="lazy" decoding="async" />
-                  </span>
+                  <span className="ti-ic"><Ic name="lock" /></span>
                   <div className="ti-body"><h3>連絡先は成立後に開示</h3><p>査定段階で業者に渡るのは、写真・品目・地域（都道府県・市区町村）・住居情報などの出品内容のみ。お名前や電話番号は業者に渡らず、詳細住所と連絡用のメールアドレスは交渉が成立するまで開示されません。</p></div>
                 </article>
                 <article className="trust-item">
-                  <span className="ti-ic img-frame img-frame--1x1 img-frame--pale img-frame--contain">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/img/real/trust-illus-3.webp" alt="" width={1024} height={768} loading="lazy" decoding="async" />
-                  </span>
+                  <span className="ti-ic"><Ic name="scale" /></span>
                   <div className="ti-body"><h3>訪問買取は特定商取引法の対象</h3><p>訪問による買取には特定商取引法（訪問購入）の規定が適用される場合があります。一部の物品は法令により対象外とされています。お客様の品物が対象かどうかは、訪問した業者が交付する書面に記載されます。ご不明な場合は消費者ホットラインにご相談ください。</p></div>
                 </article>
               </Reveal>
@@ -389,8 +390,8 @@ export default function HomePage() {
               ))}
             </div>
             <Reveal className="cats-note">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <span className="cn-ic"><img src="/img/real/bundle-bag.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span>
+              {/* 56px 枠の 3D レンダーは縮小でにじむため線アイコンへ（ラウンド3 指摘・BRIEF §4-15） */}
+              <span className="cn-ic"><Ic name="camera" /></span>
               <div className="cn-body">
                 <h4>「売れないかも」と思う物も、まずは撮ってまとめて。</h4>
                 <p>点数がそろうと<strong className="mk">まとめて一括買取</strong>の対象になりやすく、単体では値がつきにくい物も一緒に引き取れる場合があります。引き取りが難しい物は、手放す導線をご案内します。</p>
@@ -472,7 +473,9 @@ export default function HomePage() {
                   <span className="biz-chip">審査制・登録無料</span>
                 </div>
               </div>
-              <div className="biz-banner-media img-frame img-frame--1x1">
+              {/* data-label は画像が未着・失敗のときに枠を空箱にしないための CSS フォールバック（画像が届けば cover の img が覆う）。
+                  alt 文そのままの言い回しだと代替テキストの露出に見えるため、/examples の枠と同じく品名として読める短い名詞にする（ラウンド3 指摘） */}
+              <div className="biz-banner-media img-frame img-frame--1x1" data-label="まとめ買取">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/img/v2/biz-reason-bulk.webp" width={800} height={800} alt="" loading="lazy" decoding="async" />
               </div>

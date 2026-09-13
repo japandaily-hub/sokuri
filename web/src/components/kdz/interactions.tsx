@@ -64,6 +64,10 @@ export function Reveal({
     }
     const io = new IntersectionObserver(
       (entries) => {
+        // QA M2 是正: IO は observe 直後に必ず1回コールバックを返す（交差していなくても）。
+        // その初回で保険を解除すれば「IO が生きている証明」になり、1200ms の強制表示は
+        // IO が発火しない環境だけで効く（従来は IO が正常でも 1.2 秒で全 .rv が出ていた）。
+        window.clearTimeout(fallback);
         entries.forEach((e) => {
           if (e.isIntersecting) {
             e.target.classList.add("in");
@@ -85,6 +89,56 @@ export function Reveal({
       {children}
     </Component>
   );
+}
+
+/** 面としてのフォールバック（--pale-2 の枠地・濃紺の帯地）を自前で持つ入れ物の中の画像。
+ *  ここは alt の有無に関わらず視覚的に隠してよい（壊れアイコン＋alt 文字より枠の地の方が読める）。 */
+const FRAMED_IMG_SELECTOR = ".img-frame img, .hero-band > img, .auth-side > img";
+
+/**
+ * 画像が取得できなかったとき、Chrome が左上に描く壊れ画像アイコン（と alt 文字）を消す保険。
+ * CSS の color:transparent / font-size:0 では alt 文字しか消えずアイコンは残る（実測）。
+ * 対象は ① alt=""（装飾画像）と ② 枠・帯の中の画像（alt の有無を問わない）。
+ * ② を足したのはラウンド2 の実測による: 意味を持つ alt を付けた未生成画像（ex-lot-*・biz-hero・pg-hero）で
+ * 枠内に alt 文字と壊れアイコンが並び、枠がエラー表示に見えていた。alt 属性は DOM に残すので読み上げは不変で、
+ * 品目名を出したい枠は .img-frame[data-label]::before が受ける。
+ * eager + fetchPriority の画像はマウント前に失敗して error が再発火しないため、走査は load 後にも行う。
+ */
+export function BrokenImageGuard() {
+  useEffect(() => {
+    const covered = (img: HTMLImageElement) =>
+      img.getAttribute("alt") === "" || img.matches(FRAMED_IMG_SELECTOR);
+    // 証跡系の画像（古物商許可証・本人確認書類）は取得失敗を可視化したままにする（審査判断を誤らせない）
+    const EVIDENCE_PATH = /^\/(admin|mypage\/identity)(\/|$)/;
+    const hide = (img: HTMLImageElement) => {
+      if (EVIDENCE_PATH.test(window.location.pathname)) return;
+      if (covered(img)) img.style.visibility = "hidden";
+    };
+    // error はバブルしないのでキャプチャ段で拾う（lazy で後から失敗する分もここに来る）
+    const onError = (e: Event) => {
+      if (e.target instanceof HTMLImageElement) hide(e.target);
+    };
+    document.addEventListener("error", onError, true);
+    // マウント前に失敗済みの分は error が再発火しないため走査で拾う
+    const sweep = () => {
+      document
+        .querySelectorAll<HTMLImageElement>(`img[alt=""], ${FRAMED_IMG_SELECTOR}`)
+        .forEach((img) => {
+          if (img.complete && img.naturalWidth === 0) hide(img);
+        });
+    };
+    sweep();
+    // load 前にマウントした場合（eager 画像の失敗がまだ確定していない場合）の取りこぼしを拾う
+    const pending = document.readyState !== "complete";
+    if (pending) window.addEventListener("load", sweep);
+    const later = window.setTimeout(sweep, 1500);
+    return () => {
+      document.removeEventListener("error", onError, true);
+      if (pending) window.removeEventListener("load", sweep);
+      window.clearTimeout(later);
+    };
+  }, []);
+  return null;
 }
 
 /**

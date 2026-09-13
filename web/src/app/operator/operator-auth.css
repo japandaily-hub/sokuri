@@ -45,14 +45,15 @@
 }
 .operator-auth .invite-toggle:hover { text-decoration: underline; }
 .operator-auth .invite-hint { font-size: 12px; color: var(--body-soft); margin-top: 6px; line-height: 1.6; }
+/* 折りたたみを閉じているときの補足。ラウンド3 指摘: 淡青の面（要点3点 .op-points）と
+   同じ形の箱がラベル行の直下にもう一枚続き、「閉じて情報量を減らした」効果が消えていた。
+   面をやめ、折りたたみラベル行に添える 1 行の補足テキスト（--body-soft）にする。
+   淡青の面はカード上部の .op-points だけに絞る。 */
 .operator-auth .invite-note {
-  background: var(--pale);
-  color: var(--blue);
-  border-radius: var(--radius-s);
-  padding: 10px 14px;
-  font-size: 12.5px;
+  margin: 6px 0 0;
+  font-size: 13px;
   line-height: 1.7;
-  margin-bottom: 18px;
+  color: var(--body-soft);
 }
 
 /* 利用規約同意 */
@@ -67,11 +68,13 @@
    ここはカード内外に足した業者向けの案内だけを書く。共通クラスは再定義しない。
    ============================================================ */
 
-/* 参加条件の要点（/operator/signup カード上部・--pale-2 面） */
+/* 参加条件の要点（/operator/signup カード上部・--pale-2 面）
+   横並び＋折り返しだと 440px のカード幅で「2個＋1個」に割れ、3点が欠けて見える。
+   幅に依らず 3 行で確定させる（60 代の閲覧者にも並列の 3 点だと読み取れる）。 */
 .operator-auth .op-points {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 20px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
   list-style: none;
   margin: 0 0 16px;
   padding: 12px 16px;

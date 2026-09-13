@@ -131,11 +131,18 @@
   padding: 2px 8px;
 }
 .business-page .biz-reason h3 {
-  font-size: clamp(17px, 1.8vw, 20px);
+  /* r2 L6 是正: 1.8vw だと 1440px で 20px に張り付き、3カラム幅（約340px）に対して
+     18字の見出しが入り切らず語中で割れていた。上限に届かせず1段細くする。 */
+  font-size: clamp(17px, 1.35vw, 20px);
   color: var(--ink);
   line-height: 1.6;
   margin: 14px 0 10px;
+  /* r2 L11 是正: 3カラム幅だと読点の位置で不自然に割れるため行長を均す */
+  text-wrap: balance;
 }
+/* 語中改行を禁じたい短い語だけを包む。word-break:keep-all はページ全体では
+   860px 付近で 15 字の塊が列幅を超えて横スクロールを生むため採らない。 */
+.business-page .biz-reason h3 .nw { white-space: nowrap; }
 .business-page .biz-reason p { font-size: 14.5px; color: var(--body-soft); line-height: 1.85; }
 
 /* ============ 安心して参加できる理由（04〜06・ヘアラインリスト） ============
@@ -144,13 +151,25 @@
   max-width: var(--maxw-text);
   margin: clamp(56px, 7vw, 88px) auto 0;
 }
+/* r2 L4 是正: ここだけ eyebrow も短罫も無い裸の見出しで、同ページの .section-head と
+   語彙が違って見えた。h3 のままレベルは保ち（#merit の h2 配下）、見た目だけ揃える。 */
+.business-page .biz-assure-head-wrap { text-align: center; }
+.business-page .biz-assure-head-wrap .eyebrow { justify-content: center; }
 .business-page .biz-assure-head {
   font-family: var(--head);
   font-weight: 600;
   font-size: clamp(18px, 2.2vw, 22px);
   color: var(--ink);
   text-align: center;
-  margin: 0;
+  margin: 16px 0 0;
+}
+.business-page .biz-assure-head::after {
+  content: "";
+  display: block;
+  width: 48px;
+  height: 1px;
+  background: var(--primary);
+  margin: 18px auto 0;
 }
 .business-page .biz-assure-list {
   list-style: none;
@@ -235,10 +254,17 @@
 .business-page .req-body p { font-size: 13.5px; color: var(--body-soft); line-height: 1.8; margin: 0; }
 
 /* ============ 登録フォーム ============ */
+/* r2 M2 是正: 入力欄を白地＋1px --line に統一したため（/contact と同一規則・BRIEF §2.9）、
+   外枠カードは --pale-2 に退く。入力欄が「面」として浮き上がる関係に反転させる。 */
+/* r3 是正: 本文の縦軸が節ごとにずれていた（.section-head と #faq の一覧は --maxw-text=760px
+   中央、このカードだけ 680px 中央で左端が約 40px 内側に入る）。.section-head は共通 CSS で
+   中央寄せ（katazuke.css:145・コア所有）なので、カードだけ左詰めにすると見出しと本文で
+   軸が割れる。カード幅を本文列（--maxw-text）に合わせ、見出し・FAQ・フォームの左端を
+   1 本に揃える。 */
 .business-page .reg-card {
-  max-width: 680px;
+  max-width: var(--maxw-text);
   margin: 0 auto;
-  background: #fff;
+  background: var(--pale-2);
   border: 1px solid var(--line);
   border-radius: 0;
   padding: clamp(32px, 4vw, 56px);
@@ -282,7 +308,9 @@
   font-family: var(--ui);
   font-size: 15px;
   color: var(--ink);
-  background: var(--pale);
+  /* r2 M2 是正: 淡青ベタ（--pale）は枠線が沈んで「入力不可」に見えた。
+     /contact と同じ白地＋1px --line に揃える（BRIEF §2.9・§1.1 --pale 大面積廃止方向）。 */
+  background: #fff;
   border: 1px solid var(--line);
   border-radius: 0;
   padding: 13px 16px;
@@ -308,9 +336,9 @@
 .business-page .field textarea { resize: vertical; min-height: 120px; }
 .business-page .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
-/* 振込先情報セクション */
+/* 振込先情報セクション（カードが --pale-2 になったので白面の小パネルとして分ける） */
 .business-page .biz-bank-section {
-  background: var(--pale);
+  background: #fff;
   border: 1px solid var(--line);
   border-radius: 0;
   padding: 22px 20px 8px;
@@ -427,8 +455,11 @@
 .business-page .thanks h3 { font-size: 22px; color: var(--navy); margin-bottom: 12px; }
 .business-page .thanks p { color: var(--body-soft); font-size: 15px; line-height: 1.9; margin-bottom: 28px; }
 
-/* ヘッダー内 send アイコン（共通スプライトに send が無いため inline 用） */
-.business-page .biz-send-ic { fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; display: inline-block; vertical-align: -.13em; }
+/* ヘッダー内 send アイコン（共通スプライトに send が無いため inline 用）
+   r2 H1 是正: viewBox だけの裸 svg は既定 300x150 で描かれ、display:flex の
+   .biz-dock / .mobile-menu / .btn-ghost の中で伸び切る（共通 .btn .ic の 18px 指定は
+   別クラスなので当たらない）。既定寸法をここで固定する。.btn-submit の 20px は後勝ちで残る。 */
+.business-page .biz-send-ic { width: 18px; height: 18px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; display: inline-block; vertical-align: -.13em; }
 
 /* ============ モバイル固定バー ============
    BARE ページなので共通 .dock は描かれない。#register への導線を自前で持つ。 */
@@ -436,8 +467,23 @@
 
 /* ============ レスポンシブ（閾値は共有部品と同じ 859px） ============ */
 @media (max-width: 859px) {
-  /* ヒーロー画像は 2:3 のままだと縦に伸びすぎるため 4:5 に切り替え、左右は端まで見せる */
-  .business-page .biz-hero-fig { aspect-ratio: 4/5; margin-bottom: 28px; }
+  /* ヒーロー画像は 2:3 のままだと縦に伸びすぎるため 4:5 に切り替え、左右は端まで見せる。
+     r3 是正: r2 で入れた max-height が常に勝ち、390px では枠が 390x220（約16:9）に潰れて
+     aspect-ratio:4/5 が一度も成立していなかった。biz-hero の素材は 1024x1536 の縦長なので
+     横長に切ると主題が残らない。BRIEF §1.5 の例外承認（biz-hero のモバイルは表示 AR＝4:5）
+     どおり上限を撤廃する。あわせて r2 の order 上書きも外し、DOM 順（画像→文）に戻して
+     BRIEF §2.6 #1「画像上」と #requirements（.biz-req-fig）の積み順に揃える。
+     390px 時: ヘッダー ＋ 上パディング 48px ＋ 枠 487px で h1 上端は約 620px、
+     844px のビューポート内に eyebrow と h1 が残る（画面外へは落ちない）。
+     画像下の間隔も .biz-req-fig と同じ margin-bottom:28px（＋ grid の row-gap）に合わせる。 */
+  /* 画像が先頭に戻るぶん、帯の上パディングは詰める（画像の上に 48px の空白を置くと
+     h1 の 3 行目が固定バー .biz-dock（56px）に潜り込む。390px 実測で下端 777px < 788px）。 */
+  .business-page .biz-hero { padding-top: clamp(20px, 3vw, 40px); }
+  .business-page .biz-hero-fig {
+    aspect-ratio: 4/5;
+    margin-top: 0;
+    margin-bottom: 28px;
+  }
   .business-page .biz-stats .inner { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 16px; }
   .business-page .stat-item:last-child { grid-column: span 2; }
   .business-page .biz-reason-grid { grid-template-columns: 1fr; gap: 36px; }

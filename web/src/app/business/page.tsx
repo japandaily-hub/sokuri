@@ -10,7 +10,7 @@
  */
 
 import "./business.css";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Ic } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
@@ -20,7 +20,13 @@ import { submitOperatorApplication, toDisplayMessage } from "@/lib/katadzuke-api
 /** 共通スプライトに send が無いため inline 用の紙飛行機アイコン。 */
 function SendIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" className={`biz-send-ic${className ? ` ${className}` : ""}`} aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      width={18}
+      height={18}
+      className={`biz-send-ic${className ? ` ${className}` : ""}`}
+      aria-hidden="true"
+    >
       <path d="M22 2L11 13" />
       <path d="M22 2L15 22l-4-9-9-4 20-7z" />
     </svg>
@@ -46,7 +52,7 @@ const STATS: { num: string; unit: string; label: string }[] = [
 ];
 
 /** 仕入れる3つの理由（画像付き3カラム）。効果の断定は避け、条件と手順で説明する。 */
-const REASONS: { n: string; tag: string; img: string; h: string; p: string; d?: 1 | 2 }[] = [
+const REASONS: { n: string; tag: string; img: string; h: ReactNode; p: string; d?: 1 | 2 }[] = [
   {
     n: "01",
     tag: "まとめ",
@@ -58,7 +64,13 @@ const REASONS: { n: string; tag: string; img: string; h: string; p: string; d?: 
     n: "02",
     tag: "下見なし",
     img: "biz-reason-photo",
-    h: "写真と品目から、下見なしで入札できる",
+    /* r2 L6 是正: 3カラム幅で「写真と品目から、下／見なしで…」と語中改行されるため、
+       「下見なし」だけを折り返し禁止にして読点で割れるようにする（text-wrap:balance と併用）。 */
+    h: (
+      <>
+        写真と品目から、<span className="nw">下見なし</span>で入札できる
+      </>
+    ),
     p: "出品情報は写真・品目・地域（都道府県・市区町村）・住居情報などで構成。現物確認の前に買取総額の入札ができるため、下見の移動コストがかかりません。入札はすべてユーザーに一覧で提示されます。",
     d: 1,
   },
@@ -310,11 +322,14 @@ export default function BusinessPage() {
             <div className="media-split media-split--rev biz-hero-split">
               <div className="img-frame img-frame--2x3 img-frame--pale biz-hero-fig sp-bleed">
                 {/* eslint-disable @next/next/no-img-element */}
+                {/* r2 H4 是正: 枠の意味は隣接する h1・hero-sub が担保しており、この写真は
+                    仕入れ現場の雰囲気を伝える装飾。未生成・取得失敗時に alt 文がヒーロー枠へ
+                    流れて第一印象を壊すため、ページ内の他の v2 画像と同じく alt="" に揃える。 */}
                 <img
                   src="/img/v2/biz-hero.webp"
                   width={900}
                   height={1350}
-                  alt="種別ごとに整理されたリユース品の棚（イメージ）"
+                  alt=""
                   loading="eager"
                   fetchPriority="high"
                   decoding="async"
@@ -431,7 +446,12 @@ export default function BusinessPage() {
 
             {/* 04〜06 は「3つの理由」の数と衝突しないよう別見出しのヘアラインリストに分ける */}
             <div className="biz-assure">
-              <h3 className="biz-assure-head">安心して参加できる理由</h3>
+              {/* r2 L4 是正: 同ページの .section-head と同じ語彙（eyebrow ＋ 明朝見出し ＋ 短罫）に揃える。
+                  見出しレベルは #merit の h2 配下なので h3 のまま。 */}
+              <div className="biz-assure-head-wrap">
+                <span className="eyebrow">運営のしくみ</span>
+                <h3 className="biz-assure-head">安心して参加できる理由</h3>
+              </div>
               <ul className="biz-assure-list">
                 {ASSURANCES.map((a) => (
                   <li key={a.n}>
@@ -900,8 +920,11 @@ export default function BusinessPage() {
         <div className="container">
           <div className="footer-grid">
             <div>
+              {/* r2 M2 是正: 共通 .footer は白地なので variant="white" だと明朝の「カタヅケ」が
+                  白抜きで消え、--lime の小さな英字「KATAZUKE」だけが残っていた。共通 SiteFooter と
+                  同じ brand（墨の明朝 ＋ --primary の英字ラベル）・同じ size に揃える。 */}
               <Link href="/" className="logo footer-logo" aria-label="カタヅケ トップへ">
-                <KdzLogo variant="white" size={20} />
+                <KdzLogo size={22} />
               </Link>
               <p className="about">
                 家まるごと、まとめて片付け買取。業者が買取総額で競い合う、営業電話に追われない不用品買取マッチング。東京・千葉・埼玉・神奈川対応。

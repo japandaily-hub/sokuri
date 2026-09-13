@@ -5,7 +5,7 @@
  *  POST /contact（katadzuke-api.ts submitContactMessage）へ配線済み。422/429/5xx は日本語の
  *  案内に変換して表示し、失敗時に偽の完了表示は出さない（運営導線監査 r3-operator.md H1 是正）。 */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Ic } from "@/components/kdz/Icons";
 import { KdzApiError, submitContactMessage, toDisplayMessage } from "@/lib/katadzuke-api";
@@ -17,6 +17,27 @@ const REQUIRED: FieldId[] = ["name", "email", "category", "message"];
 
 const SUBMIT_FAILED_MESSAGE = "送信できませんでした。しばらくしてからもう一度お試しください。";
 
+/** 「事業者情報の開示請求」（特商法11条）の option 値。backend の ContactCategory は
+ *  Literal 8値に固定されており、このスラッグをそのまま送ると 422 になる。 */
+const DISCLOSURE_CATEGORY = "disclosure";
+/** 開示請求を送るときに本文の先頭へ前置する種別名（運営通知メールで判別するため）。 */
+const DISCLOSURE_PREFIX = "【事業者情報の開示請求】";
+
+/**
+ * 送信ペイロードの種別・本文を組み立てる。
+ * 開示請求は backend に専用スラッグが無いため category は既存の "other" に畳み、
+ * 本文の先頭に種別を前置して「その他」と区別できるようにする暫定策（QA H1）。
+ * backend（schemas_katadzuke.ContactCategory と services/notify._CONTACT_CATEGORY_LABELS）に
+ * disclosure が追加されたら、この関数ごと外して value をそのまま送る。
+ * （page.tsx は Next の page エントリなので named export を増やさない。検証は実 POST の傍受で行う）
+ */
+function buildContactPayload(selectedCategory: string, message: string) {
+  if (selectedCategory !== DISCLOSURE_CATEGORY) {
+    return { category: selectedCategory, message };
+  }
+  return { category: "other", message: `${DISCLOSURE_PREFIX}\n${message}` };
+}
+
 export default function ContactPage() {
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
@@ -27,6 +48,14 @@ export default function ContactPage() {
     category: false,
     message: false,
   });
+
+  /** 送信完了パネルの見出し。フォームが消えてパネルに差し替わるため、
+   *  フォーカスが body に落ちないよう見出しへ移す（スクリーンリーダーは完了文を読み上げる）。 */
+  const thanksHeadingRef = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    if (sent) thanksHeadingRef.current?.focus();
+  }, [sent]);
 
   function clearError(id: FieldId) {
     setErrors((prev) => (prev[id] ? { ...prev, [id]: false } : prev));
@@ -63,8 +92,11 @@ export default function ContactPage() {
 
     const name = (form.elements.namedItem("name") as HTMLInputElement).value.trim();
     const email = (form.elements.namedItem("email") as HTMLInputElement).value.trim();
-    const category = (form.elements.namedItem("category") as HTMLSelectElement).value;
-    const message = (form.elements.namedItem("message") as HTMLTextAreaElement).value.trim();
+    const selectedCategory = (form.elements.namedItem("category") as HTMLSelectElement).value;
+    const { category, message } = buildContactPayload(
+      selectedCategory,
+      (form.elements.namedItem("message") as HTMLTextAreaElement).value.trim()
+    );
 
     setSending(true);
     setSubmitError(null);
@@ -94,8 +126,13 @@ export default function ContactPage() {
 
   return (
     <main id="main">
-      {/* ============ ページヒーロー（帯上に文字を置かない） ============ */}
-      <section className="hero-band hero-band--slim hero-band--quiet hero-band--pos-r">
+      {/* ============ ページヒーロー（帯上に文字を置かない） ============
+          r1 レビュー（ct-band 未生成のため帯は無文字の濃紺ベタ）: --slim は PC 240px あり、
+          ファーストビューの上端 230px が情報ゼロで h1 到達が遅い。BRIEF §2.9 の趣旨
+          （ファーストビューにフォーム先頭を入れる）を優先し、法務3ページと同じ
+          --fixed（PC 160px／モバイル 120px）に落とす。帯上に文字は置かないまま。
+          ct-band 生成後に --slim へ戻すかは画像が入ってから判断する。 */}
+      <section className="hero-band hero-band--fixed hero-band--quiet hero-band--pos-r">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/img/v2/ct-band.webp"
@@ -250,12 +287,13 @@ export default function ContactPage() {
                         <option value="area">対応エリアについて</option>
                         <option value="privacy">個人情報の取り扱いについて</option>
                         {/* 特商法に基づく事業者情報（代表者名・詳細住所・電話番号）の開示請求。
-                            backend の ContactCategory は Literal 8値に固定されており、新しい
-                            スラッグを送ると 422 になるため value は "other" を使う。運営通知
-                            メールの種別欄は「その他」と表示されるので、専用スラッグが必要なら
-                            backend 側（schemas_katadzuke.ContactCategory と
-                            services/notify._CONTACT_CATEGORY_LABELS）の追加が要る。 */}
-                        <option value="other">事業者情報の開示請求</option>
+                            QA H1 是正: 「その他」と同じ value="other" を2つ並べると選択が区別
+                            できず（controlled 化した瞬間に表示も壊れる）、運営通知メールで開示
+                            請求が一般問い合わせに埋もれた。option は専用の value にし、送信時に
+                            buildContactPayload が category を既存の "other" へ畳んだうえで本文
+                            先頭に種別を前置する（backend の ContactCategory は Literal 8値固定で、
+                            新しいスラッグをそのまま送ると 422 になるため）。 */}
+                        <option value={DISCLOSURE_CATEGORY}>事業者情報の開示請求</option>
                         <option value="trouble">トラブル・クレーム</option>
                         <option value="partner">業者登録・提携について</option>
                         <option value="press">取材・メディア掲載</option>
@@ -329,7 +367,9 @@ export default function ContactPage() {
                     <path d="M8 12l2.5 2.5L16 9" />
                   </svg>
                 </div>
-                <h3>送信を受け付けました</h3>
+                <h2 ref={thanksHeadingRef} tabIndex={-1}>
+                  送信を受け付けました
+                </h2>
                 <p>
                   お問い合わせありがとうございます。
                   <br />

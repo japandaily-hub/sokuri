@@ -40,7 +40,10 @@ export default function LegalPage() {
       <div className="doc-wrap">
         <div className="doc-eyebrow">LEGAL</div>
         <h1 className="doc-title">特定商取引法に基づく表記</h1>
-        <div className="doc-meta">最終更新：2026年6月1日</div>
+        {/* 日付表記は /terms・/privacy と同じ「最終改定」に統一する。/legal は制定日の
+            確証が無いため制定・施行は記載しない（推測で日付を作らない）。本文（クーリング・
+            オフ欄の文言・「ユーザーの費用は0円」ブロック）を改稿した日に更新すること。 */}
+        <div className="doc-meta">最終改定：2026年9月14日</div>
 
         <p className="doc-lead">
           本ページは、特定商取引に関する法律（特定商取引法）第11条および第58条の2に基づき、本サービスの運営者情報および取引条件を表示するものです。

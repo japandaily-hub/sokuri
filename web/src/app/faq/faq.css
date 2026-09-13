@@ -65,9 +65,12 @@
 .faq-page .faq-search-clear.show { display: flex; }
 
 /* ---------- 帯の直下の白面（リード文・検索結果件数） ---------- */
+/* 帯を --slim にした分だけ下が余り、リード1行のあとに白面が 160px 以上続いて
+   サイドバーと Q&A の始点が宙に浮いていた。リード側の padding を 1 段詰め、
+   本文セクション側（.faq-page .section）と合わせて帯と本文をつなげる。 */
 .faq-page .faq-lead {
   background: #fff;
-  padding: clamp(24px, 3vw, 36px) 0 clamp(16px, 2vw, 24px);
+  padding: clamp(20px, 3vw, 32px) 0 clamp(12px, 1.4vw, 18px);
 }
 .faq-page .faq-lead p {
   font-size: 15px;
@@ -85,12 +88,14 @@
 }
 
 /* ---------- カテゴリチップ（859px 以下のみ。デスクトップはサイドバーに一本化） ---------- */
+/* sticky の top は .header（sticky・z-index:60・高さ 72px + 1px 罫）の下端に合わせる。
+   top:0 のままだと同じ位置に重なり、z-index の低いチップ列がヘッダーの下に隠れる。 */
 .faq-page .faq-cats {
   padding: 14px 0;
   border-top: 1px solid var(--line-soft);
   border-bottom: 1px solid var(--line-soft);
   position: sticky;
-  top: 0;
+  top: 73px;
   background: #fff;
   z-index: 20;
 }
@@ -120,6 +125,11 @@
 .faq-page .cat-chip .ic { font-size: 14px; stroke-width: 1.8; }
 
 /* ---------- コンテンツレイアウト ---------- */
+/* 本文は共通 .section（padding 上下 clamp(72px,9vw,128px)）の中。
+   リードの下余白と二重に効いて帯と本文の間が 160px 前後空くため、上だけ 1 段に詰める。
+   下の余白はフッター前の間合いなのでそのまま。 */
+.faq-page .section { padding-top: clamp(24px, 4vw, 40px); }
+
 .faq-page .faq-body {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
@@ -129,7 +139,8 @@
 .faq-page .faq-side {
   padding: 8px 0 32px;
   position: sticky;
-  top: 70px;
+  /* .header は 72px + 1px 罫。70px だと上端 3px がヘッダーに潜るので下端＋余白に置く */
+  top: 89px;
 }
 .faq-page .faq-side-title {
   font-family: var(--en);
@@ -200,6 +211,10 @@
   color: var(--primary);
   stroke-width: 1.6;
 }
+/* カテゴリ見出しは <h2>（h1「よくある質問」の直下の階層）。
+   見出し要素にしないと見出しジャンプでカテゴリ間を移動できず WCAG 1.3.1 に落ちるため、
+   マークアップ側を h2 に直した。字面は font-family/size/weight をここで明示しているので
+   要素が変わっても変化しない（margin は全体リセットの *{margin:0} が効く）。 */
 .faq-page .faq-section-title {
   font-family: var(--head);
   font-size: 19px;
@@ -286,23 +301,34 @@
   color: var(--primary);
 }
 
-/* 開閉は grid-template-rows 0fr→1fr。max-height の固定値で長文が切れることがない */
+/* 開閉は grid-template-rows 0fr→1fr。max-height の固定値で長文が切れることがない。
+   ただし共通 katazuke.css の .faq-a{max-height:0} は宣言が別なので黙って効き続け、
+   open でも行高に関係なく高さ 0 にクリップされる（回答が1問も出ない）。
+   開閉機構を持つこちら側で必ず max-height を打ち消す。
+   トップの <FaqAccordion> は JS で inline の max-height を当てるため共通側はそのまま。 */
 .faq-page .faq-a {
   display: grid;
   grid-template-rows: 0fr;
+  max-height: none;
+  overflow: hidden;
   transition: grid-template-rows .35s var(--ease);
 }
 .faq-page .faq-item.open .faq-a { grid-template-rows: 1fr; }
-/* 閉じている間は行の高さが 0 になり、border-box のため padding ごと clip される */
+/* 閉じている間は行の高さを 0 にする。
+   注: border-box の要素は height:0 でも padding 分までしか縮まないため、
+   .faq-a-inner に padding-bottom を常時持たせると 0fr の行がその 22px 分だけ開き、
+   回答の1行目が閉じたまま漏れて右端で切れる（ラウンド2 実測・全14問で発生）。
+   下余白は open のときだけ与え、閉状態の最小寄与を 0 にする。 */
 .faq-page .faq-a-inner {
   overflow: hidden;
   min-height: 0;
-  padding: 0 4px 22px 32px;
+  padding: 0 4px 0 32px;
   font-size: 14.5px;
   line-height: 1.95;
   max-width: 54em; /* PCで1行が長くなりすぎないよう約48字で折り返す */
   color: var(--body);
 }
+.faq-page .faq-item.open .faq-a-inner { padding-bottom: 22px; }
 .faq-page .faq-a-inner a { color: var(--primary); text-decoration: underline; text-underline-offset: .2em; }
 .faq-page .faq-a-inner mark {
   background: var(--marker);
@@ -354,7 +380,9 @@
   stroke-width: 1.4;
   flex-shrink: 0;
 }
-.faq-page .faq-contact-info h3 {
+/* 見出し階層を h1 → h2 で揃えるため要素を h3 から h2 に変更（レベル飛びの解消）。
+   字面は下記の指定で保つ。 */
+.faq-page .faq-contact-info h2 {
   font-size: 17px;
   font-weight: 600;
   color: var(--ink);
@@ -378,9 +406,26 @@
     flex-wrap: nowrap;
     overflow-x: auto;
     padding-block: 2px;
+    /* 末尾に 24px の逃げを作り、最後のチップが画面右端に貼り付いて切れて見えるのを防ぐ。
+       scroll-padding はキーボード操作でチップへ送られたときの止まり位置。 */
+    padding-inline-end: 24px;
+    scroll-padding-inline: 0 24px;
     scrollbar-width: none;
   }
   .faq-page .faq-cats-inner::-webkit-scrollbar { display: none; }
+  /* 右端の白→透明フェード。スクロールバーを消しているため、
+     「まだ右に続く」ことを示す手掛かりがこれしかない。常時表示・角丸/影なし。
+     祖先に overflow を足さず、sticky な .faq-cats（位置指定済み）を基準に重ねる。 */
+  .faq-page .faq-cats::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    width: 48px;
+    background: linear-gradient(to right, rgba(255, 255, 255, 0), #fff 60%);
+    pointer-events: none;
+  }
 
   .faq-page .faq-body {
     /* minmax(0,1fr): 子要素の最小幅でトラックが広がり横スクロールが出るのを防ぐ */
@@ -393,7 +438,9 @@
     min-width: 0;
   }
   .faq-page .faq-q { font-size: 15px; padding: 16px 0; }
-  .faq-page .faq-a-inner { padding: 0 0 20px 32px; }
+  /* 下余白は open のときだけ（閉状態で padding が残ると 0fr の行が開いて1行目が漏れる） */
+  .faq-page .faq-a-inner { padding: 0 0 0 32px; }
+  .faq-page .faq-item.open .faq-a-inner { padding-bottom: 20px; }
   /* 問い合わせブロック: 横並びだと375pxで右にはみ出すため縦積みにする */
   .faq-page .faq-contact {
     flex-direction: column;
@@ -403,4 +450,8 @@
   }
   .faq-page .faq-contact-info { min-width: 0; }
   .faq-page .faq-contact .btn { width: 100%; }
+}
+@media (max-width: 600px) {
+  /* .header の高さがこの幅から 60px + 1px 罫になる（katazuke.css）。追従位置を合わせる */
+  .faq-page .faq-cats { top: 61px; }
 }

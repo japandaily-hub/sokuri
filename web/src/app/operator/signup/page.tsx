@@ -21,19 +21,24 @@ import { AuthBar, Field, PasswordField } from "@/components/kdz/auth";
 
 export default function OperatorSignupPage() {
   const router = useRouter();
-  const [showInviteField, setShowInviteField] = useState(true);
+  // 招待コードは任意項目。既定で開くと、コードを持たない大半の業者が最初に見る入力欄が
+  // 任意欄になり、必須の会社名・古物商許可番号より前に出てしまう（ラウンド2 指摘）。既定は閉じる。
+  const [showInviteField, setShowInviteField] = useState(false);
   const [inviteCode, setInviteCode] = useState("");
   const [company, setCompany] = useState("");
   const [license, setLicense] = useState("");
   const [licenseError, setLicenseError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
   const [agree, setAgree] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   /** 古物商許可番号は個人・法人問わず必須（backend OperatorSignupRequest.license_number: min_length=5）。 */
   const LICENSE_MIN_LENGTH = 5;
+  /** パスワードは 8 文字以上（backend OperatorSignupRequest.password: min_length=8）。 */
+  const PASSWORD_MIN_LENGTH = 8;
 
   function validateLicense(): boolean {
     const trimmed = license.trim();
@@ -49,9 +54,27 @@ export default function OperatorSignupPage() {
     return true;
   }
 
+  /** QA H2 是正: フォームは noValidate のため required/minLength は発火しない。
+   *  空パスワードのまま signupOperator() が走り backend 422 を汎用エラーで見せていた。 */
+  function validatePassword(): boolean {
+    if (password.length === 0) {
+      setPasswordError("パスワードを入力してください。");
+      return false;
+    }
+    if (password.length < PASSWORD_MIN_LENGTH) {
+      setPasswordError(`パスワードは${PASSWORD_MIN_LENGTH}文字以上で入力してください。`);
+      return false;
+    }
+    setPasswordError(null);
+    return true;
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!validateLicense()) return;
+    // 先に両方を評価する（片方で return すると、もう一方のエラーが出ず二度手間になる）
+    const licenseOk = validateLicense();
+    const passwordOk = validatePassword();
+    if (!licenseOk || !passwordOk) return;
     if (!agree) {
       setError("利用規約・プライバシーポリシーへの同意が必要です。");
       return;
@@ -143,9 +166,8 @@ export default function OperatorSignupPage() {
                     <p className="invite-hint">招待コードがあると登録直後からフル機能で入札できます。</p>
                   </div>
                 ) : (
-                  <p className="invite-note" style={{ marginTop: 10, marginBottom: 0 }}>
-                    招待コードなしでも登録できます。
-                  </p>
+                  // 淡青の面ではなく、折りたたみラベル行に添える補足テキスト（operator-auth.css .invite-note）
+                  <p className="invite-note">招待コードなしでも登録できます。</p>
                 )}
               </div>
 
@@ -186,12 +208,27 @@ export default function OperatorSignupPage() {
                   autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  placeholder="example@company.co.jp"
                   inputMode="email"
                 />
               </Field>
               {/* パスワード表示切替は /operator/login・/login と同じ PasswordField に揃える */}
-              <Field label="パスワード（8文字以上）" htmlFor="op-password" rightSlot={<span className="req">必須</span>}>
-                <PasswordField id="op-password" value={password} onChange={setPassword} autoComplete="new-password" />
+              <Field
+                label="パスワード（8文字以上）"
+                htmlFor="op-password"
+                rightSlot={<span className="req">必須</span>}
+                error={passwordError}
+              >
+                <PasswordField
+                  id="op-password"
+                  value={password}
+                  onChange={(v) => {
+                    setPassword(v);
+                    if (passwordError) setPasswordError(null);
+                  }}
+                  autoComplete="new-password"
+                  minLength={PASSWORD_MIN_LENGTH}
+                />
               </Field>
 
               <div className="agree-row">

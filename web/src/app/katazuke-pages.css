@@ -186,7 +186,9 @@
 .confirm-row .val { font-weight: 600; color: var(--ink); text-align: right; }
 
 @media (max-width: 480px) {
-  .flow-wrap { padding: 18px 14px 90px; }
+  /* 下余白は固定フッター（.flow-footer 実測 81px）＋逃げ代。90px では最下部まで送っても
+     最終行とバーの間が 9px しかなく、同意文がバーに触って見える（ラウンド2 実測）。 */
+  .flow-wrap { padding: 18px 14px 104px; }
   .step-title { font-size: 18px; }
   .fs-label { font-size: 9px; }
   .flow-header-inner { gap: 8px; padding: 10px 14px; }
@@ -219,8 +221,10 @@
   padding-block: clamp(32px,5vw,56px); color: #fff;
   /* forced-colors と画像取得失敗（alt="" は何も描かれない）の地。veil と合わせて濃紺のまま文字が読める */
   background-color: var(--deep); }
+/* color:transparent / font-size:0 は「取得失敗時に Chrome が左上へ描く壊れ画像アイコンと alt 文字」を
+   濃紺地の上から消すため（alt="" 運用なので読み上げには影響しない）。画像が届けば無関係になる。 */
 .hero-band > img { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0;
-  object-fit: cover; object-position: var(--band-pos, 50% 50%); }
+  object-fit: cover; object-position: var(--band-pos, 50% 50%); color: transparent; font-size: 0; }
 .hero-band__veil { position: absolute; inset: 0; background: rgba(20,35,92,.65); pointer-events: none; }
 .hero-band__copy { position: relative; z-index: 1; color: #fff; font-family: var(--serif); }
 .hero-band__copy h1, .hero-band__copy h2, .hero-band__copy h3 { color: #fff; font-weight: 600; font-size: clamp(24px,3.4vw,40px); line-height: 1.5; }
@@ -276,17 +280,37 @@
    aspect-ratio は修飾子で必ず指定する。付け忘れると高さ 0 で崩れが見える（黙って既定に落とさない）。
    表示 AR は生成 AR と 1 対 1（1024x1024→--1x1 / 1536x1024→--3x2 / 1024x1536→--2x3）。
    --4x5 は top-hero / biz-hero の 859px 以下だけ（--pos で切り位置を指定）。 */
-.img-frame { position: relative; display: block; background: #fff; border: 1px solid var(--line); overflow: hidden; aspect-ratio: auto; }
+/* 地は --pale-2。白面の上でも「1px 罫だけの穴」にならず、画像が未着・失敗・遅延でも面として読める。
+   淡青面の上で白地に戻したい枠だけ .img-frame--white を明示的に当てる。 */
+.img-frame { position: relative; display: block; background: var(--pale-2); border: 1px solid var(--line); overflow: hidden; aspect-ratio: auto; }
 .img-frame img { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; display: block;
   object-fit: cover; object-position: var(--pos, 50% 50%); }
+/* 枠の中の img は alt の有無にかかわらず alt 文字を描かせない。意味を持つ alt（「実家整理のモデルケース…」等）が
+   取得失敗時に枠内へ本文として流れ、枠がエラー表示に見える／モバイルで枠外へ食み出すため（ラウンド2 実測）。
+   枠は --pale-2 の面＋1px 罫として残り、品目名が要る枠は [data-label] の ::before が受ける。
+   alt 属性は DOM に残るので読み上げは不変（壊れ画像アイコン自体は BrokenImageGuard が消す）。 */
+.img-frame img { color: transparent; font-size: 0; }
+/* 画像未着時に品目名などを枠内へ出す保険。::before なので img より下に敷かれ、画像が届けば隠れる */
+.img-frame[data-label]::before { content: attr(data-label); position: absolute; inset: 0; display: flex;
+  align-items: center; justify-content: center; padding: 8px 10px; text-align: center;
+  font-family: var(--ui); font-size: 12px; line-height: 1.6; color: var(--body-soft); }
 .img-frame--1x1 { aspect-ratio: 1/1; }
 .img-frame--3x2 { aspect-ratio: 3/2; }
 .img-frame--2x3 { aspect-ratio: 2/3; }
 .img-frame--4x5 { aspect-ratio: 4/5; }
-/* 白面の上に置く枠は地を --pale-2 にして輪郭を出す */
+/* 地は既定で --pale-2。--pale は互換のため残す（同値）。淡青面の上で白地にしたい枠だけ --white */
 .img-frame--pale { background: var(--pale-2); }
+.img-frame--white { background: #fff; }
 /* contain は既存 3D アイコン（/img/real/* 512px 正方形）にのみ許可。v2 の写真には使わない */
 .img-frame--contain img { object-fit: contain; }
+/* contain は素材が枠を埋めないので、枠の地が素材に焼かれた地と違うと「枠の中にもう一枚ずれた四角」が浮く
+   （ラウンド3 指摘）。/img/real/* の焼き地を実測すると how-camera=rgb(238,241,250)・
+   trust-illus-1=rgb(239,242,252) で、--pale(#eef3ff=238,243,255) とはほぼ一致、
+   --pale-2(#f4f7fc=244,247,252) は 2% ほど明るく細い縁として見える。よって contain の枠だけ地を --pale に合わせる。
+   --white / --pale より後に置き、明示指定より後勝ちさせる（contain＝3D 素材用という一体の用途のため）。
+   ※ ページ側で ID/2階層セレクタの background を当てている枠（#flow .step-photo・.auction .auc-figure の #fff）は
+     特異度で勝てないので、そちらは各ページ担当が外す。 */
+.img-frame--contain { background: var(--pale); }
 
 /* ---------- §1.6 .sp-bleed — 859px 以下だけ額装内フルブリード ----------
    .container（または .bare-scope）の --container-pad を負マージンに使う。aspect-ratio は .img-frame の修飾子で固定。 */
@@ -309,11 +333,17 @@
    <aside class="auth-side"><img src="/img/v2/su-side.webp" width="900" height="1350" alt="" loading="lazy" decoding="async" />
      <p class="auth-side__line">撮って、あとは待つだけ。</p></aside>
    --auth-bar-h: 上部バーの高さ（既定 68px＝.auth-bar）。/signup は .flow-header の実高をページ側で上書きする。
-   --auth-side-pad-b: 固定フッター（.flow-footer 等）がある時に .auth-side__line を持ち上げる量（既定 0）。 */
+   --auth-side-pad-b: .auth-side__line を持ち上げる量（既定 0）。固定フッターは下の @media で
+   フォーム列（left:46%）に閉じ込め、左カラムには重ならないようにしたので、コア側では常に 0 を当てる。
+   ページ側で持ち上げたい場合だけ .signup-page .auth-side{--auth-side-pad-b:…} のように要素へ直接指定する。 */
 .auth-page--split::before { display: none; }       /* 楕円 blob 廃止 */
 .auth-page--split { overflow: visible; }            /* /signup の sticky .flow-header を殺さない（blob が無いので安全） */
-.auth-side { position: relative; background-color: var(--deep); overflow: hidden; }
-.auth-side > img { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; object-fit: cover; object-position: 50% 40%; }
+/* 地は --deep。画像が未着・失敗のときにベタ一色の板に見えないよう、上に極薄の縦グラデだけ重ねる
+   （画像が届けば > img がこの地を覆うので無関係になる）。 */
+.auth-side { position: relative; background-color: var(--deep); overflow: hidden;
+  background-image: linear-gradient(180deg, rgba(255,255,255,.07), rgba(20,35,92,0) 46%); }
+.auth-side > img { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; object-fit: cover; object-position: 50% 40%;
+  color: transparent; font-size: 0; }
 /* 下部 40% のグラデ。白抜き文字はこの不透明側にだけ置く */
 .auth-side::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 40%; pointer-events: none;
   background: linear-gradient(180deg, rgba(20,35,92,0), rgba(20,35,92,.75)); }
@@ -325,11 +355,46 @@
 @media (min-width: 860px) {
   .auth-page--split > main { display: grid; grid-template-columns: minmax(0,46fr) minmax(0,54fr);
     min-height: calc(100dvh - var(--auth-bar-h, 68px)); }
-  .auth-page--split > main > .auth-side { grid-column: 1; grid-row: 1; }
+  /* 左カラムの地を「行の実高ぶん」敷く。.auth-side 自身はビューポート高の sticky なので、
+     ページがビューポートより高い /operator/signup（1425px）や /login（1094px）では
+     カラムの地が y=899（＝ビューポート下端）で切れ、その下のフォーム左側が白地のまま残る
+     （ラウンド3 指摘。全画面キャプチャでは特に明白で、印刷・sticky 非対応環境では実害になる）。
+     .auth-side を stretch させる案は取らない — 1 行コピー（.auth-side__line）が下端＝
+     ページ最下部へ落ちてファーストビューから消え、ラウンド2 で入れた「1 行が視界から出ない」設計が壊れるため。
+     地は main の background ではなく ::before で敷く。/signup は signup.css:62 の
+     `.signup-page > main{background:#fff}` が「レイヤー無しはレイヤー有りに常に勝つ」ため
+     どんな特異度でも上書きできず、main の背景では 4 ページのうち /signup だけ効かない（実測）。
+     ::before なら別ボックスなので main 自身の地の上に載る。
+     grid-column:1/grid-row:1 を .auth-side と共有し、DOM 順で先＝下に敷かれる。
+     main の子は 4 ページとも [aside.auth-side, .auth-wrap|.flow-wrap] の 2 つで、
+     どちらも明示配置済みのため自動配置はずれない（実測）。 */
+  .auth-page--split > main::before { content: ""; grid-column: 1; grid-row: 1;
+    align-self: stretch; justify-self: stretch; background: var(--deep); }
+  /* 左カラムはビューポート高に固定（sticky）。フォームが長い /signup でも 1 行が視界から出ない。
+     sticky の祖先に overflow を書かないこと（.auth-page--split{overflow:visible} が前提）。 */
+  .auth-page--split > main > .auth-side { grid-column: 1; grid-row: 1; position: sticky; align-self: start;
+    top: var(--auth-bar-h, 68px); height: calc(100dvh - var(--auth-bar-h, 68px)); }
   .auth-page--split > main > .auth-wrap, .auth-page--split > main > .flow-wrap { grid-column: 2; grid-row: 1; align-self: center; width: 100%; }
+  /* 固定フッター（.flow-footer 実測 87px）の下に最終行（同意文・信頼行）が入り込まないよう、
+     フォーム列の下余白をフッター実高＋約30px まで広げる。列は align-self:center なので
+     余白は中身を上へ逃がす向きに効き、最下部までスクロールしたときの逃げ代にもなる。 */
+  .auth-page--split > main > .flow-wrap { padding-bottom: 116px; }
+  /* 固定フッター（/signup の .flow-footer）は全幅だと白帯が左の濃紺カラムを横切り、
+     その下の .auth-side__line を隠す（実測コントラスト 1.0）。グリッドの 46fr/54fr に合わせて
+     フォーム列の上だけに敷く。列内で敷くので .inner の中央も「次へ」の中心と一致する。 */
+  .auth-page--split > .flow-footer { left: 46%; }
+  /* 上でフッターを左カラムから外したので、1 行を持ち上げる必要はなくなる（ページ側の値を無効化） */
+  .auth-page--split > main > .auth-side { --auth-side-pad-b: 0px; }
 }
 @media (max-width: 859px) {
   /* カード上部の 21:9 帯（最大 160px）に畳む。フォームは常に無地面 */
   .auth-side { aspect-ratio: 21/9; max-height: 160px; }
+  .auth-side { --auth-side-pad-b: 0px; }
+  /* BRIEF §1.10「859px 以下は帯に畳み、文字は非表示」に戻す。ラウンド2 では
+     「無文字だと情報量ゼロの濃紺スラブになる」として 1 行だけ残していたが、
+     その 1 行は実測 17.94px で、§1.2 の「帯上に置ける文字は 24px 以上の見出しのみ」に反する。
+     いまは画像が未生成で地が濃紺のため AA を満たしているが、su-side/li-side/ol-side/os-side が入ると
+     写真の明部に 17.94px の白抜きが乗り AA を割る（cover なので明部の位置は制御できない）。
+     帯は aspect-ratio:21/9・max-height:160px の無文字のまま残し、文言はカード側の見出しが担う。 */
   .auth-side__line { display: none; }
 }

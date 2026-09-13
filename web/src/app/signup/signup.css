@@ -31,7 +31,9 @@
 .signup-page .done-screen { text-align: center; padding: 52px 20px; }
 .signup-page .done-circle { width: 88px; height: 88px; border-radius: 50%; background: var(--pale); margin: 0 auto 24px; display: flex; align-items: center; justify-content: center; }
 .signup-page .done-circle .ic { font-size: 46px; color: var(--blue); stroke-width: 1.7; }
-.signup-page .done-screen h2 { font-size: 24px; color: var(--navy); margin-bottom: 12px; }
+/* 完了画面の見出しも h1（ラウンド3 a11y 指摘。表示中ステップの見出しを h1 に揃え、
+   どのステップでもページに h1 がちょうど 1 つある状態にする）。見えは従来どおり。 */
+.signup-page .done-screen h1 { font-size: 24px; color: var(--navy); margin-bottom: 12px; }
 .signup-page .done-screen p { font-size: 15px; color: var(--body-soft); line-height: 1.85; margin-bottom: 32px; }
 .signup-page .done-actions { display: flex; flex-direction: column; gap: 12px; align-items: center; }
 
@@ -47,9 +49,19 @@
    ============================================================ */
 
 /* --auth-bar-h: split グリッドの高さ計算に使う上部バー高。/signup の上部バーは .auth-bar ではなく
-   sticky の .flow-header（上下 14px ＋ ステッパー 24px ＋ ラベル行）＝実測 67px。
-   --auth-side-pad-b: 左カラムの1行が固定の .flow-footer（約 77px）に潜らないよう持ち上げる量。 */
-.signup-page { --auth-bar-h: 67px; --auth-side-pad-b: 80px; }
+   sticky の .flow-header（上下 14px ＋ ステッパー 24px ＋ ラベル行 ＋ 下罫 1px）＝実測 75.67px。
+   67px のままだと左カラム（height:calc(100dvh - var(--auth-bar-h))）がビューポート下端を
+   8.67px はみ出し、初回描画で .auth-side__line の下端が画面外に落ちる（ラウンド2 実測）。
+   --auth-side-pad-b は指定しない: 固定フッターはコア §1.10 でフォーム列（left:46%）に閉じ込めてあり、
+   左カラムに重ならないので 1 行を持ち上げる必要がない（コアが 0 を当てる）。 */
+.signup-page { --auth-bar-h: 76px; }
+
+/* フォーム面の地は全幅で白（左カラムは .auth-side が --deep を塗る）。
+   他の認証3ページ（.auth-page{background:#fff}）と地を揃え、--pale の大面積使用を減らす。
+   .form-card は 1px var(--line) を持つので、白地でも入力欄の境界は沈まない。
+   859px 以下も同じ白にする: モバイルだけ .flow-bg の --pale が残ると、同じページが
+   画面幅で別物に見え、/login・/operator/* と地が割れる（ラウンド2 指摘）。 */
+.signup-page > main { background: #fff; }
 
 /* フォーム直上の注記（登録＝業者への通知ではない、という実装事実） */
 .signup-page .signup-lead-note {
@@ -68,10 +80,25 @@
 .signup-page .flow-step.done .fs-dot { background: var(--deep); border-color: var(--deep); color: #fff; }
 .signup-page .flow-step.done + .flow-step::before { background: var(--deep); }
 
-/* 「次へ」はカード直下（固定フッター）で幅いっぱいに。戻るは内容幅のまま */
+/* 「次へ」はカード直下（固定フッター）で幅いっぱいに。戻るは内容幅のまま。
+   .inner の max-width は共通の 600px のまま触らない: /signup のフォーム列は .auth-wrap(440px) ではなく
+   .flow-wrap(600px) なので、列内で中央寄せされた 600px がカードと同じ幅・同じ中心になる。 */
 .signup-page .flow-footer .inner { justify-content: stretch; }
 .signup-page .btn-flow-back { flex: 0 0 auto; }
 .signup-page .btn-flow-next { flex: 1; justify-content: center; }
 
 /* 信頼行はカードの外側（フロー全体の脚）に置くので上余白を足す */
 .signup-page .flow-wrap > .trust-row { margin-top: 28px; }
+
+/* 860px 以上: 初回描画でカード直下の 1 行（「すでにアカウントをお持ちの方はログイン」）が
+   固定フッターの上端にちょうど半分かかり、文字が水平に切れて見える
+   （ラウンド2 実測 1440x900: 行 800–826 / フッター上端 813.3）。
+   列の上余白とカード周りの間隔を合計 26px 詰めて、その行をバーの上へ逃がす。
+   続く信頼行はバーより下から始まるので、画面に「切れた行」が残らない。
+   最下部までスクロールしたときの逃げ代（padding-bottom:116px）はコア §1.10 の値をそのまま使う。
+   このブロックは同じ詳細度の既存宣言より後に置くこと（margin-bottom を上書きするため）。 */
+@media (min-width: 860px) {
+  .signup-page > main > .flow-wrap { padding-top: 12px; }
+  .signup-page .signup-lead-note { margin-bottom: 18px; }
+  .signup-page .form-card { margin-bottom: 10px; }
+}

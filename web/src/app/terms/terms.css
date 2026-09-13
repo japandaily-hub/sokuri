@@ -7,11 +7,22 @@
    ============================================================ */
 
 /* 帯直下の見出しブロック（法務3ページ共通の構え）。本文 .legal-body と同じ 760px 幅に揃える */
+/* r3 レビュー: 見出し下の罫が /terms・/privacy だけ額いっぱい（frame 幅）に引かれ、
+   /legal（.doc-meta の下罫＝本文カラム幅）と揃っていなかった。3ページを続けて開いても
+   同じテンプレートに見えるよう、罫を本文カラム幅（.legal-body と同じ 760px − 左右 24px）
+   に合わせる。罫は ::after で content box 幅に引く（__inner に border を置くと
+   padding の外側 = 760px になり本文の h2 罫より 24px ずつ広くなる）。 */
 .legal-head {
-  padding: clamp(26px, 4vw, 44px) 0 clamp(20px, 3vw, 30px);
-  border-bottom: 1px solid var(--line);
+  padding: clamp(26px, 4vw, 44px) 0 0;
 }
 .legal-head__inner { max-width: 760px; margin: 0 auto; padding-inline: 24px; }
+.legal-head__inner::after {
+  content: "";
+  display: block;
+  height: 1px;
+  background: var(--line);
+  margin-top: clamp(20px, 3vw, 30px);
+}
 .legal-head__en {
   display: block; font-family: var(--en); font-weight: 600; font-size: 11.5px;
   letter-spacing: .18em; text-transform: uppercase; color: var(--primary);
@@ -77,8 +88,13 @@
 .legal-body p { font-size: 14.5px; color: var(--body); line-height: 1.9; margin-bottom: 12px; }
 .legal-body ul, .legal-body ol { padding-left: 20px; margin-bottom: 14px; }
 .legal-body li { font-size: 14.5px; color: var(--body); line-height: 1.85; margin-bottom: 5px; }
+/* 本文の補足注記。r3 レビュー: --warm/--gold は状態色であり、本文の補足に使うと
+   青・濃紺で統一した面に暖色が1点だけ混じる（/legal 冒頭の補足は淡青＋青罫）。
+   法務3ページで注記の地と罫を1種（淡青＋青の左罫）に揃える。
+   ※赤の .important（重要な注意）と /legal の .doc-warn（取引上の警告）は
+     状態色の本来の用法なのでそのまま。 */
 .legal-body .note {
-  background: var(--warm); border-left: 3px solid var(--gold); padding: 14px 18px;
+  background: var(--pale-2); border-left: 3px solid var(--blue); padding: 14px 18px;
   border-radius: 0; font-size: 13.5px; color: var(--body); margin: 20px 0; line-height: 1.8;
 }
 .legal-body .important {
@@ -95,6 +111,14 @@
   font-size: 13.5px; font-weight: 600; color: var(--blue); margin-bottom: 32px;
 }
 .back-link:hover { text-decoration: underline; }
+/* r1 レビュー: 戻り導線がタブ切替の直下・第1条の直前にあると、タブと本文の間に挟まって
+   目次にも戻り導線にもならない。読み終えた位置＝各ペインの末尾に置く（/privacy と同位置）。 */
+.legal-foot {
+  margin-top: clamp(40px, 5vw, 56px);
+  padding-top: 24px;
+  border-top: 1px solid var(--line-soft);
+}
+.legal-foot .back-link { margin-bottom: 0; }
 
 @media (max-width: 560px) {
   .legal-head__inner, .terms-points__inner { padding-inline: 18px; }

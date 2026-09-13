@@ -230,7 +230,8 @@ export default function FaqPage() {
   function selectCat(cat: "all" | CatKey) {
     setActiveCat(cat);
     setQuery("");
-    setOpenKeys(new Set(DEFAULT_OPEN_KEYS));
+    // QA M6 是正: ここで既定3問へ戻すと、利用者が閉じた回答がカテゴリを切り替えるたびに
+    // 開き直る。既定は初回マウント（useState の初期値）だけに適用し、切替では開閉を触らない。
   }
 
   function toggle(key: string) {
@@ -398,7 +399,7 @@ export default function FaqPage() {
                         <div className="faq-section-icon">
                           <Ic name={c.icon} />
                         </div>
-                        <div className="faq-section-title">{c.label}</div>
+                        <h2 className="faq-section-title">{c.label}</h2>
                         <span className="faq-section-count">{c.items.length}問</span>
                       </div>
                       <div className="faq-list">
@@ -424,7 +425,7 @@ export default function FaqPage() {
               <div className="faq-contact">
                 <Ic name="chat" />
                 <div className="faq-contact-info">
-                  <h3>解決しない場合はお問い合わせください</h3>
+                  <h2>解決しない場合はお問い合わせください</h2>
                   <p>フォームよりお気軽にご連絡ください。通常3営業日以内にご返信いたします。</p>
                   <Link href="/contact" className="btn btn-primary faq-contact-btn">
                     お問い合わせフォームへ

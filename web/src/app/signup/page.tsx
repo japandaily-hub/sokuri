@@ -11,7 +11,7 @@ import { signIn } from "next-auth/react";
 import { signupUser, toDisplayMessage, clearRedirectLoopStorage } from "@/lib/katadzuke-api";
 import { Ic } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
-import { PasswordField, LineAuthButton } from "@/components/kdz/auth";
+import { PasswordField, LineAuthButton, TrustRow } from "@/components/kdz/auth";
 import "./signup.css";
 
 const STEPS = ["アカウント", "プロフィール", "確認", "完了"];
@@ -22,37 +22,6 @@ function pwScore(v: string): number {
   if (/[A-Z]/.test(v) || /[0-9]/.test(v)) s++;
   if (/[^A-Za-z0-9]/.test(v) || v.length >= 12) s++;
   return s;
-}
-
-/** 信頼行。共通 TrustRow（components/kdz/auth.tsx）の3項目めは「無料ログイン」だが、
- *  無料なのはログインではなく登録・利用そのものなので、認証2ページではこちらを使う
- *  （BRIEF §2.5「無料ログイン」→「登録・利用は無料」）。/login と同一の文言・並び。 */
-function AuthTrustRow() {
-  return (
-    <div className="trust-row">
-      <div className="trust-item">
-        <svg viewBox="0 0 24 24">
-          <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z" />
-          <path d="M9 12l2 2 4-4" />
-        </svg>
-        SSL暗号化通信
-      </div>
-      <div className="trust-item">
-        <svg viewBox="0 0 24 24">
-          <rect x="5" y="11" width="14" height="10" rx="2" />
-          <path d="M8 11V7a4 4 0 018 0v4" />
-        </svg>
-        プライバシー保護
-      </div>
-      <div className="trust-item">
-        <svg viewBox="0 0 24 24">
-          <circle cx="12" cy="12" r="9" />
-          <path d="M9 12l2 2 4-4" />
-        </svg>
-        登録・利用は無料
-      </div>
-    </div>
-  );
 }
 
 function PwStrength({ value }: { value: string }) {
@@ -168,7 +137,11 @@ export default function SignupPage() {
           {/* STEP 1 */}
           {step === 1 && (
             <div>
-              <h2 className="step-title">アカウントを作成する</h2>
+              {/* ラウンド3 指摘（a11y）: このページには h1 が 1 つも無く、見出しナビゲーションで
+                  ページの主題に到達できなかった。ステップは同時に 1 つしか描画されないので、
+                  表示中のステップ見出しを h1 にすれば常に h1 はページに 1 つだけになる。
+                  .step-title はクラス指定（katazuke-pages.css:154）なので見えは変わらない。 */}
+              <h1 className="step-title">アカウントを作成する</h1>
               <p className="step-desc">メールアドレスとパスワードを設定してください。LINEで続けることもできます。</p>
 
               {/* 登録＝業者への通知ではないこと（実装事実）を、入力を始める前に置く */}
@@ -193,7 +166,7 @@ export default function SignupPage() {
                 </div>
                 <div className={`field${errs.pw ? " has-error" : ""}`}>
                   <label htmlFor="inp-pw">パスワード<span className="req">必須</span></label>
-                  <PasswordField id="inp-pw" value={password} onChange={setPassword} placeholder="8文字以上" autoComplete="new-password" />
+                  <PasswordField id="inp-pw" value={password} onChange={setPassword} placeholder="8文字以上" autoComplete="new-password" minLength={8} />
                   <PwStrength value={password} />
                   {errs.pw && <div className="field-error">{errs.pw}</div>}
                 </div>
@@ -213,7 +186,7 @@ export default function SignupPage() {
           {/* STEP 2 */}
           {step === 2 && (
             <div>
-              <h2 className="step-title">プロフィールを設定する</h2>
+              <h1 className="step-title">プロフィールを設定する</h1>
               <p className="step-desc">出品時にお呼びする、お名前を入力してください。</p>
 
               <div className="form-card">
@@ -234,7 +207,7 @@ export default function SignupPage() {
           {/* STEP 3 */}
           {step === 3 && (
             <div>
-              <h2 className="step-title">内容を確認して<br />登録を完了してください</h2>
+              <h1 className="step-title">内容を確認して<br />登録を完了してください</h1>
               <p className="step-desc">以下の内容で登録します。よろしければ同意の上、登録ボタンを押してください。</p>
 
               {authErr && (
@@ -274,7 +247,7 @@ export default function SignupPage() {
           {step === 4 && (
             <div className="done-screen">
               <div className="done-circle"><Ic name="check-circle" /></div>
-              <h2>登録が完了しました。</h2>
+              <h1>登録が完了しました。</h1>
               <p>カタヅケへようこそ。<br />さっそく不用品を撮って、<br />業者からの見積もりを受け取りましょう。</p>
               <p style={{ fontSize: 12.5, color: "var(--body-soft)" }}>対応エリアは東京・千葉・埼玉・神奈川です。</p>
               <div className="done-actions">
@@ -286,7 +259,7 @@ export default function SignupPage() {
             </div>
           )}
 
-          {step < 4 && <AuthTrustRow />}
+          {step < 4 && <TrustRow />}
         </div>
       </main>
 

@@ -8,17 +8,36 @@
 .vendors-page {
   min-height: 100vh;
   background: var(--pale-2);
+  /* r2 M6 是正: 本文が短い状態（読込中・エラー・空）でも末尾フッターが画面下に着くよう縦フレックス。
+     overflow は書かない（sticky 祖先の規約）。 */
+  display: flex;
+  flex-direction: column;
 }
+.vendors-page > main { flex: 1 0 auto; }
 /* 額装のない BARE ページ。左右の余白は .bare-scope の --container-pad と揃え、
    .sp-bleed の負マージンが正確に端まで届くようにする。 */
 .vendors-page .vendors-wrap {
   max-width: 720px;
   margin: 0 auto;
-  padding: clamp(24px, 4vw, 40px) var(--container-pad, 24px) 100px;
+  /* r2 M6 是正: 末尾に1行フッターを置いたので、底の 100px の空白は過剰だった */
+  padding: clamp(24px, 4vw, 40px) var(--container-pad, 24px) clamp(48px, 7vw, 80px);
 }
 
-/* 帯（.hero-band--headline）は veil .55 のため見出しだけ。注記は帯の下の白面に置く */
-.vendors-page .vd-band .hero-band__copy h1 { margin: 0; }
+/* r2 M5 是正: 帯が見出し1語だけで濃紺面が空に見えたので eyebrow ＋ h1 ＋ 1行リードにする。
+   帯の上の eyebrow は既定色（--primary）だと濃紺に沈む。.deep-band は --lime を使うが
+   あれはベタ地の話で、写真＋veil .65 の上では --lime は 13px で AA に届かないため白＋白罫に、
+   リードは 16px なので幅を詰めて 1〜2 行に収める。veil は既定の .65（--headline を外した）。 */
+.vendors-page .vd-band .hero-band__copy h1 { margin: 12px 0 0; }
+.vendors-page .vd-band .eyebrow { color: #fff; }
+.vendors-page .vd-band .eyebrow::before { background: #fff; }
+.vendors-page .vd-band .hero-band__copy p { max-width: 30em; }
+/* r2 M3 是正: 帯だけ .container（--maxw 1240）で、帯下の本文は .vendors-wrap（720）。
+   見出しの左端と本文の左端が別の線に乗っていたので、帯側を本文のラッパー幅に合わせる。
+   .vendors-wrap と同じ 720px ＋ 左右 24px（border-box）なので左端が一本の線に揃う。 */
+.vendors-page .vd-band .hero-band__copy {
+  max-width: 720px;
+  padding-inline: 24px;
+}
 
 .vendors-page .vendors-back {
   display: inline-flex;
@@ -29,7 +48,9 @@
   color: var(--body-soft);
   text-decoration: none;
   transition: color .2s;
-  margin-bottom: 16px;
+  /* r3 是正: 帯の直下（ページ先頭の最初の導線）が「戻る」だったため、末尾の .vd-join の下へ
+     移した。ページはリード文から始まる。上の帯と離して 1 行の出口として置く。 */
+  margin-top: 20px;
 }
 .vendors-page .vendors-back:hover { color: var(--blue); }
 .vendors-page .vendors-back svg {
@@ -42,41 +63,50 @@
   line-height: 1.9;
   color: var(--body);
   margin: 0 0 24px;
+  /* r2 L7 是正: ラッパ幅いっぱい（約48字）だと 40〜60代には行頭を追いにくい。
+     40em ≒ 40字で折り返し、本文の左端はラッパのまま保つ。 */
+  max-width: 40em;
 }
 
-/* 読み込み中・エラーの見分けが付くよう、面と罫線を分ける */
+/* r2 M6 是正: 読込中・エラーが「淡青の地に通知1個が浮くだけ」でページが途中で切れて見えた。
+   3状態（読込中／エラー／空）を .vd-empty と同じ寸法感の白面シェルに入れて面を揃える。
+   状態の区別は面ではなく中身（スピナー／Notice の注意色／画像＋見出し）が担う。 */
+/* r3 是正: 上下 72px ＋ 行間で、文言とボタンだけの中身の上下に 100px 近い無地が残り、
+   掲載前の画面が作りかけに見えた。シェルの内パディングを詰めて中身を 1 つの塊にし、
+   余白は塊の外（margin-bottom）へ寄せる。 */
 .vendors-page .vd-state {
   background: #fff;
-  border: 1px solid var(--line);
-  padding: clamp(24px, 4vw, 36px) 20px;
-  margin-bottom: 24px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: clamp(26px, 4vw, 40px) 20px;
+  margin-bottom: 32px;
+  text-align: center;
 }
-/* 読込中は面も罫線も持たせない（空状態＝白面／エラー＝注意色の枠 と見分けが付くように） */
+/* シェル幅いっぱいに広がると読みづらいので、中身だけ本文幅で中央に置く */
+.vendors-page .vd-state > * {
+  max-width: 34em;
+  margin-inline: auto;
+}
+/* Notice は自前の面（注意色）を持つ箱なので、箱は中央・文面は左揃えに戻す */
+.vendors-page .vd-state--error > :first-child { text-align: left; }
 .vendors-page .vd-state--loading {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  border: 0;
-  background: transparent;
 }
 .vendors-page .vd-state-text {
   margin: 0;
   font-size: 13px;
   color: var(--body-soft);
 }
-/* エラーは Notice（注意色）が面を持つので、外枠は重ねず導線だけを添える */
-.vendors-page .vd-state--error {
-  border: 0;
-  background: transparent;
-  padding: 0;
-}
 .vendors-page .vd-state-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 16px;
-  margin-top: 16px;
+  justify-content: center;
+  gap: 12px 16px;
+  margin-top: 18px;
 }
 .vendors-page .vd-state-link {
   font-size: 13px;
@@ -86,12 +116,13 @@
   text-underline-offset: 3px;
 }
 
-/* 空状態（意図された空）: 白面を上下のヘアラインで区切る */
+/* 空状態（意図された空）: 白面を上下のヘアラインで区切る。
+   r3 是正: 上下パディングは .vd-state と同じ値に詰め、余白は塊の外に寄せる。 */
 .vendors-page .vd-empty {
   background: #fff;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
-  padding: clamp(32px, 6vw, 56px) 0;
+  padding: clamp(26px, 4vw, 40px) 0;
   text-align: center;
 }
 .vendors-page .vd-empty-fig {
@@ -105,14 +136,16 @@
   font-size: clamp(18px, 2.4vw, 24px);
   color: var(--ink);
   line-height: 1.6;
-  margin: 0 0 12px;
+  /* r2 L7 是正: 見出し・本文・ボタンの間隔が近く、視線の停止点が無かった。
+     見出し直下 16px / 本文とボタン群の間 32px と差をつけて塊を分ける。 */
+  margin: 0 0 16px;
 }
 .vendors-page .vd-empty-note {
   font-size: 14px;
   line-height: 1.9;
   color: var(--body);
   max-width: 34em;
-  margin: 0 auto clamp(24px, 4vw, 32px);
+  margin: 0 auto 32px;
 }
 .vendors-page .vd-empty-cta {
   display: flex;
@@ -240,8 +273,42 @@
   text-underline-offset: 3px;
 }
 
+/* ============ 末尾の1行フッター ============
+   r2 M6 是正: BARE ページで共通 .footer を持たないため、本文が短いとページが
+   途中で切れて見えた。規約・法務3本と運営者表記だけの最小フッターで底を作る。
+   共通 .footer を複製せず、このページ専用の最小構成にとどめる。 */
+.vendors-page .vd-foot {
+  flex: none;
+  border-top: 1px solid var(--line);
+  background: #fff;
+}
+.vendors-page .vd-foot-inner {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 18px 24px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 20px;
+  font-family: var(--ui);
+  font-size: 12.5px;
+  color: var(--body-soft);
+}
+.vendors-page .vd-foot-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+}
+.vendors-page .vd-foot-links a {
+  color: var(--body-soft);
+  text-decoration: none;
+}
+.vendors-page .vd-foot-links a:hover { color: var(--blue); text-decoration: underline; text-underline-offset: 3px; }
+
 @media (max-width: 560px) {
   .vendors-page .vendor-row { flex-direction: column; gap: 10px; }
   .vendors-page .vendor-row-link { align-self: flex-start; }
   .vendors-page .vd-empty-cta .btn { width: 100%; }
+  .vendors-page .vd-state-actions .btn { width: 100%; }
 }

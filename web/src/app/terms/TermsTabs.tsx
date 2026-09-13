@@ -50,8 +50,8 @@ export function TermsTabs() {
       {/* ユーザー利用規約 */}
       <div className={`legal-pane${tab === "user" ? " active" : ""}`} id="pane-user">
         <div className="legal-body">
-          <Link href="/" className="back-link">← トップへ戻る</Link>
-
+          {/* 戻り導線はペイン末尾（.legal-foot）に置く。タブ直下・第1条の直前に挟むと
+              タブと本文を分断してしまうため（r1 レビュー）。/privacy と同位置。 */}
           <h2>第1条　適用</h2>
           <p>
             本規約は、カタヅケ運営事務局（以下「当社」）が提供する不用品買取マッチングサービス「カタヅケ」（以下「本サービス」）を利用するすべてのユーザーに適用されます。本サービスをご利用いただくことで、本規約に同意したものとみなします。
@@ -121,14 +121,16 @@ export function TermsTabs() {
           <p>
             本規約は日本法に準拠します。本サービスに関する紛争については、東京地方裁判所を第一審の専属的合意管轄裁判所とします。
           </p>
+          <div className="legal-foot">
+            <Link href="/" className="back-link">← トップへ戻る</Link>
+          </div>
         </div>
       </div>
 
       {/* 業者利用規約 */}
       <div className={`legal-pane${tab === "biz" ? " active" : ""}`} id="pane-biz">
         <div className="legal-body">
-          <Link href="/business" className="back-link">← 業者ページへ戻る</Link>
-
+          {/* 戻り導線はペイン末尾（.legal-foot）に置く（r1 レビュー） */}
           <h2>第1条　適用</h2>
           <p>
             本規約は、カタヅケ運営事務局（以下「当社」）が提供する本サービスに登録業者として参加するすべての事業者（以下「業者」）に適用されます。
@@ -199,6 +201,9 @@ export function TermsTabs() {
           <p>
             本規約は日本法に準拠します。本サービスに関する紛争については、東京地方裁判所を第一審の専属的合意管轄裁判所とします。
           </p>
+          <div className="legal-foot">
+            <Link href="/business" className="back-link">← 業者ページへ戻る</Link>
+          </div>
         </div>
       </div>
     </>

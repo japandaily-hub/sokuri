@@ -54,10 +54,8 @@ export default function PrivacyPage() {
       {/* privacy-body: terms.css も同名の .legal-body を定義しており、クライアント遷移で
           両方の CSS が同居する。v2 で変えた条見出し・表の規則だけは特異度で確実に勝たせる。 */}
       <div className="legal-body privacy-body">
-        <Link href="/" className="back-link">
-          ← トップへ戻る
-        </Link>
-
+        {/* 戻り導線は本文末尾（.legal-foot）に置く。第1条の直前に挟むと本文の流れを
+            断ち切るため（r1 レビュー）。/terms も同じ位置に揃えてある。 */}
         <h2>第1条　基本方針</h2>
         <p>
           カタヅケ運営事務局（以下「当社」）は、ユーザーおよび登録業者（以下総称して「利用者」）の個人情報の保護を重要な責務と捉え、個人情報の保護に関する法律（以下「個人情報保護法」）その他の関連法令を遵守し、適切な取り扱いに努めます。
@@ -152,6 +150,12 @@ export default function PrivacyPage() {
           <br />
           神奈川県横浜市（詳細な住所は、請求があれば遅滞なく開示します）
         </p>
+
+        <div className="legal-foot">
+          <Link href="/" className="back-link">
+            ← トップへ戻る
+          </Link>
+        </div>
       </div>
     </main>
   );
