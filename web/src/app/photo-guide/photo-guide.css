@@ -1,60 +1,32 @@
 /* ============================================================
-   カタヅケ — 撮影ガイド（撮影ガイド.html の <style> 固有分のみ）
-   共通クラス（.container/.section/.eyebrow/.btn/.btn-white 等）は
-   katazuke.css / katazuke-pages.css に存在するため再定義しない。
+   カタヅケ — 撮影ガイド（このページでしか使わないクラスのみ）
+   共通クラス（.container/.section/.eyebrow/.btn/.hero-band/.img-frame/
+   .media-split/.deep-band/.sp-bleed 等）は katazuke.css / katazuke-pages.css
+   に存在するため再定義しない。
+   モバイル閾値は共有部品と同じ 859px に揃える。
    ============================================================ */
 
-/* ヒーロー — トップページと同じ明るいトーン */
-.guide-hero {
-  background:
-    radial-gradient(58% 52% at 84% -10%, rgba(82,126,82, .22) 0%, rgba(82,126,82, 0) 60%),
-    radial-gradient(30% 30% at -6% -8%, rgba(244, 112, 63, .13) 0%, rgba(244, 112, 63, 0) 70%),
-    linear-gradient(180deg, var(--pale) 0%, var(--pale) 58%);
-  padding: clamp(56px, 8vw, 96px) 0 clamp(44px, 6vw, 72px);
-  position: relative;
-  overflow: hidden;
-}
-.guide-hero::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(ellipse 70% 60% at 110% 10%, rgba(82,126,82, .10) 0%, transparent 60%);
-}
-.guide-hero .container { position: relative; z-index: 1; }
-/* 明るいヒーロー背景上でチップの輪郭が沈みやすいため、トップページの .hero-eyebrow と
-   同じ体感（白地+境界線+影）を与える */
-.guide-hero .eyebrow { background: #fff; border: 1px solid var(--line); box-shadow: var(--shadow-s); }
-.guide-hero h1 {
-  font-size: clamp(28px, 4vw, 44px);
-  color: var(--navy);
-  margin-top: 16px;
-  line-height: 1.3;
-}
-.guide-hero p {
-  color: var(--body);
-  font-size: clamp(14px, 1.6vw, 17px);
-  margin-top: 16px;
-  max-width: 520px;
-  line-height: 1.85;
-}
-.guide-hero .cta-wrap {
-  margin-top: 28px;
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
+/* ---------- ヒーロー（.hero-band--tall.hero-band--pos-r） ---------- */
+/* 帯の上は白抜き。eyebrow の罫だけ --lime に落として見出しの邪魔をしない */
+.pg-hero .eyebrow { color: #fff; }
+.pg-hero .eyebrow::before { background: var(--lime); }
+.pg-hero .hero-band__copy { padding-block: clamp(32px, 5vw, 56px); }
+.pg-hero .hero-band__copy h1 { margin-top: 16px; }
+.pg-hero .hero-band__copy p { max-width: 34em; }
+.pg-hero .hero-cta { margin-top: clamp(20px, 3vw, 30px); }
 
-/* メリットバー */
+/* ---------- 帯の直下：4チェック行（白地・上下ヘアライン） ---------- */
 .merit-bar {
-  background: var(--pale);
+  background: #fff;
+  border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
-  padding: 20px 0;
+  padding: 18px 0;
 }
 .merit-bar-inner {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: clamp(24px, 4vw, 56px);
+  gap: clamp(18px, 4vw, 56px);
   flex-wrap: wrap;
 }
 .merit-chip {
@@ -63,12 +35,13 @@
   gap: 10px;
   font-size: 14px;
   font-weight: 600;
-  color: var(--navy);
+  color: var(--ink);
 }
-.merit-chip .ic { width: 20px; height: 20px; color: var(--blue); stroke-width: 2; flex-shrink: 0; }
+.merit-chip .ic { width: 20px; height: 20px; color: var(--primary); stroke-width: 2; flex-shrink: 0; }
 
-/* ガイドセクション */
-.guide-section { margin-bottom: 64px; }
+/* ---------- ガイドセクション ---------- */
+.guide-section { margin-bottom: clamp(56px, 8vw, 88px); }
+.guide-section:last-child { margin-bottom: 0; }
 .guide-section-head {
   display: flex;
   align-items: flex-start;
@@ -78,9 +51,9 @@
 .guide-section-num {
   width: 44px; height: 44px;
   border-radius: 0;
-  background: var(--blue);
+  background: var(--primary);
   color: #fff;
-  font-family: var(--head);
+  font-family: var(--en-display);
   font-size: 18px;
   font-weight: 400;
   display: flex;
@@ -88,188 +61,193 @@
   justify-content: center;
   flex-shrink: 0;
 }
-.guide-section-head h2 { font-size: clamp(18px, 2.5vw, 24px); color: var(--navy); margin-bottom: 4px; }
+.guide-section-head h2 { font-size: clamp(18px, 2.5vw, 24px); color: var(--ink); margin-bottom: 4px; }
 .guide-section-head p { font-size: 14px; color: var(--body-soft); line-height: 1.7; }
 
-/* 比較カード（良い例・悪い例） */
+/* 注記（買取額の決まり方・写り込み注意）。打消しは本文と同一視野に置く */
+.pg-note {
+  margin-top: 16px;
+  font-family: var(--ui);
+  font-size: 13.5px;
+  color: var(--body-soft);
+  line-height: 1.8;
+}
+
+/* ---------- 良い例 / 避けたい例（同サイズ 1:1・枠は両方 1px --line） ---------- */
 .compare-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-bottom: 20px;
+  gap: clamp(16px, 3vw, 28px);
 }
-.compare-card {
-  border-radius: var(--radius-s);
-  overflow: hidden;
-  border: 1.5px solid var(--line);
-}
-.compare-card.good { border-color: var(--primary-l); }
-.compare-card.bad { border-color: #fca5a5; }
-.compare-photo {
-  aspect-ratio: 4/3;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 56px;
-  position: relative;
-  overflow: hidden;
-}
-.compare-photo.good-bg { background: linear-gradient(135deg, var(--pale) 0%, var(--pale) 100%); }
-.compare-photo.bad-bg { background: linear-gradient(135deg, #fff5f5 0%, var(--warm) 100%); }
-.compare-photo-illus {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-}
-.compare-photo-illus svg { max-width: 100%; height: auto; }
+.compare-card { min-width: 0; }
 .compare-label {
-  padding: 12px 16px;
+  padding: 14px 0 0;
   display: flex;
   align-items: flex-start;
   gap: 10px;
 }
 .compare-label-badge {
-  font-size: 11px;
-  font-weight: 400;
-  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--ui);
+  padding: 4px 12px;
   border-radius: 0;
   flex-shrink: 0;
-  margin-top: 2px;
-}
-.good .compare-label-badge { background: var(--pale); color: var(--primary-d); }
-.bad .compare-label-badge { background: #fee2e2; color: var(--danger); }
-.compare-label p { font-size: 13.5px; color: var(--ink); line-height: 1.6; }
-
-/* ポイントカード */
-.point-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 14px;
-}
-.point-card {
-  border: 1.5px solid var(--line);
-  border-radius: var(--radius-s);
-  padding: 18px 16px;
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
-}
-.point-ic {
-  width: 36px; height: 36px;
-  border-radius: 0;
-  background: var(--pale);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--blue);
-}
-.point-ic .ic { width: 18px; height: 18px; stroke-width: 2; }
-.point-body h4 { font-size: 14px; font-weight: 600; color: var(--navy); margin-bottom: 4px; }
-.point-body p { font-size: 13px; color: var(--body-soft); line-height: 1.7; }
-
-/* ステップ */
-.shoot-steps {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.shoot-step {
-  display: flex;
-  gap: 16px;
-  align-items: flex-start;
-  padding: 18px 20px;
-  background: var(--pale);
-  border: 1.5px solid var(--line);
-  border-radius: var(--radius-s);
-}
-.shoot-step-num {
-  width: 32px; height: 32px;
-  border-radius: 50%;
-  background: var(--blue);
-  color: #fff;
-  font-family: var(--head);
-  font-size: 14px;
-  font-weight: 400;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.shoot-step-body h4 { font-size: 14.5px; font-weight: 600; color: var(--navy); margin-bottom: 5px; }
-.shoot-step-body p { font-size: 13.5px; color: var(--body-soft); line-height: 1.75; max-width: 46em; }
-.shoot-step-body .tip {
-  margin-top: 8px;
-  font-size: 12.5px;
-  color: var(--blue);
-  background: var(--pale);
-  border-radius: 0;
-  padding: 6px 10px;
+  color: var(--ink);
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
-.shoot-step-body .tip .ic { width: 14px; height: 14px; flex-shrink: 0; }
+.compare-label-badge.is-good { background: var(--marker); }
+.compare-label-badge.is-bad { background: var(--pale-2); border: 1px solid var(--line); }
+.compare-label p { font-size: 13.5px; color: var(--body); line-height: 1.8; }
 
-/* カテゴリ別ガイド */
+/* ---------- 撮影の手順（番号＋文のリスト。画像なし） ---------- */
+.limit-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.limit-chip {
+  font-family: var(--ui);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line);
+  padding: 6px 12px;
+}
+.shoot-steps {
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+.shoot-step {
+  display: flex;
+  gap: clamp(14px, 2.5vw, 24px);
+  align-items: flex-start;
+  padding: clamp(18px, 2.6vw, 26px) 0;
+  border-bottom: 1px solid var(--line);
+}
+.shoot-step-num {
+  font-family: var(--en-display);
+  font-size: 20px;
+  line-height: 1.4;
+  color: var(--primary);
+  letter-spacing: .04em;
+  flex-shrink: 0;
+  min-width: 2.4em;
+}
+.shoot-step-body h4 { font-size: 15px; font-weight: 600; color: var(--ink); margin-bottom: 5px; }
+.shoot-step-body p { font-size: 14px; color: var(--body); line-height: 1.85; max-width: 46em; }
+.shoot-step-body .tip {
+  margin-top: 10px;
+  font-family: var(--ui);
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--primary-d);
+  border-left: 2px solid var(--marker);
+  padding-left: 10px;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.shoot-step-body .tip .ic { width: 14px; height: 14px; flex-shrink: 0; margin-top: 3px; }
+
+/* ---------- ポイント（zig-zag の .media-split ×3 ＋ ヘアラインリスト） ---------- */
+.tip-splits {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(36px, 6vw, 72px);
+}
+.tip-copy { min-width: 0; }
+.tip-num {
+  display: block;
+  font-family: var(--en-display);
+  font-size: 18px;
+  color: var(--primary);
+  letter-spacing: .06em;
+  margin-bottom: 10px;
+}
+.tip-copy h4 { font-family: var(--serif); font-size: clamp(17px, 2.2vw, 21px); font-weight: 600; color: var(--ink); margin-bottom: 10px; }
+.tip-copy p { font-size: 14.5px; color: var(--body); line-height: 1.95; }
+
+.point-list {
+  list-style: none;
+  margin-top: clamp(36px, 6vw, 64px);
+  border-top: 1px solid var(--line);
+}
+.point-item {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+.point-ic {
+  width: 36px; height: 36px;
+  border-radius: 0;
+  background: var(--pale-2);
+  border: 1px solid var(--line);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+}
+.point-ic .ic { width: 18px; height: 18px; stroke-width: 2; }
+.point-body h4 { font-size: 14.5px; font-weight: 600; color: var(--ink); margin-bottom: 4px; }
+.point-body p { font-size: 13.5px; color: var(--body-soft); line-height: 1.8; }
+
+/* ---------- カテゴリ別チェックリスト（行頭に既存 3D アイコン 56px） ---------- */
 .cat-guide-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
+  gap: clamp(14px, 2vw, 20px);
 }
 .cat-guide-card {
-  border: 1.5px solid var(--line);
-  border-radius: var(--radius-s);
-  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  padding: 18px;
+  min-width: 0;
 }
 .cat-guide-card .cat-name {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13.5px;
+  gap: 12px;
+  font-size: 14px;
   font-weight: 600;
-  color: var(--navy);
-  margin-bottom: 10px;
+  color: var(--ink);
+  margin-bottom: 12px;
 }
-.cat-guide-card .cat-name .cat-ic {
-  width: 28px; height: 28px;
-  border-radius: 0;
-  background: var(--pale);
-  color: var(--blue);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.cat-guide-card .cat-name .cat-ic .ic { width: 16px; height: 16px; }
+/* .img-frame--pale .img-frame--1x1 を 56px に固定（512px 素材・2倍規約の範囲外だが既存アイコン） */
+.cat-guide-card .cat-ic { width: 56px; flex: 0 0 56px; }
 .cat-guide-card ul { padding-left: 16px; }
-.cat-guide-card li { font-size: 12.5px; color: var(--body-soft); line-height: 1.7; margin-bottom: 3px; }
+.cat-guide-card li { font-size: 12.5px; color: var(--body-soft); line-height: 1.8; margin-bottom: 3px; }
 
-/* CTA */
-.guide-cta {
-  background: linear-gradient(120deg, var(--pale) 0%, var(--warm) 100%);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: clamp(32px, 4vw, 48px);
-  text-align: center;
-  margin-top: 64px;
-  position: relative;
-  overflow: hidden;
+/* ---------- 末尾 CTA（濃紺帯＋直下の白面にボタン） ---------- */
+.pg-cta-band { text-align: center; }
+.pg-cta-band h2 { font-size: clamp(20px, 2.8vw, 30px); margin-top: 14px; }
+.pg-cta-band p { font-size: 14.5px; line-height: 1.95; margin-top: 14px; }
+.pg-cta-actions { background: #fff; padding: clamp(28px, 4vw, 44px) 0; }
+.pg-cta-btns {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
 }
-.guide-cta-inner { position: relative; z-index: 1; }
-.guide-cta h2 { font-size: clamp(20px, 2.5vw, 28px); color: var(--navy); margin-bottom: 12px; }
-.guide-cta p { font-size: 14.5px; color: var(--body-soft); margin-bottom: 24px; line-height: 1.8; }
-.guide-cta .btn-wrap { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
 
-/* レスポンシブ */
-@media (max-width: 680px) {
-  .compare-grid { grid-template-columns: 1fr; }
-  .point-grid { grid-template-columns: 1fr; }
+/* ---------- レスポンシブ（共有部品と同じ 859px で折り返す） ---------- */
+@media (max-width: 859px) {
+  .compare-grid { grid-template-columns: 1fr; gap: clamp(24px, 6vw, 36px); }
   .cat-guide-grid { grid-template-columns: repeat(2, 1fr); }
+  .shoot-step { gap: 12px; }
+  .shoot-step-num { font-size: 17px; min-width: 2.2em; }
+  .pg-cta-btns .btn { width: 100%; }
 }
-@media (max-width: 480px) {
+@media (max-width: 560px) {
+  .merit-bar-inner { justify-content: flex-start; gap: 12px 20px; }
+  .merit-chip { font-size: 13px; }
   .cat-guide-grid { grid-template-columns: 1fr; }
+  .guide-section-num { width: 38px; height: 38px; font-size: 16px; }
 }

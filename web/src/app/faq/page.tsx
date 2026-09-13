@@ -1,8 +1,10 @@
 "use client";
 
-/** よくある質問（FAQ）。デザインハンドオフ「よくある質問.html」をピクセル忠実に再実装。
+/** よくある質問（FAQ）。デザインハンドオフ「よくある質問.html」由来。
  *  検索・カテゴリフィルタ・アコーディオン開閉を伴うためクライアントコンポーネント。
- *  ヘッダー/フッターは共通 SiteChrome が付与するため、ここでは <main id="main"> の中身のみを描画する。 */
+ *  ヘッダー/フッターは共通 SiteChrome が付与するため、ここでは <main id="main"> の中身のみを描画する。
+ *  ビジュアル再構築 v2（BRIEF §2.4）: 画像はヒーロー帯 1 本だけ。Q&A の間に帯を入れない
+ *  （打消し表示の近接を壊さないため）。サイドバーは既存の線アイコン .ic に一本化する。 */
 
 import "./faq.css";
 import { useMemo, useState } from "react";
@@ -43,7 +45,7 @@ const CATEGORIES: Category[] = [
   {
     key: "privacy",
     label: "個人情報・安心",
-    icon: "shield",
+    icon: "lock",
     items: [
       {
         q: "しつこい営業電話は来ますか？",
@@ -68,7 +70,7 @@ const CATEGORIES: Category[] = [
   {
     key: "item",
     label: "品物・査定",
-    icon: "spark",
+    icon: "zoom",
     items: [
       {
         q: "1点だけでも依頼できますか？",
@@ -133,11 +135,15 @@ const CATEGORIES: Category[] = [
   },
 ];
 
-/** カテゴリタブ（「すべて」を先頭に追加） */
+/** カテゴリタブ（「すべて」を先頭に追加）。モバイルの横スクロールチップと
+ *  デスクトップのサイドバーの両方がこの一覧を使う（導線を一本化する）。 */
 const CAT_TABS: { key: "all" | CatKey; label: string; icon: IcName }[] = [
-  { key: "all", label: "すべて", icon: "box" },
+  { key: "all", label: "すべて", icon: "menu" },
   ...CATEGORIES.map((c) => ({ key: c.key, label: c.label, icon: c.icon })),
 ];
+
+/** 既定で開いておく Q&A（BRIEF §2.4 #3: 「個人情報・安心」の3問）。 */
+const DEFAULT_OPEN_KEYS = ["privacy-0", "privacy-1", "privacy-2"];
 
 /** 検索用にカテゴリをまたいだ全 Q&A をフラット化。プレーンテキストは検索一致判定に使う。 */
 type FlatItem = { q: string; a: React.ReactNode; catLabel: string; text: string };
@@ -176,7 +182,8 @@ function highlight(text: string, kw: string): React.ReactNode {
   );
 }
 
-/** 1件のアコーディオン項目 */
+/** 1件のアコーディオン項目。開閉は grid-template-rows（0fr→1fr）で伸ばすため、
+ *  max-height の固定値で長文が途中で切れることがない。 */
 function FaqItem({
   q,
   a,
@@ -197,7 +204,7 @@ function FaqItem({
         <span className="faq-q-text">{q}</span>
         <Ic name="chev" className="faq-chev" />
       </button>
-      <div className="faq-a" style={{ maxHeight: open ? 600 : 0 }}>
+      <div className="faq-a">
         <div className="faq-a-inner">
           {catLabel ? <em className="faq-a-cat">{catLabel}</em> : null}
           {a}
@@ -210,8 +217,8 @@ function FaqItem({
 export default function FaqPage() {
   const [activeCat, setActiveCat] = useState<"all" | CatKey>("all");
   const [query, setQuery] = useState("");
-  // 開閉状態は "<scope>-<index>" をキーに管理（同セクション内で1件のみ開く）
-  const [openKey, setOpenKey] = useState<string | null>(null);
+  // 開閉状態は "<scope>-<index>" をキーに管理（複数同時に開ける。既定は「個人情報・安心」の3問）
+  const [openKeys, setOpenKeys] = useState<Set<string>>(() => new Set(DEFAULT_OPEN_KEYS));
 
   const kw = query.trim();
 
@@ -223,33 +230,39 @@ export default function FaqPage() {
   function selectCat(cat: "all" | CatKey) {
     setActiveCat(cat);
     setQuery("");
-    setOpenKey(null);
+    setOpenKeys(new Set(DEFAULT_OPEN_KEYS));
   }
 
   function toggle(key: string) {
-    setOpenKey((prev) => (prev === key ? null : key));
+    setOpenKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   }
 
   const visibleCats =
     activeCat === "all" ? CATEGORIES : CATEGORIES.filter((c) => c.key === activeCat);
 
-  // サイドリンクのハイライト対象（all のときは先頭=費用をアクティブ表示／デザイン準拠）
-  const sideActive: CatKey = activeCat === "all" ? "fee" : activeCat;
-
   return (
     <main id="main" className="faq-page">
-      {/* ヒーロー */}
-      <section className="faq-hero">
-        <div className="container">
-          <span className="eyebrow">よくある質問</span>
+      {/* ヒーロー写真帯（.site-frame の内側いっぱいに届く）。
+          --headline のため帯に置くのは h1（見出し）と白地の検索窓だけ。本文・注記は帯の下に置く。 */}
+      <section className="hero-band hero-band--slim hero-band--pos-l hero-band--headline faq-hero">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/img/v2/faq-band.webp"
+          width={1920}
+          height={1080}
+          alt=""
+          loading="eager"
+          fetchPriority="high"
+          decoding="async"
+        />
+        <div className="hero-band__veil" aria-hidden="true" />
+        <div className="container hero-band__copy">
           <h1>よくある質問</h1>
-          <p>
-            ご利用前の疑問にまとめてお答えします。解決しない場合は
-            <Link href="/contact" style={{ color: "var(--blue)" }}>
-              お問い合わせ
-            </Link>
-            ください。
-          </p>
           <div className="faq-search-wrap">
             <input
               type="text"
@@ -276,7 +289,18 @@ export default function FaqPage() {
               </svg>
             )}
           </div>
-          <p className="search-hint">
+        </div>
+      </section>
+
+      {/* 帯の直下の白面（リード文・検索結果件数） */}
+      <div className="faq-lead">
+        <div className="container">
+          <p>
+            ご利用前の疑問にまとめてお答えします。解決しない場合は
+            <Link href="/contact">お問い合わせ</Link>
+            ください。
+          </p>
+          <p className="search-hint" aria-live="polite">
             {kw
               ? hits && hits.length > 0
                 ? `${hits.length}件見つかりました`
@@ -284,9 +308,9 @@ export default function FaqPage() {
               : ""}
           </p>
         </div>
-      </section>
+      </div>
 
-      {/* カテゴリタブ */}
+      {/* カテゴリタブ（859px 以下のみ。デスクトップはサイドバーに一本化） */}
       <div className="faq-cats">
         <div className="container">
           <div className="faq-cats-inner">
@@ -308,29 +332,23 @@ export default function FaqPage() {
       <div className="section">
         <div className="container">
           <div className="faq-body">
-            {/* サイドナビ */}
+            {/* サイドナビ（行頭は既存の線アイコン .ic。3D アイコンは使わない） */}
             <aside className="faq-side">
               <div className="faq-side-title">カテゴリ</div>
-              {CATEGORIES.map((c) => (
+              {CAT_TABS.map((t) => (
                 <button
-                  key={c.key}
+                  key={t.key}
                   type="button"
-                  className={`faq-side-link${!kw && sideActive === c.key ? " active" : ""}`}
-                  onClick={() => selectCat(c.key)}
+                  className={`faq-side-link${!kw && activeCat === t.key ? " active" : ""}`}
+                  onClick={() => selectCat(t.key)}
                 >
-                  <Ic name={c.icon} />
-                  {c.label}
+                  <Ic name={t.icon} />
+                  {t.label}
                 </button>
               ))}
-              <div
-                style={{
-                  marginTop: 28,
-                  paddingTop: 20,
-                  borderTop: "1px solid var(--line-soft)",
-                }}
-              >
+              <div className="faq-side-foot">
                 <div className="faq-side-title">解決しない場合</div>
-                <Link href="/contact" className="faq-side-link" style={{ color: "var(--blue)" }}>
+                <Link href="/contact" className="faq-side-link faq-side-link--link">
                   <Ic name="chat" />
                   お問い合わせ
                 </Link>
@@ -351,7 +369,7 @@ export default function FaqPage() {
                           q={highlight(it.q, kw)}
                           a={it.a}
                           catLabel={it.catLabel}
-                          open={openKey === key}
+                          open={openKeys.has(key)}
                           onToggle={() => toggle(key)}
                         />
                       );
@@ -365,9 +383,7 @@ export default function FaqPage() {
                       <p>
                         「{kw}」に一致する質問が見つかりませんでした。
                         <br />
-                        <Link href="/contact" style={{ color: "var(--blue)" }}>
-                          お問い合わせ
-                        </Link>
+                        <Link href="/contact">お問い合わせ</Link>
                         からご質問ください。
                       </p>
                     </div>
@@ -393,7 +409,7 @@ export default function FaqPage() {
                               key={key}
                               q={it.q}
                               a={it.a}
-                              open={openKey === key}
+                              open={openKeys.has(key)}
                               onToggle={() => toggle(key)}
                             />
                           );
@@ -410,11 +426,7 @@ export default function FaqPage() {
                 <div className="faq-contact-info">
                   <h3>解決しない場合はお問い合わせください</h3>
                   <p>フォームよりお気軽にご連絡ください。通常3営業日以内にご返信いたします。</p>
-                  <Link
-                    href="/contact"
-                    className="btn btn-primary"
-                    style={{ marginTop: 12, display: "inline-flex" }}
-                  >
+                  <Link href="/contact" className="btn btn-primary faq-contact-btn">
                     お問い合わせフォームへ
                     <Ic name="arrow" />
                   </Link>

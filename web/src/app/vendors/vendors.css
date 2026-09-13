@@ -1,18 +1,24 @@
 /* ============================================================
    登録業者一覧ページ 固有CSS
-   共通クラス（.container .section .btn .field 等）は再定義しない。
+   共通クラス（.container .section .btn .field .hero-band .img-frame .sp-bleed 等）は
+   再定義しない。katazuke.css / katazuke-pages.css の定義をそのまま使う。
    全クラスを .vendors-page 配下にスコープし他ページへ漏れないようにする。
    ============================================================ */
 
 .vendors-page {
   min-height: 100vh;
-  background: var(--pale);
+  background: var(--pale-2);
 }
+/* 額装のない BARE ページ。左右の余白は .bare-scope の --container-pad と揃え、
+   .sp-bleed の負マージンが正確に端まで届くようにする。 */
 .vendors-page .vendors-wrap {
   max-width: 720px;
   margin: 0 auto;
-  padding: 24px 20px 100px;
+  padding: clamp(24px, 4vw, 40px) var(--container-pad, 24px) 100px;
 }
+
+/* 帯（.hero-band--headline）は veil .55 のため見出しだけ。注記は帯の下の白面に置く */
+.vendors-page .vd-band .hero-band__copy h1 { margin: 0; }
 
 .vendors-page .vendors-back {
   display: inline-flex;
@@ -31,28 +37,88 @@
   fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
 }
 
-.vendors-page .vendors-title {
+.vendors-page .vendors-lead {
+  font-size: 14px;
+  line-height: 1.9;
+  color: var(--body);
+  margin: 0 0 24px;
+}
+
+/* 読み込み中・エラーの見分けが付くよう、面と罫線を分ける */
+.vendors-page .vd-state {
+  background: #fff;
+  border: 1px solid var(--line);
+  padding: clamp(24px, 4vw, 36px) 20px;
+  margin-bottom: 24px;
+}
+/* 読込中は面も罫線も持たせない（空状態＝白面／エラー＝注意色の枠 と見分けが付くように） */
+.vendors-page .vd-state--loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  background: transparent;
+}
+.vendors-page .vd-state-text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--body-soft);
+}
+/* エラーは Notice（注意色）が面を持つので、外枠は重ねず導線だけを添える */
+.vendors-page .vd-state--error {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+.vendors-page .vd-state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+.vendors-page .vd-state-link {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* 空状態（意図された空）: 白面を上下のヘアラインで区切る */
+.vendors-page .vd-empty {
+  background: #fff;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: clamp(32px, 6vw, 56px) 0;
+  text-align: center;
+}
+.vendors-page .vd-empty-fig {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto clamp(24px, 4vw, 32px);
+}
+.vendors-page .vd-empty-title {
   font-family: var(--head);
   font-weight: 600;
-  font-size: 22px;
-  letter-spacing: .04em;
-  margin: 0 0 6px;
+  font-size: clamp(18px, 2.4vw, 24px);
+  color: var(--ink);
+  line-height: 1.6;
+  margin: 0 0 12px;
 }
-.vendors-page .vendors-lead {
-  font-size: 13px;
-  line-height: 1.8;
-  color: var(--body-soft);
-  margin: 0 0 20px;
+.vendors-page .vd-empty-note {
+  font-size: 14px;
+  line-height: 1.9;
+  color: var(--body);
+  max-width: 34em;
+  margin: 0 auto clamp(24px, 4vw, 32px);
 }
-.vendors-page .vendors-loading {
+.vendors-page .vd-empty-cta {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
-  padding: 48px 0;
-}
-.vendors-page .vendors-empty {
-  font-size: 13px;
-  color: var(--body-soft);
-  padding: 24px 0;
+  gap: 14px;
 }
 
 .vendors-page .vendors-list {
@@ -71,7 +137,7 @@
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 0;
-  padding: 16px 18px;
+  padding: 18px 20px;
 }
 .vendors-page .vendor-row-main { min-width: 0; flex: 1; }
 .vendors-page .vendor-row-head {
@@ -83,18 +149,20 @@
 .vendors-page .vendor-row-name {
   font-family: var(--head);
   font-weight: 600;
-  font-size: 16px;
+  font-size: 18px;
   color: var(--ink);
   text-decoration: none;
+  overflow-wrap: anywhere;
 }
 .vendors-page .vendor-row-name:hover { color: var(--blue); text-decoration: underline; }
 .vendors-page .vendor-tag {
   display: inline-block;
+  font-family: var(--ui);
   font-size: 11px;
   letter-spacing: .06em;
   padding: 2px 8px;
-  border: 1px solid var(--green, #2f7d4f);
-  color: var(--green, #2f7d4f);
+  border: 1px solid var(--line);
+  color: var(--body-soft);
   background: #fff;
   border-radius: 0;
   white-space: nowrap;
@@ -102,27 +170,39 @@
 .vendors-page .vendor-tag-blue { border-color: var(--blue); color: var(--blue); }
 
 .vendors-page .vendor-row-rating {
-  margin-top: 6px;
+  margin-top: 8px;
   display: flex;
   align-items: baseline;
   gap: 6px;
   font-size: 13px;
 }
-.vendors-page .vendor-stars { color: #d4a017; letter-spacing: .05em; }
-.vendors-page .vendor-rating-num { font-weight: 600; font-variant-numeric: tabular-nums; }
-.vendors-page .vendor-rating-count { color: var(--body-soft); font-size: 12px; }
+.vendors-page .vendor-stars { color: var(--gold-text); letter-spacing: .05em; }
+.vendors-page .vendor-rating-num { font-family: var(--ui); font-weight: 600; font-variant-numeric: tabular-nums; }
+.vendors-page .vendor-rating-count { font-family: var(--ui); color: var(--body-soft); font-size: 12px; }
+
+/* 星は装飾。スクリーンリーダーには「5段階中 4.2」を読ませる */
+.vendors-page .vd-sr {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
 
 .vendors-page .vendor-row-quote {
-  margin: 8px 0 0;
+  margin: 10px 0 0;
   font-size: 13px;
   line-height: 1.7;
   color: var(--ink);
-  border-left: 3px solid var(--line);
-  padding-left: 10px;
+  border-left: 1px solid var(--line);
+  padding-left: 12px;
   overflow-wrap: anywhere;
 }
 .vendors-page .vendor-row-meta {
-  margin: 8px 0 0;
+  margin: 10px 0 0;
+  font-family: var(--ui);
   font-size: 12px;
   color: var(--body-soft);
   display: flex;
@@ -140,7 +220,28 @@
   white-space: nowrap;
 }
 
+/* 末尾の業者登録導線 */
+.vendors-page .vd-join {
+  margin-top: clamp(40px, 6vw, 64px);
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+.vendors-page .vd-join-text {
+  margin: 0 0 10px;
+  font-size: 14px;
+  line-height: 1.9;
+  color: var(--body);
+}
+.vendors-page .vd-join-link {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 @media (max-width: 560px) {
   .vendors-page .vendor-row { flex-direction: column; gap: 10px; }
   .vendors-page .vendor-row-link { align-self: flex-start; }
+  .vendors-page .vd-empty-cta .btn { width: 100%; }
 }

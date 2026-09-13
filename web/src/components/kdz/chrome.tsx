@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Ic } from "./Icons";
 import { KdzLogo } from "./Logo";
@@ -56,10 +59,26 @@ export function SiteFooter() {
   );
 }
 
-/** モバイル追従CTA（デザイン .dock）。860px 以下で表示。 */
-export function Dock({ href = "/login?callbackUrl=%2Fcreate", label = "LINEではじめる" }: { href?: string; label?: string }) {
+/**
+ * モバイル追従CTA（デザイン .dock）。860px 以下で表示。
+ * ヒーロー CTA（.hero-cta）が画面内にある間は同じ導線が二重に見えるため .dock--hidden で隠す（BRIEF §1.8）。
+ * 対象が無いページでは常時表示。表示/非表示のみなので reduced-motion でも動作させる。
+ * ルート遷移でリセットするため SiteChrome 側は key={pathname} で再マウントする（effect 内 setState を避ける）。
+ */
+export function Dock({ href = "/login?callbackUrl=%2Fcreate", label = "LINEで無料ではじめる" }: { href?: string; label?: string }) {
+  const [heroCtaInView, setHeroCtaInView] = useState(false);
+  useEffect(() => {
+    const target = document.querySelector(".hero-cta");
+    if (!target || !("IntersectionObserver" in window)) return;
+    const io = new IntersectionObserver(
+      (entries) => setHeroCtaInView(entries[entries.length - 1].isIntersecting),
+      { threshold: 0 }
+    );
+    io.observe(target);
+    return () => io.disconnect();
+  }, []);
   return (
-    <div className="dock">
+    <div className={`dock${heroCtaInView ? " dock--hidden" : ""}`}>
       <Link href={href} className="btn btn-line">
         <Ic name="chat" />
         {label}

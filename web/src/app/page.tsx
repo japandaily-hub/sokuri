@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Ic, type IcName } from "@/components/kdz/Icons";
-import { Reveal, PhImg, FaqAccordion } from "@/components/kdz/interactions";
+import { Ic } from "@/components/kdz/Icons";
+import { Reveal, FaqAccordion } from "@/components/kdz/interactions";
 import { KdzLogo } from "@/components/kdz/Logo";
+import "./katazuke-top.css";
 
 /** 対応カテゴリ（3Dアイコンで表現） */
 const CATEGORIES: { img: string; name: string; ex: string }[] = [
@@ -28,18 +29,27 @@ const FAQ_ITEMS = [
   { q: "訪問買取に不安があります", a: "参加するのは、古物商許可番号の登録を必須とし、運営が許可証を確認した登録事業者のみ。訪問による買取には特定商取引法（訪問購入）の規定が適用される場合があり、クーリング・オフの可否は品目や契約に至った経緯によって異なります。業者から交付される書面をご確認ください。" },
 ];
 
-const STEPS: { n: string; en: string; icon: IcName; h: string; p: string; img: string }[] = [
-  { n: "1", en: "SHOOT", icon: "camera", h: "1点ずつ撮る", p: "家じゅうの不用品を1点ずつ撮影。写真と品目をまとめて登録するだけで出品完了です。", img: "step-1.png" },
-  { n: "2", en: "WAIT", icon: "scan", h: "査定が届く", p: "買取業者があなたの出品した商品に入札。あなたは待つだけで査定が集まります。", img: "step-2.png" },
-  { n: "3", en: "CHOOSE", icon: "scale", h: "査定を見比べて選ぶ", p: "届いた査定を一覧で見比べて、納得の1社を選ぶだけ。選ぶまで、業者から連絡は来ません。", img: "step-3.png" },
-  { n: "4", en: "DONE", icon: "truck", h: "引き取りに来てもらう", p: "成立した業者がまとめて引き取りに。玄関先で渡すだけで、片付け完了です。", img: "step-4.png" },
+/** ご利用の流れ。図版は既存 3D シリーズ（/img/real/*.webp）を 220px の白枠で大きく使う */
+const STEPS: { n: string; en: string; h: string; p: string; img: string }[] = [
+  { n: "1", en: "SHOOT", h: "1点ずつ撮る", p: "家じゅうの不用品を1点ずつ撮影。写真と品目をまとめて登録するだけで出品完了です。", img: "how-camera" },
+  { n: "2", en: "WAIT", h: "査定が届く", p: "買取業者があなたの出品した商品に入札。あなたは待つだけで査定が集まります。", img: "how-trend" },
+  { n: "3", en: "CHOOSE", h: "査定を見比べて選ぶ", p: "届いた査定を一覧で見比べて、納得の1社を選ぶだけ。選ぶまで、業者から連絡は来ません。", img: "how-crown" },
+  { n: "4", en: "DONE", h: "引き取りに来てもらう", p: "成立した業者がまとめて引き取りに。玄関先で渡すだけで、片付け完了です。", img: "how-truck" },
 ];
 
-const SCENES: { tag: string; tagIcon: IcName; h: string; p: string; img: string; icon: IcName }[] = [
-  { tag: "断捨離", tagIcon: "spark", h: "暮らしを身軽に", p: "使わない物をまとめて手放し、すっきりした部屋に。1点からでも、まとめてでも。", img: "p-female.png", icon: "spark" },
-  { tag: "引越し", tagIcon: "truck", h: "新居に持っていかない物を", p: "荷造りのついでに撮るだけ。運ぶ前にまとめて買取・回収できます。", img: "p-moving.png", icon: "truck" },
-  { tag: "実家じまい", tagIcon: "people", h: "家族で、まとめて整理", p: "量が多く判断に迷う実家の整理も、撮ってまとめれば業者がまとめて査定。", img: "p-senior.png", icon: "house" },
-  { tag: "遺品整理", tagIcon: "shield", h: "ていねいに、まとめて", p: "値がつかない物も含めてまとめて回収。気持ちの整理も、無理なく進められます。", img: "p-ihin.png", icon: "shield" },
+/** 利用シーン。人物写真は撤去し、場面を示す静物（1:1）に置換 */
+const SCENES: { tag: string; h: string; p: string; img: string }[] = [
+  { tag: "断捨離", h: "暮らしを身軽に", p: "使わない物をまとめて手放し、すっきりした部屋に。1点からでも、まとめてでも。", img: "top-scene-danshari" },
+  { tag: "引越し", h: "新居に持っていかない物を", p: "荷造りのついでに撮るだけ。運ぶ前にまとめて買取・回収できます。", img: "top-scene-moving" },
+  { tag: "実家じまい", h: "家族で、まとめて整理", p: "量が多く判断に迷う実家の整理も、撮ってまとめれば業者がまとめて査定。", img: "top-scene-jikka" },
+  { tag: "遺品整理", h: "ていねいに、まとめて", p: "値がつかない物も含めてまとめて回収。気持ちの整理も、無理なく進められます。", img: "top-scene-ihin" },
+];
+
+/** よくある不安。人物実写のストック写真を撤去し、静物 1:1 の連作に置換 */
+const WORRIES: { h: string; p: string; img: string }[] = [
+  { h: "出品も発送も、正直めんどう", p: "撮影・採寸・説明文・梱包・発送・購入者対応。フリマは手間が多く、量が多いほど踏み出せません。", img: "top-worry-listing" },
+  { h: "営業電話が、一斉にかかってくる", p: "一括査定に申し込んだ途端、多数の業者から電話が殺到。応対だけで疲れ、結局決めきれません。", img: "top-worry-phone" },
+  { h: "そもそも、何から手をつければ", p: "売れる物・売れない物、仕分けの基準がわからない。家まるごととなると、考えるだけで腰が重くなります。", img: "top-worry-boxes" },
 ];
 
 const delayOf = (i: number) => ((i % 3 || undefined) as 1 | 2 | undefined);
@@ -51,7 +61,6 @@ export default function HomePage() {
         <div className="site-frame">
         {/* ============ HERO ============ */}
         <section className="hero" id="top">
-          <div className="hero-blob" aria-hidden="true" />
           <div className="container hero-grid">
             <div className="hero-copy">
               <h1>
@@ -70,16 +79,15 @@ export default function HomePage() {
                 <li><span className="tb"><img src="/img/real/check.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span>連絡は選んだ1社だけ</li>
                 {/* eslint-enable @next/next/no-img-element */}
               </ul>
+              {/* 4ステップ帯は番号＋文字のみ（アイコンは「ご利用の流れ」で大きく1箇所に集める） */}
               <div className="hero-how">
-                {/* eslint-disable @next/next/no-img-element */}
-                <div className="hw-step"><span className="hw-n">1</span><img src="/img/real/how-camera.webp" alt="" width={512} height={512} loading="lazy" decoding="async" className="hw-ic" /><span>撮る</span></div>
+                <div className="hw-step"><span className="hw-n">1</span><span>撮る</span></div>
                 <Ic name="arrow" className="hw-arr" />
-                <div className="hw-step"><span className="hw-n">2</span><img src="/img/real/how-trend.webp" alt="" width={512} height={512} loading="lazy" decoding="async" className="hw-ic" /><span>業者が競う</span></div>
+                <div className="hw-step"><span className="hw-n">2</span><span>業者が競う</span></div>
                 <Ic name="arrow" className="hw-arr" />
-                <div className="hw-step"><span className="hw-n">3</span><img src="/img/real/how-crown.webp" alt="" width={512} height={512} loading="lazy" decoding="async" className="hw-ic" /><span>見比べて選ぶ</span></div>
+                <div className="hw-step"><span className="hw-n">3</span><span>見比べて選ぶ</span></div>
                 <Ic name="arrow" className="hw-arr" />
-                <div className="hw-step"><span className="hw-n">4</span><img src="/img/real/how-truck.webp" alt="" width={512} height={512} loading="lazy" decoding="async" className="hw-ic" /><span>引き取り完了</span></div>
-                {/* eslint-enable @next/next/no-img-element */}
+                <div className="hw-step"><span className="hw-n">4</span><span>引き取り完了</span></div>
               </div>
               <div className="hero-cta">
                 <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-line btn-lg">
@@ -89,8 +97,11 @@ export default function HomePage() {
               </div>
             </div>
             <div className="hero-figure">
-              <figure className="hero-photo ph-wrap">
-                <PhImg src="/img/p-hero.png" alt="自宅のリビングで、家じゅうの不用品をまとめてスマホで撮影する女性" label="p-hero.png" icon="camera" imgStyle={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              <figure className="hero-photo sp-bleed">
+                <div className="img-frame img-frame--2x3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/img/v2/top-hero.webp" width={900} height={1350} alt="床に並べた不用品をスマートフォンで1点ずつ撮影する手元（イメージ）" loading="eager" fetchPriority="high" decoding="async" />
+                </div>
               </figure>
             </div>
           </div>
@@ -100,10 +111,10 @@ export default function HomePage() {
         <section className="assure" aria-label="サービスの安心ポイント">
           <div className="container">
             {/* eslint-disable @next/next/no-img-element */}
-            <div className="assure-item"><span className="ai"><img src="/img/real/assure-shield.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span><span><b>登録事業者のみ</b><span>古物商許可を確認</span></span></div>
-            <div className="assure-item"><span className="ai"><img src="/img/real/assure-lock.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span><span><b>連絡先は成立後に開示</b><span>氏名・電話は渡りません</span></span></div>
-            <div className="assure-item"><span className="ai"><img src="/img/real/assure-phone.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span><span><b>一斉架電なし</b><span>連絡は選んだ1社だけ</span></span></div>
-            <div className="assure-item"><span className="ai"><img src="/img/real/assure-pin.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span><span><b>東京・千葉・埼玉・神奈川</b><span>順次エリア拡大中</span></span></div>
+            <div className="assure-item"><span className="ai img-frame img-frame--1x1 img-frame--pale img-frame--contain"><img src="/img/real/assure-shield.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span><span><b>登録事業者のみ</b><span>古物商許可を確認</span></span></div>
+            <div className="assure-item"><span className="ai img-frame img-frame--1x1 img-frame--pale img-frame--contain"><img src="/img/real/assure-lock.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span><span><b>連絡先は成立後に開示</b><span>氏名・電話は渡りません</span></span></div>
+            <div className="assure-item"><span className="ai img-frame img-frame--1x1 img-frame--pale img-frame--contain"><img src="/img/real/assure-phone.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span><span><b>一斉架電なし</b><span>連絡は選んだ1社だけ</span></span></div>
+            <div className="assure-item"><span className="ai img-frame img-frame--1x1 img-frame--pale img-frame--contain"><img src="/img/real/assure-pin.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span><span><b>東京・千葉・埼玉・神奈川</b><span>順次エリア拡大中</span></span></div>
             {/* eslint-enable @next/next/no-img-element */}
           </div>
         </section>
@@ -117,18 +128,15 @@ export default function HomePage() {
               <p className="sub">「家じゅうを片付けたい」気持ちはあるのに、最初の一歩でつまずく。多くの方が、同じところで止まっています。</p>
             </div>
             <div className="emp-grid">
-              <Reveal as="article" className="emp-card">
-                <div className="emp-photo ph-wrap"><PhImg src="/img/worry-1.png" alt="出品や発送の手間を思って気が重くなる女性" label="worry-1.png" icon="camera" imgStyle={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>
-                <div className="emp-body"><h3>出品も発送も、正直めんどう</h3><p>撮影・採寸・説明文・梱包・発送・購入者対応。フリマは手間が多く、量が多いほど踏み出せません。</p></div>
-              </Reveal>
-              <Reveal as="article" className="emp-card" delay={1}>
-                <div className="emp-photo ph-wrap"><PhImg src="/img/worry-2.png" alt="一括査定の営業電話が一斉にかかってきて不安な女性" label="worry-2.png" icon="phone" imgStyle={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>
-                <div className="emp-body"><h3>営業電話が、一斉にかかってくる</h3><p>一括査定に申し込んだ途端、多数の業者から電話が殺到。応対だけで疲れ、結局決めきれません。</p></div>
-              </Reveal>
-              <Reveal as="article" className="emp-card" delay={2}>
-                <div className="emp-photo ph-wrap"><PhImg src="/img/worry-3.png" alt="物の山を前に、何から手をつけるか迷う女性" label="worry-3.png" icon="box" imgStyle={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>
-                <div className="emp-body"><h3>そもそも、何から手をつければ</h3><p>売れる物・売れない物、仕分けの基準がわからない。家まるごととなると、考えるだけで腰が重くなります。</p></div>
-              </Reveal>
+              {WORRIES.map((w, i) => (
+                <Reveal as="article" className="emp-card" delay={delayOf(i)} key={w.img}>
+                  <div className="emp-photo img-frame img-frame--1x1 sp-bleed">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={`/img/v2/${w.img}.webp`} alt="" width={800} height={800} loading="lazy" decoding="async" />
+                  </div>
+                  <div className="emp-body"><h3>{w.h}</h3><p>{w.p}</p></div>
+                </Reveal>
+              ))}
             </div>
             <div className="turn"><p>カタヅケなら、その「めんどう」を<span className="accent">撮って待つだけ</span>に変えます。</p></div>
           </div>
@@ -147,7 +155,10 @@ export default function HomePage() {
             <div className="steps-grid">
               {STEPS.map((s, i) => (
                 <Reveal as="article" className="step" delay={delayOf(i)} key={s.n}>
-                  <div className="step-photo ph-wrap"><PhImg src={`/img/${s.img}`} alt={s.h} label={s.img} icon={s.icon} imgStyle={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>
+                  <div className="step-photo img-frame img-frame--1x1 img-frame--contain">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={`/img/real/${s.img}.webp`} alt="" width={512} height={512} loading="lazy" decoding="async" />
+                  </div>
                   <div className="step-body">
                     <span className="step-n"><span className="num">{s.n}</span>{s.en}</span>
                     <h3>{s.h}</h3>
@@ -162,7 +173,7 @@ export default function HomePage() {
         {/* ============ 中間CTA ============ */}
         <div className="section-cta">
           <div className="container">
-            <Reveal className="scta-inner">
+            <div className="scta-inner">
               <div className="scta-text">
                 <strong>まず1枚、撮るだけ。<br className="sp-br" />今日から始められます。</strong>
                 <span>登録・査定・お断りまですべて無料</span>
@@ -170,7 +181,7 @@ export default function HomePage() {
               <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-line btn-lg">
                 <Ic name="chat" />LINEで無料ではじめる<Ic name="arrow" />
               </Link>
-            </Reveal>
+            </div>
           </div>
         </div>
 
@@ -179,8 +190,9 @@ export default function HomePage() {
           <span className="vt" aria-hidden="true">まとめて出すほど、有利になる。</span>
           <div className="container">
             <div className="bundle-lead">
-              <Reveal className="bundle-figure ph-wrap">
-                <PhImg src="/img/real/bundle-3d.webp" alt="さまざまな不用品がひとつの箱にまとまり、まとめて1つの価格がつくイメージ" label="bundle-3d.webp" icon="box" imgStyle={{ width: "100%", height: "100%", objectFit: "contain" }} />
+              <Reveal className="bundle-figure img-frame img-frame--contain">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/img/real/bundle-3d.webp" alt="さまざまな不用品がひとつの箱にまとまり、まとめて1つの価格がつくイメージ" width={1536} height={864} loading="lazy" decoding="async" />
               </Reveal>
               <Reveal className="bundle-copy" delay={1}>
                 <span className="eyebrow">まとめ売り</span>
@@ -223,8 +235,9 @@ export default function HomePage() {
               <p className="sub">あなたが出したのは写真だけ。あとは登録業者どうしが、あなたが出品した商品に買取総額で入札し合います。</p>
             </div>
             <div className="auc-grid">
-              <Reveal className="auc-figure ph-wrap">
-                <PhImg src="/img/real/bid-3d.webp" alt="複数の業者が、まとめた不用品に買取総額を提示して競り合うイメージ" label="bid-3d.webp" icon="trend" imgStyle={{ width: "100%", height: "100%", objectFit: "contain" }} />
+              <Reveal className="auc-figure img-frame img-frame--contain">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/img/real/bid-3d.webp" alt="複数の業者が、まとめた不用品に買取総額を提示して競り合うイメージ" width={1536} height={864} loading="lazy" decoding="async" />
               </Reveal>
               <ol className="auc-steps">
                 <li><span className="an">1</span><div><h4>連絡先を伏せて出品内容が届く</h4><p>業者に届くのは、写真・品目・地域（都道府県・市区町村）・住居情報などの出品内容のみ。あなたのお名前・電話・詳細住所は伏せたままです。</p></div></li>
@@ -238,10 +251,11 @@ export default function HomePage() {
         </section>
 
         {/* ============ HANDOVER ============ */}
-        <section className="section">
+        <section className="section handover">
           <div className="container media-split">
-            <Reveal className="media-figure ph-wrap">
-              <PhImg src="/img/handover-new.png" alt="玄関先で、業者スタッフがまとめた品物を受け取る様子" label="handover-new.png" icon="truck" imgStyle={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            <Reveal className="handover-figure img-frame img-frame--3x2 sp-bleed">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/img/v2/top-handover.webp" width={1600} height={1067} alt="玄関先で、まとめた品物を業者に引き渡す場面（イメージ）" loading="lazy" decoding="async" />
             </Reveal>
             <Reveal className="media-copy" delay={1}>
               <span className="eyebrow">引き渡しの流れ</span>
@@ -260,7 +274,7 @@ export default function HomePage() {
         </section>
 
         {/* ============ 利用シーン ============ */}
-        <section className="section bg-pale">
+        <section className="section scenes">
           <div className="container">
             <div className="section-head">
               <span className="eyebrow">こんな時に</span>
@@ -270,7 +284,10 @@ export default function HomePage() {
             <div className="scenes-grid">
               {SCENES.map((s, i) => (
                 <Reveal as="article" className="scene-card" delay={delayOf(i)} key={s.tag}>
-                  <div className="scene-img ph-wrap"><PhImg src={`/img/${s.img}`} alt={s.h} label={s.img} icon={s.icon} imgStyle={{ width: "100%", height: "100%", objectFit: "cover" }} /></div>
+                  <div className="scene-img img-frame img-frame--1x1 img-frame--pale">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={`/img/v2/${s.img}.webp`} alt="" width={800} height={800} loading="lazy" decoding="async" />
+                  </div>
                   <div className="scene-body">
                     <span className="scene-tag">{s.tag}</span>
                     <h3>{s.h}</h3>
@@ -285,39 +302,55 @@ export default function HomePage() {
 
         <div className="site-frame">
         {/* ============ TRUST ============ */}
-        <section className="section" id="trust">
+        <section className="section trust" id="trust">
           <div className="container">
             <div className="section-head">
               <span className="eyebrow">安心の仕組み</span>
               <h2>はじめてでも、<br className="sp-br" />安心して任せられる</h2>
               <p className="sub">「知らない業者は不安」を解消するために。カタヅケは、参加する業者とあなたの情報の扱いに、きちんと線を引いています。</p>
             </div>
-            <div className="trust-grid">
-              <Reveal as="article" className="trust-c">
-                <div className="tc-illus ph-wrap"><PhImg src="/img/real/trust-illus-1.webp" alt="登録事業者を審査・確認するイメージ" label="trust-illus-1.webp" icon="shield" imgStyle={{ width: "100%", height: "100%", objectFit: "contain", padding: 10 }} /></div>
-                <div className="tc-body"><h3>登録制の事業者のみ</h3><p>査定に参加するのは登録された買取事業者だけ。古物営業に必要な古物商許可を、登録時・取引前に確認します。</p></div>
+            <div className="media-split trust-split">
+              <Reveal className="trust-hero img-frame img-frame--contain">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/img/real/trust-illus-1.webp" alt="登録事業者の古物商許可を確認するイメージ" width={1024} height={768} loading="lazy" decoding="async" />
               </Reveal>
-              <Reveal as="article" className="trust-c" delay={1}>
-                <div className="tc-illus ph-wrap"><PhImg src="/img/real/trust-illus-2.webp" alt="連絡先は交渉成立後に開示されるイメージ" label="trust-illus-2.webp" icon="lock" imgStyle={{ width: "100%", height: "100%", objectFit: "contain", padding: 10 }} /></div>
-                <div className="tc-body"><h3>連絡先は成立後に開示</h3><p>査定段階で業者に渡るのは、写真・品目・地域（都道府県・市区町村）・住居情報などの出品内容のみ。お名前や電話番号は業者に渡らず、詳細住所と連絡用のメールアドレスは交渉が成立するまで開示されません。</p></div>
-              </Reveal>
-              <Reveal as="article" className="trust-c" delay={2}>
-                <div className="tc-illus ph-wrap"><PhImg src="/img/real/trust-illus-3.webp" alt="訪問買取に特定商取引法の規定が適用されるイメージ" label="trust-illus-3.webp" icon="check-circle" imgStyle={{ width: "100%", height: "100%", objectFit: "contain", padding: 10 }} /></div>
-                <div className="tc-body"><h3>訪問買取は特定商取引法の対象</h3><p>訪問による買取には特定商取引法（訪問購入）の規定が適用される場合があります。クーリング・オフの可否は、品目（家具・家電等は対象外）や契約に至った経緯（ご自身の依頼で業者が訪問した場合は対象外となることがあります）によって異なります。業者から交付される書面をご確認ください。</p></div>
+              <Reveal className="trust-list" delay={1}>
+                <article className="trust-item trust-item--lead">
+                  <div className="ti-body"><h3>登録制の事業者のみ</h3><p>査定に参加するのは登録された買取事業者だけ。古物営業に必要な古物商許可を、登録時・取引前に確認します。</p></div>
+                </article>
+                <article className="trust-item">
+                  <span className="ti-ic img-frame img-frame--1x1 img-frame--pale img-frame--contain">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/img/real/trust-illus-2.webp" alt="" width={1024} height={768} loading="lazy" decoding="async" />
+                  </span>
+                  <div className="ti-body"><h3>連絡先は成立後に開示</h3><p>査定段階で業者に渡るのは、写真・品目・地域（都道府県・市区町村）・住居情報などの出品内容のみ。お名前や電話番号は業者に渡らず、詳細住所と連絡用のメールアドレスは交渉が成立するまで開示されません。</p></div>
+                </article>
+                <article className="trust-item">
+                  <span className="ti-ic img-frame img-frame--1x1 img-frame--pale img-frame--contain">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/img/real/trust-illus-3.webp" alt="" width={1024} height={768} loading="lazy" decoding="async" />
+                  </span>
+                  <div className="ti-body"><h3>訪問買取は特定商取引法の対象</h3><p>訪問による買取には特定商取引法（訪問購入）の規定が適用される場合があります。一部の物品は法令により対象外とされています。お客様の品物が対象かどうかは、訪問した業者が交付する書面に記載されます。ご不明な場合は消費者ホットラインにご相談ください。</p></div>
+                </article>
               </Reveal>
             </div>
           </div>
         </section>
 
         {/* ============ 料金 ============ */}
-        <section className="section bg-pale" id="fee">
+        <section className="section bg-pale fee" id="fee">
           <div className="container">
             <div className="section-head">
               <span className="eyebrow">料金について</span>
               <h2>費用は、一切かかりません</h2>
               <p className="sub">出品・査定・成約まで、すべて無料です。</p>
             </div>
-            <Reveal className="fee-card">
+            <Reveal className="fee-zero">
+              <span className="fz-label">お客様のお支払い</span>
+              <strong className="fz-num">¥0</strong>
+              <span className="fz-note">出品・査定・お断り・引き取りまで、費用は一切かかりません。</span>
+            </Reveal>
+            <Reveal className="fee-card" delay={1}>
               <div className="fee-head"><h3>出品から成約まで、お金はかかりません</h3><p>出品・査定・お断りまで、すべて無料</p></div>
               <div className="fee-rows">
                 <div className="fee-row"><span className="fl">写真・品目の登録<small>まとめて出品するだけ</small></span><span className="fv">無料</span></div>
@@ -325,7 +358,7 @@ export default function HomePage() {
                 <div className="fee-row"><span className="fl">査定を見て断る<small>金額に納得できなければ取りやめOK</small></span><span className="fv">無料</span></div>
                 <div className="fee-row"><span className="fl">成約・引き取り<small>買取額や条件は事前に明示</small></span><span className="fv">無料</span></div>
               </div>
-              <p style={{ fontSize: 12.5, color: "var(--body-soft)", lineHeight: 1.8, margin: "14px 0 0" }}>
+              <p className="fee-caution">
                 ※ 訪問時の現物確認により、業者から減額のご相談が届くことがあります。同意しない場合は取引を断れます。
               </p>
             </Reveal>
@@ -343,7 +376,8 @@ export default function HomePage() {
             <div className="cats-grid">
               {CATEGORIES.map((c) => (
                 <Link href="/create" className="cat" key={c.name}>
-                  <div className="cat-img">
+                  {/* data-label は画像が読み込めなかったときに枠へ品目名を残すための CSS フォールバック */}
+                  <div className="cat-img img-frame img-frame--1x1" data-label={c.name}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={`/img/real/${c.img}.webp`} alt="" width={512} height={512} loading="lazy" decoding="async" />
                   </div>
@@ -366,11 +400,11 @@ export default function HomePage() {
         </section>
 
         {/* ============ 運営者メッセージ ============ */}
-        <section className="section" id="founder">
-          <div className="container founder-grid">
-            <Reveal as="figure" className="founder-photo ph-wrap">
-              <PhImg src="/img/founder-new.png" alt="カタヅケ運営事務局のスタッフ" label="founder-new.png" icon="people" imgStyle={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              <figcaption>カタヅケ運営事務局</figcaption>
+        <section className="section founder" id="founder">
+          <div className="container media-split media-split--rev">
+            <Reveal as="figure" className="founder-photo img-frame img-frame--3x2 sp-bleed">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/img/v2/top-founder-desk.webp" width={1600} height={1067} alt="" loading="lazy" decoding="async" />
             </Reveal>
             <Reveal className="founder-copy" delay={1}>
               <span className="mb-4 inline-block"><KdzLogo size={20} /></span>
@@ -392,16 +426,23 @@ export default function HomePage() {
               <h2>よくある質問</h2>
             </div>
             <FaqAccordion items={FAQ_ITEMS} />
-            <div style={{ textAlign: "center", marginTop: 32 }}>
+            <div className="faq-more">
               <Link href="/faq" className="btn btn-ghost btn-lg">すべてのQ&amp;Aを見る<Ic name="arrow" /></Link>
             </div>
           </div>
         </section>
 
-        {/* ============ 最終CTA ============ */}
-        <section className="section final" id="contact">
-          <div className="container">
+        {/* ============ 最終CTA（写真帯は見出しだけ。ボタンは帯の下の白面） ============ */}
+        <section className="hero-band hero-band--mid hero-band--headline" id="contact">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/img/v2/top-cta-band.webp" width={1920} height={1080} alt="" loading="lazy" decoding="async" />
+          <div className="hero-band__veil" aria-hidden="true" />
+          <div className="container hero-band__copy">
             <h2>今日、その<br className="sp-br" />「片付けたい」を動かす</h2>
+          </div>
+        </section>
+        <section className="final-actions">
+          <div className="container">
             <p>まずは1枚、撮ってみることから。LINEで友だち追加すれば、すぐに出品をはじめられます。登録・査定は無料です。</p>
             <div className="final-cta">
               <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-line btn-lg"><Ic name="chat" />LINEではじめる<Ic name="arrow" /></Link>
@@ -422,13 +463,18 @@ export default function HomePage() {
                 <div className="biz-banner-tags">
                   <span className="biz-tag">初期費用・月額費用 無料</span>
                   <span className="biz-tag">成約時8%（税別）のみ</span>
+                  <span className="biz-tag">β期間中は手数料0円（期間限定・請求開始は事前にお知らせします）</span>
                   <span className="biz-tag">下見なし・一斉架電なし</span>
                   <span className="biz-tag">古物商許可が必要</span>
                 </div>
+                <div className="biz-banner-cta">
+                  <Link href="/business" className="btn btn-white btn-lg">業者登録の詳細を見る<Ic name="arrow" /></Link>
+                  <span className="biz-chip">審査制・登録無料</span>
+                </div>
               </div>
-              <div className="biz-banner-cta">
-                <Link href="/business" className="btn btn-white btn-lg">業者登録の詳細を見る<Ic name="arrow" /></Link>
-                <span style={{ fontSize: 12, color: "var(--body-soft)" }}>審査制・登録無料</span>
+              <div className="biz-banner-media img-frame img-frame--1x1">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/img/v2/biz-reason-bulk.webp" width={800} height={800} alt="" loading="lazy" decoding="async" />
               </div>
             </div>
           </div>

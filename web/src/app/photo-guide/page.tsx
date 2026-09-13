@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./photo-guide.css";
@@ -7,17 +8,20 @@ import { Reveal } from "@/components/kdz/interactions";
 export const metadata: Metadata = {
   title: "撮影ガイド",
   description:
-    "カタヅケの撮影ガイド。上手に撮ると業者の評価が上がり、より高い買取額が届きやすくなります。",
+    "カタヅケの撮影ガイド。上手に撮ると、業者が品物を判断しやすくなります。",
   alternates: { canonical: "/photo-guide" },
 };
 
-/** メリットバーのチップ */
+/** ヒーロー帯の直下に置くチェック行 */
 const MERITS = [
   "1点ずつ撮って、まとめて1件に",
   "スマホで十分",
   "最大150枚まで追加できる",
   "写真が多いほど評価しやすい",
 ];
+
+/** 撮影の上限（事実ベースの数値のみ） */
+const LIMITS = ["写真は1点につき12枚まで", "1案件あたり150枚まで"];
 
 /** 撮影の手順（6ステップ） */
 const STEPS: { h: string; p: string; tip: string }[] = [
@@ -53,54 +57,87 @@ const STEPS: { h: string; p: string; tip: string }[] = [
   },
 ];
 
-/** 高評価につながる撮影のポイント（アイコンは Icons.tsx の近似に置換） */
+/** ポイントのうち、写真で見せる3点（zig-zag の .media-split） */
+const TIP_SPLITS: { img: string; h: string; p: string }[] = [
+  {
+    img: "pg-tip-light",
+    h: "明るく撮る",
+    p: "照明を増やす、窓の近くで撮るなど明るさを確保。暗い写真は業者が敬遠しがちです。",
+  },
+  {
+    img: "pg-tip-bg",
+    h: "背景をすっきりさせる",
+    p: "無地の床や壁の前に品物を1点だけ置き、まわりのものはいったんどけます。背景が整うほど、形も色もそのまま伝わります。",
+  },
+  {
+    img: "pg-tip-detail",
+    h: "全体と詳細の両方を撮る",
+    p: "1点ごとに、全体が映る引きの写真＋気になる部分のアップ写真。この組み合わせが最も評価されます。",
+  },
+];
+
+/** 残りの撮影ポイント（ヘアラインリスト。アイコンは Icons.tsx の近似） */
 const POINTS: { icon: IcName; h: string; p: string }[] = [
-  { icon: "sun", h: "明るく撮る", p: "照明を増やす、窓の近くで撮るなど明るさを確保。暗い写真は業者が敬遠しがちです。" },
-  { icon: "crop", h: "全体と詳細の両方を撮る", p: "1点ごとに、全体が映る引きの写真＋気になる部分のアップ写真。この組み合わせが最も評価されます。" },
   { icon: "tag", h: "ブランドロゴ・型番シール・タグは接写で", p: "メーカーロゴや型番シール、製造タグがくっきり読めるアップ写真があると、業者が価格を調べやすくなり高い入札につながります。" },
   { icon: "box", h: "付属品も一緒に撮る", p: "箱・リモコン・充電器・説明書など付属品があれば一緒に撮影。買取額がアップします。" },
   { icon: "check-circle", h: "動作状態を伝える", p: "電源が入る家電は電源ON状態の写真を。動作確認済みは買取額が大きく変わります。" },
   { icon: "up", h: "枚数は多いほどいい", p: "商品1点につき最大12枚、案件全体で最大150枚まで追加できます。写真が多いほど業者が安心して高い入札を出せます。" },
 ];
 
-/** カテゴリ別チェックリスト（実画像未投入のためアイコンタイルで表現） */
-const CATS: { icon: IcName; name: string; items: string[] }[] = [
-  { icon: "bag", name: "ブランド品", items: ["ロゴ・刻印が見える写真", "バッグは内側・金具も撮影", "付属品（保存袋・箱）も", "傷・汚れ・色あせは正直に"] },
-  { icon: "sun", name: "家電・PC", items: ["型番・メーカーが見える写真", "電源ON状態の写真があると◎", "リモコン・充電器も一緒に", "製造年がわかれば伝える"] },
-  { icon: "clock", name: "時計", items: ["文字盤・ケースバック・竜頭", "ブランドロゴが読めるアップ", "箱・保証書・コマ数も撮影", "傷・色あせの状態を正直に"] },
-  { icon: "camera", name: "カメラ", items: ["ボディ・レンズを別々に撮影", "センサーの状態（埃・カビ確認）", "付属レンズ・フラッシュも", "動作確認済みなら必ず伝える"] },
-  { icon: "sofa", name: "家具", items: ["正面・側面・背面・底面を撮影", "傷・へこみ・色あせは接写で", "サイズが分かる写真があると◎", "解体できる場合は伝える"] },
-  { icon: "box", name: "ゲーム", items: ["本体・コントローラーを一緒に", "ソフトはタイトルが読める写真", "付属品・箱があれば一緒に", "動作確認済みは必ず伝える"] },
+/** カテゴリ別チェックリスト（行頭に既存 3D アイコン /img/real/cat-*.webp） */
+const CATS: { img: string; name: string; items: string[] }[] = [
+  { img: "cat-brand", name: "ブランド品", items: ["ロゴ・刻印が見える写真", "バッグは内側・金具も撮影", "付属品（保存袋・箱）も", "傷・汚れ・色あせは正直に"] },
+  { img: "cat-kaden", name: "家電・PC", items: ["型番・メーカーが見える写真", "電源ON状態の写真があると◎", "リモコン・充電器も一緒に", "製造年がわかれば伝える"] },
+  { img: "cat-watch", name: "時計", items: ["文字盤・ケースバック・竜頭", "ブランドロゴが読めるアップ", "箱・保証書・コマ数も撮影", "傷・色あせの状態を正直に"] },
+  { img: "cat-camera", name: "カメラ", items: ["ボディ・レンズを別々に撮影", "センサーの状態（埃・カビ確認）", "付属レンズ・フラッシュも", "動作確認済みなら必ず伝える"] },
+  { img: "cat-furniture", name: "家具", items: ["正面・側面・背面・底面を撮影", "傷・へこみ・色あせは接写で", "サイズが分かる写真があると◎", "解体できる場合は伝える"] },
+  { img: "cat-game", name: "ゲーム", items: ["本体・コントローラーを一緒に", "ソフトはタイトルが読める写真", "付属品・箱があれば一緒に", "動作確認済みは必ず伝える"] },
 ];
 
 /** スクロール演出の遅延（3列グリッド用） */
 const delayOf = (i: number) => ((i % 3 || undefined) as 1 | 2 | undefined);
 
+/** 2桁の通し番号（var(--en-display) で表示する） */
+const numOf = (i: number) => String(i + 1).padStart(2, "0");
+
 export default function PhotoGuidePage() {
   return (
     <main id="main">
-      {/* ============ ヒーロー ============ */}
-      <section className="guide-hero">
-        <div className="container">
+      {/* ============ ヒーロー（写真帯・LCP） ============ */}
+      <section className="hero-band hero-band--tall hero-band--pos-r pg-hero">
+        <img
+          src="/img/v2/pg-hero.webp"
+          width={1920}
+          height={1080}
+          alt="窓際の床に置いた品物を、スマートフォンで真上から撮影する手元（イメージ）"
+          loading="eager"
+          fetchPriority="high"
+          decoding="async"
+        />
+        <div className="hero-band__veil" aria-hidden="true" />
+        <div className="container hero-band__copy">
           <span className="eyebrow">撮影ガイド</span>
           <h1>
             撮るほど、
             <br />
-            高く売れる。
+            伝わる。
           </h1>
           <p>
-            カタヅケでは写真と品目情報が業者の入札根拠になります。上手に撮ると評価が上がり、より高い買取額が届きやすくなります。
+            カタヅケでは写真と品目情報が業者の入札根拠になります。上手に撮ると、業者が品物を判断しやすくなります。
           </p>
-          <div className="cta-wrap">
-            <Link href="/create" className="btn btn-primary btn-lg">
-              さっそく出品する
+          <div className="hero-cta">
+            <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-primary btn-lg">
+              LINEではじめる（無料）
               <Ic name="arrow" />
             </Link>
+            <a href="#basics" className="btn btn-ghost btn-lg">
+              読んでから決める ↓
+            </a>
           </div>
         </div>
       </section>
 
-      {/* ============ メリットバー ============ */}
+      {/* ============ 帯の直下：4チェック行（白地・ヘアライン） ============ */}
       <div className="merit-bar">
         <div className="container">
           <div className="merit-bar-inner">
@@ -116,7 +153,7 @@ export default function PhotoGuidePage() {
 
       <div className="section">
         <div className="container">
-          {/* ============ 1. 一品ずつ撮る（良い例・悪い例） ============ */}
+          {/* ============ 1. 一品ずつ撮る（良い例・避けたい例） ============ */}
           <div className="guide-section" id="basics">
             <div className="guide-section-head">
               <div className="guide-section-num">1</div>
@@ -129,53 +166,46 @@ export default function PhotoGuidePage() {
             </div>
 
             <div className="compare-grid">
-              <div className="compare-card good">
-                <div className="compare-photo good-bg">
-                  <div className="compare-photo-illus">
-                    <svg viewBox="0 0 200 150" width="200" height="150" aria-hidden="true">
-                      <rect x="10" y="10" width="180" height="130" rx="8" fill="#f0f7ff" />
-                      <ellipse cx="100" cy="118" rx="58" ry="7" fill="#dbe7f5" />
-                      <rect x="52" y="48" width="96" height="58" rx="10" fill="#90caf9" />
-                      <rect x="40" y="62" width="20" height="44" rx="8" fill="#64b5f6" />
-                      <rect x="140" y="62" width="20" height="44" rx="8" fill="#64b5f6" />
-                      <rect x="60" y="86" width="80" height="18" rx="6" fill="#bbdefb" />
-                      <rect x="52" y="104" width="12" height="12" rx="2" fill="#5c8bc4" />
-                      <rect x="136" y="104" width="12" height="12" rx="2" fill="#5c8bc4" />
-                      <path d="M100 22 L100 30" stroke="#f0b429" strokeWidth="2.5" strokeLinecap="round" />
-                      <path d="M120 24 L117 31" stroke="#f0b429" strokeWidth="2" strokeLinecap="round" />
-                      <path d="M80 24 L83 31" stroke="#f0b429" strokeWidth="2" strokeLinecap="round" />
-                      <circle cx="170" cy="130" r="12" fill="#4ade80" />
-                      <path d="M164 130 L168 134 L176 126" stroke="#fff" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </div>
+              <figure className="compare-card">
+                <div className="img-frame img-frame--1x1 sp-bleed">
+                  <img
+                    src="/img/v2/pg-good.webp"
+                    width={800}
+                    height={800}
+                    alt="明るい部屋で、ソファ1点の全体が枠に収まっている"
+                    loading="lazy"
+                    decoding="async"
+                  />
                 </div>
-                <div className="compare-label">
-                  <span className="compare-label-badge">良い例</span>
+                <figcaption className="compare-label">
+                  <span className="compare-label-badge is-good">
+                    <span aria-hidden="true">○</span>良い例
+                  </span>
                   <p>1枚に1品。品物全体が映り、明るい場所で背景がすっきりしている。</p>
-                </div>
-              </div>
+                </figcaption>
+              </figure>
 
-              <div className="compare-card bad">
-                <div className="compare-photo bad-bg">
-                  <div className="compare-photo-illus">
-                    <svg viewBox="0 0 200 150" width="200" height="150" aria-hidden="true">
-                      <rect x="10" y="10" width="180" height="130" rx="8" fill="#fff5f5" />
-                      <rect x="15" y="60" width="50" height="60" rx="4" fill="#ffcdd2" transform="rotate(-15,40,90)" />
-                      <rect x="80" y="20" width="90" height="70" rx="4" fill="#e0e0e0" />
-                      <rect x="40" y="30" width="35" height="50" rx="4" fill="#ffecb3" transform="rotate(10,57,55)" />
-                      <rect x="120" y="90" width="60" height="40" rx="4" fill="#b3e5fc" transform="rotate(-5,150,110)" />
-                      <rect x="10" y="10" width="180" height="130" rx="8" fill="rgba(0,0,0,0.25)" />
-                      <circle cx="170" cy="130" r="12" fill="#f87171" />
-                      <path d="M165 125 L175 135M175 125 L165 135" stroke="#fff" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-                    </svg>
-                  </div>
+              <figure className="compare-card">
+                <div className="img-frame img-frame--1x1 sp-bleed">
+                  <img
+                    src="/img/v2/pg-bad.webp"
+                    width={800}
+                    height={800}
+                    alt="暗い部屋で、洗濯物や箱が重なり、ソファが右端で見切れている"
+                    loading="lazy"
+                    decoding="async"
+                  />
                 </div>
-                <div className="compare-label">
-                  <span className="compare-label-badge">悪い例</span>
+                <figcaption className="compare-label">
+                  <span className="compare-label-badge is-bad">
+                    <span aria-hidden="true">△</span>避けたい例
+                  </span>
                   <p>複数の品物を1枚に詰め込み、暗くて重なっていて何があるか分からない。</p>
-                </div>
-              </div>
+                </figcaption>
+              </figure>
             </div>
+
+            <p className="pg-note">※ 買取額は業者の現物査定で決まります</p>
           </div>
 
           {/* ============ 2. 撮影の手順 ============ */}
@@ -188,10 +218,20 @@ export default function PhotoGuidePage() {
               </div>
             </div>
 
-            <div className="shoot-steps">
+            <div className="limit-chips">
+              {LIMITS.map((l) => (
+                <span className="limit-chip" key={l}>
+                  {l}
+                </span>
+              ))}
+            </div>
+
+            <ol className="shoot-steps">
               {STEPS.map((s, i) => (
-                <Reveal as="div" className="shoot-step" key={s.h}>
-                  <div className="shoot-step-num">{i + 1}</div>
+                <Reveal as="li" className="shoot-step" key={s.h}>
+                  <span className="shoot-step-num" aria-hidden="true">
+                    {numOf(i)}
+                  </span>
                   <div className="shoot-step-body">
                     <h4>{s.h}</h4>
                     <p>{s.p}</p>
@@ -202,7 +242,11 @@ export default function PhotoGuidePage() {
                   </div>
                 </Reveal>
               ))}
-            </div>
+            </ol>
+
+            <p className="pg-note">
+              写真に住所・氏名・他の人が写り込まないよう、書類や画面は伏せて撮ってください。
+            </p>
           </div>
 
           {/* ============ 3. 高評価につながる撮影のポイント ============ */}
@@ -211,23 +255,51 @@ export default function PhotoGuidePage() {
               <div className="guide-section-num">3</div>
               <div>
                 <h2>高評価につながる撮影のポイント</h2>
-                <p>少し意識するだけで入札額が変わります。</p>
+                <p>少し意識するだけで、伝わり方が変わります。</p>
               </div>
             </div>
 
-            <div className="point-grid">
-              {POINTS.map((pt) => (
-                <Reveal as="div" className="point-card" key={pt.h}>
-                  <div className="point-ic">
-                    <Ic name={pt.icon} />
+            <div className="tip-splits">
+              {TIP_SPLITS.map((t, i) => (
+                <Reveal
+                  as="div"
+                  className={i % 2 === 1 ? "media-split media-split--rev tip-split" : "media-split tip-split"}
+                  key={t.h}
+                >
+                  <div className="img-frame img-frame--1x1 sp-bleed">
+                    <img
+                      src={`/img/v2/${t.img}.webp`}
+                      width={800}
+                      height={800}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                    />
                   </div>
-                  <div className="point-body">
-                    <h4>{pt.h}</h4>
-                    <p>{pt.p}</p>
+                  <div className="tip-copy">
+                    <span className="tip-num" aria-hidden="true">
+                      {numOf(i)}
+                    </span>
+                    <h4>{t.h}</h4>
+                    <p>{t.p}</p>
                   </div>
                 </Reveal>
               ))}
             </div>
+
+            <ul className="point-list">
+              {POINTS.map((pt) => (
+                <li className="point-item" key={pt.h}>
+                  <span className="point-ic">
+                    <Ic name={pt.icon} />
+                  </span>
+                  <div className="point-body">
+                    <h4>{pt.h}</h4>
+                    <p>{pt.p}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
 
           {/* ============ 4. カテゴリ別・撮影チェックリスト ============ */}
@@ -244,8 +316,15 @@ export default function PhotoGuidePage() {
               {CATS.map((c, i) => (
                 <Reveal as="div" className="cat-guide-card" delay={delayOf(i)} key={c.name}>
                   <div className="cat-name">
-                    <span className="cat-ic">
-                      <Ic name={c.icon} />
+                    <span className="img-frame img-frame--pale img-frame--1x1 cat-ic">
+                      <img
+                        src={`/img/real/${c.img}.webp`}
+                        width={512}
+                        height={512}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                      />
                     </span>
                     {c.name}
                   </div>
@@ -258,27 +337,33 @@ export default function PhotoGuidePage() {
               ))}
             </div>
           </div>
+        </div>
+      </div>
 
-          {/* ============ CTA ============ */}
-          <Reveal className="guide-cta">
-            <div className="guide-cta-inner">
-              <h2>準備ができたら、さっそく出品しよう</h2>
-              <p>
-                1点ずつ撮って、まとめて出すだけ。1点ずつ売る手間も、しつこい営業電話もありません。
-                <br />
-                出品・査定・お断りまで、ユーザーの費用は一切無料です。
-              </p>
-              <div className="btn-wrap">
-                <Link href="/create" className="btn btn-primary btn-lg">
-                  出品をはじめる
-                  <Ic name="arrow" />
-                </Link>
-                <Link href="/" className="btn btn-ghost btn-lg">
-                  サービスの詳細を見る
-                </Link>
-              </div>
-            </div>
-          </Reveal>
+      {/* ============ 末尾 CTA（濃紺帯。ボタンは帯の下の白面に置く） ============ */}
+      <section className="deep-band pg-cta-band">
+        <div className="container">
+          <span className="deep-band__label">READY</span>
+          <h2>準備ができたら、さっそく出品しよう</h2>
+          <p>
+            1点ずつ撮って、まとめて出すだけ。1点ずつ売る手間も、しつこい営業電話もありません。
+            <br />
+            出品・査定・お断りまで、ユーザーの費用は一切無料です。
+          </p>
+        </div>
+      </section>
+
+      <div className="pg-cta-actions">
+        <div className="container">
+          <div className="pg-cta-btns">
+            <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-primary btn-lg">
+              LINEではじめる（無料）
+              <Ic name="arrow" />
+            </Link>
+            <Link href="/" className="btn btn-ghost btn-lg">
+              サービスの詳細を見る
+            </Link>
+          </div>
         </div>
       </div>
     </main>

@@ -24,6 +24,37 @@ function pwScore(v: string): number {
   return s;
 }
 
+/** 信頼行。共通 TrustRow（components/kdz/auth.tsx）の3項目めは「無料ログイン」だが、
+ *  無料なのはログインではなく登録・利用そのものなので、認証2ページではこちらを使う
+ *  （BRIEF §2.5「無料ログイン」→「登録・利用は無料」）。/login と同一の文言・並び。 */
+function AuthTrustRow() {
+  return (
+    <div className="trust-row">
+      <div className="trust-item">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z" />
+          <path d="M9 12l2 2 4-4" />
+        </svg>
+        SSL暗号化通信
+      </div>
+      <div className="trust-item">
+        <svg viewBox="0 0 24 24">
+          <rect x="5" y="11" width="14" height="10" rx="2" />
+          <path d="M8 11V7a4 4 0 018 0v4" />
+        </svg>
+        プライバシー保護
+      </div>
+      <div className="trust-item">
+        <svg viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M9 12l2 2 4-4" />
+        </svg>
+        登録・利用は無料
+      </div>
+    </div>
+  );
+}
+
 function PwStrength({ value }: { value: string }) {
   if (!value) return null;
   const score = pwScore(value);
@@ -105,7 +136,7 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="signup-page flow-bg">
+    <div className="signup-page flow-bg auth-page auth-page--split">
       {/* flow-header */}
       <div className="flow-header">
         <div className="flow-header-inner">
@@ -128,12 +159,22 @@ export default function SignupPage() {
       </div>
 
       <main id="main">
+        <aside className="auth-side">
+          {/* eslint-disable @next/next/no-img-element */}
+          <img src="/img/v2/su-side.webp" width={900} height={1350} alt="" loading="lazy" decoding="async" />
+          <p className="auth-side__line">撮って、あとは待つだけ。</p>
+        </aside>
         <div className="flow-wrap">
           {/* STEP 1 */}
           {step === 1 && (
             <div>
               <h2 className="step-title">アカウントを作成する</h2>
               <p className="step-desc">メールアドレスとパスワードを設定してください。LINEで続けることもできます。</p>
+
+              {/* 登録＝業者への通知ではないこと（実装事実）を、入力を始める前に置く */}
+              <p className="signup-lead-note">
+                登録しただけでは業者に何も伝わりません。連絡が来るのは、あなたが1社を選んだ後だけです。
+              </p>
 
               <div style={{ marginBottom: 18 }}>
                 <LineAuthButton label="LINEで無料登録" callbackUrl="/create" />
@@ -244,6 +285,8 @@ export default function SignupPage() {
               </div>
             </div>
           )}
+
+          {step < 4 && <AuthTrustRow />}
         </div>
       </main>
 

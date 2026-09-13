@@ -7,11 +7,42 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn, signOut, useSession } from "next-auth/react";
-import { AuthBar, Field, PasswordField, LineAuthButton, TrustRow } from "@/components/kdz/auth";
+import { AuthBar, Field, PasswordField, LineAuthButton } from "@/components/kdz/auth";
 import { safeInternalPath } from "@/lib/safe-path";
 import { clearRedirectLoopStorage } from "@/lib/katadzuke-api";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** 信頼行。共通 TrustRow（components/kdz/auth.tsx）の3項目めは「無料ログイン」だが、
+ *  無料なのはログインではなく登録・利用そのものなので、認証2ページではこちらを使う
+ *  （BRIEF §2.5「無料ログイン」→「登録・利用は無料」）。 */
+function AuthTrustRow() {
+  return (
+    <div className="trust-row">
+      <div className="trust-item">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z" />
+          <path d="M9 12l2 2 4-4" />
+        </svg>
+        SSL暗号化通信
+      </div>
+      <div className="trust-item">
+        <svg viewBox="0 0 24 24">
+          <rect x="5" y="11" width="14" height="10" rx="2" />
+          <path d="M8 11V7a4 4 0 018 0v4" />
+        </svg>
+        プライバシー保護
+      </div>
+      <div className="trust-item">
+        <svg viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M9 12l2 2 4-4" />
+        </svg>
+        登録・利用は無料
+      </div>
+    </div>
+  );
+}
 
 function LoginForm() {
   const router = useRouter();
@@ -114,9 +145,14 @@ function LoginForm() {
   }
 
   return (
-    <div className="auth-page">
+    <div className="auth-page auth-page--split">
       <AuthBar rightHref="/signup" rightLabel="新規登録はこちら →" />
       <main id="main">
+        <aside className="auth-side">
+          {/* eslint-disable @next/next/no-img-element */}
+          <img src="/img/v2/li-side.webp" width={900} height={1350} alt="" loading="lazy" decoding="async" />
+          <p className="auth-side__line">入札の結果を、確かめに。</p>
+        </aside>
         <div className="auth-wrap">
           <div className="auth-card">
             <div className="auth-head">
@@ -138,9 +174,20 @@ function LoginForm() {
               </div>
             ) : null}
 
+            <p style={{ fontSize: 13, color: "var(--body-soft)", lineHeight: 1.75, textAlign: "center", marginBottom: 10 }}>
+              LINEではじめた方は、こちらを押してください
+            </p>
             <LineAuthButton callbackUrl={callbackUrl} />
+            {/* 同意文は LINE ボタンと同一視野に置く（押す前に規約・ポリシーへ到達できる） */}
+            <p style={{ fontSize: 12.5, color: "var(--body-soft)", lineHeight: 1.75, textAlign: "center", marginTop: 10 }}>
+              続行すると
+              <Link href="/terms" style={{ color: "var(--primary)", textDecoration: "underline" }}>利用規約</Link>
+              ・
+              <Link href="/privacy" style={{ color: "var(--primary)", textDecoration: "underline" }}>プライバシーポリシー</Link>
+              に同意したものとみなします
+            </p>
 
-            <div className="auth-divider">メールアドレスで続ける</div>
+            <div className="auth-divider">メールアドレスで登録した方</div>
 
             {suspended || suspendedNow ? (
               <div className="auth-error" role="alert">
@@ -228,7 +275,7 @@ function LoginForm() {
               </button>
             </form>
 
-            <TrustRow />
+            <AuthTrustRow />
           </div>
 
           <div className="auth-switch">
@@ -236,7 +283,8 @@ function LoginForm() {
             <br />
             <Link href="/signup">無料で新規登録する →</Link>
           </div>
-          <div className="auth-switch" style={{ marginTop: 10 }}>
+          {/* 業者導線は依頼者の主導線と混ざらないよう、ヘアラインで一段下げる */}
+          <div className="auth-switch" style={{ marginTop: 20, paddingTop: 18, borderTop: "1px solid var(--line)", fontSize: 13 }}>
             業者の方は <Link href="/operator/login">業者ログイン →</Link>
           </div>
         </div>

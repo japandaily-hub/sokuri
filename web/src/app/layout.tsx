@@ -98,9 +98,25 @@ const WEBSITE_LD = {
     "家じゅうの不用品を、1点ずつ撮って、あとは待つだけ。登録業者が買取総額で競い合う片付け買取マッチング。",
 };
 
+/** .rv（スクロールでフェードイン）の堅牢化（BRIEF §1.7）。IntersectionObserver が使え、かつ
+ *  prefers-reduced-motion でない時だけ <html> に js-rv を付ける。katazuke.css は transition と
+ *  opacity:0 を html.js-rv 配下にしか書かないので、JS 未実行・低速回線・reduced-motion では本文が消えない。
+ *  初回ペイント前に同期実行させるため <head> 内の blocking inline script にする
+ *  （next/script の afterInteractive では「見えていた本文が一度フェードアウトしてから戻る」）。 */
+const JS_RV_SCRIPT =
+  "if('IntersectionObserver' in window&&!matchMedia('(prefers-reduced-motion:reduce)').matches){document.documentElement.classList.add('js-rv')}";
+
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="ja" className={`${fontSerif.variable} ${fontUi.variable} ${fontEn.variable} ${fontEnDisplay.variable}`}>
+    // suppressHydrationWarning: 上の script が hydration 前に <html> の class へ js-rv を足すため（属性差分の警告だけ抑止）
+    <html
+      lang="ja"
+      className={`${fontSerif.variable} ${fontUi.variable} ${fontEn.variable} ${fontEnDisplay.variable}`}
+      suppressHydrationWarning
+    >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: JS_RV_SCRIPT }} />
+      </head>
       {/* antialiased は明朝 400 で字画が痩せるため付与しない（globals.css @layer base も auto） */}
       <body className="min-h-screen">
         {/* スキップリンク（WCAG 2.4.1） */}

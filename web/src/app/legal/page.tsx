@@ -23,6 +23,20 @@ export const metadata = {
 export default function LegalPage() {
   return (
     <main id="main">
+      {/* 法務3ページ共通の無文字帯（高さ固定・文字は置かない。/terms は --pos-l、/privacy は既定） */}
+      <section className="hero-band hero-band--fixed hero-band--quiet hero-band--pos-r">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/img/v2/lg-band.webp"
+          width="1920"
+          height="1080"
+          alt=""
+          loading="lazy"
+          decoding="async"
+        />
+        <div className="hero-band__veil" aria-hidden="true" />
+      </section>
+
       <div className="doc-wrap">
         <div className="doc-eyebrow">LEGAL</div>
         <h1 className="doc-title">特定商取引法に基づく表記</h1>
@@ -31,6 +45,19 @@ export default function LegalPage() {
         <p className="doc-lead">
           本ページは、特定商取引に関する法律（特定商取引法）第11条および第58条の2に基づき、本サービスの運営者情報および取引条件を表示するものです。
         </p>
+
+        {/* ユーザーの費用（表に埋めず、表の前に単独で置く） */}
+        <section className="doc-free" aria-label="ユーザーの費用">
+          <p className="doc-free__num" aria-hidden="true">
+            ¥0
+          </p>
+          <div className="doc-free__body">
+            <p className="doc-free__lead">ユーザーの費用は0円です。</p>
+            <p className="doc-free__sub">
+              出品・査定・お断りまで、ユーザーに費用の請求はありません。成約に至った場合も同じです。買取を行うのは登録業者であり、当社（カタヅケ運営事務局）は買取取引の当事者ではありません。
+            </p>
+          </div>
+        </section>
 
         {/* 運営者情報 */}
         <h2 className="doc-section-title">サービス運営者情報</h2>
@@ -174,7 +201,11 @@ export default function LegalPage() {
                 （ユーザー）
               </th>
               <td>
-                訪問による買取には特定商取引法（訪問購入）の規定が適用される場合があります。クーリング・オフの可否は、品目（家具・家電等は対象外）や契約に至った経緯（ご自身の依頼で業者が訪問した場合は対象外となることがあります）によって異なります。業者から交付される書面をご確認ください。
+                訪問による買取には、特定商取引法（訪問購入）の規定が適用される場合があります。一部の物品は法令により対象外とされています。お客様の品物が対象かどうかは、訪問した業者が交付する書面に記載されます。ご不明な場合は消費者ホットラインにご相談ください。
+                <br />
+                <span className="note">
+                  ※ クーリング・オフの可否を判断し、書面で告知するのは、訪問した登録業者です。当社（カタヅケ運営事務局）は買取取引の当事者ではありません。
+                </span>
                 <br />
                 <span className="note">
                   ※ 当社の定める取引のお取りやめについては

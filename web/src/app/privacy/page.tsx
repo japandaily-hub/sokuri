@@ -27,15 +27,33 @@ const COLLECTED: { type: string; how: string; detail: string }[] = [
 export default function PrivacyPage() {
   return (
     <main id="main">
-      <section className="legal-hero">
-        <div className="container">
-          <span className="eyebrow">プライバシーポリシー</span>
+      {/* 法務3ページ共通の無文字帯（高さ固定・文字は置かない） */}
+      <section className="hero-band hero-band--fixed hero-band--quiet">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/img/v2/lg-band.webp"
+          width="1920"
+          height="1080"
+          alt=""
+          loading="lazy"
+          decoding="async"
+        />
+        <div className="hero-band__veil" aria-hidden="true" />
+      </section>
+
+      <section className="legal-head">
+        <div className="legal-head__inner">
+          <span className="legal-head__en">PRIVACY</span>
           <h1>プライバシーポリシー</h1>
-          <p className="updated">制定・施行：2026年4月1日　最終改定：2026年9月4日</p>
+          <p className="legal-head__meta">
+            制定・施行：2026年4月1日　最終改定：2026年9月4日
+          </p>
         </div>
       </section>
 
-      <div className="legal-body">
+      {/* privacy-body: terms.css も同名の .legal-body を定義しており、クライアント遷移で
+          両方の CSS が同居する。v2 で変えた条見出し・表の規則だけは特異度で確実に勝たせる。 */}
+      <div className="legal-body privacy-body">
         <Link href="/" className="back-link">
           ← トップへ戻る
         </Link>
@@ -47,20 +65,23 @@ export default function PrivacyPage() {
 
         <h2>第2条　収集する情報</h2>
         <p>当社は、サービス提供のため以下の情報を収集します。</p>
-        <table>
-          <thead>
-            <tr>
-              <th>情報の種類</th>
-              <th>収集方法</th>
-              <th>具体的な内容</th>
+        {/* 859px 以下ではカード積みに切り替える（privacy.css）。display:block で
+            失われる表のセマンティクスは明示 role で維持する。data-label が
+            カード時の項目名になるため、th の文言と一致させること。 */}
+        <table role="table" className="collect-table">
+          <thead role="rowgroup">
+            <tr role="row">
+              <th role="columnheader" scope="col">情報の種類</th>
+              <th role="columnheader" scope="col">収集方法</th>
+              <th role="columnheader" scope="col">具体的な内容</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody role="rowgroup">
             {COLLECTED.map((row) => (
-              <tr key={row.type}>
-                <td>{row.type}</td>
-                <td>{row.how}</td>
-                <td>{row.detail}</td>
+              <tr role="row" key={row.type}>
+                <td role="cell" data-label="情報の種類" className="collect-type">{row.type}</td>
+                <td role="cell" data-label="収集方法">{row.how}</td>
+                <td role="cell" data-label="具体的な内容">{row.detail}</td>
               </tr>
             ))}
           </tbody>

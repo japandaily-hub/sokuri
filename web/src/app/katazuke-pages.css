@@ -198,3 +198,138 @@
 @media (max-width: 360px) {
   .fs-label { display: none; }
 }
+
+/* ============================================================
+   共有ビジュアル部品 v2（ビジュアル再構築 2026-09-14・BRIEF §1）
+   globals.css が全ルート（BARE 含む）に読み込むので、どのページでもそのまま使う。
+   モバイル閾値は額装解除（katazuke.css .site-frame）と同じ 859px に統一。
+   角丸0・影0・backdrop-filter なし。画像の上に乗せる色だけ rgba(20,35,92,.x) を許可。
+   ============================================================ */
+
+/* ---------- §1.2 .hero-band — フレームブリード写真帯 ----------
+   額装ページでは .site-frame の直接の子 <section>（.container の外）、BARE では <main> 直下に置く。
+   負マージン・width:100vw・祖先の overflow は使わない（内側の sticky を殺すため）。
+   <section class="hero-band hero-band--tall">
+     <img src="/img/v2/<id>.webp" width height alt loading decoding />
+     <div class="hero-band__veil" aria-hidden="true"></div>
+     <div class="container hero-band__copy"><h2>…</h2><p>…</p></div>
+   </section>
+   高さ・画像位置はクラス修飾子で持つ（インライン style のカスタムプロパティは @media に常に勝つため禁止）。 */
+.hero-band { position: relative; display: flex; align-items: center; min-height: clamp(260px,32vw,400px);
+  padding-block: clamp(32px,5vw,56px); color: #fff;
+  /* forced-colors と画像取得失敗（alt="" は何も描かれない）の地。veil と合わせて濃紺のまま文字が読める */
+  background-color: var(--deep); }
+.hero-band > img { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0;
+  object-fit: cover; object-position: var(--band-pos, 50% 50%); }
+.hero-band__veil { position: absolute; inset: 0; background: rgba(20,35,92,.65); pointer-events: none; }
+.hero-band__copy { position: relative; z-index: 1; color: #fff; font-family: var(--serif); }
+.hero-band__copy h1, .hero-band__copy h2, .hero-band__copy h3 { color: #fff; font-weight: 600; font-size: clamp(24px,3.4vw,40px); line-height: 1.5; }
+.hero-band__copy p { font-size: 16px; line-height: 1.9; margin-top: 12px; }
+.hero-band__copy a:not(.btn) { color: #fff; text-decoration: underline; text-underline-offset: .2em; }
+/* 高さ修飾子（PC）。--fixed は法務3ページ用の固定高（/terms の .tab-wrap{top:76px} に影響させない） */
+.hero-band--tall { min-height: clamp(340px,40vw,480px); }
+.hero-band--mid  { min-height: clamp(260px,32vw,400px); }
+.hero-band--slim { min-height: clamp(180px,22vw,240px); }
+.hero-band--fixed { min-height: 160px; height: 160px; padding-block: 0; }
+/* 画像の見せる側（cover で切る位置）。images.json の構図指定に合わせて使う */
+.hero-band--pos-l { --band-pos: 20% 50%; }
+.hero-band--pos-r { --band-pos: 80% 50%; }
+/* veil の規約（画像は warm off-white 指定のため合成色が明るい）:
+   既定 .65 = 見出し＋本文（14px 以上）／--headline .55 = 見出し（24px 以上・600）のみ／--quiet .18 = 文字を置かない */
+.hero-band--headline .hero-band__veil { background: rgba(20,35,92,.55); }
+.hero-band--quiet .hero-band__veil { background: rgba(20,35,92,.18); }
+@media (max-width: 859px) {
+  .hero-band--tall { min-height: clamp(240px,56vw,320px); }
+  .hero-band--mid  { min-height: clamp(220px,52vw,300px); }
+  .hero-band--slim { min-height: clamp(160px,40vw,200px); }
+  .hero-band--fixed { min-height: 120px; height: 120px; }
+}
+/* 強制カラー: 帯の画像と veil だけ消し、濃紺地は UA 色に任せる（無限定 img{display:none} は禁止）。color は上書きしない */
+@media (forced-colors: active) {
+  .hero-band > img, .hero-band__veil { display: none; }
+}
+
+/* ---------- §1.3 .deep-band — 濃紺ベタ帯（1ページ最大1本・ボタンは置かず直下の白面へ） ---------- */
+.deep-band { background: var(--deep); color: #fff; padding: clamp(48px,7vw,88px) 0; }
+.deep-band h1, .deep-band h2, .deep-band h3 { color: #fff; font-weight: 600; }
+.deep-band p { color: #fff; }
+.deep-band .eyebrow { color: var(--lime); }
+.deep-band .eyebrow::before { background: var(--lime); }
+/* 英字ラベル（TERMS / BUYER 等）。--en 600 uppercase、色は差し色 --lime */
+.deep-band__label { display: block; font-family: var(--en); font-weight: 600; font-size: 12px; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--lime); margin-bottom: 14px; }
+
+/* ---------- §1.4 .media-split — 画像＋テキスト2カラム（汎用） ----------
+   画像側は必ず .img-frame で包む。列比は --ms-img / --ms-txt で上書き可（既定 48:52）。
+   注: katazuke.css:386 の旧 .media-split（1fr 1fr・980px 折返し）を同特異度・後勝ちで上書きする。
+   トップの旧 .media-figure 構造は担当 A の再構築で .img-frame に置き換わる。 */
+.media-split { display: grid; grid-template-columns: minmax(0,var(--ms-img,48fr)) minmax(0,var(--ms-txt,52fr));
+  gap: clamp(28px,5vw,64px); align-items: center; }
+.media-split--rev { direction: rtl; }
+.media-split--rev > * { direction: ltr; }
+@media (max-width: 859px) {
+  .media-split { grid-template-columns: 1fr; }
+}
+
+/* ---------- §1.5 .img-frame — 画像枠（輪郭回復の要） ----------
+   白地＋1px --line。overflow は「画像の直親」であるこの枠にだけ許可（sticky の祖先に置かない）。
+   aspect-ratio は修飾子で必ず指定する。付け忘れると高さ 0 で崩れが見える（黙って既定に落とさない）。
+   表示 AR は生成 AR と 1 対 1（1024x1024→--1x1 / 1536x1024→--3x2 / 1024x1536→--2x3）。
+   --4x5 は top-hero / biz-hero の 859px 以下だけ（--pos で切り位置を指定）。 */
+.img-frame { position: relative; display: block; background: #fff; border: 1px solid var(--line); overflow: hidden; aspect-ratio: auto; }
+.img-frame img { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; display: block;
+  object-fit: cover; object-position: var(--pos, 50% 50%); }
+.img-frame--1x1 { aspect-ratio: 1/1; }
+.img-frame--3x2 { aspect-ratio: 3/2; }
+.img-frame--2x3 { aspect-ratio: 2/3; }
+.img-frame--4x5 { aspect-ratio: 4/5; }
+/* 白面の上に置く枠は地を --pale-2 にして輪郭を出す */
+.img-frame--pale { background: var(--pale-2); }
+/* contain は既存 3D アイコン（/img/real/* 512px 正方形）にのみ許可。v2 の写真には使わない */
+.img-frame--contain img { object-fit: contain; }
+
+/* ---------- §1.6 .sp-bleed — 859px 以下だけ額装内フルブリード ----------
+   .container（または .bare-scope）の --container-pad を負マージンに使う。aspect-ratio は .img-frame の修飾子で固定。 */
+@media (max-width: 859px) {
+  .sp-bleed { margin-inline: calc(-1 * var(--container-pad, 24px)); width: calc(100% + var(--container-pad, 24px) * 2); max-width: none; }
+}
+
+/* ---------- §1.9 .bare-scope — BARE ページ（/business /vendors /operator/*）の余白基準 ----------
+   .container を使わない独自ラッパーの page.tsx ルート要素に付ける。値はページ側で上書き可（.biz-scope{--container-pad:20px} 等）。
+   共有クラスを business.css / vendors.css に再定義しない。 */
+.bare-scope { --container-pad: 24px; }
+@media (max-width: 560px) {
+  .bare-scope { --container-pad: 18px; }
+}
+
+/* ---------- §1.10 .auth-page--split — 認証4ページの共通シェル ----------
+   実 DOM: .auth-page.auth-page--split > .auth-bar(68px) + main#main > [aside.auth-side + .auth-wrap]
+   （/signup は .flow-header + main > .flow-wrap）。grid は <main> に張り、.auth-side は .auth-wrap（.flow-wrap）の
+   直前の兄弟として置く。.auth-wrap(440px)・.auth-card・LINE ボタン（角丸 99px）の中身は変えない。
+   <aside class="auth-side"><img src="/img/v2/su-side.webp" width="900" height="1350" alt="" loading="lazy" decoding="async" />
+     <p class="auth-side__line">撮って、あとは待つだけ。</p></aside>
+   --auth-bar-h: 上部バーの高さ（既定 68px＝.auth-bar）。/signup は .flow-header の実高をページ側で上書きする。
+   --auth-side-pad-b: 固定フッター（.flow-footer 等）がある時に .auth-side__line を持ち上げる量（既定 0）。 */
+.auth-page--split::before { display: none; }       /* 楕円 blob 廃止 */
+.auth-page--split { overflow: visible; }            /* /signup の sticky .flow-header を殺さない（blob が無いので安全） */
+.auth-side { position: relative; background-color: var(--deep); overflow: hidden; }
+.auth-side > img { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; object-fit: cover; object-position: 50% 40%; }
+/* 下部 40% のグラデ。白抜き文字はこの不透明側にだけ置く */
+.auth-side::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 40%; pointer-events: none;
+  background: linear-gradient(180deg, rgba(20,35,92,0), rgba(20,35,92,.75)); }
+.auth-side__line { position: absolute; left: 0; right: 0; bottom: var(--auth-side-pad-b, 0px); z-index: 1; margin: 0;
+  padding: 0 clamp(24px,4vw,48px) clamp(28px,4vw,48px); color: #fff; font-family: var(--serif); font-weight: 600;
+  font-size: clamp(24px,2.4vw,32px); line-height: 1.5; letter-spacing: .06em; text-wrap: balance; }
+/* 業者側は終端を .85 まで濃くし、業務用の入口を色で区別 */
+.operator-auth .auth-side::after { background: linear-gradient(180deg, rgba(20,35,92,0), rgba(20,35,92,.85)); }
+@media (min-width: 860px) {
+  .auth-page--split > main { display: grid; grid-template-columns: minmax(0,46fr) minmax(0,54fr);
+    min-height: calc(100dvh - var(--auth-bar-h, 68px)); }
+  .auth-page--split > main > .auth-side { grid-column: 1; grid-row: 1; }
+  .auth-page--split > main > .auth-wrap, .auth-page--split > main > .flow-wrap { grid-column: 2; grid-row: 1; align-self: center; width: 100%; }
+}
+@media (max-width: 859px) {
+  /* カード上部の 21:9 帯（最大 160px）に畳む。フォームは常に無地面 */
+  .auth-side { aspect-ratio: 21/9; max-height: 160px; }
+  .auth-side__line { display: none; }
+}

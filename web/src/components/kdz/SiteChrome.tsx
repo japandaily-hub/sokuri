@@ -51,7 +51,8 @@ export function SiteChrome({ children }: { children: React.ReactNode }) {
       <SiteHeader />
       {framed ? <div className="site-frame">{children}</div> : children}
       <SiteFooter />
-      <Dock />
+      {/* key でルート毎に再マウントし、.hero-cta 監視の表示状態を必ずリセットする */}
+      <Dock key={pathname} />
     </>
   );
 }

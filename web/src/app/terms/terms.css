@@ -1,16 +1,55 @@
 /* ============================================================
    利用規約ページ固有スタイル（design_handoff_katazuke/利用規約.html の <style> を移植）
-   共通クラス（.container/.eyebrow/.section 等）は katazuke.css 側を使用し再定義しない。
+   共通クラス（.container/.eyebrow/.section/.hero-band 等）は katazuke.css /
+   katazuke-pages.css 側を使用し再定義しない。
+   v2: 淡青ヘッダー面 .legal-hero を廃し、共通の無文字帯（.hero-band--fixed
+   --quiet）＋帯直下の見出しブロック .legal-head に置き換えた（BRIEF §2.10）。
    ============================================================ */
 
-.legal-hero {
-  background: var(--pale);
-  padding: clamp(40px, 5vw, 72px) 0 clamp(32px, 4vw, 56px);
+/* 帯直下の見出しブロック（法務3ページ共通の構え）。本文 .legal-body と同じ 760px 幅に揃える */
+.legal-head {
+  padding: clamp(26px, 4vw, 44px) 0 clamp(20px, 3vw, 30px);
   border-bottom: 1px solid var(--line);
 }
-.legal-hero .eyebrow { justify-content: flex-start; }
-.legal-hero h1 { font-size: clamp(24px, 3.5vw, 36px); margin-top: 14px; }
-.legal-hero .updated { font-size: 13px; color: var(--body-soft); margin-top: 10px; }
+.legal-head__inner { max-width: 760px; margin: 0 auto; padding-inline: 24px; }
+.legal-head__en {
+  display: block; font-family: var(--en); font-weight: 600; font-size: 11.5px;
+  letter-spacing: .18em; text-transform: uppercase; color: var(--primary);
+}
+.legal-head h1 {
+  font-family: var(--head); font-weight: 400; color: var(--ink);
+  font-size: clamp(24px, 3.5vw, 36px); margin-top: 12px;
+}
+.legal-head__meta {
+  font-family: var(--ui); font-size: 12.5px; color: var(--body-soft);
+  letter-spacing: .02em; margin-top: 12px; line-height: 1.8;
+}
+
+/* 要点3つ（本文の要約。根拠となる条を併記する） */
+.terms-points { padding: clamp(28px, 4vw, 44px) 0 clamp(28px, 4vw, 44px); }
+.terms-points__inner { max-width: 760px; margin: 0 auto; padding-inline: 24px; }
+.terms-points__title {
+  font-family: var(--head); font-weight: 600; font-size: 17px; color: var(--ink);
+  padding-bottom: 12px; border-bottom: 1px solid var(--line); margin-bottom: 4px;
+}
+.terms-points__list { list-style: none; padding: 0; margin: 0; }
+.terms-points__list li {
+  display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 4px;
+  align-items: baseline; padding: 16px 0; border-bottom: 1px solid var(--line-soft);
+}
+.terms-points__no {
+  font-family: var(--en-display); font-size: 18px; color: var(--primary); letter-spacing: .04em;
+}
+.terms-points__body { font-size: 14.5px; color: var(--body); line-height: 1.9; }
+.terms-points__body strong { display: block; color: var(--ink); font-weight: 600; }
+.terms-points__ref {
+  display: block; font-family: var(--ui); font-size: 12px; color: var(--body-soft);
+  letter-spacing: .02em; margin-top: 6px;
+}
+.terms-points__note {
+  font-size: 13px; color: var(--body-soft); line-height: 1.85; margin-top: 16px;
+}
+.terms-points__note a { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; }
 
 .legal-tabs { display: flex; gap: 0; border-bottom: 2px solid var(--line); margin-bottom: 0; }
 .legal-tab {
@@ -19,7 +58,8 @@
   font-family: var(--head); background: none; border-top: none; border-left: none; border-right: none;
 }
 .legal-tab:hover { color: var(--blue); }
-.legal-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+/* 選択中は面で示す（色だけに頼らない）。角丸0・影0の正典どおり地の塗りとヘアラインのみ */
+.legal-tab.active { color: var(--blue); border-bottom-color: var(--blue); background: var(--pale); }
 
 .legal-pane { display: none; }
 .legal-pane.active { display: block; }
@@ -46,6 +86,7 @@
   border-radius: 0; font-size: 13.5px; color: var(--body); margin: 20px 0; line-height: 1.8;
 }
 
+/* sticky。祖先（.site-frame / main / .legal-head / .terms-points）に overflow を書かない */
 .tab-wrap { background: #fff; border-bottom: 1px solid var(--line); position: sticky; top: 76px; z-index: 40; }
 .tab-inner { max-width: 760px; margin: 0 auto; padding: 0 24px; }
 
@@ -54,3 +95,9 @@
   font-size: 13.5px; font-weight: 600; color: var(--blue); margin-bottom: 32px;
 }
 .back-link:hover { text-decoration: underline; }
+
+@media (max-width: 560px) {
+  .legal-head__inner, .terms-points__inner { padding-inline: 18px; }
+  .terms-points__list li { grid-template-columns: 34px minmax(0, 1fr); }
+  .legal-tab { padding: 13px 16px; font-size: 13.5px; }
+}

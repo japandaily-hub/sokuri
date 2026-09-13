@@ -39,3 +39,39 @@
   .signup-page .area-grid { grid-template-columns: repeat(2, 1fr); }
   .signup-page .role-grid { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   ビジュアル再構築 v2（BRIEF §2.5 /signup）
+   シェル（.auth-page--split / .auth-side / .auth-side__line）は katazuke-pages.css（コア）。
+   ここはページ側が供給する値と、/signup 固有の見え方だけを書く。
+   ============================================================ */
+
+/* --auth-bar-h: split グリッドの高さ計算に使う上部バー高。/signup の上部バーは .auth-bar ではなく
+   sticky の .flow-header（上下 14px ＋ ステッパー 24px ＋ ラベル行）＝実測 67px。
+   --auth-side-pad-b: 左カラムの1行が固定の .flow-footer（約 77px）に潜らないよう持ち上げる量。 */
+.signup-page { --auth-bar-h: 67px; --auth-side-pad-b: 80px; }
+
+/* フォーム直上の注記（登録＝業者への通知ではない、という実装事実） */
+.signup-page .signup-lead-note {
+  background: #fff; border: 1px solid var(--line); border-radius: 0;
+  padding: 14px 16px; margin-bottom: 22px;
+  font-size: 13.5px; line-height: 1.85; color: var(--body);
+}
+
+/* ステッパー: 現在地は --primary ベタの 28px 正方形、通過済みは --deep。
+   margin で外側に 2px ずつ食み出させ、レイアウト上の高さ（24px）と
+   コネクタ線（.flow-step+.flow-step::before{top:12px}）の位置は変えない。 */
+.signup-page .flow-step.active .fs-dot {
+  width: 28px; height: 28px; margin: -2px 0; font-size: 12px;
+  background: var(--primary); border-color: var(--primary); color: #fff;
+}
+.signup-page .flow-step.done .fs-dot { background: var(--deep); border-color: var(--deep); color: #fff; }
+.signup-page .flow-step.done + .flow-step::before { background: var(--deep); }
+
+/* 「次へ」はカード直下（固定フッター）で幅いっぱいに。戻るは内容幅のまま */
+.signup-page .flow-footer .inner { justify-content: stretch; }
+.signup-page .btn-flow-back { flex: 0 0 auto; }
+.signup-page .btn-flow-next { flex: 1; justify-content: center; }
+
+/* 信頼行はカードの外側（フロー全体の脚）に置くので上余白を足す */
+.signup-page .flow-wrap > .trust-row { margin-top: 28px; }

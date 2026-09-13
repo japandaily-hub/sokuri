@@ -38,7 +38,8 @@ export function ScrollProgress() {
 
 /**
  * スクロール到達でフェードイン（デザイン .rv → .in）。
- * prefers-reduced-motion は CSS 側で尊重済み。
+ * 非表示（opacity:0）になるのは layout.tsx が <html> に js-rv を付けた時だけ（IO あり・reduced-motion でない）。
+ * IO が発火しないケース（レイアウト前の 0 高さ・古い WebView 等）の保険として、マウント後 1200ms で .in を強制付与する。
  */
 export function Reveal({
   children,
@@ -55,6 +56,12 @@ export function Reveal({
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    const show = () => el.classList.add("in");
+    const fallback = window.setTimeout(show, 1200);
+    if (!("IntersectionObserver" in window)) {
+      show();
+      return () => window.clearTimeout(fallback);
+    }
     const io = new IntersectionObserver(
       (entries) => {
         entries.forEach((e) => {
@@ -67,7 +74,10 @@ export function Reveal({
       { threshold: 0.12, rootMargin: "0px 0px -8% 0px" }
     );
     io.observe(el);
-    return () => io.disconnect();
+    return () => {
+      window.clearTimeout(fallback);
+      io.disconnect();
+    };
   }, []);
   const Component = Tag as ElementType;
   return (

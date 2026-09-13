@@ -78,7 +78,8 @@ h1,h2,h3,h4,h5{font-family:var(--head);color:var(--ink);font-weight:400;
 strong{font-weight:600;color:var(--ink);}
 ::selection{background:rgba(82,126,82,.16);color:var(--ink);}
 /* :focus-visible は globals.css の @layer base に集約（重複定義を排除。挙動は同一） */
-.container{width:100%;max-width:var(--maxw);margin-inline:auto;padding-inline:24px;}
+/* --container-pad は .sp-bleed（katazuke-pages.css）が負マージンに使う。値は padding-inline と常に同一に保つ */
+.container{--container-pad:24px;width:100%;max-width:var(--maxw);margin-inline:auto;padding-inline:var(--container-pad);}
 .ic{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:1.5;
   stroke-linecap:round;stroke-linejoin:round;display:inline-block;vertical-align:-.13em;}
 
@@ -563,10 +564,12 @@ section:has(> .vt){position:relative;}
 /* ============================================================
    追従CTA（モバイル）
    ============================================================ */
-.dock{position:fixed;left:0;right:0;bottom:0;z-index:55;display:none;gap:10px;padding:12px 16px
-  calc(12px + env(safe-area-inset-bottom));background:#fff;
-  backdrop-filter:none;border-top:1px solid var(--line);box-shadow:none;}
-.dock .btn{flex:1;padding:15px;font-size:15px;}
+/* 高さ 56px（BRIEF §1.8）。ヒーロー CTA（.hero-cta）が画面内の間は Dock（chrome.tsx）が .dock--hidden を付けて隠す */
+.dock{position:fixed;left:0;right:0;bottom:0;z-index:55;display:none;gap:10px;align-items:center;
+  min-height:calc(56px + env(safe-area-inset-bottom));padding:8px 16px calc(8px + env(safe-area-inset-bottom));
+  background:#fff;backdrop-filter:none;border-top:1px solid var(--line);box-shadow:none;}
+.dock .btn{flex:1;min-height:40px;padding:11px 15px;font-size:15px;}
+.dock.dock--hidden{display:none;}
 
 /* ============================================================
    中間インラインCTA
@@ -585,12 +588,18 @@ section:has(> .vt){position:relative;}
 /* ============================================================
    スクロール演出 — フェードのみ（人の森は移動を伴わない）
    ============================================================ */
-.rv{opacity:0;transform:none;transition:opacity .7s var(--ease);}
-.rv.in{opacity:1;transform:none;}
-.rv[data-d="1"]{transition-delay:.08s;}
-.rv[data-d="2"]{transition-delay:.16s;}
-.rv[data-d="3"]{transition-delay:.24s;}
-@media(prefers-reduced-motion:reduce){.rv{opacity:1;transform:none;transition:none;}}
+/* 基底は「見える」。transition は html.js-rv 配下だけに書く（js-rv は layout.tsx の <head> 内 blocking script が
+   IntersectionObserver あり・かつ prefers-reduced-motion でない時のみ付与）。
+   → JS 未実行・低速回線・reduced-motion で本文が消えず、基底に transition が無いので
+   「見えていた本文が一度フェードアウトしてから戻る」現象も起きない（BRIEF §1.7）。 */
+.rv{opacity:1;transform:none;}
+html.js-rv .rv{transition:opacity .7s var(--ease);}
+html.js-rv .rv:not(.in){opacity:0;}
+html.js-rv .rv[data-d="1"]{transition-delay:.08s;}
+html.js-rv .rv[data-d="2"]{transition-delay:.16s;}
+html.js-rv .rv[data-d="3"]{transition-delay:.24s;}
+/* 閲覧中に OS 設定が reduce に変わった場合の保険（script は初回のみ実行のため） */
+@media(prefers-reduced-motion:reduce){html.js-rv .rv:not(.in){opacity:1;transition:none;}}
 
 /* ============================================================
    画像プレースホルダ（生成前の堅牢化）
@@ -621,7 +630,7 @@ img[data-ph]{position:relative;}
   body{padding-bottom:74px;}
 }
 @media(max-width:560px){
-  .container{padding-inline:18px;}
+  .container{--container-pad:18px;}
   .steps-grid,.scenes-grid{grid-template-columns:1fr;max-width:420px;margin-inline:auto;}
   .hero-cta .btn{width:100%;}
   .hero-photo::after{display:none;}

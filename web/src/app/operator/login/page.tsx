@@ -100,13 +100,18 @@ function OperatorLoginForm() {
   }
 
   return (
-    <div className="auth-page operator-auth">
+    <div className="auth-page auth-page--split operator-auth">
       <AuthBar rightHref="/operator/signup" rightLabel="業者登録はこちら →" />
       <main id="main">
+        <aside className="auth-side">
+          {/* eslint-disable @next/next/no-img-element */}
+          <img src="/img/v2/ol-side.webp" width={900} height={1350} alt="" loading="lazy" decoding="async" />
+          <p className="auth-side__line">業者の方の入口です。</p>
+        </aside>
         <div className="auth-wrap">
           <div className="auth-card">
             <div className="auth-head">
-              <span className="buyer-tag">BUYER</span>
+              <span className="buyer-tag"><span className="buyer-tag__en">BUYER</span>買取業者さま向け</span>
               <h1 className="auth-title">業者ログイン</h1>
               <p className="auth-sub">登録業者さま向けの管理画面に入ります。</p>
             </div>
@@ -228,13 +233,31 @@ function OperatorLoginForm() {
             </form>
           </div>
 
-          <div className="auth-switch">
-            招待コードをお持ちの方は
-            <br />
-            <Link href="/operator/signup">業者登録 →</Link>
+          {/* 状態別の案内。審査の所要日数は書かない（確約になるため・BRIEF §2.5） */}
+          <div className="op-guide">
+            <p className="op-guide-t">ログインできない場合</p>
+            <ul className="op-guide-list">
+              <li>
+                まだお申し込みでない方は、<Link href="/business">業者登録のお申し込み</Link>からご案内しています。
+              </li>
+              <li>お申し込み済みの方は、審査完了後にメールでお知らせします。</li>
+              <li>
+                招待コードをお持ちの方は、<Link href="/operator/signup">業者登録</Link>からアカウントを作成できます。
+              </li>
+            </ul>
+            <p className="op-guide-note">
+              パスワードの再設定は<Link href="/contact">お問い合わせ</Link>ください。
+            </p>
           </div>
-          <div className="auth-switch" style={{ marginTop: 10 }}>
+
+          <div className="auth-switch" style={{ marginTop: 20 }}>
             ユーザーの方は <Link href="/login">ユーザーログイン →</Link>
+          </div>
+
+          <div className="op-auth-foot">
+            運営: カタヅケ運営事務局
+            <span aria-hidden="true"> ／ </span>
+            <Link href="/company">運営者情報</Link>
           </div>
         </div>
       </main>

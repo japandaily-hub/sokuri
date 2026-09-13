@@ -94,15 +94,28 @@ export default function ContactPage() {
 
   return (
     <main id="main">
-      {/* ============ ページヒーロー ============ */}
-      <section className="page-hero">
-        <div className="container">
-          <span className="eyebrow">お問い合わせ</span>
+      {/* ============ ページヒーロー（帯上に文字を置かない） ============ */}
+      <section className="hero-band hero-band--slim hero-band--quiet hero-band--pos-r">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/img/v2/ct-band.webp"
+          width="1920"
+          height="1080"
+          alt=""
+          loading="eager"
+          fetchPriority="high"
+          decoding="async"
+        />
+        <div className="hero-band__veil" aria-hidden="true" />
+      </section>
+
+      <section className="ct-head">
+        <div className="ct-head__box">
+          <span className="ct-head__en">CONTACT</span>
           <h1>お問い合わせ</h1>
-          <p>
-            サービスに関するご質問・ご要望など、
-            <br />
-            お気軽にお問い合わせください。
+          <p>サービスに関するご質問・ご要望など、お気軽にお問い合わせください。</p>
+          <p className="ct-head__faq">
+            <Link href="/faq">よくある質問で解決するかもしれません</Link>
           </p>
         </div>
       </section>
@@ -113,7 +126,7 @@ export default function ContactPage() {
           {/* LINE 優先案内 */}
           <div className="line-first">
             <div className="line-first-body">
-              <strong>片付けを始めるなら、<br className="sp-br" />LINEが最短です</strong>
+              <strong>LINEなら最短、<br className="sp-br" />フォームならメールで返信</strong>
               <p>
                 査定・出品のご依頼はLINEから。友だち追加するだけで、すぐに出品をはじめられます。
               </p>
@@ -132,6 +145,9 @@ export default function ContactPage() {
             {!sent ? (
               <div id="form-body">
                 <p className="form-section-label">お問い合わせフォーム</p>
+                <p className="form-owner">
+                  担当：カタヅケ運営事務局（メールでの対応を原則としています）
+                </p>
 
                 {submitError && (
                   <div className="auth-error" role="alert" style={{ marginBottom: 16 }}>
@@ -233,6 +249,13 @@ export default function ContactPage() {
                         <option value="pricing">料金・費用について</option>
                         <option value="area">対応エリアについて</option>
                         <option value="privacy">個人情報の取り扱いについて</option>
+                        {/* 特商法に基づく事業者情報（代表者名・詳細住所・電話番号）の開示請求。
+                            backend の ContactCategory は Literal 8値に固定されており、新しい
+                            スラッグを送ると 422 になるため value は "other" を使う。運営通知
+                            メールの種別欄は「その他」と表示されるので、専用スラッグが必要なら
+                            backend 側（schemas_katadzuke.ContactCategory と
+                            services/notify._CONTACT_CATEGORY_LABELS）の追加が要る。 */}
+                        <option value="other">事業者情報の開示請求</option>
                         <option value="trouble">トラブル・クレーム</option>
                         <option value="partner">業者登録・提携について</option>
                         <option value="press">取材・メディア掲載</option>

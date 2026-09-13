@@ -5,17 +5,28 @@
    共通クラス（.auth-page/.auth-card/.field/.btn 等）はここで再定義しない。
    ============================================================ */
 
+/* アカウント種別の明示。英字だけでは 60 代の閲覧者に伝わらないため和文を主、BUYER を従の小ラベルに。 */
 .operator-auth .buyer-tag {
-  display: inline-block;
-  font-size: 10.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: .04em;
   color: var(--blue);
   background: var(--pale);
   border: 1px solid var(--line);
   border-radius: 0;
-  padding: 3px 11px;
+  padding: 4px 11px;
   margin-bottom: 10px;
+}
+.operator-auth .buyer-tag__en {
+  font-family: var(--en);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--body-soft);
 }
 
 /* 招待コード（任意・アコーディオン表示） */
@@ -49,3 +60,78 @@
 .operator-auth .agree-cb { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--blue); margin-top: 2px; cursor: pointer; }
 .operator-auth .agree-row label { font-size: 13px; color: var(--body); line-height: 1.75; cursor: pointer; }
 .operator-auth .agree-row a { color: var(--blue); font-weight: 600; }
+
+/* ============================================================
+   ビジュアル再構築 v2（BRIEF §2.5 /operator/signup・/operator/login）
+   シェル（.auth-page--split / .auth-side / .auth-side__line）は katazuke-pages.css（コア）。
+   ここはカード内外に足した業者向けの案内だけを書く。共通クラスは再定義しない。
+   ============================================================ */
+
+/* 参加条件の要点（/operator/signup カード上部・--pale-2 面） */
+.operator-auth .op-points {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  background: var(--pale-2);
+  font-family: var(--ui);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--body);
+}
+.operator-auth .op-points li { position: relative; padding-left: 14px; }
+.operator-auth .op-points li::before {
+  content: ""; position: absolute; left: 0; top: .62em;
+  width: 6px; height: 6px; background: var(--primary);
+}
+
+/* 承認前にできること／できないこと（アコーディオン外に常時表示・日数は書かない） */
+.operator-auth .op-gate-note {
+  border: 1px solid var(--line);
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  line-height: 1.85;
+  color: var(--body);
+}
+
+/* 入力欄に添える補足（許可番号の確認主体など） */
+.operator-auth .field-note { margin-top: 6px; font-size: 12px; line-height: 1.7; color: var(--body-soft); }
+
+/* 状態別の案内（/operator/login のカード下） */
+.operator-auth .op-guide {
+  margin-top: 22px;
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+}
+.operator-auth .op-guide-t { font-family: var(--head); font-size: 14px; font-weight: 600; color: var(--ink); margin-bottom: 10px; }
+.operator-auth .op-guide-list { list-style: none; margin: 0; padding: 0; }
+.operator-auth .op-guide-list li {
+  position: relative;
+  padding: 0 0 0 16px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  line-height: 1.85;
+  color: var(--body);
+}
+.operator-auth .op-guide-list li::before {
+  content: ""; position: absolute; left: 0; top: .78em;
+  width: 8px; height: 1px; background: var(--line);
+}
+.operator-auth .op-guide-list a, .operator-auth .op-guide-note a { color: var(--blue); font-weight: 600; }
+.operator-auth .op-guide-note { margin-top: 12px; font-size: 12.5px; line-height: 1.8; color: var(--body-soft); }
+
+/* 運営者の明示（/operator/login の脚） */
+.operator-auth .op-auth-foot {
+  margin-top: 24px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+  text-align: center;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: var(--body-soft);
+}
+.operator-auth .op-auth-foot a { color: var(--blue); font-weight: 600; }
+.operator-auth .op-auth-foot a:hover { text-decoration: underline; }

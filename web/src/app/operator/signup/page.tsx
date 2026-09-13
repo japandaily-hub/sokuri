@@ -17,7 +17,7 @@ import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { signupOperator, toDisplayMessage } from "@/lib/katadzuke-api";
-import { AuthBar, Field } from "@/components/kdz/auth";
+import { AuthBar, Field, PasswordField } from "@/components/kdz/auth";
 
 export default function OperatorSignupPage() {
   const router = useRouter();
@@ -79,13 +79,18 @@ export default function OperatorSignupPage() {
   }
 
   return (
-    <div className="auth-page operator-auth">
+    <div className="auth-page auth-page--split operator-auth">
       <AuthBar rightHref="/operator/login" rightLabel="ログインはこちら →" />
       <main id="main">
+        <aside className="auth-side">
+          {/* eslint-disable @next/next/no-img-element */}
+          <img src="/img/v2/os-side.webp" width={900} height={1350} alt="" loading="lazy" decoding="async" />
+          <p className="auth-side__line">審査制。古物商許可を確認します。</p>
+        </aside>
         <div className="auth-wrap">
           <div className="auth-card">
             <div className="auth-head">
-              <span className="buyer-tag">BUYER</span>
+              <span className="buyer-tag"><span className="buyer-tag__en">BUYER</span>買取業者さま向け</span>
               <h1 className="auth-title">業者登録</h1>
               <p className="auth-sub">
                 業者登録には運営の審査があります。まだお申し込みでない方は、まず
@@ -95,6 +100,18 @@ export default function OperatorSignupPage() {
                 からご案内しています。招待コードをお持ちの方はこちらからアカウントを作成してください。
               </p>
             </div>
+
+            {/* 参加条件の要点。左カラムの1行（審査制）を、右カラムの事実で受ける */}
+            <ul className="op-points">
+              <li>古物商許可の確認</li>
+              <li>初期費用0円</li>
+              <li>下見なし</li>
+            </ul>
+
+            {/* 承認前にできること／できないこと。アコーディオンの開閉に関わらず常時表示（日数は書かない） */}
+            <p className="op-gate-note">
+              登録後すぐに案件の閲覧ができます。入札は運営の承認後に開放されます。
+            </p>
 
             {error ? (
               <div className="auth-error" role="alert">
@@ -114,7 +131,7 @@ export default function OperatorSignupPage() {
                 </button>
                 {showInviteField ? (
                   <div style={{ marginTop: 10 }}>
-                    <Field label="招待コード" htmlFor="op-invite">
+                    <Field label="招待コード" htmlFor="op-invite" rightSlot={<span className="opt">任意</span>}>
                       <input
                         id="op-invite"
                         type="text"
@@ -127,12 +144,12 @@ export default function OperatorSignupPage() {
                   </div>
                 ) : (
                   <p className="invite-note" style={{ marginTop: 10, marginBottom: 0 }}>
-                    招待コードなしでも登録できます。ただし、入札には運営の承認が必要です（案件の閲覧は登録後すぐに可能です）。
+                    招待コードなしでも登録できます。
                   </p>
                 )}
               </div>
 
-              <Field label="会社名" htmlFor="op-company">
+              <Field label="会社名" htmlFor="op-company" rightSlot={<span className="req">必須</span>}>
                 <input
                   id="op-company"
                   type="text"
@@ -148,17 +165,20 @@ export default function OperatorSignupPage() {
                 rightSlot={<span className="req">必須</span>}
                 error={licenseError}
               >
-                <input
-                  id="op-license"
-                  type="text"
-                  required
-                  minLength={LICENSE_MIN_LENGTH}
-                  value={license}
-                  onChange={(e) => setLicense(e.target.value)}
-                  placeholder="東京都公安委員会 第XXXXXXXXXX号"
-                />
+                <>
+                  <input
+                    id="op-license"
+                    type="text"
+                    required
+                    minLength={LICENSE_MIN_LENGTH}
+                    value={license}
+                    onChange={(e) => setLicense(e.target.value)}
+                    placeholder="東京都公安委員会 第XXXXXXXXXX号"
+                  />
+                  <p className="field-note">利用者の安心のため、許可証を運営が確認します。</p>
+                </>
               </Field>
-              <Field label="メールアドレス" htmlFor="op-email">
+              <Field label="メールアドレス" htmlFor="op-email" rightSlot={<span className="req">必須</span>}>
                 <input
                   id="op-email"
                   type="email"
@@ -169,16 +189,9 @@ export default function OperatorSignupPage() {
                   inputMode="email"
                 />
               </Field>
-              <Field label="パスワード（8文字以上）" htmlFor="op-password">
-                <input
-                  id="op-password"
-                  type="password"
-                  required
-                  minLength={8}
-                  autoComplete="new-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
+              {/* パスワード表示切替は /operator/login・/login と同じ PasswordField に揃える */}
+              <Field label="パスワード（8文字以上）" htmlFor="op-password" rightSlot={<span className="req">必須</span>}>
+                <PasswordField id="op-password" value={password} onChange={setPassword} autoComplete="new-password" />
               </Field>
 
               <div className="agree-row">

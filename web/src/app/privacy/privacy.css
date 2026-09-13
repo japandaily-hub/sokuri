@@ -1,29 +1,49 @@
 /* プライバシーポリシー（長文・節構成）ページ固有CSS。
-   共通クラス（.container/.eyebrow 等）は katazuke.css にあるため再定義しない。
-   デザイン正典: docs/design_handoff_katazuke/プライバシーポリシー.html の <style> を移植。 */
+   共通クラス（.container/.eyebrow/.hero-band 等）は katazuke.css /
+   katazuke-pages.css にあるため再定義しない。
+   デザイン正典: docs/design_handoff_katazuke/プライバシーポリシー.html の <style> を移植。
+   v2: 淡青ヘッダー面 .legal-hero を廃し、共通の無文字帯（.hero-band--fixed --quiet）＋
+   帯直下の見出しブロック .legal-head に置き換え。第2条の表は罫線を水平方向だけに整理し、
+   859px 以下はカード積みにする（BRIEF §2.10）。 */
 
-.legal-hero {
-  background: var(--pale);
-  padding: clamp(40px, 5vw, 72px) 0 clamp(32px, 4vw, 56px);
+/* 帯直下の見出しブロック（法務3ページ共通の構え）。本文 .legal-body と同じ 760px 幅に揃える */
+.legal-head {
+  padding: clamp(26px, 4vw, 44px) 0 clamp(20px, 3vw, 30px);
   border-bottom: 1px solid var(--line);
 }
-.legal-hero .eyebrow { justify-content: flex-start; }
-.legal-hero h1 { font-size: clamp(24px, 3.5vw, 36px); margin-top: 14px; }
-.legal-hero .updated { font-size: 13px; color: var(--body-soft); margin-top: 10px; }
+.legal-head__inner { max-width: 760px; margin: 0 auto; padding-inline: 24px; }
+.legal-head__en {
+  display: block; font-family: var(--en); font-weight: 600; font-size: 11.5px;
+  letter-spacing: .18em; text-transform: uppercase; color: var(--primary);
+}
+.legal-head h1 {
+  font-family: var(--head); font-weight: 400; color: var(--ink);
+  font-size: clamp(24px, 3.5vw, 36px); margin-top: 12px;
+}
+.legal-head__meta {
+  font-family: var(--ui); font-size: 12.5px; color: var(--body-soft);
+  letter-spacing: .02em; margin-top: 12px; line-height: 1.8;
+}
 
 .legal-body {
   max-width: 760px;
   margin: 0 auto;
   padding: clamp(40px, 5vw, 72px) 24px clamp(64px, 8vw, 108px);
 }
-.legal-body h2 {
-  font-size: 18px;
+/* 条見出しは明朝 22px＋上 1px 罫（下線での囲い込みをやめ、余白と 1 本の罫で節を切る）。
+   terms.css の .legal-body h2（下罫 2px）と同居しても勝つよう .privacy-body で特異度を上げる。 */
+.legal-body.privacy-body h2 {
+  font-family: var(--head);
+  font-weight: 600;
+  font-size: 22px;
   color: var(--navy);
-  margin: 40px 0 14px;
-  padding-bottom: 10px;
-  border-bottom: 2px solid var(--line);
+  margin: clamp(40px, 5vw, 56px) 0 16px;
+  padding-top: clamp(28px, 3.5vw, 36px);
+  padding-bottom: 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 0;
 }
-.legal-body h2:first-of-type { margin-top: 0; }
+.legal-body.privacy-body h2:first-of-type { margin-top: 0; padding-top: 0; border-top: 0; }
 .legal-body h3 { font-size: 15px; color: var(--ink); margin: 22px 0 8px; }
 .legal-body p {
   font-size: 14.5px;
@@ -38,27 +58,38 @@
   line-height: 1.85;
   margin-bottom: 6px;
 }
-.legal-body table {
+
+/* 第2条の表: 淡青のヘッダ塗りを外し、ヘッダ行は下罫 2px --ink、行間は 1px --line */
+.legal-body.privacy-body table {
   width: 100%;
   border-collapse: collapse;
   margin-bottom: 20px;
   font-size: 14px;
 }
-.legal-body th {
-  background: var(--pale);
-  padding: 11px 14px;
+.legal-body.privacy-body th {
+  background: none;
+  padding: 12px 16px 12px 0;
   text-align: left;
+  font-family: var(--ui);
   font-weight: 600;
-  color: var(--navy);
-  border: 1px solid var(--line);
+  font-size: 12.5px;
+  letter-spacing: .04em;
+  color: var(--ink);
+  border: 0;
+  border-bottom: 2px solid var(--ink);
 }
-.legal-body td {
-  padding: 10px 14px;
+.legal-body.privacy-body td {
+  padding: 14px 16px 14px 0;
   color: var(--body);
-  border: 1px solid var(--line);
-  line-height: 1.75;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  line-height: 1.85;
   vertical-align: top;
 }
+.legal-body.privacy-body th:last-child,
+.legal-body.privacy-body td:last-child { padding-right: 0; }
+.legal-body.privacy-body .collect-type { color: var(--ink); font-weight: 600; }
+
 .legal-body .note {
   background: var(--warm);
   border-left: 3px solid var(--gold);
@@ -83,10 +114,50 @@
 }
 .back-link:hover { text-decoration: underline; }
 
-/* スマホ幅では 3 列の表が 1 文字ずつ縦に折れて読めない（モバイル監査 2026-09-07）。
-   表を横スクロールにして列幅を確保する。 */
-@media (max-width: 640px) {
-  .legal-body table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .legal-body table thead, .legal-body table tbody { display: table; width: 100%; min-width: 600px; }
-  .legal-body th { white-space: nowrap; }
+/* 3 列の表はスマホ幅で 1 文字ずつ縦に折れて読めない（モバイル監査 2026-09-07）。
+   横スクロールではなくカード積みにして、各セルに項目名（data-label）を添える。
+   セマンティクスは page.tsx の明示 role（table/rowgroup/row/columnheader/cell）で維持する。 */
+@media (max-width: 859px) {
+  .legal-body.privacy-body table,
+  .legal-body.privacy-body thead,
+  .legal-body.privacy-body tbody,
+  .legal-body.privacy-body tr,
+  .legal-body.privacy-body th,
+  .legal-body.privacy-body td { display: block; }
+  /* ヘッダ行は data-label に役目を譲るので視覚的にだけ隠す（読み上げには残す） */
+  .legal-body.privacy-body thead {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip-path: inset(50%); white-space: nowrap;
+  }
+  .legal-body.privacy-body tbody tr {
+    border: 1px solid var(--line);
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+  .legal-body.privacy-body tbody tr:last-child { margin-bottom: 0; }
+  .legal-body.privacy-body td {
+    padding: 0;
+    border: 0;
+    font-size: 14px;
+  }
+  .legal-body.privacy-body td + td {
+    margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line-soft);
+  }
+  .legal-body.privacy-body td::before {
+    content: attr(data-label);
+    display: block;
+    font-family: var(--ui);
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    color: var(--body-soft);
+    margin-bottom: 4px;
+  }
+  .legal-body.privacy-body .collect-type { font-size: 15px; }
+}
+
+@media (max-width: 560px) {
+  .legal-head__inner { padding-inline: 18px; }
+  .legal-body.privacy-body { padding-inline: 18px; }
+  .legal-body.privacy-body h2 { font-size: 20px; }
 }

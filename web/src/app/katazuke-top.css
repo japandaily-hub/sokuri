@@ -1,0 +1,184 @@
+/* ============================================================
+   カタヅケ トップ（/）固有スタイル — ビジュアル再構築 v2（BRIEF §2.1）
+   所有: ページ担当 A。katazuke.css / katazuke-pages.css は触らない。
+   page.tsx から import されるためカスケードレイヤーの外（unlayered）で読まれ、
+   layer(components) の既存定義より後勝ちになる。それでも意図を明示するため、
+   上書きは必ず既存セレクタと同特異度以上で書く。
+   正典（DESIGN_SYSTEM §10）: 角丸ゼロ・影ゼロ・明朝・主色 #1447e0。
+   width:100vw は使わない。.site-frame と sticky の祖先に overflow を書かない。
+   モバイル閾値は額装解除と同じ 859px に統一（.sp-bleed と同じ）。
+   ============================================================ */
+
+/* ============================================================
+   #1 HERO — 右カラムを 2:3 の額装写真に。blob と破線コネクタは廃止
+   ============================================================ */
+/* 面の語彙を 4 種（白 / --pale-2 / 濃紺帯 / 写真帯）に絞るため楕円 blob を出さない。
+   要素自体は page.tsx から外したが、キャッシュされた旧 HTML への保険として残す。 */
+.hero .hero-blob{display:none;}
+
+/* .hero-photo は「青ずらし枠（::before）を持つ入れ物」に徹し、寸法は内側の .img-frame が決める */
+.hero .hero-photo{position:relative;aspect-ratio:auto;overflow:visible;background:transparent;border:0;}
+/* 破線コネクタ（::after）は削除。写真と本文を線でつながない */
+.hero .hero-photo::after{content:none;}
+/* images.json 指定の切り位置。縦長でも手元が切れない */
+.hero .hero-photo .img-frame{--pos:50% 45%;}
+
+/* 4ステップ帯は番号＋文字のみ（アイコンは「ご利用の流れ」で 220px 大判に集約） */
+.hero .hw-ic{display:none;}
+
+@media(max-width:859px){
+  /* 写真を h1 の直後・本文の前に繰り上げる。
+     .hero-copy の箱を display:contents で外し、hero-grid 直下の flex 項目として order を付ける。 */
+  .hero .hero-grid{display:flex;flex-direction:column;gap:0;}
+  .hero .hero-copy{display:contents;}
+  .hero .hero-copy h1{order:1;}
+  .hero .hero-figure{order:2;max-width:none;margin:22px 0 0;}
+  .hero .hero-sub{order:3;}
+  .hero .hero-trust{order:4;}
+  .hero .hero-how{order:5;}
+  .hero .hero-cta{order:6;}
+  /* 縦 585px を避けるため 4:5 に切り替える（AR 規約の例外1・images.json に明記） */
+  .hero .hero-photo .img-frame{aspect-ratio:4/5;}
+  /* .sp-bleed で画面端まで届くので、右に 6px はみ出す青ずらし枠は畳む（横スクロール防止） */
+  .hero .hero-photo::before{content:none;}
+}
+
+/* ============================================================
+   #2 ASSURE — 帯の高さを 1.4 倍にし、3D アイコンを枠に入れて輪郭を戻す
+   ============================================================ */
+.assure .container{padding-block:40px;}
+.assure-item .ai{width:56px;height:56px;background:var(--pale-2);border:1px solid var(--line);}
+.assure-item .ai img{object-fit:contain;padding:7px;}
+@media(max-width:520px){
+  .assure .container{padding-block:30px;}
+  .assure-item .ai{width:48px;height:48px;}
+}
+
+/* ============================================================
+   #3 共感（よくある不安）— 人物実写を静物 1:1 に置換し、間隔を広げる
+   ============================================================ */
+.empathy .emp-grid{gap:clamp(32px,4vw,48px);}
+.empathy .emp-photo{aspect-ratio:1/1;background:#fff;}
+@media(max-width:859px){
+  /* .sp-bleed の負マージンが画面幅とぴったり合うよう、カード幅の上限を外す */
+  .empathy .emp-grid{grid-template-columns:1fr;max-width:none;margin-inline:0;}
+}
+
+/* ============================================================
+   #4 ご利用の流れ — 既存 3D アイコンを 1 辺 220px の白枠で大きく見せる
+   ============================================================ */
+#flow .step-photo{aspect-ratio:1/1;max-width:220px;margin-inline:auto;background:#fff;}
+#flow .step-photo img{object-fit:contain;padding:clamp(10px,1.6vw,18px);}
+#flow .step-body{text-align:center;}
+@media(max-width:859px){
+  #flow .steps-grid{grid-template-columns:repeat(2,1fr);max-width:none;margin-inline:0;gap:clamp(22px,4vw,32px);}
+}
+
+/* ============================================================
+   #6 #7 BUNDLE / AUCTION — 3D 図版を白地・1px 枠に入れて輪郭を出す
+   生成 AR（1536x864 = 16:9）に表示 AR を合わせる
+   ============================================================ */
+.bundle .bundle-figure,
+.auction .auc-figure{aspect-ratio:16/9;background:#fff;}
+.bundle .bundle-figure img,
+.auction .auc-figure img{object-fit:contain;padding:clamp(10px,2vw,22px);}
+
+/* ============================================================
+   #8 引き渡し — .media-split（左画像 3:2 / 右テキスト）
+   ============================================================ */
+.handover .handover-figure{background:#fff;}
+
+/* ============================================================
+   #9 利用シーン — 淡青の大面積をやめ白面に。カード画像は淡い地の枠
+   ============================================================ */
+.scenes .scene-img{aspect-ratio:1/1;}
+@media(max-width:859px){
+  .scenes .scenes-grid{grid-template-columns:repeat(2,1fr);max-width:none;margin-inline:0;gap:clamp(22px,4vw,32px);}
+}
+
+/* ============================================================
+   #10 安心の仕組み — .media-split。左に大判、右に 3 項目の縦リスト
+   ============================================================ */
+.trust .trust-split{--ms-img:44fr;--ms-txt:56fr;margin-top:clamp(28px,4vw,44px);align-items:start;}
+.trust .trust-hero{aspect-ratio:4/3;max-width:520px;margin-inline:auto;background:#fff;}
+.trust .trust-hero img{object-fit:contain;padding:clamp(12px,2vw,24px);}
+.trust .trust-list{display:flex;flex-direction:column;gap:clamp(24px,3vw,34px);}
+.trust .trust-item{display:grid;grid-template-columns:64px minmax(0,1fr);gap:18px;align-items:start;}
+/* 先頭の項目は左の大判が図版を兼ねるため、行頭アイコンを持たない */
+.trust .trust-item--lead{grid-template-columns:minmax(0,1fr);}
+.trust .ti-ic{width:64px;height:64px;}
+.trust .ti-ic img{padding:6px;}
+.trust .ti-body h3{font-size:18px;color:var(--ink);}
+.trust .ti-body p{font-size:15px;color:var(--body);margin-top:8px;line-height:1.9;}
+@media(max-width:859px){
+  .trust .trust-hero{max-width:none;}
+}
+
+/* ============================================================
+   #11 料金 — 画像を置かず「¥0」に振り切る。面は --pale-2（.bg-pale）
+   ============================================================ */
+.fee .fee-zero{text-align:center;margin:clamp(30px,4vw,46px) 0 clamp(32px,5vw,52px);}
+.fee .fz-label{display:block;font-size:13px;letter-spacing:.14em;color:var(--body-soft);}
+.fee .fz-num{display:block;font-family:var(--serif);font-weight:600;color:var(--primary);
+  font-size:clamp(64px,9vw,96px);line-height:1.15;letter-spacing:.02em;margin-top:8px;}
+.fee .fz-note{display:block;font-size:14px;color:var(--body);margin-top:16px;line-height:1.9;}
+.fee .fee-caution{font-size:12.5px;color:var(--body-soft);line-height:1.8;margin:14px 0 0;}
+
+/* ============================================================
+   #12 対応カテゴリ — 4 列・cover・白地 1px。空箱を出さない
+   ============================================================ */
+.cats-grid{grid-template-columns:repeat(4,1fr);gap:clamp(16px,2vw,22px);}
+/* 512px 素材に対して枠は最大 260px（表示幅の 2 倍以内） */
+.cats-grid .cat-img{max-width:260px;margin-inline:auto;background:#fff;}
+/* 画像が読み込めなかった場合の地。img は alt="" で何も描かないため、品目名が残る */
+.cats-grid .cat-img::before{content:attr(data-label);position:absolute;inset:0;z-index:0;
+  display:grid;place-items:center;padding:10px;text-align:center;
+  font-family:var(--head);font-weight:400;font-size:13px;line-height:1.6;
+  color:var(--body-soft);background:var(--pale-2);}
+.cats-grid .cat-img img{z-index:1;object-fit:cover;padding:0;}
+@media(max-width:1100px){.cats-grid{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:859px){.cats-grid{grid-template-columns:repeat(2,1fr);}}
+
+/* ============================================================
+   #13 運営者メッセージ — 人物写真を撤去し、静物 3:2 を右に置く
+   ============================================================ */
+.founder .founder-photo{aspect-ratio:3/2;background:#fff;margin:0;}
+
+/* ============================================================
+   FAQ — 「すべてのQ&Aを見る」の配置（旧インライン style の置換）
+   ============================================================ */
+#faq .faq-more{text-align:center;margin-top:32px;}
+
+/* ============================================================
+   #15 最終CTA — 写真帯には見出しだけ。緑ボタンは帯の直下の白面に置く
+   ============================================================ */
+.final-actions{background:#fff;text-align:center;
+  padding:clamp(36px,5vw,56px) 0 clamp(48px,6vw,80px);}
+.final-actions p{font-size:16px;color:var(--body);max-width:34em;margin-inline:auto;line-height:2;}
+.final-actions .final-cta{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-top:28px;}
+.final-actions .btn-ghost{background:#fff;color:#333;border:1px solid #333;}
+.final-actions .final-note{margin-top:22px;font-size:13px;color:var(--body-soft);}
+@media(max-width:560px){
+  .final-actions .final-cta .btn{width:100%;}
+}
+
+/* ============================================================
+   #14 業者向けバナー — 左テキスト／右画像の 2 カラムに密度を上げる
+   ============================================================ */
+.biz-banner .biz-banner-inner{display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,300px);
+  gap:clamp(28px,4vw,56px);align-items:center;}
+.biz-banner .biz-banner-cta{flex-direction:row;flex-wrap:wrap;align-items:center;
+  justify-content:flex-start;gap:14px;margin-top:22px;}
+/* 「審査制・登録無料」は 13px --body のヘアラインチップに */
+.biz-banner .biz-chip{font-size:13px;color:var(--body);background:#fff;
+  border:1px solid var(--line);padding:6px 14px;line-height:1.7;}
+.biz-banner .biz-banner-media{background:#fff;}
+@media(max-width:859px){
+  .biz-banner .biz-banner-inner{grid-template-columns:1fr;}
+  .biz-banner .biz-banner-media{max-width:400px;margin-inline:auto;width:100%;}
+}
+@media(max-width:560px){
+  .biz-banner .biz-banner-cta .btn{width:100%;}
+  .biz-banner .biz-chip{width:100%;text-align:center;}
+}

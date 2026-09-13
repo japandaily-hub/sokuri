@@ -1,213 +1,238 @@
 /* ============================================================
    業者向けLP（/business）固有スタイル
    共通クラス（.container/.section/.btn/.btn-white/.eyebrow/.section-head/
-   .header .nav .mobile-menu .hamburger .faq .footer .bg-pale 等）は
+   .header .nav .mobile-menu .hamburger .faq .footer .bg-pale、および
+   .hero-band / .media-split / .img-frame / .sp-bleed / .bare-scope）は
    katazuke.css / katazuke-pages.css に定義済み。ここでは重複させない。
    フォームの .field は共通 .field と値が異なるため .business-page 配下にスコープする。
+   モバイル閾値は共有部品と揃えて 859px。
    ============================================================ */
 
 /* ページラッパ（背景は白ベースのまま、最小高さを確保） */
 .business-page { min-height: 100vh; }
 
-/* ヒーロー — トップページと同じ明るいトーン */
+/* ============ ヒーロー ============
+   緑（#527e52）とオレンジの radial 4本 + ::before の被りを撤去し、
+   白 → --pale-2 の縦グラデ1本だけにする。輪郭は右カラムの .img-frame が持つ。 */
 .business-page .biz-hero {
-  background:
-    radial-gradient(58% 52% at 84% -10%, rgba(82,126,82, .22) 0%, rgba(82,126,82, 0) 60%),
-    radial-gradient(30% 30% at -6% -8%, rgba(244, 112, 63, .13) 0%, rgba(244, 112, 63, 0) 70%),
-    linear-gradient(180deg, var(--pale) 0%, var(--pale) 58%);
+  background: linear-gradient(180deg, #fff 0%, var(--pale-2) 100%);
   color: var(--body);
-  padding: clamp(72px, 9vw, 120px) 0 clamp(64px, 8vw, 104px);
-  position: relative;
-  overflow: hidden;
+  padding: clamp(48px, 6.5vw, 96px) 0 clamp(40px, 5vw, 72px);
 }
-.business-page .biz-hero::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(ellipse 80% 60% at 110% 10%, rgba(82,126,82, .10) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 50% at -10% 90%, rgba(244, 112, 63, .08) 0%, transparent 60%);
-  pointer-events: none;
-}
-.business-page .biz-hero .container { position: relative; z-index: 1; }
-/* 明るいヒーロー背景上でチップの輪郭が沈みやすいため、トップページの .hero-eyebrow と
-   同じ体感（白地+境界線+影）を与える */
-.business-page .biz-hero .eyebrow { background: #fff; border: 1px solid var(--line); box-shadow: var(--shadow-s); }
+.business-page .biz-hero .container { position: relative; }
+/* 画像 34 : テキスト 66。画像は 2:3 縦長なので列幅を絞って帯丈を抑える */
+.business-page .biz-hero-split { --ms-img: 34fr; --ms-txt: 66fr; }
+.business-page .biz-hero-fig { align-self: center; }
+.business-page .biz-hero-copy { min-width: 0; }
 .business-page .biz-hero h1 {
-  font-size: clamp(30px, 4.5vw, 54px);
+  font-size: clamp(28px, 4.2vw, 48px);
   color: var(--navy);
   margin-top: 18px;
-  line-height: 1.28;
+  line-height: 1.32;
   text-wrap: balance;
 }
 .business-page .biz-hero h1 .hl { color: var(--blue); }
 .business-page .biz-hero .hero-sub {
-  font-size: clamp(15px, 1.6vw, 18px);
+  font-size: clamp(14.5px, 1.5vw, 16.5px);
   color: var(--body);
   margin-top: 22px;
-  max-width: 560px;
-  line-height: 1.9;
+  line-height: 2;
 }
+.business-page .biz-hero .hero-sub strong { color: var(--ink); font-weight: 600; }
 .business-page .biz-hero-cta {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 14px;
-  margin-top: 36px;
+  margin-top: 32px;
 }
 
-/* 帯：数字実績 */
+/* ============ β期間の注記（独立ノート） ============
+   8% を書く全ての箇所で「いま請求されないこと」を同一視野に置くための帯。 */
+.business-page .biz-beta {
+  background: var(--pale-2);
+  padding: 0 0 clamp(28px, 4vw, 44px);
+}
+.business-page .biz-beta-note {
+  margin: 0;
+  background: #fff;
+  border: 1px solid var(--line);
+  padding: 14px 18px;
+  font-family: var(--ui);
+  font-size: 14px;
+  line-height: 1.9;
+  color: var(--body);
+}
+
+/* ============ 数値帯（事実ベースのサービス条件のみ） ============ */
 .business-page .biz-stats {
-  background: var(--pale);
+  background: var(--pale-2);
+  border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
-  padding: 36px 0;
+  padding: clamp(28px, 4vw, 40px) 0;
 }
 .business-page .biz-stats .inner {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: clamp(32px, 6vw, 80px);
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: clamp(16px, 2.5vw, 32px);
 }
-.business-page .stat-item { text-align: center; }
+.business-page .stat-item { text-align: center; min-width: 0; }
 .business-page .stat-num {
   font-family: var(--head);
-  font-size: clamp(28px, 3.5vw, 40px);
+  font-size: clamp(26px, 3.2vw, 38px);
   font-weight: 400;
   color: var(--navy);
   line-height: 1;
 }
 .business-page .stat-num span { font-size: .58em; font-weight: 600; color: var(--blue); margin-left: 2px; }
-.business-page .stat-label { font-size: 13px; color: var(--body-soft); margin-top: 6px; font-weight: 600; }
+.business-page .stat-label {
+  font-family: var(--ui);
+  font-size: 12.5px;
+  color: var(--body-soft);
+  margin-top: 8px;
+  font-weight: 600;
+  line-height: 1.6;
+}
 
-/* メリットグリッド */
-.business-page .merit-grid {
+/* ============ 章の切れ目の写真帯 ============
+   veil 既定（.65）のままなので 14px 以上の注記を1行だけ置ける。 */
+.business-page .biz-band-sorting .biz-band-note {
+  font-size: 14px;
+  line-height: 1.8;
+  margin-top: 10px;
+}
+
+/* ============ 仕入れる3つの理由（画像付き3カラム） ============ */
+.business-page .biz-reason-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(24px, 3vw, 36px);
 }
-.business-page .merit-card {
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 32px 28px;
-  box-shadow: var(--shadow-s);
-  transition: box-shadow .25s, transform .25s;
-}
-.business-page .merit-card:hover { box-shadow: var(--shadow-m); }
-.business-page .merit-num {
-  font-family: var(--head);
-  font-size: 13px;
-  font-weight: 400;
-  color: var(--blue);
-  letter-spacing: .1em;
-  margin-bottom: 18px;
+.business-page .biz-reason { min-width: 0; }
+.business-page .biz-reason-fig { margin-bottom: 20px; }
+.business-page .biz-reason-num {
   display: flex;
   align-items: center;
-  gap: 8px;
-}
-.business-page .merit-num::after { content: ""; flex: 1; height: 1px; background: var(--line); }
-.business-page .merit-card h3 { font-size: clamp(16px, 1.7vw, 19px); margin-bottom: 12px; }
-.business-page .merit-card p { font-size: 14.5px; color: var(--body-soft); line-height: 1.85; }
-.business-page .merit-tag {
-  display: inline-block;
-  font-size: 12px;
+  gap: 10px;
+  font-family: var(--en);
   font-weight: 600;
-  padding: 3px 10px;
-  border-radius: 0;
-  margin-bottom: 12px;
+  font-size: 12px;
+  letter-spacing: .16em;
+  color: var(--blue);
 }
-.business-page .merit-tag.green { background: #e6f5ee; color: var(--green); }
-.business-page .merit-tag.blue { background: var(--pale); color: var(--blue); }
-.business-page .merit-tag.gold { background: var(--warm); color: var(--gold-text); }
+.business-page .biz-reason-num::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.business-page .biz-reason-tag {
+  font-family: var(--ui);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  color: var(--body-soft);
+  border: 1px solid var(--line);
+  padding: 2px 8px;
+}
+.business-page .biz-reason h3 {
+  font-size: clamp(17px, 1.8vw, 20px);
+  color: var(--ink);
+  line-height: 1.6;
+  margin: 14px 0 10px;
+}
+.business-page .biz-reason p { font-size: 14.5px; color: var(--body-soft); line-height: 1.85; }
 
-/* フロー（業者視点） */
+/* ============ 安心して参加できる理由（04〜06・ヘアラインリスト） ============
+   見出しが「3つの理由」なので、4件目以降は別見出しのリストに分けて数の不一致を解消する。 */
+.business-page .biz-assure {
+  max-width: var(--maxw-text);
+  margin: clamp(56px, 7vw, 88px) auto 0;
+}
+.business-page .biz-assure-head {
+  font-family: var(--head);
+  font-weight: 600;
+  font-size: clamp(18px, 2.2vw, 22px);
+  color: var(--ink);
+  text-align: center;
+  margin: 0;
+}
+.business-page .biz-assure-list {
+  list-style: none;
+  margin: clamp(20px, 3vw, 28px) 0 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+}
+.business-page .biz-assure-list > li {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 0 16px;
+  padding: 22px 0;
+  border-bottom: 1px solid var(--line);
+}
+.business-page .biz-assure-n {
+  font-family: var(--en);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: .14em;
+  color: var(--blue);
+  padding-top: 5px;
+}
+.business-page .biz-assure-body h4 { font-size: 16px; color: var(--ink); margin: 0 0 8px; line-height: 1.6; }
+.business-page .biz-assure-body p { font-size: 14px; color: var(--body-soft); line-height: 1.9; margin: 0; }
+
+/* ============ フロー（業者視点・4ステップ） ============
+   円形バッジ → 48px の正方形 1px 枠。アイコンは既存 3D シリーズを 120px の枠で contain。 */
 .business-page .biz-flow {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  position: relative;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(20px, 3vw, 32px);
 }
-.business-page .biz-flow::before {
-  content: "";
-  position: absolute;
-  top: 40px;
-  left: calc(12.5% + 8px);
-  right: calc(12.5% + 8px);
-  height: 2px;
-  background: linear-gradient(90deg, var(--blue) 0%, var(--primary) 100%);
-  z-index: 0;
-}
-.business-page .biz-step {
-  text-align: center;
-  position: relative;
-  z-index: 1;
-}
-.business-page .biz-step-ic {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  border: 2px solid var(--blue);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 18px;
-  color: var(--blue);
-  font-size: 28px;
-  position: relative;
-  background: #fff;
-  box-shadow: var(--shadow-s);
-}
-.business-page .biz-step-ic .ic { width: 32px; height: 32px; stroke-width: 1.9; }
+.business-page .biz-step { text-align: center; min-width: 0; }
+.business-page .biz-step-fig { width: 120px; margin: 0 auto 16px; }
 .business-page .biz-step-n {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  width: 24px;
-  height: 24px;
-  background: var(--blue);
-  color: #fff;
-  border-radius: 50%;
-  font-family: var(--head);
-  font-size: 12px;
-  font-weight: 400;
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--blue);
+  background: #fff;
+  color: var(--blue);
   display: flex;
   align-items: center;
   justify-content: center;
+  margin: 0 auto 14px;
+  font-family: var(--en);
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: .04em;
 }
 .business-page .biz-step h4 { font-size: 15px; margin-bottom: 8px; color: var(--navy); }
 .business-page .biz-step p { font-size: 13px; color: var(--body-soft); line-height: 1.75; }
 
-/* 要件カード */
-.business-page .req-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
+/* ============ 登録要件（画像＋ヘアラインリスト） ============ */
+.business-page .biz-req-split { --ms-img: 40fr; --ms-txt: 60fr; }
+.business-page .biz-req-fig { align-self: start; }
+.business-page .req-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
 }
-.business-page .req-card {
+.business-page .req-item {
   display: flex;
-  gap: 16px;
+  gap: 14px;
   align-items: flex-start;
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-s);
-  padding: 24px 22px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
 }
 .business-page .req-ic {
-  width: 44px;
-  height: 44px;
-  border-radius: 0;
-  background: var(--pale);
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--line);
+  background: #fff;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--blue);
-  font-size: 22px;
 }
-.business-page .req-ic .ic { width: 22px; height: 22px; stroke-width: 1.9; }
-.business-page .req-body h4 { font-size: 15px; margin-bottom: 6px; }
-.business-page .req-body p { font-size: 13.5px; color: var(--body-soft); line-height: 1.75; }
+.business-page .req-ic .ic { width: 20px; height: 20px; stroke-width: 1.7; }
+.business-page .req-body h4 { font-size: 15px; margin: 0 0 6px; color: var(--ink); line-height: 1.6; }
+.business-page .req-body p { font-size: 13.5px; color: var(--body-soft); line-height: 1.8; margin: 0; }
 
 /* ============ 登録フォーム ============ */
 .business-page .reg-card {
@@ -215,9 +240,9 @@
   margin: 0 auto;
   background: #fff;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: 0;
   padding: clamp(32px, 4vw, 56px);
-  box-shadow: var(--shadow-m);
+  box-shadow: none;
 }
 
 /* フォーム内の .field は共通 .field（katazuke-pages.css）と値が異なるため
@@ -225,6 +250,7 @@
 .business-page .field { margin-bottom: 22px; }
 .business-page .field label {
   display: block;
+  font-family: var(--ui);
   font-size: 14px;
   font-weight: 600;
   color: var(--ink);
@@ -237,7 +263,7 @@
   color: #fff;
   background: var(--blue);
   padding: 1px 6px;
-  border-radius: 4px;
+  border-radius: 0;
   margin-left: 6px;
   vertical-align: middle;
 }
@@ -253,30 +279,31 @@
 .business-page .field select,
 .business-page .field textarea {
   width: 100%;
-  font-family: var(--sans);
+  font-family: var(--ui);
   font-size: 15px;
   color: var(--ink);
   background: var(--pale);
-  border: 1.5px solid var(--line);
-  border-radius: var(--radius-s);
+  border: 1px solid var(--line);
+  border-radius: 0;
   padding: 13px 16px;
   transition: border-color .2s, box-shadow .2s;
   appearance: none;
   line-height: 1.6;
 }
 .business-page .field input::placeholder,
-.business-page .field textarea::placeholder { color: var(--line); }
+.business-page .field textarea::placeholder { color: var(--body-soft); opacity: .7; }
+/* フォーカスリングは主色由来（緑の名残 rgba(82,126,82,…) を撤去） */
 .business-page .field input:focus,
 .business-page .field select:focus,
 .business-page .field textarea:focus {
   border-color: var(--blue);
   background: #fff;
-  box-shadow: 0 0 0 3px rgba(82,126,82, .12);
+  box-shadow: 0 0 0 3px rgba(20, 71, 224, .14);
 }
 .business-page .field input.is-invalid,
 .business-page .field select.is-invalid {
   border-color: var(--danger);
-  box-shadow: 0 0 0 3px rgba(215,0,53, .12);
+  box-shadow: 0 0 0 3px rgba(215, 0, 53, .12);
 }
 .business-page .field textarea { resize: vertical; min-height: 120px; }
 .business-page .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -285,7 +312,7 @@
 .business-page .biz-bank-section {
   background: var(--pale);
   border: 1px solid var(--line);
-  border-radius: var(--radius-s);
+  border-radius: 0;
   padding: 22px 20px 8px;
   margin-bottom: 22px;
 }
@@ -293,7 +320,14 @@
   font-size: 15px;
   font-weight: 600;
   color: var(--navy);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
+}
+/* 「なぜ口座を聞くのか」「いつ請求されるのか」をブロックの冒頭で明示する */
+.business-page .biz-bank-lead {
+  font-size: 13.5px;
+  color: var(--body);
+  line-height: 1.85;
+  margin-bottom: 8px;
 }
 .business-page .biz-bank-note {
   font-size: 12.5px;
@@ -302,13 +336,13 @@
   margin-bottom: 18px;
 }
 
-/* 送信エラー表示 */
+/* 送信エラー表示（面はハードコード色をやめ、意味色 --danger のヘアラインで示す） */
 .business-page .biz-submit-error {
   font-size: 13.5px;
   color: var(--danger);
-  background: #fdf1f1;
-  border: 1px solid #f3c8c8;
-  border-radius: var(--radius-s);
+  background: #fff;
+  border: 1px solid var(--danger);
+  border-radius: 0;
   padding: 12px 16px;
   margin-bottom: 20px;
   line-height: 1.7;
@@ -342,6 +376,7 @@
   cursor: pointer;
 }
 .business-page .check-field label {
+  font-family: var(--ui);
   font-size: 13.5px;
   color: var(--body-soft);
   line-height: 1.75;
@@ -368,43 +403,71 @@
   border: none;
   cursor: pointer;
   box-shadow: none;
-  transition: .25s var(--ease);
+  transition: opacity .25s var(--ease);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
 }
-.business-page .btn-submit:hover { background: var(--blue-d); box-shadow: none; }
-.business-page .btn-submit:disabled { opacity: .6; cursor: not-allowed; transform: none; box-shadow: none; }
+.business-page .btn-submit:hover { opacity: .8; }
+.business-page .btn-submit:disabled { opacity: .6; cursor: not-allowed; }
 .business-page .btn-submit .biz-send-ic { width: 20px; height: 20px; }
 .business-page .submit-note { font-size: 12.5px; color: var(--body-soft); text-align: center; line-height: 1.75; }
 
 /* 送信完了 */
 .business-page .thanks { text-align: center; padding: 56px 32px; }
 .business-page .thanks-ic {
-  width: 64px; height: 64px;
-  background: var(--pale); border-radius: 50%;
+  width: 56px; height: 56px;
+  background: #fff; border: 1px solid var(--line); border-radius: 0;
   display: flex; align-items: center; justify-content: center;
   margin: 0 auto 24px;
-  color: var(--blue); font-size: 32px;
+  color: var(--blue);
 }
-.business-page .thanks-ic .ic { width: 32px; height: 32px; stroke-width: 2; }
+.business-page .thanks-ic .ic { width: 28px; height: 28px; stroke-width: 1.8; }
 .business-page .thanks h3 { font-size: 22px; color: var(--navy); margin-bottom: 12px; }
 .business-page .thanks p { color: var(--body-soft); font-size: 15px; line-height: 1.9; margin-bottom: 28px; }
 
 /* ヘッダー内 send アイコン（共通スプライトに send が無いため inline 用） */
 .business-page .biz-send-ic { fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; display: inline-block; vertical-align: -.13em; }
 
-/* レスポンシブ */
-@media (max-width: 900px) {
-  .business-page .merit-grid { grid-template-columns: repeat(2, 1fr); }
-  .business-page .biz-flow { grid-template-columns: repeat(2, 1fr); gap: 24px; }
-  .business-page .biz-flow::before { display: none; }
+/* ============ モバイル固定バー ============
+   BARE ページなので共通 .dock は描かれない。#register への導線を自前で持つ。 */
+.business-page .biz-dock { display: none; }
+
+/* ============ レスポンシブ（閾値は共有部品と同じ 859px） ============ */
+@media (max-width: 859px) {
+  /* ヒーロー画像は 2:3 のままだと縦に伸びすぎるため 4:5 に切り替え、左右は端まで見せる */
+  .business-page .biz-hero-fig { aspect-ratio: 4/5; margin-bottom: 28px; }
+  .business-page .biz-stats .inner { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 16px; }
+  .business-page .stat-item:last-child { grid-column: span 2; }
+  .business-page .biz-reason-grid { grid-template-columns: 1fr; gap: 36px; }
+  .business-page .biz-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 16px; }
+  .business-page .biz-req-fig { margin-bottom: 28px; }
+
+  .business-page { padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
+  .business-page .biz-dock {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 55;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: calc(56px + env(safe-area-inset-bottom, 0px));
+    padding: 0 16px env(safe-area-inset-bottom, 0px);
+    background: var(--blue);
+    color: #fff;
+    font-family: var(--head);
+    font-weight: 600;
+    font-size: 15px;
+    text-decoration: none;
+  }
+  .business-page .biz-dock:hover { opacity: .85; }
 }
 @media (max-width: 640px) {
-  .business-page .merit-grid { grid-template-columns: 1fr; }
-  .business-page .req-grid { grid-template-columns: 1fr; }
   .business-page .field-row { grid-template-columns: 1fr; }
-  .business-page .biz-stats .inner { gap: 28px; }
   .business-page .reg-card { padding: 28px 20px; }
+  .business-page .biz-assure-list > li { grid-template-columns: 1fr; gap: 6px; }
+  .business-page .biz-assure-n { padding-top: 0; }
+  .business-page .biz-hero-cta .btn { width: 100%; }
 }

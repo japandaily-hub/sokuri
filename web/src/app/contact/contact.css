@@ -1,42 +1,71 @@
 /* ============================================================
    お問い合わせページ固有スタイル
-   （共通クラス .container/.section/.eyebrow/.btn 等は katazuke.css の正典を使用。
-    ここはデザイン handoff の contact.html <style> 固有分のみ。
-    共通 .field と衝突しないよう、フォーム系は .contact-wrap 配下にスコープする。）
+   （共通クラス .container/.section/.eyebrow/.btn/.hero-band 等は katazuke.css /
+    katazuke-pages.css の正典を使用。ここはデザイン handoff の contact.html <style>
+    固有分のみ。共通 .field と衝突しないよう、フォーム系は .contact-wrap 配下にスコープする。）
+   v2: 淡青グラデのページヒーローを廃し、無文字の写真帯（.hero-band--slim --quiet --pos-r）＋
+   帯直下の白小箱 .ct-head に置き換え。LINE ブロックは白地・上下 1px、入力欄は白地＋1px --line、
+   フォームの外枠カードは --pale-2（BRIEF §2.9）。
    ============================================================ */
 
-/* ページヒーロー */
-.page-hero {
-  background: radial-gradient(120% 90% at 80% -10%, var(--pale) 0%, transparent 55%), #fff;
-  padding: clamp(56px, 7vw, 96px) 0 clamp(48px, 6vw, 80px);
-  text-align: center;
-  border-bottom: 1px solid var(--line-soft);
+/* 帯直下の白小箱（h1 と /faq 導線） */
+.ct-head {
+  padding: clamp(28px, 4vw, 44px) 24px clamp(8px, 1.5vw, 16px);
 }
-.page-hero .eyebrow { justify-content: center; }
-.page-hero h1 {
-  font-size: clamp(28px, 4vw, 44px);
-  color: var(--navy);
-  margin-top: 16px;
+.ct-head__box {
+  max-width: 720px;
+  margin: 0 auto;
+  background: #fff;
+  border: 1px solid var(--line);
+  padding: clamp(24px, 4vw, 40px);
+}
+.ct-head__en {
+  display: block;
+  font-family: var(--en);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+.ct-head h1 {
   font-family: var(--head);
+  font-size: clamp(26px, 3.6vw, 38px);
   font-weight: 400;
+  color: var(--navy);
+  margin-top: 12px;
   letter-spacing: -.01em;
   text-wrap: balance;
 }
-.page-hero p {
-  color: var(--body-soft);
-  font-size: clamp(15px, 1.5vw, 17px);
-  margin-top: 16px;
+.ct-head p {
+  color: var(--body);
+  font-size: 15px;
+  margin-top: 14px;
   line-height: 1.9;
 }
+.ct-head__faq {
+  margin-top: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 14px;
+}
+.ct-head__faq a {
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.ct-head__faq a::after { content: " →"; text-decoration: none; }
 
-/* LINE優先CTA */
+/* LINE優先CTA（白地・上下 1px。緑ボタンの周囲に 24px 以上の白余白を確保する） */
 .line-first {
-  background: var(--pale);
+  background: #fff;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 36px 40px;
+  padding: clamp(28px, 4vw, 40px) 0;
   display: flex;
   align-items: center;
-  gap: 32px;
+  gap: clamp(24px, 4vw, 40px);
   margin-bottom: 48px;
 }
 .line-first-body { flex: 1; }
@@ -45,7 +74,7 @@
   font-family: var(--head);
   font-size: clamp(17px, 2vw, 20px);
   color: var(--navy);
-  font-weight: 400;
+  font-weight: 600;
   margin-bottom: 6px;
 }
 .line-first-body p {
@@ -53,7 +82,7 @@
   color: var(--body-soft);
   line-height: 1.75;
 }
-.line-first .btn { flex-shrink: 0; }
+.line-first .btn { flex-shrink: 0; margin: 8px 0; }
 
 /* フォームカード */
 .contact-wrap {
@@ -62,22 +91,29 @@
   padding-bottom: clamp(64px, 8vw, 108px);
 }
 .form-card {
-  background: #fff;
+  background: var(--pale-2);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: clamp(32px, 4vw, 56px);
   box-shadow: var(--shadow-m);
 }
 .form-section-label {
-  font-family: var(--head);
+  font-family: var(--en);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: .14em;
-  color: var(--blue);
+  color: var(--primary);
   text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.form-owner {
+  font-family: var(--ui);
+  font-size: 12.5px;
+  color: var(--body-soft);
+  line-height: 1.8;
   margin-bottom: 24px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--line-soft);
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
 }
 
 /* フォームフィールド（共通 .field を contact-wrap 配下で上書き） */
@@ -97,7 +133,7 @@
   color: #fff;
   background: var(--blue);
   padding: 1px 6px;
-  border-radius: 4px;
+  border-radius: 0;
   margin-left: 6px;
   vertical-align: middle;
   letter-spacing: .04em;
@@ -107,8 +143,9 @@
   font-size: 11px;
   font-weight: 600;
   color: var(--body-soft);
-  background: var(--line-soft); /* 背景を明示（axe が背景を判定できず 1.56:1 と報告した対策・profile と同型） */
-  padding: 1px 6px;
+  background: #fff; /* 背景を明示（axe が背景を判定できず 1.56:1 と報告した対策・profile と同型） */
+  border: 1px solid var(--line);
+  padding: 0 6px;
   margin-left: 6px;
   vertical-align: middle;
 }
@@ -116,11 +153,11 @@
 .contact-wrap .field select,
 .contact-wrap .field textarea {
   width: 100%;
-  font-family: var(--sans);
+  font-family: var(--ui);
   font-size: 15px;
   color: var(--ink);
-  background: var(--pale);
-  border: 1.5px solid var(--line);
+  background: #fff;
+  border: 1px solid var(--line);
   border-radius: var(--radius-s);
   padding: 13px 16px;
   transition: border-color .2s, box-shadow .2s;
@@ -128,19 +165,19 @@
   line-height: 1.6;
 }
 .contact-wrap .field input::placeholder,
-.contact-wrap .field textarea::placeholder { color: var(--line); }
+.contact-wrap .field textarea::placeholder { color: var(--body-soft); }
 .contact-wrap .field input:focus,
 .contact-wrap .field select:focus,
 .contact-wrap .field textarea:focus {
   border-color: var(--blue);
   background: #fff;
-  box-shadow: 0 0 0 3px rgba(82,126,82, .12);
+  box-shadow: 0 0 0 3px rgba(20, 71, 224, .14);
 }
 .contact-wrap .field input.has-error,
 .contact-wrap .field select.has-error,
 .contact-wrap .field textarea.has-error {
   border-color: var(--danger);
-  box-shadow: 0 0 0 3px rgba(215,0,53, .12);
+  box-shadow: 0 0 0 3px rgba(215, 0, 53, .12);
 }
 .contact-wrap .field textarea { resize: vertical; min-height: 160px; }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -218,8 +255,9 @@
 .thanks-ic {
   width: 64px;
   height: 64px;
-  background: var(--pale);
-  border-radius: 50%;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -259,7 +297,12 @@
 
 /* レスポンシブ */
 @media (max-width: 680px) {
-  .line-first { flex-direction: column; align-items: flex-start; gap: 20px; padding: 28px 24px; }
+  .line-first { flex-direction: column; align-items: stretch; gap: 24px; padding: 28px 0; }
+  .line-first .btn { margin: 0; }
   .field-row { grid-template-columns: 1fr; }
   .form-card { padding: 28px 20px; }
+}
+@media (max-width: 560px) {
+  .ct-head { padding-inline: 18px; }
+  .ct-head__box { padding: 22px 18px; }
 }

@@ -42,25 +42,61 @@ const STATS: { num: string; unit: string; label: string }[] = [
   { num: "0", unit: "円", label: "初期費用・月額費用" },
   { num: "8", unit: "%", label: "成約時の手数料のみ" },
   { num: "12", unit: "カテゴリ", label: "家電〜ブランド品まで対応" },
-  { num: "下見", unit: "0回", label: "写真と品目で入札が完結" },
+  { num: "0", unit: "回", label: "下見・現地調査" },
 ];
 
-/** 参加メリット */
-const MERITS: { n: string; tag: string; tagColor: "green" | "blue" | "gold"; h: string; p: string; d?: 1 | 2 }[] = [
-  { n: "01", tag: "効率", tagColor: "green", h: "まとめ買いで、1件の効率が高い", p: "ユーザーは家じゅうの不用品をまとめて出品します。1件の訪問でまとまった点数を仕入れられるため、1点ずつ集める買取より移動・交渉コストを大幅に削減できます。" },
-  { n: "02", tag: "透明", tagColor: "blue", h: "写真査定で、下見コスト不要", p: "出品情報は写真・品目・地域（都道府県・市区町村）・住居情報などで構成。現物確認の前に買取総額の入札ができるため、下見の移動コストがかかりません。入札はすべてユーザーに一覧で提示されます。", d: 1 },
-  { n: "03", tag: "競争", tagColor: "gold", h: "入札制で、適正価格を見極められる", p: "複数業者が買取総額で競う入札制。過度な値引き競争ではなく、出品された商品全体の価値に対して適正な金額を提示できます。自社の買取基準に合った案件だけに入札可能です。", d: 2 },
-  { n: "04", tag: "安心", tagColor: "blue", h: "営業電話の一斉架電なし", p: "ユーザーへ連絡できるのは、選ばれた業者のみ。無駄な営業電話をかける必要がなく、成約に進んだユーザーとだけ丁寧にやりとりできます。信頼関係を築きやすい環境です。" },
-  { n: "05", tag: "シンプル", tagColor: "green", h: "費用は成約時の8%（税別）のみ", p: "登録・掲載・入札はすべて無料。成約が決まった際に、買取金額の8%（税別・消費税を別途加算）のみ手数料として発生します。それ以外の費用は一切かかりません。固定費ゼロで始められます。※ サービス開始当初（β期間）は手数料を請求しません。請求開始の際は事前にメールでお知らせします。", d: 1 },
-  { n: "06", tag: "三方よし", tagColor: "gold", h: "顧客・業者・社会、三者に喜びと安心を", p: "顧客は手軽に手放せ、業者は効率よく仕入れられる。双方が納得できる取引が成立し、不用品が社会に循環する。カタヅケは「三方よし」の仕組みだからこそ、長く安定したプラットフォームになれると考えています。", d: 2 },
+/** 仕入れる3つの理由（画像付き3カラム）。効果の断定は避け、条件と手順で説明する。 */
+const REASONS: { n: string; tag: string; img: string; h: string; p: string; d?: 1 | 2 }[] = [
+  {
+    n: "01",
+    tag: "まとめ",
+    img: "biz-reason-bulk",
+    h: "まとめ買いで、1回の訪問がまとまる",
+    p: "ユーザーは家じゅうの不用品をまとめて出品します。1回の訪問でまとまった点数を見られるため、1点ずつ集める買取に比べて移動・交渉のコストを削減しやすくなります。",
+  },
+  {
+    n: "02",
+    tag: "下見なし",
+    img: "biz-reason-photo",
+    h: "写真と品目から、下見なしで入札できる",
+    p: "出品情報は写真・品目・地域（都道府県・市区町村）・住居情報などで構成。現物確認の前に買取総額の入札ができるため、下見の移動コストがかかりません。入札はすべてユーザーに一覧で提示されます。",
+    d: 1,
+  },
+  {
+    n: "03",
+    tag: "入札制",
+    img: "biz-reason-route",
+    h: "入札制で、自社の基準に合う案件だけ選べる",
+    p: "複数業者が買取総額で競う入札制。過度な値引き競争ではなく、出品された商品全体の価値に対して金額を提示できます。自社の買取基準や対応エリアに合った案件だけに入札可能です。",
+    d: 2,
+  },
 ];
 
-/** 業者視点のフロー（4ステップ） */
-const FLOW: { n: string; icon: "camera" | "yen" | "chat" | "truck"; h: string; p: string; d?: 1 | 2 | 3 }[] = [
-  { n: "1", icon: "camera", h: "案件を確認", p: "出品された「まとめ」の写真・品目リストを確認。気になる案件に入札します。" },
-  { n: "2", icon: "yen", h: "買取総額で入札", p: "出品された商品すべてに対して、買取総額を提示。他社と競い合います。", d: 1 },
-  { n: "3", icon: "chat", h: "ユーザーが1社を選択", p: "全入札がユーザーに提示され、見比べて1社を選択。選ばれると連絡先が開示されます。", d: 2 },
-  { n: "4", icon: "truck", h: "訪問・引き取り", p: "成約後に訪問日時を決定。まとめて引き取りを行います。", d: 3 },
+/** 安心して参加できる理由（04〜06・ヘアラインリスト） */
+const ASSURANCES: { n: string; h: string; p: string }[] = [
+  {
+    n: "04",
+    h: "営業電話の一斉架電なし",
+    p: "ユーザーへ連絡できるのは、選ばれた業者のみ。無駄な営業電話をかける必要がなく、成約に進んだユーザーとだけ丁寧にやりとりできます。信頼関係を築きやすい環境です。",
+  },
+  {
+    n: "05",
+    h: "費用は成約時の8%（税別）のみ",
+    p: "登録・掲載・入札はすべて無料。成約が決まった際に、買取金額の8%（税別・消費税を別途加算）のみ手数料として発生します。それ以外の費用は一切かかりません。固定費ゼロで始められます。※ サービス開始当初（β期間）は手数料を請求しません。請求開始の際は事前にメールでお知らせします。",
+  },
+  {
+    n: "06",
+    h: "顧客・業者・社会、三者に喜びと安心を",
+    p: "顧客は手軽に手放せ、業者はまとめて仕入れられる。双方が納得できる取引が成立し、不用品が社会に循環する。カタヅケは「三方よし」の仕組みだからこそ、長く安定したプラットフォームになれると考えています。",
+  },
+];
+
+/** 業者視点のフロー（4ステップ）。アイコンは既存 3D シリーズ（/img/real/*.webp・512px）。 */
+const FLOW: { n: string; img: string; h: string; p: string; d?: 1 | 2 | 3 }[] = [
+  { n: "1", img: "how-camera", h: "案件を確認", p: "出品された「まとめ」の写真・品目リストを確認。気になる案件に入札します。" },
+  { n: "2", img: "how-trend", h: "買取総額で入札", p: "出品された商品すべてに対して、買取総額を提示。他社と競い合います。", d: 1 },
+  { n: "3", img: "how-crown", h: "ユーザーが1社を選択", p: "全入札がユーザーに提示され、見比べて1社を選択。選ばれると連絡先が開示されます。", d: 2 },
+  { n: "4", img: "how-truck", h: "訪問・引き取り", p: "成約後に訪問日時を決定。まとめて引き取りを行います。", d: 3 },
 ];
 
 /** 登録要件 */
@@ -224,7 +260,7 @@ export default function BusinessPage() {
   const invClass = (key: string) => (invalid.has(key) ? " is-invalid" : "");
 
   return (
-    <div className="business-page">
+    <div className="business-page bare-scope">
       {/* ============ 独自ヘッダー ============ */}
       <header className={`header scrolled${menuOpen ? " menu-open" : ""}`}>
         <div className="container inner">
@@ -266,37 +302,66 @@ export default function BusinessPage() {
       </div>
 
       <main id="main">
-        {/* ============ HERO ============ */}
+        {/* ============ HERO ============
+            ファーストビューのため Reveal は付けない（無 JS でも読める）。
+            画像は LCP 候補なのでページ内で唯一 eager + fetchPriority="high"。 */}
         <section className="biz-hero">
           <div className="container">
-            <span className="eyebrow">買取業者の方へ</span>
-            <h1>
-              まとめ買取の<br className="sp-br" />仕入れルートを、
-              <br />
-              <span className="hl">カタヅケ</span>で開拓する。
-            </h1>
-            <p className="hero-sub">
-              個人が家じゅうの不用品をまとめて出品。業者は写真だけで買取総額を入札し、選ばれた1社がユーザーと取引します。下見なし・一斉架電なし・まとめて効率的な仕入れ。費用は成約時の
-              <strong style={{ color: "var(--navy)" }}>買取金額8%（税別・消費税を別途加算）のみ</strong>
-              （※ サービス開始当初（β期間）は手数料を請求しません。請求開始の際は事前にメールでお知らせします）。カタヅケは片付けニーズを恒久的につなぐプラットフォームを目指します。
-              <br />
-              顧客も業者も無駄がなく、納得できる。だから安定する。
-            </p>
-            <div className="biz-hero-cta">
-              <a href="#register" className="btn btn-primary btn-lg">
-                <SendIcon />
-                業者登録を申し込む
-                <Ic name="arrow" />
-              </a>
-              <a href="#merit" className="btn btn-ghost btn-lg">
-                参加メリットを見る
-              </a>
+            <div className="media-split media-split--rev biz-hero-split">
+              <div className="img-frame img-frame--2x3 img-frame--pale biz-hero-fig sp-bleed">
+                {/* eslint-disable @next/next/no-img-element */}
+                <img
+                  src="/img/v2/biz-hero.webp"
+                  width={900}
+                  height={1350}
+                  alt="種別ごとに整理されたリユース品の棚（イメージ）"
+                  loading="eager"
+                  fetchPriority="high"
+                  decoding="async"
+                />
+                {/* eslint-enable @next/next/no-img-element */}
+              </div>
+              <div className="biz-hero-copy">
+                <span className="eyebrow">買取業者の方へ</span>
+                <h1>
+                  まとめ買取の<br className="sp-br" />仕入れルートを、
+                  <br />
+                  <span className="hl">カタヅケ</span>で開拓する。
+                </h1>
+                <p className="hero-sub">
+                  個人が家じゅうの不用品を、まとめて1件として出品します。
+                  <br />
+                  業者は写真と品目から買取総額を入札し、選ばれた1社だけがユーザーと直接やりとりします。
+                  <br />
+                  登録・掲載・入札は無料。費用は成約時の
+                  <strong>買取金額8%（税別・消費税を別途加算）のみ</strong>です。
+                </p>
+                <div className="biz-hero-cta">
+                  <a href="#merit" className="btn btn-primary btn-lg">
+                    参加メリットを見る
+                    <Ic name="arrow" />
+                  </a>
+                  <a href="#register" className="btn btn-ghost btn-lg">
+                    <SendIcon />
+                    業者登録を申し込む
+                  </a>
+                </div>
+              </div>
             </div>
           </div>
         </section>
 
+        {/* ============ β期間の注記（8% を書く全箇所で条件を同一視野に置く） ============ */}
+        <section className="biz-beta" aria-label="手数料について">
+          <div className="container">
+            <p className="biz-beta-note">
+              いまは手数料0円（β期間）。請求開始は事前にメールでお知らせします。成約時8%（税別・消費税別途）。
+            </p>
+          </div>
+        </section>
+
         {/* ============ 数値帯（事実ベースのみ） ============ */}
-        <section className="biz-stats" aria-label="サービスの特徴">
+        <section className="biz-stats" aria-label="サービスの条件">
           <div className="container">
             <div className="inner">
               {STATS.map((s) => (
@@ -312,23 +377,72 @@ export default function BusinessPage() {
           </div>
         </section>
 
+        {/* ============ 章の切れ目（写真帯・veil .65 = 見出し＋14px 以上の注記） ============ */}
+        <section className="hero-band hero-band--mid biz-band-sorting">
+          {/* eslint-disable @next/next/no-img-element */}
+          <img
+            src="/img/v2/biz-band-sorting.webp"
+            width={1920}
+            height={1080}
+            alt=""
+            loading="lazy"
+            decoding="async"
+          />
+          {/* eslint-enable @next/next/no-img-element */}
+          <div className="hero-band__veil" aria-hidden="true" />
+          <div className="container hero-band__copy">
+            <h2>写真と品目から、入札できる。</h2>
+            <p className="biz-band-note">最終額は現物査定で決まります。</p>
+          </div>
+        </section>
+
         {/* ============ 参加メリット ============ */}
         <section className="section" id="merit">
           <div className="container">
             <div className="section-head">
               <span className="eyebrow">カタヅケの強み</span>
               <h2>カタヅケで仕入れる、3つの理由</h2>
-              <p className="sub">家まるごとの一括出品だからこそ、業者にとって効率的な仕入れルートになります。</p>
+              <p className="sub">家まるごとの一括出品だからこそ、まとめて見に行ける仕入れルートになります。</p>
             </div>
-            <div className="merit-grid">
-              {MERITS.map((m) => (
-                <Reveal as="article" className="merit-card" delay={m.d} key={m.n}>
-                  <div className="merit-num">{m.n}</div>
-                  <span className={`merit-tag ${m.tagColor}`}>{m.tag}</span>
-                  <h3>{m.h}</h3>
-                  <p>{m.p}</p>
+            <div className="biz-reason-grid">
+              {REASONS.map((r) => (
+                <Reveal as="article" className="biz-reason" delay={r.d} key={r.n}>
+                  <div className="img-frame img-frame--1x1 img-frame--pale biz-reason-fig">
+                    {/* eslint-disable @next/next/no-img-element */}
+                    <img
+                      src={`/img/v2/${r.img}.webp`}
+                      width={800}
+                      height={800}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                    />
+                    {/* eslint-enable @next/next/no-img-element */}
+                  </div>
+                  <div className="biz-reason-num">
+                    {r.n}
+                    <span className="biz-reason-tag">{r.tag}</span>
+                  </div>
+                  <h3>{r.h}</h3>
+                  <p>{r.p}</p>
                 </Reveal>
               ))}
+            </div>
+
+            {/* 04〜06 は「3つの理由」の数と衝突しないよう別見出しのヘアラインリストに分ける */}
+            <div className="biz-assure">
+              <h3 className="biz-assure-head">安心して参加できる理由</h3>
+              <ul className="biz-assure-list">
+                {ASSURANCES.map((a) => (
+                  <li key={a.n}>
+                    <span className="biz-assure-n" aria-hidden="true">{a.n}</span>
+                    <div className="biz-assure-body">
+                      <h4>{a.h}</h4>
+                      <p>{a.p}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         </section>
@@ -339,15 +453,24 @@ export default function BusinessPage() {
             <div className="section-head">
               <span className="eyebrow">入札の流れ</span>
               <h2>入札から成約までの流れ</h2>
-              <p className="sub">登録後はシンプルな4ステップ。下見なし、一斉架電なしで効率的に進められます。</p>
+              <p className="sub">登録後はシンプルな4ステップ。下見なし・一斉架電なしで進められます。</p>
             </div>
             <div className="biz-flow">
               {FLOW.map((f) => (
                 <Reveal className="biz-step" delay={f.d} key={f.n}>
-                  <div className="biz-step-ic">
-                    <span className="biz-step-n">{f.n}</span>
-                    <Ic name={f.icon} />
+                  <div className="img-frame img-frame--1x1 img-frame--contain img-frame--pale biz-step-fig">
+                    {/* eslint-disable @next/next/no-img-element */}
+                    <img
+                      src={`/img/real/${f.img}.webp`}
+                      width={512}
+                      height={512}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                    />
+                    {/* eslint-enable @next/next/no-img-element */}
                   </div>
+                  <div className="biz-step-n" aria-hidden="true">{f.n}</div>
                   <h4>{f.h}</h4>
                   <p>{f.p}</p>
                 </Reveal>
@@ -364,18 +487,32 @@ export default function BusinessPage() {
               <h2>参加に必要な要件</h2>
               <p className="sub">ユーザーの安心のため、登録時に以下を確認させていただきます。</p>
             </div>
-            <Reveal className="req-grid">
-              {REQUIREMENTS.map((r) => (
-                <div className="req-card" key={r.h}>
-                  <div className="req-ic">
-                    <Ic name={r.icon} />
-                  </div>
-                  <div className="req-body">
-                    <h4>{r.h}</h4>
-                    <p>{r.p}</p>
-                  </div>
-                </div>
-              ))}
+            <Reveal className="media-split media-split--rev biz-req-split">
+              <div className="img-frame img-frame--1x1 img-frame--pale biz-req-fig sp-bleed">
+                {/* eslint-disable @next/next/no-img-element */}
+                <img
+                  src="/img/v2/biz-req-docs.webp"
+                  width={800}
+                  height={800}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                />
+                {/* eslint-enable @next/next/no-img-element */}
+              </div>
+              <ul className="req-list">
+                {REQUIREMENTS.map((r) => (
+                  <li className="req-item" key={r.h}>
+                    <div className="req-ic" aria-hidden="true">
+                      <Ic name={r.icon} />
+                    </div>
+                    <div className="req-body">
+                      <h4>{r.h}</h4>
+                      <p>{r.p}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             </Reveal>
           </div>
         </section>
@@ -574,6 +711,9 @@ export default function BusinessPage() {
 
                   <div className="biz-bank-section">
                     <h4 className="biz-bank-heading">振込先情報</h4>
+                    <p className="biz-bank-lead">
+                      手数料の請求・精算のためにお伺いします。審査結果の通知前に請求は発生しません。
+                    </p>
                     <p className="biz-bank-note">※お申し込み内容の確認と、手数料の請求・精算に関する連絡（返金が生じた場合の振込先を含む）にのみ使用します</p>
 
                     <div className="field-row">
@@ -695,9 +835,10 @@ export default function BusinessPage() {
                       checked={form.agree}
                       onChange={(e) => update("agree", e.target.checked)}
                     />
+                    {/* 同意リンクは 3 本とも /terms を指していたため、それぞれの正しい文書へ配線し直す */}
                     <label htmlFor="agree">
-                      <Link href="/terms">特定商取引法に基づく表記</Link>・
-                      <Link href="/terms">プライバシーポリシー</Link>および
+                      <Link href="/legal">特定商取引法に基づく表記</Link>・
+                      <Link href="/privacy">プライバシーポリシー</Link>および
                       <Link href="/terms">業者利用規約</Link>に同意します
                     </label>
                   </div>
@@ -748,6 +889,12 @@ export default function BusinessPage() {
         </section>
       </main>
 
+      {/* ============ モバイル固定バー（BARE ページなので共通 .dock は描かれない） ============ */}
+      <a href="#register" className="biz-dock">
+        <SendIcon />
+        業者登録を申し込む
+      </a>
+
       {/* ============ FOOTER ============ */}
       <footer className="footer">
         <div className="container">
@@ -783,8 +930,9 @@ export default function BusinessPage() {
               <ul>
                 <li><Link href="/#founder">運営者メッセージ</Link></li>
                 <li><Link href="/faq">お問い合わせ</Link></li>
-                <li><Link href="/terms">特定商取引法に基づく表記</Link></li>
-                <li><Link href="/terms">プライバシーポリシー・利用規約</Link></li>
+                <li><Link href="/legal">特定商取引法に基づく表記</Link></li>
+                <li><Link href="/privacy">プライバシーポリシー</Link></li>
+                <li><Link href="/terms">利用規約</Link></li>
               </ul>
             </div>
           </div>
