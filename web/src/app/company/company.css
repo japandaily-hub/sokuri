@@ -57,37 +57,112 @@
   line-height: 1.9;
 }
 
-/* ---------- 運営者情報テーブル（内容・構成は現行のまま） ---------- */
+/* ---------- 運営者情報テーブル（内容・構成は現行のまま） ----------
+   ラウンド5 指摘（8）: 全セルを罫線で囲む箱組＋ th の灰色面は、/legal の .spec-table・
+   /privacy の台帳（どちらも縦罫なし・行の上罫だけのヘアライン台帳）と別系統で、
+   サイト内に3種類の表スタイルが混在していた。縦罫と面を全廃して /legal と同じ構えにそろえる
+   （行の上罫 1px --line-soft／先頭行だけ 2px --ink／最終行の下罫 1px --line／th は左寄せ・
+   右パディングで列を作る）。内容・列順・掲載項目は変えない。 */
 .company-table-wrap {
-  background: #fff;
+  background: transparent;
+  border: 0;
   border-radius: 0;
   box-shadow: none;
-  border: 1px solid var(--line);
-  overflow: hidden;
 }
 .company-table { width: 100%; border-collapse: collapse; }
-.company-table tr + tr { border-top: 1px solid var(--line); }
 .company-table th {
-  padding: 16px 18px;
+  padding: 14px 20px 14px 0;
+  border-top: 1px solid var(--line-soft);
+  background: transparent;
   font-family: var(--ui);
   font-size: 13px;
   font-weight: 600;
   color: var(--body-soft);
-  background: var(--pale-2);
   width: 140px;
   text-align: left;
   vertical-align: top;
-  border-right: 1px solid var(--line);
+  white-space: nowrap;
 }
 .company-table td {
-  padding: 16px 18px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line-soft);
   font-size: 14.5px;
   color: var(--ink);
   line-height: 1.8;
   vertical-align: top;
   word-break: break-word;
 }
+/* 台帳の始まりと終わり（/legal .spec-table と同じ 2px ＋ 1px） */
+.company-table tr:first-child th,
+.company-table tr:first-child td { border-top: 2px solid var(--ink); }
+.company-table tr:last-child th,
+.company-table tr:last-child td { border-bottom: 1px solid var(--line); }
 .company-table td a { color: var(--primary); text-decoration: underline; text-underline-offset: .2em; }
+/* 連絡先セルの2つめの窓口（メール／フォーム）。改行して並べ、メールだけが窓口に見えないようにする */
+.company-table .company-table__or {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--ui);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--body-soft);
+}
+
+/* ---------- 安心の3点（表の直前・ヘアラインの3項目） ---------- */
+/* 縦罫は引かない（台帳と同じヘアラインの作法）。1カラムに畳んだときだけ項目間に上罫を足す */
+.co-assure {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 clamp(16px, 3vw, 28px);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: clamp(18px, 3vw, 26px);
+}
+.co-assure li { padding: 14px 0; min-width: 0; }
+.co-assure b {
+  display: block;
+  font-family: var(--ui);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 5px;
+}
+.co-assure span {
+  display: block;
+  font-family: var(--ui);
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: var(--body-soft);
+}
+
+/* ---------- 業者の方へ（お預かりする情報の扱い・ヘアラインの台帳） ---------- */
+.about-section .co-vendor-lead { margin-bottom: 14px; }
+.co-vendor {
+  list-style: none;
+  border-top: 1px solid var(--ink);
+}
+.co-vendor li {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 0 20px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.co-vendor li:last-child { border-bottom: 1px solid var(--line); }
+.co-vendor b {
+  font-family: var(--ui);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--body-soft);
+  line-height: 1.8;
+}
+.co-vendor span {
+  font-size: 14px;
+  color: var(--ink);
+  line-height: 1.85;
+}
+.co-vendor a { color: var(--primary); text-decoration: underline; text-underline-offset: .2em; }
 
 /* 表の直下に置く開示請求の導線（/legal に既出の事実の案内のみ。新しい事実は書かない） */
 .about-section .about-disclose {
@@ -228,8 +303,14 @@
   .about-wrap { padding-inline: 18px; }
   .about-cta-btns { flex-direction: column; align-items: stretch; }
   .about-cta-btns .btn { text-align: center; width: 100%; }
+  /* 3項目を縦に積む。縦に並ぶと項目の境目が消えるため、ここだけ項目間に上罫を足す */
+  .co-assure { grid-template-columns: 1fr; }
+  .co-assure li { padding: 12px 0; }
+  .co-assure li + li { border-top: 1px solid var(--line-soft); }
+  /* 200px の見出し列は畳む（390px で本文が 6〜7 文字幅になるため） */
+  .co-vendor li { grid-template-columns: 1fr; gap: 5px 0; }
 }
 @media (max-width: 600px) {
-  .company-table th { width: 98px; font-size: 12px; padding: 12px 10px; }
-  .company-table td { font-size: 13px; padding: 12px 10px; }
+  .company-table th { width: 92px; font-size: 12px; padding: 12px 14px 12px 0; }
+  .company-table td { font-size: 13px; padding: 12px 0; }
 }

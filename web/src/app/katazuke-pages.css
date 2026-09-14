@@ -38,8 +38,11 @@
 /* app 面の地の文は 15px / 1.75（2.0 だと1画面が伸びて送信ボタンが折り返し下に落ちる） */
 .auth-sub { font-size: 15px; color: var(--body-soft); line-height: 1.75; margin-top: 8px; }
 
+/* ラウンド5 指摘（7/14/27）: 公式仕様で角丸 99px のまま据え置く LINE ボタンが、角丸ゼロの版面の中で
+   前後に詰まって並ぶと「浮いた装飾」に見える。ボタン自体（.btn-line-auth）は触らず、
+   区切りの前後余白を 24px 以上取って「別の入口」として独立させる（幅は既に max-width:360px で抑制済み）。 */
 .auth-divider {
-  display: flex; align-items: center; gap: 12px; margin: 20px 0;
+  display: flex; align-items: center; gap: 12px; margin: 28px 0 24px;
   color: var(--body-soft); font-size: 12px; letter-spacing: .08em;
 }
 .auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
@@ -288,6 +291,79 @@
   .hero-band--slim { min-height: clamp(160px,40vw,200px); }
   .hero-band--fixed { min-height: 120px; height: 120px; }
 }
+/* ============================================================
+   R5（ラウンド5）帯ごとのトリミングとスクリム
+   ------------------------------------------------------------
+   --band-pos はページ CSS に書かない規約（R4 D.1）なので、ページ単位の是正も core に置く。
+   共通の幾何（素材はいずれも 1920x1080 ＝ 1.778:1）:
+     可視域 h ＝ 帯高 ÷ (帯幅 ÷ 1.778)、可視域の上端 ＝ (1 − h) × P（P ＝ --band-pos の縦値）
+   帯は PC・SP とも素材より横長にトリミングされる（横の overflow は 0）ため、
+   横成分は常に無効。「被写体が左右で切れている」類は object-position では直せない。
+   ============================================================ */
+
+/* 指摘 12/17/21/22/28（3視点が同一指摘）: 被写体が上〜中央にある素材で見出しを上下中央に置くと
+   「白見出しが肩・腕に重なり、反対側は空の暗面」になる。見出しを帯の下辺へ寄せ（下余白は
+   .hero-band の padding-block が持つ）、veil を縦グラデにして上半分を写真へ明け渡す。
+   .vd-band は除く: 13px の eyebrow ＋ h1 ＋ 2〜3行リードで copy が帯高の 5割を超え、
+   下寄せしても上端が帯の中ほどに残るため、上を明るくすると 13px が AA を割る。 */
+.faq-hero, .biz-band-sorting, .co-band { align-items: flex-end; }
+/* 縦グラデの veil。青の寄与を落とした中性ダーク（16,20,34）で /company の紫転び（指摘 17/28）を止める。
+   白 #fff on 合成色の計算値（画像側が最明 v≒255 の最悪値）: .30→約 2.3:1（文字を置かない上部）／
+   .68→約 6.7:1／.82→約 9.2:1。下寄せした copy の実測（PC 1440px・帯幅 1389px）は
+   /company 文字上端 48.5%（枠 39%＋padding 40px）〜87%・/faq h1 71〜86%・/business h2＋14px注記 67〜86%
+   ＝ いずれも .68 が始まる 48% より下に入り、最悪値でも 6.7:1（14px の注記込みで AA）。
+   .68 の変化点を 48% に置いているのはこのため（60% だと /company の1行目が .55 まで薄くなる）。
+   /company は R4 の平坦 .65（実測 p95 5.56）より暗い側から始まるので、明るくして落ちることはない。
+   .co-band は R4 の .co-band.hero-band--headline（0,3,0）を上書きするため 3 クラスで書く。 */
+.faq-hero .hero-band__veil,
+.biz-band-sorting .hero-band__veil,
+.co-band.hero-band--headline .hero-band__veil {
+  background: linear-gradient(180deg, rgba(16,20,34,.22) 0%, rgba(16,20,34,.30) 26%,
+    rgba(16,20,34,.68) 48%, rgba(16,20,34,.82) 100%);
+}
+/* 指摘 10/30/34（/photo-guide の頭部切れ）: pg-hero は人物の頭頂が素材の y≒1% にあり、
+   素材そのものに頭上の余白が無い。PC（1440px・--tall 480px ＝ h 59.3%）では既定 --face(.42) で
+   可視域の上端が 17.1% ＝ 顔（14〜30%）の上半分が切れていた。P=.04 で上端 1.6% ＝ 切れない最小値に寄せる。
+   引き換えに手前のトート（62〜93%）は画角の外に出る（h が 59.3% しかなく頭頂とトートは同時に入らない。
+   素材の再生成は R4 D.1 によりしない）。SP は 390px で帯 240px > 素材の縦 219px ＝ 縦は全域が
+   見えるので縦値は無効（--face のまま）。 */
+.pg-hero { --band-pos: 50% 4%; }
+/* 指摘 29（/faq の頭上の余白）: 頭頂は素材の 24.5%。--mid 400px（h 49.4%）の既定 .42 は
+   上端 21.3%（余白 3.2%）。.38 で上端 19.2%（余白 5.3%）に広げる。 */
+.faq-hero { --band-pos: 50% 38%; }
+/* 指摘 17/22/28（/company）: veil を縦グラデに置き換えたので、明部（右の障子・縁側）が残る縦位置へ下げる。
+   company.css:14 の .co-band.hero-band--tall（PC 420px・h 51.9%）で .54 ＝ 可視域 26.0〜77.9%
+   ＝ 障子・畳・卓上の湯呑みが入る（和室が「夜の無人の部屋」に見える原因は veil 側で解消）。 */
+.co-band { --band-pos: 50% 54%; }
+/* 指摘 6/19/23/25/39（/contact の帯・R4 差し戻しの未了分）: 素材 ct-band の封筒は縦 34〜70%
+   （＝ 36%）を占めるが、--slim（PC 1440px で 240px）の可視域は 29.6% しかなく、P=.5 では
+   フラップ（上）と台（下）が同時に切れて「読み込み途中」に見えていた。帯高を上げて可視域を 37%
+   （300 ÷ 810）まで広げ、P=.52 で可視域 32.8〜69.8% ＝ 封筒とカップが丸ごと入る（切れるのは机の前縁だけ）。
+   ページ CSS にも page.tsx にも書けないため素材で限定して core に置く
+   （既存の .operator-auth .auth-side > img[src*="ol-side"] と同じ作法）。
+   SP は 390px・帯 160px（可視域 73%）で封筒は既に全体が入っているが、指摘 23 の
+   「装飾として機能しない」に応えて 200px まで上げ、封筒の上下に余白を作る。 */
+.hero-band:has(> img[src*="ct-band"]) { --band-pos: 50% 52%; min-height: clamp(200px,21vw,300px); }
+/* 指摘 18（/terms /privacy /legal が同一クロップ）: 3 ルートは同じ lg-band を --pos-l / 既定 / --pos-r で
+   出し分けているが横成分は無効（上記の幾何）なので 3 枚が完全に同一だった。縦成分で出し分ける。
+   素材の文具一式は縦 42〜63%（＝ 21%）。
+   - /terms（--pos-l）: 一式を丸ごと。160px（可視域 19.8%）では入らないので 186px（23%）に上げ、
+     P=.53 で 40.5〜63.5%。--fixed は高さ固定なので min-height と height の両方を上書きし、
+     SP（120px）は下の @media で元に戻す。/terms の .tab-wrap{top:76px} は帯高と無関係。
+   - /privacy（--pos-* なし）: 文具より上の無地の木目。P=.20 で 16.0〜35.8%。
+   - /legal（--pos-r）: 文具より下の無地の木目。P=.88 で 70.6〜90.4%。
+   被写体を中途半端に切るより、無地の木目のテクスチャ帯にするほうが「壊れて見えない」
+   （3 ルートとも文字を置かない --quiet なのでコントラストの制約は無い）。 */
+.hero-band--fixed.hero-band--pos-l { --band-pos: 50% 53%; min-height: 186px; height: 186px; }
+.hero-band--fixed:not(.hero-band--pos-l):not(.hero-band--pos-r) { --band-pos: 50% 20%; }
+.hero-band--fixed.hero-band--pos-r { --band-pos: 50% 88%; }
+@media (max-width: 859px) {
+  /* SP は素材とほぼ同比で可視域が 54.8%（120 ÷ 219）あり、3 ルートとも文具が丸ごと入る。
+     PC 用に上げた /terms の帯高だけ元に戻す（無限定の上の宣言が 289 行目の @media に勝つため）。 */
+  .hero-band--fixed.hero-band--pos-l { min-height: 120px; height: 120px; }
+  .hero-band:has(> img[src*="ct-band"]) { min-height: 200px; }
+}
+
 /* 強制カラー: 帯の画像と veil だけ消し、濃紺地は UA 色に任せる（無限定 img{display:none} は禁止）。color は上書きしない */
 @media (forced-colors: active) {
   .hero-band > img, .hero-band__veil { display: none; }
@@ -437,6 +513,40 @@
   /* 業者側は終端をさらに濃く（業務用の入口を色で区別する既存方針を維持） */
   .auth-page--split.operator-auth > main > .auth-side::after {
     background: linear-gradient(180deg, rgba(20,35,92,0), rgba(20,35,92,.48) 50%, rgba(20,35,92,.88));
+  }
+}
+/* ---------- R5 認証4ページ（ラウンド5 指摘 4/13/24/31/33/35/38） ---------- */
+@media (min-width: 860px) {
+  /* 指摘 4/13/24/33/35/38（6視点が同一指摘・viewport/<route>__desktop_bottom.png の実測）:
+     下端までスクロールすると左カラムの最上部に約 68px の濃紺帯（main::before の地）が露出する。
+     原因は「上端オフセット（top:var(--auth-bar-h)）は sticky な上部バーを避けるための値」なのに、
+     上部バーが sticky なのは /signup（.flow-header）だけで、/login・/operator/* の .auth-bar は
+     一緒にスクロールして消えるため、最大スクロール時にオフセットぶんが素地として見えること。
+     → バーを持たない3ページだけ top:0・高さ 100dvh にして、ビューポートを画像で満たす。
+     /signup は sticky なバーの下に画像を潜らせない現状（top:76px）を維持する（実測で解消済み）。
+     :has() は Chrome 105 / Safari 15.4 / Firefox 121 以降。非対応環境では従来どおり
+     オフセット付きで表示されるだけ（機能の欠落にはならない）。
+     --auth-bar-h ごと 0 にはしない: > main の min-height 計算にも使われており、
+     /login の短いフォームでページが 68px 伸びてスクロールが生えるため。 */
+  .auth-page--split:not(:has(> .flow-header)) > main > .auth-side {
+    top: 0; height: 100dvh;
+  }
+  /* 指摘 31: /signup は右カラムが align-self:center のままで、フォームが行より高いとき
+     中央寄せの overflow が上側にも出る（先頭行「メールアドレスとパスワードを設定してください。」が
+     sticky のステップヘッダーの下に潜って読めない）。フォームが長い /signup の列だけ
+     上寄せに切り替え、sticky バーの実高ぶんの上余白を持たせる。
+     .auth-wrap（/login・/operator/*）は 1 画面に収まるので中央寄せのまま。 */
+  .auth-page--split > main > .flow-wrap {
+    align-self: start; padding-top: calc(var(--auth-bar-h, 68px) + 24px);
+  }
+  /* 指摘 15: /operator/signup の左（書類マクロ os-side）が /operator/login の人物全景と
+     被写体スケールが揃わず、業者2ページが別シリーズに見える。机の全景寄りに引く（人物なしは維持）。 */
+  .operator-auth .auth-side > img[src*="os-side"] { object-position: 50% 45%; }
+  /* 指摘 15: 業者側の下端グラデが青寄り（20,35,92）で木部・書類に乗ると紫に転ぶ。
+     中性ダーク（16,20,34）に置換。終端は .88 のままなので .auth-side__line のコントラストは下がらない
+     （同アルファでは中性のほうが暗い＝計算値は上がる）。 */
+  .auth-page--split.operator-auth > main > .auth-side::after {
+    background: linear-gradient(180deg, rgba(16,20,34,0), rgba(16,20,34,.48) 50%, rgba(16,20,34,.88));
   }
 }
 @media (max-width: 859px) {

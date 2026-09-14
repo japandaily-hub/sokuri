@@ -3,9 +3,11 @@
    （共通クラス .container/.section/.eyebrow/.btn/.hero-band 等は katazuke.css /
     katazuke-pages.css の正典を使用。ここはデザイン handoff の contact.html <style>
     固有分のみ。共通 .field と衝突しないよう、フォーム系は .contact-wrap 配下にスコープする。）
-   v2: 淡青グラデのページヒーローを廃し、無文字の写真帯（.hero-band--slim --quiet --pos-r。
+   v2: 淡青グラデのページヒーローを廃し、無文字の写真帯（.hero-band--slim --quiet。
    r1 で --fixed=160px に落としたが、ラウンド4 で「帯が薄片に見える」指摘2件を受け
-   --slim=240px/SP 160px に戻した。経緯は page.tsx の帯のコメント）＋帯直下の見出しブロック
+   --slim へ戻し、ラウンド5 で縦位置と高さ（--band-pos:50% 52%・PC 200〜300px／SP 200px）を
+   core の katazuke-pages.css が素材限定（:has(> img[src*="ct-band"])）で確定させた。
+   帯の高さ・位置はこのファイルに書かない（R4 D.1/F.0）＋帯直下の見出しブロック
    .ct-head に置き換え。LINE ブロックは白地・上下 1px、入力欄は白地＋1px --line、
    フォームの外枠カードは --pale-2（BRIEF §2.9）。
    ============================================================ */
@@ -321,6 +323,21 @@
   font-size: 15px;
   line-height: 1.9;
   margin-bottom: 28px;
+}
+
+/* 業者向けの案内（ラウンド5 指摘 18）。フォームカードの手前に 1 行だけ置く。
+   囲みは持たせない（.ct-head と同じ「罫と余白だけで区切る」構え）。 */
+.ct-biz-note {
+  font-size: 13.5px;
+  color: var(--body-soft);
+  line-height: 1.85;
+  margin: 0 0 24px;
+}
+.ct-biz-note a {
+  font-weight: 600;
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 /* divider */

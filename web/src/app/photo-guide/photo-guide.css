@@ -288,14 +288,29 @@
   /* 390px 実測で 24px。.sp-bleed の2枚が縦に接して1枚の長い写真に見え、
      良い例／避けたい例の対比が弱まるため、左右はフルブリードのまま縦だけ 32px 以上あける */
   .compare-grid { grid-template-columns: 1fr; gap: clamp(32px, 8vw, 44px); }
+  /* ラウンド5 指摘（17）: flex の横一列は 390px で「3＋1」、700px で「2＋2」と幅ごとに
+     折り返しが変わり、4項目が不規則な塊になって読み飛ばされていた（150枚まで・スマホで十分
+     という安心材料が効いていない）。859px 以下は 2×2 に固定する。
+     文字は 13px から 14px・行間 1.8 に戻し（PC と同値）、2行以上になる項目でも
+     チェックと文の左端がそろうよう、アイコンは行頭に置いて 1行目に光学中心をあわせる
+     （align-items:center のままだと 3〜4行の項目でアイコンだけが中央に落ちる）。 */
+  .merit-bar-inner {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px clamp(14px, 4vw, 20px);
+    justify-content: stretch;
+  }
+  .merit-chip { align-items: flex-start; font-size: 14px; line-height: 1.8; }
+  /* 1行の高さ 14×1.8 ＝ 25.2px に対してアイコン 20px。(25.2 − 20) ÷ 2 ≒ 2.6px 下げる */
+  .merit-chip .ic { margin-top: 2.6px; }
   .cat-guide-grid { grid-template-columns: repeat(2, 1fr); }
   .shoot-step { gap: 12px; }
   .shoot-step-num { font-size: 17px; min-width: 2.2em; }
   .pg-cta-btns .btn { width: 100%; }
 }
 @media (max-width: 560px) {
-  .merit-bar-inner { justify-content: flex-start; gap: 12px 20px; }
-  .merit-chip { font-size: 13px; }
+  /* 2×2 は 859px 以下の block が持つ（列間だけ詰める。文字サイズは 14px を維持） */
+  .merit-bar-inner { gap: 12px 14px; }
   .cat-guide-grid { grid-template-columns: 1fr; }
   .guide-section-num { width: 38px; height: 38px; font-size: 16px; }
 }

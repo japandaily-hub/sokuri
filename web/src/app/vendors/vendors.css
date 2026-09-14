@@ -38,6 +38,16 @@
   max-width: 720px;
   padding-inline: 24px;
 }
+/* r5 #6: 素材（台車の作業者）が右端 1/8 に小さく写り、左端に用途不明の近接物が入って
+   主題が読めなかった。帯の縦位置を下げて（46%）主題を中央寄りに残し、コピーを下辺に寄せて
+   上半分を写真に明け渡す。--slim（180〜240px）では上下とも文字で埋まるので下限を 240px に上げる。
+   ページCSS は @layer に入らないため、共有 .hero-band--face（layer components）の
+   --band-pos: 50% 42% に対してこの指定が勝つ（モバイルの共有値 46% と同値なので SP は不変）。 */
+.vendors-page .vd-band {
+  min-height: clamp(240px, 22vw, 300px);
+  --band-pos: 50% 46%;
+  align-items: end;
+}
 
 .vendors-page .vendors-back {
   display: inline-flex;
@@ -64,6 +74,19 @@
   margin-bottom: 14px;
   font-size: 12.5px;
   color: var(--body-soft);
+}
+
+/* r5 #24: 掲載0件・取得失敗のときだけ帯の直下に置く1行（出品はできる／入札の入り方）。
+   注意色は使わない（障害の通知ではなく、次の一手の提示）。 */
+.vendors-page .vd-notice {
+  margin: 0 0 18px;
+  padding-left: 12px;
+  border-left: 3px solid var(--primary);
+  font-family: var(--ui);
+  font-size: 13.5px;
+  line-height: 1.85;
+  color: var(--ink);
+  max-width: 40em;
 }
 
 .vendors-page .vendors-lead {
@@ -134,13 +157,21 @@
   gap: 12px 16px;
   margin-top: 18px;
 }
+/* r5 #14: 再読み込みは <button> のままテキストリンクの見た目に落とす（3番目の弱い扱い）。
+   フォーカスリングは消さない（:focus-visible は共通のまま効く）。 */
 .vendors-page .vd-state-link {
+  font-family: inherit;
   font-size: 13px;
   font-weight: 600;
   color: var(--blue);
   text-decoration: underline;
   text-underline-offset: 3px;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
 }
+.vendors-page .vd-state-link:hover { opacity: .75; }
 
 /* 空状態（意図された空）: 白面を上下のヘアラインで区切る。
    r3 是正: 上下パディングは .vd-state と同じ値に詰め、余白は塊の外に寄せる。 */
@@ -166,20 +197,16 @@
      見出し直下 16px / 本文とボタン群の間 32px と差をつけて塊を分ける。 */
   margin: 0 0 16px;
 }
-.vendors-page .vd-empty-note {
-  font-size: 14px;
-  line-height: 1.9;
-  color: var(--body);
-  max-width: 34em;
-  margin: 0 auto 32px;
-}
-/* R4 E.2-3: ボタン2本の間は 16px 以上あける（誤タップ防止と、
-   /business 行きが依頼者導線の付属物に見えないようにするため）。.btn-ghost のままにする。 */
+/* r5 #1/#24: .vd-empty-note（掲載前でも出品はできます…）は帯直下の .vd-notice に一本化した。
+   R4 E.2-3: ボタンの間は 16px 以上あける（誤タップ防止）。空状態のボタンは「出品する」1本で、
+   業者導線は .vd-sample-cta が受ける。 */
 .vendors-page .vd-empty-cta {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 16px;
+  /* 見出しとボタンの間は、旧 .vd-empty-note が持っていた停止点ぶんを余白で受ける */
+  margin-top: 28px;
 }
 
 /* 掲載時に表示する項目（R4 C.3）
@@ -222,25 +249,38 @@
   color: var(--ink);
   margin-bottom: 4px;
 }
+/* r5 #1/#5/#11/#17/#23/#28: 3列グリッド（flex 1 1 180px）＋ ul の border-top ＋ 各 li の
+   border-bottom が「4項目のうち評価だけが2行目に孤立し、その下に中身のない罫線行が残る表」に
+   見えていた。罫線を全部やめて素の箇条書き（中黒・1行1項目＋短い説明）に戻す。
+   罫線を持たないので、項目数が増減しても空の行は生まれない。 */
 .vendors-page .vd-sample-list {
   list-style: none;
-  margin: 0;
+  margin: 10px 0 0;
   padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0;
-  border-top: 1px solid var(--line);
-  max-width: 56em;
+  max-width: 40em;
 }
 .vendors-page .vd-sample-list li {
-  flex: 1 1 180px;
-  min-width: 0;
+  position: relative;
+  padding-left: 1.15em;
   font-family: var(--ui);
   font-size: 14px;
-  line-height: 1.8;
+  line-height: 1.95;
   color: var(--body);
-  padding: 12px 0;
-  border-bottom: 1px solid var(--line);
+}
+.vendors-page .vd-sample-list li::before {
+  content: "・";
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--body-soft);
+}
+.vendors-page .vd-sample-list b {
+  font-weight: 600;
+  color: var(--ink);
+}
+/* r5 #33: 説明を読み終えた業者の次の一手（/business）をこの位置の通常ボタンで受ける。 */
+.vendors-page .vd-sample-cta {
+  margin: 22px 0 0;
 }
 
 .vendors-page .vendors-list {
@@ -342,25 +382,8 @@
   white-space: nowrap;
 }
 
-/* 末尾の業者登録導線 */
-.vendors-page .vd-join {
-  margin-top: clamp(40px, 6vw, 64px);
-  padding-top: 24px;
-  border-top: 1px solid var(--line);
-}
-.vendors-page .vd-join-text {
-  margin: 0 0 10px;
-  font-size: 14px;
-  line-height: 1.9;
-  color: var(--body);
-}
-.vendors-page .vd-join-link {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--blue);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
+/* r5 #14/#33: 末尾の業者登録導線（.vd-join）は、エラーカードのボタンと
+   .vd-sample-cta のボタンに統合したため削除した（同じ行き先が3本並ぶのを避ける）。 */
 
 /* ============ 末尾の1行フッター ============
    r2 M6 是正: BARE ページで共通 .footer を持たないため、本文が短いとページが

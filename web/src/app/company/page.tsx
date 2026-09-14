@@ -25,11 +25,80 @@ const COMPANY_ROWS: { th: string; td: React.ReactNode }[] = [
      代表者名・稼働状況は実データ／掲載可否がユーザー確認待ちのため追加しない）。 */
   { th: "運営形態", td: "個人事業（法人ではありません）" },
   { th: "所在地", td: "神奈川県横浜市" },
+  /* ラウンド5 指摘（14）: 連絡先が gmail のアドレス1行だけだと「メールしか窓口がない」に見え、
+     知らない業者を家に呼ぶ判断をする面で不安が最大化する。既存の窓口（/contact のフォーム）を
+     同じセルに並記する。返信までの日数などの新しい約束は書かない（実績・運用条件は未確定）。 */
   {
     th: "お問い合わせ",
-    td: <a href="mailto:katazuke.info@gmail.com">katazuke.info@gmail.com</a>,
+    td: (
+      <>
+        <a href="mailto:katazuke.info@gmail.com">katazuke.info@gmail.com</a>
+        <span className="company-table__or">
+          または<Link href="/contact">お問い合わせフォーム</Link>
+        </span>
+      </>
+    ),
   },
   { th: "事業内容", td: "不用品買取マッチングプラットフォームの運営" },
+];
+
+/**
+ * 運営者情報テーブルの直前に置く安心の3点（ラウンド5 指摘 14）。
+ * 「個人事業・所在地は市まで・代表者名は非掲載・連絡先は gmail」が縦に並ぶ面に安心材料が
+ * 同居していないため、トップの .assure 帯と無料表記からの再掲を同じ視野に入れる。
+ * 出典: 古物商許可の確認＝VALUES「安全・安心」と /business の登録条件、開示範囲＝
+ * /privacy 第4条（詳細住所と連絡用メールは成立した業者にのみ／氏名・電話は提供しない）、
+ * 0円＝/ の料金表（出品・査定・お断り・成約すべて無料）。新しい事実・数値は作らない。
+ */
+const ASSURE: { h: string; p: string }[] = [
+  { h: "登録事業者のみ", p: "買取を行うのは登録業者です。その古物商許可は運営が確認します。" },
+  {
+    h: "連絡先は成立後に開示",
+    p: "詳細な住所と連絡用のメールアドレスが渡るのは、成立した1社だけです。氏名・電話番号は業者に渡りません。",
+  },
+  { h: "出品・査定・お断りまで0円", p: "ユーザーの費用はかかりません。" },
+];
+
+/**
+ * 業者の方へ：お預かりする情報の扱い（ラウンド5 指摘 18）。
+ * 業者側には古物商許可証のコピーと振込先口座を求めるのに、運営側は個人事業・代表者名非掲載で
+ * 情報の非対称が大きく、登録の最後で止まる、という指摘。既出の事実の再掲とリンクだけで埋める。
+ * 出典: 許可証のコピー＝/business の登録条件、暗号化保存＝/privacy 第2条（業者情報）、
+ * 削除＝/privacy 第8条、窓口＝/contact の種別「業者登録・提携について」。
+ * 保管期間・無償期間・返信日数など、現時点で確定していない約束は書かない。
+ */
+const VENDOR_NOTES: { h: string; p: React.ReactNode }[] = [
+  {
+    h: "古物商許可証のコピー",
+    p: (
+      <>
+        登録時にご提出いただき、古物営業法に基づく許可を運営が確認するために使います。登録条件は
+        <Link href="/business">業者向けページ</Link>に掲載しています。
+      </>
+    ),
+  },
+  {
+    h: "振込先口座",
+    p: (
+      <>
+        ご登録いただいた振込先口座は暗号化して保存します。取り扱いは
+        <Link href="/privacy">プライバシーポリシー</Link>のとおりです。
+      </>
+    ),
+  },
+  {
+    h: "退会・削除のお申し出",
+    p: "お申し出があった場合、当方が保有する個人情報（本人確認書類の画像・振込口座情報を含みます）は、法令上保存が必要な期間を除き、遅滞なく削除します。",
+  },
+  {
+    h: "業者からのお問い合わせ",
+    p: (
+      <>
+        <Link href="/contact">お問い合わせ</Link>
+        の種別「業者登録・提携について」からお送りください。
+      </>
+    ),
+  },
 ];
 
 /**
@@ -37,15 +106,23 @@ const COMPANY_ROWS: { th: string; td: React.ReactNode }[] = [
  * 線アイコンを 3D 静物（/img/v2/co-value-*.webp）に置き換え、各項に
  * 検証できる事実の1文（fact）を添える。実績値・体験談は置かない。
  */
-const VALUES: { img: string; title: string; body: string; fact: React.ReactNode }[] = [
+const VALUES: { img: string; w: number; title: string; body: string; fact: React.ReactNode }[] = [
   {
     img: "co-value-clear",
+    w: 520,
     title: "透明性",
     body: "入札価格・手数料・評価情報をユーザーに公開します。納得して判断できる環境を作ります。",
     fact: "ユーザーの費用は0円です。業者から受け取る手数料は、条件とあわせて業者向けページに公開しています。",
   },
   {
-    img: "co-value-safe",
+    /* ラウンド5 指摘（2/12/16/19）: 旧 co-value-safe は「青いリボンを掛けた白い箱に金色の鍵」で、
+       贈り物にしか見えず「古物商許可証を運営が確認する」という下の1文とつながらなかった。
+       R4 D.1 により画像の再生成はしないため、同じ 1:1 で既に検査を通った現場の静物
+       biz-req-docs（窓光の机に書類一式と印鑑箱・背後にファイル棚）を再利用する。
+       ルート跨ぎの再利用は既存の biz-reason-bulk（/business と / の業者バナー）と同じ作法。
+       残り2点（透明性・循環）の比喩オブジェクトは 1:1 の代替が v2 に無いため画像担当に残す。 */
+    img: "biz-req-docs",
+    w: 800,
     title: "安全・安心",
     body: "古物商許可番号の登録を必須とし、運営が許可証を確認した業者のみが参加します。",
     fact: (
@@ -58,6 +135,7 @@ const VALUES: { img: string; title: string; body: string; fact: React.ReactNode 
   },
   {
     img: "co-value-cycle",
+    w: 520,
     title: "サーキュラーエコノミー",
     body: "まだ使えるものを廃棄ではなく、再流通に回す仕組みにします。",
     fact: "引き取られた品物は、古物商許可を受けた登録業者を通じて中古品として再流通します。",
@@ -114,6 +192,15 @@ export default function CompanyPage() {
         <div className="about-section">
           <span className="eyebrow">COMPANY</span>
           <h2>運営者情報</h2>
+          {/* 表の直前に安心の3点（再掲）。掲載できない項目が縦に並ぶ面と同じ視野に置く */}
+          <ul className="co-assure" aria-label="ご利用にあたっての安心の3点">
+            {ASSURE.map((a) => (
+              <li key={a.h}>
+                <b>{a.h}</b>
+                <span>{a.p}</span>
+              </li>
+            ))}
+          </ul>
           <div className="company-table-wrap">
             <table className="company-table">
               <tbody>
@@ -135,6 +222,23 @@ export default function CompanyPage() {
           </p>
         </div>
 
+        {/* ============ 業者の方へ：お預かりする情報の扱い（既出の事実の再掲） ============ */}
+        <div className="about-section">
+          <span className="eyebrow">FOR VENDORS</span>
+          <h2>業者の方へ：お預かりする情報の扱い</h2>
+          <p className="co-vendor-lead">
+            ご登録の際にお預かりする書類と口座情報の扱いを、業者向けページとプライバシーポリシーから再掲します。
+          </p>
+          <ul className="co-vendor">
+            {VENDOR_NOTES.map((v) => (
+              <li key={v.h}>
+                <b>{v.h}</b>
+                <span>{v.p}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
         {/* ============ 私たちが大切にすること ============ */}
         <div className="about-section">
           <span className="eyebrow">VALUES</span>
@@ -145,8 +249,8 @@ export default function CompanyPage() {
                 <div className="img-frame img-frame--pale img-frame--1x1 value-img">
                   <img
                     src={`/img/v2/${v.img}.webp`}
-                    width={800}
-                    height={800}
+                    width={v.w}
+                    height={v.w}
                     alt=""
                     loading="lazy"
                     decoding="async"

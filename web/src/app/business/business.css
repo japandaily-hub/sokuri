@@ -59,6 +59,17 @@
   margin: 14px 0 0;
   max-width: 40em;
 }
+/* r5 #25: 依頼者が業者向けページに入ってしまったときの戻り道。同じ行（手続きの注記）に
+   1本だけ置く。業者向けの主導線と競らないようテキストリンクのまま。 */
+.business-page .biz-hero-alt {
+  display: inline-block;
+  margin-left: 12px;
+  font-weight: 600;
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
 
 /* ============ β期間の注記（独立ノート） ============
    8% を書く全ての箇所で「いま請求されないこと」を同一視野に置くための帯。 */
@@ -108,7 +119,24 @@
 }
 
 /* ============ 章の切れ目の写真帯 ============
-   veil 既定（.65）のままなので 14px 以上の注記を1行だけ置ける。 */
+   veil 既定（.65）のままなので 14px 以上の注記を1行だけ置ける。
+   r5 #8: 素材（16:9）に対し帯は常に横長で、横位置では白見出しと左の人物の肩・腕の重なりを
+   避けられない。/faq と同じ処方で「コピーを下辺へ寄せ、veil を縦グラデに替える」。
+   上 40% は .24 で人物2名の階調を残し、文字が乗る下辺は .70（白 #fff で計算値 約 7:1）。
+   ページCSS は @layer 外なので、共有 .hero-band--face の横グラデ（layer components）に勝つ。 */
+.business-page .biz-band-sorting { align-items: end; }
+.business-page .biz-band-sorting .hero-band__copy { padding-bottom: clamp(4px, 1vw, 12px); }
+.business-page .biz-band-sorting .hero-band__veil {
+  /* 指摘の 0→40% .24 / 100% .7 だと、下辺に寄せた h2（帯下端から約 60〜100px）が .45 前後の
+     位置に来て AA を割る。文字が実際に乗る 70% 以降を .68 まで先に上げ、p95 で AA を確保する。 */
+  /* 実測: h2 の上端は帯の 55%、注記は 74%（1064px 幅）。文字が乗り始める 55% で .62 に達するよう
+     ランプを前に寄せる（h2 約 6:1／注記 約 7:1）。上 32% は .20〜.26 で人物2名の階調を残す。 */
+  background: linear-gradient(180deg,
+    rgba(14,20,38,.20) 0%,
+    rgba(14,20,38,.26) 32%,
+    rgba(14,20,38,.62) 55%,
+    rgba(14,20,38,.76) 100%);
+}
 .business-page .biz-band-sorting .biz-band-note {
   font-size: 14px;
   line-height: 1.8;
@@ -249,14 +277,26 @@
   color: var(--body-soft);
   margin: 0;
 }
-/* R4 r4 #3/#21: 「下見0回」は表の1行目に格上げした（.vc-facts の 1 行目）。この段落は
-   その前提（現物確認で条件が合わないときの扱い）を表の直下に置くための注記に変わった。 */
+/* r5 #10/#12: 「下見・現地調査は0回」はサービスの仕様なので、架空値の台帳（.vc-facts）の
+   外・.vc-facts-label の上に独立した事実行として置く（R4 C.2 の指定）。注記色ではなく本文色。 */
 .business-page .vc-visit {
+  font-family: var(--ui);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--body);
+  margin: 0 0 10px;
+}
+/* r5 #32: /examples の依頼者モデルケースとの水準差の理由（1行）。金額の直下に置く。 */
+.business-page .vc-range {
   font-family: var(--ui);
   font-size: 12.5px;
   line-height: 1.8;
   color: var(--body-soft);
   margin: 12px 0 0;
+}
+/* r5 #4: 現物確認の但し書きは節末に1回だけ。カード群と引用から離して置く。 */
+.business-page .vc-terms {
+  margin-top: clamp(24px, 3.5vw, 36px);
 }
 .business-page .vc-facts-label {
   font-family: var(--ui);
@@ -284,14 +324,7 @@
   color: var(--body);
   min-width: 0;
 }
-/* 1 行目（下見・現地調査）だけが持つ補足。架空値ではなく仕様であることを行内で断る。 */
-.business-page .vc-facts dt small {
-  display: block;
-  font-size: 11.5px;
-  line-height: 1.65;
-  color: var(--body-soft);
-  margin-top: 3px;
-}
+/* r5 #10/#12: 1 行目（下見・現地調査）の行内補足は .vc-visit へ出したため、dt に small は無い。 */
 .business-page .vc-facts dd {
   margin: 0;
   flex: 0 0 auto;
@@ -310,8 +343,9 @@
   color: var(--body);
   margin: 12px 0 0;
 }
+/* r5 #4: 表（.vc-facts）と引用の間は塊が分かれて見えるまで余白を広げる。 */
 .business-page .vc-quote {
-  margin: 22px 0 0;
+  margin: 28px 0 0;
   padding: 2px 0 2px 18px;
   border-left: 3px solid var(--primary);
 }
@@ -332,17 +366,22 @@
 }
 
 /* ============ フロー（業者視点・4ステップ） ============
-   円形バッジ → 48px の正方形 1px 枠。アイコンは既存 3D シリーズを 120px の枠で contain。 */
+   r5 #2/#15/#21/#34: 旧 3D アイコン（カメラ・棒グラフ・王冠・トラック）を外し、
+   番号の角形タイル＋見出し＋本文のヘアラインリストにした。4列のまま各列の上に 1px を引き、
+   .biz-assure-list と同じ「台帳の行」の語彙に揃える（中央寄せをやめ左揃え）。 */
 .business-page .biz-flow {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: clamp(20px, 3vw, 32px);
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
-.business-page .biz-step { text-align: center; min-width: 0; }
-/* R4 r4 #25: 110px 前後のサムネイルでは他セクションの写真に対して密度が足りず、
-   4 点が添え物に見えた。枠を 240px まで広げる（素材は 512px なので 2x 以内に収まる）。
-   王冠（3）の画像そのものの差し替えは画像側の担当。 */
-.business-page .biz-step-fig { width: min(240px, 100%); margin: 0 auto 16px; }
+.business-page .biz-step {
+  min-width: 0;
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+}
 .business-page .biz-step-n {
   width: 48px;
   height: 48px;
@@ -352,14 +391,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 14px;
+  margin: 0 0 14px;
   font-family: var(--en);
   font-weight: 600;
   font-size: 15px;
   letter-spacing: .04em;
 }
 .business-page .biz-step h4 { font-size: 15px; margin-bottom: 8px; color: var(--navy); }
-.business-page .biz-step p { font-size: 13px; color: var(--body-soft); line-height: 1.75; }
+.business-page .biz-step p { font-size: 13px; color: var(--body-soft); line-height: 1.85; margin: 0; }
 
 /* ============ 登録要件（画像＋ヘアラインリスト） ============ */
 .business-page .biz-req-split { --ms-img: 40fr; --ms-txt: 60fr; }
@@ -514,16 +553,30 @@
   color: var(--body);
   margin: 0 0 10px;
 }
+/* r5 #13: 退避路。説明の文中のリンクから、フォーム開始位置の直前に置く .btn-ghost へ。
+   上下をヘアラインで区切らず、余白だけで「フォームの手前の別の道」として立てる。 */
 .business-page .biz-form-alt {
+  margin: 0 0 28px;
+}
+.business-page .biz-form-alt p {
   font-family: var(--ui);
   font-size: 13px;
   line-height: 1.85;
   color: var(--body-soft);
-  margin: 0 0 28px;
+  margin: 0 0 12px;
 }
-.business-page .biz-form-alt a {
-  display: inline-block;
-  margin-left: 4px;
+.business-page .biz-form-alt .btn-ghost {
+  font-size: 14px;
+}
+/* r5 #27: 精算ブロック内にも同じ行き先を1本置く（口座を出さずに案件を見る道）。 */
+.business-page .biz-bank-alt {
+  font-family: var(--ui);
+  font-size: 13px;
+  line-height: 1.85;
+  color: var(--body-soft);
+  margin: 0 0 18px;
+}
+.business-page .biz-bank-alt a {
   font-weight: 600;
   color: var(--blue);
   text-decoration: underline;
@@ -708,7 +761,11 @@
     word-break: auto-phrase;
     line-break: strict;
   }
-  .business-page .biz-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 16px; }
+  /* r5 #15: 画像を外したので、モバイルは 2 列に割らず 1 列のヘアラインリストにする
+     （見出し＋本文が 2 列では 3〜4 行に割れて手順として読みにくい）。 */
+  .business-page .biz-flow { grid-template-columns: 1fr; gap: 0; }
+  .business-page .biz-step { padding: 16px 0 18px; }
+  .business-page .biz-step-n { width: 40px; height: 40px; margin-bottom: 10px; }
   .business-page .biz-req-fig { margin-bottom: 28px; }
 
   .business-page { padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }

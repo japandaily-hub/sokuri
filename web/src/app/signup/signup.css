@@ -95,8 +95,15 @@
    ままで触らない（他社ブランドの公式仕様＋ CONSTRAINTS R4 §4）。ここは上下の余白を広げて、
    注記の箱と「メールアドレスで登録」の罫の間で「並んだ選択肢の一つ」として読めるようにする。
    上側は .signup-lead-note の margin-bottom（22px）と相殺して 32px になる。
-   860px 以上は従来値（0 / 18px）に戻す — 下の @media(min-width:860px) を参照。 */
+   860px 以上は 24px / 24px（ラウンド5 指摘 4/7/12）— 下の @media(min-width:860px) を参照。 */
 .signup-page .signup-line-slot { margin: 32px 0 28px; }
+/* ラウンド5 指摘（4）: ピルの直前に「何の入口か」を 12px で 1 行だけ添える。
+   ボタン本体は触らないので、説明はボタンと同じ幅（コア .btn-line-auth の max-width:360px）に
+   揃えて中央寄せし、ピルと 1 つの塊として読ませる。 */
+.signup-page .signup-line-note {
+  max-width: 360px; margin: 0 auto 8px; text-align: center;
+  font-family: var(--ui); font-size: 12px; line-height: 1.6; color: var(--body-soft);
+}
 
 /* R4 ラウンド4 指摘（9/15・部分採用）。
    「固定バーが最終入力欄に永続的に重なり登録できない」という前提は実測では成立しない:
@@ -121,13 +128,23 @@
    最下部までスクロールしたときの逃げ代（padding-bottom:116px）はコア §1.10 の値をそのまま使う。
    このブロックは同じ詳細度の既存宣言より後に置くこと（margin-bottom を上書きするため）。 */
 @media (min-width: 860px) {
-  .signup-page > main > .flow-wrap { padding-top: 12px; }
+  /* ラウンド5 指摘（14・部分採用）: sticky なステップヘッダーの直下に 12px しか空いておらず、
+     明朝の h1 がバーの罫に貼り付いて見える。24px まで戻す。
+     コアが指摘31 で入れた .auth-page--split > main > .flow-wrap{padding-top:calc(var(--auth-bar-h)+24px)}
+     ＝100px は /signup では効かない（ページ CSS は @layer 外なので、同特異度でもレイヤー内のコアに常に勝つ）。
+     意図的にそのままにしている: 先頭行がヘッダーに潜る原因は align-self:center による上側オーバーフローで、
+     それはコアの align-self:start で解消済み。ここに 100px の空きを足すと 1 枚目のカードがフォールドの下へ落ちる。
+     （最大スクロール時に先頭行がヘッダーの下に入るのは sticky バーの性質上どの値でも同じで、
+     残る対処は scroll-padding-top（html＝コア所有）だけ。） */
+  .signup-page > main > .flow-wrap { padding-top: 24px; }
   .signup-page .signup-lead-note { margin-bottom: 18px; }
   .signup-page .form-card { margin-bottom: 10px; }
-  /* 指摘3/14 の余白拡大はここでは適用しない（従来値に戻す）。
-     この画面幅では上で 26px 詰めて「すでにアカウントをお持ちの方は…」の 1 行を固定フッターの上へ
-     逃がしており（実測 1440x900: 行の下端 798px / フッター上端 813px、余裕 15px）、
-     縦を足すとその行がバーの境界をまたいで再び水平に切れる。
-     ピルの面積そのものはコアの max-width:360px で既に抑えてあり、ここでは増減させない。 */
-  .signup-page .signup-line-slot { margin: 0 0 18px; }
+  /* ラウンド5 指摘（4/7/12）: ここでも前後 24px を確保する。
+     ラウンド4 時点では「縦を足すと『すでにアカウントをお持ちの方は…』の 1 行が固定フッターの
+     境界をまたいで水平に切れる」ため従来値（0/18px）に戻していたが、コアが指摘31 で
+     .auth-page--split > main > .flow-wrap を align-self:center → start に変えたため、
+     列は行の高さで中央寄せされず、内容が行より高いときは main 自体が伸びて
+     ページがスクロールするようになった（＝切れた行が固定表示で残る条件が消えた）。
+     ピルの面積そのものはコアの max-width:360px で抑えてあり、ここでは増減させない。 */
+  .signup-page .signup-line-slot { margin: 24px 0 24px; }
 }

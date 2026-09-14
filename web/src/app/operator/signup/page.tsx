@@ -115,12 +115,22 @@ export default function OperatorSignupPage() {
             <div className="auth-head">
               <span className="buyer-tag"><span className="buyer-tag__en">BUYER</span>買取業者さま向け</span>
               <h1 className="auth-title">業者登録</h1>
+              {/* ラウンド5 指摘（18）: 依頼者（売りたい方）が誤って開いても戻る導線が無く、
+                  必須の古物商許可番号まで見えるため「これが自分の登録画面か」と不安になる。
+                  h1 の直下＝入力より手前に 1 行だけ置く。 */}
+              <p className="op-other-side">
+                ご依頼（売りたい）の方は<Link href="/signup">こちらから無料登録 →</Link>
+              </p>
+              {/* ラウンド5 指摘（21）: 「審査のお申し込みへ」→「招待コードをお持ちの方はこちらから」→
+                  直後の「招待コードなしでも登録できます」で入口が3転していた。
+                  導入文からは招待コードの話を落とし、「このページで何ができるか」の 1 文に統一する
+                  （案件の閲覧と入札の可否は直下の .op-gate-note が受ける）。 */}
               <p className="auth-sub">
-                業者登録には運営の審査があります。まだお申し込みでない方は、まず
+                このページから業者アカウントを作成できます。審査のお申し込みがまだの方は
                 <Link href="/business" style={{ color: "var(--blue)", fontWeight: 600 }}>
                   業者登録のお申し込み
                 </Link>
-                からご案内しています。招待コードをお持ちの方はこちらからアカウントを作成してください。
+                へお進みください。
               </p>
             </div>
 
@@ -167,7 +177,9 @@ export default function OperatorSignupPage() {
                   </div>
                 ) : (
                   // 淡青の面ではなく、折りたたみラベル行に添える補足テキスト（operator-auth.css .invite-note）
-                  <p className="invite-note">招待コードなしでも登録できます。</p>
+                  // 指摘（21）: 導入文から招待コードの話を外したので、ここは「持っている人だけの欄」だと
+                  // 言い切るだけに縮める（「なしでも登録できます」の打消しが不要になった）。
+                  <p className="invite-note">お持ちの方のみご入力ください。</p>
                 )}
               </div>
 

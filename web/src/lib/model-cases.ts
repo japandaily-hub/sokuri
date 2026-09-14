@@ -38,7 +38,12 @@ export type CaseItem = {
   featured?: boolean;
 };
 
-/** 依頼者のモデルケース 6 件（並び順は /examples の現行どおり・値は変更しない）。 */
+/** 依頼者のモデルケース 6 件（並び順は /examples の現行どおり）。
+ *  ラウンド5 指摘（37）で bidCount を 3〜5 の範囲に下げた（旧 11/7/6/8/4/9）。理由:
+ *  稼働直前・登録業者0・対応4都県の段階で 11社・9社の入札は業者側に「9社に負ける市場」と読まれ、
+ *  /business の「過度な値引き競争ではない」という説明と矛盾する。「複数業者が競う」は3社でも成立する。
+ *  id:5 だけ 4 のまま（quote 内の「4社の査定を見比べて」と一致させる。数値と本文は必ず揃える）。
+ *  金額・日数・点数は変更しない（ここが /`・`/examples` の単一の正本）。 */
 export const CASES: CaseItem[] = [
   {
     id: 1,
@@ -47,7 +52,7 @@ export const CASES: CaseItem[] = [
     avatar: "田",
     name: "田中さん",
     amount: 148000,
-    bidCount: 11,
+    bidCount: 5,
     days: 2,
     cats: ["家電・PC", "家具", "ブランド品", "時計", "カメラ"],
     count: 32,
@@ -69,7 +74,7 @@ export const CASES: CaseItem[] = [
     avatar: "鈴",
     name: "鈴木さん",
     amount: 72000,
-    bidCount: 7,
+    bidCount: 3,
     days: 3,
     cats: ["家電・PC", "カメラ", "ブランド品"],
     count: 14,
@@ -90,7 +95,7 @@ export const CASES: CaseItem[] = [
     avatar: "佐",
     name: "佐藤さん",
     amount: 58000,
-    bidCount: 6,
+    bidCount: 4,
     days: 2,
     cats: ["ブランド品", "時計", "衣類・靴"],
     count: 11,
@@ -107,7 +112,7 @@ export const CASES: CaseItem[] = [
     avatar: "山",
     name: "山口さん",
     amount: 95000,
-    bidCount: 8,
+    bidCount: 5,
     days: 2,
     cats: ["家電・PC", "家具", "音楽", "ゲーム"],
     count: 24,
@@ -145,7 +150,7 @@ export const CASES: CaseItem[] = [
     avatar: "小",
     name: "小林さん夫婦",
     amount: 112000,
-    bidCount: 9,
+    bidCount: 3,
     days: 1,
     cats: ["家電・PC", "家具", "スポーツ", "ゲーム"],
     count: 19,
@@ -216,8 +221,11 @@ export const VENDOR_CASES: VendorCase[] = [
     portrait: "vc-staff",
     portraitAlt: "搬出口で台車に手を添える買取スタッフ（架空のモデルケース）",
     month: { deals: 6, amount: 52000, pickups: 6 },
+    /* ラウンド5 指摘（32/36）: 「訪問が空振りにならない」は断定で、同じカード内の打消し
+       （現物確認で条件が合わない場合、依頼者が取引を断ることがある）と正面から矛盾する。
+       空振りゼロの約束にならないよう「事前に点数と状態が分かる＝不安が小さい」まで格下げする。 */
     quote:
-      "引き取りは家まるごとの単位なので、ルートが組みやすいです。訪問が空振りにならないのが一番ありがたい。",
+      "引き取りは家まるごとの単位なので、ルートが組みやすいです。訪問の前に点数と状態が分かるので、空振りの不安が小さいです。",
   },
 ];
 

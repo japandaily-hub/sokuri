@@ -132,10 +132,19 @@ export default function ContactPage() {
           「ct-band 生成後に --slim へ戻すかは画像が入ってから判断する」と保留していた。
           ラウンド4（画像投入後）で PC・SP とも「封筒とカップが上下で切れた薄片に見える／
           読み込み途中のように見える」の指摘が2件出たため、保留していた判断をここで確定し
-          --slim（PC clamp(180px,22vw,240px)／モバイル clamp(160px,40vw,200px)）へ戻す。
+          --slim（PC clamp(180px,22vw,240px)／モバイル clamp(160px,40vw,200px)）へ戻した。
           高さは共有の修飾子だけで決める（ページ CSS で .hero-band--* を再定義しない・
-          --band-pos もページ CSS に書かない＝R4 D.1/F.0）。帯上に文字は置かないまま。 */}
-      <section className="hero-band hero-band--slim hero-band--quiet hero-band--pos-r">
+          --band-pos もページ CSS に書かない＝R4 D.1/F.0）。帯上に文字は置かないまま。
+
+          ラウンド5 指摘（1/6/8/10/17 の5件が同一箇所）: 縦位置が未是正で封筒のフラップが
+          上端、カップが右端で切れていた。是正は core の katazuke-pages.css に入り
+          （.hero-band:has(> img[src*="ct-band"]) で --band-pos:50% 52% と
+          min-height:clamp(200px,21vw,300px)／SP 200px を素材限定で指定）、封筒とカップが
+          丸ごと画角に入る。ここで持っていた --pos-r（--band-pos:20%→80% 50% の横位置）は
+          外す: 素材 1920x1080 に対し帯は常にそれより横長にトリミングされるため横成分は
+          効かず、「右寄せで切っている」という誤った宣言が残るだけだった（縦位置の共有
+          修飾子は core 側が :has() で当てるため、ここにクラスを足す必要はない）。 */}
+      <section className="hero-band hero-band--slim hero-band--quiet">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/img/v2/ct-band.webp"
@@ -166,12 +175,18 @@ export default function ContactPage() {
           {/* LINE 優先案内 */}
           <div className="line-first">
             <div className="line-first-body">
-              <strong>LINEなら最短、<br className="sp-br" />フォームならメールで返信</strong>
+              {/* ラウンド5 指摘（11/13）: 「LINEなら最短、フォームならメールで返信」は
+                  1行に収まらず読点で2行に折れ、さらに隣のボタンが「LINEではじめる／LINE
+                  アカウントでログインできます」＝出品のログイン導線なので、質問したいだけの
+                  人には「どちらを押せば返事が来るのか」が読めなかった。見出しは意味の
+                  切れ目1つ（＝LINEは依頼の導線）に絞り、返信の経路は本文で言い切る。
+                  ボタンの本数・href は増やさない（R4 4.: ページ内の LINE CTA を増やさない）。 */}
+              <strong>査定・出品のご依頼はLINEから</strong>
               {/* ラウンド4 指摘（High）: リンク先は自社ログイン（/login?callbackUrl=/create）で
                   友だち追加は発生しない。R4 ブリーフが CTA から外した「友だち追加」の語が本文に
                   残っていたため差し替える。公式アカウント導線が実装されるまでこの語は使わない。 */}
               <p>
-                査定・出品のご依頼はLINEから。LINEアカウントでログインすれば、そのまま出品をはじめられます。
+                LINEアカウントでログインすれば、そのまま出品をはじめられます。ご質問へのご返信は、下のフォーム（メール）からお送りします。
               </p>
             </div>
             {/* LINE CTA は 7 箇所共通の 2 トーン構造（主色ブルーの面＋左端に LINE 緑のタイル）。
@@ -187,6 +202,15 @@ export default function ContactPage() {
           </div>
 
           <div className="or-divider">または、フォームからお問い合わせ</div>
+
+          {/* ラウンド5 指摘（18・業者視点）: 先頭が依頼者向けの LINE ブロックだけで、業者は
+              種別プルダウンを開くまで自分が対象か分からなかった。フォームの手前に1行だけ
+              置く（LINE ブロックには触らない・ボタンは増やさない）。 */}
+          <p className="ct-biz-note">
+            業者登録のご相談は
+            <Link href="/business">業者登録のお申し込み</Link>
+            から。審査や手数料のご質問は、このフォーム（種別「業者登録・提携について」）でも承ります。
+          </p>
 
           {/* フォームカード */}
           <div className="form-card" id="form">

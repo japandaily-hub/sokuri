@@ -62,8 +62,42 @@ export default function LegalPage() {
           </div>
         </section>
 
+        {/* ラウンド5 指摘（14）: 代表者名・詳細住所・電話番号の3項目がそろって
+            「請求があれば遅滞なく開示」で、訪問買取を頼むかを決める材料が弱かった。
+            掲載内容そのもの（省略運用）は変えず、「取引の相手は誰か」「運営にどう連絡でき、
+            いつ返ってくるか」を表の手前に置く。文言は既存の正典の範囲に留める
+            （業者の許可確認 = 業者利用規約 第2条・利用規約 第9条、返信目安 = /contact の注記）。 */}
+        <section className="doc-assure" aria-label="取引の相手と運営への連絡">
+          <ul className="doc-assure__list">
+            <li>
+              <strong>買取を行うのは登録業者です。</strong>
+              登録業者には有効な古物商許可を求め、お申し込み時に許可証を確認しています（
+              <Link href="/terms#biz">業者利用規約 第2条</Link>）。当社（カタヅケ運営事務局）はマッチングの場を提供する立場で、買取取引の当事者ではありません。
+            </li>
+            <li>
+              <strong>運営への連絡はお問い合わせフォームから。</strong>
+              いただいた内容には通常3営業日以内にご返信します（メールでの対応を原則としています）。事業者情報の開示請求も同じフォームの種別から承ります。
+              <Link href="/contact">お問い合わせフォーム</Link>
+            </li>
+          </ul>
+          <p className="doc-assure__more">
+            運営が大切にしていること（3点）は <Link href="/company">カタヅケについて</Link> に記載しています。
+          </p>
+        </section>
+
+        {/* 目次（ラウンド5 指摘 12）: /terms・/privacy と同じ構えで本文の手がかりを置く */}
+        <nav className="doc-toc" aria-label="このページの目次">
+          <p className="doc-toc__label">このページの内容</p>
+          <ol className="doc-toc__list">
+            <li><a href="#lg-1">サービス運営者情報</a></li>
+            <li><a href="#lg-2">サービス内容・取引条件</a></li>
+            <li><a href="#lg-3">返品・キャンセルについて</a></li>
+            <li><a href="#lg-4">個人情報の取り扱い</a></li>
+          </ol>
+        </nav>
+
         {/* 運営者情報 */}
-        <h2 className="doc-section-title">サービス運営者情報</h2>
+        <h2 className="doc-section-title" id="lg-1">サービス運営者情報</h2>
         <table className="spec-table">
           <tbody>
             <tr>
@@ -123,7 +157,7 @@ export default function LegalPage() {
         </table>
 
         {/* サービス内容 */}
-        <h2 className="doc-section-title">サービス内容・取引条件</h2>
+        <h2 className="doc-section-title" id="lg-2">サービス内容・取引条件</h2>
         <table className="spec-table">
           <tbody>
             <tr>
@@ -201,7 +235,7 @@ export default function LegalPage() {
         </table>
 
         {/* 返品・キャンセル */}
-        <h2 className="doc-section-title">返品・キャンセルについて</h2>
+        <h2 className="doc-section-title" id="lg-3">返品・キャンセルについて</h2>
         <table className="spec-table">
           <tbody>
             <tr>
@@ -249,7 +283,7 @@ export default function LegalPage() {
         </table>
 
         {/* 個人情報 */}
-        <h2 className="doc-section-title">個人情報の取り扱い</h2>
+        <h2 className="doc-section-title" id="lg-4">個人情報の取り扱い</h2>
         <table className="spec-table">
           <tbody>
             <tr>

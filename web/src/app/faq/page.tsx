@@ -142,8 +142,12 @@ const CAT_TABS: { key: "all" | CatKey; label: string; icon: IcName }[] = [
   ...CATEGORIES.map((c) => ({ key: c.key, label: c.label, icon: c.icon })),
 ];
 
-/** 既定で開いておく Q&A（BRIEF §2.4 #3: 「個人情報・安心」の3問）。 */
-const DEFAULT_OPEN_KEYS = ["privacy-0", "privacy-1", "privacy-2"];
+/** ラウンド6 指摘（11）: 初期表示は全節とも「全閉」に統一する。
+ *  BRIEF §2.4 #3 は「個人情報・安心」の3問を既定で展開していたが、その結果
+ *  「費用・料金」は全閉・「個人情報・安心」だけ3問展開という不統一な初期画面になり、
+ *  どこを押せば答えが出るのかの基準が読者に伝わらなかった。
+ *  代わりに (a) 各節見出しに「すべて開く」トグルを1つ置き、
+ *  (b) 検索語があるときは該当項目を自動展開する（探している答えを1タップ手前で止めない）。 */
 
 /** 検索用にカテゴリをまたいだ全 Q&A をフラット化。プレーンテキストは検索一致判定に使う。 */
 type FlatItem = { q: string; a: React.ReactNode; catLabel: string; text: string };
@@ -217,8 +221,11 @@ function FaqItem({
 export default function FaqPage() {
   const [activeCat, setActiveCat] = useState<"all" | CatKey>("all");
   const [query, setQuery] = useState("");
-  // 開閉状態は "<scope>-<index>" をキーに管理（複数同時に開ける。既定は「個人情報・安心」の3問）
-  const [openKeys, setOpenKeys] = useState<Set<string>>(() => new Set(DEFAULT_OPEN_KEYS));
+  // 開閉状態は "<scope>-<index>" をキーに管理（複数同時に開ける。既定は全閉）
+  const [openKeys, setOpenKeys] = useState<Set<string>>(() => new Set<string>());
+  // 検索結果は既定で展開する。ここには「利用者が明示的に閉じた項目」だけを入れ、
+  // 検索語が変わったら捨てる（openKeys とは意味が逆なので別の state にしている）
+  const [closedHits, setClosedHits] = useState<Set<string>>(() => new Set<string>());
 
   const kw = query.trim();
 
@@ -230,6 +237,7 @@ export default function FaqPage() {
   function selectCat(cat: "all" | CatKey) {
     setActiveCat(cat);
     setQuery("");
+    setClosedHits(new Set());
     // QA M6 是正: ここで既定3問へ戻すと、利用者が閉じた回答がカテゴリを切り替えるたびに
     // 開き直る。既定は初回マウント（useState の初期値）だけに適用し、切替では開閉を触らない。
   }
@@ -239,6 +247,30 @@ export default function FaqPage() {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
+      return next;
+    });
+  }
+
+  /** 検索結果の開閉（既定=開。閉じたものだけを覚える）。 */
+  function toggleHit(key: string) {
+    setClosedHits((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  /** 節の一括開閉。1問でも閉じていれば全部開く、全部開いていれば全部閉じる。 */
+  function toggleSection(cat: Category) {
+    const keys = cat.items.map((_, i) => `${cat.key}-${i}`);
+    setOpenKeys((prev) => {
+      const next = new Set(prev);
+      const allOpen = keys.every((k) => next.has(k));
+      for (const k of keys) {
+        if (allOpen) next.delete(k);
+        else next.add(k);
+      }
       return next;
     });
   }
@@ -271,9 +303,25 @@ export default function FaqPage() {
         </div>
       </section>
 
-      {/* 検索窓は帯の外・帯直下の白面に置く（R4 ラウンド5 指摘 3/7/15/17）。
+      {/* 帯の直下の白面（リード文）。
+          ラウンド6 指摘（9）: リード文が検索窓の下にあり「道具が説明より先に出る」読み順に
+          なっていた。DOM 順で説明 → 検索窓に直す（CSS の order で見た目だけ入れ替えると
+          DOM 順・タブ順と食い違うので使わない）。
+          ラウンド6 指摘（5）: モバイルで検索窓が帯の下端に接し、帯とフォームが1つの塊に
+          見えていた。帯を受ける余白はこの面の上パディングが持ち、ヘアラインは置かない。 */}
+      <div className="faq-lead">
+        <div className="container">
+          <p>
+            ご利用前の疑問にまとめてお答えします。解決しない場合は
+            <Link href="/contact">お問い合わせ</Link>
+            ください。
+          </p>
+        </div>
+      </div>
+
+      {/* 検索窓は帯の外・リード文の下に置く（R4 ラウンド5 指摘 3/7/15/17）。
           帯の中に置くと白地 1px 枠の箱が人物の顔の直下に接し、顔を分断して「雑な合成」に見えた。
-          帯の下端と地続きに見えるよう、この面には上下の罫を持たせず余白だけで受ける。 */}
+          件数（aria-live）は検索窓の直下＝操作した場所に置く。 */}
       <div className="faq-searchbar">
         <div className="container">
           <div className="faq-search-wrap">
@@ -281,7 +329,11 @@ export default function FaqPage() {
               type="text"
               className="faq-search"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                // 検索語が変わったら「閉じた項目」の記憶を捨てる（新しい検索は全件展開から始める）
+                setClosedHits(new Set());
+              }}
               placeholder="キーワードで検索（例：費用、エリア）"
               autoComplete="off"
               aria-label="質問を検索"
@@ -291,7 +343,10 @@ export default function FaqPage() {
                 className="faq-search-clear show"
                 type="button"
                 aria-label="クリア"
-                onClick={() => setQuery("")}
+                onClick={() => {
+                  setQuery("");
+                  setClosedHits(new Set());
+                }}
               >
                 ×
               </button>
@@ -302,17 +357,6 @@ export default function FaqPage() {
               </svg>
             )}
           </div>
-        </div>
-      </div>
-
-      {/* 帯の直下の白面（リード文・検索結果件数） */}
-      <div className="faq-lead">
-        <div className="container">
-          <p>
-            ご利用前の疑問にまとめてお答えします。解決しない場合は
-            <Link href="/contact">お問い合わせ</Link>
-            ください。
-          </p>
           <p className="search-hint" aria-live="polite">
             {kw
               ? hits && hits.length > 0
@@ -359,6 +403,15 @@ export default function FaqPage() {
                   {t.label}
                 </button>
               ))}
+              {/* ラウンド6 指摘（25）: 検索から /faq に落ちた業者が、手数料・審査の答え
+                  （/business の「業者向けよくある質問」）に届かなかった。カテゴリ列の末尾に
+                  1 本だけ置く。859px 以下はサイドバーが消えるので、末尾の
+                  .faq-biz-line が同じ導線を担う（導線の本数は常に1本）。 */}
+              <Link href="/business#faq" className="faq-side-link faq-side-link--biz">
+                <Ic name="bag" />
+                業者の方はこちら
+              </Link>
+
               <div className="faq-side-foot">
                 <div className="faq-side-title">解決しない場合</div>
                 <Link href="/contact" className="faq-side-link faq-side-link--link">
@@ -382,8 +435,9 @@ export default function FaqPage() {
                           q={highlight(it.q, kw)}
                           a={it.a}
                           catLabel={it.catLabel}
-                          open={openKeys.has(key)}
-                          onToggle={() => toggle(key)}
+                          /* 検索中は該当項目を自動展開する（ラウンド6 指摘 11） */
+                          open={!closedHits.has(key)}
+                          onToggle={() => toggleHit(key)}
                         />
                       );
                     })
@@ -413,6 +467,18 @@ export default function FaqPage() {
                         </div>
                         <h2 className="faq-section-title">{c.label}</h2>
                         <span className="faq-section-count">{c.items.length}問</span>
+                        {/* 初期表示を全閉に統一した代わりの一括開閉（ラウンド6 指摘 11）。
+                            状態はラベルの文字が持つので aria-expanded は付けない
+                            （1つのボタンが複数の領域を制御するため状態の指す先が曖昧になる）。 */}
+                        <button
+                          type="button"
+                          className="faq-section-all"
+                          onClick={() => toggleSection(c)}
+                        >
+                          {c.items.every((_, i) => openKeys.has(`${c.key}-${i}`))
+                            ? "すべて閉じる"
+                            : "すべて開く"}
+                        </button>
                       </div>
                       <div className="faq-list">
                         {c.items.map((it, i) => {
@@ -443,6 +509,10 @@ export default function FaqPage() {
                     お問い合わせフォームへ
                     <Ic name="arrow" />
                   </Link>
+                  {/* サイドバーが消える 859px 以下だけ表示（ラウンド6 指摘 25） */}
+                  <p className="faq-biz-line">
+                    業者の方は<Link href="/business#faq">業者向けよくある質問</Link>をご覧ください。
+                  </p>
                 </div>
               </div>
             </div>

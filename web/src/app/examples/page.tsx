@@ -1,6 +1,6 @@
 "use client";
 
-/** 成約イメージ（カードグリッド・金額/カテゴリ）。
+/** 利用イメージ（カードグリッド・金額/カテゴリ）。
  *  デザイン handoff: docs/design_handoff_katazuke/成約事例.html を移植。
  *  ヘッダー/フッターは共通 SiteChrome が付与するため、ここでは <main id="main"> の中身のみ描画する。
  *  カテゴリフィルターはクライアント側の状態で切り替える（元デザインの filterCases 相当）。
@@ -12,13 +12,14 @@
  *  R4: 事例データ（CASES）は @/lib/model-cases の単一正本を読む。トップ（/）の「利用イメージ」
  *  節と同じ値を共有し、金額・入札数・日数がページ間で食い違わないようにする。ここに再定義しない。
  *
- *  R4 ラウンド5（指摘 2/13）で肖像の方針を改めた。R4_BRIEF B.3 は「48px の円に入れても顔が
- *  潰れる」ことを理由に見送りにしていたが、円ではなく矩形（.img-frame--1x1・PC 200px /
- *  SP 128px）で出せば潰れない。トップの「こんなふうに使えます」で顔のある3人（田中・鈴木・
- *  山口＝portrait を持つケース）が、同じ3人の詳細である本ページではイニシャルの円のままで、
- *  同一人物の見え方が分断されていたため、B.3 の判断を上書きして肖像を出す。
- *  素材は原寸 800px 角（表示 200px）なので、画像担当が 440px 角の派生（mc-*-440.webp）を
- *  書き出したら src を差し替える（BRIEF §1.11 の 2x 規約）。manifest の used_by も要追記。
+ *  ラウンド6（指摘 2/6/10/12/16/20＝6視点が一致）で肖像を撤回し、R4_BRIEF B.3 の決定
+ *  （/examples は肖像を出さず頭文字アバターを維持）に戻した。ラウンド5 で矩形の肖像を足した
+ *  結果、同一人物が「矩形の肖像」と「頭文字の円」の2つの記号で並んで identity が二重化し、
+ *  さらに肖像を持つのは 6件中3件のためカードの立ち上がり高さが不揃いになった。
+ *  モバイルでは肖像が約 100x80px に縮んで顔が判別できず、装飾としても情報としても働いていない。
+ *  肖像を残す前提（表示 220px 以上＋440px 角の派生 webp。BRIEF §1.11 の 2x 規約）も未整備。
+ *  顔のある3人はトップの「こんなふうに使えます」が担い、本ページは頭文字アバターで通す。
+ *  /examples の v2 画像点数は 6（6件の主役画像）に戻る。
  *
  *  【景品表示法（優良誤認）対応】掲載する事例は handoff 由来の架空データであり、実際の
  *  取引実績ではない。よって本ページでは (1)「実際の」等の実在を示す表現を使わない
@@ -120,26 +121,12 @@ function CaseCard({ c, index }: { c: CaseItem; index: number }) {
           ))}
         </div>
 
-        {/* R4 ラウンド5 指摘（2/13）: トップの「こんなふうに使えます」で顔のある3人（田中・
-            鈴木・山口）が、同じ3人の詳細であるこのページではイニシャルの円のままで、同一人物の
-            見え方が分断されていた。肖像を持つケースだけ矩形（.img-frame--1x1）で顔を出す。
-            円形のイニシャルは氏名の隣の識別マークとして残す（正典: 円形はアバターとドットのみ）。
-            肖像は生成画像・架空であることを、この上の .cases-hero-note（MODEL_CASE_NOTE）と
-            alt 内の「架空のモデルケース」、下の .case-quote-note が三重に担保する。 */}
-        <div className={`case-persona${c.portrait ? " case-persona--portrait" : ""}`}>
-          {c.portrait ? (
-            <div className="img-frame img-frame--1x1 img-frame--white case-portrait">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`/img/v2/${c.portrait}.webp`}
-                width={800}
-                height={800}
-                alt={c.portraitAlt}
-                loading="lazy"
-                decoding="async"
-              />
-            </div>
-          ) : null}
+        {/* ラウンド6 指摘（2/6/10/12/16/20）: ラウンド5 で足した矩形の肖像を撤回し、
+            頭文字の円アバター 1 本に戻した（同一人物を2つの記号で示す二重表示の解消。
+            6件中3件だけ肖像がありカードの立ち上がり高さも不揃いだった）。
+            顔のある3人（田中・鈴木・山口）はトップの「こんなふうに使えます」が担う。
+            c.portrait / c.portraitAlt はトップ専用のフィールドなのでここでは参照しない。 */}
+        <div className="case-persona">
           <div className="case-avatar">{c.avatar}</div>
           <div className="case-persona-info">
             <div className="name">{caseName(c)}</div>
@@ -154,18 +141,24 @@ function CaseCard({ c, index }: { c: CaseItem; index: number }) {
             {c.bidCount}社が入札 ／ {c.count}点まとめ ／ {c.days}日で成約
           </div>
           <div className="case-amount-label">買取額の例（架空のモデルケース）</div>
+          {/* ラウンド6 指摘（7/13/18）: 1カードに ※ が3本（金額注記・セリフ注記・ページ冒頭の
+              注記）あり、6件で計19本の小活字が本文より面積を占めていた。カード内の打消しは
+              「チップ1つ＋金額の1行」に統合し、現物査定と引用の断り書きはカード群の手前の
+              .cases-hero-note に一度だけ集約する。
+              指摘 18（先頭カードが最高額 ¥148,000 で、上から読む人が最初に触れる金額が最大値に
+              なる）に合わせ、この1行は金額の「手前」に置く（打消し表示を強調表示より先に読ませる。
+              R4_BRIEF B.3 の「金額より手前」を .model-chip に続いて二重に満たす）。 */}
+          <p className="case-note">
+            ※ 架空の想定額です。買取額は品物や状況により大きく異なります。
+          </p>
           <div className="case-amount">
             ¥{c.amount.toLocaleString()}
             <span>円</span>
           </div>
-          <p className="case-amount-note">
-            ※ 架空のモデルケースの想定額です。買取額は品物や状況により異なり、最終的な金額は業者の現物査定で決まります。
-          </p>
         </div>
 
         <div className="case-quote">
           <p>{c.quote}</p>
-          <span className="case-quote-note">※ 人物・セリフを含め、架空の利用イメージです</span>
         </div>
       </div>
     </Reveal>
@@ -183,13 +176,17 @@ export default function ExamplesPage() {
   return (
     <main id="main">
       {/* ============ ヒーロー ============ */}
-      {/* R4 ラウンド5 指摘（11）: eyebrow が「成約事例」だと、直下の h1「成約イメージ
-          （モデルケース）」という打消し表示の直前に、実在の成約実績を示唆する語を置くことに
-          なる。トップの .model-cases 節（eyebrow「利用イメージ」）と語彙を揃える。 */}
+      {/* R4 ラウンド5 指摘（11）: eyebrow が「成約事例」だと、直下の h1 という打消し表示の
+          直前に、実在の成約実績を示唆する語を置くことになる。トップの .model-cases 節
+          （eyebrow「利用イメージ」）と語彙を揃える。
+          ラウンド6 指摘（1/15/19＝3視点が一致）: h1 も「成約イメージ」のままで eyebrow と
+          食い違っていた。「成約」は実取引の成立を示唆する語で、稼働直前の現状では最も避けたい。
+          h1 と layout.tsx の metadata.title を「利用イメージ（モデルケース）」に統一する
+          （ヘッダーナビ・フッターのラベルは core 所有のため差し戻し）。 */}
       <section className="cases-hero">
         <div className="container">
           <span className="eyebrow">利用イメージ</span>
-          <h1>成約イメージ（モデルケース）</h1>
+          <h1>利用イメージ（モデルケース）</h1>
           <p>
             まとめて出品すると、どのように査定が集まり、成約に至るのか。サービスの流れがイメージできるモデルケースをご紹介します。
           </p>
@@ -249,8 +246,12 @@ export default function ExamplesPage() {
               立っていた。文言は一切短縮せず（折りたたみにも入れない＝打消し表示を隠さない）、
               打消しの対象＝カード群・金額の直前に移す。DOM 順は「注記 → カード（.model-chip）
               → 金額」で、金額より手前という要件（R4_BRIEF B.3）を維持する。 */}
+          {/* ラウンド6 指摘（13）: カード内に散っていた断り書き（引用が架空である旨・現物査定）を
+              ここに一度だけ集約する。MODEL_CASE_NOTE は共有の正本（core 所有）なので、
+              このページの表示に必要な2文だけを後ろに足す。 */}
           <p className="cases-hero-note" role="note">
             {MODEL_CASE_NOTE}
+            カード内のコメントも架空のもので、実際の利用者の体験談ではありません。最終的な買取額は、業者が現物を確認したうえで決まります。
           </p>
 
           {/* ============ 事例グリッド ============ */}

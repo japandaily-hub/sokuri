@@ -175,7 +175,13 @@ section:has(> .vt){position:relative;}
    2トーンが意図として読めない。タイルを縦罫（10〜14px）まで絞り「主色ブルーのボタン＋左端の
    LINE 合図」として読ませる。高さいっぱいに敷く（A.0-3）・アイコンを置かない（A.0-1）は不変で、
    ブランド例外の面積はさらに小さくなる（A.0-2 の方向）。境界は forced-colors 用の線で担保。 */
-.btn-line__tile{flex:0 0 clamp(10px,1vw,14px);align-self:stretch;background:#06c755;}
+/* ラウンド5 指摘（8）: 同じページの中でタイル幅が実測 27px／10px／19px とインスタンスごとに違い、
+   意図した縦罫ではなく「描画事故の細い筋」に見えていた。原因は flex-basis だけを clamp() で
+   渡していたこと — 基準幅は 1vw と viewport 依存で、かつ width/min-width が auto のまま
+   （全幅になる行では .btn の justify-content との兼ね合いでレイアウト側の丸めが乗る）。
+   縦罫（10〜14px・R4 確定）の範囲内で固定値にし、flex/width/min-width の 3 宣言で
+   どの器でも同じ幅になるよう固定する。緑の面積を増やす（56px 復帰）案は採らない。 */
+.btn-line__tile{flex:0 0 12px;width:12px;min-width:12px;align-self:stretch;background:#06c755;}
 /* flex:1 1 auto が無いと、全幅になる場面（モバイルの CTA 行・Dock）で .btn の
    justify-content:center がタイル＋本文を1塊として中央に寄せ、緑タイルが左端から
    40px 前後内側に浮く（ラウンド4 の 390px 実測）。本文を伸ばしてタイルを左端に固定し、
@@ -193,7 +199,7 @@ section:has(> .vt){position:relative;}
   /* 相方の .btn-ghost も同時に全幅にする（LINE だけ全幅で不揃いになるのを防ぐ） */
   .hero-cta>.btn,.final-cta>.btn,.pg-hero-cta>.btn,.biz-hero-cta>.btn{
     width:100%;flex:1 1 auto;min-width:0;}
-  .btn-line__tile{flex-basis:10px;}
+  .btn-line__tile{flex:0 0 10px;width:10px;min-width:10px;}
   .btn-line__label{font-size:15px;}
   .btn-line__sub{font-size:11px;}
 }
@@ -209,6 +215,14 @@ section:has(> .vt){position:relative;}
 @media (forced-colors:active){
   .btn.btn-line{border:1px solid CanvasText;}
   .btn-line__tile{border-inline-end:1px solid CanvasText;}
+}
+/* ラウンド5 指摘（11）: CTA 行で LINE ボタン（2行組みのため min-height:60px／SP 54px）と
+   .btn-ghost（padding だけで高さが決まる）の実高が数 px ずれ、天地が揃わない。
+   行の中のボタンにだけ同じ最低高を与える（.btn 全体には当てない＝他の面のボタン高は不変）。
+   .btn は align-items:center なのでラベルは中央のまま。 */
+.hero-cta>.btn,.final-cta>.btn,.pg-hero-cta>.btn,.biz-hero-cta>.btn{min-height:60px;}
+@media (max-width:859px){
+  .hero-cta>.btn,.final-cta>.btn,.pg-hero-cta>.btn,.biz-hero-cta>.btn{min-height:54px;}
 }
 /* LINE 緑と苔緑を隣接させないため、ゴーストは黒枠 */
 .btn-ghost{background:#fff;color:#333;border:1px solid #333;}
@@ -619,7 +633,10 @@ section:has(> .vt){position:relative;}
    ============================================================ */
 .footer{background:#fff;color:var(--body-soft);border-top:1px solid var(--line);
   padding:clamp(48px,6vw,72px) 0 36px;font-size:12px;}
-.footer-grid{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:32px;}
+/* ラウンド5 指摘（1/2/3）: 「業者の方へ」列を新設したので 4 列 → 5 列（ロゴ列＋4ナビ列）。
+   ナビ列は minmax(0,1fr) で等幅にし、「特定商取引法に基づく表記」等の長いラベルは列内で折り返す
+   （1fr だけだと最小内容幅で列が膨らみロゴ列が潰れる）。860px 以下は 2 列のまま（下の @media）。 */
+.footer-grid{display:grid;grid-template-columns:1.4fr repeat(4,minmax(0,1fr));gap:clamp(22px,2.4vw,32px);}
 .footer-logo img{height:40px;filter:none;opacity:1;}
 .founder-logo{display:block;width:56px;margin-bottom:20px;}
 .final-logo{display:block;width:64px;margin:0 auto 24px;}
@@ -656,7 +673,7 @@ section:has(> .vt){position:relative;}
    .dock の上下 padding 4+4 で実高 56px（body{padding-bottom:74px} の前提を維持）。
    .btn-line__body の上書きを省くと中身が約 58px になり 56px 前提が崩れるので省略不可。 */
 .dock .btn.btn-line{flex:1 1 auto;min-width:0;min-height:48px;padding:0;}
-.dock .btn-line__tile{flex-basis:10px;}   /* ラウンド4 指摘（4/36）: 44px の無地ベタを縦罫に絞る */
+.dock .btn-line__tile{flex:0 0 10px;width:10px;min-width:10px;}   /* ラウンド4 指摘（4/36）: 44px の無地ベタを縦罫に絞る／ラウンド5 指摘（8）: 3宣言で固定 */
 .dock .btn-line__body{padding:4px clamp(14px,2.2vw,20px);gap:1px;}
 .dock .btn-line__label{font-size:15px;line-height:1.3;}
 .dock .btn-line__sub{font-size:11px;line-height:1.3;}

@@ -10,27 +10,41 @@ export const metadata: Metadata = {
   alternates: { canonical: "/terms" },
 };
 
-/** 冒頭の「要点3つ」。本文（TermsTabs）の要約であり、根拠となる条を併記する。
- *  ref は該当条の見出し文字列。TermsTabs 側に id が無いためリンクにはせず、
- *  探す手がかりとしてのみ表示する（無効なアンカーを作らない）。 */
-const POINTS: { no: string; lead: string; body: string; ref: string }[] = [
+/** 冒頭の「要点」。本文（TermsTabs）の要約であり、根拠となる条を併記する。
+ *  ラウンド5 指摘（12）で本文の各条に id（ユーザー側 tu-N／業者側 tb-N）を振ったため、
+ *  ref を該当条へのページ内リンクにする（tb-* は TermsTabs が業者ペインを開いてから送る）。 */
+const POINTS: { no: string; lead: string; body: string; ref: string; href: string }[] = [
   {
     no: "01",
     lead: "ユーザーの費用は0円です。",
     body: "出品・査定・お断りまで、ユーザーに費用の請求はありません。",
     ref: "ユーザー利用規約 第6条",
+    href: "#tu-6",
   },
   {
     no: "02",
     lead: "連絡が来るのは、選んだ1社だけです。",
     body: "詳細住所と連絡用のメールアドレスは、交渉が成立した業者にのみ開示されます。氏名・電話番号を業者に開示することはありません。",
     ref: "ユーザー利用規約 第5条",
+    href: "#tu-5",
   },
   {
     no: "03",
     lead: "業者を選ぶ前なら、取り下げできます。",
     body: "入札の受付は、ユーザーが業者を選んだ時点で終了します。それまでは出品を取り下げることができます。",
     ref: "ユーザー利用規約 第4条",
+    href: "#tu-4",
+  },
+  {
+    /* ラウンド5 指摘（15）: 一番不安な「来てもらった後に断れるか」が要点に無く、条文と
+       /legal を読まないと分からなかった。文言はトップの料金節（page.tsx の .fz-caution）と
+       /faq の既存文言と同じ範囲に留める（無条件の解約権を新たに書かない）。根拠は
+       「ユーザーの同意なく一方的に減額できない」＝業者利用規約 第5条。 */
+    no: "04",
+    lead: "金額のご相談に納得できなければ、お断りできます。",
+    body: "訪問時の現物確認で写真と状態が違えば、業者から金額のご相談が届くことがあります。同意しない場合は取引をお断りでき、お断りに費用はかかりません。",
+    ref: "業者利用規約 第5条",
+    href: "#tb-5",
   },
 ];
 
@@ -82,7 +96,9 @@ export default function TermsPage() {
                 <span className="terms-points__body">
                   <strong>{p.lead}</strong>
                   {p.body}
-                  <span className="terms-points__ref">{p.ref}</span>
+                  <a className="terms-points__ref" href={p.href}>
+                    {p.ref}
+                  </a>
                 </span>
               </li>
             ))}

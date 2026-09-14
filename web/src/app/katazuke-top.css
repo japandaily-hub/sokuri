@@ -45,8 +45,15 @@
    折れた結果、左端だけ揃って右端が 100px ラグになっていた。横並びは物理的に入らないので
    「縦積みのまま同幅」を選び、列方向＋stretch で 2 本を同じ幅に固定する。
    ≤859px は核の .hero-cta>.btn{width:100%} が既に全幅にしているので触らない。 */
+/* ラウンド5 指摘（15）: 縦積みの 2 本は幅は揃ったが、LINE 側が「左端の緑罫＋左揃えの 2 行ラベル」、
+   ゴースト側が中央揃えで、文字の開始位置が揃わず主従が読めない列になっていた。
+   横並びは幅が足りず成立しない（上のラウンド4 実測）ので、縦積みのままゴーストも左揃えにし、
+   高さを LINE と同じ 60px に、文字の左端を LINE のラベル（緑罫 12px ＋ .btn-line__body の
+   padding）と同じ位置に合わせる。主従は面（主色ベタ）と補足行の有無が担う。 */
 @media(min-width:860px){
   .hero .hero-cta{flex-direction:column;flex-wrap:nowrap;align-items:stretch;max-width:360px;}
+  .hero .hero-cta .btn-ghost{justify-content:flex-start;min-height:60px;
+    padding-inline:calc(12px + clamp(18px,2.2vw,28px)) clamp(18px,2.2vw,28px);}
 }
 
 /* モバイルは flex-wrap だと「1 撮る / 2 業者が競う / 3 見比べて選ぶ」で 1 行が埋まり、
@@ -176,6 +183,17 @@
      （18px / 行間は既定 1.5 前後）に対する保険で、lh 対応ブラウザでは後勝ちの 2lh が効く。 */
   .scenes .scene-body h3{min-height:calc(1.5em * 2);min-height:2lh;}
 }
+/* ラウンド5 指摘（14）: 390px でも 2 列のままだと本文カラムが約 150px になり、
+   「新居に／持っていかない物を」のように見出しが不自然に折れ、本文が 4〜6 行に伸びて
+   4 枚の高さが揃わない（word-break:auto-phrase と 2lh の保険でも吸収しきれない）。
+   430px 以下は 1 列にして本文幅を戻し、画像は縦に伸びすぎないよう 16:9 で全幅にする
+   （1:1 素材の中央を切り出す。object-position は既定の 50% 50% のまま）。
+   1 列では見出しが 1 行で収まるため 2 行分の下限は解除する。 */
+@media(max-width:430px){
+  .scenes .scenes-grid{grid-template-columns:1fr;gap:clamp(24px,6vw,32px);}
+  .scenes .scene-img{aspect-ratio:16/9;}
+  .scenes .scene-body h3{min-height:0;}
+}
 
 /* ============================================================
    #9.5 利用イメージ（架空のモデルケース）— R4 B.2
@@ -193,9 +211,8 @@
 /* 「私たちについて」の手前（#cats → .founder）も同じ理由で詰める */
 .founder.section{padding-top:clamp(36px,4vw,56px);}
 
-/* 3 枚が「実績の抜粋」に見えないための文脈（ラウンド4・3）。打消し表示 .model-note より前 */
-.model-cases .mc-status{font-family:var(--ui);font-size:14px;line-height:1.9;color:var(--body);
-  margin:0 0 10px;}
+/* ラウンド5（4/12/19）: .mc-status（業者募集の 1 行）は #trust の「登録制の事業者のみ」へ移設し、
+   この節から外した（page.tsx 側のコメント参照）。要素が無くなったので規則も残さない。 */
 .model-cases .mc-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
   gap:clamp(20px,2.6vw,32px);}
 .model-cases .mc-card{display:flex;flex-direction:column;align-items:flex-start;
@@ -209,22 +226,24 @@
 .model-cases .mc-attr{display:block;font-family:var(--ui);font-size:13px;color:var(--body-soft);
   margin-top:5px;line-height:1.7;}
 .model-cases .mc-quote{margin-top:12px;font-size:15px;color:var(--body);line-height:2;}
-/* 点数・成約日数の 2 値。金額は出さない（R4 B.2）。入札社数も出さない
-   （ラウンド4・3: 3 枚並ぶと「8社前後は入札が来る」という平均像＝実質的な集計統計になるため、
-   6 件すべてが並ぶ /examples に限定した）。2 値なので 2 列に詰め、数値も 1 段落とす
-   （ラウンド4・19: 台帳の実測値ではなくカードの例示値として読ませる）。 */
-.model-cases .mc-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;
-  width:100%;margin-top:auto;padding-top:clamp(16px,1.8vw,22px);}
+/* 点数・入札社数・成約日数の 3 値を横 3 分割（R4 B.2 の指定・ラウンド5 指摘 3/8/13/18）。
+   金額は出さない（R4 B.2。買取額の例は 6 件すべてが並ぶ /examples に限定）。
+   2 値のままではカード右 1/3 が空き、直前の .model-note の「入札数も架空」という
+   打消しが画面上の数値と対応しなかった。数値は 1 段落として台帳の実測値ではなく
+   カードの例示値として読ませる（ラウンド4・19 の判断は維持）。
+   一言（.mc-quote）と数値の境目に 1px ヘアラインを引き、3 列の頭を揃える。 */
+.model-cases .mc-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;
+  width:100%;margin-top:auto;padding-top:clamp(14px,1.6vw,18px);
+  border-top:1px solid var(--line);}
 .model-cases .mc-facts>div{display:flex;flex-direction:column;gap:4px;min-width:0;}
 .model-cases .mc-facts dt{font-family:var(--ui);font-size:12px;color:var(--body-soft);line-height:1.6;}
 .model-cases .mc-facts dd{margin:0;display:flex;align-items:baseline;gap:3px;color:var(--ink);}
 .model-cases .mc-facts dd b{font-family:var(--ui);font-weight:600;font-size:clamp(20px,2vw,23px);
   line-height:1.2;letter-spacing:.01em;font-variant-numeric:tabular-nums;}
 .model-cases .mc-facts dd span{font-family:var(--ui);font-size:12px;color:var(--body);}
-/* 数値行に隣接する架空の明示（ラウンド4・19）。モバイルではカード上端の .model-chip が
-   スクロールで画面外に出るため、数値と同一視野に打消しを残す。12px にはしない（B.4 の趣旨） */
-.model-cases .mc-fnote{font-family:var(--ui);font-size:13px;line-height:1.7;color:var(--body);
-  margin:10px 0 0;}
+/* ラウンド5（2/9）: .mc-fnote（カード下の「架空のモデルケースの数値です」）は削除。
+   打消しは各カード先頭の .model-chip（14px/600・core）とカード群手前の .model-note が担う。
+   .model-note のサイズは 14px/1.9 のまま下げない（13px 案は打消し表示を弱める方向のため不採用）。 */
 /* /examples への導線は 1 本だけ。ボタンにしない（LINE CTA もこの節には足さない） */
 .model-cases .mc-more{margin-top:clamp(26px,3.2vw,38px);text-align:center;}
 .model-cases .mc-more a{display:inline-flex;align-items:center;gap:8px;
@@ -325,9 +344,19 @@
 .founder .founder-photo{aspect-ratio:3/2;background:var(--pale-2);margin:0;}
 /* 縮小は 2 カラムが成立する幅だけに限る。980px 以下は共有の .media-split が 1 列になり、
    859px 以下は .sp-bleed が負マージンで画面端まで伸ばすため、ここで幅を縛ると bleed が壊れる。 */
+/* ラウンド5 指摘（11）: 上の縮小（34fr・400px・3:2）が効きすぎて、本文 4 段落の高さに対し
+   画像だけが小さく、しかも共有の .media-split の既定（align-items:center）で縦中央に浮き、
+   見出しの天と画像の上辺が揃わず右側に空洞ができていた。
+   ① 上辺を見出し行に揃える（align-items:start）
+   ② 列を 40fr に広げ、枠の上限を 460px へ（ラウンド4 の「面積を落とす」意図は残し、
+      1440px でも本文列 60fr を下回る幅に留める）
+   ③ 器を 4:3 にして縦の空洞を詰める（3:2 素材の左右を 11% ずつ切るだけ。素材は
+      机上の静物で中央に主題があり、object-position は既定の 50% 50% のまま）
+   提案にあった 4:5 は採らない（縦長化で暖色の 1 枚の面積がラウンド4 前より増え、
+   3:2 素材の 37% を切り落とすため）。 */
 @media(min-width:981px){
-  .founder .media-split{--ms-img:34fr;--ms-txt:66fr;}
-  .founder .founder-photo{width:100%;max-width:400px;}
+  .founder .media-split{--ms-img:40fr;--ms-txt:60fr;align-items:start;}
+  .founder .founder-photo{width:100%;max-width:460px;aspect-ratio:4/3;}
 }
 
 /* ============================================================

@@ -34,9 +34,13 @@
   border-bottom: 1px solid var(--line);
   padding: clamp(24px, 3vw, 32px) 0;
 }
+/* ラウンド6 指摘（4）の部分対応: 数値項目（42px）と文型項目（19px）を天揃えにすると
+   文型側の塊が上に浮いて視線の高さが揃わない。中央揃えにして 4 項目の重心を1本に通す
+   （「12カテゴリ」を数値に戻す案は採らない。ラウンド5 で「12が何の12か伝わらない」
+   「1社＝登録業者が1社と読める」の指摘を受けて意図的に文型へ移した箇所のため）。 */
 .stats-bar-inner {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
   gap: clamp(28px, 5vw, 72px);
   flex-wrap: wrap;
@@ -167,16 +171,11 @@
    共有の .model-chip 自体は上書きしない（R4_BRIEF F.2）。 */
 .case-chip-row { display: flex; }
 
+/* ラウンド6 指摘（2/6/10/12/16/20）: ラウンド5 の矩形肖像（.case-persona--portrait /
+   .case-portrait）は撤回し、頭文字の円アバター 1 本に戻した（R4_BRIEF B.3 の決定）。
+   同一人物を肖像＋頭文字の2記号で示す二重表示と、6件中3件だけ肖像があることによる
+   カードの立ち上がり高さの不揃いを解消する。顔はトップのモデルケース節が担う。 */
 .case-persona { display: flex; align-items: center; gap: 10px; }
-/* 肖像を持つケース（田中・鈴木・山口）だけ矩形で顔を出す。トップの同一人物カードと
-   見え方を揃えるため、円形にはせず .img-frame--1x1 の矩形にする（R4 ラウンド5 指摘 2/13）。
-   表示幅は PC 200px / SP 128px。素材は 800px 角の原寸なので、画像担当が 440px 角の派生
-   （mc-*-440.webp）を書き出したら src を差し替える（BRIEF §1.11 の 2x 規約に寄せる）。 */
-.case-persona--portrait { gap: 16px; }
-.case-portrait {
-  flex: 0 0 clamp(140px, 16vw, 200px);
-  width: clamp(140px, 16vw, 200px);
-}
 .case-avatar {
   width: 44px; height: 44px;
   border-radius: 50%;
@@ -214,13 +213,16 @@
   line-height: 1.2;
 }
 .case-amount span { font-family: var(--ui); font-size: 14px; font-weight: 600; color: var(--body-soft); margin-left: 2px; }
-/* 免責は金額の直下・--body 色（打消し表示を主張と同一視野に置く） */
-.case-amount-note {
+/* カード内の打消し表示は 1 本だけ（ラウンド6 指摘 7/13）。金額の「手前」に置き、
+   強調表示（¥ の 24px）より先に読ませる（指摘 18）。
+   級数・色は 12.5px / --body のまま据え置く: 12px・--body-soft まで落とすと打消しが
+   強調表示に対して弱くなる（消費者庁「打消し表示」の考え方。R4_BRIEF B.4 と同じ理由）。 */
+.case-note {
   font-family: var(--ui);
   font-size: 12.5px;
   color: var(--body);
-  line-height: 1.7;
-  margin-top: 8px;
+  line-height: 1.8;
+  margin-bottom: 6px;
   max-width: 34em;
 }
 
@@ -245,14 +247,8 @@
   line-height: 1;
 }
 .case-quote p { padding-left: 22px; }
-.case-quote-note {
-  display: block;
-  font-family: var(--ui);
-  font-size: 11.5px;
-  color: var(--body-soft);
-  margin-top: 8px;
-  padding-left: 22px;
-}
+/* 引用が架空である旨の注記（旧 .case-quote-note）はカード群の手前の .cases-hero-note に
+   集約した（ラウンド6 指摘 7/13。6件で計19本あった小活字を減らす）。 */
 
 /* 該当なし */
 .cases-empty {
@@ -343,10 +339,6 @@
     background: linear-gradient(to right, rgba(255, 255, 255, 0), #fff 60%);
     pointer-events: none;
   }
-
-  /* 肖像は 128px 角。氏名・属性が 390px でも同じ行に収まる幅にする */
-  .case-persona--portrait { gap: 14px; }
-  .case-portrait { flex-basis: 128px; width: 128px; }
 
   .case-card { padding-block: clamp(28px, 7vw, 44px); }
   .case-media { gap: 10px; }

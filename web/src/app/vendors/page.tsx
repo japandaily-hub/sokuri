@@ -6,6 +6,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { AppHeader } from "@/components/kdz/AppHeader";
+import { SiteHeader } from "@/components/kdz/SiteHeader";
+import { SiteFooter } from "@/components/kdz/chrome";
 import { Spinner } from "@/components/Icon";
 import { vendorCategoryName } from "@/lib/categories";
 import { getVendors, toDisplayMessage, type VendorListItem } from "@/lib/katadzuke-api";
@@ -27,8 +29,11 @@ function starString(rating: number): string {
 
 /** 取得状態に依存しない静的ブロック（R4 r4 #1/#9/#16）。
  *  取得失敗時と「取得成功で0件」の両方で描く。ここに書く3点は /business の登録要件・
- *  /faq・/terms の既存記載の範囲内に限り、実在業者の件数・社名・評価・写真は一切出さない。 */
-function VendorStaticInfo() {
+ *  /faq・/terms の既存記載の範囲内に限り、実在業者の件数・社名・評価・写真は一切出さない。
+ *  r5 #1/#19: 「掲載時に表示する項目」は取得成功で0件のときだけ描く（showSample）。
+ *  取得失敗中は一覧に何が並ぶかを説明しても「読み込めなかった表」に見えるため、
+ *  審査の3点だけを残し、次の一手はエラーカードのボタンに集約する。 */
+function VendorStaticInfo({ showSample }: { showSample: boolean }) {
   return (
     <section className="vd-sample" aria-labelledby="vd-static-h">
       <h2 id="vd-static-h">掲載している業者の審査</h2>
@@ -46,14 +51,36 @@ function VendorStaticInfo() {
           訪問買取における法定書面の交付など、特定商取引法の遵守を審査時に確認します。
         </li>
       </ul>
-      <h3>掲載時に表示する項目</h3>
-      <p className="model-note">審査を通過した業者は、次の項目とともにこの一覧に掲載されます。</p>
-      <ul className="vd-sample-list">
-        <li>店舗名</li>
-        <li>エリア</li>
-        <li>取扱カテゴリ</li>
-        <li>評価</li>
-      </ul>
+      {showSample ? (
+        <>
+          <h3>掲載時に表示する項目</h3>
+          <p className="model-note">審査を通過した業者は、次の項目とともにこの一覧に掲載されます。</p>
+          {/* r5 #1/#5/#11/#17/#23/#28: 3列グリッド＋各行のヘアラインが「データの抜けた表」に
+              見えていた（4項目のため PC で「評価」が孤立し、最終行に中身のない罫線が残った）。
+              R4 C.3 の指定どおり素の箇条書き（中黒・1行1項目）に戻し、罫線は一切持たせない。 */}
+          <ul className="vd-sample-list">
+            <li>
+              <b>店舗名</b>（屋号）
+            </li>
+            <li>
+              <b>エリア</b>（訪問できる都県）
+            </li>
+            <li>
+              <b>取扱カテゴリ</b>（得意な品目）
+            </li>
+            <li>
+              <b>評価</b>（成約したユーザーの5段階評価と口コミ件数）
+            </li>
+          </ul>
+          {/* r5 #33: 掲載0件の説明を読み終えた業者の次の一手を、ページ末尾の小さな
+              テキストリンクからこの位置の通常ボタンへ移す（末尾の .vd-join は削除）。 */}
+          <p className="vd-sample-cta">
+            <Link href="/business" className="btn btn-primary">
+              業者登録の詳細を見る
+            </Link>
+          </p>
+        </>
+      ) : null}
     </section>
   );
 }
@@ -85,7 +112,10 @@ export default function VendorListPage() {
 
   return (
     <div className="vendors-page bare-scope">
-      <AppHeader />
+      {/* r5 #20: 公開ページなのにアプリ用ヘッダー（ベル・マイページ・ログアウト）が出ていた。
+          未ログインは他の公開ルートと同じ SiteHeader、ログイン済みだけ AppHeader に切り替える
+          （/vendors 専用のクロムは新設しない）。session が読込中は公開側を描く。 */}
+      {signedIn ? <AppHeader /> : <SiteHeader />}
       <main id="main">
         {/* ============ 写真帯（静的。取得状態に依存しない） ============ */}
         {/* r2 M5 是正: 見出し1語だけでは帯の濃紺面が空に見えたため、/photo-guide の帯と同じ
@@ -131,6 +161,13 @@ export default function VendorListPage() {
               実在の登録業者の写真と誤読されないよう可視の打消しを置く（alt="" は a11y 上の
               措置で、可視の否認にはならない）。書式は共有部品 .model-note に合わせる。 */}
           <p className="model-note vd-photo-note">※ 写真はイメージです。</p>
+          {/* r5 #24: 掲載0件・取得失敗のどちらでも「買い手が1社も見えない」状態になるため、
+              帯の直下に出品できることを常設する（審査の通過順に入札が入る、という既存方針の再掲）。 */}
+          {error || isEmpty ? (
+            <p className="vd-notice">
+              掲載前でも出品はできます。審査を通過した業者から順に入札します。
+            </p>
+          ) : null}
           {/* r3 是正: 戻るリンクは末尾（.vd-join の下）へ移した。ページ先頭の最初の導線が
               「戻る」になっていたため、本文はリード文から始める。 */}
           <p className="vendors-lead">
@@ -140,6 +177,12 @@ export default function VendorListPage() {
                 1文目「古物商許可番号を確認し…」は r2 M5 で帯のリードへ移した。 */}
             評価と口コミは、成約したユーザーの投稿をそのまま掲載する方針です。
             入札の選択は案件詳細から行えます。
+            {/* r5 #30: 掲載される側（業者）から見て、事実と異なる投稿の扱いが読めなかった。
+                削除の断定（運営が削除します）は実装済みの運用として確認できていないため、
+                受付窓口（/contact）があることだけを書く。 */}
+            事実と異なる投稿についてのご相談は、
+            <Link href="/contact">お問い合わせ</Link>
+            から受け付けます。
           </p>
 
           {/* エラー: 1行の控えめな注記 ＋ 再読み込み/FAQ（R4 r4 #1/#9/#16）
@@ -153,24 +196,29 @@ export default function VendorListPage() {
               <p className="vd-state-err" role="alert">
                 {error}
               </p>
+              {/* r5 #14/#24: エラー文以外に読むものがなく、次の一歩がテキストリンク3本だけだった。
+                  依頼者の一手（出品する）と業者の一手（業者登録）をボタンに格上げし、
+                  再読み込みは3番目の弱い扱い（テキスト）に下げる。 */}
               <div className="vd-state-actions">
-                <button type="button" className="btn btn-primary" onClick={() => window.location.reload()}>
-                  再読み込み
-                </button>
-                <Link href="/faq" className="btn btn-ghost">
-                  よくある質問（業者について）
+                <Link href="/create" className="btn btn-primary">
+                  出品する
+                </Link>
+                <Link href="/business" className="btn btn-ghost">
+                  業者登録（審査制）について
                 </Link>
               </div>
               <p className="vd-state-sub">
-                <Link href="/create" className="vd-state-link">
-                  出品する
+                <button type="button" className="vd-state-link" onClick={() => window.location.reload()}>
+                  再読み込み
+                </button>
+                <Link href="/faq" className="vd-state-link">
+                  よくある質問（業者について）
                 </Link>
-                <Link href="/business" className="vd-state-link">
-                  業者の方はこちら
-                </Link>
-                <Link href="/mypage" className="vd-state-link">
-                  マイ案件一覧へ
-                </Link>
+                {signedIn ? (
+                  <Link href="/mypage" className="vd-state-link">
+                    マイ案件一覧へ
+                  </Link>
+                ) : null}
               </p>
             </div>
           ) : null}
@@ -205,15 +253,11 @@ export default function VendorListPage() {
                   {/* eslint-enable @next/next/no-img-element */}
                 </div>
                 <h2 className="vd-empty-title">審査を通過した業者から順に掲載します</h2>
-                <p className="vd-empty-note">
-                  掲載前でも出品はできます。審査を通過した業者から順にここへ掲載します。
-                </p>
+                {/* r5 #1/#24: 同じ文が帯の直下（.vd-notice）に出るため、ここでは繰り返さない。
+                    業者向けの導線は「掲載時に表示する項目」の末尾（.vd-sample-cta）に1本だけ置く。 */}
                 <div className="vd-empty-cta">
                   <Link href="/create" className="btn btn-primary btn-lg">
                     出品する
-                  </Link>
-                  <Link href="/business" className="btn btn-ghost btn-lg">
-                    業者の方はこちら
                   </Link>
                 </div>
               </section>
@@ -223,7 +267,7 @@ export default function VendorListPage() {
           {/* 審査の基準と「掲載時に表示する項目」は、エラー時・空のときの両方で描く（R4 r4 #1）。
               架空の店舗名・エリア・数値・星・許可タグ・画像は出さない。VENDOR_CASES の店名も
               このページでは使わない（ページをまたいで実在の登録業者と読まれるため）。 */}
-          {error || isEmpty ? <VendorStaticInfo /> : null}
+          {error || isEmpty ? <VendorStaticInfo showSample={isEmpty} /> : null}
 
           {vendors !== null && vendors.length > 0 ? (
             <ul className="vendors-list">
@@ -271,15 +315,11 @@ export default function VendorListPage() {
             </ul>
           ) : null}
 
-          {/* ============ 末尾: 業者登録導線 ============ */}
-          <aside className="vd-join" aria-label="業者登録のご案内">
-            <p className="vd-join-text">
-              業者として掲載を希望される方は、業者登録（審査制）からお申し込みください。
-            </p>
-            <Link href="/business" className="vd-join-link">
-              業者登録（審査制）について
-            </Link>
-          </aside>
+          {/* ============ 末尾: 業者登録導線 ============
+              r5 #14/#33: 「業者として掲載を希望される方は…」＋テキストリンクは、
+              エラーカードのボタン（業者登録（審査制）について）と「掲載時に表示する項目」末尾の
+              ボタン（業者登録の詳細を見る）と重複していたため削除した。
+              一覧が1件以上あるときの業者導線はヘッダー・フッターが持つ。 */}
 
           {/* 戻る導線はページ末尾（r3 是正） */}
           {signedIn ? (
@@ -300,19 +340,24 @@ export default function VendorListPage() {
         </div>
       </main>
 
-      {/* ============ 最小フッター ============
-          r2 M6 是正: BARE ページで共通 .footer を持たず、取得エラー・空のときに
-          ページが途中で切れて見えた。規約・法務3本と運営者表記だけで底を作る。 */}
-      <footer className="vd-foot">
-        <div className="vd-foot-inner">
-          <nav className="vd-foot-links" aria-label="規約・法務">
-            <Link href="/terms">利用規約</Link>
-            <Link href="/privacy">プライバシーポリシー</Link>
-            <Link href="/legal">特定商取引法に基づく表記</Link>
-          </nav>
-          <span>© 2026 カタヅケ</span>
-        </div>
-      </footer>
+      {/* ============ フッター ============
+          r5 #20: 未ログインでは他の公開14ルートと同じ4カラムの共通フッターを描く。
+          ログイン済み（アプリの文脈）では従来の最小フッター（規約・法務3本＋運営者表記）を残す
+          — r2 M6 の「本文が短い状態でもページの底を作る」目的はどちらでも満たされる。 */}
+      {signedIn ? (
+        <footer className="vd-foot">
+          <div className="vd-foot-inner">
+            <nav className="vd-foot-links" aria-label="規約・法務">
+              <Link href="/terms">利用規約</Link>
+              <Link href="/privacy">プライバシーポリシー</Link>
+              <Link href="/legal">特定商取引法に基づく表記</Link>
+            </nav>
+            <span>© 2026 カタヅケ</span>
+          </div>
+        </footer>
+      ) : (
+        <SiteFooter />
+      )}
     </div>
   );
 }

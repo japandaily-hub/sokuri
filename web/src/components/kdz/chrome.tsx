@@ -26,7 +26,7 @@ export function SiteFooter() {
               <li><Link href="/#flow">使い方</Link></li>
               <li><Link href="/create">出品する</Link></li>
               <li><Link href="/photo-guide">撮影ガイド</Link></li>
-              <li><Link href="/examples">成約イメージ</Link></li>
+              <li><Link href="/examples">利用イメージ</Link></li>
             </ul>
           </div>
           <div>
@@ -42,11 +42,21 @@ export function SiteFooter() {
             <ul>
               <li><Link href="/#founder">運営者メッセージ</Link></li>
               <li><Link href="/company">会社概要</Link></li>
-              <li><Link href="/business">業者登録</Link></li>
               <li><Link href="/legal">特定商取引法に基づく表記</Link></li>
               <li><Link href="/privacy">プライバシーポリシー</Link></li>
               <li><Link href="/terms">利用規約</Link></li>
               <li><Link href="/contact">お問い合わせ</Link></li>
+            </ul>
+          </div>
+          {/* ラウンド5 指摘（1/2/3・3視点が同一指摘）: 業者向けの入口が「カタヅケについて」に
+              紛れ、業者利用規約（/terms#biz）への導線がサイト内のどのページにも無かった
+              （/terms 本文の相互リンクだけが唯一の入口）。業者の列として独立させる。 */}
+          <div>
+            <h5>業者の方へ</h5>
+            <ul>
+              <li><Link href="/business">業者登録</Link></li>
+              <li><Link href="/operator/login">業者ログイン</Link></li>
+              <li><Link href="/terms#biz">業者利用規約</Link></li>
             </ul>
           </div>
         </div>

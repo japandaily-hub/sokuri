@@ -54,6 +54,77 @@
   border-bottom: 0;
 }
 .legal-body.privacy-body h2:first-of-type { margin-top: 0; padding-top: 0; border-top: 0; }
+/* 目次（.pp-toc）からのページ内移動で、条見出しが画面最上端に貼り付かないようにする。
+   /privacy は sticky の要素を持たないので、共通ヘッダー（76px）＋ひと呼吸ぶんだけ確保する。
+   terms.css の .legal-body h2（クライアント遷移で同居する）より特異度が高いのでここが勝つ。 */
+.legal-body.privacy-body h2 { scroll-margin-top: 96px; }
+
+/* 目次（ラウンド5 指摘 12）。囲みは上下の 1px だけ・字面は --ui の小さいサイズに抑え、
+   本文（明朝）より前に出ないようにする。PC は 2 列、560px 以下は 1 列。 */
+.pp-toc {
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 18px 0;
+  margin-bottom: clamp(32px, 4vw, 44px);
+}
+.pp-toc__label {
+  font-family: var(--ui);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  color: var(--body-soft);
+  margin-bottom: 10px;
+}
+.pp-toc__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 24px;
+}
+.pp-toc__list li { font-size: 13.5px; line-height: 1.7; margin: 0; }
+.pp-toc__list a {
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* 第2条の冒頭の要約（ラウンド5 指摘 16）。第4条の注記（淡青＋青罫）と同じ見た目にすると
+   同型の箱が 1 画面に 2 つ並ぶため、ここは囲みを持たない素の 1 段落にする。 */
+.legal-body.privacy-body .pp-lead {
+  font-size: 14.5px;
+  color: var(--body);
+  line-height: 1.9;
+  margin-bottom: 18px;
+}
+.legal-body.privacy-body .pp-lead strong { color: var(--ink); font-weight: 600; }
+.legal-body.privacy-body .pp-lead a { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; }
+
+/* 行の性質（必須／任意・自動）のラベル（ラウンド5 指摘 16）。
+   必須は塗り＋白文字、任意・自動は白地＋1px（/contact のフォームの必須・任意ラベルと同型）。
+   PC は第1列（20% ＝ 142px）が狭いので種類名の下に改行して置く。 */
+.legal-body.privacy-body .pp-tag {
+  display: block;
+  width: fit-content;
+  margin-top: 5px;
+  font-family: var(--ui);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  line-height: 1.6;
+  color: var(--body-soft);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  padding: 0 6px;
+  white-space: nowrap;
+}
+.legal-body.privacy-body .pp-tag--req {
+  color: #fff;
+  background: var(--blue);
+  border-color: var(--blue);
+}
 .legal-body h3 { font-size: 15px; color: var(--ink); margin: 22px 0 8px; }
 .legal-body p {
   font-size: 14.5px;
@@ -124,6 +195,12 @@
 .legal-body.privacy-body th:last-child,
 .legal-body.privacy-body td:last-child { padding-right: 0; }
 .legal-body.privacy-body .collect-type { color: var(--ink); font-weight: 600; }
+/* ラウンド5 指摘（4・High）: 最終行（アクセス情報）の下罫と直後の第3条 h2 の上罫が
+   約 60px 離れて 2 本並び、「中身のない罫線だけの行」に見えていた
+   （実測: scratchpad/local6/tiles/privacy__desktop_01.png）。JSX に空の行要素は無く、
+   原因は表の閉じ罫と節の開始罫の二重。表は上端の 2px（thead の下罫）1 本で締め、
+   末尾の行の罫は落とす（節の区切りは h2 の上罫が担う）。 */
+.legal-body.privacy-body tbody tr:last-child td { border-bottom: 0; }
 
 /* 本文の補足注記。r3 レビュー: --warm/--gold は状態色であり、本文の補足に使うと
    青・濃紺で統一した面に暖色が1点だけ混じる。法務3ページで注記の地と罫を
@@ -208,10 +285,19 @@
     margin-bottom: 4px;
   }
   .legal-body.privacy-body .collect-type { font-size: 15px; }
+  /* カード積みでは第1セルがカードの見出しになるので、ラベルは見出しの右へ回す
+     （ラウンド5 指摘 16 の「各カードの見出し右に」）。 */
+  .legal-body.privacy-body .pp-tag {
+    display: inline-block;
+    margin: 0 0 0 8px;
+    vertical-align: 2px;
+  }
 }
 
 @media (max-width: 560px) {
   .legal-head__inner { padding-inline: 18px; }
   .legal-body.privacy-body { padding-inline: 18px; }
   .legal-body.privacy-body h2 { font-size: 20px; }
+  /* 390px では 2 列だと「第7条　個人情報の開示・訂正・削除」が 3 行に折れる */
+  .pp-toc__list { grid-template-columns: minmax(0, 1fr); }
 }

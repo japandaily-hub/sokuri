@@ -11,11 +11,13 @@
 }
 
 /* ---------- ヒーロー写真帯（高さ・veil・画像位置は .hero-band の正典） ---------- */
-/* 帯に置くのは h1 だけ。検索窓は帯の外＝直下の白面に置く（R4 ラウンド5 指摘 3/7/15/17:
-   帯の中では白い箱が人物の顔に接し、顔の上に UI が載って見えた）。 */
+/* 帯に置くのは h1 だけ。検索窓は帯の外＝リード文の下に置く（R4 ラウンド5 指摘 3/7/15/17:
+   帯の中では白い箱が人物の顔に接し、顔の上に UI が載って見えた）。
+   ラウンド6 指摘（5/9）: DOM 順は 帯 → リード文 → 検索窓。検索窓の上は余白だけで切り、
+   ヘアラインは置かない（帯とフォームが1つの塊に見えるのを、罫ではなく間合いで解く）。 */
 .faq-page .faq-searchbar {
   background: #fff;
-  padding: clamp(18px, 2.4vw, 26px) 0 0;
+  padding: clamp(16px, 2vw, 24px) 0 clamp(12px, 1.4vw, 18px);
 }
 .faq-page .faq-search-wrap {
   margin-top: 0;
@@ -69,13 +71,12 @@
 }
 .faq-page .faq-search-clear.show { display: flex; }
 
-/* ---------- 帯の直下の白面（検索窓・リード文・検索結果件数） ---------- */
-/* 帯の下が余り、リード1行のあとに白面が 160px 以上続いてサイドバーと Q&A の始点が
-   宙に浮いていた。リード側の padding を 1 段詰め、本文セクション側（.faq-page .section）と
-   合わせて帯と本文をつなげる。上の余白は .faq-searchbar が持つのでここでは詰める。 */
+/* ---------- 帯の直下の白面（リード文 → 検索窓 → 検索結果件数） ---------- */
+/* 帯を受ける余白はこの面の上パディングが持つ（ラウンド6 指摘 5: モバイルで検索窓が帯の
+   下端に接し、帯とフォームが1つの塊に見えていた）。下は検索窓が続くので詰める。 */
 .faq-page .faq-lead {
   background: #fff;
-  padding: clamp(14px, 1.8vw, 20px) 0 clamp(12px, 1.4vw, 18px);
+  padding: clamp(20px, 5vw, 32px) 0 0;
 }
 .faq-page .faq-lead p {
   font-size: 15px;
@@ -84,6 +85,7 @@
   max-width: 640px;
 }
 .faq-page .faq-lead a { color: var(--primary); text-decoration: underline; text-underline-offset: .2em; }
+/* 件数は検索窓の直下（操作した場所）に出す。min-height で入力前後の行送りを固定する */
 .faq-page .search-hint {
   font-family: var(--ui);
   font-size: 13px;
@@ -182,6 +184,12 @@
 .faq-page .faq-side-link:hover { background: var(--pale-2); color: var(--primary); }
 .faq-page .faq-side-link.active { background: var(--pale); color: var(--primary); }
 .faq-page .faq-side-link--link { color: var(--primary); }
+/* 業者向け FAQ（/business#faq）への1本。カテゴリ列とは別の行き先なので上をヘアラインで切る */
+.faq-page .faq-side-link--biz {
+  margin-top: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-soft);
+}
 .faq-page .faq-side-foot {
   margin-top: 28px;
   padding-top: 20px;
@@ -235,6 +243,23 @@
   padding: 0;
   margin-left: auto;
 }
+/* 節の一括開閉（ラウンド6 指摘 11: 初期表示を全閉に統一した代わりの入口）。
+   件数の隣に置く。角丸0・影0、ホバーは opacity のみ。 */
+.faq-page .faq-section-all {
+  font-family: var(--ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary);
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: 4px 0;
+  margin-left: 14px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity .15s;
+}
+.faq-page .faq-section-all:hover { opacity: .8; }
 
 /* ---------- Q&A（箱組みをやめ、1px の下罫と余白だけで区切る） ---------- */
 .faq-page .faq-list {
@@ -399,38 +424,38 @@
   line-height: 1.8;
 }
 .faq-page .faq-contact-btn { margin-top: 14px; display: inline-flex; }
+/* 業者向け FAQ への導線。デスクトップはサイドバーの .faq-side-link--biz が担うので隠す
+   （導線の本数はどの幅でも常に1本。ラウンド6 指摘 25） */
+.faq-page .faq-biz-line {
+  font-family: var(--ui);
+  font-size: 13px;
+  color: var(--body-soft);
+  line-height: 1.8;
+  margin-top: 14px;
+}
+.faq-page .faq-biz-line a { color: var(--primary); text-decoration: underline; text-underline-offset: .2em; }
 
 /* ---------- レスポンシブ（閾値は額装解除と同じ 859px） ---------- */
 @media (min-width: 860px) {
   /* デスクトップは上部チップを出さない（サイドバーに一本化） */
   .faq-page .faq-cats { display: none; }
+  /* 業者向け導線はサイドバーの1本だけにする */
+  .faq-page .faq-biz-line { display: none; }
 }
 @media (max-width: 859px) {
-  /* チップ列自身にだけ横スクロール（sticky の祖先には overflow を書かない） */
+  /* ラウンド6 指摘（23）: 横スクロール1行では 6 カテゴリのうち 3 つしか画面に入らず、
+     残りが画面外に隠れて探したい節に辿り着けなかった（スクロールバーは非表示・
+     右端のフェードだけが手掛かり）。折り返して全カテゴリを同時に見せる。
+     2 段に収めるためチップを 1 段小さくする（390px 実測: 12px＋padding 6/10＋gap 6 で
+     3 個ずつ 2 行。sticky の高さは 1 行 33px → 2 行 72px に収まる）。
+     横スクロールをやめたので ::after のフェードと scroll-padding も不要になる。 */
   .faq-page .faq-cats-inner {
-    flex-wrap: nowrap;
-    overflow-x: auto;
+    flex-wrap: wrap;
+    gap: 6px;
     padding-block: 2px;
-    /* 末尾に 24px の逃げを作り、最後のチップが画面右端に貼り付いて切れて見えるのを防ぐ。
-       scroll-padding はキーボード操作でチップへ送られたときの止まり位置。 */
-    padding-inline-end: 24px;
-    scroll-padding-inline: 0 24px;
-    scrollbar-width: none;
   }
-  .faq-page .faq-cats-inner::-webkit-scrollbar { display: none; }
-  /* 右端の白→透明フェード。スクロールバーを消しているため、
-     「まだ右に続く」ことを示す手掛かりがこれしかない。常時表示・角丸/影なし。
-     祖先に overflow を足さず、sticky な .faq-cats（位置指定済み）を基準に重ねる。 */
-  .faq-page .faq-cats::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    right: 0;
-    width: 48px;
-    background: linear-gradient(to right, rgba(255, 255, 255, 0), #fff 60%);
-    pointer-events: none;
-  }
+  .faq-page .cat-chip { padding: 6px 10px; font-size: 12px; gap: 4px; }
+  .faq-page .cat-chip .ic { font-size: 13px; }
 
   .faq-page .faq-body {
     /* minmax(0,1fr): 子要素の最小幅でトラックが広がり横スクロールが出るのを防ぐ */
@@ -459,4 +484,9 @@
 @media (max-width: 600px) {
   /* .header の高さがこの幅から 60px + 1px 罫になる（katazuke.css）。追従位置を合わせる */
   .faq-page .faq-cats { top: 61px; }
+}
+@media (max-width: 400px) {
+  /* 390px でチップが 3 段に割れないよう、この幅だけ行頭アイコンを落とす
+     （ラベルの文字だけで 6 カテゴリが 2 段に収まる。アイコンはサイドバー側に残る） */
+  .faq-page .cat-chip .ic { display: none; }
 }

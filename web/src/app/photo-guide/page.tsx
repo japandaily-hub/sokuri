@@ -109,7 +109,7 @@ export default function PhotoGuidePage() {
           src="/img/v2/pg-hero.webp"
           width={1920}
           height={1080}
-          alt="床に置いた品物をスマートフォンで真上から撮影する女性の手元（イメージ）"
+          alt="明るい部屋で、床に置いた品物をスマートフォンで撮影する女性（イメージ）"
           loading="eager"
           fetchPriority="high"
           decoding="async"

@@ -85,15 +85,60 @@
   margin-top: 8px;
 }
 
+/* 取引の相手と運営への連絡（ラウンド5 指摘 14）。¥0 ブロックと同じ「上下 1px の罫で挟む」
+   構えに揃え、囲みの箱は増やさない。ラウンド5 指摘（5）の「¥0 以降が表組みだけで単調」に対する
+   息継ぎも兼ねる。 */
+.doc-assure {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: clamp(24px, 4vw, 32px);
+  margin-bottom: clamp(40px, 5vw, 56px);
+}
+.doc-assure__list { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; }
+.doc-assure__list li {
+  font-size: 14px;
+  color: var(--body);
+  line-height: 1.9;
+  padding-left: 14px;
+  border-left: 2px solid var(--pale);
+}
+.doc-assure__list strong { color: var(--ink); font-weight: 600; }
+.doc-assure__list a,
+.doc-assure__more a { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; }
+.doc-assure__more { font-size: 13px; color: var(--body-soft); line-height: 1.85; margin-top: 16px; }
+
+/* 目次（ラウンド5 指摘 12）。/terms の .terms-toc・/privacy の .pp-toc と同じ構え。 */
+.doc-toc {
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 18px 0;
+  margin-bottom: clamp(8px, 1vw, 12px);
+}
+.doc-toc__label {
+  font-family: var(--ui); font-size: 11.5px; font-weight: 600; letter-spacing: 0.08em;
+  color: var(--body-soft); margin-bottom: 10px;
+}
+.doc-toc__list {
+  list-style: none; padding: 0; margin: 0;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 24px;
+}
+.doc-toc__list li { font-size: 13.5px; line-height: 1.7; }
+.doc-toc__list a { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; }
+
 /* テーブル */
 .spec-table {
   width: 100%;
   border-collapse: collapse;
   margin-bottom: 40px;
   font-size: 14.5px;
+  /* ラウンド5 指摘（5）: th{width:200px} は auto レイアウトでは「提案値」にすぎず、
+     4 つの表でラベル列の実幅が中身しだいにずれ（「クーリング・オフ（業者向け）」を含む表だけ
+     広い）、節をまたぐと視線の折り返し位置が揃わなかった。固定レイアウトにして 4 表とも
+     同じ 180px にする。最長の単行ラベル「ユーザー負担費用」（8字 ≒ 112px）＋右 padding 20px は
+     180px に収まる（2行のラベルは JSX 側で <br /> を入れている）。 */
+  table-layout: fixed;
 }
 .spec-table th {
-  width: 200px;
+  width: 180px;
   text-align: left;
   vertical-align: top;
   padding: 16px 20px 16px 0;
@@ -146,6 +191,8 @@
   margin: clamp(48px, 6vw, 72px) 0 18px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--line);
+  /* 目次（.doc-toc）からのページ内移動で、節見出しが共通ヘッダー（76px）に隠れない余白 */
+  scroll-margin-top: 96px;
 }
 
 /* 注意書き */
@@ -187,6 +234,10 @@
   .doc-free {
     grid-template-columns: 1fr;
     gap: 10px;
+  }
+  /* 390px では 2 列だと「サービス内容・取引条件」が 2 行に折れる */
+  .doc-toc__list {
+    grid-template-columns: minmax(0, 1fr);
   }
   .spec-table th {
     width: 118px;

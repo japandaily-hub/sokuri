@@ -152,13 +152,20 @@ export default function SignupPage() {
               {/* R4 ラウンド4 指摘（3/14）: 緑ピルが版面で唯一の巨大な単色面になり「主役」に見える。
                   公式ボタンの形状・色・角丸99px・幅（コア .btn-line-auth の max-width:360px・中央寄せ）は
                   1文字も変えず、置き方＝上下の余白だけで「選択肢の一つ」に見せる。
-                  余白の値は signup.css（.signup-line-slot）。860px 以上は従来値のまま。
-                  指摘（17）: 同じ「LINEで」がトップの主色ブルー CTA とこの緑の公式ボタンの
-                  2種類の見た目で現れるため、押した先が違うのかと迷う。ボタンの外に補足1行を足すと
-                  縦が 26px 伸び、「すでにアカウントをお持ちの方は…」の行が固定バーの境界をまたいで
-                  水平に切れる（実測 1440x900: 803–825px に対しバー上端 813px）。そのためラベルの中で
-                  「LINE アカウントを使う」ことを明示する（縦は 1px も増えない）。 */}
+                  余白の値は signup.css（.signup-line-slot）。
+                  ラウンド4 では「ボタンの外に補足1行を足すと縦が 26px 伸び、『すでにアカウントをお持ちの方は…』の
+                  行が固定バーの境界をまたいで水平に切れる」ためラベル内で言い切っていたが、
+                  コアが列を align-self:center → start に変え、内容が行より高いときはページが伸びて
+                  スクロールするようになったため、その制約は外れた（下のラウンド5 指摘を参照）。 */}
+              {/* ラウンド5 指摘（4/7/12・3視点が同一指摘）: 角丸ゼロの版面で唯一の角丸 99px のピルが
+                  「主動線」に見えてしまう。ボタン本体（コア .btn-line-auth＝LINE 公式仕様・幅 360px 中央寄せ）は
+                  1px も変えず、上に 12px の説明 1 行を添え、前後に 24px 以上の余白を取って
+                  「並んだ別の入口」として独立させる（余白は signup.css の .signup-line-slot）。
+                  指摘16 の文言「トップのLINEボタンと同じ入口です」は採らない: トップの .btn-line は
+                  /login?callbackUrl=%2Fcreate へのリンク（app/page.tsx:101/207/539）で、
+                  ここの LINE ログイン（signIn("line")）と遷移が同じではないため。 */}
               <div className="signup-line-slot">
+                <p className="signup-line-note">お使いのLINEアカウントでそのまま登録できます。パスワードの設定は不要です。</p>
                 <LineAuthButton label="LINEアカウントで無料登録" callbackUrl="/create" />
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18, color: "var(--body-soft)", fontSize: 12, fontWeight: 600, letterSpacing: ".04em" }}>

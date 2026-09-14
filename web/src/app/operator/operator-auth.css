@@ -29,6 +29,19 @@
   color: var(--body-soft);
 }
 
+/* 依頼者（売りたい方）への戻り導線（/operator/signup・h1 直下の 1 行）。
+   ラウンド5 指摘（18）。業者向けの本文（.auth-sub）より前に出るので、面も罫も持たせず
+   小さいゴシック 1 行に留める（審査制の入口であることの印象を弱めない）。 */
+.operator-auth .op-other-side {
+  margin: 8px 0 12px;
+  font-family: var(--ui);
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--body-soft);
+}
+.operator-auth .op-other-side a { color: var(--blue); font-weight: 600; }
+.operator-auth .op-other-side a:hover { text-decoration: underline; }
+
 /* 招待コード（任意・アコーディオン表示） */
 .operator-auth .invite-toggle {
   display: inline-flex;

@@ -64,9 +64,13 @@
 }
 .terms-points__body { font-size: 14.5px; color: var(--body); line-height: 1.9; }
 .terms-points__body strong { display: block; color: var(--ink); font-weight: 600; }
+/* 根拠の条。ラウンド5 指摘（12）で本文に id が入り、ここが該当条へのリンクになった
+   （span のままの灰色だと押せると分からない）。字面の大きさは据え置き。 */
 .terms-points__ref {
-  display: block; font-family: var(--ui); font-size: 12px; color: var(--body-soft);
+  display: block; width: fit-content;
+  font-family: var(--ui); font-size: 12px; color: var(--blue);
   letter-spacing: .02em; margin-top: 6px;
+  text-decoration: underline; text-underline-offset: 2px;
 }
 .terms-points__note {
   font-size: 13px; color: var(--body-soft); line-height: 1.85; margin-top: 16px;
@@ -94,7 +98,32 @@
   font-size: 17px; color: var(--navy); margin: 36px 0 12px;
   padding-bottom: 10px; border-bottom: 2px solid var(--line);
 }
-.legal-body h2:first-child { margin-top: 0; }
+/* ラウンド5 指摘（12）で各ペインの先頭に目次（.terms-toc）が入ったため、条見出しは
+   もう :first-child ではない。上マージンを消す対象は「最初の h2」なので :first-of-type にする。 */
+.legal-body h2:first-of-type { margin-top: 0; }
+/* 目次・要点ブロックからのページ内移動で、条見出しが sticky のタブ列（top:76px・高さ約 49px）に
+   隠れないようにする。共通ヘッダー 76px ＋ タブ列 49px ＋ ひと呼吸 11px。
+   /privacy 側は sticky を持たないので privacy.css が 96px で上書きする（特異度で勝つ）。 */
+.legal-body h2 { scroll-margin-top: 136px; }
+
+/* 目次（ラウンド5 指摘 12）。囲みは上下 1px だけ、字面は --ui の小さいサイズに抑える
+   （/privacy の .pp-toc・/legal の .doc-toc と同じ構え）。 */
+.terms-toc {
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 18px 0;
+  margin-bottom: clamp(28px, 3.5vw, 40px);
+}
+.terms-toc__label {
+  font-family: var(--ui); font-size: 11.5px; font-weight: 600; letter-spacing: .08em;
+  color: var(--body-soft); margin-bottom: 10px;
+}
+.terms-toc__list {
+  list-style: none; padding: 0; margin: 0;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 24px;
+}
+.terms-toc__list li { font-size: 13.5px; line-height: 1.7; margin: 0; }
+.terms-toc__list a { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; }
 .legal-body h3 { font-size: 15px; color: var(--ink); margin: 20px 0 8px; }
 .legal-body p { font-size: 14.5px; color: var(--body); line-height: 1.9; margin-bottom: 12px; }
 .legal-body ul, .legal-body ol { padding-left: 20px; margin-bottom: 14px; }
@@ -135,4 +164,8 @@
   .legal-head__inner, .terms-points__inner { padding-inline: 18px; }
   .terms-points__list li { grid-template-columns: 34px minmax(0, 1fr); }
   .legal-tab { padding: 13px 16px; font-size: 13.5px; }
+  /* 390px では 2 列だと「第5条　個人情報の開示タイミング」が 3 行に折れる */
+  .terms-toc__list { grid-template-columns: minmax(0, 1fr); }
+  /* タブ列が 45px 前後に縮むぶんだけ詰める（見出しがタブ列に隠れない最小値） */
+  .legal-body h2 { scroll-margin-top: 124px; }
 }

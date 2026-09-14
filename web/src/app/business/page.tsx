@@ -30,6 +30,12 @@ function feeApprox(amount: number): string {
   return yen(Math.round((amount * 0.08) / 100) * 100);
 }
 
+/** 同じ概算の税込（消費税10%）表示。r5 #31: 例示が税別だけでは実際の支払額が読めないため、
+ *  実額が出る .vc-fee にだけ併記する。率（8%）と課税条件の表記自体は変えない。 */
+function feeApproxIncl(amount: number): string {
+  return yen(Math.round((amount * 0.08 * 1.1) / 100) * 100);
+}
+
 /** 共通スプライトに send が無いため inline 用の紙飛行機アイコン。 */
 function SendIcon({ className }: { className?: string }) {
   return (
@@ -118,12 +124,18 @@ const ASSURANCES: { n: string; h: string; p: string }[] = [
   },
 ];
 
-/** 業者視点のフロー（4ステップ）。アイコンは既存 3D シリーズ（/img/real/*.webp・512px）。 */
-const FLOW: { n: string; img: string; h: string; p: string; d?: 1 | 2 | 3 }[] = [
-  { n: "1", img: "how-camera", h: "案件を確認", p: "出品された「まとめ」の写真・品目リストを確認。気になる案件に入札します。" },
-  { n: "2", img: "how-trend", h: "買取総額で入札", p: "出品された商品すべてに対して、買取総額を提示。他社と競い合います。", d: 1 },
-  { n: "3", img: "how-crown", h: "ユーザーが1社を選択", p: "全入札がユーザーに提示され、見比べて1社を選択。選ばれると連絡先が開示されます。", d: 2 },
-  { n: "4", img: "how-truck", h: "訪問・引き取り", p: "成約後に訪問日時を決定。まとめて引き取りを行います。", d: 3 },
+/** 業者視点のフロー（4ステップ）。
+ *  r5 #2/#15/#21/#34: 旧 3D アイコン（/img/real/how-camera・how-trend・how-crown・how-truck）を外した。
+ *  理由は3つ: ①素材集の借り物に見え、他ページのフォトリアル生活空間シリーズから浮いていた
+ *  ②「選ばれる＝王冠」は「ユーザーが1社を選択」と結び付かない広告表現 ③右肩上がりの棒グラフを
+ *  買取総額の近傍に置くと、集計統計を出さない方針の隣で成果の上昇を示唆する（有利誤認の入口）。
+ *  差し替え素材（入札票が並ぶ机上・1枚だけ選ばれた札）は今回の画像セットに無いため、
+ *  #15 の代替どおり番号＋見出し＋本文のヘアラインリストにして情報量は落とさない。 */
+const FLOW: { n: string; h: string; p: string; d?: 1 | 2 | 3 }[] = [
+  { n: "1", h: "案件を確認", p: "出品された「まとめ」の写真・品目リストを確認。気になる案件に入札します。" },
+  { n: "2", h: "買取総額で入札", p: "出品された商品すべてに対して、買取総額を提示。他社と競い合います。", d: 1 },
+  { n: "3", h: "ユーザーが1社を選択", p: "全入札がユーザーに提示され、見比べて1社を選択。選ばれると連絡先が開示されます。", d: 2 },
+  { n: "4", h: "訪問・引き取り", p: "成約後に訪問日時を決定。まとめて引き取りを行います。", d: 3 },
 ];
 
 /** 登録要件 */
@@ -147,6 +159,10 @@ const FAQ_ITEMS = [
   // r10 H2 是正: 依頼者側には「代金の受け取り方法は業者とチャットで調整」と案内しているのに、
   // 業者向けの説明がどこにも無かった（当事者間精算であることを明示する）。
   { q: "買取代金はどのように支払いますか？", a: "買取代金は依頼者と直接精算します（現金またはお振込み。方法はチャットで調整してください）。カタヅケは送金を仲介しません。カタヅケがやり取りするのは成約時の手数料のみです。" },
+  // r5 #30: 評価・口コミは成約したユーザーの投稿をそのまま掲載する方針のため、掲載される側から
+  // 「事実と異なる投稿の扱い」が読めなかった（店の看板を預ける判断ができない）。
+  // 削除の断定は運用として確認できていないので、受付窓口があることだけを書く。
+  { q: "事実と異なる口コミが投稿された場合は？", a: "評価・口コミは、成約したユーザーの投稿をそのまま掲載する方針です。そのうえで、事実と異なる内容が含まれるとお考えの場合は、お問い合わせから内容をお知らせください。運営が個別に確認します。" },
 ];
 
 type FormState = {
@@ -344,7 +360,8 @@ export default function BusinessPage() {
           </a>
         ))}
         <a href="#register" className="btn btn-primary btn-block mm-cta" onClick={() => setMenuOpen(false)}>
-          <SendIcon />
+          {/* r5 #16 と同じ理由（ページ内アンカーに送信アイコンを付けない） */}
+          <Ic name="arrow" />
           業者登録を申し込む
         </a>
       </div>
@@ -408,6 +425,11 @@ export default function BusinessPage() {
                     手続きの1行はその対象外。件数は実際の必須項目数（14）。 */}
                 <p className="biz-hero-steps">
                   入力は3ステップ（必須14項目）。送信後3営業日以内にご連絡し、審査の通過後に入札できます。
+                  {/* r5 #25: 依頼者が「業者の方へ」から入ってしまったとき、ヒーロー付近に
+                      戻る導線がなく業者向けの条件だけを読み続けることになっていた。 */}
+                  <Link href="/" className="biz-hero-alt">
+                    ご依頼（売りたい）の方はこちら →
+                  </Link>
                 </p>
               </div>
             </div>
@@ -566,18 +588,12 @@ export default function BusinessPage() {
                       読者が割り算で成約率を得るため、CONSTRAINTS R4 §2 と model-cases.ts の
                       「bids は持たない」ガードに反する。
                       「0回」が「一切現物を見ない」と読まれないよう（現物査定は成約後）を必ず伴わせる。 */}
+                  {/* r5 #10/#12: 「下見・現地調査 0回」は架空値ではなくサービスの仕様なので、
+                      R4 C.2 の指定どおり dl の外・.vc-facts-label の上に独立した事実行として出す
+                      （行内に長い注記が入って行高が他行の2倍になり、台帳のリズムが崩れていた）。 */}
+                  <p className="vc-visit">下見・現地調査は0回（現物査定は成約後）。</p>
                   <p className="vc-facts-label">ある1か月のイメージ</p>
                   <dl className="vc-facts">
-                    <div>
-                      <dt>
-                        下見・現地調査
-                        <small>サービスの仕様（このケースの架空値ではありません）。現物査定は成約後です。</small>
-                      </dt>
-                      <dd>
-                        <b>0</b>
-                        <span>回</span>
-                      </dd>
-                    </div>
                     <div>
                       <dt>成約</dt>
                       <dd>
@@ -593,16 +609,17 @@ export default function BusinessPage() {
                       </dd>
                     </div>
                   </dl>
-                  {/* R4 r4 #21: 「下見0回」と引用（訪問が空振りにならない）だけを読むと、依頼者側の
-                      「現物確認後に減額相談・取引を断れる」と矛盾して誇張に見える。0回の直下に
-                      前提を明記する（FAQ「最終的な買取額は入札額と異なってもいいですか？」と同義）。 */}
-                  <p className="vc-visit">
-                    現物確認で条件が合わない場合、ユーザーが取引を断ることがあります。提示額を下回る変更は、
-                    理由を明示してユーザーの了解を得た場合にのみ可能です。
-                  </p>
+                  {/* r5 #4/#12: 現物確認の但し書き（R4 r4 #21）は、カード内で表の下に注記が
+                      3段続く原因だったため節末（.vc-terms）に1回だけ置く。カード内は
+                      水準差の1行 ＋ 手数料1行 ＋ 引用に絞る。 */}
+                  {/* r5 #32: /examples の依頼者モデルケース（31,000〜148,000円）と水準が違って見える
+                      理由を、金額の直下に1行だけ置く。集計値ではなく既存モデルケースの範囲の再掲。 */}
+                  <p className="vc-range">品物の内容により幅があります（/examples のモデルケースは31,000〜148,000円）。</p>
+                  {/* r5 #31: 例示が税別だけだと実際の支払額が読めないため、実額が出るこの箇所だけ
+                      税込（消費税10%）を併記する。率とヒーロー・数値帯の 8% 表記は変えない。 */}
                   <p className="vc-fee">
                     費用は成約時の買取金額8%（税別・消費税を別途加算）のみ。この例では1件あたり約
-                    {feeApprox(v.month.amount)}円にあたります。
+                    {feeApprox(v.month.amount)}円（消費税10%込みで約{feeApproxIncl(v.month.amount)}円）にあたります。
                   </p>
                   <blockquote className="vc-quote">
                     <p>{v.quote}</p>
@@ -611,6 +628,13 @@ export default function BusinessPage() {
                 </article>
               ))}
             </div>
+            {/* r5 #4: 現物確認の但し書きは節末に1回だけ置く（カードごとに繰り返すと
+                表の下に細字の注記が3段続き、読む前に疲れる）。文面は R4 r4 #21 のまま、
+                FAQ「最終的な買取額は入札額と異なってもいいですか？」と同義。 */}
+            <p className="model-note vc-terms" role="note">
+              現物確認で条件が合わない場合、ユーザーが取引を断ることがあります。提示額を下回る変更は、
+              理由を明示してユーザーの了解を得た場合にのみ可能です。
+            </p>
           </div>
         </section>
 
@@ -622,27 +646,16 @@ export default function BusinessPage() {
               <h2>入札から成約までの流れ</h2>
               <p className="sub">登録後はシンプルな4ステップ。下見なし・一斉架電なしで進められます。</p>
             </div>
-            <div className="biz-flow">
+            {/* r5 #15: 画像を外し、番号タイル＋見出し＋本文のヘアラインリストにする（手順なので ol）。 */}
+            <ol className="biz-flow">
               {FLOW.map((f) => (
-                <Reveal className="biz-step" delay={f.d} key={f.n}>
-                  <div className="img-frame img-frame--1x1 img-frame--contain img-frame--pale biz-step-fig">
-                    {/* eslint-disable @next/next/no-img-element */}
-                    <img
-                      src={`/img/real/${f.img}.webp`}
-                      width={512}
-                      height={512}
-                      alt=""
-                      loading="lazy"
-                      decoding="async"
-                    />
-                    {/* eslint-enable @next/next/no-img-element */}
-                  </div>
+                <Reveal as="li" className="biz-step" delay={f.d} key={f.n}>
                   <div className="biz-step-n" aria-hidden="true">{f.n}</div>
                   <h4>{f.h}</h4>
                   <p>{f.p}</p>
                 </Reveal>
               ))}
-            </div>
+            </ol>
           </div>
         </section>
 
@@ -718,10 +731,14 @@ export default function BusinessPage() {
                       なしでもアカウントを作成でき、案件の閲覧まで進める（入札は審査の通過後。
                       lib/katadzuke-api.ts OPERATOR_CASE_VIEW_STATUSES の仕様）。役割差を1行添えて
                       軽い入口を併置する。 */}
-                  <p className="biz-form-alt">
-                    案件を先に見たい方は、アカウントだけ作ることもできます（入札は審査の通過後）。
-                    <Link href="/operator/signup">アカウントを作成して案件を見る</Link>
-                  </p>
+                  {/* r5 #13: 退避路が説明の文中の小さなテキストリンクで、重さを感じた業者が
+                      気付かなかった。説明の外・フォーム開始位置の直前に .btn-ghost で置く。 */}
+                  <div className="biz-form-alt">
+                    <p>案件を先に見たい方は、アカウントだけ作ることもできます（入札は審査の通過後）。</p>
+                    <Link href="/operator/signup" className="btn btn-ghost">
+                      まずアカウントだけ作って案件を見る
+                    </Link>
+                  </div>
                   <div className="biz-form-group">
                     <h4 className="biz-form-heading">
                       <span aria-hidden="true">1</span>
@@ -942,6 +959,15 @@ export default function BusinessPage() {
                       お申し込みの時点では請求は発生せず、請求開始は事前にメールでお知らせします。
                     </p>
                     <p className="biz-bank-note">※お申し込み内容の確認と、手数料の請求・精算に関する連絡（返金が生じた場合の振込先を含む）にのみ使用します</p>
+                    {/* r5 #27: 口座5項目は API 契約（submitOperatorApplication の bank_account）が
+                        必須のため任意化できない。代わりに、口座を出さずに案件を見る道を
+                        このブロックと同じ視野に置く（#13 の退避路と同じ行き先）。
+                        「審査通過後に登録できます」は現在の実装で確認できないため書かない。 */}
+                    <p className="biz-bank-alt">
+                      口座の登録が難しい場合は、
+                      <Link href="/operator/signup">アカウントだけ作って案件を見る</Link>
+                      こともできます（入札は審査の通過後）。
+                    </p>
 
                     <div className="field-row">
                       <div className="field">
@@ -1039,7 +1065,9 @@ export default function BusinessPage() {
                     <label htmlFor="agree">
                       <Link href="/legal">特定商取引法に基づく表記</Link>・
                       <Link href="/privacy">プライバシーポリシー</Link>および
-                      <Link href="/terms">業者利用規約</Link>に同意します
+                      {/* r5 #29: /terms はタブ構成で、既定はユーザー規約に着地する。同意対象の
+                          業者利用規約へ直接届くよう #biz アンカーへ配線する。 */}
+                      <Link href="/terms#biz">業者利用規約</Link>に同意します
                     </label>
                   </div>
 
@@ -1098,7 +1126,9 @@ export default function BusinessPage() {
         aria-hidden={!dockOn}
         tabIndex={dockOn ? undefined : -1}
       >
-        <SendIcon />
+        {/* r5 #16: 紙飛行機（送信）アイコンは、フォームへ移動するだけの導線を送信操作に見せる。
+            ラベル・href は変えず、アイコンだけ右向き矢印にする。 */}
+        <Ic name="arrow" />
         業者登録を申し込む
       </a>
 
@@ -1124,6 +1154,10 @@ export default function BusinessPage() {
                 <li><a href="#flow">掲載の流れ</a></li>
                 <li><a href="#requirements">登録要件</a></li>
                 <li><a href="#register">業者登録を申し込む</a></li>
+                {/* r5 #18/#29: 業者が同意する文書への導線がページ内に無かった（同意チェックの
+                    リンクだけ）。/terms の #biz アンカーへ1本置く。共通フッター
+                    （components/kdz/chrome.tsx）側の1本はコア担当。 */}
+                <li><Link href="/terms#biz">業者利用規約</Link></li>
               </ul>
             </div>
             <div>
