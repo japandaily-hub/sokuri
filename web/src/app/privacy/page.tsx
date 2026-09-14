@@ -45,7 +45,11 @@ const TOC: { id: string; label: string }[] = [
 export default function PrivacyPage() {
   return (
     <main id="main">
-      {/* 法務3ページ共通の無文字帯（高さ固定・文字は置かない） */}
+      {/* 法務3ページ共通の無文字帯（高さ固定・文字は置かない）。
+          R6 指摘 1/2/5/11/17: 修飾子はこの1組（--fixed --quiet）を /terms・/legal と共有する
+          （以前 /terms に付いていた --pos-l、/legal に付いていた --pos-r は削除済み）。
+          縦位置と高さは core の .hero-band--fixed（--band-pos:50% 53% / 186px・SP 120px）
+          1本だけが持ち、ページ CSS では --band-pos も帯高も上書きしない（R4 D.1/F.0）。 */}
       <section className="hero-band hero-band--fixed hero-band--quiet">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img

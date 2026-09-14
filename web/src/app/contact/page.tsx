@@ -301,8 +301,16 @@ export default function ContactPage() {
                       id="phone"
                       name="phone"
                       placeholder="例）090-0000-0000"
+                      aria-describedby="phone-hint"
                       autoComplete="tel"
                     />
+                    {/* R6 指摘 15: 「任意」バッジだけでは、営業電話を警戒する読者に
+                        「なぜ電話番号を聞くのか」が読めず入力をためらわせていた。
+                        返信の経路（メール）と、電話を使う場合を1行で言い切る。
+                        フォームの返信はメール原則（/legal の運営者情報・上の .form-owner と同旨）。 */}
+                    <div className="field-hint" id="phone-hint">
+                      ご返信はメールでお送りします。お電話は、内容の確認が必要な場合に運営からご連絡するときだけ使用します。
+                    </div>
                   </div>
 
                   <div className="field">

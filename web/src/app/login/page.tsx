@@ -10,6 +10,7 @@ import { signIn, signOut, useSession } from "next-auth/react";
 import { AuthBar, Field, PasswordField, LineAuthButton, TrustRow } from "@/components/kdz/auth";
 import { safeInternalPath } from "@/lib/safe-path";
 import { clearRedirectLoopStorage } from "@/lib/katadzuke-api";
+import "./login.css";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -114,7 +115,7 @@ function LoginForm() {
   }
 
   return (
-    <div className="auth-page auth-page--split">
+    <div className="login-page auth-page auth-page--split">
       <AuthBar rightHref="/signup" rightLabel="新規登録はこちら →" />
       <main id="main">
         <aside className="auth-side">
@@ -256,6 +257,11 @@ function LoginForm() {
           <div className="auth-switch" style={{ marginTop: 20, paddingTop: 18, borderTop: "1px solid var(--line)", fontSize: 13 }}>
             業者の方は <Link href="/operator/login">業者ログイン →</Link>
           </div>
+
+          {/* R6 指摘 11（a11y・法務）: 左（モバイルは上部の帯）の人物は生成画像（3Dレンダー）で、
+              実在の利用者ではない。/vendors・/signup・/operator/login と同じ文言で 1 行だけ揃える。
+              画像は装飾（alt=""）なので読み上げには出ず、この 1 行が音声利用者の手掛かりになる。 */}
+          <p className="photo-note">※ 写真はイメージです。</p>
         </div>
       </main>
     </div>

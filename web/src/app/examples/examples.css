@@ -13,7 +13,16 @@
   padding: clamp(56px, 7vw, 88px) 0 clamp(32px, 4vw, 48px);
   background: #fff;
 }
-.cases-hero h1 { font-size: clamp(28px, 4vw, 44px); color: var(--ink); margin-top: 16px; }
+/* 見出しの語中改行を止める（ラウンド6 指摘 15 の「同ページ内の他の見出しにも同じ指定」）。
+   「利用イメージ（モデルケース）」は全角括弧で折れるので 390px でも 2 行に収まる。 */
+.cases-hero h1 {
+  font-size: clamp(28px, 4vw, 44px);
+  color: var(--ink);
+  margin-top: 16px;
+  word-break: keep-all;
+  line-break: strict;
+  overflow-wrap: anywhere;
+}
 .cases-hero p { font-size: clamp(14px, 1.6vw, 17px); color: var(--body-soft); margin-top: 14px; max-width: 520px; line-height: 1.85; }
 
 /* 架空事例の明示（景表法対応の打消し表示）。
@@ -212,6 +221,10 @@
   color: var(--ink);
   line-height: 1.2;
 }
+/* ラウンド6 指摘（3/8・High）: 「¥148,000円」の二重表記を「148,000円」に統一した（page.tsx 側）。
+   数字は <b> で括るが明朝 400 に戻す（正典「明朝のウェイトは 400/600 のみ」）。
+   tabular-nums で 6 カードの桁位置を揃える。 */
+.case-amount b { font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: .01em; }
 .case-amount span { font-family: var(--ui); font-size: 14px; font-weight: 600; color: var(--body-soft); margin-left: 2px; }
 /* カード内の打消し表示は 1 本だけ（ラウンド6 指摘 7/13）。金額の「手前」に置き、
    強調表示（¥ の 24px）より先に読ませる（指摘 18）。
@@ -289,7 +302,19 @@
   text-align: center;
   margin-top: clamp(40px, 5vw, 64px);
 }
-.cases-cta h2 { font-size: clamp(20px, 2.5vw, 28px); color: var(--ink); margin-bottom: 10px; }
+/* ラウンド6 指摘（15・High）: モバイルで「あなたの家の不用／品、いくらになる？」と語中改行し、
+   一番押してほしい見出しが崩れていた。keep-all で文節（句読点・括弧）でしか折らせない。
+   overflow-wrap:anywhere を対に置くのは保険で、keep-all で 1 行が入り切らない幅（狭い端末・
+   文言変更）でも横スクロールを出さないため（390px 実測では「あなたの家の不用品、」＝
+   20px×10字 で CTA の内幅 278px に収まる）。 */
+.cases-cta h2 {
+  font-size: clamp(20px, 2.5vw, 28px);
+  color: var(--ink);
+  margin-bottom: 10px;
+  word-break: keep-all;
+  line-break: strict;
+  overflow-wrap: anywhere;
+}
 .cases-cta p { font-size: 15px; color: var(--body-soft); margin-bottom: 24px; line-height: 1.9; }
 .cases-cta-actions { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
 
@@ -342,28 +367,70 @@
 
   .case-card { padding-block: clamp(28px, 7vw, 44px); }
   .case-media { gap: 10px; }
-  /* 1カラムになるモバイルでは「何の事例か」を写真より先に読ませる。
-     .media-split は 859px 以下で 1 列になるので、.case-body の箱を display:contents で解いて
-     カード直下の並びに order を当てる（タグ行→人物→成約額→写真→コメント）。
-     860px 以上の左右交互配置（.media-split--rev）には一切触れない。 */
+  /* .media-split は 859px 以下で 1 列になるので、.case-body の箱を display:contents で解いて
+     カード直下の並びに order を当てる。860px 以上の左右交互配置（.media-split--rev）には
+     一切触れない。
+     ラウンド6 指摘（12）: 旧順（チップ→タグ→人物→金額→写真→コメント）は写真が金額と
+     コメントの間に挟まり、PC の 2 カラム（DOM 順＝画像→本文）と読み順が食い違って見えた。
+     写真を先頭に固定し「画像→チップ→カテゴリ→氏名→数値・金額→引用」に揃える。
+     打消し表示（.case-chip-row / .case-note）が金額（.case-amount-box）より手前という
+     要件（R4_BRIEF B.3）は order の並びで維持される。 */
   .case-card.media-split { row-gap: 18px; }
   .case-body { display: contents; }
-  /* 打消し表示チップは常に先頭（金額 order:3 より手前）。既定値と同じだが明示しておく */
-  .case-chip-row { order: 0; }
-  .case-cats { order: 1; }
-  .case-persona { order: 2; }
-  .case-amount-box { order: 3; }
-  .case-media { order: 4; }
+  .case-media { order: 0; }
+  .case-chip-row { order: 1; }
+  .case-cats { order: 2; }
+  .case-persona { order: 3; }
+  .case-amount-box { order: 4; }
   .case-quote { order: 5; }
   /* 主役画像だけ .sp-bleed で画面端まで。小2枚は本文と同じ内寄せに保つ */
   .case-thumbs { margin-top: 2px; }
   /* 金額の SP 拡大（旧 30px）は撤回。base の 24px のまま＝条件行より大きくしない */
+}
+/* ラウンド6 指摘（4/11/14＝3視点・うち High 1）: 2 列グリッドではセルの丈が揃わず、
+   左列の「¥0」「4 都県」と右列の文型項目（2〜3 行）でベースラインがガタつき、
+   42px の数字と 19px の文章が同列に並んで階層が壊れていた。さらに右列は
+   「家電からブランド品まで対／応」と語中で折れ、最初の画面が崩れて見えていた。
+   640px 以下は 1 列のヘアライン定義リストにして、1 項目＝「値 → ラベル」の 2 行に揃える。
+   指摘 4 の「値とラベルを auto 1fr の 2 列でベースライン揃え」は採らない: 390px の内幅
+   342px に対し値（「連絡が来るのは、選んだ1社だけ」＝16px×14字）だけで 224px を使い、
+   残り 118px にラベル（20字）を押し込むと 4 行に折れて逆に崩れる。
+   word-break:keep-all は「対／応」の語中改行止め（指摘 14）。overflow-wrap:anywhere は
+   保険で、keep-all で入り切らない場合に横スクロールを出さないため。 */
+@media (max-width: 640px) {
+  .stats-bar-inner {
+    grid-template-columns: 1fr;
+    gap: 0;
+    justify-content: stretch;
+  }
+  .stats-item {
+    text-align: left;
+    padding: 12px 0;
+    border-top: 1px solid var(--line);
+    max-width: none;
+  }
+  .stats-item:first-child { border-top: 0; padding-top: 0; }
+  .stats-item:last-child { padding-bottom: 0; }
+  /* 1 列になったぶん数字は 2 段落とす（文章と同じ列で並ぶため 42px は効きすぎる）。
+     minor の 2 項目は base より小さいまま＝主役（¥0・4都県）との差は残す。 */
+  .stats-num { font-size: 26px; }
+  /* 22px は 859px 以下の既存値と同じ（単位「都県」が .5em ＝ 11px のまま小さくならない） */
+  .stats-item--minor .stats-num { font-size: 22px; }
+  .stats-txt { font-size: 16px; }
+  .stats-item--minor .stats-txt { font-size: 15px; }
+  .stats-txt, .stats-lbl {
+    word-break: keep-all;
+    line-break: strict;
+    overflow-wrap: anywhere;
+  }
+  .stats-lbl { margin-top: 4px; }
 }
 @media (max-width: 600px) {
   /* .header の高さがこの幅から 60px + 1px 罫になる（katazuke.css）。追従位置を合わせる */
   .filter-bar { top: 61px; }
 }
 @media (max-width: 480px) {
-  .stats-bar-inner { gap: 16px 10px; }
+  /* 旧「.stats-bar-inner{gap:16px 10px}」は削除。640px 以下は 1 列のヘアライン定義リスト
+     （gap:0＋padding＋border-top）になったため、ここで gap を戻すと罫と行間が二重になる。 */
   .cases-cta-actions .btn { width: 100%; }
 }

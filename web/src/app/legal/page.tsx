@@ -23,8 +23,15 @@ export const metadata = {
 export default function LegalPage() {
   return (
     <main id="main">
-      {/* 法務3ページ共通の無文字帯（高さ固定・文字は置かない。/terms は --pos-l、/privacy は既定） */}
-      <section className="hero-band hero-band--fixed hero-band--quiet hero-band--pos-r">
+      {/* 法務3ページ共通の無文字帯（高さ固定・文字は置かない）。
+          R6 指摘 2/6/9/12/16（High が4件）: /legal だけ --pos-r が付いており、3ページを
+          並べると「同じ素材なのに1枚だけ絵が違う＝画像が壊れている」に見えていた。
+          素材 lg-band（1920x1080）に対し帯は常にそれより横長にトリミングされるため
+          object-position の横成分は効かず、--pos-r は見た目を変えないまま
+          「右を見せている」という誤った宣言だけを残していた（core の幾何コメント参照）。
+          修飾子を /terms・/privacy と同じ1組（--fixed --quiet）に揃え、縦位置と高さは
+          core の .hero-band--fixed（--band-pos:50% 53% / 186px・SP 120px）1本だけが持つ。 */}
+      <section className="hero-band hero-band--fixed hero-band--quiet">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/img/v2/lg-band.webp"
@@ -98,6 +105,15 @@ export default function LegalPage() {
 
         {/* 運営者情報 */}
         <h2 className="doc-section-title" id="lg-1">サービス運営者情報</h2>
+        {/* R6 指摘 14: 表を上から読むと「請求があれば遅滞なく開示します」が3項目続き、
+            確定している事実（誰が・どこで運営し・どう連絡が付くか）が表の中に埋もれて
+            「最後まで運営者が分からない」読み方になっていた。表の直上に確定値だけを1行置く。
+            掲載内容（代表者名・番地・電話番号は請求開示の省略運用）は変えない。
+            運営者メッセージ /company への導線は表の直上の .doc-assure__more が既に担っている
+            ため、表の直下に2本目は置かない（同一画面内で同じリンクを重ねない）。 */}
+        <p className="doc-owner-line">
+          運営：カタヅケ運営事務局（神奈川県横浜市）／ご連絡はメールで、通常3営業日以内にご返信します。
+        </p>
         <table className="spec-table">
           <tbody>
             <tr>

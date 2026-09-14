@@ -274,6 +274,9 @@
   padding: clamp(32px, 5vw, 48px) clamp(20px, 4vw, 32px);
   text-align: center;
 }
+/* 見出しの語中改行止め（ラウンド6 指摘 12: 390px で「片付けをも／っと」と語の途中で折れていた）。
+   keep-all は句読点・括弧でしか折らせないため、入り切らない幅で横スクロールが出ないよう
+   overflow-wrap:anywhere を対に置く（/examples の .cases-hero h1 と同じ作法）。 */
 .about-cta h3 {
   font-family: var(--serif);
   font-size: clamp(19px, 2.5vw, 24px);
@@ -281,6 +284,8 @@
   color: var(--ink);
   margin-bottom: 10px;
   line-height: 1.55;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 .about-cta p {
   font-size: 14.5px;

@@ -35,12 +35,16 @@ const FAQ_ITEMS = [
   { q: "訪問買取に不安があります", a: "参加するのは、古物商許可番号の登録を必須とし、運営が許可証を確認した登録事業者のみ。訪問による買取には特定商取引法（訪問購入）の規定が適用される場合があり、クーリング・オフの可否は品目や契約に至った経緯によって異なります。業者から交付される書面をご確認ください。" },
 ];
 
-/** ご利用の流れ。図版は既存 3D シリーズ（/img/real/*.webp）を 220px の白枠で大きく使う */
-const STEPS: { n: string; en: string; h: string; p: string; img: string }[] = [
-  { n: "1", en: "SHOOT", h: "1点ずつ撮る", p: "家じゅうの不用品を1点ずつ撮影。写真と品目をまとめて登録するだけで出品完了です。", img: "how-camera" },
-  { n: "2", en: "WAIT", h: "査定が届く", p: "買取業者があなたの出品した商品に入札。あなたは待つだけで査定が集まります。", img: "how-trend" },
-  { n: "3", en: "CHOOSE", h: "査定を見比べて選ぶ", p: "届いた査定を一覧で見比べて、納得の1社を選ぶだけ。選ぶまで、業者から連絡は来ません。", img: "how-crown" },
-  { n: "4", en: "DONE", h: "引き取りに来てもらう", p: "成立した業者がまとめて引き取りに。玄関先で渡すだけで、片付け完了です。", img: "how-truck" },
+/** ご利用の流れ。ラウンド5 までは既存 3D シリーズ（/img/real/how-*.webp）を 220px の枠で使っていたが、
+    ラウンド6 指摘（5・9・12）で 3 視点が「意味と結びつかない・玩具の置物に見える」と一致したため図版を撤去し、
+    番号＋見出しのテキストステップにした（素材の実物: how-camera=浮いたコンパクトカメラ、
+    how-trend=木製の棒グラフ、how-crown=宝飾の王冠リング、how-truck=玩具のトラック。
+    3 枚は #cats のカテゴリ商品写真と語彙が重なる）。差し替え素材は /img/v2 に無い（画像は全点投入済み）。 */
+const STEPS: { n: string; en: string; h: string; p: string }[] = [
+  { n: "1", en: "SHOOT", h: "1点ずつ撮る", p: "家じゅうの不用品を1点ずつ撮影。写真と品目をまとめて登録するだけで出品完了です。" },
+  { n: "2", en: "WAIT", h: "査定が届く", p: "買取業者があなたの出品した商品に入札。あなたは待つだけで査定が集まります。" },
+  { n: "3", en: "CHOOSE", h: "査定を見比べて選ぶ", p: "届いた査定を一覧で見比べて、納得の1社を選ぶだけ。選ぶまで、業者から連絡は来ません。" },
+  { n: "4", en: "DONE", h: "引き取りに来てもらう", p: "成立した業者がまとめて引き取りに。玄関先で渡すだけで、片付け完了です。" },
 ];
 
 /** 利用シーン。人物写真は撤去し、場面を示す静物（1:1）に置換 */
@@ -180,10 +184,7 @@ export default function HomePage() {
             <div className="steps-grid">
               {STEPS.map((s, i) => (
                 <Reveal as="article" className="step" delay={delayOf(i)} key={s.n}>
-                  <div className="step-photo img-frame img-frame--1x1 img-frame--contain">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={`/img/real/${s.img}.webp`} alt="" width={512} height={512} loading="lazy" decoding="async" />
-                  </div>
+                  {/* 図版なし（上の STEPS のコメント参照）。区切りは 1px の上罫と余白だけ */}
                   <div className="step-body">
                     <span className="step-n"><span className="num">{s.n}</span>{s.en}</span>
                     <h3>{s.h}</h3>
@@ -208,7 +209,10 @@ export default function HomePage() {
                 <span className="btn-line__tile" aria-hidden="true" />
                 <span className="btn-line__body">
                   <span className="btn-line__label">LINEで無料ではじめる</span>
-                  <span className="btn-line__sub">登録・査定・お断りまで無料</span>
+                  {/* ラウンド6 指摘（10）: 補足が左の .scta-text「登録・査定・お断りまですべて無料」と
+                      同内容で、同一視野に同じ文が 2 回出ていた。無料の条件は左のテキスト側に持たせ、
+                      ボタン内はヒーロー／最終 CTA と同じ「押した先で何が起きるか」に戻す。 */}
+                  <span className="btn-line__sub">LINEアカウントでログインできます</span>
                 </span>
                 <Ic name="arrow" className="btn-line__arr" />
               </Link>

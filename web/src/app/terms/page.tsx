@@ -51,8 +51,15 @@ const POINTS: { no: string; lead: string; body: string; ref: string; href: strin
 export default function TermsPage() {
   return (
     <main id="main">
-      {/* 法務3ページ共通の無文字帯（高さ固定・文字は置かない。.tab-wrap の sticky に影響させない） */}
-      <section className="hero-band hero-band--fixed hero-band--quiet hero-band--pos-l">
+      {/* 法務3ページ共通の無文字帯（高さ固定・文字は置かない。.tab-wrap の sticky に影響させない）。
+          R6 指摘 2/12: /terms=--pos-l、/legal=--pos-r、/privacy=既定 と修飾子が3ページで
+          バラバラだったため「並べると1ページだけ絵が違う＝壊れて見える」判定が続いていた。
+          素材 lg-band（1920x1080）に対し帯は PC・SP とも常にそれより横長にトリミングされ、
+          object-position の横成分は効かない（core の katazuke-pages.css の幾何コメント参照）＝
+          --pos-* は見た目を変えないまま「ページごとに違う指定がある」という誤解だけを残す。
+          3ページとも修飾子をこの1組（--fixed --quiet）に揃え、縦位置と高さは core の
+          .hero-band--fixed（--band-pos:50% 53% / 186px・SP 120px）1本だけが持つ形にする。 */}
+      <section className="hero-band hero-band--fixed hero-band--quiet">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/img/v2/lg-band.webp"

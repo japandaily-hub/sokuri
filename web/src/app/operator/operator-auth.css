@@ -139,6 +139,18 @@
 .operator-auth .op-guide-list a, .operator-auth .op-guide-note a { color: var(--blue); font-weight: 600; }
 .operator-auth .op-guide-note { margin-top: 12px; font-size: 12.5px; line-height: 1.8; color: var(--body-soft); }
 
+/* R6 指摘 11（a11y・法務）: 人物画像（ol-side）が生成物であることの明示。/operator/login のみ
+   （/operator/signup は人物なしの os-side なので付けない）。面も罫も持たせず 1 行に留め、
+   運営者の明示（.op-auth-foot）より後ろ＝列の最後に置く。文言は /vendors・/signup・/login と同一。 */
+.operator-auth .photo-note {
+  margin: 14px 0 0;
+  text-align: center;
+  font-family: var(--ui);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--body-soft);
+}
+
 /* 運営者の明示（/operator/login の脚） */
 .operator-auth .op-auth-foot {
   margin-top: 24px;

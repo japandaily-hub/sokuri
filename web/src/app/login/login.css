@@ -1,0 +1,16 @@
+/* ログイン 固有スタイル。
+   シェル（.auth-page / .auth-page--split / .auth-side / .auth-wrap / .auth-card / .btn-line-auth）は
+   katazuke-pages.css（コア §1.10）。ここは /login だけに要る追加分を書き、共通クラスは再定義しない。
+   ページ CSS は @layer 外なのでコアに常に勝つ。上書きを増やさないため、新しいクラスのみを定義する。 */
+
+/* R6 指摘 11（a11y・法務）: 人物画像（li-side）が生成物であることの明示。1 行だけ・面も罫も持たせない。
+   帯／画像の上には重ねない（§1.2「帯上の文字は 24px 以上の見出しのみ」）ため、フォーム列の末尾に置く。
+   文言は /vendors の 1 行（.vd-photo-note）と同一に揃える（新しい約束・条件は足さない）。 */
+.login-page .photo-note {
+  margin: 18px 0 0;
+  text-align: center;
+  font-family: var(--ui);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--body-soft);
+}

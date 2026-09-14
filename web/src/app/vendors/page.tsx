@@ -196,17 +196,9 @@ export default function VendorListPage() {
               <p className="vd-state-err" role="alert">
                 {error}
               </p>
-              {/* r5 #14/#24: エラー文以外に読むものがなく、次の一歩がテキストリンク3本だけだった。
-                  依頼者の一手（出品する）と業者の一手（業者登録）をボタンに格上げし、
-                  再読み込みは3番目の弱い扱い（テキスト）に下げる。 */}
-              <div className="vd-state-actions">
-                <Link href="/create" className="btn btn-primary">
-                  出品する
-                </Link>
-                <Link href="/business" className="btn btn-ghost">
-                  業者登録（審査制）について
-                </Link>
-              </div>
+              {/* r6 #10: 主導線（出品する／業者登録）はこの枠の外（.vd-next）へ出した。
+                  エラー文と同じ白枠に入れていたため、エラー復帰用の操作に見えていた。
+                  枠の中に残すのは、エラーそのものに対する操作（再読み込み）と参照先だけ。 */}
               <p className="vd-state-sub">
                 <button type="button" className="vd-state-link" onClick={() => window.location.reload()}>
                   再読み込み
@@ -220,6 +212,21 @@ export default function VendorListPage() {
                   </Link>
                 ) : null}
               </p>
+            </div>
+          ) : null}
+
+          {/* r6 #10: 出品・業者登録は「一覧が読めたかどうか」に関係なく成り立つ次の一手なので、
+              エラーの器（白面＋--danger のヘアライン）から出し、枠を持たない淡青面
+              （ページの地 --pale-2）に置く。ボタンの見た目・文言・行き先は変えない。
+              r5 #14 の「主導線はボタン・再読み込みはテキスト」という序列は維持する。 */}
+          {error ? (
+            <div className="vd-next">
+              <Link href="/create" className="btn btn-primary">
+                出品する
+              </Link>
+              <Link href="/business" className="btn btn-ghost">
+                業者登録（審査制）について
+              </Link>
             </div>
           ) : null}
 

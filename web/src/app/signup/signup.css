@@ -148,3 +148,15 @@
      ピルの面積そのものはコアの max-width:360px で抑えてあり、ここでは増減させない。 */
   .signup-page .signup-line-slot { margin: 24px 0 24px; }
 }
+
+/* R6 指摘 11（a11y・法務）: 人物画像（su-side）が生成物であることの明示。1 行だけ・面も罫も持たせない。
+   フォーム列の末尾に置くので、固定フッターの逃げ代（コア §1.10 の padding-bottom）より内側に入り、
+   モバイルの固定バーとは重ならない。文言は /vendors の 1 行と同一に揃える（新しい約束は足さない）。 */
+.signup-page .photo-note {
+  margin: 18px 0 0;
+  text-align: center;
+  font-family: var(--ui);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--body-soft);
+}

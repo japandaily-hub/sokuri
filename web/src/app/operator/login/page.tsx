@@ -264,6 +264,11 @@ function OperatorLoginForm() {
             <span aria-hidden="true"> ／ </span>
             <Link href="/company">運営者情報</Link>
           </div>
+
+          {/* R6 指摘 11（a11y・法務）: 左（モバイルは上部の帯）の人物は生成画像（3Dレンダー）で、
+              実在の登録業者ではない。/vendors・/signup・/login と同じ文言で 1 行だけ揃える。
+              画像は装飾（alt=""）なので読み上げには出ず、この 1 行が音声利用者の手掛かりになる。 */}
+          <p className="photo-note">※ 写真はイメージです。</p>
         </div>
       </main>
     </div>

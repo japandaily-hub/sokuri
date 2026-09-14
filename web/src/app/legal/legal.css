@@ -182,6 +182,16 @@
   margin-top: 6px;
 }
 
+/* 運営者情報の表の直上に置く確定値の1行（R6 指摘 14）。
+   囲み・地色は持たせない（帯 → 箱 → 表と囲みが続くのを避ける・正典「区切りは1px罫と余白」）。
+   表の 1 行目（事業者名）と重複して見えないよう、本文色より一段薄い --body-soft に落とす。 */
+.doc-owner-line {
+  font-size: 13.5px;
+  color: var(--body-soft);
+  line-height: 1.85;
+  margin: 0 0 16px;
+}
+
 /* セクション見出し（節罫線は 1px、節間は clamp で開ける） */
 .doc-section-title {
   font-family: var(--head);

@@ -57,22 +57,29 @@ const STEPS: { h: string; p: string; tip: string }[] = [
   },
 ];
 
-/** ポイントのうち、写真で見せる3点（zig-zag の .media-split） */
-const TIP_SPLITS: { img: string; h: string; p: string }[] = [
+/** ポイントのうち、写真で見せる3点（zig-zag の .media-split）
+    ラウンド6 指摘（8）: 1:1 の画像に対して本文が2行しかなく、テキスト側に 150px 超の空きが残って
+    読み進む動機が切れていた。画像の表示 AR は BRIEF §1.5「表示AR＝生成AR」（素材 1024x1024）の
+    ため変えられないので、テキスト側に具体例の1行（tip）を足して左右の分量を均す。
+    書式は §2 手順の .tip と同じ（ゴシック小・左に --marker の縦罫）。 */
+const TIP_SPLITS: { img: string; h: string; p: string; tip: string }[] = [
   {
     img: "pg-tip-light",
     h: "明るく撮る",
     p: "照明を増やす、窓の近くで撮るなど明るさを確保。暗い写真は色や傷が見えにくく、業者が状態を判断しにくくなります。",
+    tip: "例：日中に窓際で撮る。部屋の照明はすべて点ける",
   },
   {
     img: "pg-tip-bg",
     h: "背景をすっきりさせる",
     p: "無地の床や壁の前に品物を1点だけ置き、まわりのものはいったんどけます。背景が整うほど、形も色もそのまま伝わります。",
+    tip: "例：無地の布やシーツを1枚敷いて、その上に置く",
   },
   {
     img: "pg-tip-detail",
     h: "全体と詳細の両方を撮る",
     p: "1点ごとに、全体が映る引きの写真＋気になる部分のアップ写真。この組み合わせが、いちばん伝わりやすくなります。",
+    tip: "例：引きで1枚＋ロゴ・型番・傷のアップで数枚",
   },
 ];
 
@@ -84,14 +91,20 @@ const POINTS: { icon: IcName; h: string; p: string }[] = [
   { icon: "up", h: "枚数は多いほどいい", p: "商品1点につき最大12枚、案件全体で最大150枚まで追加できます。写真が多いほど、業者が現物を見ずに状態を確認しやすくなります。" },
 ];
 
-/** カテゴリ別チェックリスト（行頭に既存 3D アイコン /img/real/cat-*.webp） */
-const CATS: { img: string; name: string; items: string[] }[] = [
-  { img: "cat-brand", name: "ブランド品", items: ["ロゴ・刻印が見える写真", "バッグは内側・金具も撮影", "付属品（保存袋・箱）も", "傷・汚れ・色あせは正直に"] },
-  { img: "cat-kaden", name: "家電・PC", items: ["型番・メーカーが見える写真", "電源ON状態の写真があると◎", "リモコン・充電器も一緒に", "製造年がわかれば伝える"] },
-  { img: "cat-watch", name: "時計", items: ["文字盤・ケースバック・竜頭", "ブランドロゴが読めるアップ", "箱・保証書・コマ数も撮影", "傷・色あせの状態を正直に"] },
-  { img: "cat-camera", name: "カメラ", items: ["ボディ・レンズを別々に撮影", "センサーの状態（埃・カビ確認）", "付属レンズ・フラッシュも", "動作確認済みなら必ず伝える"] },
-  { img: "cat-furniture", name: "家具", items: ["正面・側面・背面・底面を撮影", "傷・へこみ・色あせは接写で", "サイズが分かる写真があると◎", "解体できる場合は伝える"] },
-  { img: "cat-game", name: "ゲーム", items: ["本体・コントローラーを一緒に", "ソフトはタイトルが読める写真", "付属品・箱があれば一緒に", "動作確認済みは必ず伝える"] },
+/** カテゴリ別チェックリスト（品目名＋確認項目のみ。サムネイルは置かない）
+    ラウンド6 指摘（5）: 行頭の 72px サムネは 3D 静物の中身が判別できず、1px 枠のボックスに
+    小さな画像が乗るだけの構成が安く見えていた（512px 素材を 72px＝7.1倍で敷く BRIEF §1.11 の
+    2x 規約超過もここが唯一の残件だった）。/img/real/cat-*.webp の参照を外し、箱組も畳んで
+    ヘアラインの台帳（.point-list / /company の .co-vendor と同じ作法）にそろえる。
+    Icons.tsx は core 所有・R4 で変更不可のため、6品目すべてに合う .ic が無い（家電・PC／ゲーム）。
+    半端なアイコンを混ぜるより品目名のみで通す。 */
+const CATS: { name: string; items: string[] }[] = [
+  { name: "ブランド品", items: ["ロゴ・刻印が見える写真", "バッグは内側・金具も撮影", "付属品（保存袋・箱）も", "傷・汚れ・色あせは正直に"] },
+  { name: "家電・PC", items: ["型番・メーカーが見える写真", "電源ON状態の写真があると◎", "リモコン・充電器も一緒に", "製造年がわかれば伝える"] },
+  { name: "時計", items: ["文字盤・ケースバック・竜頭", "ブランドロゴが読めるアップ", "箱・保証書・コマ数も撮影", "傷・色あせの状態を正直に"] },
+  { name: "カメラ", items: ["ボディ・レンズを別々に撮影", "センサーの状態（埃・カビ確認）", "付属レンズ・フラッシュも", "動作確認済みなら必ず伝える"] },
+  { name: "家具", items: ["正面・側面・背面・底面を撮影", "傷・へこみ・色あせは接写で", "サイズが分かる写真があると◎", "解体できる場合は伝える"] },
+  { name: "ゲーム", items: ["本体・コントローラーを一緒に", "ソフトはタイトルが読める写真", "付属品・箱があれば一緒に", "動作確認済みは必ず伝える"] },
 ];
 
 /** スクロール演出の遅延（3列グリッド用） */
@@ -264,6 +277,13 @@ export default function PhotoGuidePage() {
             <p className="pg-note">
               写真に住所・氏名・他の人が写り込まないよう、書類や画面は伏せて撮ってください。
             </p>
+            {/* ラウンド6 指摘（9）: 手順 06 の例示が他社の登録商標の実名で、記述的使用ではあっても
+                自社の販促面に他社商標が並ぶため提携の誤認リスクが残る。「メーカー名＋型番」という
+                書き方を示すには実名の例が最も伝わるので例示は残し、指摘が併記した代替のとおり
+                商標の帰属と無関係であることを同一視野に1行で添える。 */}
+            <p className="pg-note">
+              ※ 記載の会社名・製品名は各社の商標または登録商標です。カタヅケと各社の提携関係を示すものではありません。
+            </p>
           </div>
 
           {/* ============ 3. 伝わりやすくなる撮影のポイント ============ */}
@@ -293,12 +313,16 @@ export default function PhotoGuidePage() {
                       decoding="async"
                     />
                   </div>
+                  {/* ラウンド6 指摘（11）: この節の 01/02/03 は §2「撮影の手順」と同じ番号書式で、
+                      どちらが手順でどちらが補足か読み分けられなかった。番号は手順章だけの記号として残し、
+                      ポイント側は見出しのみにする。 */}
                   <div className="tip-copy">
-                    <span className="tip-num" aria-hidden="true">
-                      {numOf(i)}
-                    </span>
                     <h4>{t.h}</h4>
                     <p>{t.p}</p>
+                    <span className="tip">
+                      <Ic name="spark" />
+                      {t.tip}
+                    </span>
                   </div>
                 </Reveal>
               ))}
@@ -332,19 +356,7 @@ export default function PhotoGuidePage() {
             <div className="cat-guide-grid">
               {CATS.map((c, i) => (
                 <Reveal as="div" className="cat-guide-card" delay={delayOf(i)} key={c.name}>
-                  <div className="cat-name">
-                    <span className="img-frame img-frame--pale img-frame--1x1 cat-ic">
-                      <img
-                        src={`/img/real/${c.img}.webp`}
-                        width={512}
-                        height={512}
-                        alt=""
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    </span>
-                    {c.name}
-                  </div>
+                  <div className="cat-name">{c.name}</div>
                   <ul>
                     {c.items.map((li) => (
                       <li key={li}>{li}</li>
@@ -357,8 +369,16 @@ export default function PhotoGuidePage() {
         </div>
       </div>
 
-      {/* ============ 末尾 CTA（濃紺帯。ボタンは帯の下の白面に置く） ============ */}
-      <section className="deep-band pg-cta-band">
+      {/* ============ 末尾 CTA（見出し・本文・ボタンを1ブロックに内包） ============
+          ラウンド6 指摘（3 High / 6 High・同一箇所）: 濃紺帯が見出し＋本文2行で終わり、
+          LINE と副 CTA の2本が帯の外の白地に落ちていたため、帯の下端に無駄な余白が残り
+          「ボタンが帯からはみ出した崩れ」「章に属さず浮いたボタン」に見えていた。
+          指摘3 の推奨案 A を採る: 面を --pale-2 に替え、CTA 行を同じ section の中に内包する。
+          これで LINE CTA を --deep の上に置かない規約（BRIEF §1.3・R4 A.4）を保ったまま、
+          見出し→本文→ボタンが1つのブロックとして読める（帯とボタンの間の白い谷が消える）。
+          .deep-band は外す（面が濃紺でなくなるため）。READY ラベルは書式だけ
+          .deep-band__label から借り、色を --primary に落とす（案 A の指定どおり）。 */}
+      <section className="pg-cta-band">
         <div className="container">
           <span className="deep-band__label">READY</span>
           <h2>準備ができたら、さっそく出品しよう</h2>
@@ -367,11 +387,6 @@ export default function PhotoGuidePage() {
             <br />
             出品・査定・お断りまで、ユーザーの費用は一切無料です。
           </p>
-        </div>
-      </section>
-
-      <div className="pg-cta-actions">
-        <div className="container">
           <div className="pg-cta-btns">
             {/* ヒーローと同一の 2 トーン構造。同じ文言のボタンが違う見た目で並ばないよう揃える。 */}
             <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-line btn-lg">
@@ -387,7 +402,7 @@ export default function PhotoGuidePage() {
             </Link>
           </div>
         </div>
-      </div>
+      </section>
     </main>
   );
 }

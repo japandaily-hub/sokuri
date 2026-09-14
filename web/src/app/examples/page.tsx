@@ -151,8 +151,13 @@ function CaseCard({ c, index }: { c: CaseItem; index: number }) {
           <p className="case-note">
             ※ 架空の想定額です。買取額は品物や状況により大きく異なります。
           </p>
+          {/* ラウンド6 指摘（3/8＝2視点・High）: 「¥148,000円」と通貨記号「¥」と単位「円」が
+              二重だった（6件すべて）。ページ内で最も大きい数字の誤植なので単位は1つに統一する。
+              「円」側を残す: /business の vc-facts（業者側モデルケースの買取総額）が「円」のみで、
+              2ページで表記が揃う。数字は <b> で括って tabular-nums を当て桁を揃える
+              （<b> の既定 700 は使わず CSS で明朝 400 に戻す。正典「明朝のウェイトは 400/600 のみ」）。 */}
           <div className="case-amount">
-            ¥{c.amount.toLocaleString()}
+            <b>{c.amount.toLocaleString()}</b>
             <span>円</span>
           </div>
         </div>

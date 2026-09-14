@@ -13,6 +13,24 @@
 .pg-hero .hero-band__copy { padding-block: clamp(32px, 5vw, 56px); }
 .pg-hero .hero-band__copy h1 { margin-top: 16px; }
 .pg-hero .hero-band__copy p { max-width: 34em; }
+/* ラウンド6 指摘（2・モバイル）: 共有の .hero-band--face の veil は水平グラデ
+   （390px で左 .74 → 右 .60）で、390px 幅では 14 ポイントの差が「左は夜・右は日中光」に割れ、
+   境目が縦の線として見えていた。モバイルだけ横方向のランプをやめ、上明→下暗の縦グラデにする。
+   混色は core と同じ中性ダーク rgba(16,20,34) のまま（紫かぶりを戻さない）。
+   コントラスト（白 #fff on 合成色・画像側の輝度は core が実測から逆算した最悪値 v≒222〜228）:
+   .66→約 6.7:1／.72→約 7.5:1／.78→約 8.3:1。モバイルは帯の高さいっぱいに copy が入る
+   （h1 2行＋本文3〜4行で min-height 240px を超える）ため、いちばん薄い上端でも AA を
+   割らない .66 を floor にする。ラウンド6 実測の p95（h1 7.08／本文 6.97）を下回らない側の変更。
+   ページ CSS は unlayered で layer(components) の .hero-band--face に常に勝つ。
+   PC は現状の水平グラデのまま（1440px では 1389px に広がるため縦線として認識されない）。 */
+@media (max-width: 859px) {
+  .pg-hero .hero-band__veil {
+    background: linear-gradient(180deg,
+      rgba(16, 20, 34, .66) 0%,
+      rgba(16, 20, 34, .72) 55%,
+      rgba(16, 20, 34, .78) 100%);
+  }
+}
 
 /* ---------- ヒーローの CTA 行（帯の外・直下の白面） ----------
    R4 A.4「LINE CTA を写真帯／濃紺帯の上に置かない」。帯の上では主色ブルーの面が
@@ -201,16 +219,28 @@
   .tip-splits { gap: clamp(48px, 6vw, 72px); }
 }
 .tip-copy { min-width: 0; }
-.tip-num {
-  display: block;
-  font-family: var(--en-display);
-  font-size: 18px;
-  color: var(--primary);
-  letter-spacing: .06em;
-  margin-bottom: 10px;
-}
 .tip-copy h4 { font-family: var(--serif); font-size: clamp(17px, 2.2vw, 21px); font-weight: 600; color: var(--ink); margin-bottom: 10px; }
-.tip-copy p { font-size: 14.5px; color: var(--body); line-height: 1.95; }
+/* 本文は 26em（実測 377px）で折る。列の全幅（1440px で約 590px）に 2 行だけ流すと、
+   461px の正方形画像の隣で「幅は広いのに背が低い」塊になり、上下の空きが実際より大きく見えた
+   （ラウンド6 指摘 4/8）。文字の塊の縦横比を画像側に近づけるための折り返し幅
+   （実測: 1行の長さが 26em を超える 02 だけ 3 行になり 140px → 169px）。 */
+.tip-copy p { font-size: 14.5px; color: var(--body); line-height: 1.95; max-width: 26em; }
+/* 具体例の1行（ラウンド6 指摘 8）。書式は §2 手順の .shoot-step-body .tip と同一にして、
+   ページ内で「例示は青の縦罫の小さな行」という同じ記号で読ませる。
+   .tip-num（01/02/03）は廃止（指摘 11: 手順章と同じ番号書式で読み分けができない）。 */
+.tip-copy .tip {
+  margin-top: 14px;
+  font-family: var(--ui);
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--primary-d);
+  border-left: 2px solid var(--marker);
+  padding-left: 10px;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.tip-copy .tip .ic { width: 14px; height: 14px; flex-shrink: 0; margin-top: 3px; }
 
 .point-list {
   list-style: none;
@@ -239,48 +269,62 @@
 .point-body h4 { font-size: 14.5px; font-weight: 600; color: var(--ink); margin-bottom: 4px; }
 .point-body p { font-size: 13.5px; color: var(--body-soft); line-height: 1.8; }
 
-/* ---------- カテゴリ別チェックリスト（行頭に既存 3D アイコン 56px） ---------- */
+/* ---------- カテゴリ別チェックリスト（品目名＋確認項目。箱は作らない） ----------
+   ラウンド6 指摘（5）: 72px のサムネは中身が判別できず、1px 枠のボックスに小さな画像が乗る
+   構成が安く見えていた（512px 素材を 72px＝7.1倍で敷く BRIEF §1.11 の 2x 規約超過も残件だった）。
+   画像参照は page.tsx 側で外し、ここでは囲み枠も畳んで「上罫 1px ＋ 余白」だけの区切りにする
+   （§3 末尾の .point-list、/company の .co-vendor と同じヘアライン台帳の作法）。 */
 .cat-guide-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: clamp(14px, 2vw, 20px);
+  gap: clamp(20px, 3vw, 32px) clamp(24px, 3.5vw, 48px);
 }
 .cat-guide-card {
-  border: 1px solid var(--line);
+  border: 0;
+  border-top: 1px solid var(--line);
   border-radius: 0;
-  padding: 18px;
+  padding: 16px 0 0;
   min-width: 0;
 }
+/* 品目名は明朝 600（見出しは明朝の正典）。アイコン列が無くなったので block に戻す */
 .cat-guide-card .cat-name {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 14px;
+  display: block;
+  font-family: var(--serif);
+  font-size: 16px;
   font-weight: 600;
   color: var(--ink);
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
-/* .img-frame--pale .img-frame--1x1 を 72px に固定。56px では 3D 静物の被写体が判別できず
-   （ラウンド4 実測: 1440px で約 56px＝カテゴリの見分けがつかないノイズ）、見出しの横に置く
-   意味が消えていた。512px 素材のため 72px でも「表示幅の2倍」規約の範囲内には収まらないが、
-   56px（9.1倍）より 72px（7.1倍）のほうが超過は小さくなる方向。144px の派生 webp は画像担当。 */
-.cat-guide-card .cat-ic { width: 72px; flex: 0 0 72px; }
 .cat-guide-card ul { padding-left: 16px; }
-.cat-guide-card li { font-size: 12.5px; color: var(--body-soft); line-height: 1.8; margin-bottom: 3px; }
+.cat-guide-card li { font-size: 13px; color: var(--body-soft); line-height: 1.85; margin-bottom: 4px; }
 
-/* ---------- 末尾 CTA（濃紺帯＋直下の白面にボタン） ---------- */
-.pg-cta-band { text-align: center; }
-.pg-cta-band h2 { font-size: clamp(20px, 2.8vw, 30px); margin-top: 14px; }
-.pg-cta-band p { font-size: 14.5px; line-height: 1.95; margin-top: 14px; }
-/* 帯とボタンの距離は上を詰める（ラウンド4 指摘: 帯が CTA から切り離された装飾ストライプに見える）。
-   帯の中にボタンを置く解は採らない（.deep-band §1.3「ボタンは置かず直下の白面へ」＋ R4 A.4）。 */
-.pg-cta-actions { background: #fff; padding: clamp(20px, 2.4vw, 26px) 0 clamp(28px, 4vw, 44px); }
+/* ---------- 末尾 CTA（--pale-2 の1ブロック。見出し・本文・ボタンを内包） ----------
+   ラウンド6 指摘（3 High / 6 High）: 濃紺帯が見出し＋本文2行で終わり、ボタン2本が帯の外の
+   白地に落ちて「帯からはみ出した崩れ」に見えていた（帯下端の余白＋白面の上端余白で
+   文と ボタンの間に 110px 超の白い谷ができていた）。指摘3 の推奨案 A のとおり面を --pale-2 に
+   替え、CTA 行を同じ section に内包して1ブロックに戻す。LINE CTA は --deep の上に置かない
+   規約（BRIEF §1.3・R4 A.4）を保ったまま、白の谷と帯の切断を同時に消す。
+   上罫の 1px だけで直前の白面と切り、下罫は引かない（.site-frame の下辺と二重線になるため）。
+   コントラスト: --pale-2(#f4f7fc) 上の --ink / --body / --primary はいずれも AA 達成
+   （/company の .about-cta と同じ地・同じ組み合わせ）。 */
+.pg-cta-band {
+  background: var(--pale-2);
+  border-top: 1px solid var(--line);
+  padding: clamp(40px, 5.5vw, 64px) 0 clamp(30px, 4vw, 44px);
+  text-align: center;
+}
+/* READY は .deep-band__label の書式（--en 600 uppercase・字間 .16em）だけを借り、
+   濃紺地用の --lime から --primary に落とす（淡い地の上で --lime は読めないため） */
+.pg-cta-band .deep-band__label { color: var(--primary); }
+.pg-cta-band h2 { font-size: clamp(20px, 2.8vw, 30px); color: var(--ink); margin-top: 14px; }
+.pg-cta-band p { font-size: 14.5px; color: var(--body); line-height: 1.95; margin-top: 14px; }
 .pg-cta-btns {
   display: flex;
   justify-content: center;
   align-items: stretch;
   gap: 14px;
   flex-wrap: wrap;
+  margin-top: clamp(24px, 3vw, 32px);
 }
 
 /* ---------- レスポンシブ（共有部品と同じ 859px で折り返す） ---------- */

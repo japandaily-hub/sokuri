@@ -76,6 +76,11 @@
   .hero .hero-trust{order:4;}
   .hero .hero-how{order:5;}
   .hero .hero-cta{order:6;}
+  /* ラウンド6 指摘（7）: 核の .hero-grid は align-items:center のままなので、列方向に積み直すと
+     ヘアラインの箱（.hero-how）だけが shrink-to-fit で中央に寄り、上下の全幅ボタン・全幅本文に対して
+     内側へずれて見えた（390px 実機で左右に約 50px の余り）。箱を container 幅まで伸ばし、
+     左端を本文・ボタンの左端（container の 16px）に揃える。内側余白は 4 工程が 1 行で収まるよう詰める。 */
+  .hero .hero-how{align-self:stretch;justify-content:space-between;padding:12px 14px;}
   /* 縦 585px を避ける 4:5 への切替（AR 規約の例外1）は core の .hero-photo--2x3 /
      .img-frame--hero-person が持つ。ここで再指定しない（切り位置 --pos ごと core に一本化） */
   /* .sp-bleed で画面端まで届くので、右に 6px はみ出す青ずらし枠は畳む（横スクロール防止） */
@@ -109,17 +114,26 @@
 }
 
 /* ============================================================
-   #4 ご利用の流れ — 既存 3D アイコンを 1 辺 220px の白枠で大きく見せる
+   #4 ご利用の流れ — 図版を撤去し、番号＋見出しのテキストステップに
    ============================================================ */
-/* 地は指定しない。contain の枠は素材に焼かれた淡青の地（how-* = rgb(238,241,250)）と枠の地が違うと
-   「枠の中にもう一枚ずれた四角」が浮くため、katazuke-pages.css の
-   `.img-frame--contain{background:var(--pale)}` に揃える（ラウンド3 指摘）。
-   ここで #fff を書くと 2 階層セレクタの特異度で共有定義に勝ってしまうので、意図的に空けている。 */
-#flow .step-photo{aspect-ratio:1/1;max-width:220px;margin-inline:auto;}
-#flow .step-photo img{object-fit:contain;padding:clamp(10px,1.6vw,18px);}
-#flow .step-body{text-align:center;}
+/* ラウンド6 指摘（5・9・12／うち 12 は High）: 4 枚の図版（/img/real/how-*.webp）は
+   「浮いたコンパクトカメラ・木製の棒グラフ・宝飾の王冠リング・玩具のトラック」で、
+   ①「見比べて選ぶ」「引き取り」の意味と結びつかない ② 淡青 studio 背景の単体物撮りで、
+   同ページの v2（室内・自然光）と質感が合わない ③ カメラ・王冠・トラックは #cats の
+   カテゴリ商品写真と語彙が重なる（step 3 が「時計・宝飾」に見える）。
+   同じ室内・同じ光の代替素材は /img/v2 に存在せず（画像は全点投入済み）、1 枚だけ差し替えると
+   4 枚の連作が崩れるため、指摘 9 が示した代替案「4 枚すべて番号＋見出しのみ」を採る。
+   区切りは 1px の上罫と余白だけ（角丸0・影0）。番号は core の .step-n .num（22px）を
+   この節だけ大きくして図版の代わりに視線の入口を作る。文字は明朝＝正典どおり。 */
+#flow .step{border-top:1px solid var(--line);padding-top:clamp(14px,1.7vw,20px);}
+/* 核の .step-body{padding:18px 0 0} は図版との間隔。図版が無くなったので上罫との距離は .step 側が持つ */
+#flow .step-body{padding-top:0;}
+#flow .step-n{align-items:baseline;gap:10px;}
+#flow .step-n .num{font-size:clamp(28px,3vw,38px);line-height:1;}
+#flow .step-body h3{margin-top:clamp(8px,1.1vw,12px);}
 @media(max-width:859px){
-  #flow .steps-grid{grid-template-columns:repeat(2,1fr);max-width:none;margin-inline:0;gap:clamp(22px,4vw,32px);}
+  #flow .steps-grid{grid-template-columns:repeat(2,1fr);max-width:none;margin-inline:0;
+    gap:clamp(20px,3.4vw,28px) clamp(22px,4vw,32px);}
 }
 
 /* ============================================================
@@ -404,14 +418,26 @@
 .biz-banner .biz-banner-tags{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
 .biz-banner .biz-banner-tags .biz-tag{display:flex;align-items:center;min-width:0;}
 .biz-banner .biz-banner-tags .biz-tag--wide{grid-column:1/-1;}
+/* ラウンド6 指摘（4・High）: 1 列になるモバイルでは 6 本のチップが「全幅・1px 枠・青文字」の箱として
+   縦に並び、直下の主 CTA と合わせて入力欄／ボタンの列に見えていた（390px 実機）。
+   押せない要素にボタンの面を持たせない方針（指摘 8 と同じ）に合わせ、枠を外してヘアラインの
+   定義リストにする。最後の 1 本だけ下罫を足して、リストの下端を CTA と切り離す。
+   色は --primary（リンクに見える）ではなく --body に落とし、面も持たせない。 */
 @media(max-width:859px){
-  .biz-banner .biz-banner-tags{grid-template-columns:1fr;}
+  .biz-banner .biz-banner-tags{grid-template-columns:1fr;gap:0;}
+  .biz-banner .biz-banner-tags .biz-tag{background:none;border:0;
+    border-top:1px solid var(--line);padding:11px 0;font-size:13px;color:var(--body);line-height:1.7;}
+  .biz-banner .biz-banner-tags .biz-tag:last-child{border-bottom:1px solid var(--line);}
 }
 .biz-banner .biz-banner-cta{flex-direction:row;flex-wrap:wrap;align-items:center;
   justify-content:flex-start;gap:14px;margin-top:22px;}
-/* 「審査制・登録無料」は 13px --body のヘアラインチップに */
-.biz-banner .biz-chip{font-size:13px;color:var(--body);background:#fff;
-  border:1px solid var(--line);padding:6px 14px;line-height:1.7;}
+/* ラウンド6 指摘（8・High／4 も同じ箇所）: 「審査制・登録無料」を白面＋1px 枠のチップにしていたため、
+   主 CTA（青の全幅ボタン）の直下で「無効状態の第2ボタン」に見え、タップしても何も起きない偽ボタンに
+   なっていた（モバイル実機。PC でもボタンの右隣に同じ面が並ぶ）。
+   押せない要素はボタンの面を持たない — 面・枠・中央寄せを外し、左寄せの 1 行テキストに戻す。
+   PC / モバイルで同じ扱いに統一する（指摘 8 の「デスクトップ側も同じ扱いに」）。 */
+.biz-banner .biz-chip{font-family:var(--ui);font-size:13px;font-weight:400;color:var(--body);
+  background:none;border:0;padding:0;line-height:1.7;text-align:left;}
 .biz-banner .biz-banner-media{background:#fff;}
 @media(max-width:859px){
   .biz-banner .biz-banner-inner{grid-template-columns:1fr;}
@@ -419,5 +445,8 @@
 }
 @media(max-width:560px){
   .biz-banner .biz-banner-cta .btn{width:100%;}
-  .biz-banner .biz-chip{width:100%;text-align:center;}
+  /* 指摘 8: 全幅・中央寄せ（＝旧 .biz-chip{width:100%;text-align:center}）をやめ、
+     ボタンの下に置く注記テキストとして左寄せのまま流す。核の .biz-banner-cta{align-items:center} は
+     このページ CSS の .biz-banner-cta で row/flex-start に上書き済みなので、折り返した 2 行目は左端に付く。 */
+  .biz-banner .biz-chip{width:auto;text-align:left;}
 }
