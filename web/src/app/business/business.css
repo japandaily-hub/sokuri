@@ -854,3 +854,6 @@
   .business-page .biz-assure-n { padding-top: 0; }
   .business-page .biz-hero-cta .btn { width: 100%; }
 }
+
+/* 最終検査（legal）: ヒーローの人物写真に対する可視の打消し（/vendors .vd-photo-note と同じ12px） */
+.business-page .biz-photo-note { margin-top: 14px; font-family: var(--ui); font-size: 12px; line-height: 1.7; color: var(--body-soft); }

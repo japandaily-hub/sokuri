@@ -38,7 +38,7 @@
 /* app 面の地の文は 15px / 1.75（2.0 だと1画面が伸びて送信ボタンが折り返し下に落ちる） */
 .auth-sub { font-size: 15px; color: var(--body-soft); line-height: 1.75; margin-top: 8px; }
 
-/* ラウンド5 指摘（7/14/27）: 公式仕様で角丸 99px のまま据え置く LINE ボタンが、角丸ゼロの版面の中で
+/* ラウンド5 指摘（7/14/27）: 角丸 99px のまま据え置く LINE ボタンが、角丸ゼロの版面の中で
    前後に詰まって並ぶと「浮いた装飾」に見える。ボタン自体（.btn-line-auth）は触らず、
    区切りの前後余白を 24px 以上取って「別の入口」として独立させる（幅は既に max-width:360px で抑制済み）。 */
 .auth-divider {
@@ -96,18 +96,19 @@
 .auth-switch a:hover { text-decoration: underline; }
 
 /* LINE ボタン（認証）
-   角丸 99px は据え置く。LINE ログインボタンは公式のボタン仕様に従う領域で、
-   形状変更は規約リスク側に倒れるため（他社ブランドの規約 > 自社の見た目の統一）。 */
+   角丸 99px は据え置く（LINE ヤフー配布の公式ボタン画像／指定ロゴに差し替える前提で、公式ボタンに
+   近い外形を保っておく）。ただしこれ自体は公式ボタンではないので「公式仕様」とは称さない。
+   R4 legal High 是正: 自作の吹き出しマーク（svg）はボタンから削除した（components/kdz/auth.tsx）。
+   マークを再び出すときは公式素材を <img> で置くこと（path の自作・再描画はしない）。 */
 .btn-line-auth {
   width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;
   background: #06c755; color: #fff; border: none; border-radius: 99px; padding: 16px 20px;
-  max-width: 360px; margin-left: auto; margin-right: auto; /* 巨大ピルが版面の重心を支配しないよう幅を抑える（形状はLINE公式に準拠） */
+  max-width: 360px; margin-left: auto; margin-right: auto; /* 巨大ピルが版面の重心を支配しないよう幅を抑える（外形は公式ボタンに寄せるが、公式ボタンそのものではない） */
   font-family: var(--head); font-size: 16px; font-weight: 600; letter-spacing: .08em; cursor: pointer;
   box-shadow: none; transition: opacity .25s;
 }
 .btn-line-auth:hover { background: #06c755; opacity: .8; }
 .btn-line-auth:disabled { opacity: .7; cursor: default; }
-.btn-line-auth svg { width: 20px; height: 20px; fill: #fff; flex-shrink: 0; }
 
 /* トースト通知 */
 .kdz-toast {

@@ -113,6 +113,12 @@ export function PasswordField({
  * signIn("line", { callbackUrl }) を呼び出し、NextAuth の LINE OAuth フローへ遷移する。
  * サーバー側で LINE プロバイダが未登録（環境変数未設定）の場合は NextAuth が
  * エラーページへ遷移する（事前の利用可否チェックはあえて行わない設計）。
+ *
+ * R4 レビュー（legal High）是正: 以前はここに LINE の吹き出しマークを模した自作の SVG path を
+ * 置いていた。緑地＋白い吹き出しは LINE アプリアイコンの構成要素であり、独自ロゴ・類似物の作成に
+ * 当たるため削除し、暫定でテキストのみのボタンにした。このボタンは LINE ヤフー提供の公式ボタンでは
+ * ないため、マークを出す場合は同社が配布する公式ボタン画像／指定ロゴに差し替えること（自作の
+ * 再描画はしない）。「公式仕様」という記述も本ファイル・CSS・呼び出し側のコメントから外した。
  */
 export function LineAuthButton({
   label = "LINEで続ける",
@@ -133,9 +139,6 @@ export function LineAuthButton({
         void signIn("line", { callbackUrl });
       }}
     >
-      <svg viewBox="0 0 24 24">
-        <path d="M12 2C6.48 2 2 6.1 2 11.1c0 4.5 3.6 8.3 8.5 9-.3.8-.4 2-.4 2s-.1.7.4.9c.5.2 1-.2 1-.2s2.7-1.8 3.8-2.5c.4.1.9.1 1.3.1C17.7 20.4 22 16.4 22 11.1 22 6.1 17.5 2 12 2z" />
-      </svg>
       {label}
     </button>
   );

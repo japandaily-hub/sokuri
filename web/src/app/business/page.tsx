@@ -431,6 +431,8 @@ export default function BusinessPage() {
                     ご依頼（売りたい）の方はこちら →
                   </Link>
                 </p>
+                {/* 最終検査（legal）: 顔のある人物を2点出すページなので、可視の打消しを /vendors・/login と同じ文言で置く */}
+                <p className="biz-photo-note">※ 写真はイメージです。</p>
               </div>
             </div>
           </div>
@@ -477,7 +479,7 @@ export default function BusinessPage() {
           <img
             src="/img/v2/biz-band-sorting.webp"
             width={1920}
-            height={1080}
+            height={1088}
             alt=""
             loading="lazy"
             decoding="async"

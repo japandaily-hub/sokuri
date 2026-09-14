@@ -548,7 +548,7 @@ export default function HomePage() {
             帯に本文は置かない（白見出しは素材中央の落ち着いた中間調ゾーンに載る） */}
         <section className="hero-band hero-band--mid hero-band--headline hero-band--face" id="contact">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/img/v2/top-cta-band.webp" width={1920} height={1080} alt="" loading="lazy" decoding="async" />
+          <img src="/img/v2/top-cta-band.webp" width={1920} height={1088} alt="" loading="lazy" decoding="async" />
           <div className="hero-band__veil" aria-hidden="true" />
           <div className="container hero-band__copy">
             <h2>今日、その<br className="sp-br" />「片付けたい」を動かす</h2>

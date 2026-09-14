@@ -150,7 +150,7 @@ export default function CompanyPage() {
         <img
           src="/img/v2/co-band.webp"
           width={1920}
-          height={1080}
+          height={1088}
           alt=""
           loading="eager"
           fetchPriority="high"

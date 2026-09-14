@@ -163,7 +163,12 @@ export const CASES: CaseItem[] = [
 ];
 
 /** トップ「利用イメージ」に出す 3 件（並び順は CASES 準拠）。 */
-export const FEATURED_CASES: CaseItem[] = CASES.filter((c) => c.featured);
+/** トップの「利用イメージ」に出す件。肖像（portrait / portraitAlt）を必ず持つ型に絞る:
+ *  featured だけ付いた件が混ざると /img/v2/undefined.webp の 404 と alt 無しの画像が静かに出るため。 */
+export type FeaturedCase = CaseItem & { portrait: string; portraitAlt: string };
+export const FEATURED_CASES: FeaturedCase[] = CASES.filter(
+  (c): c is FeaturedCase => !!c.featured && !!c.portrait && !!c.portraitAlt
+);
 
 /** 表示名は必ずこれを通す（例「田中さん（仮名）」）。CASES の name の値自体は変更しない。
  *  業者の店舗名だけ「（仮名）」が付いて人物側に付かない、という非対称を作らないため。 */
@@ -193,7 +198,7 @@ export type VendorCase = {
   /** 当該モデルケース1件の例示値。amount は「成約1件あたりの買取総額（このケースの例）」。
    *  ラベルに「平均」「累計」の語を使わない（集計値に見えるため）。
    *  入札件数（bids）は持たない: 成約件数と並べると読者が割り算で成約率を得るため。 */
-  month: { deals: number; amount: number; pickups: number };
+  month: { deals: number; amount: number };
   quote: string;
 };
 
@@ -208,7 +213,7 @@ export const VENDOR_CASES: VendorCase[] = [
     speaker: "店主（50代）",
     portrait: "vc-owner",
     portraitAlt: "店の棚の前に立つリユース店の店主（架空のモデルケース）",
-    month: { deals: 4, amount: 86000, pickups: 4 },
+    month: { deals: 4, amount: 86000 },
     quote:
       "写真と品目を見て入札しています。下見に行かないぶん、1回の訪問でまとまった点数を見られるのが助かっています。",
   },
@@ -220,7 +225,7 @@ export const VENDOR_CASES: VendorCase[] = [
     speaker: "引き取り担当（30代）",
     portrait: "vc-staff",
     portraitAlt: "搬出口で台車に手を添える買取スタッフ（架空のモデルケース）",
-    month: { deals: 6, amount: 52000, pickups: 6 },
+    month: { deals: 6, amount: 52000 },
     /* ラウンド5 指摘（32/36）: 「訪問が空振りにならない」は断定で、同じカード内の打消し
        （現物確認で条件が合わない場合、依頼者が取引を断ることがある）と正面から矛盾する。
        空振りゼロの約束にならないよう「事前に点数と状態が分かる＝不安が小さい」まで格下げする。 */

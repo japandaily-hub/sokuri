@@ -9,7 +9,7 @@ export type NavItem = { href: string; label: string };
 
 const DEFAULT_NAV: NavItem[] = [
   { href: "/#flow", label: "使い方" },
-  { href: "/examples", label: "成約イメージ" },
+  { href: "/examples", label: "利用イメージ" },
   { href: "/photo-guide", label: "撮影ガイド" },
   { href: "/faq", label: "よくある質問" },
 ];

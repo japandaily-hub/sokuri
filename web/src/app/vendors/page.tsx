@@ -132,7 +132,7 @@ export default function VendorListPage() {
           <img
             src="/img/v2/vd-band.webp"
             width={1920}
-            height={1080}
+            height={1088}
             alt=""
             loading="eager"
             fetchPriority="high"
