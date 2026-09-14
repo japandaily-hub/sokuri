@@ -612,6 +612,9 @@
 }
 .business-page .biz-form-alt .btn-ghost {
   font-size: 14px;
+  /* e2e 01（mobile 375px）で 8px の横スクロール: 長いラベル＋.btn の nowrap＋左右 40px パディングで 344px になり
+     版面（375−18×2=339px）を越えていた。折り返しを許し、幅は版面に収める。 */
+  white-space: normal; max-width: 100%; line-height: 1.5; padding-inline: 20px; text-align: center;
 }
 /* r5 #27: 精算ブロック内にも同じ行き先を1本置く（口座を出さずに案件を見る道）。 */
 .business-page .biz-bank-alt {

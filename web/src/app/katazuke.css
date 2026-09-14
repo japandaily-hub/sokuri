@@ -750,3 +750,5 @@ img[data-ph]{position:relative;}
   .hero-cta .btn{width:100%;}
   .hero-photo::after{display:none;}
 }
+/* 安全弁（e2e 01 mobile 375px の横スクロール再発防止）: 480px 以下では長いラベルのゴーストボタンを折り返し可能にし、版面幅を越えさせない */
+@media (max-width:480px){ .btn.btn-ghost{white-space:normal;max-width:100%;line-height:1.4;} }
