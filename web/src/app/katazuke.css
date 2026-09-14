@@ -135,8 +135,11 @@ section:has(> .vt){position:relative;}
   border-radius:0;vertical-align:middle;}
 
 /* ---------- セクション枠 ---------- */
-/* 人の森はセクション上下 128px 級の余白でリズムを作るため上限を引き上げる */
-.section{padding:clamp(72px,9vw,128px) 0;}
+/* 人の森はセクション上下 128px 級の余白でリズムを作るため上限を引き上げる。
+   R4 ラウンド4 指摘（38/44）: 隣接セクションの合算余白が 250px 超になり、40〜60代の
+   閲覧者にはスクロール量だけが増える。リズムの語彙は保ったまま上限を1段階（約18%）詰める
+   （128→104px ＝ 隣接合算 256→208px。最小は 72→60px）。.section.tight は据え置き。 */
+.section{padding:clamp(60px,7.4vw,104px) 0;}
 .section.tight{padding:clamp(48px,6vw,80px) 0;}
 .eyebrow{display:inline-flex;align-items:center;gap:10px;font-family:var(--head);
   font-weight:400;font-size:13px;letter-spacing:.12em;color:var(--primary);
@@ -168,9 +171,17 @@ section:has(> .vt){position:relative;}
 .btn.btn-line{background:var(--primary);color:#fff;padding:0;gap:0;
   align-items:stretch;text-align:left;min-height:60px;white-space:normal;flex:0 0 auto;}
 .btn.btn-line:hover,.btn.btn-line:active{background:var(--primary);color:#fff;}
-.btn-line__tile{flex:0 0 56px;align-self:stretch;background:#06c755;}
+/* R4 ラウンド4 指摘（4/36/7）: 56px の無地タイルは「アイコンが抜け落ちた枠／色見本」に見え、
+   2トーンが意図として読めない。タイルを縦罫（10〜14px）まで絞り「主色ブルーのボタン＋左端の
+   LINE 合図」として読ませる。高さいっぱいに敷く（A.0-3）・アイコンを置かない（A.0-1）は不変で、
+   ブランド例外の面積はさらに小さくなる（A.0-2 の方向）。境界は forced-colors 用の線で担保。 */
+.btn-line__tile{flex:0 0 clamp(10px,1vw,14px);align-self:stretch;background:#06c755;}
+/* flex:1 1 auto が無いと、全幅になる場面（モバイルの CTA 行・Dock）で .btn の
+   justify-content:center がタイル＋本文を1塊として中央に寄せ、緑タイルが左端から
+   40px 前後内側に浮く（ラウンド4 の 390px 実測）。本文を伸ばしてタイルを左端に固定し、
+   .btn.btn-line{text-align:left} の版面（左寄せラベル）を全幅でも成立させる。 */
 .btn-line__body{display:flex;flex-direction:column;justify-content:center;gap:3px;
-  padding:10px clamp(18px,2.2vw,28px);min-width:0;}
+  padding:10px clamp(18px,2.2vw,28px);min-width:0;flex:1 1 auto;}
 .btn-line__label{font-family:var(--head);font-weight:600;font-size:16px;line-height:1.3;
   letter-spacing:.06em;}
 .btn-line__sub{font-family:var(--ui);font-weight:400;font-size:12px;line-height:1.4;
@@ -182,7 +193,7 @@ section:has(> .vt){position:relative;}
   /* 相方の .btn-ghost も同時に全幅にする（LINE だけ全幅で不揃いになるのを防ぐ） */
   .hero-cta>.btn,.final-cta>.btn,.pg-hero-cta>.btn,.biz-hero-cta>.btn{
     width:100%;flex:1 1 auto;min-width:0;}
-  .btn-line__tile{flex-basis:48px;}
+  .btn-line__tile{flex-basis:10px;}
   .btn-line__label{font-size:15px;}
   .btn-line__sub{font-size:11px;}
 }
@@ -190,6 +201,9 @@ section:has(> .vt){position:relative;}
    （.btn.btn-line の flex:0 0 auto で縮まない）。640px 以下だけ全幅にする */
 @media (max-width:640px){
   .scta-inner .btn.btn-line,.line-first .btn.btn-line{width:100%;flex:1 1 auto;min-width:0;}
+  /* R4 ラウンド4 指摘（9）: 390px では矢印が本体右端で潰れ「切れた線」に見える。
+     Dock（.dock .btn-line__arr{display:none}）と同じ扱いに揃え、モバイルは矢印なしで統一する */
+  .btn.btn-line .btn-line__arr{display:none;}
 }
 /* 強制カラーではタイルの色が消えるため境界を線で担保 */
 @media (forced-colors:active){
@@ -198,6 +212,12 @@ section:has(> .vt){position:relative;}
 }
 /* LINE 緑と苔緑を隣接させないため、ゴーストは黒枠 */
 .btn-ghost{background:#fff;color:#333;border:1px solid #333;}
+/* R4 ラウンド4 指摘（17/12）: 濃紺帯の上では白ベタのゴーストが主色ブルーの LINE CTA より
+   目立ち、主従が逆転する（/photo-guide ヒーロー）。帯のコピー内だけ白枠ゴーストに弱めて
+   主従を戻す。帯の外（白地・淡青地）の .btn-ghost は従来どおり白地＋黒枠のまま。
+   白文字は veil 上で 6:1 以上（.hero-band--face の実測 min 4.7〜7.6）、枠線 .72 は非テキスト 3:1 以上。
+   LINE CTA そのものを帯の外へ出す R4 A.4 の是正は /photo-guide 担当（misc）側の作業。 */
+.hero-band__copy .btn-ghost{background:transparent;color:#fff;border-color:rgba(255,255,255,.72);}
 .btn-lg{font-size:16px;padding:18px 44px;}
 .btn-block{width:100%;}
 
@@ -608,8 +628,14 @@ section:has(> .vt){position:relative;}
 .footer h5{color:var(--primary);font-family:"Montserrat",var(--head);font-weight:600;
   text-transform:uppercase;font-size:13px;letter-spacing:.14em;margin-bottom:14px;}
 .footer ul{list-style:none;display:flex;flex-direction:column;gap:9px;}
-.footer ul a{color:var(--body-soft);transition:color .2s;}
-.footer ul a:hover{color:var(--primary);}
+/* R4 ラウンド4 指摘（1）: 「フッターのリンクが未訪問の青と訪問済みの茶／紫で3色に見える」。
+   実測（local5/tiles/contact__desktop_02.png のグリフ最暗部 ≒ rgb(100,110,130)）では色は
+   --body-soft(#63707b) 1色で、色差は明朝の細い字画に出たサブピクセル・フリンジだった。
+   ただし UA の :link/:visited に依存しないことを明示しておく（a{color:inherit} だけに頼らない）。 */
+.footer ul a,.footer ul a:link,.footer ul a:visited{color:var(--body-soft);transition:color .2s;}
+.footer ul a:hover,.footer ul a:visited:hover{color:var(--primary);}
+.footer-bottom a,.footer-bottom a:link,.footer-bottom a:visited,
+.footer .about a,.footer .about a:link,.footer .about a:visited{color:var(--body-soft);}
 .footer-bottom{margin-top:40px;padding-top:24px;border-top:1px solid var(--line);
   display:flex;flex-wrap:wrap;gap:10px 24px;justify-content:center;text-align:center;
   color:var(--body-soft);font-size:12px;}
@@ -630,7 +656,7 @@ section:has(> .vt){position:relative;}
    .dock の上下 padding 4+4 で実高 56px（body{padding-bottom:74px} の前提を維持）。
    .btn-line__body の上書きを省くと中身が約 58px になり 56px 前提が崩れるので省略不可。 */
 .dock .btn.btn-line{flex:1 1 auto;min-width:0;min-height:48px;padding:0;}
-.dock .btn-line__tile{flex-basis:44px;}
+.dock .btn-line__tile{flex-basis:10px;}   /* ラウンド4 指摘（4/36）: 44px の無地ベタを縦罫に絞る */
 .dock .btn-line__body{padding:4px clamp(14px,2.2vw,20px);gap:1px;}
 .dock .btn-line__label{font-size:15px;line-height:1.3;}
 .dock .btn-line__sub{font-size:11px;line-height:1.3;}
@@ -693,6 +719,10 @@ img[data-ph]{position:relative;}
   .header.menu-open + .mobile-menu{display:flex;}
   .dock{display:flex;}
   body{padding-bottom:74px;}
+  /* R4 ラウンド4 指摘（10）: 法務文書（/terms・/privacy・/legal）では SiteChrome が Dock を
+     描かない。Dock が無いルートでは下の逃げ代も外す。:has 非対応環境ではこの規則がマッチせず
+     74px が残るだけ（安全側） */
+  body:not(:has(.dock)){padding-bottom:0;}
 }
 @media(max-width:560px){
   .container{--container-pad:18px;}

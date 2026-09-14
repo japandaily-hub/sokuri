@@ -249,6 +249,39 @@
    既定 .65 = 見出し＋本文（14px 以上）／--headline .55 = 見出し（24px 以上・600）のみ／--quiet .18 = 文字を置かない */
 .hero-band--headline .hero-band__veil { background: rgba(20,35,92,.55); }
 .hero-band--quiet .hero-band__veil { background: rgba(20,35,92,.18); }
+/* R4 ラウンド4 指摘（2/18/26/27）: 平坦な rgba(20,35,92,.55〜.65) は紫がかった一枚の色面になり
+   人物カットの素材感が消え、さらに / のモバイル（実測 p95 4.41）は AA 未達だった。
+   人物入り帯だけ veil を「文字側が濃い水平グラデ＋青みを抑えた中性の暗色」に置き換える。
+   - 混色を rgba(16,20,34,.x) 側へ寄せて青の寄与（B=92 → 34）を落とし、紫かぶりを消す
+   - 文字が乗る左〜中央を .72/.64 と濃くし、右端だけ .56 まで緩めて写真の階調を残す
+   - biz-band-sorting の「左の作業者の胴に白見出しが重なる」も、この左側スクリムが受け持つ
+   計算値（白 #fff on 合成色。画像側の輝度は実測 p95 から逆算した最悪値 v≒222〜228）:
+   .72→約 7.5:1／.64→約 6.4:1／.56→約 4.6:1。帯のコピーは .container 内（左 8%〜右 92%）に
+   収まり、最も薄い右端でも AA を割らない。--headline(.55) / 既定(.65) より暗い側から始まる。
+   .hero-band--headline と同特異度 0,2,0 なのでこの位置（後）で後勝ちさせる。 */
+.hero-band--face .hero-band__veil {
+  background: linear-gradient(90deg, rgba(16,20,34,.72) 0%, rgba(16,20,34,.64) 52%, rgba(19,28,66,.60) 100%);
+}
+@media (max-width: 859px) {
+  /* モバイルは帯が狭く（390px）文字が幅いっぱいに伸びるので floor を .60 まで上げる
+     （/ の最終CTA帯 4.41 → 計算値 約 5.4:1）。--mid / --tall の帯は 390px で素材とほぼ同比＝
+     ほぼ無トリミングのため --band-pos では是正できず、veil が唯一の効くレバーになる。 */
+  .hero-band--face .hero-band__veil {
+    background: linear-gradient(90deg, rgba(16,20,34,.74) 0%, rgba(16,20,34,.66) 62%, rgba(19,28,66,.60) 100%);
+  }
+}
+/* R4 ラウンド4 指摘（26）: /company の白見出しが実測 p95 4.23 で 15ルート中の最低値（AA 未達）。
+   co-band はコピーが中央寄せ（company.css:15）で水平グラデでは救えず、人物帯でもないため
+   R4_BRIEF D.1 の是正順②「--headline を外して veil を .65 に上げる」を core 側で当てる
+   （JSX のクラスは変えない）。計算値: .65 で約 5.6:1。画像の再生成はしない。 */
+.co-band.hero-band--headline .hero-band__veil { background: rgba(20,35,92,.65); }
+/* R4 ラウンド4 指摘（35/39）＋ 画像選定メモ: biz-band-sorting は人物の頭部が画像上部 13〜33% に
+   あり、既定 42% では PC（1440px で帯 400px ＝ 可視域が画像高の 49.4%）で額が上端に接する。
+   縦位置を 32% に寄せると可視域の上端が画像高 16.2% → 頭部の余白が確保される
+   （offset = (1 - 0.494) × P。P=.42→21.3%、P=.35→17.7%、P=.32→16.2%）。
+   帯位置はページ CSS に書かない規約（D.1）のため core に置く。859px 以下は帯と素材が
+   ほぼ同比（390/220 ＝ 1.77 対 1.78）で切れ幅が 0.3% しかなく、値は実質無効。 */
+.biz-band-sorting { --band-pos: 50% 32%; }
 @media (max-width: 859px) {
   .hero-band--tall { min-height: clamp(240px,56vw,320px); }
   .hero-band--mid  { min-height: clamp(220px,52vw,300px); }
@@ -392,11 +425,31 @@
   .auth-page--split > .flow-footer { left: 46%; }
   /* 上でフッターを左カラムから外したので、1 行を持ち上げる必要はなくなる（ページ側の値を無効化） */
   .auth-page--split > main > .auth-side { --auth-side-pad-b: 0px; }
+  /* R4 ラウンド4 指摘（23）: /signup のキャプション「撮って、あとは待つだけ。」の実測 p95 が
+     4.53（AA ぎりぎり）。背後がグラデ中間の明るい床面にかかるため、スクリムを 40%→56% に伸ばし
+     終端を .84 まで濃くして、文字が乗る下端 20% を常に .74 以上にする。
+     計算値: 画像側が最明（v≒255）でも .80 で約 7.9:1。文字のサイズ・色は変えない。
+     モバイル（21:9・160px の帯／キャプション非表示）には適用しない＝帯を暗くしない。 */
+  .auth-page--split > main > .auth-side::after {
+    height: 56%;
+    background: linear-gradient(180deg, rgba(20,35,92,0), rgba(20,35,92,.44) 50%, rgba(20,35,92,.84));
+  }
+  /* 業者側は終端をさらに濃く（業務用の入口を色で区別する既存方針を維持） */
+  .auth-page--split.operator-auth > main > .auth-side::after {
+    background: linear-gradient(180deg, rgba(20,35,92,0), rgba(20,35,92,.48) 50%, rgba(20,35,92,.88));
+  }
 }
 @media (max-width: 859px) {
   /* カード上部の 21:9 帯（最大 160px）に畳む。フォームは常に無地面 */
   .auth-side { aspect-ratio: 21/9; max-height: 160px; }
   .auth-side { --auth-side-pad-b: 0px; }
+  /* R4 ラウンド4 指摘（14/30/34/40/42・5名が同一指摘）＋ 画像選定メモ: ol-side は頭頂が画像高の
+     約18% にあり、21:9 に畳む帯（可視域が画像高の約 27%）では既定 50% 40% で顔の上半分が切れる。
+     縦位置を 14% に寄せて頭頂の余白を確保する（offset = (1 - 0.27) × P。P=.40→29%、P=.14→10%）。
+     PC（min-width:860px の分割レイアウト）は 50% 40% のまま。
+     ページ CSS（operator-auth.css）には object-position を書かない規約のため core に置く。
+     /operator/signup（os-side・人物なし）には当てないよう src で限定する。 */
+  .operator-auth .auth-side > img[src*="ol-side"] { object-position: 50% 14%; }
   /* BRIEF §1.10「859px 以下は帯に畳み、文字は非表示」に戻す。ラウンド2 では
      「無文字だと情報量ゼロの濃紺スラブになる」として 1 行だけ残していたが、
      その 1 行は実測 17.94px で、§1.2 の「帯上に置ける文字は 24px 以上の見出しのみ」に反する。

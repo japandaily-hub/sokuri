@@ -149,8 +149,17 @@ export default function SignupPage() {
                 登録しただけでは業者に何も伝わりません。連絡が来るのは、あなたが1社を選んだ後だけです。
               </p>
 
-              <div style={{ marginBottom: 18 }}>
-                <LineAuthButton label="LINEで無料登録" callbackUrl="/create" />
+              {/* R4 ラウンド4 指摘（3/14）: 緑ピルが版面で唯一の巨大な単色面になり「主役」に見える。
+                  公式ボタンの形状・色・角丸99px・幅（コア .btn-line-auth の max-width:360px・中央寄せ）は
+                  1文字も変えず、置き方＝上下の余白だけで「選択肢の一つ」に見せる。
+                  余白の値は signup.css（.signup-line-slot）。860px 以上は従来値のまま。
+                  指摘（17）: 同じ「LINEで」がトップの主色ブルー CTA とこの緑の公式ボタンの
+                  2種類の見た目で現れるため、押した先が違うのかと迷う。ボタンの外に補足1行を足すと
+                  縦が 26px 伸び、「すでにアカウントをお持ちの方は…」の行が固定バーの境界をまたいで
+                  水平に切れる（実測 1440x900: 803–825px に対しバー上端 813px）。そのためラベルの中で
+                  「LINE アカウントを使う」ことを明示する（縦は 1px も増えない）。 */}
+              <div className="signup-line-slot">
+                <LineAuthButton label="LINEアカウントで無料登録" callbackUrl="/create" />
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18, color: "var(--body-soft)", fontSize: 12, fontWeight: 600, letterSpacing: ".04em" }}>
                 <div style={{ flex: 1, height: 1, background: "var(--line)" }} />

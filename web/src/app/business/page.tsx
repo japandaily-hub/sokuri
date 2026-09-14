@@ -10,7 +10,7 @@
  */
 
 import "./business.css";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Ic } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
@@ -225,6 +225,27 @@ export default function BusinessPage() {
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  /* R4 r4 #11/#17: 固定バーが常時出ているため、ヒーローのリード文に重なり（390px 実測で
+     「…カタヅケで開拓する。」の次の行が隠れる）、同じ文言のボタンが画面に2つ並んでいた。
+     監視対象はヒーロー節そのもの（CTA 単体だと、390px では画像 487px の下にある CTA が
+     初期表示で画面外のため固定バーが即出て h1 に重なる）。ヒーローが一部でも見えている間は
+     出さず、読み終えてから確約 CTA を出す。IntersectionObserver が無い環境では常時表示。 */
+  const heroRef = useRef<HTMLElement | null>(null);
+  const [dockOn, setDockOn] = useState(false);
+  useEffect(() => {
+    const el = heroRef.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setDockOn(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => setDockOn(!entries[0].isIntersecting),
+      { threshold: 0 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -332,7 +353,7 @@ export default function BusinessPage() {
         {/* ============ HERO ============
             ファーストビューのため Reveal は付けない（無 JS でも読める）。
             画像は LCP 候補なのでページ内で唯一 eager + fetchPriority="high"。 */}
-        <section className="biz-hero">
+        <section className="biz-hero" ref={heroRef}>
           <div className="container">
             <div className="media-split media-split--rev biz-hero-split">
               <div className="img-frame img-frame--2x3 img-frame--pale biz-hero-fig sp-bleed">
@@ -369,16 +390,25 @@ export default function BusinessPage() {
                   登録・掲載・入札は無料。費用は成約時の
                   <strong>買取金額8%（税別・消費税を別途加算）のみ</strong>です。
                 </p>
+                {/* R4 r4 #11: ヒーロー・固定バー・ページ末尾の3か所に同じ「業者登録を申し込む」が
+                    並び、どれが正規の入口か分からなかった。確約の CTA は固定バーとページ末尾
+                    （#register）に絞り、ヒーローの2本目は先に条件を確かめる導線にする。 */}
                 <div className="biz-hero-cta">
                   <a href="#merit" className="btn btn-primary btn-lg">
                     参加メリットを見る
                     <Ic name="arrow" />
                   </a>
-                  <a href="#register" className="btn btn-ghost btn-lg">
-                    <SendIcon />
-                    業者登録を申し込む
+                  <a href="#requirements" className="btn btn-ghost btn-lg">
+                    登録要件を確認する
                   </a>
                 </div>
+                {/* R4 r4 #22: 申し込みの所要時間・審査期間・入札が使えるようになる時点を、
+                    CTA を押す前に1行で置く。E.2-1（CTA 直下に条件1行を足さない）は費用条件の
+                    反復と 8% 欠落による有利誤認を避けるための判断なので、費用に触れない
+                    手続きの1行はその対象外。件数は実際の必須項目数（14）。 */}
+                <p className="biz-hero-steps">
+                  入力は3ステップ（必須14項目）。送信後3営業日以内にご連絡し、審査の通過後に入札できます。
+                </p>
               </div>
             </div>
           </div>
@@ -529,16 +559,22 @@ export default function BusinessPage() {
                       </p>
                     </div>
                   </div>
-                  {/* 下見0回は架空数値ではなくサービスの仕様。「ある1か月のイメージ」という
-                      架空ラベルの下に埋めず、事実行として表の上に置く。あわせて .biz-stats の
+                  {/* R4 r4 #3: 「引き取り 4回／成約 4件」は定義上つねに同数で、行数を稼いだ表に
+                      見えていた。引き取りの行を削り、サービスの仕様である「下見・現地調査 0回」を
+                      表の1行目に格上げする（表の上の小さな文から昇格）。
+                      #20（入札件数の行を足して勝率を読ませる）は採らない: 入札数と成約数を並べると
+                      読者が割り算で成約率を得るため、CONSTRAINTS R4 §2 と model-cases.ts の
+                      「bids は持たない」ガードに反する。
                       「0回」が「一切現物を見ない」と読まれないよう（現物査定は成約後）を必ず伴わせる。 */}
-                  <p className="vc-visit">下見・現地調査は0回（現物査定は成約後）</p>
                   <p className="vc-facts-label">ある1か月のイメージ</p>
                   <dl className="vc-facts">
                     <div>
-                      <dt>引き取り</dt>
+                      <dt>
+                        下見・現地調査
+                        <small>サービスの仕様（このケースの架空値ではありません）。現物査定は成約後です。</small>
+                      </dt>
                       <dd>
-                        <b>{v.month.pickups}</b>
+                        <b>0</b>
                         <span>回</span>
                       </dd>
                     </div>
@@ -557,6 +593,13 @@ export default function BusinessPage() {
                       </dd>
                     </div>
                   </dl>
+                  {/* R4 r4 #21: 「下見0回」と引用（訪問が空振りにならない）だけを読むと、依頼者側の
+                      「現物確認後に減額相談・取引を断れる」と矛盾して誇張に見える。0回の直下に
+                      前提を明記する（FAQ「最終的な買取額は入札額と異なってもいいですか？」と同義）。 */}
+                  <p className="vc-visit">
+                    現物確認で条件が合わない場合、ユーザーが取引を断ることがあります。提示額を下回る変更は、
+                    理由を明示してユーザーの了解を得た場合にのみ可能です。
+                  </p>
                   <p className="vc-fee">
                     費用は成約時の買取金額8%（税別・消費税を別途加算）のみ。この例では1件あたり約
                     {feeApprox(v.month.amount)}円にあたります。
@@ -666,177 +709,237 @@ export default function BusinessPage() {
             <Reveal className="reg-card">
               {!submitted ? (
                 <form onSubmit={onSubmit} noValidate>
-                  <div className="field-row">
+                  {/* R4 r4 #22: フォームの長さと審査期間の予告を冒頭に置く。会社情報 →
+                      許可・エリア → 精算の3見出しに分け、どこまで進んだか分かるようにする。 */}
+                  <p className="biz-form-flow">
+                    入力は3ステップ（必須14項目）。送信後3営業日以内にご連絡し、審査の通過後に入札できます。
+                  </p>
+                  {/* R4 r4 #23: 重い申込フォームだけが入口に見えていた。/operator/signup は招待コード
+                      なしでもアカウントを作成でき、案件の閲覧まで進める（入札は審査の通過後。
+                      lib/katadzuke-api.ts OPERATOR_CASE_VIEW_STATUSES の仕様）。役割差を1行添えて
+                      軽い入口を併置する。 */}
+                  <p className="biz-form-alt">
+                    案件を先に見たい方は、アカウントだけ作ることもできます（入札は審査の通過後）。
+                    <Link href="/operator/signup">アカウントを作成して案件を見る</Link>
+                  </p>
+                  <div className="biz-form-group">
+                    <h4 className="biz-form-heading">
+                      <span aria-hidden="true">1</span>
+                      会社情報
+                    </h4>
+                    <div className="field-row">
+                      <div className="field">
+                        <label htmlFor="company">
+                          会社名・屋号<span className="req">必須</span>
+                        </label>
+                        <input
+                          type="text"
+                          id="company"
+                          name="company"
+                          placeholder="株式会社〇〇"
+                          className={invClass("company").trim()}
+                          value={form.company}
+                          onChange={(e) => update("company", e.target.value)}
+                        />
+                      </div>
+                      <div className="field">
+                        <label htmlFor="rep">
+                          担当者名<span className="req">必須</span>
+                        </label>
+                        <input
+                          type="text"
+                          id="rep"
+                          name="rep"
+                          placeholder="山田 太郎"
+                          className={invClass("rep").trim()}
+                          value={form.rep}
+                          onChange={(e) => update("rep", e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="field-row">
+                      <div className="field">
+                        <label htmlFor="rep-name">
+                          代表者名<span className="req">必須</span>
+                        </label>
+                        <input
+                          type="text"
+                          id="rep-name"
+                          name="rep-name"
+                          placeholder="代表取締役 山田 太郎"
+                          className={invClass("repName").trim()}
+                          value={form.repName}
+                          onChange={(e) => update("repName", e.target.value)}
+                        />
+                      </div>
+                      <div className="field">
+                        <label htmlFor="registered-address">
+                          法人登録住所<span className="req">必須</span>
+                        </label>
+                        <input
+                          type="text"
+                          id="registered-address"
+                          name="registered-address"
+                          placeholder="東京都千代田区〇〇1-2-3"
+                          className={invClass("registeredAddress").trim()}
+                          value={form.registeredAddress}
+                          onChange={(e) => update("registeredAddress", e.target.value)}
+                        />
+                      </div>
+                    </div>
+
                     <div className="field">
-                      <label htmlFor="company">
-                        会社名・屋号<span className="req">必須</span>
+                      <label htmlFor="email">
+                        メールアドレス<span className="req">必須</span>
                       </label>
                       <input
-                        type="text"
-                        id="company"
-                        name="company"
-                        placeholder="株式会社〇〇"
-                        className={invClass("company").trim()}
-                        value={form.company}
-                        onChange={(e) => update("company", e.target.value)}
+                        type="email"
+                        id="email"
+                        name="email"
+                        placeholder="info@company.co.jp"
+                        className={invClass("email").trim()}
+                        value={form.email}
+                        onChange={(e) => update("email", e.target.value)}
                       />
                     </div>
+
                     <div className="field">
-                      <label htmlFor="rep">
-                        担当者名<span className="req">必須</span>
+                      <label htmlFor="phone">
+                        電話番号<span className="req">必須</span>
                       </label>
                       <input
-                        type="text"
-                        id="rep"
-                        name="rep"
-                        placeholder="山田 太郎"
-                        className={invClass("rep").trim()}
-                        value={form.rep}
-                        onChange={(e) => update("rep", e.target.value)}
+                        type="tel"
+                        id="phone"
+                        name="phone"
+                        placeholder="03-0000-0000"
+                        className={invClass("phone").trim()}
+                        value={form.phone}
+                        onChange={(e) => update("phone", e.target.value)}
                       />
+                    </div>
+
+                    <div className="field">
+                      <label htmlFor="biz-type">
+                        事業形態<span className="req">必須</span>
+                      </label>
+                      <div className="select-wrap">
+                        <select
+                          id="biz-type"
+                          name="biz-type"
+                          className={invClass("bizType").trim()}
+                          value={form.bizType}
+                          onChange={(e) => update("bizType", e.target.value)}
+                        >
+                          <option value="" disabled>
+                            選択してください
+                          </option>
+                          <option value="corp">法人</option>
+                          <option value="sole">個人事業主</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="field-row">
+                  <div className="biz-form-group">
+                    <h4 className="biz-form-heading">
+                      <span aria-hidden="true">2</span>
+                      許可・対応エリア
+                    </h4>
+                    <div className="field-row">
+                      <div className="field">
+                        <label htmlFor="license-number">
+                          古物商許可番号<span className="req">必須</span>
+                        </label>
+                        <input
+                          type="text"
+                          id="license-number"
+                          name="license-number"
+                          placeholder="東京都公安委員会 第XXXXXXXXXX号"
+                          className={invClass("licenseNumber").trim()}
+                          value={form.licenseNumber}
+                          onChange={(e) => update("licenseNumber", e.target.value)}
+                        />
+                      </div>
+                      <div className="field">
+                        <label htmlFor="invoice-number">
+                          インボイス制度登録番号<span className="opt">任意</span>
+                        </label>
+                        <input
+                          type="text"
+                          id="invoice-number"
+                          name="invoice-number"
+                          placeholder="T1234567890123"
+                          value={form.invoiceNumber}
+                          onChange={(e) => update("invoiceNumber", e.target.value)}
+                        />
+                      </div>
+                    </div>
+
                     <div className="field">
-                      <label htmlFor="rep-name">
-                        代表者名<span className="req">必須</span>
+                      <label htmlFor="area">
+                        主な対応エリア<span className="req">必須</span>
+                      </label>
+                      <div className="select-wrap">
+                        <select
+                          id="area"
+                          name="area"
+                          className={invClass("area").trim()}
+                          value={form.area}
+                          onChange={(e) => update("area", e.target.value)}
+                        >
+                          <option value="" disabled>
+                            選択してください
+                          </option>
+                          <option value="tokyo">東京都</option>
+                          <option value="chiba">千葉県</option>
+                          <option value="saitama">埼玉県</option>
+                          <option value="kanagawa">神奈川県</option>
+                          <option value="multi">複数都県</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="field">
+                      <label htmlFor="cats">
+                        得意なカテゴリ<span className="opt">任意</span>
                       </label>
                       <input
                         type="text"
-                        id="rep-name"
-                        name="rep-name"
-                        placeholder="代表取締役 山田 太郎"
-                        className={invClass("repName").trim()}
-                        value={form.repName}
-                        onChange={(e) => update("repName", e.target.value)}
+                        id="cats"
+                        name="cats"
+                        placeholder="例：家電・ブランド品・家具"
+                        value={form.cats}
+                        onChange={(e) => update("cats", e.target.value)}
                       />
                     </div>
+
                     <div className="field">
-                      <label htmlFor="registered-address">
-                        法人登録住所<span className="req">必須</span>
+                      <label htmlFor="message">
+                        ご質問・備考<span className="opt">任意</span>
                       </label>
-                      <input
-                        type="text"
-                        id="registered-address"
-                        name="registered-address"
-                        placeholder="東京都千代田区〇〇1-2-3"
-                        className={invClass("registeredAddress").trim()}
-                        value={form.registeredAddress}
-                        onChange={(e) => update("registeredAddress", e.target.value)}
+                      <textarea
+                        id="message"
+                        name="message"
+                        placeholder="ご質問や確認したいことがあればご記入ください。"
+                        value={form.message}
+                        onChange={(e) => update("message", e.target.value)}
                       />
-                    </div>
-                  </div>
-
-                  <div className="field">
-                    <label htmlFor="email">
-                      メールアドレス<span className="req">必須</span>
-                    </label>
-                    <input
-                      type="email"
-                      id="email"
-                      name="email"
-                      placeholder="info@company.co.jp"
-                      className={invClass("email").trim()}
-                      value={form.email}
-                      onChange={(e) => update("email", e.target.value)}
-                    />
-                  </div>
-
-                  <div className="field">
-                    <label htmlFor="phone">
-                      電話番号<span className="req">必須</span>
-                    </label>
-                    <input
-                      type="tel"
-                      id="phone"
-                      name="phone"
-                      placeholder="03-0000-0000"
-                      className={invClass("phone").trim()}
-                      value={form.phone}
-                      onChange={(e) => update("phone", e.target.value)}
-                    />
-                  </div>
-
-                  <div className="field">
-                    <label htmlFor="biz-type">
-                      事業形態<span className="req">必須</span>
-                    </label>
-                    <div className="select-wrap">
-                      <select
-                        id="biz-type"
-                        name="biz-type"
-                        className={invClass("bizType").trim()}
-                        value={form.bizType}
-                        onChange={(e) => update("bizType", e.target.value)}
-                      >
-                        <option value="" disabled>
-                          選択してください
-                        </option>
-                        <option value="corp">法人</option>
-                        <option value="sole">個人事業主</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="field-row">
-                    <div className="field">
-                      <label htmlFor="license-number">
-                        古物商許可番号<span className="req">必須</span>
-                      </label>
-                      <input
-                        type="text"
-                        id="license-number"
-                        name="license-number"
-                        placeholder="東京都公安委員会 第XXXXXXXXXX号"
-                        className={invClass("licenseNumber").trim()}
-                        value={form.licenseNumber}
-                        onChange={(e) => update("licenseNumber", e.target.value)}
-                      />
-                    </div>
-                    <div className="field">
-                      <label htmlFor="invoice-number">
-                        インボイス制度登録番号<span className="opt">任意</span>
-                      </label>
-                      <input
-                        type="text"
-                        id="invoice-number"
-                        name="invoice-number"
-                        placeholder="T1234567890123"
-                        value={form.invoiceNumber}
-                        onChange={(e) => update("invoiceNumber", e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="field">
-                    <label htmlFor="area">
-                      主な対応エリア<span className="req">必須</span>
-                    </label>
-                    <div className="select-wrap">
-                      <select
-                        id="area"
-                        name="area"
-                        className={invClass("area").trim()}
-                        value={form.area}
-                        onChange={(e) => update("area", e.target.value)}
-                      >
-                        <option value="" disabled>
-                          選択してください
-                        </option>
-                        <option value="tokyo">東京都</option>
-                        <option value="chiba">千葉県</option>
-                        <option value="saitama">埼玉県</option>
-                        <option value="kanagawa">神奈川県</option>
-                        <option value="multi">複数都県</option>
-                      </select>
                     </div>
                   </div>
 
                   <div className="biz-bank-section">
-                    <h4 className="biz-bank-heading">振込先情報</h4>
+                    {/* R4 r4 #10/#19: 初回接触の時点で口座を必須で聞く心理的負担が最大だったため、
+                        ブロックをフォームの最後（会社情報・許可の後）へ移した。任意化・別ステップ化は
+                        API 契約（submitOperatorApplication の bank_account は必須）の変更が必要なため
+                        ここでは行わず、「いつ請求が始まるのか」を必須ラベルより先に読ませる。 */}
+                    <h4 className="biz-bank-heading biz-form-heading">
+                      <span aria-hidden="true">3</span>
+                      精算（手数料の請求・返金）
+                    </h4>
                     <p className="biz-bank-lead">
-                      手数料の請求・精算のためにお伺いします。審査結果の通知前に請求は発生しません。
+                      手数料の請求・精算（返金が生じた場合の振込先を含む）のためにお伺いします。
+                      お申し込みの時点では請求は発生せず、請求開始は事前にメールでお知らせします。
                     </p>
                     <p className="biz-bank-note">※お申し込み内容の確認と、手数料の請求・精算に関する連絡（返金が生じた場合の振込先を含む）にのみ使用します</p>
 
@@ -924,33 +1027,6 @@ export default function BusinessPage() {
                     </div>
                   </div>
 
-                  <div className="field">
-                    <label htmlFor="cats">
-                      得意なカテゴリ<span className="opt">任意</span>
-                    </label>
-                    <input
-                      type="text"
-                      id="cats"
-                      name="cats"
-                      placeholder="例：家電・ブランド品・家具"
-                      value={form.cats}
-                      onChange={(e) => update("cats", e.target.value)}
-                    />
-                  </div>
-
-                  <div className="field">
-                    <label htmlFor="message">
-                      ご質問・備考<span className="opt">任意</span>
-                    </label>
-                    <textarea
-                      id="message"
-                      name="message"
-                      placeholder="ご質問や確認したいことがあればご記入ください。"
-                      value={form.message}
-                      onChange={(e) => update("message", e.target.value)}
-                    />
-                  </div>
-
                   <div className={`check-field${invalid.has("agree") ? " is-invalid" : ""}`}>
                     <input
                       type="checkbox"
@@ -1013,8 +1089,15 @@ export default function BusinessPage() {
         </section>
       </main>
 
-      {/* ============ モバイル固定バー（BARE ページなので共通 .dock は描かれない） ============ */}
-      <a href="#register" className="biz-dock">
+      {/* ============ モバイル固定バー（BARE ページなので共通 .dock は描かれない） ============
+          R4 r4 #11/#17: ヒーローの CTA が見えている間は出さない（.is-on が付いたときだけ
+          display:flex。CSS 側で閾値 859px にゲートしている）。 */}
+      <a
+        href="#register"
+        className={`biz-dock${dockOn ? " is-on" : ""}`}
+        aria-hidden={!dockOn}
+        tabIndex={dockOn ? undefined : -1}
+      >
         <SendIcon />
         業者登録を申し込む
       </a>

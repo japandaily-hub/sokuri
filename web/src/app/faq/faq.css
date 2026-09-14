@@ -11,9 +11,14 @@
 }
 
 /* ---------- ヒーロー写真帯（高さ・veil・画像位置は .hero-band の正典） ---------- */
-/* 帯に置くのは h1 と白地の検索窓だけ。検索窓は無地面なので枠内でコントラストを担保する */
-.faq-page .faq-hero .faq-search-wrap {
-  margin-top: clamp(16px, 2vw, 22px);
+/* 帯に置くのは h1 だけ。検索窓は帯の外＝直下の白面に置く（R4 ラウンド5 指摘 3/7/15/17:
+   帯の中では白い箱が人物の顔に接し、顔の上に UI が載って見えた）。 */
+.faq-page .faq-searchbar {
+  background: #fff;
+  padding: clamp(18px, 2.4vw, 26px) 0 0;
+}
+.faq-page .faq-search-wrap {
+  margin-top: 0;
   position: relative;
   max-width: 460px;
 }
@@ -64,13 +69,13 @@
 }
 .faq-page .faq-search-clear.show { display: flex; }
 
-/* ---------- 帯の直下の白面（リード文・検索結果件数） ---------- */
-/* 帯を --slim にした分だけ下が余り、リード1行のあとに白面が 160px 以上続いて
-   サイドバーと Q&A の始点が宙に浮いていた。リード側の padding を 1 段詰め、
-   本文セクション側（.faq-page .section）と合わせて帯と本文をつなげる。 */
+/* ---------- 帯の直下の白面（検索窓・リード文・検索結果件数） ---------- */
+/* 帯の下が余り、リード1行のあとに白面が 160px 以上続いてサイドバーと Q&A の始点が
+   宙に浮いていた。リード側の padding を 1 段詰め、本文セクション側（.faq-page .section）と
+   合わせて帯と本文をつなげる。上の余白は .faq-searchbar が持つのでここでは詰める。 */
 .faq-page .faq-lead {
   background: #fff;
-  padding: clamp(20px, 3vw, 32px) 0 clamp(12px, 1.4vw, 18px);
+  padding: clamp(14px, 1.8vw, 20px) 0 clamp(12px, 1.4vw, 18px);
 }
 .faq-page .faq-lead p {
   font-size: 15px;

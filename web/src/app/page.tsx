@@ -106,7 +106,11 @@ export default function HomePage() {
                   </span>
                   <Ic name="arrow" className="btn-line__arr" />
                 </Link>
-                <Link href="/#auction" className="btn btn-ghost btn-lg">仕組みを確認する</Link>
+                {/* ラウンド4（22）: 「仕組みを確認する」では着地が分からず、LINE を押せない人の受け皿に
+                    ならない。着地（このページ内の「入札のしくみ」節）を label に出し、同一ページ内移動を
+                    ↓ で示す（/photo-guide の「読んでから決める ↓」と語彙を揃える）。
+                    所要時間（「1分でわかる」）は E 章「新しい約束・期間・効果を書かない」に反するため書かない。 */}
+                <Link href="/#auction" className="btn btn-ghost btn-lg">入札のしくみを見る ↓</Link>
               </div>
             </div>
             <div className="hero-figure">
@@ -341,6 +345,11 @@ export default function HomePage() {
               <h2>こんなふうに使えます</h2>
               <p className="sub">サービスの流れをイメージしていただくための、架空のモデルケースです。実際の利用実績ではありません。</p>
             </div>
+            {/* ラウンド4（3）: 3枚が「実績の抜粋」と読まれないための文脈。稼働直前であることを
+                カード群の手前に置く。打消し表示（.model-note）はカードの直前に残すため、この行は
+                .model-note より前に置く。/business（審査制・登録募集）と /vendors（掲載0件時の文言）
+                に実装済みの事実の再掲で、新しい約束は足さない。 */}
+            <p className="mc-status">カタヅケは現在、参加いただける買取業者を募集しています。</p>
             <p className="model-note" role="note">{MODEL_CASE_NOTE}</p>
             <div className="mc-grid">
               {FEATURED_CASES.map((c, i) => (
@@ -356,11 +365,17 @@ export default function HomePage() {
                     <span className="mc-attr">{c.persona}／{c.tag}</span>
                   </p>
                   <p className="mc-quote">「{c.quoteShort}」</p>
+                  {/* ラウンド4（3）: 入札社数（11社・7社・8社）は 3 枚が並ぶと「だいたい8社前後は入札が来る」
+                      という平均像＝実質的な集計統計になる（CONSTRAINTS R4-2 が禁じる範囲）。
+                      トップから社数を外し、6 件すべてが並ぶ /examples に限定する。
+                      これは B.2 が「金額はトップに出さない」とした判断と同じ根拠。 */}
                   <dl className="mc-facts">
                     <div><dt>まとめて出品</dt><dd><b>{c.count}</b><span>点</span></dd></div>
-                    <div><dt>入札</dt><dd><b>{c.bidCount}</b><span>社</span></dd></div>
                     <div><dt>成約まで</dt><dd><b>{c.days}</b><span>日</span></dd></div>
                   </dl>
+                  {/* ラウンド4（19）: モバイルでは上端の .model-chip がスクロールで画面外に出るため、
+                      数値と同一視野に架空であることを残す（打消し表示の近接）。12px にはしない。 */}
+                  <p className="mc-fnote">架空のモデルケースの数値です</p>
                 </Reveal>
               ))}
             </div>
@@ -418,6 +433,10 @@ export default function HomePage() {
               <span className="fz-label">お客様のお支払い</span>
               <strong className="fz-num">¥0</strong>
               <span className="fz-note">出品・査定・お断り・引き取りまで、費用は一切かかりません。</span>
+              {/* ラウンド4（20）: 減額相談の注記は最下部の最小級の※ではなく ¥0 と同一視野に、本文サイズ・
+                  肯定形で置く（打消し表示は強調表示と同程度に認識できる大きさ・近接で示す）。
+                  意味は旧 .fee-caution と同一で、新しい約束・期間は足していない。 */}
+              <span className="fz-caution">訪問時の現物確認で写真と状態が違えば、業者から金額のご相談が届くことがあります。納得できなければお断りできます（お断りにも費用はかかりません）。</span>
             </Reveal>
             <Reveal className="fee-card" delay={1}>
               <div className="fee-head"><h3>出品から成約まで、お金はかかりません</h3><p>出品・査定・お断りまで、すべて無料</p></div>
@@ -427,9 +446,7 @@ export default function HomePage() {
                 <div className="fee-row"><span className="fl">査定を見て断る<small>金額に納得できなければ取りやめOK</small></span><span className="fv">無料</span></div>
                 <div className="fee-row"><span className="fl">成約・引き取り<small>買取額や条件は事前に明示</small></span><span className="fv">無料</span></div>
               </div>
-              <p className="fee-caution">
-                ※ 訪問時の現物確認により、業者から減額のご相談が届くことがあります。同意しない場合は取引を断れます。
-              </p>
+              {/* 旧 .fee-caution（12.5px の最下部※）は ¥0 直下の .fz-caution へ移設（ラウンド4・20） */}
             </Reveal>
           </div>
         </section>
@@ -514,7 +531,10 @@ export default function HomePage() {
         </section>
         <section className="final-actions">
           <div className="container">
-            <p>まずは1枚、撮ってみることから。LINEで友だち追加すれば、すぐに出品をはじめられます。登録・査定は無料です。</p>
+            {/* ラウンド4（12）: リンク先は自社ログイン画面（/login?callbackUrl=%2Fcreate）で、押しても
+                LINE 公式アカウントの友だち追加は起きない。R4 ブリーフ A.1 が据え置きの条件にした
+                「実挙動確認」がこのラウンドで確定したため、他の .btn-line__sub と同じ語に揃える。 */}
+            <p>まずは1枚、撮ってみることから。LINEアカウントでログインすれば、すぐに出品をはじめられます。登録・査定は無料です。</p>
             <div className="final-cta">
               <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-line btn-lg">
                 <span className="btn-line__tile" aria-hidden="true" />
@@ -538,12 +558,16 @@ export default function HomePage() {
                 <span className="eyebrow">買取業者の方へ</span>
                 <h2>買取業者の方へ。<br />カタヅケに参加しませんか。</h2>
                 <p>顧客と業者、双方に無駄がない。だから長く続く。<br />一括出品への入札で、効率的な仕入れルートを開拓できます。<br />※ サービス開始当初（β期間）は手数料を請求しません。請求開始の際は事前にメールでお知らせします。</p>
+                {/* ラウンド4（7）: flex-wrap のままだと 5 個の幅が極端に不揃いで、長い β の1本が
+                    折返しをぎざぎざにしていた。PC は 2 列の等幅グリッドにし、長い β だけを最後段に
+                    全幅で送る（katazuke-top.css）。DOM は短い4本の並び順を保ったまま β を末尾へ移す
+                    だけで、文言・条件の意味は変えない。 */}
                 <div className="biz-banner-tags">
                   <span className="biz-tag">初期費用・月額費用 無料</span>
                   <span className="biz-tag">成約時8%（税別）のみ</span>
-                  <span className="biz-tag">β期間中は手数料0円（期間限定・請求開始は事前にお知らせします）</span>
                   <span className="biz-tag">下見なし・一斉架電なし</span>
                   <span className="biz-tag">古物商許可が必要</span>
+                  <span className="biz-tag biz-tag--wide">β期間中は手数料0円（期間限定・請求開始は事前にお知らせします）</span>
                 </div>
                 <div className="biz-banner-cta">
                   <Link href="/business" className="btn btn-white btn-lg">業者登録の詳細を見る<Ic name="arrow" /></Link>

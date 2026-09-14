@@ -49,6 +49,16 @@
   gap: 14px;
   margin-top: 32px;
 }
+/* R4 r4 #22: 手続き（所要・審査期間・入札解放）の1行。費用には触れない（E.2-1 の理由は
+   費用条件の反復と 8% 欠落による有利誤認なので、この行はその対象外）。地は敷かず 1 行の注記。 */
+.business-page .biz-hero-steps {
+  font-family: var(--ui);
+  font-size: 13px;
+  line-height: 1.85;
+  color: var(--body-soft);
+  margin: 14px 0 0;
+  max-width: 40em;
+}
 
 /* ============ β期間の注記（独立ノート） ============
    8% を書く全ての箇所で「いま請求されないこと」を同一視野に置くための帯。 */
@@ -202,6 +212,10 @@
    面は白のまま（#flow の淡青と連続させない）。カードは枠で囲わず、ヘアラインと余白だけで
    区切る（角丸0・影0）。.model-chip / .model-note は katazuke-pages.css（layer components）の
    共有部品で、ページ CSS は unlayered のため常に勝つ。ここでは再定義しない（余白のみ与える）。 */
+/* R4 r4 #26: 直前の #merit（.section）の下 104px と自分の上 104px が積もり、
+   見出しの手前に 200px 超の無地が入ってセクションが切れて見えた。上だけ落として
+   セクション間を .section 1 枚ぶん（PC 104px）に揃える。 */
+.business-page .vc-cases { padding-top: 0; }
 .business-page .vc-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -216,7 +230,9 @@
   gap: 20px;
   align-items: center;
 }
-.business-page .vc-fig { width: 100%; }
+/* R4 r4 #12: align-items:center のセルで枠の高さが縮み、1:1 のはずの肖像が横長
+   （約 220x182）に潰れていた。セル内で上寄せにして aspect-ratio を保たせる。 */
+.business-page .vc-fig { width: 100%; align-self: start; }
 .business-page .vc-meta { min-width: 0; }
 .business-page .vc-meta h3 {
   font-family: var(--head);
@@ -233,14 +249,14 @@
   color: var(--body-soft);
   margin: 0;
 }
-/* 下見0回は架空数値ではなくサービスの仕様＝業者の痛点に答える唯一の事実。
-   「ある1か月のイメージ」という架空ラベルの下に埋めず、表の上に独立した行として置く。 */
+/* R4 r4 #3/#21: 「下見0回」は表の1行目に格上げした（.vc-facts の 1 行目）。この段落は
+   その前提（現物確認で条件が合わないときの扱い）を表の直下に置くための注記に変わった。 */
 .business-page .vc-visit {
   font-family: var(--ui);
-  font-size: 13px;
+  font-size: 12.5px;
   line-height: 1.8;
-  color: var(--body);
-  margin: 20px 0 0;
+  color: var(--body-soft);
+  margin: 12px 0 0;
 }
 .business-page .vc-facts-label {
   font-family: var(--ui);
@@ -267,6 +283,14 @@
   line-height: 1.7;
   color: var(--body);
   min-width: 0;
+}
+/* 1 行目（下見・現地調査）だけが持つ補足。架空値ではなく仕様であることを行内で断る。 */
+.business-page .vc-facts dt small {
+  display: block;
+  font-size: 11.5px;
+  line-height: 1.65;
+  color: var(--body-soft);
+  margin-top: 3px;
 }
 .business-page .vc-facts dd {
   margin: 0;
@@ -315,7 +339,10 @@
   gap: clamp(20px, 3vw, 32px);
 }
 .business-page .biz-step { text-align: center; min-width: 0; }
-.business-page .biz-step-fig { width: 120px; margin: 0 auto 16px; }
+/* R4 r4 #25: 110px 前後のサムネイルでは他セクションの写真に対して密度が足りず、
+   4 点が添え物に見えた。枠を 240px まで広げる（素材は 512px なので 2x 以内に収まる）。
+   王冠（3）の画像そのものの差し替えは画像側の担当。 */
+.business-page .biz-step-fig { width: min(240px, 100%); margin: 0 auto 16px; }
 .business-page .biz-step-n {
   width: 48px;
   height: 48px;
@@ -476,6 +503,70 @@
   margin-bottom: 18px;
 }
 
+/* ============ フォームの段組み（R4 r4 #22/#23） ============
+   長いフォームを 会社情報 / 許可・対応エリア / 精算 の3段に割り、進行が見えるようにする。
+   段は箱を作らず、上ヘアラインと番号の角形タイルだけで区切る（角丸0・影0）。
+   .biz-bank-heading と同じ props を持つので、後勝ちさせるためこの位置（後）に置く。 */
+.business-page .biz-form-flow {
+  font-family: var(--ui);
+  font-size: 13.5px;
+  line-height: 1.85;
+  color: var(--body);
+  margin: 0 0 10px;
+}
+.business-page .biz-form-alt {
+  font-family: var(--ui);
+  font-size: 13px;
+  line-height: 1.85;
+  color: var(--body-soft);
+  margin: 0 0 28px;
+}
+.business-page .biz-form-alt a {
+  display: inline-block;
+  margin-left: 4px;
+  font-weight: 600;
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.business-page .biz-form-group + .biz-form-group,
+.business-page .biz-form-group + .biz-bank-section {
+  margin-top: 8px;
+}
+.business-page .biz-form-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--head);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--navy);
+  line-height: 1.5;
+  margin: 0 0 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.business-page .biz-form-heading > span {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--blue);
+  background: #fff;
+  color: var(--blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--en);
+  font-size: 12px;
+  font-weight: 600;
+}
+/* 振込先の白箱は段の 3 つ目。箱の中では上ヘアラインが二重線になるので外す。 */
+.business-page .biz-bank-section .biz-form-heading {
+  border-top: 0;
+  padding-top: 0;
+  margin-bottom: 8px;
+}
+
 /* 送信エラー表示（面はハードコード色をやめ、意味色 --danger のヘアラインで示す） */
 .business-page .biz-submit-error {
   font-size: 13.5px;
@@ -605,14 +696,24 @@
   .business-page .biz-stats .inner { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 16px; }
   .business-page .stat-item:last-child { grid-column: span 2; }
   .business-page .biz-reason-grid { grid-template-columns: 1fr; gap: 36px; }
-  /* モデルケースは 1 列。肖像は 140px（PC 220px の 2x ＝ 440px 派生をそのまま使う） */
+  /* モデルケースは 1 列。
+     R4 r4 #5: 140px 肖像との 2 カラムでは見出しの幅が足りず「リユースショッ／プ みなも（仮名）」と
+     カタカナが語中で割れて店名が読めなかった。肖像を上・見出しを全幅に積み替える。
+     overflow-wrap:anywhere は使わない（どこでも割れて悪化するため）。 */
   .business-page .vc-grid { grid-template-columns: 1fr; }
-  .business-page .vc-head { grid-template-columns: 140px 1fr; gap: 16px; }
+  .business-page .vc-head { grid-template-columns: 1fr; gap: 14px; }
+  .business-page .vc-fig { width: min(160px, 42%); }
+  .business-page .vc-meta h3 {
+    font-size: 17px;
+    word-break: auto-phrase;
+    line-break: strict;
+  }
   .business-page .biz-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 16px; }
   .business-page .biz-req-fig { margin-bottom: 28px; }
 
   .business-page { padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
-  .business-page .biz-dock {
+  /* R4 r4 #11/#17: .is-on（ヒーローの CTA が画面外）のときだけ出す。 */
+  .business-page .biz-dock.is-on {
     position: fixed;
     left: 0; right: 0; bottom: 0;
     z-index: 55;
@@ -629,7 +730,7 @@
     font-size: 15px;
     text-decoration: none;
   }
-  .business-page .biz-dock:hover { opacity: .85; }
+  .business-page .biz-dock.is-on:hover { opacity: .85; }
 }
 @media (max-width: 640px) {
   .business-page .field-row { grid-template-columns: 1fr; }

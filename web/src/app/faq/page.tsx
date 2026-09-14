@@ -249,8 +249,12 @@ export default function FaqPage() {
   return (
     <main id="main" className="faq-page">
       {/* ヒーロー写真帯（.site-frame の内側いっぱいに届く）。
-          --headline のため帯に置くのは h1（見出し）と白地の検索窓だけ。本文・注記は帯の下に置く。 */}
-      <section className="hero-band hero-band--slim hero-band--face hero-band--headline faq-hero">
+          --headline のため帯に置くのは h1（見出し）だけ。本文・注記・検索窓は帯の下に置く。
+          R4 ラウンド5 指摘（1/3）: --slim（PC 240px / SP 160px）では PC で人物の頭頂が帯の
+          上端で切れ、SP では帯が薄すぎて人物が判別できなかった。--mid（PC 400px / SP 220px）に
+          上げると可視域が画像高の 30.5% → 50.8%（SP は 100%）に広がり、頭上の余白が確保できる。
+          帯の縦位置（--band-pos）は core 所有（R4_BRIEF D.1）なのでここには書かない。 */}
+      <section className="hero-band hero-band--mid hero-band--face hero-band--headline faq-hero">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/img/v2/faq-band.webp"
@@ -264,6 +268,14 @@ export default function FaqPage() {
         <div className="hero-band__veil" aria-hidden="true" />
         <div className="container hero-band__copy">
           <h1>よくある質問</h1>
+        </div>
+      </section>
+
+      {/* 検索窓は帯の外・帯直下の白面に置く（R4 ラウンド5 指摘 3/7/15/17）。
+          帯の中に置くと白地 1px 枠の箱が人物の顔の直下に接し、顔を分断して「雑な合成」に見えた。
+          帯の下端と地続きに見えるよう、この面には上下の罫を持たせず余白だけで受ける。 */}
+      <div className="faq-searchbar">
+        <div className="container">
           <div className="faq-search-wrap">
             <input
               type="text"
@@ -291,7 +303,7 @@ export default function FaqPage() {
             )}
           </div>
         </div>
-      </section>
+      </div>
 
       {/* 帯の直下の白面（リード文・検索結果件数） */}
       <div className="faq-lead">

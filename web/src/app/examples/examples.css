@@ -9,24 +9,23 @@
 
 /* ---------- ヒーロー（画像なし。文字と余白で入る） ---------- */
 .cases-hero {
-  padding: clamp(56px, 7vw, 88px) 0 clamp(24px, 3vw, 36px);
+  /* 注記をカード群の直前へ移したぶん、ヒーローの下は見出し・リードと数値バーの間合いだけ */
+  padding: clamp(56px, 7vw, 88px) 0 clamp(32px, 4vw, 48px);
   background: #fff;
 }
 .cases-hero h1 { font-size: clamp(28px, 4vw, 44px); color: var(--ink); margin-top: 16px; }
 .cases-hero p { font-size: clamp(14px, 1.6vw, 17px); color: var(--body-soft); margin-top: 14px; max-width: 520px; line-height: 1.85; }
 
 /* 架空事例の明示（景表法対応の打消し表示）。
-   帯には乗せず、ヒーロー直下の白面に 14px --body で置き、主張と同一視野に入れる。 */
-.cases-disclosure {
-  background: #fff;
-  padding-bottom: clamp(32px, 4vw, 48px);
-  border-bottom: 1px solid var(--line-soft);
-}
-.cases-disclosure .cases-hero-note {
+   R4 ラウンド5 指摘（4/14）: h1 直下に置くと入口が灰色の小文字の塊になるため、
+   打消しの対象＝カード群の直前（フィルターの下）に移した。文言は短縮せず・折りたたまず、
+   14px --body のまま「金額より手前」を維持する。 */
+.cases-hero-note {
   font-size: 14px;
   color: var(--body);
   max-width: 680px;
   line-height: 1.85;
+  margin-top: clamp(24px, 3vw, 36px);
 }
 
 /* ---------- サービス数値バー ---------- */
@@ -52,6 +51,17 @@
 }
 .stats-num span { font-family: var(--ui); font-size: .5em; color: var(--primary); font-weight: 600; margin-left: 3px; }
 .stats-lbl { font-family: var(--ui); font-size: 13px; color: var(--body-soft); margin-top: 6px; font-weight: 600; }
+/* R4 ラウンド5 指摘（12）: 数字で出すのは ¥0 と 4都県 の2項目だけ。「1社」「12カテゴリ」は
+   数字の級数をやめ、ラベル先行の文型で本文と同じ大きさに置く（「登録業者が1社しかない」
+   「12が何の12か分からない」という誤読を消す）。数字の代わりに明朝の1行を主役にする。 */
+.stats-item--text { max-width: 22em; }
+.stats-txt {
+  font-family: var(--head);
+  font-size: clamp(16px, 1.7vw, 19px);
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.6;
+}
 
 /* ---------- フィルター（マークアップ不変・sticky） ---------- */
 /* sticky の top は .header（sticky・z-index:60・高さ 72px + 1px 罫）の下端に合わせる。
@@ -94,7 +104,7 @@
 .filter-chip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
 .filter-count { margin-left: auto; font-family: var(--ui); font-size: 13px; color: var(--body-soft); white-space: nowrap; }
 /* 架空である旨の常設ラベル（打消し表示の補助）。件数の隣に置き、絞り込み操作中も消えない。
-   本体の打消し表示はヒーロー直下の .cases-hero-note と各カードの .model-chip が担う */
+   本体の打消し表示はカード群直前の .cases-hero-note と各カードの .model-chip が担う */
 .filter-note {
   font-family: var(--ui);
   font-size: 12px;
@@ -153,7 +163,20 @@
 /* 打消し表示チップは共有の .model-chip（katazuke-pages.css）を使う。
    ページ CSS は unlayered で共有部品に常に勝つため、ここで再定義しない（R4_BRIEF F.2）。 */
 
+/* 打消し表示チップの行。カテゴリタグ群と同じ行に並べず 1 行を専有させる（R4 ラウンド5 指摘 8）。
+   共有の .model-chip 自体は上書きしない（R4_BRIEF F.2）。 */
+.case-chip-row { display: flex; }
+
 .case-persona { display: flex; align-items: center; gap: 10px; }
+/* 肖像を持つケース（田中・鈴木・山口）だけ矩形で顔を出す。トップの同一人物カードと
+   見え方を揃えるため、円形にはせず .img-frame--1x1 の矩形にする（R4 ラウンド5 指摘 2/13）。
+   表示幅は PC 200px / SP 128px。素材は 800px 角の原寸なので、画像担当が 440px 角の派生
+   （mc-*-440.webp）を書き出したら src を差し替える（BRIEF §1.11 の 2x 規約に寄せる）。 */
+.case-persona--portrait { gap: 16px; }
+.case-portrait {
+  flex: 0 0 clamp(140px, 16vw, 200px);
+  width: clamp(140px, 16vw, 200px);
+}
 .case-avatar {
   width: 44px; height: 44px;
   border-radius: 50%;
@@ -284,6 +307,9 @@
   }
   .stats-item--minor .stats-num { font-size: 22px; }
   .stats-item--minor .stats-lbl { font-size: 12px; }
+  /* 文型の項目は 2 列に収まるよう幅の上限を外し、下段は 1 段小さく */
+  .stats-item--text { max-width: none; }
+  .stats-item--minor .stats-txt { font-size: 15px; }
 
   /* チップ列自身にだけ横スクロールを持たせる（sticky の祖先には overflow を書かない）。
      架空明示の .filter-note はスクロール列の外＝チップ列の下に置き、常に見える状態にする */
@@ -292,6 +318,11 @@
     flex-wrap: nowrap;
     overflow-x: auto;
     padding-block: 2px;
+    /* 末尾に 28px の逃げを作り、最後のチップが画面右端に貼り付いて切れて見えるのを防ぐ。
+       scroll-padding はキーボード操作でチップへ送られたときの止まり位置（R4 ラウンド5 指摘 9）。
+       /faq の .faq-cats-inner と同じ手当てに揃える */
+    padding-inline-end: 28px;
+    scroll-padding-inline: 0 24px;
     scrollbar-width: none;
     width: 100%;
   }
@@ -299,6 +330,23 @@
   .filter-chip { flex: 0 0 auto; }
   .filter-count { flex: 0 0 auto; margin-left: 12px; }
   .filter-note { white-space: normal; }
+  /* 右端の白→透明フェード。スクロールバーを消しているため「まだ右に続く」手掛かりがこれしかない。
+     祖先に overflow を足さず、sticky な .filter-bar（位置指定済み）を基準に重ねる。
+     打消し表示の .filter-note（チップ列の下）に被らないよう、チップ行の高さ分だけに限る。 */
+  .filter-bar::after {
+    content: "";
+    position: absolute;
+    top: 14px;
+    height: 36px;
+    right: 0;
+    width: 44px;
+    background: linear-gradient(to right, rgba(255, 255, 255, 0), #fff 60%);
+    pointer-events: none;
+  }
+
+  /* 肖像は 128px 角。氏名・属性が 390px でも同じ行に収まる幅にする */
+  .case-persona--portrait { gap: 14px; }
+  .case-portrait { flex-basis: 128px; width: 128px; }
 
   .case-card { padding-block: clamp(28px, 7vw, 44px); }
   .case-media { gap: 10px; }
@@ -308,6 +356,8 @@
      860px 以上の左右交互配置（.media-split--rev）には一切触れない。 */
   .case-card.media-split { row-gap: 18px; }
   .case-body { display: contents; }
+  /* 打消し表示チップは常に先頭（金額 order:3 より手前）。既定値と同じだが明示しておく */
+  .case-chip-row { order: 0; }
   .case-cats { order: 1; }
   .case-persona { order: 2; }
   .case-amount-box { order: 3; }

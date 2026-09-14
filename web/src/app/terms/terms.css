@@ -35,6 +35,17 @@
   font-family: var(--ui); font-size: 12.5px; color: var(--body-soft);
   letter-spacing: .02em; margin-top: 12px; line-height: 1.8;
 }
+/* 業者利用規約への相互リンク（ラウンド4 指摘）。見出しブロックの罫（__inner::after）の
+   内側に置き、日付メタと同じ小さな字面で 1 行だけ足す。囲みは持たせない（法務3ページの
+   「罫と余白だけで区切る」構えを崩さないため）。 */
+.legal-head__cross {
+  font-size: 13.5px; color: var(--body); margin-top: 10px; line-height: 1.8;
+}
+.legal-head__cross a {
+  font-weight: 600; color: var(--blue);
+  text-decoration: underline; text-underline-offset: 2px;
+}
+.legal-head__cross a::after { content: " →"; text-decoration: none; }
 
 /* 要点3つ（本文の要約。根拠となる条を併記する） */
 .terms-points { padding: clamp(28px, 4vw, 44px) 0 clamp(28px, 4vw, 44px); }

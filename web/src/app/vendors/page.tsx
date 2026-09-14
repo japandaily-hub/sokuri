@@ -7,7 +7,6 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import { Spinner } from "@/components/Icon";
-import { Notice } from "@/components/kdz/Ui";
 import { vendorCategoryName } from "@/lib/categories";
 import { getVendors, toDisplayMessage, type VendorListItem } from "@/lib/katadzuke-api";
 
@@ -26,19 +25,62 @@ function starString(rating: number): string {
   return "★".repeat(filled) + "☆".repeat(Math.max(0, 5 - filled));
 }
 
+/** 取得状態に依存しない静的ブロック（R4 r4 #1/#9/#16）。
+ *  取得失敗時と「取得成功で0件」の両方で描く。ここに書く3点は /business の登録要件・
+ *  /faq・/terms の既存記載の範囲内に限り、実在業者の件数・社名・評価・写真は一切出さない。 */
+function VendorStaticInfo() {
+  return (
+    <section className="vd-sample" aria-labelledby="vd-static-h">
+      <h2 id="vd-static-h">掲載している業者の審査</h2>
+      <ul className="vd-criteria">
+        <li>
+          <b>古物商許可の確認</b>
+          古物営業法に基づく古物商許可証を、運営が確認した事業者のみを掲載します。
+        </li>
+        <li>
+          <b>一斉架電なし</b>
+          連絡できるのは、ユーザーが選んだ1社だけです。選ばれなかった業者に連絡先は渡りません。
+        </li>
+        <li>
+          <b>特定商取引法の遵守</b>
+          訪問買取における法定書面の交付など、特定商取引法の遵守を審査時に確認します。
+        </li>
+      </ul>
+      <h3>掲載時に表示する項目</h3>
+      <p className="model-note">審査を通過した業者は、次の項目とともにこの一覧に掲載されます。</p>
+      <ul className="vd-sample-list">
+        <li>店舗名</li>
+        <li>エリア</li>
+        <li>取扱カテゴリ</li>
+        <li>評価</li>
+      </ul>
+    </section>
+  );
+}
+
 export default function VendorListPage() {
   const [vendors, setVendors] = useState<VendorListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { status: sessionStatus } = useSession();
   const signedIn = sessionStatus === "authenticated";
   /* 取得が成功して 0 件だった状態（＝意図された空）。読込中（vendors === null）とエラーは含まない。
-     帯リードの差し替えと「掲載時に表示する項目」ブロックは、この状態のときだけ描く。 */
+     「現在、掲載中の業者はありません」の断定はこの状態のときだけ書く（R4 r4 #1）。 */
   const isEmpty = vendors !== null && vendors.length === 0;
 
   useEffect(() => {
     getVendors()
       .then(setVendors)
-      .catch((e) => setError(toDisplayMessage(e, "業者一覧の取得に失敗しました")));
+      .catch((e) =>
+        setError(
+          /* R4 r4 #24: 共通の通信エラー文（lib/katadzuke-api.ts）が「電波状況を確認し」で、
+             PC で見ている人には的外れ。共通文言はコア管理のため、ページ側で表記だけ正規化する
+             （共通側が直れば置換が不発になるだけで害はない）。 */
+          toDisplayMessage(e, "業者一覧の取得に失敗しました").replace(
+            "電波状況を確認し、",
+            "通信環境を確認のうえ、",
+          ),
+        ),
+      );
   }, []);
 
   return (
@@ -51,10 +93,10 @@ export default function VendorListPage() {
             --headline（.55）をやめ既定の .65 に戻す（白 13〜16px で AA を確保するため）。
             R4 D.2 #7: 素材に遠景の作業者が入るため縦位置修飾子 .hero-band--face を足す。
             --headline は付けない（3要素が載る帯なので veil を .65 のまま維持する）。
-            R4 C.3-4: リード文は掲載0件のときだけ「…掲載します／現在、掲載中の業者はありません。」に
-            差し替える。承認済みの実在業者がいる断定文を 0 件で常時出すと優良誤認になるため。
-            読込中・エラー時・1社以上あるときは現行文のまま（帯は取得状態に依存しないという
-            既存の設計意図を、空状態の1ケースにだけ例外を設ける形で維持する）。 */}
+            R4 C.3-4 / R4 r4 #1: 承認済みの実在業者がいる断定文（「〜業者です」）は、掲載0件でも
+            取得失敗中でも優良誤認になるため出さない。0件では「…のみを掲載します／現在、掲載中の
+            業者はありません。」、取得失敗では「…のみを掲載します。」（0件の断定は足さない）。
+            1社以上あるときだけ現行文のまま。 */}
         <section className="hero-band hero-band--slim hero-band--face vd-band">
           {/* eslint-disable @next/next/no-img-element */}
           <img
@@ -74,12 +116,21 @@ export default function VendorListPage() {
             <p>
               {isEmpty
                 ? "古物商許可番号を確認し、運営が承認した業者のみを掲載します。現在、掲載中の業者はありません。"
-                : "古物商許可番号を確認し、運営が承認した業者です。"}
+                : error
+                  ? /* R4 r4 #1: 取得できていない状態で「承認した業者です」と断定すると、
+                       掲載0件でも「承認済みの業者が並んでいる」と読める。ただし取得失敗時は
+                       0件かどうかも不明なので、0件の断定（空状態の文）は足さない。 */
+                    "古物商許可番号を確認し、運営が承認した業者のみを掲載します。"
+                  : "古物商許可番号を確認し、運営が承認した業者です。"}
             </p>
           </div>
         </section>
 
         <div className="vendors-wrap">
+          {/* R4 r4 #14: 帯の人物は生成画像。直下に「古物商許可番号を確認し…」が並ぶため、
+              実在の登録業者の写真と誤読されないよう可視の打消しを置く（alt="" は a11y 上の
+              措置で、可視の否認にはならない）。書式は共有部品 .model-note に合わせる。 */}
+          <p className="model-note vd-photo-note">※ 写真はイメージです。</p>
           {/* r3 是正: 戻るリンクは末尾（.vd-join の下）へ移した。ページ先頭の最初の導線が
               「戻る」になっていたため、本文はリード文から始める。 */}
           <p className="vendors-lead">
@@ -91,17 +142,27 @@ export default function VendorListPage() {
             入札の選択は案件詳細から行えます。
           </p>
 
-          {/* エラー: 注意色の枠 + 再読み込み導線 */}
+          {/* エラー: 1行の控えめな注記 ＋ 再読み込み/FAQ（R4 r4 #1/#9/#16）
+              赤枠の Notice だけが面に浮き「壊れている」と読まれていたため、注意の表示は
+              1行（--danger のヘアライン）に落とし、直後に取得状態に依存しない静的ブロック
+              <VendorStaticInfo /> を必ず描く。
+              r2 M10（行き止まりを作らない）は維持するが、「出品する」は主導線の .btn から
+              テキストリンクに降格する（一覧を確かめに来た人の次の一手は再読み込みと FAQ）。 */}
           {error ? (
             <div className="vd-state vd-state--error">
-              <Notice tone="error">{error}</Notice>
-              {/* r2 M10 是正: 再読み込みしか出口が無く、取得できない間は行き止まりだった。
-                  一覧が見られなくても進める2導線（出品・業者登録）を併置する。 */}
+              <p className="vd-state-err" role="alert">
+                {error}
+              </p>
               <div className="vd-state-actions">
                 <button type="button" className="btn btn-primary" onClick={() => window.location.reload()}>
                   再読み込み
                 </button>
-                <Link href="/create" className="btn btn-ghost">
+                <Link href="/faq" className="btn btn-ghost">
+                  よくある質問（業者について）
+                </Link>
+              </div>
+              <p className="vd-state-sub">
+                <Link href="/create" className="vd-state-link">
                   出品する
                 </Link>
                 <Link href="/business" className="vd-state-link">
@@ -110,7 +171,7 @@ export default function VendorListPage() {
                 <Link href="/mypage" className="vd-state-link">
                   マイ案件一覧へ
                 </Link>
-              </div>
+              </p>
             </div>
           ) : null}
 
@@ -156,21 +217,13 @@ export default function VendorListPage() {
                   </Link>
                 </div>
               </section>
-              {/* 掲載時に「何が出るのか」だけを伝える説明ブロック。架空の店舗名・エリア・数値・
-                  星・許可タグ・画像は出さない。VENDOR_CASES の店名もこのページでは使わない
-                  （ページをまたいで実在の登録業者と読まれるため）。 */}
-              <section className="vd-sample" aria-labelledby="vd-sample-h">
-                <h3 id="vd-sample-h">掲載時に表示する項目</h3>
-                <p className="model-note">審査を通過した業者は、次の項目とともにこの一覧に掲載されます。</p>
-                <ul>
-                  <li>店舗名</li>
-                  <li>エリア</li>
-                  <li>取扱カテゴリ</li>
-                  <li>評価</li>
-                </ul>
-              </section>
             </>
           ) : null}
+
+          {/* 審査の基準と「掲載時に表示する項目」は、エラー時・空のときの両方で描く（R4 r4 #1）。
+              架空の店舗名・エリア・数値・星・許可タグ・画像は出さない。VENDOR_CASES の店名も
+              このページでは使わない（ページをまたいで実在の登録業者と読まれるため）。 */}
+          {error || isEmpty ? <VendorStaticInfo /> : null}
 
           {vendors !== null && vendors.length > 0 ? (
             <ul className="vendors-list">

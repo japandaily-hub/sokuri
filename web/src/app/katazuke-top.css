@@ -39,6 +39,16 @@
 .hero .hero-how{margin-block:clamp(16px,2vw,24px) 0;}
 .hero .hero-cta{margin-top:clamp(16px,2vw,24px);}
 
+/* ラウンド4（11・16）— PC の 2 本の CTA の右端を揃える。
+   ヒーロー左カラムは 1440px でも約 500px しかなく、LINE ボタン（約305px）＋「仕組み」（約205px）
+   ＋gap 14px＝約524px は入らないため、核の flex-wrap で必ず 2 行に折れる（ラウンド4 実測）。
+   折れた結果、左端だけ揃って右端が 100px ラグになっていた。横並びは物理的に入らないので
+   「縦積みのまま同幅」を選び、列方向＋stretch で 2 本を同じ幅に固定する。
+   ≤859px は核の .hero-cta>.btn{width:100%} が既に全幅にしているので触らない。 */
+@media(min-width:860px){
+  .hero .hero-cta{flex-direction:column;flex-wrap:nowrap;align-items:stretch;max-width:360px;}
+}
+
 /* モバイルは flex-wrap だと「1 撮る / 2 業者が競う / 3 見比べて選ぶ」で 1 行が埋まり、
    「4 引き取り完了」だけが 2 行目に落ちて 4 工程が一続きに読めない（ラウンド3 実測）。
    2×2 に固定して 4 項目を均等に見せる。矢印は行をまたぐと向きが意味を失うので畳む
@@ -159,6 +169,12 @@
      均等割りを解除し、対応ブラウザでは文節単位で折り返させる（BRIEF §2.1 の 2×2 は維持）。
      word-break:auto-phrase は未対応ブラウザでは無視され、通常の折返しに戻るだけ。 */
   .scenes .scene-body h3,#flow .step-body h3{text-wrap:wrap;word-break:auto-phrase;}
+  /* ラウンド4（9）— 2 列で見出しが 1 行／2 行に混在し、本文の開始位置が段でずれる。
+     subgrid は採らない: .scene-card は「画像 + .scene-body」の 2 行構造で、4 行の subgrid にするには
+     .scene-body を外す＝core 所有の .scene-body / .scene-card の共有定義に手を入れることになる。
+     見出しに 2 行分の下限を与えるだけで本文の行頭が揃う。em の値は核の .scene-body h3
+     （18px / 行間は既定 1.5 前後）に対する保険で、lh 対応ブラウザでは後勝ちの 2lh が効く。 */
+  .scenes .scene-body h3{min-height:calc(1.5em * 2);min-height:2lh;}
 }
 
 /* ============================================================
@@ -168,6 +184,18 @@
    .model-chip / .model-note は core の共有クラス（katazuke-pages.css）。ここで再定義しない
    — ページ CSS は unlayered で layer(components) に常に勝つため、打消し表示の
    サイズ（14px/600）とコントラストを壊してしまう。位置（余白）だけを与える。 */
+/* ラウンド4（4）— frame2 の末尾で「こんな時に」→「利用イメージ」の間に 250px 超の白が空き、
+   スクロール中に一度ページが終わったように見えた（章の切れ目ではないのに額装の切れ目より広い）。
+   核の .section{padding:clamp(60px,7.4vw,104px)} は共有定義なので触らず、
+   frame 内の連続する 2 節の合わせ目だけをこのページで詰める（額装 .site-frame の切れ目は据え置き）。 */
+.scenes.section{padding-bottom:clamp(36px,4vw,56px);}
+.model-cases.section{padding-top:clamp(36px,4vw,56px);}
+/* 「私たちについて」の手前（#cats → .founder）も同じ理由で詰める */
+.founder.section{padding-top:clamp(36px,4vw,56px);}
+
+/* 3 枚が「実績の抜粋」に見えないための文脈（ラウンド4・3）。打消し表示 .model-note より前 */
+.model-cases .mc-status{font-family:var(--ui);font-size:14px;line-height:1.9;color:var(--body);
+  margin:0 0 10px;}
 .model-cases .mc-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
   gap:clamp(20px,2.6vw,32px);}
 .model-cases .mc-card{display:flex;flex-direction:column;align-items:flex-start;
@@ -181,15 +209,22 @@
 .model-cases .mc-attr{display:block;font-family:var(--ui);font-size:13px;color:var(--body-soft);
   margin-top:5px;line-height:1.7;}
 .model-cases .mc-quote{margin-top:12px;font-size:15px;color:var(--body);line-height:2;}
-/* 点数・入札社数・成約日数の 3 値。金額は出さない（R4 B.2） */
-.model-cases .mc-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;
+/* 点数・成約日数の 2 値。金額は出さない（R4 B.2）。入札社数も出さない
+   （ラウンド4・3: 3 枚並ぶと「8社前後は入札が来る」という平均像＝実質的な集計統計になるため、
+   6 件すべてが並ぶ /examples に限定した）。2 値なので 2 列に詰め、数値も 1 段落とす
+   （ラウンド4・19: 台帳の実測値ではなくカードの例示値として読ませる）。 */
+.model-cases .mc-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;
   width:100%;margin-top:auto;padding-top:clamp(16px,1.8vw,22px);}
 .model-cases .mc-facts>div{display:flex;flex-direction:column;gap:4px;min-width:0;}
 .model-cases .mc-facts dt{font-family:var(--ui);font-size:12px;color:var(--body-soft);line-height:1.6;}
 .model-cases .mc-facts dd{margin:0;display:flex;align-items:baseline;gap:3px;color:var(--ink);}
-.model-cases .mc-facts dd b{font-family:var(--ui);font-weight:600;font-size:clamp(22px,2.4vw,26px);
+.model-cases .mc-facts dd b{font-family:var(--ui);font-weight:600;font-size:clamp(20px,2vw,23px);
   line-height:1.2;letter-spacing:.01em;font-variant-numeric:tabular-nums;}
 .model-cases .mc-facts dd span{font-family:var(--ui);font-size:12px;color:var(--body);}
+/* 数値行に隣接する架空の明示（ラウンド4・19）。モバイルではカード上端の .model-chip が
+   スクロールで画面外に出るため、数値と同一視野に打消しを残す。12px にはしない（B.4 の趣旨） */
+.model-cases .mc-fnote{font-family:var(--ui);font-size:13px;line-height:1.7;color:var(--body);
+  margin:10px 0 0;}
 /* /examples への導線は 1 本だけ。ボタンにしない（LINE CTA もこの節には足さない） */
 .model-cases .mc-more{margin-top:clamp(26px,3.2vw,38px);text-align:center;}
 .model-cases .mc-more a{display:inline-flex;align-items:center;gap:8px;
@@ -243,7 +278,14 @@
 .fee .fz-num{display:block;font-family:var(--serif);font-weight:600;color:var(--primary);
   font-size:clamp(64px,9vw,96px);line-height:1.15;letter-spacing:.02em;margin-top:8px;}
 .fee .fz-note{display:block;font-size:14px;color:var(--body);margin-top:16px;line-height:1.9;}
-.fee .fee-caution{font-size:12.5px;color:var(--body-soft);line-height:1.8;margin:14px 0 0;}
+/* ラウンド4（20）— 減額相談の注記を ¥0 と同一視野に、本文サイズで置く
+   （旧 .fee-caution は .fee-card の最下部・12.5px --body-soft で、¥0 と無料バッジ4行を読んだ後に
+   初めて出てくるため「後から気づいて裏切られた」印象になっていた）。
+   打消し表示は強調表示（¥0）と同程度に認識できる大きさ・近接で示す。
+   サイズは隣の肯定文 .fz-note と同じ 14px --body に揃える（打消しだけを小さくしない・
+   かつ肯定文より大きくして不安を煽ることもしない）。2 文あるので中央揃えにはしない。 */
+.fee .fz-caution{display:block;font-size:14px;color:var(--body);line-height:1.9;
+  max-width:38em;margin:16px auto 0;text-align:left;}
 
 /* ============================================================
    #12 対応カテゴリ — 4 列・cover・白地 1px。空箱を出さない
@@ -274,7 +316,19 @@
 /* ============================================================
    #13 運営者メッセージ — 人物写真を撤去し、静物 3:2 を右に置く
    ============================================================ */
-.founder .founder-photo{aspect-ratio:3/2;background:#fff;margin:0;}
+/* ラウンド4（8）— top-founder-desk だけが強い暖色（茶・橙）で、CONSTRAINTS §5 の
+   warm off-white ＋ light grey ＋ cobalt から浮く唯一のカット。
+   恒久対応は素材のカラーグレード（画像担当）。CSS フィルタは正典外なので使わない。
+   暫定として、この 1 枚が占める面積を落として版面への影響を小さくする
+   （画像列を 34fr に絞り、枠自体にも上限を与える。地は淡青にして継ぎ目を白面より目立たなくする）。
+   素材が寒色側に差し替わったら下の @media ブロックを消せば元の 2 カラムに戻る。 */
+.founder .founder-photo{aspect-ratio:3/2;background:var(--pale-2);margin:0;}
+/* 縮小は 2 カラムが成立する幅だけに限る。980px 以下は共有の .media-split が 1 列になり、
+   859px 以下は .sp-bleed が負マージンで画面端まで伸ばすため、ここで幅を縛ると bleed が壊れる。 */
+@media(min-width:981px){
+  .founder .media-split{--ms-img:34fr;--ms-txt:66fr;}
+  .founder .founder-photo{width:100%;max-width:400px;}
+}
 
 /* ============================================================
    FAQ — 「すべてのQ&Aを見る」の配置（旧インライン style の置換）
@@ -312,6 +366,18 @@
 .biz-banner .biz-banner-inner{display:grid;
   grid-template-columns:minmax(0,1fr) minmax(0,300px);
   gap:clamp(28px,4vw,56px);align-items:center;}
+/* ラウンド4（7）— 条件チップ 5 個を等幅の 2 列グリッドにする。
+   核の .biz-banner-tags は display:flex;flex-wrap:wrap で、チップ幅が文字数そのままになるため
+   最終 CTA の直前でいちばん不揃いに見えていた（長い β の1本が折返しをぎざぎざにする）。
+   長い β だけ全幅で最後段に送る（page.tsx で DOM 末尾へ移動済み）。角丸0・1px --line は核のまま。
+   .biz-banner-tags / .biz-tag はトップ専用（/vendors/[id] の .biz-tag は .vendor-page 側で別定義）
+   なので、このページ CSS で面倒を見てよい。 */
+.biz-banner .biz-banner-tags{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+.biz-banner .biz-banner-tags .biz-tag{display:flex;align-items:center;min-width:0;}
+.biz-banner .biz-banner-tags .biz-tag--wide{grid-column:1/-1;}
+@media(max-width:859px){
+  .biz-banner .biz-banner-tags{grid-template-columns:1fr;}
+}
 .biz-banner .biz-banner-cta{flex-direction:row;flex-wrap:wrap;align-items:center;
   justify-content:flex-start;gap:14px;margin-top:22px;}
 /* 「審査制・登録無料」は 13px --body のヘアラインチップに */

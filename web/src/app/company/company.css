@@ -121,6 +121,17 @@
   color: var(--body);
   line-height: 1.95;
 }
+/* 署名（運営者メッセージの書き手）。本文と同じ左端にそろえ、ゴシック小ラベルの書式で置く。
+   .mission-card p（0,1,1）に勝つ必要があるため .mission-card .mission-sign（0,2,0）で書く。 */
+.mission-card .mission-sign {
+  margin-top: 16px;
+  font-family: var(--ui);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  line-height: 1.7;
+  color: var(--body-soft);
+}
 
 /* ---------- 理念（VALUES）3カラム ---------- */
 .values-grid {

@@ -3,8 +3,9 @@
    （共通クラス .container/.section/.eyebrow/.btn/.hero-band 等は katazuke.css /
     katazuke-pages.css の正典を使用。ここはデザイン handoff の contact.html <style>
     固有分のみ。共通 .field と衝突しないよう、フォーム系は .contact-wrap 配下にスコープする。）
-   v2: 淡青グラデのページヒーローを廃し、無文字の写真帯（.hero-band--fixed --quiet --pos-r。
-   r1 レビューで --slim=240px から法務3ページと同じ 160px へ）＋帯直下の見出しブロック
+   v2: 淡青グラデのページヒーローを廃し、無文字の写真帯（.hero-band--slim --quiet --pos-r。
+   r1 で --fixed=160px に落としたが、ラウンド4 で「帯が薄片に見える」指摘2件を受け
+   --slim=240px/SP 160px に戻した。経緯は page.tsx の帯のコメント）＋帯直下の見出しブロック
    .ct-head に置き換え。LINE ブロックは白地・上下 1px、入力欄は白地＋1px --line、
    フォームの外枠カードは --pale-2（BRIEF §2.9）。
    ============================================================ */
@@ -88,7 +89,10 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
-  gap: clamp(24px, 4vw, 48px);
+  /* ラウンド4 指摘（Med）: PC で 48px 開くと見出し＋補足とボタンが「関係ない2要素」に
+     見えていた。列構造（1fr auto）は据え置きのまま溝だけ 28px 上限へ詰める。
+     640px 以下は下の @media で縦積み・24px のまま（縦方向は詰めない）。 */
+  gap: clamp(16px, 2vw, 28px);
   margin-bottom: 48px;
 }
 .line-first-body { min-width: 0; }

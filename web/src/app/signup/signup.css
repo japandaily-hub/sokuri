@@ -90,6 +90,29 @@
 /* 信頼行はカードの外側（フロー全体の脚）に置くので上余白を足す */
 .signup-page .flow-wrap > .trust-row { margin-top: 28px; }
 
+/* R4 ラウンド4 指摘（3/14）: LINE 公式ボタンの「置き方」だけを直す。
+   ボタン本体（緑ベタ・角丸99px・高さ・幅 max-width:360px の中央寄せ）はコアの .btn-line-auth の
+   ままで触らない（他社ブランドの公式仕様＋ CONSTRAINTS R4 §4）。ここは上下の余白を広げて、
+   注記の箱と「メールアドレスで登録」の罫の間で「並んだ選択肢の一つ」として読めるようにする。
+   上側は .signup-lead-note の margin-bottom（22px）と相殺して 32px になる。
+   860px 以上は従来値（0 / 18px）に戻す — 下の @media(min-width:860px) を参照。 */
+.signup-page .signup-line-slot { margin: 32px 0 28px; }
+
+/* R4 ラウンド4 指摘（9/15・部分採用）。
+   「固定バーが最終入力欄に永続的に重なり登録できない」という前提は実測では成立しない:
+   375x812 実測で .flow-wrap の padding-bottom は 104px（バー実高 81px）、最下部まで送ったとき
+   パスワード（確認）の下端はバー上端より 166px 上に出る。バー自身も既に不透明な #fff ＋
+   上 1px ヘアライン（コア .flow-footer）を持つ。残る実害は safe-area で、ホームバーのある端末では
+   固定バーの操作面が下端インジケータに潜る。バーと、下端まで送ったときの逃げ代の両方に同量を足す。
+   バーの表示・非表示はフォーカスで切り替えない（主要操作が入力中に消えるのは不可・指摘15 の後半は却下）。 */
+@media (max-width: 859px) {
+  .signup-page .flow-footer { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .signup-page > main > .flow-wrap { padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (max-width: 480px) {
+  .signup-page > main > .flow-wrap { padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px)); }
+}
+
 /* 860px 以上: 初回描画でカード直下の 1 行（「すでにアカウントをお持ちの方はログイン」）が
    固定フッターの上端にちょうど半分かかり、文字が水平に切れて見える
    （ラウンド2 実測 1440x900: 行 800–826 / フッター上端 813.3）。
@@ -101,4 +124,10 @@
   .signup-page > main > .flow-wrap { padding-top: 12px; }
   .signup-page .signup-lead-note { margin-bottom: 18px; }
   .signup-page .form-card { margin-bottom: 10px; }
+  /* 指摘3/14 の余白拡大はここでは適用しない（従来値に戻す）。
+     この画面幅では上で 26px 詰めて「すでにアカウントをお持ちの方は…」の 1 行を固定フッターの上へ
+     逃がしており（実測 1440x900: 行の下端 798px / フッター上端 813px、余裕 15px）、
+     縦を足すとその行がバーの境界をまたいで再び水平に切れる。
+     ピルの面積そのものはコアの max-width:360px で既に抑えてあり、ここでは増減させない。 */
+  .signup-page .signup-line-slot { margin: 0 0 18px; }
 }

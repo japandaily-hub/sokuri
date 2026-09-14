@@ -58,6 +58,13 @@ export default function TermsPage() {
           <p className="legal-head__meta">
             制定・施行：2026年4月1日　最終改定：2026年9月4日
           </p>
+          {/* ラウンド4 指摘（Med・業者視点）: 本ページは着地時にユーザー利用規約のペインが
+              開くため、/business の同意チェックから来た業者が「同意対象の業者利用規約」に
+              たどり着けたか分からなかった。冒頭に相互リンクを置く。href="#biz" は
+              TermsTabs が hashchange を見て業者ペインを開き、タブ列まで送る。 */}
+          <p className="legal-head__cross">
+            業者の方の規約はこちら <a href="#biz">業者利用規約</a>
+          </p>
         </div>
       </section>
 

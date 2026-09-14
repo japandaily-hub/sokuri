@@ -125,7 +125,18 @@ export default function PhotoGuidePage() {
           <p>
             カタヅケでは写真と品目情報が業者の入札根拠になります。上手に撮ると、業者が品物を判断しやすくなります。
           </p>
-          <div className="hero-cta">
+        </div>
+      </section>
+
+      {/* ============ ヒーローの CTA（帯の外・直下の白面） ============
+          R4 ブリーフ A.4「LINE CTA を写真帯／濃紺帯の上に置かない」に合わせ、CTA 行を帯の外へ出す。
+          .deep-band（katazuke-pages.css §1.3「ボタンは置かず直下の白面へ」）と同じ扱いに統一し、
+          ベイル済みの帯の上で主色ブルーの面が地と同系になる／緑タイルが暗い面に浮く問題を解消する。
+          .hero-cta は Dock の IntersectionObserver の監視対象なのでクラスは残す（Dock 挙動は不変）。
+          区切りの罫は直下 .merit-bar の border-top が持つため、この面には引かない。 */}
+      <div className="pg-hero-actions">
+        <div className="container">
+          <div className="hero-cta pg-hero-cta">
             {/* LINE CTA は 7 箇所共通の 2 トーン構造（主色ブルーの面＋左端に LINE 緑のタイル）。
                 タイルは aria-hidden の純装飾で、アクセシブル名はラベル＋補足の文字が担う。 */}
             <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-line btn-lg">
@@ -141,7 +152,7 @@ export default function PhotoGuidePage() {
             </a>
           </div>
         </div>
-      </section>
+      </div>
 
       {/* ============ 帯の直下：4チェック行（白地・ヘアライン） ============ */}
       <div className="merit-bar">

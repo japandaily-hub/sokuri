@@ -127,12 +127,15 @@ export default function ContactPage() {
   return (
     <main id="main">
       {/* ============ ページヒーロー（帯上に文字を置かない） ============
-          r1 レビュー（ct-band 未生成のため帯は無文字の濃紺ベタ）: --slim は PC 240px あり、
-          ファーストビューの上端 230px が情報ゼロで h1 到達が遅い。BRIEF §2.9 の趣旨
-          （ファーストビューにフォーム先頭を入れる）を優先し、法務3ページと同じ
-          --fixed（PC 160px／モバイル 120px）に落とす。帯上に文字は置かないまま。
-          ct-band 生成後に --slim へ戻すかは画像が入ってから判断する。 */}
-      <section className="hero-band hero-band--fixed hero-band--quiet hero-band--pos-r">
+          r1 レビュー（ct-band 未生成のため帯は無文字の濃紺ベタ）の時点では、情報ゼロの
+          上端を詰めるため法務3ページと同じ --fixed（PC 160px／モバイル 120px）に落とし、
+          「ct-band 生成後に --slim へ戻すかは画像が入ってから判断する」と保留していた。
+          ラウンド4（画像投入後）で PC・SP とも「封筒とカップが上下で切れた薄片に見える／
+          読み込み途中のように見える」の指摘が2件出たため、保留していた判断をここで確定し
+          --slim（PC clamp(180px,22vw,240px)／モバイル clamp(160px,40vw,200px)）へ戻す。
+          高さは共有の修飾子だけで決める（ページ CSS で .hero-band--* を再定義しない・
+          --band-pos もページ CSS に書かない＝R4 D.1/F.0）。帯上に文字は置かないまま。 */}
+      <section className="hero-band hero-band--slim hero-band--quiet hero-band--pos-r">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/img/v2/ct-band.webp"
@@ -164,8 +167,11 @@ export default function ContactPage() {
           <div className="line-first">
             <div className="line-first-body">
               <strong>LINEなら最短、<br className="sp-br" />フォームならメールで返信</strong>
+              {/* ラウンド4 指摘（High）: リンク先は自社ログイン（/login?callbackUrl=/create）で
+                  友だち追加は発生しない。R4 ブリーフが CTA から外した「友だち追加」の語が本文に
+                  残っていたため差し替える。公式アカウント導線が実装されるまでこの語は使わない。 */}
               <p>
-                査定・出品のご依頼はLINEから。友だち追加するだけで、すぐに出品をはじめられます。
+                査定・出品のご依頼はLINEから。LINEアカウントでログインすれば、そのまま出品をはじめられます。
               </p>
             </div>
             {/* LINE CTA は 7 箇所共通の 2 トーン構造（主色ブルーの面＋左端に LINE 緑のタイル）。
@@ -219,11 +225,14 @@ export default function ContactPage() {
                       <label htmlFor="name">
                         お名前<span className="req">必須</span>
                       </label>
+                      {/* ラウンド4 指摘（Med）: 和文のプレースホルダは同じ色（4 欄とも
+                          --body-soft の1値）でも欧文より濃く見え、「すでに入力済みの値」と
+                          誤読される。入力値ではないことが文字で分かるよう「例）」を前置する。 */}
                       <input
                         type="text"
                         id="name"
                         name="name"
-                        placeholder="山田 花子"
+                        placeholder="例）山田 花子"
                         autoComplete="name"
                         className={errors.name ? "has-error" : undefined}
                         onInput={() => clearError("name")}
@@ -237,7 +246,7 @@ export default function ContactPage() {
                         type="text"
                         id="kana"
                         name="kana"
-                        placeholder="ヤマダ ハナコ"
+                        placeholder="例）ヤマダ ハナコ"
                         autoComplete="off"
                       />
                     </div>
@@ -267,7 +276,7 @@ export default function ContactPage() {
                       type="tel"
                       id="phone"
                       name="phone"
-                      placeholder="090-0000-0000"
+                      placeholder="例）090-0000-0000"
                       autoComplete="tel"
                     />
                   </div>

@@ -13,7 +13,15 @@
 .pg-hero .hero-band__copy { padding-block: clamp(32px, 5vw, 56px); }
 .pg-hero .hero-band__copy h1 { margin-top: 16px; }
 .pg-hero .hero-band__copy p { max-width: 34em; }
-.pg-hero .hero-cta { margin-top: clamp(20px, 3vw, 30px); }
+
+/* ---------- ヒーローの CTA 行（帯の外・直下の白面） ----------
+   R4 A.4「LINE CTA を写真帯／濃紺帯の上に置かない」。帯の上では主色ブルーの面が
+   ベイル済みの地と同系になって図地が立たず、左端の LINE 緑タイルだけが暗い面に浮いていた。
+   下罫は引かない（直下 .merit-bar の border-top が区切りを持つ・ヘアラインの二重引きを避ける）。
+   2ボタンの天地は align-items:stretch でそろえる（.btn.btn-line は min-height 60/54px、
+   .btn-ghost は padding で高さが決まるため、そろえないと数 px の段差が出る）。 */
+.pg-hero-actions { background: #fff; padding: clamp(22px, 3vw, 32px) 0; }
+.pg-hero-actions .hero-cta { margin-top: 0; align-items: stretch; }
 
 /* ---------- 帯の直下：4チェック行（白地・上下ヘアライン） ---------- */
 .merit-bar {
@@ -252,8 +260,11 @@
   color: var(--ink);
   margin-bottom: 12px;
 }
-/* .img-frame--pale .img-frame--1x1 を 56px に固定（512px 素材・2倍規約の範囲外だが既存アイコン） */
-.cat-guide-card .cat-ic { width: 56px; flex: 0 0 56px; }
+/* .img-frame--pale .img-frame--1x1 を 72px に固定。56px では 3D 静物の被写体が判別できず
+   （ラウンド4 実測: 1440px で約 56px＝カテゴリの見分けがつかないノイズ）、見出しの横に置く
+   意味が消えていた。512px 素材のため 72px でも「表示幅の2倍」規約の範囲内には収まらないが、
+   56px（9.1倍）より 72px（7.1倍）のほうが超過は小さくなる方向。144px の派生 webp は画像担当。 */
+.cat-guide-card .cat-ic { width: 72px; flex: 0 0 72px; }
 .cat-guide-card ul { padding-left: 16px; }
 .cat-guide-card li { font-size: 12.5px; color: var(--body-soft); line-height: 1.8; margin-bottom: 3px; }
 
@@ -261,10 +272,13 @@
 .pg-cta-band { text-align: center; }
 .pg-cta-band h2 { font-size: clamp(20px, 2.8vw, 30px); margin-top: 14px; }
 .pg-cta-band p { font-size: 14.5px; line-height: 1.95; margin-top: 14px; }
-.pg-cta-actions { background: #fff; padding: clamp(28px, 4vw, 44px) 0; }
+/* 帯とボタンの距離は上を詰める（ラウンド4 指摘: 帯が CTA から切り離された装飾ストライプに見える）。
+   帯の中にボタンを置く解は採らない（.deep-band §1.3「ボタンは置かず直下の白面へ」＋ R4 A.4）。 */
+.pg-cta-actions { background: #fff; padding: clamp(20px, 2.4vw, 26px) 0 clamp(28px, 4vw, 44px); }
 .pg-cta-btns {
   display: flex;
   justify-content: center;
+  align-items: stretch;
   gap: 14px;
   flex-wrap: wrap;
 }

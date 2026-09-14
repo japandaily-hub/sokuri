@@ -58,6 +58,14 @@
   fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
 }
 
+.vendors-page .vd-photo-note {
+  /* R4 r4 #14: 帯の直下に置く打消し。共有 .model-note の下余白（最大32px）ではリード文と
+     切れて見えるので、このページだけ詰めて帯 → 打消し → リードを1塊にする。 */
+  margin-bottom: 14px;
+  font-size: 12.5px;
+  color: var(--body-soft);
+}
+
 .vendors-page .vendors-lead {
   font-size: 14px;
   line-height: 1.9;
@@ -87,8 +95,26 @@
   max-width: 34em;
   margin-inline: auto;
 }
-/* Notice は自前の面（注意色）を持つ箱なので、箱は中央・文面は左揃えに戻す */
-.vendors-page .vd-state--error > :first-child { text-align: left; }
+/* R4 r4 #1: エラーは赤枠の箱をやめ、--danger のヘアライン1本の控えめな注記にする
+   （面は白のまま。角丸0・影0）。文面は中央寄せの面の中でも左揃えに戻す。 */
+.vendors-page .vd-state-err {
+  text-align: left;
+  border-left: 3px solid var(--danger);
+  padding-left: 14px;
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.85;
+  color: var(--body);
+}
+/* 主導線（再読み込み・FAQ）の下に置く副導線。ボタンに見せない。 */
+.vendors-page .vd-state-sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 18px;
+  margin: 16px 0 0;
+}
 .vendors-page .vd-state--loading {
   display: flex;
   flex-direction: column;
@@ -163,6 +189,7 @@
 .vendors-page .vd-sample {
   padding: clamp(26px, 4vw, 40px) 0 0;
 }
+.vendors-page .vd-sample h2,
 .vendors-page .vd-sample h3 {
   font-family: var(--head);
   font-weight: 600;
@@ -171,7 +198,31 @@
   line-height: 1.6;
   margin: 0 0 12px;
 }
-.vendors-page .vd-sample ul {
+.vendors-page .vd-sample h3 { margin-top: clamp(26px, 4vw, 36px); }
+/* 審査の3点（R4 r4 #16）。カードの形をとらず、ヘアラインの箇条書きにとどめる。 */
+.vendors-page .vd-criteria {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+  max-width: 56em;
+}
+.vendors-page .vd-criteria li {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13.5px;
+  line-height: 1.9;
+  color: var(--body);
+}
+.vendors-page .vd-criteria b {
+  display: block;
+  font-family: var(--head);
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+.vendors-page .vd-sample-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -181,7 +232,7 @@
   border-top: 1px solid var(--line);
   max-width: 56em;
 }
-.vendors-page .vd-sample li {
+.vendors-page .vd-sample-list li {
   flex: 1 1 180px;
   min-width: 0;
   font-family: var(--ui);

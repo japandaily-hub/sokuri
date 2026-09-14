@@ -1,28 +1,62 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 type TabKey = "user" | "biz";
+
+/** URL ハッシュ → タブ。#biz / #pane-biz のどちらでも業者側を開く。 */
+function tabFromHash(hash: string): TabKey | null {
+  const h = hash.replace(/^#/, "");
+  if (h === "biz" || h === "pane-biz") return "biz";
+  if (h === "user" || h === "pane-user") return "user";
+  return null;
+}
 
 /**
  * 利用規約のタブ切替（ユーザー / 業者）。
  * デザイン（利用規約.html）の data-tab + .active トグル挙動を React state で再現する。
  * 切替時はデザイン同様トップへスムーズスクロールする。
+ *
+ * ラウンド4 指摘（Med・業者視点）: /business のフォームが同意を求める「業者利用規約」への
+ * リンクが /terms を指しており、着地するとユーザー側のペインが開いたままで、同意対象の本文に
+ * たどり着けたか分からなかった（業者利用規約そのものはこのタブの中に全条ある）。
+ * タブの状態を URL ハッシュ（#biz）で受け取れるようにし、リンク1本で同意対象を開けるようにする。
+ * - 初回マウントと hashchange の両方を見る（同一ページ内の <a href="#biz"> でも切り替わる）
+ * - 非アクティブのペインは display:none なのでブラウザのアンカースクロールは効かない。
+ *   タブ列（sticky）を自前で scrollIntoView して、開いた側の先頭を見せる
+ * - タブのクリックでもハッシュを replaceState で書き戻し、URL を共有可能にする
+ *   （replaceState は hashchange を発火させないので上のリスナーとは循環しない）
  */
 export function TermsTabs() {
   const [tab, setTab] = useState<TabKey>("user");
+  const tabWrapRef = useRef<HTMLDivElement>(null);
+
+  /** ハッシュ経由の切替。タブ列を画面内に入れるだけで、ページ先頭へは戻さない。 */
+  const applyHash = useCallback(() => {
+    const next = tabFromHash(window.location.hash);
+    if (!next) return;
+    setTab(next);
+    tabWrapRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
+  useEffect(() => {
+    applyHash();
+    window.addEventListener("hashchange", applyHash);
+    return () => window.removeEventListener("hashchange", applyHash);
+  }, [applyHash]);
 
   const select = (key: TabKey) => {
     setTab(key);
     if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", key === "biz" ? "#biz" : "#user");
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
 
   return (
     <>
-      <div className="tab-wrap">
+      <div className="tab-wrap" ref={tabWrapRef}>
         <div className="tab-inner">
           <div className="legal-tabs" role="tablist" aria-label="利用規約の種別">
             <button

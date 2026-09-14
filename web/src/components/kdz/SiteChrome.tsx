@@ -34,11 +34,20 @@ const BARE_PREFIXES = [
   "/admin",
 ];
 
-export { BARE_PREFIXES };
+/**
+ * 法務文書ページ。ヘッダー（CTA を含む）とフッターは共通のまま描くが、
+ * 追従する営業 CTA（Dock）は描かない。規約・ポリシーを確認しに来た読者に
+ * マーケティング CTA が追従するのは印象が悪く、本文も 74px せり上がるため
+ * （R4 ラウンド4 指摘 10）。下余白は katazuke.css の body:not(:has(.dock)) が外す。
+ */
+const DOCKLESS_PREFIXES = ["/terms", "/privacy", "/legal"];
+
+export { BARE_PREFIXES, DOCKLESS_PREFIXES };
 
 export function SiteChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "/";
   const bare = BARE_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  const dockless = DOCKLESS_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
   if (bare) return <>{children}</>;
 
@@ -52,7 +61,7 @@ export function SiteChrome({ children }: { children: React.ReactNode }) {
       {framed ? <div className="site-frame">{children}</div> : children}
       <SiteFooter />
       {/* key でルート毎に再マウントし、.hero-cta 監視の表示状態を必ずリセットする */}
-      <Dock key={pathname} />
+      {dockless ? null : <Dock key={pathname} />}
     </>
   );
 }
