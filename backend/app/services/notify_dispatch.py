@@ -337,6 +337,24 @@ async def dispatch_no_bid_reminder(
 
 
 @_best_effort
+async def dispatch_bids_pending_reminder(
+    line_user_id: str | None, email: str | None, case_id: str
+) -> None:
+    """入札未決定リマインド（依頼者宛）。LINE優先・未連携/失敗時はメール。
+
+    二重送信の防止は呼び出し元（services/reminders.py）が
+    ``cases.bids_pending_reminded_at`` で担保する（dispatch_no_bid_reminder と同じ）。
+    """
+    if line_user_id:
+        ok = await line_notify.push_bids_pending_reminder(line_user_id, case_id)
+        if ok:
+            return
+    if not email or notify.is_placeholder_email(email):
+        return
+    await notify.send_bids_pending_reminder(email, case_id)
+
+
+@_best_effort
 async def dispatch_message_received(
     line_user_id: str | None,
     transaction_id: str,

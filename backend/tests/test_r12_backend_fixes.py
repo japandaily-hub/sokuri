@@ -38,7 +38,12 @@ from app.db.models.transaction import Transaction
 from app.db.models.user import User
 from app.db.session import get_session
 from app.services import storage
-from app.services.reminders import JST, REMINDER_LOOKBACK_DAYS, run_reminders
+from app.services.reminders import (
+    BIDS_PENDING_GRACE_DAYS,
+    JST,
+    REMINDER_LOOKBACK_DAYS,
+    run_reminders,
+)
 
 
 def create_test_app(session: AsyncSession) -> FastAPI:
@@ -615,10 +620,183 @@ async def test_no_bid_reminder_selects_and_marks_once(db_session: AsyncSession):
     assert dispatch2.await_count == 0
 
 
+async def _make_bid_with_created_at(
+    db_session: AsyncSession,
+    case: Case,
+    operator: Operator,
+    *,
+    status: str,
+    created_at: datetime,
+    amount: int = 10000,
+) -> Bid:
+    """created_at を指定できる Bid を作る（_make_case と同じ二段階 commit で server_default を上書き）。"""
+    bid = Bid(case_id=case.id, operator_id=operator.id, amount=amount, status=status)
+    db_session.add(bid)
+    await db_session.commit()
+    bid.created_at = created_at
+    await db_session.commit()
+    await db_session.refresh(bid)
+    return bid
+
+
+async def test_bids_pending_reminder_selects_and_marks_once(db_session: AsyncSession):
+    """入札は届いているが2日超・未決定のまま bidding の案件だけを拾い、依頼者へ1回だけ通知する。"""
+    now = datetime.now(timezone.utc)
+    user, _ = await _make_user(db_session, "bidspending_owner@example.com")
+    operator, _ = await _make_operator(db_session, "bidspending_op@example.com")
+
+    stale = await _make_case(db_session, user, status="bidding")
+    await _make_bid_with_created_at(
+        db_session, stale, operator, status="pending", created_at=now - timedelta(days=3)
+    )
+    # 対象外1: 入札が届いてからまだ2日経っていない
+    fresh = await _make_case(db_session, user, status="bidding")
+    await _make_bid_with_created_at(
+        db_session, fresh, operator, status="pending", created_at=now - timedelta(days=1)
+    )
+    # 対象外2: 全入札が取り下げ済み（決めるべき入札が残っていない）
+    withdrawn_only = await _make_case(db_session, user, status="bidding")
+    await _make_bid_with_created_at(
+        db_session, withdrawn_only, operator, status="withdrawn", created_at=now - timedelta(days=5)
+    )
+    # 対象外3: まだ入札が1件も無い（open のまま。no_bid リマインドの対象であってこちらではない）
+    no_bid_case = await _make_case(db_session, user, created_at=now - timedelta(days=5))
+    # 対象外4: 既に決定済み（closed）
+    decided = await _make_case(db_session, user, status="closed")
+    await _make_bid_with_created_at(
+        db_session, decided, operator, status="selected", created_at=now - timedelta(days=5)
+    )
+    # 対象外5: 唯一の pending 入札が停止中業者のもの（依頼者は実際には選べない。
+    # security review Medium-1 対応 — bids.py の select_bid が弾く条件と揃える）。
+    suspended_op, _ = await _make_operator(db_session, "bidspending_suspended_op@example.com")
+    suspended_op.is_suspended = True
+    await db_session.commit()
+    suspended_only = await _make_case(db_session, user, status="bidding")
+    await _make_bid_with_created_at(
+        db_session, suspended_only, suspended_op, status="pending", created_at=now - timedelta(days=5)
+    )
+
+    with patch(
+        "app.services.notify_dispatch.dispatch_bids_pending_reminder", new_callable=AsyncMock
+    ) as dispatch, patch(
+        "app.services.notify_dispatch.dispatch_no_bid_reminder", new_callable=AsyncMock
+    ):
+        result = await run_reminders(db_session)
+
+    assert result["bids_pending"] == 1
+    assert dispatch.await_count == 1
+    assert dispatch.await_args.args[2] == str(stale.id)
+
+    for case in (stale, fresh, withdrawn_only, no_bid_case, decided, suspended_only):
+        await db_session.refresh(case)
+    assert stale.bids_pending_reminded_at is not None
+    assert fresh.bids_pending_reminded_at is None
+    assert withdrawn_only.bids_pending_reminded_at is None
+    assert no_bid_case.bids_pending_reminded_at is None
+    assert decided.bids_pending_reminded_at is None
+    assert suspended_only.bids_pending_reminded_at is None
+
+    with patch(
+        "app.services.notify_dispatch.dispatch_bids_pending_reminder", new_callable=AsyncMock
+    ) as dispatch2, patch(
+        "app.services.notify_dispatch.dispatch_no_bid_reminder", new_callable=AsyncMock
+    ):
+        again = await run_reminders(db_session)
+    assert again["bids_pending"] == 0
+    assert dispatch2.await_count == 0
+
+
+async def test_bids_pending_reminder_grace_days_boundary(db_session: AsyncSession):
+    """猶予日数ちょうどの境界（未経過は含めない・厳密不等号）を確認する（QA review 推奨）。"""
+    now = datetime.now(timezone.utc)
+    user, _ = await _make_user(db_session, "bidspending_boundary_owner@example.com")
+    operator, _ = await _make_operator(db_session, "bidspending_boundary_op@example.com")
+
+    # 対象外: 猶予にまだ1分足りない（テスト実行中の実時間経過で境界がずれても
+    # 判定が揺れないよう、ちょうど0ではなく1分のマージンを取る）。
+    just_under_grace = await _make_case(db_session, user, status="bidding")
+    await _make_bid_with_created_at(
+        db_session,
+        just_under_grace,
+        operator,
+        status="pending",
+        created_at=now - timedelta(days=BIDS_PENDING_GRACE_DAYS) + timedelta(minutes=1),
+    )
+    # 対象: 猶予を1分でも超えたら対象
+    just_over_grace_case = await _make_case(db_session, user, status="bidding")
+    await _make_bid_with_created_at(
+        db_session,
+        just_over_grace_case,
+        operator,
+        status="pending",
+        created_at=now - timedelta(days=BIDS_PENDING_GRACE_DAYS, minutes=1),
+    )
+
+    with patch(
+        "app.services.notify_dispatch.dispatch_bids_pending_reminder", new_callable=AsyncMock
+    ) as dispatch, patch(
+        "app.services.notify_dispatch.dispatch_no_bid_reminder", new_callable=AsyncMock
+    ):
+        result = await run_reminders(db_session)
+
+    assert result["bids_pending"] == 1
+    assert dispatch.await_args.args[2] == str(just_over_grace_case.id)
+
+    await db_session.refresh(just_under_grace)
+    await db_session.refresh(just_over_grace_case)
+    assert just_under_grace.bids_pending_reminded_at is None, "猶予に届いていないので対象外"
+    assert just_over_grace_case.bids_pending_reminded_at is not None
+
+
+async def test_bids_pending_reminder_respects_lookback_window(db_session: AsyncSession):
+    """遡り窓（REMINDER_LOOKBACK_DAYS）より古い放置は諦めて対象外にする（QA review 推奨）。
+
+    _run_no_bid_reminders と同じ「デプロイ直後の一斉送信防止」ロジックだが、
+    こちらは集約サブクエリ（最古の pending 入札）を経由した比較のため
+    別立てで検証する。
+    """
+    now = datetime.now(timezone.utc)
+    user, _ = await _make_user(db_session, "bidspending_window_owner@example.com")
+    operator, _ = await _make_operator(db_session, "bidspending_window_op@example.com")
+
+    within_window = await _make_case(db_session, user, status="bidding")
+    await _make_bid_with_created_at(
+        db_session,
+        within_window,
+        operator,
+        status="pending",
+        created_at=now - timedelta(days=BIDS_PENDING_GRACE_DAYS + REMINDER_LOOKBACK_DAYS - 1),
+    )
+    # 対象外: 遡り窓の外（今さら催促しても意味が無いほど古い放置）
+    too_old = await _make_case(db_session, user, status="bidding")
+    await _make_bid_with_created_at(
+        db_session,
+        too_old,
+        operator,
+        status="pending",
+        created_at=now - timedelta(days=BIDS_PENDING_GRACE_DAYS + REMINDER_LOOKBACK_DAYS + 1),
+    )
+
+    with patch(
+        "app.services.notify_dispatch.dispatch_bids_pending_reminder", new_callable=AsyncMock
+    ) as dispatch, patch(
+        "app.services.notify_dispatch.dispatch_no_bid_reminder", new_callable=AsyncMock
+    ):
+        result = await run_reminders(db_session)
+
+    assert result["bids_pending"] == 1
+    assert dispatch.await_args.args[2] == str(within_window.id)
+
+    await db_session.refresh(within_window)
+    await db_session.refresh(too_old)
+    assert within_window.bids_pending_reminded_at is not None
+    assert too_old.bids_pending_reminded_at is None, "遡り窓の外は対象外"
+
+
 async def test_admin_jobs_reminders_requires_admin_and_returns_counts(
     client: AsyncClient, db_session: AsyncSession
 ):
-    """POST /admin/jobs/reminders は admin 限定で {overdue, no_bid} を返す。"""
+    """POST /admin/jobs/reminders は admin 限定で {overdue, no_bid, bids_pending} を返す。"""
     user, user_token = await _make_user(db_session, "job_user@example.com")
     _, admin_token = await _make_user(db_session, "job_admin@example.com", role="admin")
     operator, op_token = await _make_operator(db_session, "job_op@example.com")
@@ -648,14 +826,16 @@ async def test_admin_jobs_reminders_requires_admin_and_returns_counts(
         "app.services.notify_dispatch.dispatch_visit_overdue", new_callable=AsyncMock
     ), patch(
         "app.services.notify_dispatch.dispatch_no_bid_reminder", new_callable=AsyncMock
+    ), patch(
+        "app.services.notify_dispatch.dispatch_bids_pending_reminder", new_callable=AsyncMock
     ):
         r = await client.post("/api/v1/admin/jobs/reminders", headers=_auth(admin_token))
         assert r.status_code == 200, r.text
-        assert r.json() == {"overdue": 1, "no_bid": 1}
+        assert r.json() == {"overdue": 1, "no_bid": 1, "bids_pending": 0}
 
         # 連打しても二重に送らない（マーカーで冪等）
         r = await client.post("/api/v1/admin/jobs/reminders", headers=_auth(admin_token))
-        assert r.json() == {"overdue": 0, "no_bid": 0}
+        assert r.json() == {"overdue": 0, "no_bid": 0, "bids_pending": 0}
 
 
 async def test_overdue_reminder_covers_pending_and_respects_jst_boundary_and_window(

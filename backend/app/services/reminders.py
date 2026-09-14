@@ -1,10 +1,12 @@
-"""リマインド定期処理（r12 決定3）— 訪問日超過 / 入札ゼロ放置の掘り起こし。
+"""リマインド定期処理（r12 決定3 / 入札未決定は追加分）— 訪問日超過 / 入札ゼロ放置 /
+入札未決定の掘り起こし。
 
 ``main.py`` の lifespan が 1 時間毎に :func:`run_reminders` を呼ぶほか、
 ``POST /admin/jobs/reminders`` から手動実行できる。どちらの経路でも実体は同じ関数で、
-送信済み判定は DB 列（``transactions.overdue_reminded_at`` / ``cases.no_bid_reminded_at``）
-だけに集約する（alembic 0033）。メモリ上の台帳を使わないため、再デプロイ・複数
-インスタンス・手動実行が混ざっても同一の成約・案件へ二重に通知が飛ばない。
+送信済み判定は DB 列（``transactions.overdue_reminded_at`` / ``cases.no_bid_reminded_at`` /
+``cases.bids_pending_reminded_at``）だけに集約する（alembic 0033 / 0035）。メモリ上の
+台帳を使わないため、再デプロイ・複数インスタンス・手動実行が混ざっても同一の
+成約・案件へ二重に通知が飛ばない。
 
 送信フロー（r12-review H-2 / M-5）:
 1. ``UPDATE ... WHERE reminded_at IS NULL ... RETURNING id`` で **先に確保（claim）** する。
@@ -18,9 +20,12 @@
    1通の取りこぼしより大きいという判断。運用上の再送は admin で列を戻して行う。
 
 対象抽出の計算量:
-- どちらの抽出も「未リマインド行だけを対象にする部分索引」
-  （``ix_transactions_overdue_reminder`` / ``ix_cases_no_bid_reminder``）に乗る。
-  送信済みの行が何万件積み上がっても走査対象は増えない。
+- いずれの抽出も「未リマインド行だけを対象にする部分索引」
+  （``ix_transactions_overdue_reminder`` / ``ix_cases_no_bid_reminder`` /
+  ``ix_cases_bids_pending_reminder``）に乗る。送信済みの行が何万件積み上がっても
+  走査対象は増えない（入札未決定の抽出だけは、対象を絞る「最古の pending 入札の
+  経過日数」自体はこの部分索引に乗らないサブクエリ判定のため、絞り込み後の
+  ``status='bidding'`` 母集団に対する走査になる——案件全体に対する全走査ではない）。
 - さらに **遡り窓**（:data:`REMINDER_LOOKBACK_DAYS`）と :data:`REMINDER_BATCH_LIMIT`
   で1周あたりの上限を固定する。列を追加した直後や長期停止からの復帰で「過去の
   該当行すべて」へ一斉通知が飛ぶ事故を防ぐ（r12-review H-1。0033 側でも既存行を
@@ -37,12 +42,13 @@ import uuid
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.db.models.bid import BID_STATUS_WITHDRAWN, Bid
+from app.db.models.bid import BID_STATUS_PENDING, BID_STATUS_WITHDRAWN, Bid
 from app.db.models.case import Case
+from app.db.models.operator import Operator
 from app.db.models.transaction import Transaction
 from app.db.models.user import User
 from app.services import alerts, notify_dispatch
@@ -62,6 +68,9 @@ SCHEDULED_TXN_STATUSES: tuple[str, ...] = ("pending", "visiting")
 
 #: 入札ゼロ放置とみなすまでの日数（案件作成からの経過）。
 NO_BID_GRACE_DAYS = 3
+
+#: 入札未決定とみなすまでの日数（最古の pending 入札が届いてからの経過）。
+BIDS_PENDING_GRACE_DAYS = 2
 
 #: 掘り起こしの遡り上限（日）。これより古い放置は「今さら催促しても意味が無い」
 #: ものとして対象外にする。窓が無いと、機能追加直後や長期停止からの復帰時に
@@ -221,7 +230,7 @@ async def _run_no_bid_reminders(session: AsyncSession, now: datetime) -> int:
     if not claimed_ids:
         return 0
 
-    targets = await _load_no_bid_targets(session, claimed_ids)
+    targets = await _load_case_owner_targets(session, claimed_ids)
     for line_user_id, email, case_id in targets:
         await _dispatch_or_warn(
             notify_dispatch.dispatch_no_bid_reminder,
@@ -233,10 +242,14 @@ async def _run_no_bid_reminders(session: AsyncSession, now: datetime) -> int:
     return len(claimed_ids)
 
 
-async def _load_no_bid_targets(
+async def _load_case_owner_targets(
     session: AsyncSession, case_ids: Sequence[uuid.UUID]
 ) -> list[tuple[str | None, str | None, str]]:
-    """確保済みの案件から依頼者の通知先を取り出し、読み取りTxを閉じる。"""
+    """確保済みの案件から依頼者の通知先を取り出し、読み取りTxを閉じる。
+
+    入札ゼロ放置 (b) と入札未決定 (c) の両方で使う共通ローダー——どちらも
+    「案件から依頼者本人だけに通知する」形が同じため。
+    """
     cases = (
         await session.scalars(
             select(Case).where(Case.id.in_(case_ids)).order_by(Case.created_at.asc())
@@ -251,6 +264,81 @@ async def _load_no_bid_targets(
             targets.append((owner.line_user_id, owner.email, str(case.id)))
     await session.commit()
     return targets
+
+
+async def _run_bids_pending_reminders(session: AsyncSession, now: datetime) -> int:
+    """(c) 入札は届いているが依頼者が一定日数、決定していない案件を掘り起こす。
+
+    (b) の「入札ゼロ放置」と対になる穴——入札が1件でも付くと (b) の対象から
+    外れるが、届いた入札を依頼者が放置しているケースは (b) にも訪問日超過
+    リマインド（成約前なので visit_date が無い）にも引っかからなかった。
+
+    Returns:
+        確保（= 送信済みマーカーを立てた）案件の件数。
+    """
+    newest_threshold = now - timedelta(days=BIDS_PENDING_GRACE_DAYS)
+    oldest_threshold = now - timedelta(days=BIDS_PENDING_GRACE_DAYS + REMINDER_LOOKBACK_DAYS)
+    # 「最古の pending 入札がいつ届いたか」で経過日数を測る（bidding へ遷移した
+    # 時刻は追跡していない上、2件目以降の入札でも case.status への再代入により
+    # updated_at が動きうるため、案件側の列を根拠にできない）。
+    #
+    # 選択できない入札（停止中・承認取消・退会済み業者のもの）は母集団から除外
+    # する（security review Medium-1 対応）。bids.py の select_bid が弾く条件
+    # （is_suspended / vendor_status != "active" / deleted_at）と揃えないと、
+    # 「唯一残っている pending 入札が実は選べない」案件にも「決定してください」
+    # の催促が飛び、依頼者がリンク先で選ぼうとすると必ず409で詰む。
+    oldest_pending_bid_at = (
+        select(func.min(Bid.created_at))
+        .join(Operator, Operator.id == Bid.operator_id)
+        .where(
+            Bid.case_id == Case.id,
+            Bid.status == BID_STATUS_PENDING,
+            Operator.is_suspended.is_(False),
+            Operator.vendor_status == "active",
+            Operator.deleted_at.is_(None),
+        )
+        .scalar_subquery()
+    )
+    candidates = (
+        select(Case.id)
+        .where(
+            Case.bids_pending_reminded_at.is_(None),
+            Case.status == "bidding",
+            Case.user_id.is_not(None),
+            oldest_pending_bid_at.is_not(None),
+            oldest_pending_bid_at < newest_threshold,
+            oldest_pending_bid_at >= oldest_threshold,
+        )
+        .order_by(Case.created_at.asc())
+        .limit(REMINDER_BATCH_LIMIT)
+    )
+    claimed_ids = (
+        (
+            await session.execute(
+                update(Case)
+                .where(Case.bids_pending_reminded_at.is_(None), Case.id.in_(candidates))
+                .values(bids_pending_reminded_at=now)
+                .returning(Case.id)
+                .execution_options(synchronize_session=False)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    await session.commit()
+    if not claimed_ids:
+        return 0
+
+    targets = await _load_case_owner_targets(session, claimed_ids)
+    for line_user_id, email, case_id in targets:
+        await _dispatch_or_warn(
+            notify_dispatch.dispatch_bids_pending_reminder,
+            line_user_id,
+            email,
+            case_id,
+            context=f"bids_pending case_id={case_id}",
+        )
+    return len(claimed_ids)
 
 
 async def _dispatch_or_warn(
@@ -307,11 +395,18 @@ async def run_reminders(session: AsyncSession) -> dict[str, int]:
     """リマインドを1周実行し、送信した件数を返す。
 
     Returns:
-        ``{"overdue": n, "no_bid": n}``。n は「リマインド対象として確保し、
-        送信済みマーカーを立てた件数」（宛先不達・通知失敗の分も含む）。
+        ``{"overdue": n, "no_bid": n, "bids_pending": n}``。n は「リマインド
+        対象として確保し、送信済みマーカーを立てた件数」（宛先不達・通知失敗の
+        分も含む）。
     """
     now = datetime.now(timezone.utc)
     overdue = await _run_overdue_visit_reminders(session, now)
     no_bid = await _run_no_bid_reminders(session, now)
-    logger.info("reminders: 実行完了 - overdue=%s no_bid=%s", overdue, no_bid)
-    return {"overdue": overdue, "no_bid": no_bid}
+    bids_pending = await _run_bids_pending_reminders(session, now)
+    logger.info(
+        "reminders: 実行完了 - overdue=%s no_bid=%s bids_pending=%s",
+        overdue,
+        no_bid,
+        bids_pending,
+    )
+    return {"overdue": overdue, "no_bid": no_bid, "bids_pending": bids_pending}

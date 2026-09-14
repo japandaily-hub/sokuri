@@ -311,6 +311,21 @@ async def send_no_bid_reminder(to_email: str, case_id: str) -> bool:
     )
 
 
+async def send_bids_pending_reminder(to_email: str, case_id: str) -> bool:
+    """入札が届いたまま未決定の案件のリマインド（依頼者宛）。"""
+    settings = get_settings()
+    url = f"{settings.frontend_base_url}/cases/{case_id}"
+    return await _send(
+        to_email,
+        "【カタヅケ】入札のご確認はお済みですか？",
+        _wrap(
+            "<p>届いている入札からまだ決定されていません。"
+            "内容を比較のうえ、よろしければ決定手続きにお進みください。</p>"
+            f'<p><a href="{url}">入札を確認する</a></p>'
+        ),
+    )
+
+
 async def send_bank_account_changed(to_email: str, action: str) -> bool:
     """振込先口座の登録・変更・削除を本人へ通知する（security review M-1）。
 

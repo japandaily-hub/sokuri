@@ -1877,7 +1877,7 @@ async def admin_delete_contact(
 @router.post(
     "/admin/jobs/reminders",
     response_model=ReminderJobResult,
-    summary="リマインド定期処理の手動実行（訪問日超過 / 入札ゼロ放置）",
+    summary="リマインド定期処理の手動実行（訪問日超過 / 入札ゼロ放置 / 入札未決定）",
 )
 async def run_reminder_job(
     admin: User | None = Depends(get_ops_or_admin),
@@ -1888,8 +1888,9 @@ async def run_reminder_job(
     用途は (1) 実装・設定変更後の動作確認、(2) ``REMINDERS_ENABLED=false`` で
     定期ループを止めている間の手動運用、(3) ループが落ちた際の穴埋め。
     送信済み判定は DB 列（``transactions.overdue_reminded_at`` /
-    ``cases.no_bid_reminded_at``）に集約されているため、定期ループと同時に
-    走っても・連打しても同一の宛先へ二重に通知は飛ばない（2回目以降は 0 件）。
+    ``cases.no_bid_reminded_at`` / ``cases.bids_pending_reminded_at``）に
+    集約されているため、定期ループと同時に走っても・連打しても同一の宛先へ
+    二重に通知は飛ばない（2回目以降は 0 件）。
 
     認可は ``get_ops_or_admin``（管理者 JWT または ``X-Ops-Token``）。Render Free は
     無通信でスピンダウンし、プロセス内の毎時ループごと止まるため、GitHub Actions の
@@ -1897,10 +1898,11 @@ async def run_reminder_job(
     """
     result = await run_reminders(session)
     logger.info(
-        "admin: リマインドを手動実行しました - admin_id=%s overdue=%s no_bid=%s",
+        "admin: リマインドを手動実行しました - admin_id=%s overdue=%s no_bid=%s bids_pending=%s",
         admin.id if admin is not None else "ops-token",
         result["overdue"],
         result["no_bid"],
+        result["bids_pending"],
     )
     return ReminderJobResult(**result)
 

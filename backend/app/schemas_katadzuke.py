@@ -782,6 +782,7 @@ class ReminderJobResult(BaseModel):
 
     overdue: int = Field(ge=0, description="訪問日超過リマインドを送った成約数")
     no_bid: int = Field(ge=0, description="入札ゼロ放置リマインドを送った案件数")
+    bids_pending: int = Field(ge=0, description="入札未決定リマインドを送った案件数")
 
 
 class AdminAuditEntry(BaseModel):

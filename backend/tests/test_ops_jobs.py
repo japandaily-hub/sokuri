@@ -120,10 +120,12 @@ async def test_ops_token_header_allows_jobs(client: AsyncClient, ops_token: str)
         "app.services.notify_dispatch.dispatch_visit_overdue", new_callable=AsyncMock
     ), patch(
         "app.services.notify_dispatch.dispatch_no_bid_reminder", new_callable=AsyncMock
+    ), patch(
+        "app.services.notify_dispatch.dispatch_bids_pending_reminder", new_callable=AsyncMock
     ):
         r = await client.post("/api/v1/admin/jobs/reminders", headers=_ops())
     assert r.status_code == 200, r.text
-    assert r.json() == {"overdue": 0, "no_bid": 0}
+    assert r.json() == {"overdue": 0, "no_bid": 0, "bids_pending": 0}
 
 
 async def test_ops_token_mismatch_is_rejected(client: AsyncClient, ops_token: str):

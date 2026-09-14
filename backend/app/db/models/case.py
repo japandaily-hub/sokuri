@@ -75,6 +75,17 @@ class Case(Base, TimestampMixin):
             postgresql_where=text("no_bid_reminded_at IS NULL"),
             sqlite_where=text("no_bid_reminded_at IS NULL"),
         ),
+        # 入札未決定リマインドの抽出用（alembic 0035）。定期ループは
+        # 「bids_pending_reminded_at IS NULL かつ status='bidding'」で引き、
+        # 対象の絞り込み（最古の pending 入札からの経過日数）はアプリ層の
+        # サブクエリで行う（ix_cases_no_bid_reminder と同じ部分索引方針）。
+        Index(
+            "ix_cases_bids_pending_reminder",
+            "status",
+            "created_at",
+            postgresql_where=text("bids_pending_reminded_at IS NULL"),
+            sqlite_where=text("bids_pending_reminded_at IS NULL"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
@@ -100,6 +111,11 @@ class Case(Base, TimestampMixin):
     # 入札ゼロ放置リマインド（services/reminders.py）の送信済みマーカー。NULL = 未送信。
     # transactions.overdue_reminded_at と同じ二重送信防止の役割（alembic 0033 / r12 決定3）。
     no_bid_reminded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    # 入札未決定リマインド（services/reminders.py）の送信済みマーカー。NULL = 未送信。
+    # 「入札は届いているが依頼者がまだ決定していない」案件を掘り起こす通知の
+    # 二重送信防止（alembic 0035）。no_bid_reminded_at と同じ役割。
+    bids_pending_reminded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Gemini Vision が生成した案件サマリー
     ai_summary: Mapped[str | None] = mapped_column(Text)

@@ -105,9 +105,10 @@ async def _run_reminder_loop(settings: Settings) -> None:
             async with get_background_session_factory()() as session:
                 result = await run_reminders(session)
             logger.info(
-                "reminders: 定期実行完了 - overdue=%s no_bid=%s",
+                "reminders: 定期実行完了 - overdue=%s no_bid=%s bids_pending=%s",
                 result["overdue"],
                 result["no_bid"],
+                result["bids_pending"],
             )
         except asyncio.CancelledError:
             raise
@@ -116,7 +117,7 @@ async def _run_reminder_loop(settings: Settings) -> None:
             alerts.fire_and_forget(
                 alerts.send_alert(
                     "リマインド定期処理が失敗しました",
-                    "訪問日超過・入札ゼロ放置のリマインドが1周分スキップされました。"
+                    "訪問日超過・入札ゼロ放置・入札未決定のリマインドが1周分スキップされました。"
                     f"次の周期で自動再試行します。直近のエラー: {type(exc).__name__}: {str(exc)[:200]}",
                     severity="warning",
                     key="reminders_loop_failed",

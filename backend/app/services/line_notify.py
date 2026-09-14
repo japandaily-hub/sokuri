@@ -225,6 +225,18 @@ async def push_no_bid_reminder(line_user_id: str, case_id: str) -> bool:
     )
 
 
+async def push_bids_pending_reminder(line_user_id: str, case_id: str) -> bool:
+    """入札が届いたまま未決定の案件のリマインド（依頼者宛）。"""
+    settings = get_settings()
+    url = f"{settings.frontend_base_url}/cases/{case_id}"
+    return await _push(
+        line_user_id,
+        "【カタヅケ】入札のご確認はお済みですか？\n"
+        "届いている入札を比較して、よろしければ決定してください。\n"
+        f"{url}",
+    )
+
+
 async def push_bid_received(
     line_user_id: str, case_id: str, company_name: str, amount: int
 ) -> bool:
