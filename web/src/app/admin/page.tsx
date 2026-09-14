@@ -420,6 +420,25 @@ export default function AdminPage() {
   return (
     <div className="admin-page">
       <AppHeader showBell={false} />
+      {/* 運営とひと目でわかるバナー（2026-09-14）。PageShell側に既にh1「管理画面」が
+          あるため、帯側は見出しを重ねずeyebrowラベルのみ載せる（h1重複防止）。 */}
+      <section className="hero-band hero-band--slim hero-band--face" aria-hidden="true">
+        {/* eslint-disable @next/next/no-img-element */}
+        <img
+          src="/img/v2/admin-hero.webp"
+          width={1920}
+          height={1088}
+          alt=""
+          loading="eager"
+          fetchPriority="high"
+          decoding="async"
+        />
+        {/* eslint-enable @next/next/no-img-element */}
+        <div className="hero-band__veil" aria-hidden="true" />
+        <div className="container hero-band__copy">
+          <span className="eyebrow">運営</span>
+        </div>
+      </section>
       <PageShell
         title="管理画面"
         description="業者招待コードの発行・アカウント承認・セル密度を管理します。"
