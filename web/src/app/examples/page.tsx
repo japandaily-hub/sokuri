@@ -9,142 +9,29 @@
  *  小2枚は既存 3D シリーズ /img/real/cat-*.webp（512x512・.img-frame--1x1）。
  *  奇数番目=画像左／偶数番目=画像右（.media-split--rev）で交互に置く。
  *
+ *  R4: 事例データ（CASES）は @/lib/model-cases の単一正本を読む。トップ（/）の「利用イメージ」
+ *  節と同じ値を共有し、金額・入札数・日数がページ間で食い違わないようにする。ここに再定義しない。
+ *  肖像（人物画像）は本ページでは出さない（R4_BRIEF B.3: 1:1 素材を 1:1 の円に入れると
+ *  object-position が効かず顔が潰れ、48px 枠に 800px 素材は 2x 規約にも反するため）。
+ *
  *  【景品表示法（優良誤認）対応】掲載する事例は handoff 由来の架空データであり、実際の
  *  取引実績ではない。よって本ページでは (1)「実際の」等の実在を示す表現を使わない
- *  (2) 全カード・金額表示に「モデルケース／イメージ」を明示する (3) 計測実績風の統計値
- *  （平均入札件数等）は実データ集計が配線されるまで掲載しない。実データへの差し替え時に
- *  この注記類を外すこと。 */
+ *  (2) 全カード・金額表示に「モデルケース（架空の利用イメージ）」を金額より手前で明示する
+ *  (3) 計測実績風の統計値（平均入札件数等）は実データ集計が配線されるまで掲載しない。
+ *  実データへの差し替え時にこの注記類を外すこと。 */
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Ic } from "@/components/kdz/Icons";
 import { Reveal } from "@/components/kdz/interactions";
+import {
+  CASES,
+  caseName,
+  MODEL_CASE_CHIP,
+  MODEL_CASE_NOTE,
+  type CaseItem,
+} from "@/lib/model-cases";
 import "./examples.css";
-
-type CaseItem = {
-  id: number;
-  tag: string;
-  persona: string;
-  avatar: string;
-  name: string;
-  amount: number;
-  bidCount: number;
-  days: number;
-  cats: string[];
-  count: number;
-  quote: string;
-  /** 主役画像の id（/img/v2/<lot>.webp・1536x1024 → 1600×1067）。 */
-  lot: string;
-  /** 主役画像の alt（images.json の値をそのまま使う）。 */
-  lotAlt: string;
-  /** 主役画像に添える小2枚（既存 3D シリーズ /img/real/cat-*.webp）。 */
-  thumbs: [string, string];
-};
-
-const CASES: CaseItem[] = [
-  {
-    id: 1,
-    tag: "実家整理",
-    persona: "60代・女性（東京都練馬区）",
-    avatar: "田",
-    name: "田中さん",
-    amount: 148000,
-    bidCount: 11,
-    days: 2,
-    cats: ["家電・PC", "家具", "ブランド品", "時計", "カメラ"],
-    count: 32,
-    quote:
-      "実家の片付けで途方に暮れていましたが、まとめて撮影するだけで業者さんが競ってくれるとは。引越し業者への追加依頼もなく、スタッフ2名で丁寧に運んでくれました。",
-    lot: "ex-lot-jikka",
-    lotAlt: "実家整理のモデルケース。まとめて出す品物を和室に並べたイメージ",
-    thumbs: ["cat-kaden", "cat-watch"],
-  },
-  {
-    id: 2,
-    tag: "引越し",
-    persona: "30代・男性（東京都渋谷区）",
-    avatar: "鈴",
-    name: "鈴木さん",
-    amount: 72000,
-    bidCount: 7,
-    days: 3,
-    cats: ["家電・PC", "カメラ", "ブランド品"],
-    count: 14,
-    quote:
-      "引越し前に使わない家電やカメラをまとめて出品。1点ずつ売る手間がなく、1回の撮影で引き取りまで終わりました。",
-    lot: "ex-lot-moving",
-    lotAlt: "引越しのモデルケース。新居に持っていかない家具と箱をまとめたイメージ",
-    thumbs: ["cat-camera", "cat-brand"],
-  },
-  {
-    id: 3,
-    tag: "断捨離",
-    persona: "40代・女性（神奈川県横浜市）",
-    avatar: "佐",
-    name: "佐藤さん",
-    amount: 58000,
-    bidCount: 6,
-    days: 2,
-    cats: ["ブランド品", "時計", "衣類・靴"],
-    count: 11,
-    quote:
-      "ブランド品を10点ほど。1点ずつフリマアプリに出すのが億劫で試してみたら、撮影から引き取りまで1回で片付きました。何より、選ぶまで業者から連絡が来ないのが助かりました。",
-    lot: "ex-lot-closet",
-    lotAlt: "断捨離のモデルケース。衣類や小物をまとめたイメージ",
-    thumbs: ["cat-brand", "cat-fashion"],
-  },
-  {
-    id: 4,
-    tag: "遺品整理",
-    persona: "50代・男性（千葉県船橋市）",
-    avatar: "山",
-    name: "山口さん",
-    amount: 95000,
-    bidCount: 8,
-    days: 2,
-    cats: ["家電・PC", "家具", "音楽", "ゲーム"],
-    count: 24,
-    quote:
-      "父の遺品整理で大量の品物がありました。一括で見てもらえるのでとても楽でした。業者の方も丁寧に対応してくれ、感謝しています。",
-    lot: "ex-lot-ihin",
-    lotAlt: "遺品整理のモデルケース。品物を種類ごとに分けて並べたイメージ",
-    thumbs: ["cat-music", "cat-game"],
-  },
-  {
-    id: 5,
-    tag: "模様替え",
-    persona: "20代・女性（東京都世田谷区）",
-    avatar: "中",
-    name: "中村さん",
-    amount: 31000,
-    bidCount: 4,
-    days: 3,
-    cats: ["家具", "衣類・靴", "本・メディア"],
-    count: 9,
-    quote:
-      "模様替えで不要になった家具と洋服。重い家具も玄関まで出してもらえて、部屋がすっきりしました。4社の査定を見比べて、一番コメントが丁寧な業者さんに決めました。",
-    lot: "ex-lot-rearrange",
-    lotAlt: "模様替えのモデルケース。入れ替える家具をリビングにまとめたイメージ",
-    thumbs: ["cat-furniture", "cat-fashion"],
-  },
-  {
-    id: 6,
-    tag: "引越し",
-    persona: "30代・夫婦（埼玉県さいたま市）",
-    avatar: "小",
-    name: "小林さん夫婦",
-    amount: 112000,
-    bidCount: 9,
-    days: 1,
-    cats: ["家電・PC", "家具", "スポーツ", "ゲーム"],
-    count: 19,
-    quote:
-      "2LDKの引越しで家電・家具をまるごと出品。引越し当日に合わせて引き取り日を調整してもらえ、タイミングもぴったりでした。",
-    lot: "ex-lot-kitchen",
-    lotAlt: "引越しのモデルケース。台所用品と小型家電をまとめたイメージ",
-    thumbs: ["cat-sport", "cat-game"],
-  },
-];
 
 /** フィルターチップ（label=表示, tag=照合する事例タグ。"all" は全件）。 */
 const FILTERS: { label: string; tag: string }[] = [
@@ -205,9 +92,10 @@ function CaseCard({ c, index }: { c: CaseItem; index: number }) {
       </div>
 
       <div className="case-body">
-        {/* 画像と引用の間に「モデルケース」チップを挟む（架空であることを金額の手前で明示） */}
+        {/* 打消し表示。DOM 順で必ず金額（.case-amount-box）より手前に置く（R4_BRIEF B.3）。
+            クラスは共有の .model-chip（katazuke-pages.css）。ページ CSS で再定義しない */}
         <div className="case-cats">
-          <span className="case-model-chip">モデルケース</span>
+          <span className="model-chip">{MODEL_CASE_CHIP}</span>
           <span className="case-tag-chip">{c.tag}</span>
           {c.cats.map((cat) => (
             <span className="case-cat" key={cat}>
@@ -219,20 +107,21 @@ function CaseCard({ c, index }: { c: CaseItem; index: number }) {
         <div className="case-persona">
           <div className="case-avatar">{c.avatar}</div>
           <div className="case-persona-info">
-            <div className="name">{c.name}</div>
+            <div className="name">{caseName(c)}</div>
             <div className="attr">{c.persona}</div>
           </div>
         </div>
 
         <div className="case-amount-box">
-          <div className="case-amount-label">成約買取額（イメージ）</div>
+          {/* R4_BRIEF E.1: 「量と流れ」を金額より先に読ませる（金額を主役にしない）。
+              金額は 24px に落とし、この行より大きくならないようにしてある */}
+          <div className="case-facts">
+            {c.bidCount}社が入札 ／ {c.count}点まとめ ／ {c.days}日で成約
+          </div>
+          <div className="case-amount-label">買取額の例（架空のモデルケース）</div>
           <div className="case-amount">
             ¥{c.amount.toLocaleString()}
             <span>円</span>
-          </div>
-          {/* 金額と同じ重さで「量と流れ」を読ませる（BRIEF §2.3 #4） */}
-          <div className="case-facts">
-            {c.bidCount}社が入札 ／ {c.count}点まとめ ／ {c.days}日で成約
           </div>
           <p className="case-amount-note">
             ※ 架空のモデルケースの想定額です。買取額は品物や状況により異なり、最終的な金額は業者の現物査定で決まります。
@@ -273,7 +162,7 @@ export default function ExamplesPage() {
       <div className="cases-disclosure">
         <div className="container">
           <p className="cases-hero-note" role="note">
-            ※ 掲載している事例・人物・金額・入札数はいずれも、利用の流れを説明するための架空のモデルケースです。実際の取引実績ではなく、買取額等の成果を保証するものではありません。
+            {MODEL_CASE_NOTE}
           </p>
         </div>
       </div>
@@ -312,6 +201,9 @@ export default function ExamplesPage() {
               ))}
               <span className="filter-count">{filtered.length}件</span>
             </div>
+            {/* 絞り込み操作中も架空であることが視界から消えないようにする（R4_BRIEF E.1）。
+                PC は件数の隣、859px 以下はチップ列（横スクロール）の外＝常に見える位置に置く */}
+            <span className="filter-note">すべて架空のモデルケース</span>
           </div>
 
           {/* ============ 事例グリッド ============ */}
@@ -328,6 +220,10 @@ export default function ExamplesPage() {
           </p>
 
           {/* ============ CTA ============ */}
+          {/* 押す直前の安心1行（.section-cta / /signup の既存文言の再掲。新しい約束は足さない） */}
+          <p className="cases-assure">
+            登録・査定・お断りまで無料　／　連絡が来るのは、あなたが選んだ1社だけ
+          </p>
           <Reveal className="cases-cta">
             <div className="cases-cta-inner">
               <h2>あなたの家の不用品、いくらになる？</h2>

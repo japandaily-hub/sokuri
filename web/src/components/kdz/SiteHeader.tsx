@@ -72,7 +72,10 @@ export function SiteHeader({
           >
             ログイン
           </Link>
-          <Link href={ctaHref} className="btn btn-line h-cta">
+          {/* R4: ヘッダー CTA から LINE 緑を外す（緑は .btn-line のタイル1枚に集約）。
+              .btn.btn-line(0,2,0) は .h-cta(0,1,0) に勝つため、.btn-line のままだと 72px の
+              ヘッダー内で padding:0・min-height:60px の左寄せブロックに化ける。 */}
+          <Link href={ctaHref} className="btn btn-primary h-cta">
             <Ic name="chat" />
             {ctaLabel}
           </Link>

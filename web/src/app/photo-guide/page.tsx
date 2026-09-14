@@ -104,12 +104,12 @@ export default function PhotoGuidePage() {
   return (
     <main id="main">
       {/* ============ ヒーロー（写真帯・LCP） ============ */}
-      <section className="hero-band hero-band--tall hero-band--pos-r pg-hero">
+      <section className="hero-band hero-band--tall hero-band--face pg-hero">
         <img
           src="/img/v2/pg-hero.webp"
           width={1920}
           height={1080}
-          alt="窓際の床に置いた品物を、スマートフォンで真上から撮影する手元（イメージ）"
+          alt="床に置いた品物をスマートフォンで真上から撮影する女性の手元（イメージ）"
           loading="eager"
           fetchPriority="high"
           decoding="async"
@@ -126,9 +126,15 @@ export default function PhotoGuidePage() {
             カタヅケでは写真と品目情報が業者の入札根拠になります。上手に撮ると、業者が品物を判断しやすくなります。
           </p>
           <div className="hero-cta">
-            <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-primary btn-lg">
-              LINEではじめる（無料）
-              <Ic name="arrow" />
+            {/* LINE CTA は 7 箇所共通の 2 トーン構造（主色ブルーの面＋左端に LINE 緑のタイル）。
+                タイルは aria-hidden の純装飾で、アクセシブル名はラベル＋補足の文字が担う。 */}
+            <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-line btn-lg">
+              <span className="btn-line__tile" aria-hidden="true" />
+              <span className="btn-line__body">
+                <span className="btn-line__label">LINEではじめる（無料）</span>
+                <span className="btn-line__sub">LINEアカウントでログインできます</span>
+              </span>
+              <Ic name="arrow" className="btn-line__arr" />
             </Link>
             <a href="#basics" className="btn btn-ghost btn-lg">
               読んでから決める ↓
@@ -356,9 +362,14 @@ export default function PhotoGuidePage() {
       <div className="pg-cta-actions">
         <div className="container">
           <div className="pg-cta-btns">
-            <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-primary btn-lg">
-              LINEではじめる（無料）
-              <Ic name="arrow" />
+            {/* ヒーローと同一の 2 トーン構造。同じ文言のボタンが違う見た目で並ばないよう揃える。 */}
+            <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-line btn-lg">
+              <span className="btn-line__tile" aria-hidden="true" />
+              <span className="btn-line__body">
+                <span className="btn-line__label">LINEではじめる（無料）</span>
+                <span className="btn-line__sub">LINEアカウントでログインできます</span>
+              </span>
+              <Ic name="arrow" className="btn-line__arr" />
             </Link>
             <Link href="/" className="btn btn-ghost btn-lg">
               サービスの詳細を見る

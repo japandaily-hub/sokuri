@@ -31,6 +31,9 @@ export default function VendorListPage() {
   const [error, setError] = useState<string | null>(null);
   const { status: sessionStatus } = useSession();
   const signedIn = sessionStatus === "authenticated";
+  /* 取得が成功して 0 件だった状態（＝意図された空）。読込中（vendors === null）とエラーは含まない。
+     帯リードの差し替えと「掲載時に表示する項目」ブロックは、この状態のときだけ描く。 */
+  const isEmpty = vendors !== null && vendors.length === 0;
 
   useEffect(() => {
     getVendors()
@@ -45,8 +48,14 @@ export default function VendorListPage() {
         {/* ============ 写真帯（静的。取得状態に依存しない） ============ */}
         {/* r2 M5 是正: 見出し1語だけでは帯の濃紺面が空に見えたため、/photo-guide の帯と同じ
             eyebrow ＋ h1 ＋ 1行リードの構成に揃える。小さい文字を載せるので veil は
-            --headline（.55）をやめ既定の .65 に戻す（白 13〜16px で AA を確保するため）。 */}
-        <section className="hero-band hero-band--slim vd-band">
+            --headline（.55）をやめ既定の .65 に戻す（白 13〜16px で AA を確保するため）。
+            R4 D.2 #7: 素材に遠景の作業者が入るため縦位置修飾子 .hero-band--face を足す。
+            --headline は付けない（3要素が載る帯なので veil を .65 のまま維持する）。
+            R4 C.3-4: リード文は掲載0件のときだけ「…掲載します／現在、掲載中の業者はありません。」に
+            差し替える。承認済みの実在業者がいる断定文を 0 件で常時出すと優良誤認になるため。
+            読込中・エラー時・1社以上あるときは現行文のまま（帯は取得状態に依存しないという
+            既存の設計意図を、空状態の1ケースにだけ例外を設ける形で維持する）。 */}
+        <section className="hero-band hero-band--slim hero-band--face vd-band">
           {/* eslint-disable @next/next/no-img-element */}
           <img
             src="/img/v2/vd-band.webp"
@@ -62,7 +71,11 @@ export default function VendorListPage() {
           <div className="container hero-band__copy">
             <span className="eyebrow">審査制</span>
             <h1>登録業者一覧</h1>
-            <p>古物商許可番号を確認し、運営が承認した業者です。</p>
+            <p>
+              {isEmpty
+                ? "古物商許可番号を確認し、運営が承認した業者のみを掲載します。現在、掲載中の業者はありません。"
+                : "古物商許可番号を確認し、運営が承認した業者です。"}
+            </p>
           </div>
         </section>
 
@@ -109,34 +122,54 @@ export default function VendorListPage() {
             </div>
           ) : null}
 
-          {/* 空: 画像付きの独立ブロック（上下 1px 罫線・白面） */}
-          {vendors !== null && vendors.length === 0 ? (
-            <section className="vd-empty" aria-label="掲載中の業者">
-              <div className="img-frame img-frame--1x1 img-frame--pale vd-empty-fig">
-                {/* eslint-disable @next/next/no-img-element */}
-                <img
-                  src="/img/v2/vd-empty.webp"
-                  width={800}
-                  height={800}
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                />
-                {/* eslint-enable @next/next/no-img-element */}
-              </div>
-              <h2 className="vd-empty-title">審査を通過した業者から順に掲載します</h2>
-              <p className="vd-empty-note">
-                掲載前でも出品はできます。審査を通過した業者から順にここへ掲載します。
-              </p>
-              <div className="vd-empty-cta">
-                <Link href="/create" className="btn btn-primary btn-lg">
-                  出品する
-                </Link>
-                <Link href="/business" className="btn btn-ghost btn-lg">
-                  業者の方はこちら
-                </Link>
-              </div>
-            </section>
+          {/* 空: 画像付きの独立ブロック（上下 1px 罫線・白面）
+              R4 C.3: 架空の業者カードは作らない。.vendor-row の骨格を流用した架空店は、
+              チップや注記を付けても見た目が実在の掲載と同じで「登録業者がいるかのような表示」に
+              なり得るため。代わりに、正直な空状態メッセージを先に読ませたうえで、
+              カードの形をとらない説明ブロック（掲載時に表示する項目）を直後に置く。
+              社名・エリア・星・許可タグ・画像は一切出さない。 */}
+          {isEmpty ? (
+            <>
+              <section className="vd-empty" aria-label="掲載中の業者">
+                <div className="img-frame img-frame--1x1 img-frame--pale vd-empty-fig">
+                  {/* eslint-disable @next/next/no-img-element */}
+                  <img
+                    src="/img/v2/vd-empty.webp"
+                    width={800}
+                    height={800}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  {/* eslint-enable @next/next/no-img-element */}
+                </div>
+                <h2 className="vd-empty-title">審査を通過した業者から順に掲載します</h2>
+                <p className="vd-empty-note">
+                  掲載前でも出品はできます。審査を通過した業者から順にここへ掲載します。
+                </p>
+                <div className="vd-empty-cta">
+                  <Link href="/create" className="btn btn-primary btn-lg">
+                    出品する
+                  </Link>
+                  <Link href="/business" className="btn btn-ghost btn-lg">
+                    業者の方はこちら
+                  </Link>
+                </div>
+              </section>
+              {/* 掲載時に「何が出るのか」だけを伝える説明ブロック。架空の店舗名・エリア・数値・
+                  星・許可タグ・画像は出さない。VENDOR_CASES の店名もこのページでは使わない
+                  （ページをまたいで実在の登録業者と読まれるため）。 */}
+              <section className="vd-sample" aria-labelledby="vd-sample-h">
+                <h3 id="vd-sample-h">掲載時に表示する項目</h3>
+                <p className="model-note">審査を通過した業者は、次の項目とともにこの一覧に掲載されます。</p>
+                <ul>
+                  <li>店舗名</li>
+                  <li>エリア</li>
+                  <li>取扱カテゴリ</li>
+                  <li>評価</li>
+                </ul>
+              </section>
+            </>
           ) : null}
 
           {vendors !== null && vendors.length > 0 ? (

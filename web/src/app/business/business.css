@@ -14,10 +14,13 @@
 /* ============ ヒーロー ============
    緑（#527e52）とオレンジの radial 4本 + ::before の被りを撤去し、
    白 → --pale-2 の縦グラデ1本だけにする。輪郭は右カラムの .img-frame が持つ。 */
+/* R4 E.2-1: .biz-hero-cta の直下に条件1行を足さない（直上のリード・.biz-beta・.biz-stats で
+   同じ条件が3回反復し、しかも新1行だけ 8% が欠落すると「全部0円」と読める＝有利誤認）。
+   代わりに下パディングを詰め、β注記（.biz-beta）が CTA と同一視野に入るようにする。 */
 .business-page .biz-hero {
   background: linear-gradient(180deg, #fff 0%, var(--pale-2) 100%);
   color: var(--body);
-  padding: clamp(48px, 6.5vw, 96px) 0 clamp(40px, 5vw, 72px);
+  padding: clamp(48px, 6.5vw, 96px) 0 clamp(20px, 3vw, 32px);
 }
 .business-page .biz-hero .container { position: relative; }
 /* 画像 34 : テキスト 66。画像は 2:3 縦長なので列幅を絞って帯丈を抑える */
@@ -194,6 +197,115 @@
 }
 .business-page .biz-assure-body h4 { font-size: 16px; color: var(--ink); margin: 0 0 8px; line-height: 1.6; }
 .business-page .biz-assure-body p { font-size: 14px; color: var(--body-soft); line-height: 1.9; margin: 0; }
+
+/* ============ 参加のモデルケース（架空・R4 C.2） ============
+   面は白のまま（#flow の淡青と連続させない）。カードは枠で囲わず、ヘアラインと余白だけで
+   区切る（角丸0・影0）。.model-chip / .model-note は katazuke-pages.css（layer components）の
+   共有部品で、ページ CSS は unlayered のため常に勝つ。ここでは再定義しない（余白のみ与える）。 */
+.business-page .vc-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(28px, 4vw, 56px);
+}
+.business-page .vc-card { min-width: 0; }
+/* チップはカード先頭・肖像より上・金額より手前（打消し表示の近接） */
+.business-page .vc-card .model-chip { margin-bottom: 16px; }
+.business-page .vc-head {
+  display: grid;
+  grid-template-columns: minmax(0, 220px) 1fr;
+  gap: 20px;
+  align-items: center;
+}
+.business-page .vc-fig { width: 100%; }
+.business-page .vc-meta { min-width: 0; }
+.business-page .vc-meta h3 {
+  font-family: var(--head);
+  font-weight: 600;
+  font-size: clamp(17px, 1.9vw, 20px);
+  color: var(--navy);
+  line-height: 1.6;
+  margin: 0 0 8px;
+}
+.business-page .vc-attr {
+  font-family: var(--ui);
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--body-soft);
+  margin: 0;
+}
+/* 下見0回は架空数値ではなくサービスの仕様＝業者の痛点に答える唯一の事実。
+   「ある1か月のイメージ」という架空ラベルの下に埋めず、表の上に独立した行として置く。 */
+.business-page .vc-visit {
+  font-family: var(--ui);
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--body);
+  margin: 20px 0 0;
+}
+.business-page .vc-facts-label {
+  font-family: var(--ui);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  color: var(--body-soft);
+  margin: 18px 0 0;
+}
+/* ヘアラインの定義リスト（台帳のように読ませる。箱を作らない） */
+.business-page .vc-facts { margin: 8px 0 0; }
+.business-page .vc-facts > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 0;
+  border-top: 1px solid var(--line);
+}
+.business-page .vc-facts > div:last-child { border-bottom: 1px solid var(--line); }
+.business-page .vc-facts dt {
+  font-family: var(--ui);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--body);
+  min-width: 0;
+}
+.business-page .vc-facts dd {
+  margin: 0;
+  flex: 0 0 auto;
+  font-family: var(--ui);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.business-page .vc-facts dd b { font-size: 20px; font-weight: 600; }
+.business-page .vc-facts dd span { font-size: 12px; font-weight: 600; color: var(--body); margin-left: 3px; }
+/* 利得側（引き取り・成約・買取総額）と同じ視野に業者の負担（成約時8%）を置く。省略不可。 */
+.business-page .vc-fee {
+  font-family: var(--ui);
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--body);
+  margin: 12px 0 0;
+}
+.business-page .vc-quote {
+  margin: 22px 0 0;
+  padding: 2px 0 2px 18px;
+  border-left: 3px solid var(--primary);
+}
+.business-page .vc-quote p {
+  font-family: var(--head);
+  font-weight: 400;
+  font-size: 16px;
+  line-height: 2;
+  color: var(--ink);
+  margin: 0;
+}
+.business-page .vc-quote footer {
+  font-family: var(--ui);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--body-soft);
+  margin-top: 10px;
+}
 
 /* ============ フロー（業者視点・4ステップ） ============
    円形バッジ → 48px の正方形 1px 枠。アイコンは既存 3D シリーズを 120px の枠で contain。 */
@@ -412,11 +524,13 @@
 }
 .business-page .check-field.is-invalid label { color: var(--danger); }
 .business-page .check-field label a { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; }
+/* R4 E.2-4: 送信ボタンと注記が近すぎて注記が押下領域の付属物に見えていた。
+   両者の間を広げ、注記が独立した1行として同一視野に残るようにする（文言は変えない）。 */
 .business-page .submit-area {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: clamp(20px, 3vw, 32px);
 }
 .business-page .btn-submit {
   width: 100%;
@@ -479,14 +593,21 @@
   /* 画像が先頭に戻るぶん、帯の上パディングは詰める（画像の上に 48px の空白を置くと
      h1 の 3 行目が固定バー .biz-dock（56px）に潜り込む。390px 実測で下端 777px < 788px）。 */
   .business-page .biz-hero { padding-top: clamp(20px, 3vw, 40px); }
+  /* R4 D.2 #5: 素材（1024x1536・膝上構図の人物）を 4:5 に切ると上下が落ちるため、
+     モバイルだけ上寄せにして頭と胸から上を残す。PC は枠と素材の AR が一致し
+     トリミングが起きないので --pos は与えない（効かない指定を書かない）。 */
   .business-page .biz-hero-fig {
     aspect-ratio: 4/5;
+    --pos: 50% 42%;
     margin-top: 0;
     margin-bottom: 28px;
   }
   .business-page .biz-stats .inner { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 16px; }
   .business-page .stat-item:last-child { grid-column: span 2; }
   .business-page .biz-reason-grid { grid-template-columns: 1fr; gap: 36px; }
+  /* モデルケースは 1 列。肖像は 140px（PC 220px の 2x ＝ 440px 派生をそのまま使う） */
+  .business-page .vc-grid { grid-template-columns: 1fr; }
+  .business-page .vc-head { grid-template-columns: 140px 1fr; gap: 16px; }
   .business-page .biz-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 16px; }
   .business-page .biz-req-fig { margin-bottom: 28px; }
 

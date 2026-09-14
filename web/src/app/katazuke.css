@@ -159,8 +159,43 @@ section:has(> .vt){position:relative;}
 .btn:hover{opacity:.8;}
 .btn:active{opacity:.65;}
 .btn-primary{background:var(--primary);color:#fff;}
-/* LINE 緑は他社ブランド色。ホバーでも色を変えない（白地白文字バグの解消も兼ねる） */
-.btn-line,.btn-line:hover,.final .btn-line:hover{background:#06c755;color:#fff;box-shadow:none;}
+/* LINE CTA: 主色ブルーの面＋左端に LINE 緑のタイル。緑はタイル1枚に閉じる（他社ブランド色の面積を最小化）。
+   タイルは aria-hidden の純装飾（意味はラベルの文字が持つ）＝ WCAG 1.4.11（非テキストコントラスト）の対象外。
+   タイル内にアイコンを置かない（緑地＋白吹き出しは LINE アプリアイコンの模倣になるため）。
+   .btn-lg{padding:18px 44px}(0,1,0) に勝つよう .btn.btn-line(0,2,0) で書く。
+   コントラスト実測: 白 on --primary(#1447e0)=6.99:1／rgba(255,255,255,.86) 合成 on --primary=5.57:1（いずれも AA）。
+   ホバー/アクティブは .btn の opacity だけ（色は動かさない）。overflow:hidden を付けない（:focus-visible リングを切らないため）。 */
+.btn.btn-line{background:var(--primary);color:#fff;padding:0;gap:0;
+  align-items:stretch;text-align:left;min-height:60px;white-space:normal;flex:0 0 auto;}
+.btn.btn-line:hover,.btn.btn-line:active{background:var(--primary);color:#fff;}
+.btn-line__tile{flex:0 0 56px;align-self:stretch;background:#06c755;}
+.btn-line__body{display:flex;flex-direction:column;justify-content:center;gap:3px;
+  padding:10px clamp(18px,2.2vw,28px);min-width:0;}
+.btn-line__label{font-family:var(--head);font-weight:600;font-size:16px;line-height:1.3;
+  letter-spacing:.06em;}
+.btn-line__sub{font-family:var(--ui);font-weight:400;font-size:12px;line-height:1.4;
+  letter-spacing:.02em;color:rgba(255,255,255,.86);}
+.btn-line__arr{margin-inline-start:auto;align-self:center;
+  padding-inline-end:clamp(16px,2vw,24px);font-size:18px;flex:0 0 auto;}
+@media (max-width:859px){
+  .btn.btn-line{min-height:54px;}
+  /* 相方の .btn-ghost も同時に全幅にする（LINE だけ全幅で不揃いになるのを防ぐ） */
+  .hero-cta>.btn,.final-cta>.btn,.pg-hero-cta>.btn,.biz-hero-cta>.btn{
+    width:100%;flex:1 1 auto;min-width:0;}
+  .btn-line__tile{flex-basis:48px;}
+  .btn-line__label{font-size:15px;}
+  .btn-line__sub{font-size:11px;}
+}
+/* .scta-inner / .line-first は 640px で縦積みになる既存構造。641〜859px は横並びのまま
+   （.btn.btn-line の flex:0 0 auto で縮まない）。640px 以下だけ全幅にする */
+@media (max-width:640px){
+  .scta-inner .btn.btn-line,.line-first .btn.btn-line{width:100%;flex:1 1 auto;min-width:0;}
+}
+/* 強制カラーではタイルの色が消えるため境界を線で担保 */
+@media (forced-colors:active){
+  .btn.btn-line{border:1px solid CanvasText;}
+  .btn-line__tile{border-inline-end:1px solid CanvasText;}
+}
 /* LINE 緑と苔緑を隣接させないため、ゴーストは黒枠 */
 .btn-ghost{background:#fff;color:#333;border:1px solid #333;}
 .btn-lg{font-size:16px;padding:18px 44px;}
@@ -234,9 +269,24 @@ section:has(> .vt){position:relative;}
 
 /* ヒーロー写真：円形にしない（四隅の情報を落とさないため） */
 .hero-figure{position:relative;}
-.hero-photo{position:relative;border-radius:0;aspect-ratio:3/4;overflow:visible;
+.hero-photo{position:relative;border-radius:0;aspect-ratio:var(--hero-photo-ar,3/4);overflow:visible;
   background:var(--pale);border:0;box-shadow:none;}
 .hero-photo img{width:100%;height:100%;object-fit:cover;object-position:center 35%;}
+/* R4: .hero-photo が .img-frame を内包する構成では AR は wrapper が持つ（枠は wrapper いっぱいに敷き、
+   ::before の縦罫リングと ::after の破線を枠の輪郭にそのまま沿わせる）。
+   切り位置は枠の --pos を使う（.hero-photo img の object-position:center 35% に勝たせる）。 */
+.hero-photo > .img-frame{position:absolute;inset:0;aspect-ratio:auto;}
+.hero-photo > .img-frame img{object-position:var(--pos,50% 50%);}
+/* 縦ヒーロー画像（top-hero-person / biz-hero。素材 1024x1536＝2:3）の AR と切り位置。
+   PC は枠と素材の AR が一致するため object-fit:cover のトリミングが起きず object-position は無効
+   ＝ PC 用の --pos は書かない。859px 以下だけ 4:5 に詰めて上下を切るので、そこで初めて縦位置が効く。
+   値は必ずクラスで渡す（インライン style のカスタムプロパティは使わない）。 */
+.hero-photo--2x3{--hero-photo-ar:2/3;}
+@media(max-width:859px){
+  .hero-photo--2x3{--hero-photo-ar:4/5;}
+  .img-frame--2x3.img-frame--hero-person{aspect-ratio:4/5;--pos:50% 38%;}
+  .img-frame--2x3.img-frame--hero-biz{aspect-ratio:4/5;--pos:50% 42%;}
+}
 /* 緑リングを 6px ずらす（人の森の円形リングの直角版） */
 .hero-photo::before{content:"";position:absolute;inset:-6px -6px 6px 6px;
   border:1px solid var(--primary);pointer-events:none;}
@@ -570,10 +620,21 @@ section:has(> .vt){position:relative;}
    ============================================================ */
 /* 高さ 56px（BRIEF §1.8）。ヒーロー CTA（.hero-cta）が画面内の間は Dock（chrome.tsx）が .dock--hidden を付けて隠す */
 .dock{position:fixed;left:0;right:0;bottom:0;z-index:55;display:none;gap:10px;align-items:center;
-  min-height:calc(56px + env(safe-area-inset-bottom));padding:8px 16px calc(8px + env(safe-area-inset-bottom));
+  min-height:calc(56px + env(safe-area-inset-bottom));padding:4px 14px calc(4px + env(safe-area-inset-bottom));
   background:#fff;backdrop-filter:none;border-top:1px solid var(--line);box-shadow:none;}
 .dock .btn{flex:1;min-height:40px;padding:11px 15px;font-size:15px;}
 .dock.dock--hidden{display:none;}
+/* Dock の LINE ボタン（2トーン版）。Dock は 860px 以下でしか display:flex にならないので
+   @media で囲まない（859/860px の 1px の谷を作らないため）。
+   実高の検算: 中身 = 4 + 15×1.3 + 1 + 11×1.3 + 4 ≒ 43px → min-height:48px が効き、
+   .dock の上下 padding 4+4 で実高 56px（body{padding-bottom:74px} の前提を維持）。
+   .btn-line__body の上書きを省くと中身が約 58px になり 56px 前提が崩れるので省略不可。 */
+.dock .btn.btn-line{flex:1 1 auto;min-width:0;min-height:48px;padding:0;}
+.dock .btn-line__tile{flex-basis:44px;}
+.dock .btn-line__body{padding:4px clamp(14px,2.2vw,20px);gap:1px;}
+.dock .btn-line__label{font-size:15px;line-height:1.3;}
+.dock .btn-line__sub{font-size:11px;line-height:1.3;}
+.dock .btn-line__arr{display:none;}   /* 390px 幅でラベルが2行に折れるのを防ぐ */
 
 /* ============================================================
    中間インラインCTA

@@ -6,7 +6,7 @@
    モバイル閾値は共有部品と同じ 859px に揃える。
    ============================================================ */
 
-/* ---------- ヒーロー（.hero-band--tall.hero-band--pos-r） ---------- */
+/* ---------- ヒーロー（.hero-band--tall.hero-band--face） ---------- */
 /* 帯の上は白抜き。eyebrow の罫だけ --lime に落として見出しの邪魔をしない */
 .pg-hero .eyebrow { color: #fff; }
 .pg-hero .eyebrow::before { background: var(--lime); }

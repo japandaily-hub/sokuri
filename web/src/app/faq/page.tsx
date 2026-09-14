@@ -250,7 +250,7 @@ export default function FaqPage() {
     <main id="main" className="faq-page">
       {/* ヒーロー写真帯（.site-frame の内側いっぱいに届く）。
           --headline のため帯に置くのは h1（見出し）と白地の検索窓だけ。本文・注記は帯の下に置く。 */}
-      <section className="hero-band hero-band--slim hero-band--pos-l hero-band--headline faq-hero">
+      <section className="hero-band hero-band--slim hero-band--face hero-band--headline faq-hero">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/img/v2/faq-band.webp"

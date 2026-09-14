@@ -62,11 +62,15 @@ export function SiteFooter() {
 /**
  * モバイル追従CTA（デザイン .dock）。860px 以下で表示。
  * ヒーロー CTA（.hero-cta）とページ内の LINE ボタン（.btn-line）のいずれかが画面内にある間は
- * 同じ緑が上下に二枚並ぶため .dock--hidden で隠す（BRIEF §1.8／/contact で二重表示を実測）。
+ * 同じ CTA が上下に二枚並ぶため .dock--hidden で隠す（BRIEF §1.8／/contact で二重表示を実測）。
  * 対象が無いページでは常時表示。表示/非表示のみなので reduced-motion でも動作させる。
  * ルート遷移でリセットするため SiteChrome 側は key={pathname} で再マウントする（effect 内 setState を避ける）。
  */
-export function Dock({ href = "/login?callbackUrl=%2Fcreate", label = "LINEで無料ではじめる" }: { href?: string; label?: string }) {
+export function Dock({
+  href = "/login?callbackUrl=%2Fcreate",
+  label = "LINEで無料ではじめる",
+  sub = "LINEアカウントでログインできます",
+}: { href?: string; label?: string; sub?: string }) {
   const [ctaInView, setCtaInView] = useState(false);
   useEffect(() => {
     if (!("IntersectionObserver" in window)) return;
@@ -92,8 +96,13 @@ export function Dock({ href = "/login?callbackUrl=%2Fcreate", label = "LINEで�
   return (
     <div className={`dock${ctaInView ? " dock--hidden" : ""}`}>
       <Link href={href} className="btn btn-line">
-        <Ic name="chat" />
-        {label}
+        {/* 緑タイルは意味を持たない装飾（アクセシブル名はラベル＋補足のテキストが担う） */}
+        <span className="btn-line__tile" aria-hidden="true" />
+        <span className="btn-line__body">
+          <span className="btn-line__label">{label}</span>
+          <span className="btn-line__sub">{sub}</span>
+        </span>
+        <Ic name="arrow" className="btn-line__arr" />
       </Link>
     </div>
   );

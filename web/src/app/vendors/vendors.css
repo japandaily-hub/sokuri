@@ -147,11 +147,49 @@
   max-width: 34em;
   margin: 0 auto 32px;
 }
+/* R4 E.2-3: ボタン2本の間は 16px 以上あける（誤タップ防止と、
+   /business 行きが依頼者導線の付属物に見えないようにするため）。.btn-ghost のままにする。 */
 .vendors-page .vd-empty-cta {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 14px;
+  gap: 16px;
+}
+
+/* 掲載時に表示する項目（R4 C.3）
+   架空の業者カードを作らない代わりに置く「説明ブロック」。.vendor-row の骨格は流用せず、
+   カードに見える面（枠・影・星・タグ）を持たない。社名・エリア・数値は一切書かない。
+   .model-note は katazuke-pages.css（layer components）の共有部品なので再定義しない。 */
+.vendors-page .vd-sample {
+  padding: clamp(26px, 4vw, 40px) 0 0;
+}
+.vendors-page .vd-sample h3 {
+  font-family: var(--head);
+  font-weight: 600;
+  font-size: clamp(16px, 2vw, 19px);
+  color: var(--ink);
+  line-height: 1.6;
+  margin: 0 0 12px;
+}
+.vendors-page .vd-sample ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  border-top: 1px solid var(--line);
+  max-width: 56em;
+}
+.vendors-page .vd-sample li {
+  flex: 1 1 180px;
+  min-width: 0;
+  font-family: var(--ui);
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--body);
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
 }
 
 .vendors-page .vendors-list {

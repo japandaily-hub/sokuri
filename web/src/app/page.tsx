@@ -2,6 +2,12 @@ import Link from "next/link";
 import { Ic } from "@/components/kdz/Icons";
 import { Reveal, FaqAccordion } from "@/components/kdz/interactions";
 import { KdzLogo } from "@/components/kdz/Logo";
+import {
+  FEATURED_CASES,
+  caseName,
+  MODEL_CASE_CHIP,
+  MODEL_CASE_NOTE,
+} from "@/lib/model-cases";
 import "./katazuke-top.css";
 
 /** 対応カテゴリ（3Dアイコンで表現） */
@@ -71,9 +77,11 @@ export default function HomePage() {
               <p className="hero-sub">
                 家じゅうの不用品を、<strong>1点ずつ撮って、あとは待つだけ</strong>。登録業者が<span className="mk">買取総額</span>で競い合い、値がつかない物もまとめて引き取ります。営業電話に追われることはありません。
               </p>
+              {/* R4 E.1-1: 「撮るだけ・待つだけ」は .hero-sub の「1点ずつ撮って、あとは待つだけ」と重複するため
+                  3 項目に減らす。CTA 直下に安心 1 行は足さない（直下の .assure 帯に同じ約束があり、
+                  ファーストビューで同じ約束が 3 回並ぶため）。 */}
               <ul className="hero-trust">
                 {/* eslint-disable @next/next/no-img-element */}
-                <li><span className="tb"><img src="/img/real/check.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span>撮るだけ・待つだけ</li>
                 <li><span className="tb"><img src="/img/real/check.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span>まとめるほど高くなりやすい</li>
                 <li><span className="tb"><img src="/img/real/check.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span>値がつかない物も回収</li>
                 <li><span className="tb"><img src="/img/real/check.webp" alt="" width={512} height={512} loading="lazy" decoding="async" /></span>連絡は選んだ1社だけ</li>
@@ -91,16 +99,27 @@ export default function HomePage() {
               </div>
               <div className="hero-cta">
                 <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-line btn-lg">
-                  <Ic name="chat" />LINEで無料ではじめる<Ic name="arrow" />
+                  <span className="btn-line__tile" aria-hidden="true" />
+                  <span className="btn-line__body">
+                    <span className="btn-line__label">LINEで無料ではじめる</span>
+                    <span className="btn-line__sub">LINEアカウントでログインできます</span>
+                  </span>
+                  <Ic name="arrow" className="btn-line__arr" />
                 </Link>
                 <Link href="/#auction" className="btn btn-ghost btn-lg">仕組みを確認する</Link>
               </div>
             </div>
             <div className="hero-figure">
-              <figure className="hero-photo sp-bleed">
-                <div className="img-frame img-frame--2x3">
+              {/* R4 D.2 #1: LCP。AR は .hero-photo--2x3（PC 2:3 / 859px 以下 4:5）が持ち、
+                  859px 以下の切り位置は .img-frame--hero-person（core・katazuke.css）が持つ。
+                  PC は枠と素材の AR が一致しトリミングが起きないため --pos は書かない。
+                  ▼手元版（人物なし）の控え。人物版との最終択一は Wave V 出口で AD が行う:
+                     src="/img/v2/top-hero.webp"
+                     alt="床に並べた不用品をスマートフォンで1点ずつ撮影する手元（イメージ）" */}
+              <figure className="hero-photo hero-photo--2x3 sp-bleed">
+                <div className="img-frame img-frame--2x3 img-frame--hero-person">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/img/v2/top-hero.webp" width={900} height={1350} alt="床に並べた不用品をスマートフォンで1点ずつ撮影する手元（イメージ）" loading="eager" fetchPriority="high" decoding="async" />
+                  <img src="/img/v2/top-hero-person.webp" width={900} height={1350} alt="リビングの床に座り、並べた不用品をスマートフォンで1点ずつ撮影する女性（イメージ）" loading="eager" fetchPriority="high" decoding="async" />
                 </div>
               </figure>
             </div>
@@ -178,10 +197,16 @@ export default function HomePage() {
             <div className="scta-inner">
               <div className="scta-text">
                 <strong>まず1枚、撮るだけ。<br className="sp-br" />今日から始められます。</strong>
-                <span>登録・査定・お断りまですべて無料</span>
+                {/* R4 E.1-2: 既存の無料表記に「連絡は選んだ1社だけ」を並べ、CTA と同一視野に入れる */}
+                <span>登録・査定・お断りまですべて無料<br />連絡が来るのは、選んだ1社だけ</span>
               </div>
               <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-line btn-lg">
-                <Ic name="chat" />LINEで無料ではじめる<Ic name="arrow" />
+                <span className="btn-line__tile" aria-hidden="true" />
+                <span className="btn-line__body">
+                  <span className="btn-line__label">LINEで無料ではじめる</span>
+                  <span className="btn-line__sub">登録・査定・お断りまで無料</span>
+                </span>
+                <Ic name="arrow" className="btn-line__arr" />
               </Link>
             </div>
           </div>
@@ -299,6 +324,49 @@ export default function HomePage() {
                 </Reveal>
               ))}
             </div>
+          </div>
+        </section>
+
+        {/* ============ 利用イメージ（架空のモデルケース） ============ */}
+        {/* R4 B.2: 「こんな時に」（.scenes）で自分を重ねた直後に置く。
+            数値・文言はすべて @/lib/model-cases の FEATURED_CASES から描画する（直書き禁止。
+            /examples と値がずれないようにするため）。
+            景表法: .model-note をカード群より手前・.model-chip を各カードの先頭（肖像より上）に置く。
+            トップに金額は出さない（上位3件の額だけを見た読者に平均像を与えないため。
+            買取額の例は 6 件すべてが並ぶ /examples に限定する）。 */}
+        <section className="section model-cases" id="model-cases">
+          <div className="container">
+            <div className="section-head">
+              <span className="eyebrow">利用イメージ</span>
+              <h2>こんなふうに使えます</h2>
+              <p className="sub">サービスの流れをイメージしていただくための、架空のモデルケースです。実際の利用実績ではありません。</p>
+            </div>
+            <p className="model-note" role="note">{MODEL_CASE_NOTE}</p>
+            <div className="mc-grid">
+              {FEATURED_CASES.map((c, i) => (
+                <Reveal as="article" className="mc-card" delay={delayOf(i)} key={c.id}>
+                  <span className="model-chip">{MODEL_CASE_CHIP}</span>
+                  <div className="mc-fig img-frame img-frame--1x1">
+                    {/* 1:1 の枠に 1:1 の素材＝トリミングが起きないため --pos は書かない（R4 D.2 #11-13） */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={`/img/v2/${c.portrait}.webp`} alt={c.portraitAlt} width={800} height={800} loading="lazy" decoding="async" />
+                  </div>
+                  <p className="mc-who">
+                    <span className="mc-name">{caseName(c)}</span>
+                    <span className="mc-attr">{c.persona}／{c.tag}</span>
+                  </p>
+                  <p className="mc-quote">「{c.quoteShort}」</p>
+                  <dl className="mc-facts">
+                    <div><dt>まとめて出品</dt><dd><b>{c.count}</b><span>点</span></dd></div>
+                    <div><dt>入札</dt><dd><b>{c.bidCount}</b><span>社</span></dd></div>
+                    <div><dt>成約まで</dt><dd><b>{c.days}</b><span>日</span></dd></div>
+                  </dl>
+                </Reveal>
+              ))}
+            </div>
+            <p className="mc-more">
+              <Link href="/examples">6件のモデルケース（買取額の例を含む）を見る<Ic name="arrow" /></Link>
+            </p>
           </div>
         </section>
         </div>
@@ -434,7 +502,9 @@ export default function HomePage() {
         </section>
 
         {/* ============ 最終CTA（写真帯は見出しだけ。ボタンは帯の下の白面） ============ */}
-        <section className="hero-band hero-band--mid hero-band--headline" id="contact">
+        {/* R4 D.2 #2: 人物入りの帯。縦位置は .hero-band--face（core）。veil は --headline の .55 のまま、
+            帯に本文は置かない（白見出しは素材中央の落ち着いた中間調ゾーンに載る） */}
+        <section className="hero-band hero-band--mid hero-band--headline hero-band--face" id="contact">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/img/v2/top-cta-band.webp" width={1920} height={1080} alt="" loading="lazy" decoding="async" />
           <div className="hero-band__veil" aria-hidden="true" />
@@ -446,7 +516,14 @@ export default function HomePage() {
           <div className="container">
             <p>まずは1枚、撮ってみることから。LINEで友だち追加すれば、すぐに出品をはじめられます。登録・査定は無料です。</p>
             <div className="final-cta">
-              <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-line btn-lg"><Ic name="chat" />LINEではじめる<Ic name="arrow" /></Link>
+              <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-line btn-lg">
+                <span className="btn-line__tile" aria-hidden="true" />
+                <span className="btn-line__body">
+                  <span className="btn-line__label">LINEではじめる</span>
+                  <span className="btn-line__sub">LINEアカウントでログインできます</span>
+                </span>
+                <Ic name="arrow" className="btn-line__arr" />
+              </Link>
               <Link href="/#bundle" className="btn btn-ghost btn-lg">もう一度、仕組みを見る</Link>
             </div>
             <p className="final-note">※ 最終的な買取額は業者の現物査定により決まります。</p>

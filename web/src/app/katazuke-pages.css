@@ -238,6 +238,13 @@
 /* 画像の見せる側（cover で切る位置）。images.json の構図指定に合わせて使う */
 .hero-band--pos-l { --band-pos: 20% 50%; }
 .hero-band--pos-r { --band-pos: 80% 50%; }
+/* 人物入り帯。縦位置だけを持つ 1 種（--pos-* と同特異度 0,1,0 なのでこの位置で後勝ちさせる）。
+   横位置の修飾子は作らない: 素材 1920x1080（16:9）に対し帯は PC・SP とも常にそれより横長に
+   トリミングされるため object-position の横成分が事実上効かない。 */
+.hero-band--face { --band-pos: 50% 42%; }
+@media (max-width: 859px) {
+  .hero-band--face { --band-pos: 50% 46%; }
+}
 /* veil の規約（画像は warm off-white 指定のため合成色が明るい）:
    既定 .65 = 見出し＋本文（14px 以上）／--headline .55 = 見出し（24px 以上・600）のみ／--quiet .18 = 文字を置かない */
 .hero-band--headline .hero-band__veil { background: rgba(20,35,92,.55); }
@@ -398,3 +405,17 @@
      帯は aspect-ratio:21/9・max-height:160px の無文字のまま残し、文言はカード側の見出しが担う。 */
   .auth-side__line { display: none; }
 }
+
+/* ---------- R4 モデルケース（架空）の明示 — トップ / /examples / /business 共通 ----------
+   .model-chip は「打消し表示」。消費者庁の考え方に沿い、強調表示（金額 24px・数値 20px）と
+   同程度に認識できる大きさ・ウェイトにする。12px・通常ウェイトにしない。
+   DOM 順で必ず **金額より手前**・カード先頭に置くこと（表示側の責務）。
+   コントラスト実測: --marker(#d7e6ff) 上の --ink(#20242e) = 約 12.3:1（AA/AAA 達成）。
+   参考: 同じ地の --body(#454e59) = 約 6.7:1（AA 達成・AAA 未達）。
+   .model-note は各カード群の直前（節見出しの下・カードより上）に必ず置く。
+   ページ CSS は unlayered で本ファイルに常に勝つため、この2クラスをページ CSS で再定義しない。 */
+.model-chip { display: inline-block; font-family: var(--ui); font-size: 14px; font-weight: 600;
+  line-height: 1.5; letter-spacing: .02em; color: var(--ink); background: var(--marker);
+  border: 0; border-radius: 0; padding: 6px 12px; }
+.model-note { font-family: var(--ui); font-size: 14px; line-height: 1.9; color: var(--body);
+  max-width: 56em; margin: 0 0 clamp(20px, 2.4vw, 32px); }

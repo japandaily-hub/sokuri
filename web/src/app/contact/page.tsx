@@ -168,10 +168,15 @@ export default function ContactPage() {
                 査定・出品のご依頼はLINEから。友だち追加するだけで、すぐに出品をはじめられます。
               </p>
             </div>
+            {/* LINE CTA は 7 箇所共通の 2 トーン構造（主色ブルーの面＋左端に LINE 緑のタイル）。
+                タイルは aria-hidden の純装飾で、アクセシブル名はラベル＋補足の文字が担う。 */}
             <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-line btn-lg">
-              <Ic name="chat" />
-              LINEではじめる
-              <Ic name="arrow" />
+              <span className="btn-line__tile" aria-hidden="true" />
+              <span className="btn-line__body">
+                <span className="btn-line__label">LINEではじめる</span>
+                <span className="btn-line__sub">LINEアカウントでログインできます</span>
+              </span>
+              <Ic name="arrow" className="btn-line__arr" />
             </Link>
           </div>
 

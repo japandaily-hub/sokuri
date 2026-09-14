@@ -16,15 +16,28 @@
    要素自体は page.tsx から外したが、キャッシュされた旧 HTML への保険として残す。 */
 .hero .hero-blob{display:none;}
 
-/* .hero-photo は「青ずらし枠（::before）を持つ入れ物」に徹し、寸法は内側の .img-frame が決める */
-.hero .hero-photo{position:relative;aspect-ratio:auto;overflow:visible;background:transparent;border:0;}
+/* .hero-photo は「青ずらし枠（::before）を持つ入れ物」に徹し、面と罫は内側の .img-frame が持つ。
+   R4: 内側の .img-frame は core が `position:absolute;inset:0` にしたため、寸法（AR）はこの入れ物側が
+   持たないと高さ 0 に潰れる。AR は core の .hero-photo--2x3（PC 2:3 / 859px 以下 4:5）が決めるので、
+   ここで aspect-ratio を上書きしない（ページ CSS は unlayered で共有定義に常に勝つため）。 */
+.hero .hero-photo{position:relative;overflow:visible;background:transparent;border:0;}
 /* 破線コネクタ（::after）は削除。写真と本文を線でつながない */
 .hero .hero-photo::after{content:none;}
-/* images.json 指定の切り位置。縦長でも手元が切れない */
-.hero .hero-photo .img-frame{--pos:50% 45%;}
+/* 切り位置（--pos）はここに書かない。PC は枠（2:3）と素材 top-hero-person（1024x1536＝2:3）の AR が
+   一致しトリミングが起きず object-position が無効。859px 以下の 4:5 だけ縦位置が効き、その値は
+   core の .img-frame--hero-person（katazuke.css）が持つ（R4 D.2 #1 / BRIEF v2 §1.11）。 */
 
 /* 4ステップ帯は番号＋文字のみ（アイコンは「ご利用の流れ」で 220px 大判に集約） */
 .hero .hw-ic{display:none;}
+
+/* R4 E.1-1 — ファーストビューの整理。
+   .hero-trust（3項目に減らした安心の要点）と .hero-cta の距離を詰め、
+   「連絡は選んだ1社だけ」が CTA と同一視野に入るようにする。両者の間には 4 ステップ帯（.hero-how）が
+   挟まるので、その前後の余白を同じ値に揃えて合計距離を縮める
+   （核は .hero-how margin:22px 0 6px ＋ .hero-cta margin-top:30px＝合計 58px）。
+   CTA 直下に安心 1 行は足さない（直下の .assure 帯と .hero-trust で同じ約束が 3 回並ぶため）。 */
+.hero .hero-how{margin-block:clamp(16px,2vw,24px) 0;}
+.hero .hero-cta{margin-top:clamp(16px,2vw,24px);}
 
 /* モバイルは flex-wrap だと「1 撮る / 2 業者が競う / 3 見比べて選ぶ」で 1 行が埋まり、
    「4 引き取り完了」だけが 2 行目に落ちて 4 工程が一続きに読めない（ラウンド3 実測）。
@@ -46,8 +59,8 @@
   .hero .hero-trust{order:4;}
   .hero .hero-how{order:5;}
   .hero .hero-cta{order:6;}
-  /* 縦 585px を避けるため 4:5 に切り替える（AR 規約の例外1・images.json に明記） */
-  .hero .hero-photo .img-frame{aspect-ratio:4/5;}
+  /* 縦 585px を避ける 4:5 への切替（AR 規約の例外1）は core の .hero-photo--2x3 /
+     .img-frame--hero-person が持つ。ここで再指定しない（切り位置 --pos ごと core に一本化） */
   /* .sp-bleed で画面端まで届くので、右に 6px はみ出す青ずらし枠は畳む（横スクロール防止） */
   .hero .hero-photo::before{content:none;}
 }
@@ -91,6 +104,14 @@
 @media(max-width:859px){
   #flow .steps-grid{grid-template-columns:repeat(2,1fr);max-width:none;margin-inline:0;gap:clamp(22px,4vw,32px);}
 }
+
+/* ============================================================
+   #5 中間CTA — 補足を 2 行にした分の行間（R4 E.1-2）
+   ============================================================ */
+/* 核は .scta-text span{font-size:13px;margin-top:4px}（サイズは変えない）。
+   <br> で「登録・査定・お断りまですべて無料」「連絡が来るのは、選んだ1社だけ」の 2 行になるため、
+   既定の行間だと 13px の 2 行が詰まって 1 文に見える。行間だけを足す。 */
+.section-cta .scta-text span{line-height:1.8;}
 
 /* ============================================================
    #6 #7 BUNDLE / AUCTION — 3D 図版を 1px 枠に入れて輪郭を出す
@@ -138,6 +159,45 @@
      均等割りを解除し、対応ブラウザでは文節単位で折り返させる（BRIEF §2.1 の 2×2 は維持）。
      word-break:auto-phrase は未対応ブラウザでは無視され、通常の折返しに戻るだけ。 */
   .scenes .scene-body h3,#flow .step-body h3{text-wrap:wrap;word-break:auto-phrase;}
+}
+
+/* ============================================================
+   #9.5 利用イメージ（架空のモデルケース）— R4 B.2
+   ============================================================ */
+/* 面は白。カードは枠で囲まない（区切りは 1px の上罫と余白だけ。角丸0・影0）。
+   .model-chip / .model-note は core の共有クラス（katazuke-pages.css）。ここで再定義しない
+   — ページ CSS は unlayered で layer(components) に常に勝つため、打消し表示の
+   サイズ（14px/600）とコントラストを壊してしまう。位置（余白）だけを与える。 */
+.model-cases .mc-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:clamp(20px,2.6vw,32px);}
+.model-cases .mc-card{display:flex;flex-direction:column;align-items:flex-start;
+  border-top:1px solid var(--line);padding-top:clamp(16px,1.8vw,22px);}
+/* 肖像。PC 3 列で表示幅は約 340〜400px＝DPR2 で 800px 素材の範囲内（BRIEF §1.11）。
+   1:1 の枠に 1:1 の素材なのでトリミングは起きない（--pos は書かない）。円形にしない */
+.model-cases .mc-fig{width:100%;margin-top:clamp(14px,1.6vw,18px);background:#fff;}
+.model-cases .mc-who{margin-top:clamp(14px,1.6vw,18px);}
+.model-cases .mc-name{display:block;font-family:var(--head);font-weight:600;font-size:17px;
+  color:var(--ink);line-height:1.5;}
+.model-cases .mc-attr{display:block;font-family:var(--ui);font-size:13px;color:var(--body-soft);
+  margin-top:5px;line-height:1.7;}
+.model-cases .mc-quote{margin-top:12px;font-size:15px;color:var(--body);line-height:2;}
+/* 点数・入札社数・成約日数の 3 値。金額は出さない（R4 B.2） */
+.model-cases .mc-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;
+  width:100%;margin-top:auto;padding-top:clamp(16px,1.8vw,22px);}
+.model-cases .mc-facts>div{display:flex;flex-direction:column;gap:4px;min-width:0;}
+.model-cases .mc-facts dt{font-family:var(--ui);font-size:12px;color:var(--body-soft);line-height:1.6;}
+.model-cases .mc-facts dd{margin:0;display:flex;align-items:baseline;gap:3px;color:var(--ink);}
+.model-cases .mc-facts dd b{font-family:var(--ui);font-weight:600;font-size:clamp(22px,2.4vw,26px);
+  line-height:1.2;letter-spacing:.01em;font-variant-numeric:tabular-nums;}
+.model-cases .mc-facts dd span{font-family:var(--ui);font-size:12px;color:var(--body);}
+/* /examples への導線は 1 本だけ。ボタンにしない（LINE CTA もこの節には足さない） */
+.model-cases .mc-more{margin-top:clamp(26px,3.2vw,38px);text-align:center;}
+.model-cases .mc-more a{display:inline-flex;align-items:center;gap:8px;
+  font-size:15px;color:var(--primary);text-decoration:none;
+  border-bottom:1px solid currentColor;padding-bottom:3px;}
+.model-cases .mc-more .ic{font-size:16px;stroke-width:1.5;}
+@media(max-width:859px){
+  .model-cases .mc-grid{grid-template-columns:1fr;gap:clamp(26px,5vw,36px);}
 }
 
 /* ============================================================
@@ -232,9 +292,12 @@
 .final-actions{background:#fff;text-align:center;
   padding:clamp(36px,5vw,56px) 0 clamp(48px,6vw,80px);}
 .final-actions p{font-size:16px;color:var(--body);max-width:34em;margin-inline:auto;line-height:2;}
-.final-actions .final-cta{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-top:28px;}
+/* R4 E.1-4: 本文 → ボタン群 → 注記 の 3 ブロックの間をそれぞれ広げ、
+   2 トーンになった LINE ボタン（高さ 60px）が本文・注記に詰まって見えないようにする */
+.final-actions .final-cta{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;
+  margin-top:clamp(20px,3vw,32px);}
 .final-actions .btn-ghost{background:#fff;color:#333;border:1px solid #333;}
-.final-actions .final-note{margin-top:22px;font-size:13px;color:var(--body-soft);}
+.final-actions .final-note{margin-top:clamp(16px,2vw,24px);font-size:13px;color:var(--body-soft);}
 @media(max-width:560px){
   .final-actions .final-cta .btn{width:100%;}
 }

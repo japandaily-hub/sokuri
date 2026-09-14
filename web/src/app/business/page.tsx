@@ -16,6 +16,19 @@ import { Ic } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
 import { Reveal, FaqAccordion } from "@/components/kdz/interactions";
 import { submitOperatorApplication, toDisplayMessage } from "@/lib/katadzuke-api";
+import { MODEL_CASE_CHIP, VENDOR_CASES, VENDOR_CASE_NOTE } from "@/lib/model-cases";
+
+/** 3桁区切り。ロケール実装に依存しないよう自前で整形する（SSR とクライアントで同じ文字列にするため）。 */
+function yen(n: number): string {
+  return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+/** モデルケース1件あたりの成約手数料（買取金額の8%）を百円単位に丸めた概算。
+ *  利得側の数値（成約・買取総額・引き取り）と同じ視野に業者の負担を置くための表示で、
+ *  率・課税条件ともヒーロー／ASSURANCES 05／FAQ の既存表記の再掲。新しい約束・割引は足さない。 */
+function feeApprox(amount: number): string {
+  return yen(Math.round((amount * 0.08) / 100) * 100);
+}
 
 /** 共通スプライトに send が無いため inline 用の紙飛行機アイコン。 */
 function SendIcon({ className }: { className?: string }) {
@@ -44,11 +57,13 @@ const NAV: { href: string; label: string }[] = [
 /** 数値帯（事実ベースのサービス条件のみ。計測実績風の数値は景表法（優良誤認）回避のため
  *  実データ集計が配線されるまで掲載しない） */
 const STATS: { num: string; unit: string; label: string }[] = [
+  /* R4 E.2-2: 業者が最初に見る数字を「下見0回」にする（下見の空振りが最大の痛点のため）。
+     並び替えのみで、項目・文言・値は一切変えない。 */
+  { num: "0", unit: "回", label: "下見・現地調査" },
   { num: "4", unit: "都県", label: "東京・千葉・埼玉・神奈川" },
   { num: "0", unit: "円", label: "初期費用・月額費用" },
   { num: "8", unit: "%", label: "成約時の手数料のみ" },
   { num: "12", unit: "カテゴリ", label: "家電〜ブランド品まで対応" },
-  { num: "0", unit: "回", label: "下見・現地調査" },
 ];
 
 /** 仕入れる3つの理由（画像付き3カラム）。効果の断定は避け、条件と手順で説明する。 */
@@ -322,14 +337,17 @@ export default function BusinessPage() {
             <div className="media-split media-split--rev biz-hero-split">
               <div className="img-frame img-frame--2x3 img-frame--pale biz-hero-fig sp-bleed">
                 {/* eslint-disable @next/next/no-img-element */}
-                {/* r2 H4 是正: 枠の意味は隣接する h1・hero-sub が担保しており、この写真は
-                    仕入れ現場の雰囲気を伝える装飾。未生成・取得失敗時に alt 文がヒーロー枠へ
-                    流れて第一印象を壊すため、ページ内の他の v2 画像と同じく alt="" に揃える。 */}
+                {/* R4 D.2 #5: 素材を人物入り（仕分けた棚の前に立つスタッフ）に差し替えたため、
+                    「誰が入札する側なのか」を伝える意味を持つ画像になった。alt は spec_people.json の
+                    文言をそのまま使う。r2 H4 で alt="" にした理由（取得失敗時に alt 文が枠内へ流れる）は、
+                    共有部品側の `.img-frame img{color:transparent;font-size:0}` で解消済み。
+                    枠 2:3 と素材 1024x1536 は AR 一致で無トリミングのため --pos は書かない
+                    （859px 以下の 4:5 だけ business.css で --pos:50% 42% を与える）。 */}
                 <img
                   src="/img/v2/biz-hero.webp"
                   width={900}
                   height={1350}
-                  alt=""
+                  alt="仕分けた棚の前に立つリユース業者のスタッフ（イメージ）"
                   loading="eager"
                   fetchPriority="high"
                   decoding="async"
@@ -392,8 +410,10 @@ export default function BusinessPage() {
           </div>
         </section>
 
-        {/* ============ 章の切れ目（写真帯・veil .65 = 見出し＋14px 以上の注記） ============ */}
-        <section className="hero-band hero-band--mid biz-band-sorting">
+        {/* ============ 章の切れ目（写真帯・veil .65 = 見出し＋14px 以上の注記） ============
+            R4 D.2 #6: 素材が人物入り（作業台で仕分ける2人）に替わるため、縦位置を持つ
+            .hero-band--face を足す（横位置の修飾子は帯が常に素材より横長で効かないため無い）。 */}
+        <section className="hero-band hero-band--mid hero-band--face biz-band-sorting">
           {/* eslint-disable @next/next/no-img-element */}
           <img
             src="/img/v2/biz-band-sorting.webp"
@@ -463,6 +483,90 @@ export default function BusinessPage() {
                   </li>
                 ))}
               </ul>
+            </div>
+          </div>
+        </section>
+
+        {/* ============ 参加のモデルケース（架空） ============
+            R4 C.2: 抽象（#merit の3つの理由）→ 具体（モデルケース）→ 手順（#flow）の順に読ませる。
+            面は白のまま（bg-pale を付けない）。直後の #flow が淡青なので章の境界はそちらで立つ。
+            景表法: ①架空であることの明示 .model-chip を金額より手前・カード先頭に、
+            ②注記 .model-note をカード群より手前に置く。③サイト全体の集計値（累計・平均・成約率・
+            登録業者数）は出さない。④入札数は持たない（成約数と並べると割り算で成約率が出るため）。
+            ⑤業者が負担する成約手数料 .vc-fee を利得側の数値と同一視野に置く。 */}
+        <section className="section vc-cases" id="model-cases" aria-labelledby="vc-cases-h">
+          <div className="container">
+            <div className="section-head">
+              <span className="eyebrow">参加のモデルケース</span>
+              <h2 id="vc-cases-h">こんな使い方をイメージしています</h2>
+              <p className="sub">参加した場合の使われ方をイメージしていただくための、架空のモデルケースです。</p>
+            </div>
+            <p className="model-note" role="note">{VENDOR_CASE_NOTE}</p>
+            <div className="vc-grid">
+              {VENDOR_CASES.map((v) => (
+                <article className="vc-card" key={v.id}>
+                  <span className="model-chip">{MODEL_CASE_CHIP}</span>
+                  <div className="vc-head">
+                    <div className="img-frame img-frame--1x1 vc-fig">
+                      {/* eslint-disable @next/next/no-img-element */}
+                      {/* 表示は 220px（859px 以下 140px）。原寸 800 では表示幅の2倍を超えるため
+                          440px の派生 webp を参照する。1:1 枠 × 1:1 素材はトリミングが起きないので
+                          --pos は書かない（書いても効かない）。円形にもしない。 */}
+                      <img
+                        src={`/img/v2/${v.portrait}-440.webp`}
+                        width={440}
+                        height={440}
+                        alt={v.portraitAlt}
+                        loading="lazy"
+                        decoding="async"
+                      />
+                      {/* eslint-enable @next/next/no-img-element */}
+                    </div>
+                    <div className="vc-meta">
+                      <h3>{v.shop}</h3>
+                      <p className="vc-attr">
+                        {v.area}／{v.kind}
+                      </p>
+                    </div>
+                  </div>
+                  {/* 下見0回は架空数値ではなくサービスの仕様。「ある1か月のイメージ」という
+                      架空ラベルの下に埋めず、事実行として表の上に置く。あわせて .biz-stats の
+                      「0回」が「一切現物を見ない」と読まれないよう（現物査定は成約後）を必ず伴わせる。 */}
+                  <p className="vc-visit">下見・現地調査は0回（現物査定は成約後）</p>
+                  <p className="vc-facts-label">ある1か月のイメージ</p>
+                  <dl className="vc-facts">
+                    <div>
+                      <dt>引き取り</dt>
+                      <dd>
+                        <b>{v.month.pickups}</b>
+                        <span>回</span>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>成約</dt>
+                      <dd>
+                        <b>{v.month.deals}</b>
+                        <span>件</span>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>成約1件あたりの買取総額（例）</dt>
+                      <dd>
+                        <b>{yen(v.month.amount)}</b>
+                        <span>円</span>
+                      </dd>
+                    </div>
+                  </dl>
+                  <p className="vc-fee">
+                    費用は成約時の買取金額8%（税別・消費税を別途加算）のみ。この例では1件あたり約
+                    {feeApprox(v.month.amount)}円にあたります。
+                  </p>
+                  <blockquote className="vc-quote">
+                    <p>{v.quote}</p>
+                    <footer>{v.speaker}</footer>
+                  </blockquote>
+                </article>
+              ))}
             </div>
           </div>
         </section>

@@ -1,0 +1,719 @@
+{
+  "style_common": "Photorealistic 3D render (Octane/Redshift look), physically-based materials, soft natural daylight from a window, subtle global illumination, shallow depth of field, 35-50mm lens, clean Japanese interior context (light wood, white walls, tatami or pale flooring where natural). Palette: warm off-white and light grey with restrained cobalt-blue (#1447e0) accents (a folded cloth, a box label, a tag), avoid saturated red/green/yellow, avoid teal casts. No text, no letters, no logos, no brand names, no watermark, no UI screenshots. Composition leaves clean negative space where indicated. Consistent across all images so they read as one series. ※ R4 改訂により、spec_people.json の15点に限り日本人の人物（顔あり）を許可。",
+  "checked_legend": {
+    "faces": "人物なしの画像は顔が写っていないこと。people:true の15点は R4 改訂で顔ありが解禁されたため、『顔の写り方が spec_people.json の許可範囲に収まっていること』を指す",
+    "text": "読み取れる文字・数字の写り込みがないこと（等倍＋200% で確認）",
+    "brands": "実在ブランドの意匠・商標的な形状がないこと",
+    "badges": "認証バッジ・リボン・メダル等、第三者認証を示唆する意匠がないこと",
+    "plates": "車両ナンバー・社名・表札の写り込みがないこと",
+    "likeness": "【R4・people:true のみ】実在の人物・著名人に酷似していないこと（目視）",
+    "marks": "【R4・people:true のみ】読み取れる文字・ロゴ・車両ナンバー・商標的な形状の写り込みがないこと（等倍＋200%）"
+  },
+  "note": "checked の全項目が true でない id は公開しない（BRIEF §1.12）。people:true は spec_people.json の15点＋その派生に限る。mc-* は used_by のとおりトップでのみ使う。",
+  "images": [
+    {
+      "id": "top-hero",
+      "file": "/img/v2/top-hero.webp",
+      "width": 900,
+      "height": 1350,
+      "route": "/",
+      "slot": "ヒーロー右カラム .hero-photo .img-frame--2x3（LCP eager）。859px 以下のみ --4x5 で pos 50% 45%（AR規約の例外1）",
+      "alt": "床に並べた不用品をスマートフォンで1点ずつ撮影する手元（イメージ）",
+      "people": false
+    },
+    {
+      "id": "top-worry-listing",
+      "file": "/img/v2/top-worry-listing.webp",
+      "width": 800,
+      "height": 800,
+      "route": "/",
+      "slot": "よくある不安 カード1「出品も発送も、正直めんどう」.img-frame--1x1",
+      "alt": "",
+      "people": false
+    },
+    {
+      "id": "top-worry-phone",
+      "file": "/img/v2/top-worry-phone.webp",
+      "width": 800,
+      "height": 800,
+      "route": "/",
+      "slot": "よくある不安 カード2「営業電話が、一斉にかかってくる」.img-frame--1x1",
+      "alt": "",
+      "people": false
+    },
+    {
+      "id": "top-worry-boxes",
+      "file": "/img/v2/top-worry-boxes.webp",
+      "width": 800,
+      "height": 800,
+      "route": "/",
+      "slot": "よくある不安 カード3「そもそも、何から手をつければ」.img-frame--1x1",
+      "alt": "",
+      "people": false
+    },
+    {
+      "id": "top-scene-danshari",
+      "file": "/img/v2/top-scene-danshari.webp",
+      "width": 800,
+      "height": 800,
+      "route": "/",
+      "slot": "こんな時に カード「断捨離」.img-frame--pale .img-frame--1x1",
+      "alt": "",
+      "people": false
+    },
+    {
+      "id": "top-scene-moving",
+      "file": "/img/v2/top-scene-moving.webp",
+      "width": 800,
+      "height": 800,
+      "route": "/",
+      "slot": "こんな時に カード「引越し」.img-frame--pale .img-frame--1x1",
+      "alt": "",
+      "people": false
+    },
+    {
+      "id": "top-scene-jikka",
+      "file": "/img/v2/top-scene-jikka.webp",
+      "width": 800,
+      "height": 800,
+      "route": "/",
+      "slot": "こんな時に カード「実家じまい」.img-frame--pale .img-frame--1x1",
+      "alt": "",
+      "people": false
+    },
+    {
+      "id": "top-scene-ihin",
+      "file": "/img/v2/top-scene-ihin.webp",
+      "width": 800,
+      "height": 800,
+      "route": "/",
+      "slot": "こんな時に カード「遺品整理」.img-frame--pale .img-frame--1x1",
+      "alt": "",
+      "people": false
+    },
+    {
+      "id": "top-handover",
+      "file": "/img/v2/top-handover.webp",
+      "width": 1536,
+      "height": 1024,
+      "route": "/",
+      "slot": "引き渡しの流れ .media-split 左 .img-frame--3x2",
+      "alt": "玄関先で、まとめた品物を業者に引き渡す場面（イメージ）",
+      "people": false
+    },
+    {
+      "id": "top-founder-desk",
+      "file": "/img/v2/top-founder-desk.webp",
+      "width": 1536,
+      "height": 1024,
+      "route": "/",
+      "slot": "#founder 運営者メッセージ .media-split--rev 右 .img-frame--3x2",
+      "alt": "",
+      "people": false
+    },
+    {
+      "id": "top-cta-band",
+      "file": "/img/v2/top-cta-band.webp",
+      "width": 1920,
+      "height": 1088,
+      "route": "/",
+      "slot": "最終CTA .hero-band--mid.hero-band--headline（veil .55、白文字は見出しのみ）",
+      "alt": "",
+      "people": true,
+      "checked": {
+        "faces": true,
+        "text": true,
+        "brands": true,
+        "badges": true,
+        "plates": true,
+        "likeness": true,
+        "marks": true
+      },
+      "checked_at": "2026-09-14",
+      "checked_by": "画像担当（Wave P・等倍＋200% 目視）"
+    },
+    {
+      "id": "pg-hero",
+      "file": "/img/v2/pg-hero.webp",
+      "width": 1920,
+      "height": 1088,
+      "route": "/photo-guide",
+      "slot": ".hero-band--tall.hero-band--face ヒーロー（LCP eager、veil .65、見出し＋本文が左に）",
+      "alt": "床に置いた品物をスマートフォンで真上から撮影する女性の手元（イメージ）",
+      "people": true,
+      "checked": {
+        "faces": true,
+        "text": true,
+        "brands": true,
+        "badges": true,
+        "plates": true,
+        "likeness": true,
+        "marks": true
+      },
+      "checked_at": "2026-09-14",
+      "checked_by": "画像担当（Wave P・等倍＋200% 目視）"
+    },
+    {
+      "id": "pg-good",
+      "file": "/img/v2/pg-good.webp",
+      "width": 800,
+      "height": 800,
+      "route": "/photo-guide",
+      "slot": "#basics 良い例 .img-frame--1x1（pg-bad と同一ソファ・同一部屋。再利用しない）",
+      "alt": "明るい部屋で、ソファ1点の全体が枠に収まっている",
+      "people": false
+    },
+    {
+      "id": "pg-bad",
+      "file": "/img/v2/pg-bad.webp",
+      "width": 800,
+      "height": 800,
+      "route": "/photo-guide",
+      "slot": "#basics 避けたい例 .img-frame--1x1（pg-good と同一ソファ・同一部屋）",
+      "alt": "暗い部屋で、洗濯物や箱が重なり、ソファが右端で見切れている",
+      "people": false
+    },
+    {
+      "id": "pg-tip-light",
+      "file": "/img/v2/pg-tip-light.webp",
+      "width": 800,
+      "height": 800,
+      "route": "/photo-guide",
+      "slot": "#tips ポイント1「明るさ」 .media-split 左 .img-frame--1x1",
+      "alt": "",
+      "people": false
+    },
+    {
+      "id": "pg-tip-bg",
+      "file": "/img/v2/pg-tip-bg.webp",
+      "width": 800,
+      "height": 800,
+      "route": "/photo-guide",
+      "slot": "#tips ポイント2「背景の整理」 .media-split--rev 右 .img-frame--1x1",
+      "alt": "",
+      "people": false
+    },
+    {
+      "id": "pg-tip-detail",
+      "file": "/img/v2/pg-tip-detail.webp",
+      "width": 800,
+      "height": 800,
+      "route": "/photo-guide",
+      "slot": "#tips ポイント3「全体と細部」 .media-split 左 .img-frame--1x1",
+      "alt": "",
+      "people": false
+    },
+    {
+      "id": "ex-lot-jikka",
+      "file": "/img/v2/ex-lot-jikka.webp",
+      "width": 1536,
+      "height": 1024,
+      "route": "/examples",
+      "slot": "ケースカード1「実家整理（田中さん）」主役 .img-frame--3x2（金額との間にモデルケースチップ）",
+      "alt": "実家整理のモデルケース。まとめて出す品物を和室に並べたイメージ",
+      "people": false
+    },
+    {
+      "id": "ex-lot-moving",
+      "file": "/img/v2/ex-lot-moving.webp",
+      "width": 1536,
+      "height": 1024,
+      "route": "/examples",
+      "slot": "ケースカード2「引越し（鈴木さん）」主役 .img-frame--3x2",
+      "alt": "引越しのモデルケース。新居に持っていかない家具と箱をまとめたイメージ",
+      "people": false
+    },
+    {
+      "id": "ex-lot-closet",
+      "file": "/img/v2/ex-lot-closet.webp",
+      "width": 1536,
+      "height": 1024,
+      "route": "/examples",
+      "slot": "ケースカード3「断捨離（佐藤さん）」主役 .img-frame--3x2",
+      "alt": "断捨離のモデルケース。衣類や小物をまとめたイメージ",
+      "people": false
+    },
+    {
+      "id": "ex-lot-ihin",
+      "file": "/img/v2/ex-lot-ihin.webp",
+      "width": 1536,
+      "height": 1024,
+      "route": "/examples",
+      "slot": "ケースカード4「遺品整理（山口さん）」主役 .img-frame--3x2",
+      "alt": "遺品整理のモデルケース。品物を種類ごとに分けて並べたイメージ",
+      "people": false
+    },
+    {
+      "id": "ex-lot-rearrange",
+      "file": "/img/v2/ex-lot-rearrange.webp",
+      "width": 1536,
+      "height": 1024,
+      "route": "/examples",
+      "slot": "ケースカード5「模様替え（中村さん）」主役 .img-frame--3x2",
+      "alt": "模様替えのモデルケース。入れ替える家具をリビングにまとめたイメージ",
+      "people": false
+    },
+    {
+      "id": "ex-lot-kitchen",
+      "file": "/img/v2/ex-lot-kitchen.webp",
+      "width": 1536,
+      "height": 1024,
+      "route": "/examples",
+      "slot": "ケースカード6「引越し（小林さん夫婦）」主役 .img-frame--3x2（ケース2と構図を変え、台所用品と小家電中心）",
+      "alt": "引越しのモデルケース。台所用品と小型家電をまとめたイメージ",
+      "people": false
+    },
+    {
+      "id": "faq-band",
+      "file": "/img/v2/faq-band.webp",
+      "width": 1920,
+      "height": 1088,
+      "route": "/faq",
+      "slot": ".hero-band--slim.hero-band--face.hero-band--headline（veil .55、h1のみ白抜き）",
+      "alt": "",
+      "people": true,
+      "checked": {
+        "faces": true,
+        "text": true,
+        "brands": true,
+        "badges": true,
+        "plates": true,
+        "likeness": true,
+        "marks": true
+      },
+      "checked_at": "2026-09-14",
+      "checked_by": "画像担当（Wave P・等倍＋200% 目視）"
+    },
+    {
+      "id": "biz-hero",
+      "file": "/img/v2/biz-hero.webp",
+      "width": 900,
+      "height": 1350,
+      "route": "/business",
+      "slot": ".biz-hero の .media-split--rev 右 .img-frame--2x3（LCP eager）。859px 以下のみ --4x5",
+      "alt": "仕分けた棚の前に立つリユース業者のスタッフ（イメージ）",
+      "people": true,
+      "checked": {
+        "faces": true,
+        "text": true,
+        "brands": true,
+        "badges": true,
+        "plates": true,
+        "likeness": true,
+        "marks": true
+      },
+      "checked_at": "2026-09-14",
+      "checked_by": "画像担当（Wave P・等倍＋200% 目視）"
+    },
+    {
+      "id": "biz-band-sorting",
+      "file": "/img/v2/biz-band-sorting.webp",
+      "width": 1920,
+      "height": 1088,
+      "route": "/business",
+      "slot": ".hero-band--mid 数値帯の直後（veil .65、白文字『写真と品目から、入札できる。』＋本文）",
+      "alt": "",
+      "people": true,
+      "checked": {
+        "faces": true,
+        "text": true,
+        "brands": true,
+        "badges": true,
+        "plates": true,
+        "likeness": true,
+        "marks": true
+      },
+      "checked_at": "2026-09-14",
+      "checked_by": "画像担当（Wave P・等倍＋200% 目視）"
+    },
+    {
+      "id": "biz-reason-bulk",
+      "file": "/img/v2/biz-reason-bulk.webp",
+      "width": 800,
+      "height": 800,
+      "route": "/business",
+      "slot": "#merit 理由01「まとめ買い」.img-frame--1x1。used_by: /business と /（業者バナー .img-frame--1x1）",
+      "alt": "",
+      "people": false
+    },
+    {
+      "id": "biz-reason-photo",
+      "file": "/img/v2/biz-reason-photo.webp",
+      "width": 800,
+      "height": 800,
+      "route": "/business",
+      "slot": "#merit 理由02「下見不要・写真で判断」.img-frame--1x1",
+      "alt": "",
+      "people": false
+    },
+    {
+      "id": "biz-reason-route",
+      "file": "/img/v2/biz-reason-route.webp",
+      "width": 800,
+      "height": 800,
+      "route": "/business",
+      "slot": "#merit 理由03「効率・エリア」.img-frame--1x1",
+      "alt": "",
+      "people": false
+    },
+    {
+      "id": "biz-req-docs",
+      "file": "/img/v2/biz-req-docs.webp",
+      "width": 800,
+      "height": 800,
+      "route": "/business",
+      "slot": "#requirements .media-split--rev 右 .img-frame--1x1",
+      "alt": "",
+      "people": false
+    },
+    {
+      "id": "vd-band",
+      "file": "/img/v2/vd-band.webp",
+      "width": 1920,
+      "height": 1088,
+      "route": "/vendors",
+      "slot": ".hero-band--slim.hero-band--headline 最上部（veil .55、白文字『登録業者一覧』のみ）",
+      "alt": "",
+      "people": true,
+      "checked": {
+        "faces": true,
+        "text": true,
+        "brands": true,
+        "badges": true,
+        "plates": true,
+        "likeness": true,
+        "marks": true
+      },
+      "checked_at": "2026-09-14",
+      "checked_by": "画像担当（Wave P・等倍＋200% 目視）"
+    },
+    {
+      "id": "vd-empty",
+      "file": "/img/v2/vd-empty.webp",
+      "width": 800,
+      "height": 800,
+      "route": "/vendors",
+      "slot": "空状態ブロック 中央 .img-frame--1x1 最大 480px",
+      "alt": "",
+      "people": false
+    },
+    {
+      "id": "co-band",
+      "file": "/img/v2/co-band.webp",
+      "width": 1920,
+      "height": 1088,
+      "route": "/company",
+      "slot": ".hero-band--tall.hero-band--headline ヒーロー（veil .55、白抜き見出しのみ中央、LCP eager）",
+      "alt": "",
+      "people": false
+    },
+    {
+      "id": "co-value-clear",
+      "file": "/img/v2/co-value-clear.webp",
+      "width": 520,
+      "height": 520,
+      "route": "/company",
+      "slot": "VALUES「透明性」 .img-frame--pale .img-frame--1x1 最大 260px",
+      "alt": "",
+      "people": false
+    },
+    {
+      "id": "co-value-safe",
+      "file": "/img/v2/co-value-safe.webp",
+      "width": 520,
+      "height": 520,
+      "route": "/company",
+      "slot": "VALUES「安全・安心」 .img-frame--pale .img-frame--1x1 最大 260px",
+      "alt": "",
+      "people": false
+    },
+    {
+      "id": "co-value-cycle",
+      "file": "/img/v2/co-value-cycle.webp",
+      "width": 520,
+      "height": 520,
+      "route": "/company",
+      "slot": "VALUES「サーキュラーエコノミー」 .img-frame--pale .img-frame--1x1 最大 260px",
+      "alt": "",
+      "people": false
+    },
+    {
+      "id": "su-side",
+      "file": "/img/v2/su-side.webp",
+      "width": 900,
+      "height": 1350,
+      "route": "/signup",
+      "slot": ".auth-page--split 左カラム .auth-side（cover、pos 50% 40%、下部グラデ上に『撮って、あとは待つだけ。』）",
+      "alt": "",
+      "people": true,
+      "checked": {
+        "faces": true,
+        "text": true,
+        "brands": true,
+        "badges": true,
+        "plates": true,
+        "likeness": true,
+        "marks": true
+      },
+      "checked_at": "2026-09-14",
+      "checked_by": "画像担当（Wave P・等倍＋200% 目視）"
+    },
+    {
+      "id": "li-side",
+      "file": "/img/v2/li-side.webp",
+      "width": 900,
+      "height": 1350,
+      "route": "/login",
+      "slot": ".auth-page--split 左カラム .auth-side（cover、pos 50% 40%、下部グラデ上に『査定の結果を、確かめに。』）",
+      "alt": "",
+      "people": true,
+      "checked": {
+        "faces": true,
+        "text": true,
+        "brands": true,
+        "badges": true,
+        "plates": true,
+        "likeness": true,
+        "marks": true
+      },
+      "checked_at": "2026-09-14",
+      "checked_by": "画像担当（Wave P・等倍＋200% 目視）"
+    },
+    {
+      "id": "ol-side",
+      "file": "/img/v2/ol-side.webp",
+      "width": 900,
+      "height": 1350,
+      "route": "/operator/login",
+      "slot": ".auth-page--split .operator-auth 左カラム（cover、pos 50% 40%、グラデ .85）",
+      "alt": "",
+      "people": true,
+      "checked": {
+        "faces": true,
+        "text": true,
+        "brands": true,
+        "badges": true,
+        "plates": true,
+        "likeness": true,
+        "marks": true
+      },
+      "checked_at": "2026-09-14",
+      "checked_by": "画像担当（Wave P・等倍＋200% 目視）"
+    },
+    {
+      "id": "os-side",
+      "file": "/img/v2/os-side.webp",
+      "width": 900,
+      "height": 1350,
+      "route": "/operator/signup",
+      "slot": ".auth-page--split .operator-auth 左カラム（cover、pos 50% 40%、白抜き「審査制。古物商許可を確認します。」のみ。小リストは右カラム）。859px 以下は 21:9 帯 160px",
+      "alt": "",
+      "people": false
+    },
+    {
+      "id": "ct-band",
+      "file": "/img/v2/ct-band.webp",
+      "width": 1920,
+      "height": 1088,
+      "route": "/contact",
+      "slot": ".hero-band--slim.hero-band--quiet.hero-band--pos-r（帯上に文字を置かない。法務帯 lg-band と構図を変え、封筒とペンの寄り）",
+      "alt": "",
+      "people": false
+    },
+    {
+      "id": "lg-band",
+      "file": "/img/v2/lg-band.webp",
+      "width": 1920,
+      "height": 1088,
+      "route": "/terms",
+      "slot": ".hero-band--fixed.hero-band--quiet（160px/120px 固定、帯上に文字なし）。used_by: /terms（--pos-l）/privacy（既定）/legal（--pos-r）",
+      "alt": "",
+      "people": false
+    },
+    {
+      "id": "top-hero-person",
+      "file": "/img/v2/top-hero-person.webp",
+      "width": 900,
+      "height": 1350,
+      "route": "/",
+      "slot": "HERO .hero-photo .img-frame--2x3（LCP）人物版。手元版 top-hero と最終レビューで択一",
+      "alt": "リビングの床に座り、並べた不用品をスマートフォンで1点ずつ撮影する女性（イメージ）",
+      "people": true,
+      "checked": {
+        "faces": true,
+        "text": true,
+        "brands": true,
+        "badges": true,
+        "plates": true,
+        "likeness": true,
+        "marks": true
+      },
+      "checked_at": "2026-09-14",
+      "checked_by": "画像担当（Wave P・等倍＋200% 目視）"
+    },
+    {
+      "id": "mc-jikka",
+      "file": "/img/v2/mc-jikka.webp",
+      "width": 800,
+      "height": 800,
+      "route": "/",
+      "slot": "モデルケース カード 人物 .img-frame--1x1（実家整理・60代女性）（トップのみ。/examples では肖像を出さない）",
+      "alt": "和室で品物を整理する60代の女性（架空のモデルケース）",
+      "people": true,
+      "checked": {
+        "faces": true,
+        "text": true,
+        "brands": true,
+        "badges": true,
+        "plates": true,
+        "likeness": true,
+        "marks": true
+      },
+      "checked_at": "2026-09-14",
+      "checked_by": "画像担当（Wave P・等倍＋200% 目視）",
+      "used_by": [
+        "/"
+      ]
+    },
+    {
+      "id": "mc-moving",
+      "file": "/img/v2/mc-moving.webp",
+      "width": 800,
+      "height": 800,
+      "route": "/",
+      "slot": "モデルケース カード 人物 .img-frame--1x1（引越し・30代男性）（トップのみ。/examples では肖像を出さない）",
+      "alt": "引越し前のリビングでスマートフォンを持つ30代の男性（架空のモデルケース）",
+      "people": true,
+      "checked": {
+        "faces": true,
+        "text": true,
+        "brands": true,
+        "badges": true,
+        "plates": true,
+        "likeness": true,
+        "marks": true
+      },
+      "checked_at": "2026-09-14",
+      "checked_by": "画像担当（Wave P・等倍＋200% 目視）",
+      "used_by": [
+        "/"
+      ]
+    },
+    {
+      "id": "mc-ihin",
+      "file": "/img/v2/mc-ihin.webp",
+      "width": 800,
+      "height": 800,
+      "route": "/",
+      "slot": "モデルケース カード 人物 .img-frame--1x1（遺品整理・50代男性）（トップのみ。/examples では肖像を出さない）",
+      "alt": "静かな部屋で小さな木箱を手にする50代の男性（架空のモデルケース）",
+      "people": true,
+      "checked": {
+        "faces": true,
+        "text": true,
+        "brands": true,
+        "badges": true,
+        "plates": true,
+        "likeness": true,
+        "marks": true
+      },
+      "checked_at": "2026-09-14",
+      "checked_by": "画像担当（Wave P・等倍＋200% 目視）",
+      "used_by": [
+        "/"
+      ]
+    },
+    {
+      "id": "vc-owner",
+      "file": "/img/v2/vc-owner.webp",
+      "width": 800,
+      "height": 800,
+      "route": "/business",
+      "slot": "参加業者モデルケース 人物 .img-frame--1x1（リユース店 店主・50代男性）",
+      "alt": "店の棚の前に立つリユース店の店主（架空のモデルケース）",
+      "people": true,
+      "checked": {
+        "faces": true,
+        "text": true,
+        "brands": true,
+        "badges": true,
+        "plates": true,
+        "likeness": true,
+        "marks": true
+      },
+      "checked_at": "2026-09-14",
+      "checked_by": "画像担当（Wave P・等倍＋200% 目視）"
+    },
+    {
+      "id": "vc-owner-440",
+      "file": "/img/v2/vc-owner-440.webp",
+      "width": 440,
+      "height": 440,
+      "route": "/business",
+      "slot": "モデルケース vc-1 .vc-head .vc-fig .img-frame--1x1（表示 220px／859px 以下 140px。2x 規約のための派生。--pos は書かない）",
+      "alt": "店の棚の前に立つリユース店の店主（架空のモデルケース）",
+      "people": true,
+      "derived_from": "vc-owner",
+      "used_by": [
+        "/business"
+      ],
+      "checked": {
+        "faces": true,
+        "text": true,
+        "brands": true,
+        "badges": true,
+        "plates": true,
+        "likeness": true,
+        "marks": true
+      },
+      "checked_at": "2026-09-14",
+      "checked_by": "画像担当（Wave P・派生元 vc-owner と同一画像）"
+    },
+    {
+      "id": "vc-staff",
+      "file": "/img/v2/vc-staff.webp",
+      "width": 800,
+      "height": 800,
+      "route": "/business",
+      "slot": "参加業者モデルケース 人物 .img-frame--1x1（買取スタッフ・30代女性）",
+      "alt": "搬出口で台車に手を添える買取スタッフ（架空のモデルケース）",
+      "people": true,
+      "checked": {
+        "faces": true,
+        "text": true,
+        "brands": true,
+        "badges": true,
+        "plates": true,
+        "likeness": true,
+        "marks": true
+      },
+      "checked_at": "2026-09-14",
+      "checked_by": "画像担当（Wave P・等倍＋200% 目視）"
+    },
+    {
+      "id": "vc-staff-440",
+      "file": "/img/v2/vc-staff-440.webp",
+      "width": 440,
+      "height": 440,
+      "route": "/business",
+      "slot": "モデルケース vc-2 .vc-head .vc-fig .img-frame--1x1（表示 220px／859px 以下 140px。2x 規約のための派生。--pos は書かない）",
+      "alt": "搬出口で台車に手を添える買取スタッフ（架空のモデルケース）",
+      "people": true,
+      "derived_from": "vc-staff",
+      "used_by": [
+        "/business"
+      ],
+      "checked": {
+        "faces": true,
+        "text": true,
+        "brands": true,
+        "badges": true,
+        "plates": true,
+        "likeness": true,
+        "marks": true
+      },
+      "checked_at": "2026-09-14",
+      "checked_by": "画像担当（Wave P・派生元 vc-staff と同一画像）"
+    }
+  ]
+}
