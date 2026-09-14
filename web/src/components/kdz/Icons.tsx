@@ -40,6 +40,9 @@ export function KdzIconSprite() {
         <symbol id="i-box" viewBox="0 0 24 24"><path d="M3 7.5L12 3l9 4.5v9L12 21l-9-4.5z" /><path d="M3 7.5L12 12l9-4.5M12 12v9" /></symbol>
         <symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" /></symbol>
         <symbol id="i-yen" viewBox="0 0 24 24"><path d="M12 13v7M7 4l5 7 5-7M8 13h8M8 16.5h8" /></symbol>
+        {/* ヒーロー カルーセルの一時停止トグル用（.hero-carousel__toggle）。線画のみ・塗りなしで既存アイコンと統一 */}
+        <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14" /></symbol>
+        <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5l13 7.5-13 7.5z" /></symbol>
       </defs>
     </svg>
   );
@@ -49,7 +52,7 @@ export type IcName =
   | "camera" | "arrow" | "check" | "x" | "spark" | "trend" | "people" | "scan"
   | "scale" | "truck" | "check-circle" | "menu" | "shield" | "bag" | "lock"
   | "sun" | "tag" | "zoom" | "crop" | "chat" | "up" | "house" | "crown"
-  | "phone" | "clock" | "pin" | "sofa" | "box" | "chev" | "yen";
+  | "phone" | "clock" | "pin" | "sofa" | "box" | "chev" | "yen" | "pause" | "play";
 
 /** デザインの `<svg class="ic"><use href="#i-xxx"/></svg>` を React で再現する薄いヘルパー。 */
 export function Ic({ name, className, ...rest }: { name: IcName } & SVGProps<SVGSVGElement>) {

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Ic } from "@/components/kdz/Icons";
-import { Reveal, FaqAccordion } from "@/components/kdz/interactions";
+import { Reveal, FaqAccordion, HeroCarousel, type HeroSlide } from "@/components/kdz/interactions";
 import { KdzLogo } from "@/components/kdz/Logo";
 import {
   FEATURED_CASES,
@@ -24,6 +24,17 @@ const CATEGORIES: { img: string; name: string; ex: string }[] = [
   { img: "cat-sport", name: "スポーツ", ex: "ゴルフ・アウトドア" },
   { img: "cat-tools", name: "工具・DIY", ex: "電動工具ほか" },
   { img: "cat-other", name: "その他いろいろ", ex: "まずは撮ってみる" },
+];
+
+/** ヒーローの人物カルーセル（2026-09-14 ユーザー指示）。
+ *  「若い女性→若い男性→30代夫婦と子ども→60代夫婦」の順で、誰が使うサービスかを一人の像に
+ *  固定しない。全カット同じ 2:3（1024x1536→900x1350）・同じ構図の語彙（床に座り、待たせている
+ *  持ち物のそばでスマホを構える）で撮影し、切り替わっても「同じ部屋・同じ行為」に見えるようにする。 */
+const HERO_SLIDES: HeroSlide[] = [
+  { id: "top-hero-woman-20s", width: 900, height: 1350, alt: "リビングの床で、不用品をスマートフォンで撮影する20代の女性（イメージ）" },
+  { id: "top-hero-man-20s", width: 900, height: 1350, alt: "リビングの床で、不用品をスマートフォンで撮影する20代の男性（イメージ）" },
+  { id: "top-hero-couple-child", width: 900, height: 1350, alt: "子どもと一緒に、不用品をまとめて撮影する30代の夫婦（イメージ）" },
+  { id: "top-hero-couple-60s", width: 900, height: 1350, alt: "並べた不用品をスマートフォンで撮影する60代の夫婦（イメージ）" },
 ];
 
 const FAQ_ITEMS = [
@@ -118,17 +129,16 @@ export default function HomePage() {
               </div>
             </div>
             <div className="hero-figure">
-              {/* R4 D.2 #1: LCP。AR は .hero-photo--2x3（PC 2:3 / 859px 以下 4:5）が持ち、
+              {/* 2026-09-14: 単一の人物像を「若い女性→若い男性→30代夫婦と子ども→60代夫婦」の
+                  4カット巡回に変更（ユーザー指示）。AR は .hero-photo--2x3（PC 2:3 / 859px 以下 4:5）が持ち、
                   859px 以下の切り位置は .img-frame--hero-person（core・katazuke.css）が持つ。
-                  PC は枠と素材の AR が一致しトリミングが起きないため --pos は書かない。
-                  ▼手元版（人物なし）の控え。人物版との最終択一は Wave V 出口で AD が行う:
+                  4カットとも同じ 2:3 素材（構図の語彙を揃えてあるため --pos の値もそのまま使い回せる）。
+                  実装は HeroCarousel（components/kdz/interactions.tsx）。1枚目のみ LCP。
+                  ▼手元版（人物なし）の控え。単一カットに戻す場合はこのコメントを参照:
                      src="/img/v2/top-hero.webp"
                      alt="床に並べた不用品をスマートフォンで1点ずつ撮影する手元（イメージ）" */}
               <figure className="hero-photo hero-photo--2x3 sp-bleed">
-                <div className="img-frame img-frame--2x3 img-frame--hero-person">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/img/v2/top-hero-person.webp" width={900} height={1350} alt="リビングの床に座り、並べた不用品をスマートフォンで1点ずつ撮影する女性（イメージ）" loading="eager" fetchPriority="high" decoding="async" />
-                </div>
+                <HeroCarousel slides={HERO_SLIDES} />
               </figure>
             </div>
           </div>

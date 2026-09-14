@@ -184,6 +184,124 @@ export function PhImg({
   );
 }
 
+/** ヒーロー カルーセルの1枚（/img/v2/<id>.webp）。 */
+export type HeroSlide = {
+  /** ファイル名（拡張子なし）。src は `/img/v2/${id}.webp` に固定。 */
+  id: string;
+  /** 意味のある alt（人物の年代・場面が分かる1文＋「（イメージ）」）。 */
+  alt: string;
+  width: number;
+  height: number;
+};
+
+/**
+ * トップ ヒーロー写真のペルソナ・カルーセル（.hero-photo > .img-frame の中身を担う）。
+ * 依頼者の像を「若い女性→若い男性→30代夫婦と子ども→60代夫婦」の順に巡回させ、
+ * 誰が使うサービスかを一人の像に固定しない（ユーザー指示 2026-09-14）。
+ *
+ * 実装方針:
+ * - `.img-frame img` は共有 CSS（katazuke-pages.css）で `position:absolute;inset:0` 済みなので、
+ *   同じ枠に複数の <img> を重ねて敷くだけで版面が揃う。切替は opacity のクロスフェードのみ
+ *   （デザイン正典: fade 以外のモーションを使わない）。
+ * - JS 未実行時は React の初期状態（1枚目のみ .is-active）がそのまま出るため、無JSでも崩れない
+ *   （`.rv` の js-rv ゲートのような追加の保険は不要 — 初期状態自体が「意味のある1枚」だから）。
+ * - 1枚目のみ LCP（eager + fetchPriority high）。残り3枚も eager だが fetchPriority low で
+ *   先読みしつつ LCP を譲る（初回の巡回でちらつかないように事前に読み込んでおく）。
+ * - `prefers-reduced-motion: reduce` では自動巡回しない（初期状態のまま静止）。ドットでの
+ *   手動切替は動作するが、同メディアクエリで transition 自体を切るため瞬時に切り替わる
+ *   （自動再生ではなく利用者の操作なので WCAG のアニメーション回避の対象外）。
+ * - 自動巡回には一時停止ボタンを必ず添える（WCAG 2.2.2 Pause, Stop, Hide）。タブが非表示の間・
+ *   ホバー/フォーカス中は自動送りを止める。
+ */
+export function HeroCarousel({
+  slides,
+  intervalMs = 5000,
+}: {
+  slides: HeroSlide[];
+  intervalMs?: number;
+}) {
+  const [current, setCurrent] = useState(0);
+  const [playing, setPlaying] = useState(true);
+  const [reducedMotion, setReducedMotion] = useState(false);
+  const pausedRef = useRef(false);
+
+  useEffect(() => {
+    if (!("matchMedia" in window)) return;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReducedMotion(mq.matches);
+    const onChange = () => setReducedMotion(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  useEffect(() => {
+    if (!playing || reducedMotion || slides.length < 2) return;
+    const id = window.setInterval(() => {
+      if (pausedRef.current || document.hidden) return;
+      setCurrent((i) => (i + 1) % slides.length);
+    }, intervalMs);
+    return () => window.clearInterval(id);
+  }, [playing, reducedMotion, slides.length, intervalMs]);
+
+  if (slides.length === 0) return null;
+  const pause = () => { pausedRef.current = true; };
+  const resume = () => { pausedRef.current = false; };
+
+  return (
+    <>
+      <div
+        className="img-frame img-frame--2x3 img-frame--hero-person"
+        onMouseEnter={pause}
+        onMouseLeave={resume}
+      >
+        {slides.map((s, i) => (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={s.id}
+            src={`/img/v2/${s.id}.webp`}
+            width={s.width}
+            height={s.height}
+            alt={s.alt}
+            aria-hidden={i === current ? undefined : true}
+            className={`hero-carousel__slide${i === current ? " is-active" : ""}`}
+            loading="eager"
+            fetchPriority={i === 0 ? "high" : "low"}
+            decoding="async"
+          />
+        ))}
+        {slides.length > 1 && (
+          <div className="hero-carousel__ctrl" onFocus={pause} onBlur={resume}>
+            <div className="hero-carousel__dots" role="tablist" aria-label="表示する人物を選ぶ">
+              {slides.map((s, i) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={i === current}
+                  aria-label={`${i + 1}枚目: ${s.alt.replace(/（イメージ）$/, "")}を表示`}
+                  className={`hero-carousel__dot${i === current ? " is-active" : ""}`}
+                  onClick={() => setCurrent(i)}
+                />
+              ))}
+            </div>
+            {!reducedMotion && (
+              <button
+                type="button"
+                className="hero-carousel__toggle"
+                aria-pressed={!playing}
+                aria-label={playing ? "自動切り替えを一時停止" : "自動切り替えを再開"}
+                onClick={() => setPlaying((p) => !p)}
+              >
+                <Ic name={playing ? "pause" : "play"} />
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
 /** FAQ アコーディオン（デザイン .faq-item / .open 開閉）。 */
 export function FaqAccordion({
   items,

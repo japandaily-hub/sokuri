@@ -324,6 +324,38 @@ section:has(> .vt){position:relative;}
   .img-frame--2x3.img-frame--hero-person{aspect-ratio:4/5;--pos:50% 38%;}
   .img-frame--2x3.img-frame--hero-biz{aspect-ratio:4/5;--pos:50% 42%;}
 }
+
+/* ============================================================
+   ヒーロー カルーセル（HeroCarousel・components/kdz/interactions.tsx）
+   複数の人物カットを .img-frame の中に重ねて敷き、opacity のクロスフェードだけで巡回させる
+   （fade 以外のモーションは使わない）。.img-frame img は既に position:absolute;inset:0 済みなので
+   重ねるだけで版面が揃う。1枚目は React の初期状態で is-active＝無 JS でも壊れない。 */
+.hero-carousel__slide{opacity:0;transition:opacity .9s var(--ease);}
+.hero-carousel__slide.is-active{opacity:1;}
+@media(prefers-reduced-motion:reduce){.hero-carousel__slide{transition:none;}}
+
+/* 操作列は写真の下端に重ねる帯（.auth-side::after と同じ「下端だけ暗くする」語彙を踏襲）。
+   .img-frame は position:relative・overflow:hidden 済みなので、この内側に敷けば額装からはみ出さない。 */
+.hero-carousel__ctrl{position:absolute;left:0;right:0;bottom:0;z-index:2;
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:14px clamp(16px,2.6vw,24px);
+  background:linear-gradient(180deg,rgba(20,35,92,0),rgba(20,35,92,.72));}
+.hero-carousel__dots{display:flex;align-items:center;gap:9px;}
+.hero-carousel__dot{width:8px;height:8px;padding:0;border-radius:50%;
+  border:1px solid rgba(255,255,255,.85);background:rgba(255,255,255,.35);
+  cursor:pointer;transition:opacity .25s var(--ease);}
+.hero-carousel__dot:hover{opacity:.75;}
+.hero-carousel__dot.is-active{background:#fff;}
+.hero-carousel__toggle{display:grid;place-items:center;width:30px;height:30px;padding:0;flex:none;
+  border:1px solid rgba(255,255,255,.6);background:transparent;color:#fff;cursor:pointer;
+  transition:opacity .25s var(--ease);}
+.hero-carousel__toggle:hover{opacity:.75;}
+.hero-carousel__toggle .ic{font-size:14px;}
+@media(max-width:859px){
+  .hero-carousel__ctrl{padding:10px 16px;}
+  .hero-carousel__dot{width:7px;height:7px;}
+}
+
 /* 緑リングを 6px ずらす（人の森の円形リングの直角版） */
 .hero-photo::before{content:"";position:absolute;inset:-6px -6px 6px 6px;
   border:1px solid var(--primary);pointer-events:none;}
