@@ -97,13 +97,13 @@ export const CASES: CaseItem[] = [
     amount: 58000,
     bidCount: 4,
     days: 2,
-    cats: ["ブランド品", "時計", "衣類・靴"],
+    cats: ["ブランド品", "時計", "衣類・靴", "その他"],
     count: 11,
     quote:
       "ブランド品を10点ほど。1点ずつフリマアプリに出すのが億劫で試してみたら、撮影から引き取りまで1回で片付きました。何より、選ぶまで業者から連絡が来ないのが助かりました。",
     lot: "ex-lot-closet",
     lotAlt: "断捨離のモデルケース。衣類や小物をまとめたイメージ",
-    thumbs: ["cat-brand", "cat-fashion"],
+    thumbs: ["cat-fashion", "cat-other"],
   },
   {
     id: 4,
@@ -135,13 +135,13 @@ export const CASES: CaseItem[] = [
     amount: 31000,
     bidCount: 4,
     days: 3,
-    cats: ["家具", "衣類・靴", "本・メディア"],
+    cats: ["家具", "衣類・靴", "食器"],
     count: 9,
     quote:
       "模様替えで不要になった家具と洋服。重い家具も玄関まで出してもらえて、部屋がすっきりしました。4社の査定を見比べて、一番コメントが丁寧な業者さんに決めました。",
     lot: "ex-lot-rearrange",
     lotAlt: "模様替えのモデルケース。入れ替える家具をリビングにまとめたイメージ",
-    thumbs: ["cat-furniture", "cat-fashion"],
+    thumbs: ["cat-furniture", "cat-tableware"],
   },
   {
     id: 6,
@@ -152,13 +152,13 @@ export const CASES: CaseItem[] = [
     amount: 112000,
     bidCount: 3,
     days: 1,
-    cats: ["家電・PC", "家具", "スポーツ", "ゲーム"],
+    cats: ["家電・PC", "家具", "スポーツ", "工具・DIY"],
     count: 19,
     quote:
       "2LDKの引越しで家電・家具をまるごと出品。引越し当日に合わせて引き取り日を調整してもらえ、タイミングもぴったりでした。",
     lot: "ex-lot-kitchen",
     lotAlt: "引越しのモデルケース。台所用品と小型家電をまとめたイメージ",
-    thumbs: ["cat-sport", "cat-game"],
+    thumbs: ["cat-sport", "cat-tools"],
   },
 ];
 

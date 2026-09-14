@@ -395,7 +395,7 @@
    で既に中央寄せ（実機スクショで確認）なので、ここでは中央寄せを重複させない。 */
 .hero-band#contact { --band-pos: 50% 32%; }
 .hero-band#contact .hero-band__veil {
-  background: linear-gradient(180deg, rgba(16,20,34,.28) 0%, rgba(16,20,34,.66) 100%);
+  background: linear-gradient(180deg, rgba(16,20,34,.38) 0%, rgba(16,20,34,.74) 100%); /* 受け入れ判定: 明るい素材（top-cta-band v2）に差し替えたため .28→.38／.66→.74 に戻し、40px 見出しの実測 p95 3.95 → 4.5 以上を確保 */
 }
 @media (max-width: 859px) {
   /* SP（390px・帯 220px）は素材が幅で cover され縦は全域が見える＝窓の明部（実測輝度 max 249）が

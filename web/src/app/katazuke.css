@@ -194,6 +194,9 @@ section:has(> .vt){position:relative;}
   letter-spacing:.02em;color:rgba(255,255,255,.86);}
 .btn-line__arr{margin-inline-start:auto;align-self:center;
   padding-inline-end:clamp(16px,2vw,24px);font-size:18px;flex:0 0 auto;}
+/* 受け入れ判定（visual）: ヒーロー/最終CTA は列で幅を揃える（360px stretch）ため、左寄せラベルだと
+   ラベルと矢印の間に大きな空白が残り「作りかけ」に見えた。ラベル群を本文域の中央に置く（タイルは左端・矢印は右端のまま）。 */
+.btn.btn-line .btn-line__body{align-items:center;text-align:center;}
 @media (max-width:859px){
   .btn.btn-line{min-height:54px;}
   /* 相方の .btn-ghost も同時に全幅にする（LINE だけ全幅で不揃いになるのを防ぐ） */
