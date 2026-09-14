@@ -30,6 +30,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.router import api_router
+from app.config import get_settings
 from app.core.security import create_access_token, hash_password
 from app.db.models.bid import Bid
 from app.db.models.case import Case, CasePhoto
@@ -37,7 +38,6 @@ from app.db.models.operator import Operator
 from app.db.models.transaction import Transaction
 from app.db.models.user import User
 from app.db.session import get_session
-from app.services import storage
 from app.services.reminders import (
     BIDS_PENDING_GRACE_DAYS,
     JST,
@@ -186,7 +186,7 @@ async def test_case_photo_delivery_blocks_unapproved_operator_token(
     無認証（``<img>`` 経由）と承認済み業者は従来どおり配信される（capability URL の
     互換性を壊さないための多層防御という位置づけ）。
     """
-    monkeypatch.setattr(storage, "_storage_root", lambda: tmp_path)
+    monkeypatch.setattr(get_settings(), "storage_dir", str(tmp_path))
     user, _ = await _make_user(db_session, "photo_owner@example.com")
     case = await _make_case(db_session, user)
     storage_key = f"{uuid.uuid4().hex}.jpg"

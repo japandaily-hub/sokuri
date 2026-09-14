@@ -28,7 +28,7 @@ from app.core.client_ip import (
 )
 from app.api.v1.endpoints.cases import sweep_stale_pending_ai
 from app.db.session import engine, get_background_session_factory
-from app.services import alerts
+from app.services import alerts, storage
 from app.services.reminders import run_reminders
 from app.services.seed import seed_channels_and_rules
 
@@ -198,6 +198,10 @@ def _config_readiness(settings: Settings) -> dict[str, bool]:
       既存の ``brevo`` が同一キーを見ているため、ここでは残る2経路を可視化する。
       ``_send_line`` はトークンと宛先の**両方**が揃って初めて送信するため、
       片方だけの設定は False（＝使えない）と判定する。
+    - ``storage_r2``: ``resolved_storage_backend`` が ``"r2"`` の場合にのみ意味を持つ。
+      R2 を使わない構成（ローカルディスク運用）では常に True（劣化ではない）とし、
+      R2 を使う構成で認証情報が不完全（``r2_configured`` が False）な場合のみ False
+      にする（security review 指摘対応）。
     """
     try:
         from cryptography.fernet import Fernet
@@ -222,6 +226,7 @@ def _config_readiness(settings: Settings) -> dict[str, bool]:
             settings.alert_line_channel_access_token and settings.alert_line_user_ids
         ),
         "alerts_webhook": bool(settings.alert_webhook_url),
+        "storage_r2": settings.resolved_storage_backend != "r2" or settings.r2_configured,
     }
 
 
@@ -266,11 +271,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "（例: \"https://*.evil.com\"）が含まれています。"
                 "許可するオリジンを明示的にカンマ区切りで指定してください。"
             )
+        if settings.resolved_storage_backend == "local":
+            # 起動は止めない（degraded + 可観測性優先。他の本番ガードと同方針）が、
+            # 「デプロイの度に写真が消える」という重大な運用事故の原因をログで
+            # 即座に特定できるようにする（R2 未設定 or STORAGE_BACKEND=local 明示）。
+            logger.critical(
+                "本番環境（APP_ENV=production）でストレージバックエンドが local です。"
+                "Render のエフェメラルディスクに保存されるため、デプロイの度に"
+                "案件写真が消えます。R2 認証情報（R2_ACCOUNT_ID 等）を設定してください。"
+            )
     elif settings.jwt_secret in _WEAK_JWT_SECRETS or len(settings.jwt_secret) < 32:
         logger.warning(
             "JWT_SECRET が弱い値（デフォルト値/例示値、または32文字未満）です。"
             "開発環境のため起動は継続しますが、本番相当の検証時は必ず強い鍵を設定してください。"
         )
+
+    logger.info(
+        "[startup] storage backend=%s bucket=%s prefix=%s",
+        storage.backend_name(),
+        settings.r2_bucket or "-",
+        settings.r2_key_prefix,
+    )
 
     app = FastAPI(
         title="カタヅケ API",
@@ -307,9 +328,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         RENDER_GIT_COMMIT（Render Blueprint がデプロイ時に自動注入）が未設定の
         環境（ローカル開発等）では commit は None。「デプロイした」をGUIではなく
         レスポンス値そのもので機械的に検証できるようにするための識別子。
+
+        ``storage`` は現在有効な写真ストレージバックエンド名（"local" | "r2"）。
+        "local" が本番で出続けている場合は R2 未設定＝デプロイの度に写真が
+        消える状態を意味する（秘密値は含めない）。
         """
         commit = settings.render_git_commit[:7] if settings.render_git_commit else None
-        return {"status": "ok", "commit": commit}
+        return {"status": "ok", "commit": commit, "storage": storage.backend_name()}
 
     @app.api_route("/readyz", methods=["GET", "HEAD"], tags=["System"], summary="レディネスチェック（DB到達性+スキーマ状態込み）")
     async def readyz(token: str | None = None) -> JSONResponse:

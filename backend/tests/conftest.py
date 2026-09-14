@@ -20,6 +20,10 @@ os.environ.setdefault("APP_ENCRYPTION_KEY", Fernet.generate_key().decode("utf-8"
 # テストは app.dependency_overrides[get_rate_limiter] でテスト専用の有効なインスタンスを
 # 注入して行うため、このグローバル設定には一切依存しない（tests/test_rate_limit_api.py）。
 os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
+# 写真ストレージは常にローカルディスクを使う（R2 未設定の CI/ローカル実行で
+# 実 R2 を叩きに行かないため）。get_settings() は lru_cache されるため、
+# Settings 初回生成より前に設定する必要がある。
+os.environ.setdefault("STORAGE_BACKEND", "local")
 
 # Override JSONB -> JSON for SQLite (JSONB is PG-specific, SQLite uses JSON)
 @compiles(JSONB, "sqlite")

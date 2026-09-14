@@ -766,6 +766,53 @@ async def test_add_photo_403_other_user(client: AsyncClient, tmp_storage):
     assert r.status_code == 403
 
 
+async def test_add_photo_403_other_user_precedes_item_and_key_validation(
+    client: AsyncClient, tmp_storage
+):
+    """qa review 指摘対応（M-1）: 認可チェックは判定順序の先頭にあり、item_id・
+    storage_key が両方とも不正な値であっても、他ユーザーの案件に対する
+    リクエストは 403（他の要因由来の 404/422 に潰れない）で止まることを
+    実証する（``_authorize_owner`` は ``_get_item_or_404`` / ``storage.is_valid_key``
+    より前に呼ばれる設計であることの回帰テスト）。
+    """
+    token = await _signup_user(client, "owner_precedence@example.com")
+    other_token = await _signup_user(client, "other_precedence@example.com")
+    case_id, _item_id, _ = await _create_case_with_item(client, token, n_photos=1)
+
+    r = await client.post(
+        f"/api/v1/cases/{case_id}/items/{uuid.uuid4()}/photos",
+        json={"storage_key": "../../etc/passwd", "sort_order": 0},
+        headers=_auth(other_token),
+    )
+    assert r.status_code == 403, r.text
+
+
+async def test_add_photo_translates_storage_unavailable_to_503(
+    client: AsyncClient, tmp_storage
+):
+    """POST .../photos で storage.exists が StorageUnavailableError を送出する場合、
+    500 ではなく 503 として返す（security review 指摘対応・修正5の回帰テスト）。
+    """
+    from unittest.mock import AsyncMock, patch
+
+    from app.services.storage import StorageUnavailableError
+
+    token = await _signup_user(client, "add_photo_storage_unavailable@example.com")
+    case_id, item_id, _ = await _create_case_with_item(client, token, n_photos=1)
+
+    with patch(
+        "app.api.v1.endpoints.case_items.storage.exists",
+        new_callable=AsyncMock,
+        side_effect=StorageUnavailableError("R2 head_object に失敗しました"),
+    ):
+        r = await client.post(
+            f"/api/v1/cases/{case_id}/items/{item_id}/photos",
+            json=_photo_with_file(tmp_storage, 0),
+            headers=_auth(token),
+        )
+    assert r.status_code == 503, r.text
+
+
 async def test_add_photo_404_item_not_found(client: AsyncClient, tmp_storage):
     token = await _signup_user(client)
     case_id, _item_id, _ = await _create_case_with_item(client, token, n_photos=1)

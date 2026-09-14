@@ -471,6 +471,8 @@ def test_config_readiness_flags_are_bool_only(monkeypatch):
         # r10 O-H3: 運営向けアラートの LINE / Webhook 経路（services/alerts.py）。
         "alerts_line",
         "alerts_webhook",
+        # security review 指摘対応: R2 移行に伴い、R2 使用時の設定完全性を可視化する。
+        "storage_r2",
     }
     assert all(isinstance(v, bool) for v in flags.values())
     # conftest が有効な APP_ENCRYPTION_KEY を注入しているので True。

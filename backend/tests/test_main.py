@@ -99,6 +99,16 @@ async def test_health_returns_status_and_commit_keys():
     assert "commit" in data
 
 
+async def test_health_returns_storage_backend_name():
+    """/health は現在有効なストレージバックエンド名（"local"|"r2"）を返す（秘密値は含まない）。"""
+    settings = Settings(_env_file=None)
+    app = create_app(settings)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        r = await client.get("/health")
+    assert r.status_code == 200
+    assert r.json()["storage"] in ("local", "r2")
+
+
 async def test_health_and_readyz_accept_head_for_external_monitors():
     """UptimeRobot 等は HEAD で叩く。GET 専用だと 405 で「Down」誤判定（2026-09-08 実測）。"""
     app = create_app(Settings(_env_file=None))

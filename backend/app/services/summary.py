@@ -15,6 +15,7 @@ from dataclasses import dataclass
 
 from app.db.models.enums import ItemCondition
 from app.services import storage
+from app.services.storage import StorageUnavailableError
 from app.services.text_sanitize import normalize_and_strip_control_chars
 from app.services.vision import analyze_image
 
@@ -151,31 +152,45 @@ async def generate_case_summary(
     return summary
 
 
-def _read_and_encode_data_url(path) -> str:  # type: ignore[no-untyped-def]
-    """ファイルを読み込み base64 データ URL 文字列を組み立てる（同期・CPU/IOバウンド）。
+def _encode_data_url(data: bytes, content_type: str) -> str:
+    """bytes を base64 データ URL 文字列へ組み立てる（同期・CPUバウンド）。
 
     ``photo_url_for_ai`` から ``asyncio.to_thread`` 経由でのみ呼び出すこと
     （イベントループを塞がないため）。
     """
     import base64
 
-    ext = path.suffix.lstrip(".").lower()
-    mime = "image/jpeg" if ext in ("jpg", "jpeg") else f"image/{ext}"
-    data = base64.b64encode(path.read_bytes()).decode("ascii")
-    return f"data:{mime};base64,{data}"
+    encoded = base64.b64encode(data).decode("ascii")
+    return f"data:{content_type};base64,{encoded}"
 
 
 async def photo_url_for_ai(storage_key: str, raw_url: str | None) -> str | None:
-    """AI に渡す画像参照を決める。ローカル保存ファイルは base64 データ URL 化する。
+    """AI に渡す画像参照を決める。保存済み写真は base64 データ URL 化する。
 
-    ファイル読み込み + base64エンコードは同期I/O・CPUバウンドのため
-    ``asyncio.to_thread`` でスレッドへ逃がし、イベントループをブロックしない
-    （security review 指摘対応。呼び出し元は「実際に解析対象となる写真のみ」
-    このタイミングで遅延呼び出しすること。全写真を先行してbase64化しない）。
+    R2 移行後も data URL 経由のまま（変更なし）。R2/ローカルいずれの
+    バックエンドでも、取得した bytes を base64 化して Gemini に渡す方式は
+    変わらない（storage.read_bytes が抽象化するため呼び出し元は無改修）。
+
+    ストレージ側の一時障害（``StorageUnavailableError``）は当該写真をスキップ
+    する（案件作成自体は失敗させない。warning ログを出す）。
+    base64エンコードは同期I/O・CPUバウンドのため ``asyncio.to_thread`` で
+    スレッドへ逃がし、イベントループをブロックしない（security review 指摘
+    対応。呼び出し元は「実際に解析対象となる写真のみ」このタイミングで遅延
+    呼び出しすること。全写真を先行してbase64化しない）。
     """
-    path = storage.file_path(storage_key)
-    if path is not None:
-        return await asyncio.to_thread(_read_and_encode_data_url, path)
+    try:
+        obj = await storage.read_bytes(storage_key)
+    except StorageUnavailableError as exc:
+        logger.warning(
+            "photo_url_for_ai: storage_key=%s の取得中にストレージ障害が発生した"
+            "ため、当該写真をAI解析から除外します - %s: %s",
+            storage.mask_key_for_log(storage_key),
+            type(exc).__name__,
+            str(exc)[:200],
+        )
+        obj = None
+    if obj is not None:
+        return await asyncio.to_thread(_encode_data_url, obj.data, obj.content_type)
     if raw_url and raw_url.startswith("https://"):
         # R3再レビュー Medium対応: vision.analyze_image は security review N-7
         # 対応（SSRF対策）により https:// URL の受け付けを全面撤廃済みのため、
@@ -189,7 +204,7 @@ async def photo_url_for_ai(storage_key: str, raw_url: str | None) -> str | None:
             "photo_url_for_ai: storage_key=%s の実体を解決できず、raw_url が "
             "https のため AI 解析をスキップします（vision.analyze_image は "
             "https を受け付けない設計）。",
-            storage_key,
+            storage.mask_key_for_log(storage_key),
         )
         return None
     return None
@@ -335,17 +350,20 @@ async def _analyze_items_with_budget(
     async def _run(raw_refs: list[RawPhotoRef]) -> ItemAnalysisResult:
         if not raw_refs:
             return ItemAnalysisResult()
+        # 解決（storage I/O・base64化）は Gemini 同時実行セマフォの外で行う
+        # （ストレージ I/O 待ちで Gemini の同時実行枠を無駄に占有しないため。
+        # 「解決 → permit取得 → analyze_item」の3段構成）。予算配分により実際に
+        # 解析対象となった写真のみ、この時点で初めて base64 データURL化する
+        # （未保存・raw_url が https でない等の理由で解決できない写真は
+        # None として除外する）。
+        resolved: list[str] = []
+        for storage_key, url in raw_refs:
+            ref = await photo_url_for_ai(storage_key, url)
+            if ref is not None:
+                resolved.append(ref)
+        if not resolved:
+            return ItemAnalysisResult()
         async with semaphore:
-            # 予算配分により実際に解析対象となった写真のみ、この時点で初めて
-            # base64 データURL化する（storage.file_path 未存在・raw_url が
-            # https でない等の理由で解決できない写真は None として除外する）。
-            resolved: list[str] = []
-            for storage_key, url in raw_refs:
-                ref = await photo_url_for_ai(storage_key, url)
-                if ref is not None:
-                    resolved.append(ref)
-            if not resolved:
-                return ItemAnalysisResult()
             name, condition, item_summary = await analyze_item(photo_refs=resolved)
         return ItemAnalysisResult(
             ai_detected_name=name, ai_condition=condition, ai_summary=item_summary

@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from functools import lru_cache
 
-from pydantic import Field, ValidationInfo, field_validator
+from pydantic import Field, SecretStr, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
@@ -76,8 +76,28 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 60 * 24 * 7
     # 管理者ロールで登録される email（カンマ区切り）。signup 時に role='admin' を付与。
     admin_emails_raw: str = Field(default="", alias="ADMIN_EMAILS")
-    # 写真ファイルの保存ディレクトリ（Render Free はエフェメラル。βでは許容）
+    # 写真ファイルの保存ディレクトリ（Render Free はエフェメラル。βでは許容）。
+    # R2 が有効なら未使用（R2未設定時のフォールバック保存先。ここに落ちている
+    # ＝写真が消える状態。/health の storage が "local" ならこのモード）。
     storage_dir: str = "./uploads_storage"
+    # ── 案件写真ストレージ（Cloudflare R2 移行） ──────────────────────
+    # "auto": r2_configured なら r2、そうでなければ local に自動フォールバック。
+    # "local"/"r2": 明示指定（r2 を指定して未設定だと起動後の呼び出し時に失敗する）。
+    storage_backend: str = Field(default="auto", alias="STORAGE_BACKEND")
+    # R2 からの同時 GET 数上限（プロセス全体で共有するセマフォの初期値）。
+    storage_max_concurrent_reads: int = Field(default=8, alias="STORAGE_MAX_CONCURRENT_READS")
+    # Cloudflare R2 認証情報。すべて未設定なら resolved_storage_backend は
+    # "auto" 時に自動的に "local" へフォールバックする（r2_configured 参照）。
+    r2_account_id: str = Field(default="", alias="R2_ACCOUNT_ID")
+    r2_access_key_id: str = Field(default="", alias="R2_ACCESS_KEY_ID")
+    r2_secret_access_key: SecretStr = Field(default=SecretStr(""), alias="R2_SECRET_ACCESS_KEY")
+    r2_bucket: str = Field(default="", alias="R2_BUCKET")
+    # 省略時は account_id から組み立てる（https://{account_id}.r2.cloudflarestorage.com）。
+    r2_endpoint_url: str = Field(default="", alias="R2_ENDPOINT_URL")
+    r2_key_prefix: str = Field(default="case-photos/", alias="R2_KEY_PREFIX")
+    r2_connect_timeout_seconds: int = Field(default=3, alias="R2_CONNECT_TIMEOUT_SECONDS")
+    r2_read_timeout_seconds: int = Field(default=10, alias="R2_READ_TIMEOUT_SECONDS")
+    r2_max_attempts: int = Field(default=3, alias="R2_MAX_ATTEMPTS")
     # Brevo（メール通知）。未設定時は送信をスキップする。
     brevo_api_key: str = ""
     mail_from: str = "noreply@katadzuke.jp"
@@ -321,6 +341,104 @@ class Settings(BaseSettings):
         if not (0 <= v <= 5):
             raise ValueError("GEMINI_MAX_RETRIES は0〜5の整数である必要があります。")
         return v
+
+    @field_validator("storage_backend", mode="after")
+    @classmethod
+    def _validate_storage_backend(cls, v: str) -> str:
+        """STORAGE_BACKEND は auto/local/r2 のいずれかを強制する。
+
+        誤字（"r2 " や "s3" 等）を起動時に弾かないと、意図せずローカル
+        フォールバックへ静かに倒れ続け、R2移行が全く効いていないことに
+        気付けないため（resolved_storage_backend の設計判断と対）。
+        """
+        if v not in {"auto", "local", "r2"}:
+            raise ValueError("STORAGE_BACKEND は auto/local/r2 のいずれかである必要があります。")
+        return v
+
+    @field_validator("storage_max_concurrent_reads", mode="after")
+    @classmethod
+    def _validate_storage_max_concurrent_reads(cls, v: int) -> int:
+        """STORAGE_MAX_CONCURRENT_READS は1〜64を強制する。
+
+        0 だと asyncio.Semaphore(0) で全ての写真配信が永久に待ち続ける
+        （GEMINI_MAX_CONCURRENT_CALLS と同じ安全弁パターン）。
+        """
+        if not (1 <= v <= 64):
+            raise ValueError("STORAGE_MAX_CONCURRENT_READS は1〜64の整数である必要があります。")
+        return v
+
+    @field_validator(
+        "r2_connect_timeout_seconds",
+        "r2_read_timeout_seconds",
+        "r2_max_attempts",
+        mode="after",
+    )
+    @classmethod
+    def _validate_r2_positive(cls, v: int, info: ValidationInfo) -> int:
+        """R2 のタイムアウト・リトライ回数は1以上を強制する。"""
+        if v < 1:
+            raise ValueError(f"{info.field_name} は1以上の整数である必要があります。")
+        return v
+
+    @field_validator("r2_key_prefix", mode="after")
+    @classmethod
+    def _normalize_r2_key_prefix(cls, v: str) -> str:
+        """R2_KEY_PREFIX を正規化する。
+
+        - 先頭 "/" は除去する（S3互換APIのキーに絶対パス的な先頭スラッシュの
+          意味は無く、混乱を招くため）。
+        - ".." を含む値はパストラバーサル的な誤設定として拒否する。
+        - 非空なら末尾に "/" を必ず付与する（storage_key との連結時の区切りを
+          設定ミスに依存させない）。
+        """
+        prefix = v.lstrip("/")
+        if ".." in prefix:
+            raise ValueError('R2_KEY_PREFIX に ".." を含めることはできません。')
+        if prefix and not prefix.endswith("/"):
+            prefix += "/"
+        return prefix
+
+    @field_validator("r2_endpoint_url", mode="after")
+    @classmethod
+    def _normalize_r2_endpoint_url(cls, v: str, info: ValidationInfo) -> str:
+        """R2_ENDPOINT_URL 未設定時は R2_ACCOUNT_ID から組み立てる。
+
+        非空で明示指定された場合は "https://" 始まりを強制する（平文 http://
+        は認証情報を含むリクエストが盗聴可能な経路を許容してしまうため）。
+        """
+        if not v:
+            account_id = info.data.get("r2_account_id", "")
+            if account_id:
+                return f"https://{account_id}.r2.cloudflarestorage.com"
+            return v
+        if not v.startswith("https://"):
+            raise ValueError("R2_ENDPOINT_URL は https:// で始まる必要があります。")
+        return v
+
+    @property
+    def r2_configured(self) -> bool:
+        """R2 を実際に使える最低限の認証情報が揃っているか。"""
+        return bool(
+            self.r2_access_key_id
+            and self.r2_secret_access_key.get_secret_value()
+            and self.r2_bucket
+            and (self.r2_account_id or self.r2_endpoint_url)
+        )
+
+    @property
+    def resolved_storage_backend(self) -> str:
+        """実際に使用するバックエンド名（"local" | "r2"）。
+
+        STORAGE_BACKEND=auto（既定）かつ R2 認証情報が未設定なら、必ず
+        "local" にフォールバックする（R2 認証情報を一切持たない状態でも
+        既存のローカルディスク保存が1バイトも変わらず動き続けることを
+        保証するための唯一の分岐点）。
+        """
+        if self.storage_backend == "local":
+            return "local"
+        if self.storage_backend == "r2":
+            return "r2"
+        return "r2" if self.r2_configured else "local"
 
     @property
     def alert_emails(self) -> list[str]:

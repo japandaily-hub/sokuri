@@ -61,7 +61,9 @@ services:
       - key: ADMIN_EMAILS
         value: "ko.13.hei@gmail.com"   # 未登録の検証用エイリアス（+kdzadmin）は 2026-09-06 の棚卸しジョブで検出し除外。管理者の追加は管理画面「管理者にする」で行う
       - key: STORAGE_DIR
-        value: /tmp/uploads            # Free plan はエフェメラル（β許容）
+        value: /tmp/uploads            # R2未設定時のフォールバック保存先。R2が有効なら未使用。
+                                        # エフェメラルなので、ここに落ちている＝写真が消える状態
+                                        # （/healthのstorageが"local"ならこのモード）。
       - key: BREVO_API_KEY
         sync: false                    # dashboard で手動入力（未設定なら送信スキップ）
       - key: MAIL_FROM

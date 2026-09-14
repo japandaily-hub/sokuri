@@ -176,7 +176,9 @@ async def test_photo_url_for_ai_skips_https_raw_url_without_calling_vision(
     """
     import logging
 
-    monkeypatch.setattr(summary_module.storage, "file_path", lambda storage_key: None)
+    monkeypatch.setattr(
+        summary_module.storage, "read_bytes", AsyncMock(return_value=None)
+    )
 
     with caplog.at_level(logging.WARNING):
         ref = await summary_module.photo_url_for_ai(
@@ -193,6 +195,36 @@ async def test_photo_url_for_ai_returns_none_when_no_local_file_and_no_raw_url(
     monkeypatch,
 ):
     """raw_url も無い（None）場合も同様に None を返す（従来通りの挙動を維持）。"""
-    monkeypatch.setattr(summary_module.storage, "file_path", lambda storage_key: None)
+    monkeypatch.setattr(
+        summary_module.storage, "read_bytes", AsyncMock(return_value=None)
+    )
     ref = await summary_module.photo_url_for_ai("some-storage-key", None)
     assert ref is None
+
+
+async def test_photo_url_for_ai_encodes_stored_object_as_data_url(monkeypatch):
+    """保存済みオブジェクトが取得できた場合、bytes を base64 データURL化して返す。"""
+    stored = summary_module.storage.StoredObject(
+        data=b"\xff\xd8\xff\xe0fakejpegbytes", content_type="image/jpeg"
+    )
+    monkeypatch.setattr(
+        summary_module.storage, "read_bytes", AsyncMock(return_value=stored)
+    )
+    ref = await summary_module.photo_url_for_ai("some-storage-key", None)
+    assert ref is not None
+    assert ref.startswith("data:image/jpeg;base64,")
+
+
+async def test_photo_url_for_ai_skips_photo_on_storage_unavailable(monkeypatch, caplog):
+    """ストレージ側の一時障害時は当該写真をスキップする（案件作成自体は失敗させない）。"""
+    import logging
+
+    monkeypatch.setattr(
+        summary_module.storage,
+        "read_bytes",
+        AsyncMock(side_effect=summary_module.StorageUnavailableError("boom")),
+    )
+    with caplog.at_level(logging.WARNING):
+        ref = await summary_module.photo_url_for_ai("some-storage-key", None)
+    assert ref is None
+    assert any("photo_url_for_ai" in rec.message for rec in caplog.records)

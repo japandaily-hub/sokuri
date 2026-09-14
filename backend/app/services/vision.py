@@ -286,6 +286,9 @@ async def analyze_image(base_image: str) -> VisionResult:
         # 外部ストレージの https URL を実際に扱うようになる）場合は、許可ホストの
         # allowlist 判定を明示的に追加してから https 対応を再度有効化すること
         # （安易な全面素通しへ戻さない）。
+        # 追記: 案件写真ストレージを Cloudflare R2 へ移行した後も、この経路は
+        # 変更なし（summary.photo_url_for_ai は storage.read_bytes で取得した
+        # bytes を引き続き base64 データURL化して渡す。https 直渡しには対応しない）。
         raise ValueError(
             "base_image は 'data:image/...' の base64 文字列である必要があります。"
         )

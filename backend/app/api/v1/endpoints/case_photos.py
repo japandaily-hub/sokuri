@@ -1,6 +1,7 @@
 """写真アップロード — presign（疑似署名）/ PUT 本体 / GET 配信。
 
-ゼロコスト方針のためローカルディスク保存（services/storage.py）。
+保存先は STORAGE_BACKEND に応じてローカルディスク / Cloudflare R2 を切り替える
+（services/storage.py）。R2 が有効な場合はデプロイをまたいで永続化される。
 presign はユーザー認証必須。アップロード本体（PUT）も認証必須にする
 （security review 指摘対応: storage_key の推測不能性のみに依存した
 capability URL 方式は、アルバム化でstorage_keyの露出面（案件一覧・
@@ -9,8 +10,7 @@ capability URL 方式は、アルバム化でstorage_keyの露出面（案件一
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from app.api.deps import (
     OPERATOR_APPROVAL_REQUIRED_DETAIL,
@@ -23,7 +23,7 @@ from app.db.models.operator import Operator
 from app.db.models.user import User
 from app.schemas_katadzuke import PresignRequest, PresignResponse
 from app.services import storage
-from app.services.storage import MAX_UPLOAD_BYTES, StorageKeyConflictError
+from app.services.storage import MAX_UPLOAD_BYTES, StorageKeyConflictError, StorageUnavailableError
 
 router = APIRouter()
 
@@ -48,6 +48,17 @@ _UNSUPPORTED_IMAGE = HTTPException(
         "（iPhone の HEIC 形式は「設定 > カメラ > フォーマット > 互換性優先」で"
         "JPEG として保存できます）。"
     ),
+)
+_UPLOAD_STORAGE_UNAVAILABLE = HTTPException(
+    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+    detail="写真の保存先に接続できませんでした。しばらくしてからもう一度お試しください。",
+)
+_SERVE_STORAGE_UNAVAILABLE = HTTPException(
+    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+    detail="写真を取得できませんでした。しばらくしてからもう一度お試しください。",
+)
+_FILE_NOT_FOUND = HTTPException(
+    status_code=status.HTTP_404_NOT_FOUND, detail="ファイルが見つかりません。"
 )
 
 
@@ -117,20 +128,42 @@ async def upload(
     if storage.sniff_image_ext(data) is None:
         raise _UNSUPPORTED_IMAGE
     try:
-        storage.save_bytes(storage_key, data)
+        await storage.save_bytes(storage_key, data)
     except StorageKeyConflictError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         ) from exc
+    except StorageUnavailableError as exc:
+        raise _UPLOAD_STORAGE_UNAVAILABLE from exc
 
 
-@router.get("/files/{storage_key}", summary="写真の配信")
+def _if_none_match_matches(header_value: str, etag: str) -> bool:
+    """If-None-Match ヘッダを寛容にパースし、``etag`` と一致するか判定する。
+
+    カンマ区切りの複数値・前後空白・弱いバリデータ接頭辞（``W/``）を許容する
+    （RFC 7232 準拠のブラウザ実装差異を吸収するため）。``"*"`` は常に一致とみなす。
+    """
+    for raw_candidate in header_value.split(","):
+        candidate = raw_candidate.strip()
+        if not candidate:
+            continue
+        if candidate == "*":
+            return True
+        if candidate.startswith("W/"):
+            candidate = candidate[2:].strip()
+        if candidate == etag:
+            return True
+    return False
+
+
+@router.get("/files/{storage_key}", summary="写真の配信", response_class=Response)
 async def serve_file(
     storage_key: str,
+    request: Request,
     operator: Operator | None = Depends(get_optional_operator),
-) -> FileResponse:
+) -> Response:
     """保存済み画像を配信する（従来どおり無認証の capability URL）。
 
     r12 決定1 の多層防御: 未承認・停止中の業者が **自分の業者トークンを付けて**
@@ -147,6 +180,35 @@ async def serve_file(
     ／承認済みトークンで従来どおり通る）。副次的に DB クエリも不要になり、
     この経路は完全に O(1)（無トークンの ``<img>``・依頼者・承認済み業者も
     従来どおり DB を一切引かない）。
+
+    R2 移行に伴い、If-None-Match が一致する場合は本体を一切取得せず 304 を
+    返す（R2 への到達自体が発生しない。キャッシュヒット時のコスト・レイテンシ
+    削減）。storage_key は不変（毎回新規UUID）のためキー自体をそのまま強い
+    ETag として使ってよい。
+
+    security review 指摘対応（2回目レビュー Medium）: ``exists()``（R2 では
+    HEAD）は 304 を返そうとする分岐（If-None-Match が一致した場合）でのみ
+    呼び出し、200 を返す経路では呼ばない。200 経路は ``read_bytes()``
+    （R2 では GET）の結果だけで「存在しない → 404」判定が完結するため、
+    その手前で ``exists()`` を呼ぶと 200 応答のたびに R2 へ HEAD → GET の
+    2 オペレーションが発生してしまう。本エンドポイントは無認証・
+    レート制限無しの capability URL のため、形式だけ正しいランダムキーを
+    大量に送られると HEAD がセマフォなしで無制限に発生し
+    （``asyncio.to_thread`` の共有スレッドプールを飽和させ、AI 解析等の
+    他処理を遅延させ得る）不要な負荷源になる。そのため R2 への到達は
+    どの経路でも最大 1 回（304 経路は ``exists()`` のみ・200 経路は
+    ``read_bytes()`` のみ）に抑える。
+
+    security/qa review 指摘対応（1回目レビュー）: 304 分岐は ETag
+    （＝ storage_key そのもの）が一致するかどうかしか見ないため、検証
+    （形式）より前に置くと「一度もアップロードされていない・形式すら
+    不正なキー」でも If-None-Match を偽装するだけで 304 が返ってしまう
+    （実在確認・404 を完全にバイパスするオラクル）。そのため 304 判定は
+    形式検証（``is_valid_key``）の**後**に置く。
+    処理順序: ①業者403多層防御 → ②is_valid_key（不正なら404）→
+    ③If-None-Match が一致する場合のみ exists() で実在確認
+    （存在しなければ404、存在すれば304）→ ④（③に該当しない場合）
+    read_bytes で本体取得し、None なら404・成功なら200。
     """
     if operator is not None and (
         operator.is_suspended or operator.vendor_status not in OPERATOR_CASE_VIEW_STATUSES
@@ -160,9 +222,31 @@ async def serve_file(
             ),
         )
 
-    path = storage.file_path(storage_key)
-    if path is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="ファイルが見つかりません。"
-        )
-    return FileResponse(path)
+    if not storage.is_valid_key(storage_key):
+        raise _FILE_NOT_FOUND
+
+    etag = f'"{storage_key}"'
+    cache_headers = {
+        "ETag": etag,
+        "Cache-Control": "private, no-cache",
+        "Vary": "Authorization",
+        "X-Content-Type-Options": "nosniff",
+    }
+
+    if_none_match = request.headers.get("if-none-match")
+    if if_none_match and _if_none_match_matches(if_none_match, etag):
+        try:
+            if not await storage.exists(storage_key):
+                raise _FILE_NOT_FOUND
+        except StorageUnavailableError as exc:
+            raise _SERVE_STORAGE_UNAVAILABLE from exc
+        return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers=cache_headers)
+
+    try:
+        obj = await storage.read_bytes(storage_key)
+    except StorageUnavailableError as exc:
+        raise _SERVE_STORAGE_UNAVAILABLE from exc
+    if obj is None:
+        raise _FILE_NOT_FOUND
+
+    return Response(content=obj.data, media_type=obj.content_type, headers=cache_headers)

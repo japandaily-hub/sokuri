@@ -25,6 +25,8 @@ from app.db.models.operator import Operator
 from app.db.models.user import User
 from app.db.session import get_session
 from app.schemas_katadzuke import CURRENT_OPERATOR_TERMS_VERSION
+from app.services import storage
+from app.services.storage import StorageUnavailableError
 
 
 def create_test_app(session: AsyncSession) -> FastAPI:
@@ -781,6 +783,51 @@ async def test_upload_roundtrip(client: AsyncClient, tmp_storage):
     r = await client.get(presign["public_url"])
     assert r.status_code == 200
     assert r.content == b"\xff\xd8\xff\xe0fakejpegbytes"
+    storage_key = presign["storage_key"]
+    assert r.headers["ETag"] == f'"{storage_key}"'
+    # security review 指摘対応: immutable を含めない（認可の反映を最大7日
+    # 遅延させないため、ETag による毎回の再検証を必須にする）。
+    assert r.headers["Cache-Control"] == "private, no-cache"
+    assert r.headers["Vary"] == "Authorization"
+    assert r.headers["X-Content-Type-Options"] == "nosniff"
+
+    r = await client.get(
+        presign["public_url"], headers={"If-None-Match": f'"{storage_key}"'}
+    )
+    assert r.status_code == 304
+    assert r.headers["ETag"] == f'"{storage_key}"'
+
+
+async def test_serve_file_rejects_malformed_key_even_with_matching_if_none_match(
+    client: AsyncClient, tmp_storage
+):
+    """security/qa review 指摘対応（回帰テスト）: 304 分岐は形式検証・実在確認の
+
+    *後* にある必要がある。一度もアップロードされたことがなく ``_KEY_RE`` の
+    形式にすら一致しないキーへ If-None-Match を偽装しても、304 ではなく
+    404 になること（qa-reviewer が実証した具体的な突破口）。
+    """
+    malformed_key = "not-a-valid-storage-key"
+    r = await client.get(
+        f"/api/v1/files/{malformed_key}",
+        headers={"If-None-Match": f'"{malformed_key}"'},
+    )
+    assert r.status_code == 404
+
+
+async def test_serve_file_rejects_well_formed_but_unuploaded_key_with_if_none_match(
+    client: AsyncClient, tmp_storage
+):
+    """形式は正しい（``_KEY_RE`` に一致する）が、一度もアップロードされていない
+    キーへ If-None-Match を偽装しても 304 ではなく 404 になること
+    （根本原因: 実在確認なしに ETag 一致だけで 304 を返していたこと）。
+    """
+    well_formed_but_never_uploaded_key = f"{uuid.uuid4().hex}.jpg"
+    r = await client.get(
+        f"/api/v1/files/{well_formed_but_never_uploaded_key}",
+        headers={"If-None-Match": f'"{well_formed_but_never_uploaded_key}"'},
+    )
+    assert r.status_code == 404
 
 
 async def test_upload_requires_authentication(client: AsyncClient, tmp_storage):
@@ -851,6 +898,92 @@ async def test_upload_rejects_invalid_key(client: AsyncClient, tmp_storage):
         headers=_auth(token),
     )
     assert r.status_code in (404, 422)
+
+
+async def test_upload_translates_storage_unavailable_to_503(
+    client: AsyncClient, tmp_storage
+):
+    """PUT /upload/{key} で storage.save_bytes が StorageUnavailableError を
+    送出する場合、500 ではなく 503 として返す（qa review 指摘対応・回帰テスト）。
+    """
+    token = await _signup_user(client)
+    r = await client.post(
+        "/api/v1/upload/presign",
+        json={"filename": "room.jpg", "content_type": "image/jpeg"},
+        headers=_auth(token),
+    )
+    presign = r.json()
+    with patch(
+        "app.api.v1.endpoints.case_photos.storage.save_bytes",
+        new_callable=AsyncMock,
+        side_effect=StorageUnavailableError("R2 put_object に失敗しました"),
+    ):
+        r = await client.put(
+            presign["upload_url"],
+            content=b"\xff\xd8\xff\xe0fakejpegbytes",
+            headers={**_auth(token), "Content-Type": "image/jpeg"},
+        )
+    assert r.status_code == 503
+
+
+async def test_serve_file_translates_storage_unavailable_to_503(
+    client: AsyncClient, tmp_storage
+):
+    """GET /files/{key} で storage.read_bytes が StorageUnavailableError を
+    送出する場合、500 ではなく 503 として返す（qa review 指摘対応・回帰テスト）。
+
+    exists() 確認（実在チェック）は通過させ、read_bytes だけが失敗するケースを
+    再現するため、事前に実ファイルを書き込んでおく。
+    """
+    storage_key = f"{uuid.uuid4().hex}.jpg"
+    (tmp_storage / storage_key).write_bytes(b"\xff\xd8\xff\xe0fakejpegbytes")
+    with patch(
+        "app.api.v1.endpoints.case_photos.storage.read_bytes",
+        new_callable=AsyncMock,
+        side_effect=StorageUnavailableError("R2 get_object に失敗しました"),
+    ):
+        r = await client.get(f"/api/v1/files/{storage_key}")
+    assert r.status_code == 503
+
+
+async def test_serve_file_if_none_match_exists_check_translates_storage_unavailable_to_503(
+    client: AsyncClient, tmp_storage
+):
+    """GET /files/{key} で If-None-Match が一致し 304 判定に入る分岐において、
+    ``storage.exists`` が StorageUnavailableError を送出する場合は 503 になる
+    （security review 2回目レビュー指摘対応の回帰テスト: exists() は
+    If-None-Match 一致時のみ呼ばれる設計になったため、このテストは一致する
+    ETag を付けてリクエストする）。
+    """
+    storage_key = f"{uuid.uuid4().hex}.jpg"
+    with patch(
+        "app.api.v1.endpoints.case_photos.storage.exists",
+        new_callable=AsyncMock,
+        side_effect=StorageUnavailableError("R2 head_object に失敗しました"),
+    ):
+        r = await client.get(
+            f"/api/v1/files/{storage_key}",
+            headers={"If-None-Match": f'"{storage_key}"'},
+        )
+    assert r.status_code == 503
+
+
+async def test_serve_file_rejects_header_injection_via_storage_key(
+    client: AsyncClient, tmp_storage
+):
+    """ヘッダインジェクション退行検知: storage_key にCRLF＋偽ヘッダを埋め込んでも
+    404 になり、レスポンスに偽装ヘッダが混入しないこと。
+    """
+    injected_key = f"{uuid.uuid4().hex}.jpg%0d%0aX-Injected:%201"
+    r = await client.get(f"/api/v1/files/{injected_key}")
+    assert r.status_code == 404
+    assert "X-Injected" not in r.headers
+
+
+def test_storage_is_valid_key_rejects_crlf_injection():
+    """storage.is_valid_key はCRLFを含む文字列を単体でも拒否する
+    （ヘッダインジェクション退行検知の単体テスト側）。"""
+    assert storage.is_valid_key(f"{uuid.uuid4().hex}.jpg\r\nX-Injected: 1") is False
 
 
 async def test_case_create_rejects_invalid_storage_key(client: AsyncClient):

@@ -30,10 +30,16 @@ from app.schemas_katadzuke import (
     CasePhotoOut,
 )
 from app.services import storage
+from app.services.storage import StorageUnavailableError
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+_STORAGE_UNAVAILABLE = HTTPException(
+    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+    detail="写真の保存先に接続できませんでした。しばらくしてからもう一度お試しください。",
+)
 
 _CASE_LOAD = (
     selectinload(Case.photos),
@@ -138,7 +144,7 @@ async def _delete_storage_if_unreferenced(session: AsyncSession, storage_key: st
         )
         return
     try:
-        storage.delete_bytes(storage_key)
+        await storage.delete_bytes(storage_key)
     except Exception:  # noqa: BLE001 - ベストエフォート削除。失敗してもAPI応答自体は成功のまま返す。
         logger.warning(
             "_delete_storage_if_unreferenced: ストレージ削除に失敗（無視して続行） - key=%s",
@@ -284,7 +290,11 @@ async def add_case_item_photo(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="storage_key が不正です。presign からやり直してください。",
         )
-    if storage.file_path(body.storage_key) is None:
+    try:
+        photo_exists = await storage.exists(body.storage_key)
+    except StorageUnavailableError as exc:
+        raise _STORAGE_UNAVAILABLE from exc
+    if not photo_exists:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="アップロード済みのファイルが見つかりません。presign → PUT を先に実行してください。",
