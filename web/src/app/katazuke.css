@@ -769,12 +769,25 @@ img[data-ph]{position:relative;}
   .header nav,.header .h-cta{display:none;}
   .hamburger{display:flex;}
   .header.menu-open + .mobile-menu{display:flex;}
+  /* バグ修正（ユーザー報告 2026-09-14）: header は position:sticky で画面上部に留まるが、
+     mobile-menu は位置指定が無く静的配置のままだった。ページ先頭では header の実位置と
+     見た目上の位置が一致するため開閉が正しく見えるが、スクロール後に開くと、パネルは
+     「元の実位置」（ページ最上部付近）にそのまま描画され、画面外で開閉していた
+     （症状: 途中でハンバーガーを押しても何も表示されない／トップへ戻れば開く）。
+     header と同じ sticky コンテキストに乗せ、常に header 直下に追従させる。
+     高さは 601〜860px は header 72px、600px 以下は 60px（下の @media で上書き）。 */
+  .mobile-menu{position:sticky;top:72px;z-index:59;max-height:calc(100dvh - 72px);overflow-y:auto;}
   .dock{display:flex;}
   body{padding-bottom:74px;}
   /* R4 ラウンド4 指摘（10）: 法務文書（/terms・/privacy・/legal）では SiteChrome が Dock を
      描かない。Dock が無いルートでは下の逃げ代も外す。:has 非対応環境ではこの規則がマッチせず
      74px が残るだけ（安全側） */
   body:not(:has(.dock)){padding-bottom:0;}
+}
+/* header の実高が 72px→60px に変わる幅（.header .inner の 600px ブレークポイントと合わせる）。
+   同特異度の .mobile-menu ルールは後勝ちのため、上の @media(max-width:860px) より後に置く。 */
+@media(max-width:600px){
+  .mobile-menu{top:60px;max-height:calc(100dvh - 60px);}
 }
 @media(max-width:560px){
   .container{--container-pad:18px;}
