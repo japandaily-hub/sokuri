@@ -783,6 +783,12 @@ class ReminderJobResult(BaseModel):
     overdue: int = Field(ge=0, description="訪問日超過リマインドを送った成約数")
     no_bid: int = Field(ge=0, description="入札ゼロ放置リマインドを送った案件数")
     bids_pending: int = Field(ge=0, description="入札未決定リマインドを送った案件数")
+    undelivered: int = Field(
+        default=0, ge=0, description="実際には届かなかった件数（LINE・メールとも失敗。再送はされない）"
+    )
+    unreachable: int = Field(
+        default=0, ge=0, description="試行できる宛先が無かった件数（LINE未連携かつ仮メール等）"
+    )
 
 
 class AdminAuditEntry(BaseModel):

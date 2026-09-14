@@ -144,7 +144,8 @@ def job_hourly() -> int:
         return fail("リマインドの定期実行に失敗", f"POST /admin/jobs/reminders → HTTP {st}: {str(body)[:300]}")
     print(
         f"✅ reminders: overdue={body.get('overdue')} no_bid={body.get('no_bid')} "
-        f"bids_pending={body.get('bids_pending')}"
+        f"bids_pending={body.get('bids_pending')} undelivered={body.get('undelivered')} "
+        f"unreachable={body.get('unreachable')}"
     )
     return 0
 

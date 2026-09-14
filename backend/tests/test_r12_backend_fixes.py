@@ -42,6 +42,9 @@ from app.services.reminders import (
     BIDS_PENDING_GRACE_DAYS,
     JST,
     REMINDER_LOOKBACK_DAYS,
+    ReminderDispatchTally,
+    _ALL_UNREACHABLE_MIN_ATTEMPTED,
+    _dispatch_and_tally,
     run_reminders,
 )
 
@@ -550,7 +553,9 @@ async def test_overdue_visit_reminder_selects_and_marks_once(db_session: AsyncSe
     )
 
     with patch(
-        "app.services.notify_dispatch.dispatch_visit_overdue", new_callable=AsyncMock
+        "app.services.notify_dispatch.dispatch_visit_overdue",
+        new_callable=AsyncMock,
+        return_value="delivered",
     ) as dispatch:
         result = await run_reminders(db_session)
 
@@ -569,7 +574,9 @@ async def test_overdue_visit_reminder_selects_and_marks_once(db_session: AsyncSe
 
     # 2周目は送信済みマーカーにより1通も飛ばない（二重送信防止）
     with patch(
-        "app.services.notify_dispatch.dispatch_visit_overdue", new_callable=AsyncMock
+        "app.services.notify_dispatch.dispatch_visit_overdue",
+        new_callable=AsyncMock,
+        return_value="delivered",
     ) as dispatch2:
         again = await run_reminders(db_session)
     assert again["overdue"] == 0
@@ -597,7 +604,9 @@ async def test_no_bid_reminder_selects_and_marks_once(db_session: AsyncSession):
     await db_session.commit()
 
     with patch(
-        "app.services.notify_dispatch.dispatch_no_bid_reminder", new_callable=AsyncMock
+        "app.services.notify_dispatch.dispatch_no_bid_reminder",
+        new_callable=AsyncMock,
+        return_value="delivered",
     ) as dispatch:
         result = await run_reminders(db_session)
 
@@ -613,7 +622,9 @@ async def test_no_bid_reminder_selects_and_marks_once(db_session: AsyncSession):
     assert cancelled.no_bid_reminded_at is None
 
     with patch(
-        "app.services.notify_dispatch.dispatch_no_bid_reminder", new_callable=AsyncMock
+        "app.services.notify_dispatch.dispatch_no_bid_reminder",
+        new_callable=AsyncMock,
+        return_value="delivered",
     ) as dispatch2:
         again = await run_reminders(db_session)
     assert again["no_bid"] == 0
@@ -677,9 +688,13 @@ async def test_bids_pending_reminder_selects_and_marks_once(db_session: AsyncSes
     )
 
     with patch(
-        "app.services.notify_dispatch.dispatch_bids_pending_reminder", new_callable=AsyncMock
+        "app.services.notify_dispatch.dispatch_bids_pending_reminder",
+        new_callable=AsyncMock,
+        return_value="delivered",
     ) as dispatch, patch(
-        "app.services.notify_dispatch.dispatch_no_bid_reminder", new_callable=AsyncMock
+        "app.services.notify_dispatch.dispatch_no_bid_reminder",
+        new_callable=AsyncMock,
+        return_value="delivered",
     ):
         result = await run_reminders(db_session)
 
@@ -697,9 +712,13 @@ async def test_bids_pending_reminder_selects_and_marks_once(db_session: AsyncSes
     assert suspended_only.bids_pending_reminded_at is None
 
     with patch(
-        "app.services.notify_dispatch.dispatch_bids_pending_reminder", new_callable=AsyncMock
+        "app.services.notify_dispatch.dispatch_bids_pending_reminder",
+        new_callable=AsyncMock,
+        return_value="delivered",
     ) as dispatch2, patch(
-        "app.services.notify_dispatch.dispatch_no_bid_reminder", new_callable=AsyncMock
+        "app.services.notify_dispatch.dispatch_no_bid_reminder",
+        new_callable=AsyncMock,
+        return_value="delivered",
     ):
         again = await run_reminders(db_session)
     assert again["bids_pending"] == 0
@@ -733,9 +752,13 @@ async def test_bids_pending_reminder_grace_days_boundary(db_session: AsyncSessio
     )
 
     with patch(
-        "app.services.notify_dispatch.dispatch_bids_pending_reminder", new_callable=AsyncMock
+        "app.services.notify_dispatch.dispatch_bids_pending_reminder",
+        new_callable=AsyncMock,
+        return_value="delivered",
     ) as dispatch, patch(
-        "app.services.notify_dispatch.dispatch_no_bid_reminder", new_callable=AsyncMock
+        "app.services.notify_dispatch.dispatch_no_bid_reminder",
+        new_callable=AsyncMock,
+        return_value="delivered",
     ):
         result = await run_reminders(db_session)
 
@@ -778,9 +801,13 @@ async def test_bids_pending_reminder_respects_lookback_window(db_session: AsyncS
     )
 
     with patch(
-        "app.services.notify_dispatch.dispatch_bids_pending_reminder", new_callable=AsyncMock
+        "app.services.notify_dispatch.dispatch_bids_pending_reminder",
+        new_callable=AsyncMock,
+        return_value="delivered",
     ) as dispatch, patch(
-        "app.services.notify_dispatch.dispatch_no_bid_reminder", new_callable=AsyncMock
+        "app.services.notify_dispatch.dispatch_no_bid_reminder",
+        new_callable=AsyncMock,
+        return_value="delivered",
     ):
         result = await run_reminders(db_session)
 
@@ -823,19 +850,37 @@ async def test_admin_jobs_reminders_requires_admin_and_returns_counts(
     ).status_code == 401
 
     with patch(
-        "app.services.notify_dispatch.dispatch_visit_overdue", new_callable=AsyncMock
+        "app.services.notify_dispatch.dispatch_visit_overdue",
+        new_callable=AsyncMock,
+        return_value="delivered",
     ), patch(
-        "app.services.notify_dispatch.dispatch_no_bid_reminder", new_callable=AsyncMock
+        "app.services.notify_dispatch.dispatch_no_bid_reminder",
+        new_callable=AsyncMock,
+        return_value="delivered",
     ), patch(
-        "app.services.notify_dispatch.dispatch_bids_pending_reminder", new_callable=AsyncMock
+        "app.services.notify_dispatch.dispatch_bids_pending_reminder",
+        new_callable=AsyncMock,
+        return_value="delivered",
     ):
         r = await client.post("/api/v1/admin/jobs/reminders", headers=_auth(admin_token))
         assert r.status_code == 200, r.text
-        assert r.json() == {"overdue": 1, "no_bid": 1, "bids_pending": 0}
+        assert r.json() == {
+            "overdue": 1,
+            "no_bid": 1,
+            "bids_pending": 0,
+            "undelivered": 0,
+            "unreachable": 0,
+        }
 
         # 連打しても二重に送らない（マーカーで冪等）
         r = await client.post("/api/v1/admin/jobs/reminders", headers=_auth(admin_token))
-        assert r.json() == {"overdue": 0, "no_bid": 0, "bids_pending": 0}
+        assert r.json() == {
+            "overdue": 0,
+            "no_bid": 0,
+            "bids_pending": 0,
+            "undelivered": 0,
+            "unreachable": 0,
+        }
 
 
 async def test_overdue_reminder_covers_pending_and_respects_jst_boundary_and_window(
@@ -864,7 +909,9 @@ async def test_overdue_reminder_covers_pending_and_respects_jst_boundary_and_win
     too_old = await _txn(today_jst - timedelta(days=REMINDER_LOOKBACK_DAYS + 1), "visiting")
 
     with patch(
-        "app.services.notify_dispatch.dispatch_visit_overdue", new_callable=AsyncMock
+        "app.services.notify_dispatch.dispatch_visit_overdue",
+        new_callable=AsyncMock,
+        return_value="delivered",
     ) as dispatch:
         result = await run_reminders(db_session)
 
@@ -884,12 +931,24 @@ async def test_reminder_claims_before_dispatch_and_never_resends_on_failure(
     """通知前にマーカーを確定（claim→commit→通知）し、通知失敗でも再送しない（H-2 / M-5）。
 
     dispatch の内側から同じ DB を読み、その時点で既に ``overdue_reminded_at`` が
-    入っていることを確認する（= 二重送信の窓が閉じている）。さらに dispatch が
-    例外を投げても1周は完走し、次周で再送されないことを確認する。
+    入っていることを確認する（= 二重送信の窓が閉じている）。さらに外部 HTTP 呼び出しの
+    境界（``line_notify.push_visit_overdue``）が例外を投げても1周は完走し、次周で
+    再送されないことを確認する。
+
+    patch 対象は ``dispatch_visit_overdue`` 自体ではなく ``line_notify.push_visit_overdue``
+    （外部 HTTP 呼び出しの直前）に限定する。``dispatch_*`` を直接 patch すると
+    ``_best_effort`` のラップより外側で差し替わってしまい、_best_effort が例外を
+    FAILED へ畳む契約そのものを検証できない（過去にこれが原因で本不具合を検出
+    できていなかった＝偽陰性）。
     """
     today_jst = datetime.now(timezone.utc).astimezone(JST).date()
     user, _ = await _make_user(db_session, "claim_owner@example.com")
     operator, _ = await _make_operator(db_session, "claim_op@example.com")
+    # LINE 連携済みにしておく（未連携だと push_visit_overdue が一度も呼ばれず
+    # メールへフォールバックしてしまい、この境界での失敗を再現できない）。
+    user.line_user_id = "Uclaim-owner-0000000000000000"
+    operator.line_user_id = "Uclaim-op-00000000000000000000"
+    await db_session.commit()
     case = await _make_case(db_session, user, status="closed")
     txn = await _make_transaction(
         db_session, case, operator, visit_date=today_jst - timedelta(days=1), status="visiting"
@@ -897,7 +956,7 @@ async def test_reminder_claims_before_dispatch_and_never_resends_on_failure(
 
     marked_at_dispatch_time: list[bool] = []
 
-    async def _explode(*args, **kwargs) -> None:
+    async def _explode(*args, **kwargs) -> bool:
         marked = await db_session.scalar(
             select(Transaction.overdue_reminded_at).where(Transaction.id == txn.id)
         )
@@ -905,7 +964,7 @@ async def test_reminder_claims_before_dispatch_and_never_resends_on_failure(
         raise RuntimeError("LINE API down")
 
     with patch(
-        "app.services.notify_dispatch.dispatch_visit_overdue", side_effect=_explode
+        "app.services.line_notify.push_visit_overdue", side_effect=_explode
     ), patch(
         # 渡されたコルーチンは close() する（未 await の RuntimeWarning を出さない）。
         "app.services.reminders.alerts.fire_and_forget",
@@ -915,12 +974,476 @@ async def test_reminder_claims_before_dispatch_and_never_resends_on_failure(
 
     assert result["overdue"] == 1
     assert marked_at_dispatch_time == [True, True], "通知の時点でマーカーが未確定（二重送信の窓）"
-    assert fire.call_count == 2, "通知失敗が運営アラート（warning）に落ちていない"
+    # 失敗のたびに個別発報せず、1周の合算結果を1本のアラートへ集約する（新方式）。
+    assert fire.call_count == 1, "1周につき1本のアラートへ集約されていない"
 
     # 2周目: 失敗した通知は再送しない（同じ催促が何通も飛ぶ害の方が大きい）。
     with patch(
-        "app.services.notify_dispatch.dispatch_visit_overdue", new_callable=AsyncMock
+        "app.services.notify_dispatch.dispatch_visit_overdue",
+        new_callable=AsyncMock,
+        return_value="delivered",
     ) as dispatch2:
         again = await run_reminders(db_session)
     assert again["overdue"] == 0
     assert dispatch2.await_count == 0
+
+
+# ──────────── DispatchOutcome 導入後: 配送失敗の集約アラート（1周1本）契約 ────────────
+#
+# ここから先は notify_dispatch.dispatch_* 自体を patch しない。patch 境界は
+# line_notify.push_* / notify.send_*（外部 HTTP 呼び出しの直前）に限定する
+# （新しいテストルール。dispatch_* を直接 patch すると _best_effort のラップより
+# 外側で差し替わり、DispatchOutcome の分岐そのものを検証できない）。
+
+
+async def _make_line_connected_user(
+    db_session: AsyncSession, email: str, line_user_id: str
+) -> User:
+    user, _ = await _make_user(db_session, email)
+    user.line_user_id = line_user_id
+    await db_session.commit()
+    await db_session.refresh(user)
+    return user
+
+
+async def _make_line_connected_operator(
+    db_session: AsyncSession, email: str, line_user_id: str
+) -> Operator:
+    operator, _ = await _make_operator(db_session, email)
+    operator.line_user_id = line_user_id
+    await db_session.commit()
+    await db_session.refresh(operator)
+    return operator
+
+
+async def test_overdue_reminder_dispatch_failure_sends_single_aggregated_alert(
+    db_session: AsyncSession,
+):
+    """LINE・メールとも失敗（対象2宛先=依頼者＋業者）→ warning アラート1本、不達件数2を本文に含む。
+
+    dispatch_* 自体は本物を通し、外部 HTTP 呼び出しの境界（line_notify.push_* /
+    notify.send_*）だけを失敗させる（本不具合の核心シナリオ＝黙った False の連鎖）。
+    """
+    today_jst = datetime.now(timezone.utc).astimezone(JST).date()
+    user = await _make_line_connected_user(
+        db_session, "overdue_alert_owner@example.com", "Uoverdue-owner-000000000000000"
+    )
+    operator = await _make_line_connected_operator(
+        db_session, "overdue_alert_op@example.com", "Uoverdue-op-0000000000000000000"
+    )
+    case = await _make_case(db_session, user, status="closed")
+    txn = await _make_transaction(
+        db_session, case, operator, visit_date=today_jst - timedelta(days=1), status="visiting"
+    )
+
+    with patch(
+        "app.services.line_notify.push_visit_overdue", new_callable=AsyncMock, return_value=False
+    ), patch(
+        "app.services.notify.send_visit_overdue", new_callable=AsyncMock, return_value=False
+    ), patch(
+        "app.services.reminders.alerts.send_alert", new_callable=AsyncMock
+    ) as send_alert, patch(
+        "app.services.reminders.alerts.resolve_alert", new_callable=AsyncMock
+    ) as resolve_alert, patch(
+        "app.services.reminders.alerts.is_active", return_value=False
+    ), patch(
+        "app.services.reminders.alerts.fire_and_forget", side_effect=lambda coro: coro.close()
+    ):
+        result = await run_reminders(db_session)
+
+    assert result == {
+        "overdue": 1,
+        "no_bid": 0,
+        "bids_pending": 0,
+        "undelivered": 2,
+        "unreachable": 0,
+    }
+    send_alert.assert_called_once()
+    _, kwargs = send_alert.call_args
+    assert kwargs["severity"] == "warning"
+    assert kwargs["key"] == "reminder_dispatch_failed"
+    body = send_alert.call_args.args[1]
+    assert "2 件が届いていません" in body
+    assert "マーカー確定済みのため再送されません" in body
+    resolve_alert.assert_not_called()
+
+    # claim（送信済みマーカー）は通知の成否に関わらず既に確定済み。
+    await db_session.refresh(txn)
+    assert txn.overdue_reminded_at is not None
+
+    # 翌周: 対象が無い（＝ delivered_total も failed_total も0）ので再送されず、
+    # is_active が True でも resolve_alert は呼ばれない（確保0件の空周は復旧通知の対象外）。
+    with patch(
+        "app.services.line_notify.push_visit_overdue", new_callable=AsyncMock
+    ) as push_next, patch(
+        "app.services.notify.send_visit_overdue", new_callable=AsyncMock
+    ) as send_next, patch(
+        "app.services.reminders.alerts.send_alert", new_callable=AsyncMock
+    ) as send_alert2, patch(
+        "app.services.reminders.alerts.resolve_alert", new_callable=AsyncMock
+    ) as resolve_alert2, patch(
+        "app.services.reminders.alerts.is_active", return_value=True
+    ), patch(
+        "app.services.reminders.alerts.fire_and_forget", side_effect=lambda coro: coro.close()
+    ):
+        again = await run_reminders(db_session)
+
+    assert again == {
+        "overdue": 0,
+        "no_bid": 0,
+        "bids_pending": 0,
+        "undelivered": 0,
+        "unreachable": 0,
+    }
+    push_next.assert_not_called()
+    send_next.assert_not_called()
+    send_alert2.assert_not_called()
+    resolve_alert2.assert_not_called()
+
+
+async def test_overdue_reminder_recovery_sends_resolve_alert_once(db_session: AsyncSession):
+    """失敗周のあと配送が復旧すると resolve_alert が1回呼ばれる（is_active=True が前提）。"""
+    today_jst = datetime.now(timezone.utc).astimezone(JST).date()
+    user = await _make_line_connected_user(
+        db_session, "overdue_recover_owner@example.com", "Uoverdue-recover-owner-0000000"
+    )
+    operator = await _make_line_connected_operator(
+        db_session, "overdue_recover_op@example.com", "Uoverdue-recover-op-00000000000"
+    )
+    case = await _make_case(db_session, user, status="closed")
+    await _make_transaction(
+        db_session, case, operator, visit_date=today_jst - timedelta(days=1), status="visiting"
+    )
+
+    with patch(
+        "app.services.line_notify.push_visit_overdue", new_callable=AsyncMock, return_value=True
+    ) as push, patch(
+        "app.services.notify.send_visit_overdue", new_callable=AsyncMock
+    ) as send, patch(
+        "app.services.reminders.alerts.send_alert", new_callable=AsyncMock
+    ) as send_alert, patch(
+        "app.services.reminders.alerts.resolve_alert", new_callable=AsyncMock
+    ) as resolve_alert, patch(
+        # 前周の失敗で reminder_dispatch_failed だけが発報済み（発報中）という前提を
+        # key 単位で明示的に与える（reminder_all_unreachable は発報されていない）。
+        "app.services.reminders.alerts.is_active",
+        side_effect=lambda key: key == "reminder_dispatch_failed",
+    ), patch(
+        "app.services.reminders.alerts.fire_and_forget", side_effect=lambda coro: coro.close()
+    ):
+        result = await run_reminders(db_session)
+
+    assert result["overdue"] == 1
+    assert result["undelivered"] == 0
+    assert push.await_count == 2, "依頼者・業者の双方へ試行する"
+    send.assert_not_called()  # LINE 成功のためメールへフォールバックしない
+    send_alert.assert_not_called()
+    resolve_alert.assert_called_once()
+    assert resolve_alert.call_args.args[0] == "reminder_dispatch_failed"
+
+
+async def test_overdue_reminder_unreachable_recipients_are_not_alerted(db_session: AsyncSession):
+    """LINE未連携かつ仮メールのみ（＝試行できる宛先が無い）は unreachable に計上され、失敗扱いにしない。"""
+    today_jst = datetime.now(timezone.utc).astimezone(JST).date()
+    placeholder_user_email = f"line-{uuid.uuid4().hex}@line.katazuke.internal"
+    placeholder_op_email = f"line-{uuid.uuid4().hex}@line.katazuke.internal"
+    user, _ = await _make_user(db_session, placeholder_user_email)
+    operator, _ = await _make_operator(db_session, placeholder_op_email)
+    case = await _make_case(db_session, user, status="closed")
+    await _make_transaction(
+        db_session, case, operator, visit_date=today_jst - timedelta(days=1), status="visiting"
+    )
+
+    with patch(
+        "app.services.line_notify.push_visit_overdue", new_callable=AsyncMock
+    ) as push, patch(
+        "app.services.notify.send_visit_overdue", new_callable=AsyncMock
+    ) as send, patch(
+        "app.services.reminders.alerts.send_alert", new_callable=AsyncMock
+    ) as send_alert, patch(
+        "app.services.reminders.alerts.is_active", return_value=False
+    ), patch(
+        "app.services.reminders.alerts.fire_and_forget", side_effect=lambda coro: coro.close()
+    ):
+        result = await run_reminders(db_session)
+
+    assert result == {
+        "overdue": 1,
+        "no_bid": 0,
+        "bids_pending": 0,
+        "undelivered": 0,
+        "unreachable": 2,
+    }
+    push.assert_not_called()
+    send.assert_not_called()
+    send_alert.assert_not_called()
+
+
+async def test_no_bid_reminder_dispatch_failure_sends_alert_with_no_bid_breakdown(
+    db_session: AsyncSession,
+):
+    """入札ゼロ放置リマインドの配送失敗も同じ集約アラート契約に従う（内訳に no_bid が出る）。"""
+    now = datetime.now(timezone.utc)
+    user = await _make_line_connected_user(
+        db_session, "nobid_alert_owner@example.com", "Unobid-alert-owner-00000000000"
+    )
+    await _make_case(db_session, user, created_at=now - timedelta(days=4))
+
+    with patch(
+        "app.services.line_notify.push_no_bid_reminder", new_callable=AsyncMock, return_value=False
+    ), patch(
+        "app.services.notify.send_no_bid_reminder", new_callable=AsyncMock, return_value=False
+    ), patch(
+        "app.services.reminders.alerts.send_alert", new_callable=AsyncMock
+    ) as send_alert, patch(
+        "app.services.reminders.alerts.resolve_alert", new_callable=AsyncMock
+    ) as resolve_alert, patch(
+        "app.services.reminders.alerts.is_active", return_value=False
+    ), patch(
+        "app.services.reminders.alerts.fire_and_forget", side_effect=lambda coro: coro.close()
+    ):
+        result = await run_reminders(db_session)
+
+    assert result["no_bid"] == 1
+    assert result["undelivered"] == 1
+    send_alert.assert_called_once()
+    body = send_alert.call_args.args[1]
+    assert "overdue=0 no_bid=1 bids_pending=0" in body
+    resolve_alert.assert_not_called()
+
+
+async def test_bids_pending_reminder_dispatch_failure_sends_alert_with_bids_pending_breakdown(
+    db_session: AsyncSession,
+):
+    """入札未決定リマインドの配送失敗も同じ集約アラート契約に従う（内訳に bids_pending が出る）。"""
+    now = datetime.now(timezone.utc)
+    user = await _make_line_connected_user(
+        db_session, "bidspending_alert_owner@example.com", "Ubidspending-alert-owner-000000"
+    )
+    operator, _ = await _make_operator(db_session, "bidspending_alert_op@example.com")
+    case = await _make_case(db_session, user, status="bidding")
+    await _make_bid_with_created_at(
+        db_session, case, operator, status="pending", created_at=now - timedelta(days=3)
+    )
+
+    with patch(
+        "app.services.line_notify.push_bids_pending_reminder",
+        new_callable=AsyncMock,
+        return_value=False,
+    ), patch(
+        "app.services.notify.send_bids_pending_reminder", new_callable=AsyncMock, return_value=False
+    ), patch(
+        "app.services.reminders.alerts.send_alert", new_callable=AsyncMock
+    ) as send_alert, patch(
+        "app.services.reminders.alerts.resolve_alert", new_callable=AsyncMock
+    ) as resolve_alert, patch(
+        "app.services.reminders.alerts.is_active", return_value=False
+    ), patch(
+        "app.services.reminders.alerts.fire_and_forget", side_effect=lambda coro: coro.close()
+    ):
+        result = await run_reminders(db_session)
+
+    assert result["bids_pending"] == 1
+    assert result["undelivered"] == 1
+    send_alert.assert_called_once()
+    body = send_alert.call_args.args[1]
+    assert "overdue=0 no_bid=0 bids_pending=1" in body
+    resolve_alert.assert_not_called()
+
+
+async def test_reminder_mixed_cycle_aggregates_single_alert_with_partial_failure(
+    db_session: AsyncSession,
+):
+    """混在周（overdue は失敗・no_bid は成功）→ アラートは1本のみ・内訳は overdue のみ・resolve は呼ばれない。"""
+    today_jst = datetime.now(timezone.utc).astimezone(JST).date()
+    now = datetime.now(timezone.utc)
+
+    overdue_user = await _make_line_connected_user(
+        db_session, "mixed_overdue_owner@example.com", "Umixed-overdue-owner-0000000000"
+    )
+    overdue_operator = await _make_line_connected_operator(
+        db_session, "mixed_overdue_op@example.com", "Umixed-overdue-op-00000000000000"
+    )
+    overdue_case = await _make_case(db_session, overdue_user, status="closed")
+    await _make_transaction(
+        db_session,
+        overdue_case,
+        overdue_operator,
+        visit_date=today_jst - timedelta(days=1),
+        status="visiting",
+    )
+
+    no_bid_user = await _make_line_connected_user(
+        db_session, "mixed_nobid_owner@example.com", "Umixed-nobid-owner-000000000000"
+    )
+    await _make_case(db_session, no_bid_user, created_at=now - timedelta(days=4))
+
+    with patch(
+        "app.services.line_notify.push_visit_overdue", new_callable=AsyncMock, return_value=False
+    ), patch(
+        "app.services.notify.send_visit_overdue", new_callable=AsyncMock, return_value=False
+    ), patch(
+        "app.services.line_notify.push_no_bid_reminder", new_callable=AsyncMock, return_value=True
+    ), patch(
+        "app.services.notify.send_no_bid_reminder", new_callable=AsyncMock
+    ) as send_no_bid, patch(
+        "app.services.reminders.alerts.send_alert", new_callable=AsyncMock
+    ) as send_alert, patch(
+        "app.services.reminders.alerts.resolve_alert", new_callable=AsyncMock
+    ) as resolve_alert, patch(
+        "app.services.reminders.alerts.is_active", return_value=False
+    ), patch(
+        "app.services.reminders.alerts.fire_and_forget", side_effect=lambda coro: coro.close()
+    ):
+        result = await run_reminders(db_session)
+
+    assert result["overdue"] == 1
+    assert result["no_bid"] == 1
+    assert result["undelivered"] == 2
+    send_no_bid.assert_not_called()  # LINE 成功のためメールへフォールバックしない
+    send_alert.assert_called_once()
+    body = send_alert.call_args.args[1]
+    assert "overdue=2 no_bid=0 bids_pending=0" in body
+    resolve_alert.assert_not_called()
+
+
+async def test_dispatch_failure_alert_body_excludes_destination_pii(db_session: AsyncSession):
+    """失敗アラート本文には宛先そのもの（email・line_user_id）を含めない（security review Low-2）。
+
+    本文に載せてよいのは transaction_id/case_id と当事者区分（user/operator）だけ。
+    ``_best_effort`` の既存方針（宛先は本文へ出さない）が集約アラートでも守られて
+    いることを、将来 context に email 等を足す改修が入ったら赤くなる形で固定する。
+    """
+    today_jst = datetime.now(timezone.utc).astimezone(JST).date()
+    owner_email = "pii_owner@example.com"
+    owner_line_user_id = "Upii-owner-00000000000000000000"
+    op_email = "pii_op@example.com"
+    op_line_user_id = "Upii-op-000000000000000000000000"
+    user = await _make_line_connected_user(db_session, owner_email, owner_line_user_id)
+    operator = await _make_line_connected_operator(db_session, op_email, op_line_user_id)
+    case = await _make_case(db_session, user, status="closed")
+    txn = await _make_transaction(
+        db_session, case, operator, visit_date=today_jst - timedelta(days=1), status="visiting"
+    )
+
+    with patch(
+        "app.services.line_notify.push_visit_overdue", new_callable=AsyncMock, return_value=False
+    ), patch(
+        "app.services.notify.send_visit_overdue", new_callable=AsyncMock, return_value=False
+    ), patch(
+        "app.services.reminders.alerts.send_alert", new_callable=AsyncMock
+    ) as send_alert, patch(
+        "app.services.reminders.alerts.is_active", return_value=False
+    ), patch(
+        "app.services.reminders.alerts.fire_and_forget", side_effect=lambda coro: coro.close()
+    ):
+        await run_reminders(db_session)
+
+    send_alert.assert_called_once()
+    title, body = send_alert.call_args.args[0], send_alert.call_args.args[1]
+    for leaked in (owner_email, owner_line_user_id, op_email, op_line_user_id, "@"):
+        assert leaked not in title
+        assert leaked not in body
+    # 識別子（transaction_id・当事者区分）は載ってよい・載る。
+    assert str(txn.id) in body
+    assert "party=user" in body
+    assert "party=operator" in body
+
+
+async def test_dispatch_and_tally_unknown_outcome_is_not_counted_as_delivered() -> None:
+    """DispatchOutcome の三値いずれにも一致しない戻り値は delivered へ黙って倒さない。
+
+    security review Low-1: delivered 扱いにすると「例外もなく黙って不達」という
+    本件と同種の盲点を、実装バグ経由で再生産してしまう。unknown カウンタへ分離
+    されることを直接固定する（誤アラート防止のため failed にも計上しない）。
+    """
+    tally = ReminderDispatchTally()
+
+    async def _returns_something_unexpected(*args: object) -> str:  # type: ignore[return-value]
+        return "not-a-real-outcome"
+
+    await _dispatch_and_tally(tally, _returns_something_unexpected, context="ctx-unknown")
+
+    assert tally.unknown == 1
+    assert tally.delivered == 0
+    assert tally.failed == 0
+    assert tally.skipped == 0
+    assert tally.attempted == 1
+
+
+async def test_reminder_all_unreachable_triggers_systemic_alert(db_session: AsyncSession):
+    """対象10件以上が全件 unreachable（0件送信）になると系統障害として別アラートを出す。
+
+    failed が1件も無いまま全滅すると reminder_dispatch_failed の発報条件
+    （failed_total > 0）には触れず沈黙してしまう（security review Low-3）。
+    """
+    today_jst = datetime.now(timezone.utc).astimezone(JST).date()
+    for i in range(_ALL_UNREACHABLE_MIN_ATTEMPTED // 2):
+        placeholder_user_email = f"line-{uuid.uuid4().hex}@line.katazuke.internal"
+        placeholder_op_email = f"line-{uuid.uuid4().hex}@line.katazuke.internal"
+        user, _ = await _make_user(db_session, placeholder_user_email)
+        operator, _ = await _make_operator(db_session, placeholder_op_email)
+        case = await _make_case(db_session, user, status="closed")
+        await _make_transaction(
+            db_session, case, operator, visit_date=today_jst - timedelta(days=1 + i), status="visiting"
+        )
+
+    with patch(
+        "app.services.line_notify.push_visit_overdue", new_callable=AsyncMock
+    ) as push, patch(
+        "app.services.notify.send_visit_overdue", new_callable=AsyncMock
+    ) as send, patch(
+        "app.services.reminders.alerts.send_alert", new_callable=AsyncMock
+    ) as send_alert, patch(
+        "app.services.reminders.alerts.is_active", return_value=False
+    ), patch(
+        "app.services.reminders.alerts.fire_and_forget", side_effect=lambda coro: coro.close()
+    ):
+        result = await run_reminders(db_session)
+
+    assert result["undelivered"] == 0
+    assert result["unreachable"] == _ALL_UNREACHABLE_MIN_ATTEMPTED
+    push.assert_not_called()
+    send.assert_not_called()
+    send_alert.assert_called_once()
+    _, kwargs = send_alert.call_args
+    assert kwargs["key"] == "reminder_all_unreachable"
+    assert kwargs["severity"] == "warning"
+
+
+async def test_reminder_all_unreachable_below_threshold_is_not_alerted(db_session: AsyncSession):
+    """全滅でも件数が閾値未満（平常運転の範囲）なら系統障害アラートは出さない。
+
+    既存の test_overdue_reminder_unreachable_recipients_are_not_alerted が
+    reminder_dispatch_failed を出さないことは検証済みだが、こちらは
+    reminder_all_unreachable も出ないことを明示的に固定する。
+    """
+    today_jst = datetime.now(timezone.utc).astimezone(JST).date()
+    placeholder_user_email = f"line-{uuid.uuid4().hex}@line.katazuke.internal"
+    placeholder_op_email = f"line-{uuid.uuid4().hex}@line.katazuke.internal"
+    user, _ = await _make_user(db_session, placeholder_user_email)
+    operator, _ = await _make_operator(db_session, placeholder_op_email)
+    case = await _make_case(db_session, user, status="closed")
+    await _make_transaction(
+        db_session, case, operator, visit_date=today_jst - timedelta(days=1), status="visiting"
+    )
+
+    with patch(
+        "app.services.line_notify.push_visit_overdue", new_callable=AsyncMock
+    ), patch(
+        "app.services.notify.send_visit_overdue", new_callable=AsyncMock
+    ), patch(
+        "app.services.reminders.alerts.send_alert", new_callable=AsyncMock
+    ) as send_alert, patch(
+        "app.services.reminders.alerts.resolve_alert", new_callable=AsyncMock
+    ) as resolve_alert, patch(
+        "app.services.reminders.alerts.is_active", return_value=False
+    ), patch(
+        "app.services.reminders.alerts.fire_and_forget", side_effect=lambda coro: coro.close()
+    ):
+        result = await run_reminders(db_session)
+
+    assert result["unreachable"] == 2
+    assert result["unreachable"] < _ALL_UNREACHABLE_MIN_ATTEMPTED
+    send_alert.assert_not_called()
+    resolve_alert.assert_not_called()

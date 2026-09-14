@@ -18,12 +18,24 @@ logger = logging.getLogger(__name__)
 
 _P = ParamSpec("_P")
 
-#: 単体テストから差し替えられるよう、モジュール属性として束縛した単調増加クロック。
-#: 壁時計（time.time）はNTP補正・DST で巻き戻りうるため、経過時間の判定には使わない。
-_monotonic = time.monotonic
+#: dispatch_* の配送結果。BackgroundTasks 経由の呼び出し元は例外化せず握り潰すため
+#: 戻り値だけが唯一の成否シグナルになる（line_notify._push / notify._send_raw が
+#: 内部で全例外を捕捉して bool/None を返す設計のため、例外の再送出では実運用の
+#: 最頻失敗モード＝「黙った False」を検知できない）。
+#: - "delivered": LINE Push またはメールのいずれかが実際に届いた。
+#: - "failed":    どれか1つ以上を試行したが、すべて失敗した。
+#: - "skipped":   試行できる宛先が無かった（未連携かつ仮メール等）。失敗ではない。
+DispatchOutcome = Literal["delivered", "failed", "skipped"]
+DELIVERED: DispatchOutcome = "delivered"
+FAILED: DispatchOutcome = "failed"
+SKIPPED: DispatchOutcome = "skipped"
 
 #: 同一 (transaction_id, recipient_party) への新着メッセージ Push の最小間隔（秒）。
 _MESSAGE_PUSH_DEBOUNCE_SECONDS = 300.0
+
+#: 単体テストから差し替えられるよう、モジュール属性として束縛した単調増加クロック。
+#: 壁時計（time.time）はNTP補正・DST で巻き戻りうるため、経過時間の判定には使わない。
+_monotonic = time.monotonic
 
 #: デバウンス台帳。キー = (transaction_id, recipient_party)、値 = 最終送信時刻（monotonic）。
 _MESSAGE_PUSH_LAST_SENT: dict[tuple[str, str], float] = {}
@@ -31,6 +43,19 @@ _MESSAGE_PUSH_LAST_SENT: dict[tuple[str, str], float] = {}
 #: 台帳の掃除を走らせるサイズ閾値。毎回 O(n) 走査すると成約数に比例して重くなるため、
 #: 一定サイズを超えたときだけ期限切れエントリをまとめて捨てる（償却 O(1)）。
 _MESSAGE_PUSH_SWEEP_THRESHOLD = 512
+
+
+def _outcome(*, attempted: bool, delivered: bool) -> DispatchOutcome:
+    """(試行有無, 到達有無) から :data:`DispatchOutcome` を一意に決める。
+
+    各 dispatch_* に同じ判定を重複させない（delivered → FAILED/SKIPPED の分岐条件を
+    1箇所に集約する）。
+    """
+    if delivered:
+        return DELIVERED
+    if attempted:
+        return FAILED
+    return SKIPPED
 
 
 def _sweep_message_push_ledger(now: float) -> None:
@@ -45,24 +70,28 @@ def _sweep_message_push_ledger(now: float) -> None:
 
 
 def _best_effort(
-    func: Callable[_P, Awaitable[None]],
-) -> Callable[_P, Awaitable[None]]:
+    func: Callable[_P, Awaitable[DispatchOutcome]],
+) -> Callable[_P, Awaitable[DispatchOutcome]]:
     """通知起因の例外を BackgroundTask の外へ出さないためのラッパ。
 
     BackgroundTasks 内で送出された例外は ASGI サーバのタスクグループまで伝播し、
     レスポンス送出後の 500 化やワーカーのエラーログ汚染を招く。通知はベストエフォート
     であり業務処理の成否とは独立なので、ここで捕捉して構造化ログに残すだけに留める。
+
+    戻り値を使うのは同期的に await する reminders.py だけ。BackgroundTasks 経由の
+    呼び出し元は戻り値を無視してよい（fire-and-forget のため受け取り先が無い）。
     """
 
     @functools.wraps(func)
-    async def _wrapper(*args: _P.args, **kwargs: _P.kwargs) -> None:
+    async def _wrapper(*args: _P.args, **kwargs: _P.kwargs) -> DispatchOutcome:
         try:
-            await func(*args, **kwargs)
+            return await func(*args, **kwargs)
         except Exception:
             # 宛先そのもの（line_user_id / email）は本文へ出さない。引数位置は
             # 各 dispatch_* で第1引数=line_user_id に統一済みのため、関数名のみで
             # 十分に切り分け可能。
             logger.exception("notify_dispatch: 通知処理で例外（処理は継続） - %s", func.__name__)
+            return FAILED
 
     return _wrapper
 
@@ -70,140 +99,183 @@ def _best_effort(
 @_best_effort
 async def dispatch_bid_selected(
     line_user_id: str | None, email: str, transaction_id: str, amount: int
-) -> None:
+) -> DispatchOutcome:
     """③ 落札通知（業者宛）。LINE優先・失敗/未連携時はメールにフォールバック。"""
+    attempted = False
     if line_user_id:
+        attempted = True
         ok = await line_notify.push_bid_selected(line_user_id, transaction_id, amount)
         if ok:
-            return
+            return DELIVERED
     if notify.is_placeholder_email(email):
-        return
-    await notify.send_bid_selected(email, transaction_id, amount)
+        return _outcome(attempted=attempted, delivered=False)
+    attempted = True
+    delivered = await notify.send_bid_selected(email, transaction_id, amount)
+    return _outcome(attempted=attempted, delivered=delivered)
 
 
 @_best_effort
-async def dispatch_case_created(line_user_id: str | None, email: str, case_id: str) -> None:
+async def dispatch_case_created(
+    line_user_id: str | None, email: str, case_id: str
+) -> DispatchOutcome:
     """① 案件登録完了通知（依頼者宛）。LINE優先・失敗/未連携時はメールにフォールバック。
 
     r6-verify-web A1 対応: 従来 cases.py が notify.send_case_created を直呼びしており、
     LINE専用ユーザー（仮メール保持者）には出品直後の通知が LINE・メールとも届いて
     いなかった。他イベントと同じ dispatch 規約へ揃える。
     """
+    attempted = False
     if line_user_id:
+        attempted = True
         ok = await line_notify.push_case_created(line_user_id, case_id)
         if ok:
-            return
+            return DELIVERED
     if notify.is_placeholder_email(email):
-        return
-    await notify.send_case_created(email, case_id)
+        return _outcome(attempted=attempted, delivered=False)
+    attempted = True
+    delivered = await notify.send_case_created(email, case_id)
+    return _outcome(attempted=attempted, delivered=delivered)
 
 
 @_best_effort
 async def dispatch_operator_verified(
     line_user_id: str | None, email: str, company_name: str, active: bool
-) -> None:
+) -> DispatchOutcome:
     """業者の入札可否切替の通知（業者宛・r6 H3）。LINE優先・失敗/未連携時はメール。"""
+    attempted = False
     if line_user_id:
+        attempted = True
         ok = await line_notify.push_operator_verified(line_user_id, active)
         if ok:
-            return
+            return DELIVERED
     if notify.is_placeholder_email(email):
-        return
-    await notify.send_operator_verified(email, company_name, active)
+        return _outcome(attempted=attempted, delivered=False)
+    attempted = True
+    delivered = await notify.send_operator_verified(email, company_name, active)
+    return _outcome(attempted=attempted, delivered=delivered)
 
 
 @_best_effort
 async def dispatch_account_unsuspended(
     line_user_id: str | None, email: str | None, party: Literal["user", "operator"]
-) -> None:
+) -> DispatchOutcome:
     """アカウント停止の解除通知（本人宛・r6 H1）。LINE優先・失敗/未連携時はメール。
 
     停止（suspend）側は理由開示の是非が運用ポリシー判断のため通知しない。解除は
     本人が復帰を知る手段が他に無いため必ず送る。
     """
+    attempted = False
     if line_user_id:
+        attempted = True
         ok = await line_notify.push_account_unsuspended(line_user_id, party)
         if ok:
-            return
+            return DELIVERED
     if not email or notify.is_placeholder_email(email):
-        return
-    await notify.send_account_unsuspended(email, party)
+        return _outcome(attempted=attempted, delivered=False)
+    attempted = True
+    delivered = await notify.send_account_unsuspended(email, party)
+    return _outcome(attempted=attempted, delivered=delivered)
 
 
 @_best_effort
 async def dispatch_identity_document_reviewed(
     line_user_id: str | None, email: str | None, approved: bool, reason: str | None = None
-) -> None:
+) -> DispatchOutcome:
     """本人確認書類の審査結果通知（依頼者宛・r6 H2）。LINE優先・失敗/未連携時はメール。"""
+    attempted = False
     if line_user_id:
+        attempted = True
         ok = await line_notify.push_identity_document_reviewed(line_user_id, approved, reason)
         if ok:
-            return
+            return DELIVERED
     if not email or notify.is_placeholder_email(email):
-        return
-    await notify.send_identity_document_reviewed(email, approved, reason)
+        return _outcome(attempted=attempted, delivered=False)
+    attempted = True
+    delivered = await notify.send_identity_document_reviewed(email, approved, reason)
+    return _outcome(attempted=attempted, delivered=delivered)
 
 
 @_best_effort
 async def dispatch_bank_account_changed(
     line_user_id: str | None, email: str, action: str
-) -> None:
+) -> DispatchOutcome:
     """振込先口座の登録・変更・削除の本人通知（security review M-1 / 再レビュー A）。
 
     不正な書き換えの早期検知が目的のため、他の通知と異なりフォールバックではなく
     **LINE Push とメールの両方** に送る（LINE 専用ユーザーは仮メールのためメール側は
     自動的にスキップされ、LINE Push が唯一の通知経路になる）。
+
+    delivered は「少なくとも片方届いた」意味（フォールバックではないため、早期
+    return は入れない＝両方に必ず試行する）。
     """
+    line_ok = False
     if line_user_id:
-        await line_notify.push_bank_account_changed(line_user_id, action)
-    if not notify.is_placeholder_email(email):
-        await notify.send_bank_account_changed(email, action)
+        line_ok = await line_notify.push_bank_account_changed(line_user_id, action)
+    mail_ok = False
+    mail_attempted = not notify.is_placeholder_email(email)
+    if mail_attempted:
+        mail_ok = await notify.send_bank_account_changed(email, action)
+    attempted = bool(line_user_id) or mail_attempted
+    delivered = line_ok or mail_ok
+    return _outcome(attempted=attempted, delivered=delivered)
 
 
 @_best_effort
 async def dispatch_bid_lost(
     line_user_id: str | None, email: str, case_id: str, prefecture: str, city: str, purpose: str
-) -> None:
+) -> DispatchOutcome:
     """落札通知（落選業者宛）。LINE優先・失敗/未連携時はメールにフォールバック。
 
     案件情報（地域・利用目的）を本文に含める（M7対応。案件を横断入札している
     業者が「どの案件が落選したか」を判別できるようにするため）。
     """
+    attempted = False
     if line_user_id:
+        attempted = True
         ok = await line_notify.push_bid_lost(line_user_id, case_id, prefecture, city, purpose)
         if ok:
-            return
+            return DELIVERED
     if notify.is_placeholder_email(email):
-        return
-    await notify.send_bid_lost(email, case_id, prefecture, city, purpose)
+        return _outcome(attempted=attempted, delivered=False)
+    attempted = True
+    delivered = await notify.send_bid_lost(email, case_id, prefecture, city, purpose)
+    return _outcome(attempted=attempted, delivered=delivered)
 
 
 @_best_effort
 async def dispatch_reduction_requested(
     line_user_id: str | None, email: str | None, case_id: str, amount: int
-) -> None:
+) -> DispatchOutcome:
     """減額申請の受付通知（依頼者宛）。LINE優先・失敗/未連携時はメールにフォールバック（ADD-2対応）。"""
+    attempted = False
     if line_user_id:
+        attempted = True
         ok = await line_notify.push_reduction_requested(line_user_id, case_id, amount)
         if ok:
-            return
+            return DELIVERED
     if not email or notify.is_placeholder_email(email):
-        return
-    await notify.send_reduction_requested(email, case_id, amount)
+        return _outcome(attempted=attempted, delivered=False)
+    attempted = True
+    delivered = await notify.send_reduction_requested(email, case_id, amount)
+    return _outcome(attempted=attempted, delivered=delivered)
 
 
 @_best_effort
 async def dispatch_reduction_decided(
     line_user_id: str | None, email: str, transaction_id: str, approved: bool, amount: int
-) -> None:
+) -> DispatchOutcome:
     """減額申請の承認／却下結果通知（申請業者宛）。LINE優先・失敗/未連携時はメールにフォールバック（H2対応）。"""
+    attempted = False
     if line_user_id:
+        attempted = True
         ok = await line_notify.push_reduction_decided(line_user_id, transaction_id, approved, amount)
         if ok:
-            return
+            return DELIVERED
     if notify.is_placeholder_email(email):
-        return
-    await notify.send_reduction_decided(email, transaction_id, approved, amount)
+        return _outcome(attempted=attempted, delivered=False)
+    attempted = True
+    delivered = await notify.send_reduction_decided(email, transaction_id, approved, amount)
+    return _outcome(attempted=attempted, delivered=delivered)
 
 
 @_best_effort
@@ -212,15 +284,19 @@ async def dispatch_transaction_cancelled(
     email: str | None,
     transaction_id: str,
     recipient_party: Literal["user", "operator"],
-) -> None:
+) -> DispatchOutcome:
     """成約キャンセル通知（相手方宛）。LINE優先・失敗/未連携時はメールにフォールバック（ADD-1対応）。"""
+    attempted = False
     if line_user_id:
+        attempted = True
         ok = await line_notify.push_transaction_cancelled(line_user_id, transaction_id, recipient_party)
         if ok:
-            return
+            return DELIVERED
     if not email or notify.is_placeholder_email(email):
-        return
-    await notify.send_transaction_cancelled(email, transaction_id, recipient_party)
+        return _outcome(attempted=attempted, delivered=False)
+    attempted = True
+    delivered = await notify.send_transaction_cancelled(email, transaction_id, recipient_party)
+    return _outcome(attempted=attempted, delivered=delivered)
 
 
 @_best_effort
@@ -229,49 +305,63 @@ async def dispatch_transaction_cancelled_by_admin(
     email: str | None,
     transaction_id: str,
     recipient_party: Literal["user", "operator"],
-) -> None:
+) -> DispatchOutcome:
     """運営による成約強制終了の通知（当事者双方宛・r8-M5）。LINE優先・メールへフォールバック。"""
+    attempted = False
     if line_user_id:
+        attempted = True
         ok = await line_notify.push_transaction_cancelled_by_admin(
             line_user_id, transaction_id, recipient_party
         )
         if ok:
-            return
+            return DELIVERED
     if not email or notify.is_placeholder_email(email):
-        return
-    await notify.send_transaction_cancelled_by_admin(email, transaction_id, recipient_party)
+        return _outcome(attempted=attempted, delivered=False)
+    attempted = True
+    delivered = await notify.send_transaction_cancelled_by_admin(
+        email, transaction_id, recipient_party
+    )
+    return _outcome(attempted=attempted, delivered=delivered)
 
 
 @_best_effort
 async def dispatch_schedule_confirmed(
     line_user_id: str | None, email: str, transaction_id: str, visit_date: str
-) -> None:
+) -> DispatchOutcome:
     """訪問日程確定通知（業者宛）。LINE優先・失敗/未連携時はメールにフォールバック。"""
+    attempted = False
     if line_user_id:
+        attempted = True
         ok = await line_notify.push_schedule_confirmed(line_user_id, transaction_id, visit_date)
         if ok:
-            return
+            return DELIVERED
     if notify.is_placeholder_email(email):
-        return
-    await notify.send_schedule_confirmed(email, transaction_id, visit_date)
+        return _outcome(attempted=attempted, delivered=False)
+    attempted = True
+    delivered = await notify.send_schedule_confirmed(email, transaction_id, visit_date)
+    return _outcome(attempted=attempted, delivered=delivered)
 
 
 @_best_effort
 async def dispatch_bid_received(
     line_user_id: str | None, email: str | None, case_id: str, company_name: str, amount: int
-) -> None:
+) -> DispatchOutcome:
     """新規入札通知（依頼者宛）。LINE優先・失敗/未連携時はメールにフォールバック。
 
     LINE専用ユーザーの仮メール（実メール未設定）宛には送信しない判定は、呼び出し元では
     なくここへ集約する（LINE連携済みなら仮メールでも LINE には届けるため）。
     """
+    attempted = False
     if line_user_id:
+        attempted = True
         ok = await line_notify.push_bid_received(line_user_id, case_id, company_name, amount)
         if ok:
-            return
+            return DELIVERED
     if not email or notify.is_placeholder_email(email):
-        return
-    await notify.send_bid_received(email, case_id, company_name, amount)
+        return _outcome(attempted=attempted, delivered=False)
+    attempted = True
+    delivered = await notify.send_bid_received(email, case_id, company_name, amount)
+    return _outcome(attempted=attempted, delivered=delivered)
 
 
 @_best_effort
@@ -282,21 +372,25 @@ async def dispatch_bid_updated(
     company_name: str,
     old_amount: int,
     new_amount: int,
-) -> None:
+) -> DispatchOutcome:
     """入札額の引き上げ通知（依頼者宛）。LINE優先・失敗/未連携時はメールにフォールバック。
 
     dispatch_bid_received と同じ理由で、仮メール判定はここへ集約する
     （LINE連携済みなら仮メールでも LINE には届けるため）。
     """
+    attempted = False
     if line_user_id:
+        attempted = True
         ok = await line_notify.push_bid_updated(
             line_user_id, case_id, company_name, old_amount, new_amount
         )
         if ok:
-            return
+            return DELIVERED
     if not email or notify.is_placeholder_email(email):
-        return
-    await notify.send_bid_updated(email, case_id, company_name, old_amount, new_amount)
+        return _outcome(attempted=attempted, delivered=False)
+    attempted = True
+    delivered = await notify.send_bid_updated(email, case_id, company_name, old_amount, new_amount)
+    return _outcome(attempted=attempted, delivered=delivered)
 
 
 @_best_effort
@@ -305,7 +399,7 @@ async def dispatch_visit_overdue(
     email: str | None,
     transaction_id: str,
     recipient_party: Literal["user", "operator"],
-) -> None:
+) -> DispatchOutcome:
     """訪問日超過リマインド（当事者宛・r12 決定3）。LINE優先・未連携/失敗時はメール。
 
     二重送信の防止は呼び出し元（services/reminders.py）が
@@ -313,45 +407,57 @@ async def dispatch_visit_overdue(
     （dispatch_message_received のメモリ台帳と違い、DB に永続する印を使うため
      プロセス再起動・複数インスタンスでも重複しない）。
     """
+    attempted = False
     if line_user_id:
+        attempted = True
         ok = await line_notify.push_visit_overdue(line_user_id, transaction_id, recipient_party)
         if ok:
-            return
+            return DELIVERED
     if not email or notify.is_placeholder_email(email):
-        return
-    await notify.send_visit_overdue(email, transaction_id, recipient_party)
+        return _outcome(attempted=attempted, delivered=False)
+    attempted = True
+    delivered = await notify.send_visit_overdue(email, transaction_id, recipient_party)
+    return _outcome(attempted=attempted, delivered=delivered)
 
 
 @_best_effort
 async def dispatch_no_bid_reminder(
     line_user_id: str | None, email: str | None, case_id: str
-) -> None:
+) -> DispatchOutcome:
     """入札ゼロ放置リマインド（依頼者宛・r12 決定3）。LINE優先・未連携/失敗時はメール。"""
+    attempted = False
     if line_user_id:
+        attempted = True
         ok = await line_notify.push_no_bid_reminder(line_user_id, case_id)
         if ok:
-            return
+            return DELIVERED
     if not email or notify.is_placeholder_email(email):
-        return
-    await notify.send_no_bid_reminder(email, case_id)
+        return _outcome(attempted=attempted, delivered=False)
+    attempted = True
+    delivered = await notify.send_no_bid_reminder(email, case_id)
+    return _outcome(attempted=attempted, delivered=delivered)
 
 
 @_best_effort
 async def dispatch_bids_pending_reminder(
     line_user_id: str | None, email: str | None, case_id: str
-) -> None:
+) -> DispatchOutcome:
     """入札未決定リマインド（依頼者宛）。LINE優先・未連携/失敗時はメール。
 
     二重送信の防止は呼び出し元（services/reminders.py）が
     ``cases.bids_pending_reminded_at`` で担保する（dispatch_no_bid_reminder と同じ）。
     """
+    attempted = False
     if line_user_id:
+        attempted = True
         ok = await line_notify.push_bids_pending_reminder(line_user_id, case_id)
         if ok:
-            return
+            return DELIVERED
     if not email or notify.is_placeholder_email(email):
-        return
-    await notify.send_bids_pending_reminder(email, case_id)
+        return _outcome(attempted=attempted, delivered=False)
+    attempted = True
+    delivered = await notify.send_bids_pending_reminder(email, case_id)
+    return _outcome(attempted=attempted, delivered=delivered)
 
 
 @_best_effort
@@ -359,7 +465,7 @@ async def dispatch_message_received(
     line_user_id: str | None,
     transaction_id: str,
     recipient_party: Literal["user", "operator"],
-) -> None:
+) -> DispatchOutcome:
     """新着チャットメッセージ通知（当事者宛）。LINEのみ・同一宛先は5分に1通へ間引く。
 
     メールでの新着メッセージ通知は既存に無く、メッセージ毎の高頻度配信は迷惑メール化
@@ -375,7 +481,7 @@ async def dispatch_message_received(
       チェック＆セットのアトミック性を確保している（順序を変えないこと）。
     """
     if not line_user_id:
-        return
+        return SKIPPED
 
     key = (transaction_id, recipient_party)
     now = _monotonic()
@@ -386,7 +492,7 @@ async def dispatch_message_received(
             transaction_id,
             recipient_party,
         )
-        return
+        return SKIPPED
     # await の前に記録する（同時実行での二重送信を防ぐ）。
     _MESSAGE_PUSH_LAST_SENT[key] = now
     if len(_MESSAGE_PUSH_LAST_SENT) > _MESSAGE_PUSH_SWEEP_THRESHOLD:
@@ -396,3 +502,5 @@ async def dispatch_message_received(
     if not ok:
         # 送れていない以上、5分間の抑止を効かせる理由がない（次のメッセージで再挑戦させる）。
         _MESSAGE_PUSH_LAST_SENT.pop(key, None)
+        return FAILED
+    return DELIVERED

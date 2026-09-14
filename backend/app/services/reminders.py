@@ -18,6 +18,14 @@
 3. 通知が失敗しても **再送しない**（マーカーは既に立っている）。ログと運営アラート
    （warning）に落とすだけに留める。二重送信の害（同じ催促が何通も飛ぶ）の方が、
    1通の取りこぼしより大きいという判断。運用上の再送は admin で列を戻して行う。
+   dispatch_* の戻り値（:data:`app.services.notify_dispatch.DispatchOutcome`）を
+   ``_dispatch_and_tally`` が種別ごとに集計し、``run_reminders`` が3種別を合算して
+   1周につき最大1本のアラートへ集約する（失敗のたびに個別発報しない）。
+   個別の失敗（``failed``）が1件も無いまま対象が全件 unreachable（= LINE未連携・
+   仮メール等で誰にも届く経路が無く0件送信）になった場合は、それ自体を
+   データ不整合の兆候とみなし ``reminder_all_unreachable`` という別キーで
+   系統障害アラートを出す（:data:`_ALL_UNREACHABLE_MIN_ATTEMPTED` 件以上の場合のみ。
+   security review Low-3 対応）。
 
 対象抽出の計算量:
 - いずれの抽出も「未リマインド行だけを対象にする部分索引」
@@ -40,6 +48,7 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, select, update
@@ -52,6 +61,7 @@ from app.db.models.operator import Operator
 from app.db.models.transaction import Transaction
 from app.db.models.user import User
 from app.services import alerts, notify_dispatch
+from app.services.notify_dispatch import DELIVERED, FAILED, SKIPPED, DispatchOutcome
 
 logger = logging.getLogger(__name__)
 
@@ -81,8 +91,39 @@ REMINDER_LOOKBACK_DAYS = 14
 #: 失敗時の影響範囲も1周分に閉じ込める。積み残しは次の周期で処理される。
 REMINDER_BATCH_LIMIT = 200
 
+#: run_reminders 終了時のアラート本文に載せる失敗 context の上限件数。
+#: alerts.send_alert の本文は 1800 文字で切り詰められるため、無制限に列挙しない。
+_ALERT_FAILURE_SAMPLES = 5
 
-async def _run_overdue_visit_reminders(session: AsyncSession, now: datetime) -> int:
+#: 「全件 unreachable（= 誰にも通知経路が無く0件送信）」を系統障害として別アラート
+#: で検知するための最小試行件数（security review Low-3）。failed が1件も無いまま
+#: 全滅すると reminder_dispatch_failed の発報条件（failed_total > 0）に触れず
+#: 沈黙してしまう（LINE連携テーブルの移行ミス等）。1〜2件程度の unreachable は
+#: 「LINE未連携かつ仮メールの利用者がたまたま該当した」という平常運転でも起こり
+#: うるため、ある程度まとまった件数が全滅したときだけ発報する。
+_ALL_UNREACHABLE_MIN_ATTEMPTED = 10
+
+
+@dataclass
+class ReminderDispatchTally:
+    """1周分の通知配送結果の集計（1種別ぶん）。run_reminders が3種別を合算する。"""
+
+    attempted: int = 0
+    delivered: int = 0
+    failed: int = 0
+    skipped: int = 0
+    #: DispatchOutcome のいずれにも一致しない戻り値（実装バグ・想定外のモック等）。
+    #: security review Low-1: delivered へ黙って倒すと「黙った不達」の再発になるため
+    #: 独立カウンタで分離し、ログにだけ残す（誤アラート防止のため運営アラートの
+    #: 発報条件には含めない）。
+    unknown: int = 0
+    #: FAILED になった呼び出しの context を先頭から最大 _ALERT_FAILURE_SAMPLES 件保持する。
+    failure_contexts: list[str] = field(default_factory=list)
+
+
+async def _run_overdue_visit_reminders(
+    session: AsyncSession, now: datetime, tally: ReminderDispatchTally
+) -> int:
     """(a) 訪問予定日を過ぎたまま完了確定されていない成約を掘り起こす。
 
     Returns:
@@ -129,7 +170,8 @@ async def _run_overdue_visit_reminders(session: AsyncSession, now: datetime) -> 
 
     targets = await _load_overdue_targets(session, claimed_ids)
     for line_user_id, email, transaction_id, recipient_party in targets:
-        await _dispatch_or_warn(
+        await _dispatch_and_tally(
+            tally,
             notify_dispatch.dispatch_visit_overdue,
             line_user_id,
             email,
@@ -185,7 +227,9 @@ async def _load_overdue_targets(
     return targets
 
 
-async def _run_no_bid_reminders(session: AsyncSession, now: datetime) -> int:
+async def _run_no_bid_reminders(
+    session: AsyncSession, now: datetime, tally: ReminderDispatchTally
+) -> int:
     """(b) 作成から一定日数、入札が1件も付かないまま open の案件を掘り起こす。
 
     Returns:
@@ -232,7 +276,8 @@ async def _run_no_bid_reminders(session: AsyncSession, now: datetime) -> int:
 
     targets = await _load_case_owner_targets(session, claimed_ids)
     for line_user_id, email, case_id in targets:
-        await _dispatch_or_warn(
+        await _dispatch_and_tally(
+            tally,
             notify_dispatch.dispatch_no_bid_reminder,
             line_user_id,
             email,
@@ -266,7 +311,9 @@ async def _load_case_owner_targets(
     return targets
 
 
-async def _run_bids_pending_reminders(session: AsyncSession, now: datetime) -> int:
+async def _run_bids_pending_reminders(
+    session: AsyncSession, now: datetime, tally: ReminderDispatchTally
+) -> int:
     """(c) 入札は届いているが依頼者が一定日数、決定していない案件を掘り起こす。
 
     (b) の「入札ゼロ放置」と対になる穴——入札が1件でも付くと (b) の対象から
@@ -331,7 +378,8 @@ async def _run_bids_pending_reminders(session: AsyncSession, now: datetime) -> i
 
     targets = await _load_case_owner_targets(session, claimed_ids)
     for line_user_id, email, case_id in targets:
-        await _dispatch_or_warn(
+        await _dispatch_and_tally(
+            tally,
             notify_dispatch.dispatch_bids_pending_reminder,
             line_user_id,
             email,
@@ -341,32 +389,60 @@ async def _run_bids_pending_reminders(session: AsyncSession, now: datetime) -> i
     return len(claimed_ids)
 
 
-async def _dispatch_or_warn(
-    dispatch: Callable[..., Awaitable[None]], *args: object, context: str
+async def _dispatch_and_tally(
+    tally: ReminderDispatchTally,
+    dispatch: Callable[..., Awaitable[DispatchOutcome]],
+    *args: object,
+    context: str,
 ) -> None:
-    """通知を送る。失敗しても **再送はせず**、ログと運営アラートに落とす。
+    """通知を送り、結果を ``tally`` へ集計する（アラート発報はしない）。
+
+    アラートの発報は run_reminders に集約する（1周の途中経過ではなく、3種別を
+    合算した最終結果で1本にまとめて上げるため）。
 
     送信済みマーカーは既に commit 済みのため、ここで例外を伝播させても再送には
-    ならず「1周分の残りの通知を巻き添えで落とす」だけになる。よって握り潰し、
-    運営が気付けるよう warning のアラートを1本上げる（key でクールダウン）。
+    ならず「1周分の残りの通知を巻き添えで落とす」だけになる。dispatch_* 自体は
+    ``_best_effort`` が例外を FAILED へ畳んで返すため通常はここへ例外が届かないが、
+    ``_load_*`` 由来の想定外の例外に備えた保険として try/except は残す（到達時は
+    failed 扱いにしてログへ残し、1周を壊さない）。
     """
+    tally.attempted += 1
     try:
-        await dispatch(*args)
+        outcome = await dispatch(*args)
     except Exception as exc:  # noqa: BLE001 -- 1件の通知失敗で1周を壊さない
-        logger.error(
-            "reminders: 通知の送信に失敗（マーカー確定済みのため再送しない） - %s - %s",
+        logger.exception(
+            "reminders: 通知処理で想定外の例外（マーカー確定済みのため再送しない） - %s - %s",
             context,
             exc,
-            exc_info=True,
         )
-        alerts.fire_and_forget(
-            alerts.send_alert(
-                "リマインド通知の送信に失敗しました",
-                "掘り起こし通知が1件届いていない可能性があります（再送はされません）。"
-                f"対象: {context} / エラー: {type(exc).__name__}: {str(exc)[:200]}",
-                severity="warning",
-                key="reminder_dispatch_failed",
-            )
+        tally.failed += 1
+        if len(tally.failure_contexts) < _ALERT_FAILURE_SAMPLES:
+            tally.failure_contexts.append(context)
+        return
+
+    if outcome == FAILED:
+        tally.failed += 1
+        logger.error(
+            "reminders: 通知の送信に失敗（マーカー確定済みのため再送しない） - %s",
+            context,
+        )
+        if len(tally.failure_contexts) < _ALERT_FAILURE_SAMPLES:
+            tally.failure_contexts.append(context)
+    elif outcome == SKIPPED:
+        tally.skipped += 1
+        logger.info("reminders: 通知先が無く送信対象外 - %s", context)
+    elif outcome == DELIVERED:
+        tally.delivered += 1
+    else:
+        # 三値のいずれにも一致しない想定外の戻り値（実装バグの可能性）。誤アラート
+        # 防止のため failed 扱いにはしないが、delivered として黙って倒すと
+        # 「例外もなく黙って不達」という本件と同種の盲点を再生産するため、
+        # 独立カウンタに分離した上で warning ログに残す（security review Low-1）。
+        tally.unknown += 1
+        logger.warning(
+            "reminders: 未知の DispatchOutcome を受信（delivered/failed どちらにも計上しない） - %r - %s",
+            outcome,
+            context,
         )
 
 
@@ -394,19 +470,105 @@ def _is_reachable_user(user: User) -> bool:
 async def run_reminders(session: AsyncSession) -> dict[str, int]:
     """リマインドを1周実行し、送信した件数を返す。
 
+    確保件数（overdue/no_bid/bids_pending）とは別に、実際の配送結果を集計し、
+    1周につき最大1本の運営アラートへ集約する（種別ごとに個別発報しない）。
+
     Returns:
-        ``{"overdue": n, "no_bid": n, "bids_pending": n}``。n は「リマインド
-        対象として確保し、送信済みマーカーを立てた件数」（宛先不達・通知失敗の
-        分も含む）。
+        ``{"overdue": n, "no_bid": n, "bids_pending": n, "undelivered": m, "unreachable": k}``。
+        n は「リマインド対象として確保し、送信済みマーカーを立てた件数」（宛先不達・
+        通知失敗の分も含む）。m（undelivered）は実際に届かなかった件数（failed の
+        合計）、k（unreachable）は試行できる宛先が無かった件数（skipped の合計）。
     """
     now = datetime.now(timezone.utc)
-    overdue = await _run_overdue_visit_reminders(session, now)
-    no_bid = await _run_no_bid_reminders(session, now)
-    bids_pending = await _run_bids_pending_reminders(session, now)
+    overdue_tally = ReminderDispatchTally()
+    no_bid_tally = ReminderDispatchTally()
+    bids_pending_tally = ReminderDispatchTally()
+
+    overdue = await _run_overdue_visit_reminders(session, now, overdue_tally)
+    no_bid = await _run_no_bid_reminders(session, now, no_bid_tally)
+    bids_pending = await _run_bids_pending_reminders(session, now, bids_pending_tally)
+
+    attempted_total = (
+        overdue_tally.attempted + no_bid_tally.attempted + bids_pending_tally.attempted
+    )
+    delivered_total = (
+        overdue_tally.delivered + no_bid_tally.delivered + bids_pending_tally.delivered
+    )
+    failed_total = overdue_tally.failed + no_bid_tally.failed + bids_pending_tally.failed
+    skipped_total = overdue_tally.skipped + no_bid_tally.skipped + bids_pending_tally.skipped
+    unknown_total = overdue_tally.unknown + no_bid_tally.unknown + bids_pending_tally.unknown
+
+    # 全件 unreachable（= 誰にも通知経路が無く0件送信）は failed_total==0 のまま
+    # 沈黙しうるため、系統障害として別キーで検知する（security review Low-3）。
+    is_systemic_unreachable = (
+        failed_total == 0
+        and unknown_total == 0
+        and delivered_total == 0
+        and attempted_total >= _ALL_UNREACHABLE_MIN_ATTEMPTED
+    )
+
+    if failed_total > 0:
+        failure_samples = (
+            overdue_tally.failure_contexts
+            + no_bid_tally.failure_contexts
+            + bids_pending_tally.failure_contexts
+        )[:_ALERT_FAILURE_SAMPLES]
+        alerts.fire_and_forget(
+            alerts.send_alert(
+                "リマインド通知の送信に失敗しました",
+                f"掘り起こし通知 {attempted_total} 件中 {failed_total} 件が届いていません。"
+                f"内訳: overdue={overdue_tally.failed} no_bid={no_bid_tally.failed} "
+                f"bids_pending={bids_pending_tally.failed}。"
+                "マーカー確定済みのため再送されません（再送は DB 列を NULL に戻して行います）。"
+                f"失敗対象（先頭{len(failure_samples)}件）: {'; '.join(failure_samples)}",
+                severity="warning",
+                key="reminder_dispatch_failed",
+            )
+        )
+    elif is_systemic_unreachable:
+        alerts.fire_and_forget(
+            alerts.send_alert(
+                "リマインド通知が全件、送信経路なしでスキップされました",
+                f"掘り起こし対象 {attempted_total} 件が全て LINE 未連携・仮メール等により"
+                "送信対象外（0件送信）でした。通常は一部の宛先だけがこの状態になるため、"
+                "LINE連携判定やメール判定のデータ不整合が起きていないか確認してください。",
+                severity="warning",
+                key="reminder_all_unreachable",
+            )
+        )
+    else:
+        if delivered_total > 0 and alerts.is_active("reminder_dispatch_failed"):
+            alerts.fire_and_forget(
+                alerts.resolve_alert(
+                    "reminder_dispatch_failed",
+                    "リマインド通知の送信が復旧しました",
+                    f"直近の実行で {delivered_total} 件のリマインド通知が正常に届きました。"
+                    "失敗していた間の通知は再送されません。",
+                )
+            )
+        if delivered_total > 0 and alerts.is_active("reminder_all_unreachable"):
+            alerts.fire_and_forget(
+                alerts.resolve_alert(
+                    "reminder_all_unreachable",
+                    "リマインド通知の送信経路が復旧しました",
+                    f"直近の実行で {delivered_total} 件のリマインド通知が正常に届きました。",
+                )
+            )
+
     logger.info(
-        "reminders: 実行完了 - overdue=%s no_bid=%s bids_pending=%s",
+        "reminders: 実行完了 - overdue=%s no_bid=%s bids_pending=%s undelivered=%s "
+        "unreachable=%s unknown=%s",
         overdue,
         no_bid,
         bids_pending,
+        failed_total,
+        skipped_total,
+        unknown_total,
     )
-    return {"overdue": overdue, "no_bid": no_bid, "bids_pending": bids_pending}
+    return {
+        "overdue": overdue,
+        "no_bid": no_bid,
+        "bids_pending": bids_pending,
+        "undelivered": failed_total,
+        "unreachable": skipped_total,
+    }

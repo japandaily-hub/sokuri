@@ -1898,11 +1898,14 @@ async def run_reminder_job(
     """
     result = await run_reminders(session)
     logger.info(
-        "admin: リマインドを手動実行しました - admin_id=%s overdue=%s no_bid=%s bids_pending=%s",
+        "admin: リマインドを手動実行しました - admin_id=%s overdue=%s no_bid=%s bids_pending=%s "
+        "undelivered=%s unreachable=%s",
         admin.id if admin is not None else "ops-token",
         result["overdue"],
         result["no_bid"],
         result["bids_pending"],
+        result["undelivered"],
+        result["unreachable"],
     )
     return ReminderJobResult(**result)
 

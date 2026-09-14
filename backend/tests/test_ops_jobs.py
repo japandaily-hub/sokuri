@@ -125,7 +125,13 @@ async def test_ops_token_header_allows_jobs(client: AsyncClient, ops_token: str)
     ):
         r = await client.post("/api/v1/admin/jobs/reminders", headers=_ops())
     assert r.status_code == 200, r.text
-    assert r.json() == {"overdue": 0, "no_bid": 0, "bids_pending": 0}
+    assert r.json() == {
+        "overdue": 0,
+        "no_bid": 0,
+        "bids_pending": 0,
+        "undelivered": 0,
+        "unreachable": 0,
+    }
 
 
 async def test_ops_token_mismatch_is_rejected(client: AsyncClient, ops_token: str):

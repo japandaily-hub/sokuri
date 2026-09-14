@@ -105,10 +105,13 @@ async def _run_reminder_loop(settings: Settings) -> None:
             async with get_background_session_factory()() as session:
                 result = await run_reminders(session)
             logger.info(
-                "reminders: 定期実行完了 - overdue=%s no_bid=%s bids_pending=%s",
+                "reminders: 定期実行完了 - overdue=%s no_bid=%s bids_pending=%s "
+                "undelivered=%s unreachable=%s",
                 result["overdue"],
                 result["no_bid"],
                 result["bids_pending"],
+                result["undelivered"],
+                result["unreachable"],
             )
         except asyncio.CancelledError:
             raise
