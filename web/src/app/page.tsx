@@ -113,7 +113,10 @@ export default function HomePage() {
                 <div className="hw-step"><span className="hw-n">4</span><span>引き取り完了</span></div>
               </div>
               <div className="hero-cta">
-                <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-line btn-lg">
+                {/* ユーザー指示によりLINEログイン後の着地先を /create から /mypage へ変更
+                    （2026-09-15）。従来はコピー「まずは1枚、撮ってみることから」に合わせて
+                    /create 固定だったが、マイページ着地を優先する方針に変更。 */}
+                <Link href="/login?callbackUrl=%2Fmypage" className="btn btn-line btn-lg">
                   <span className="btn-line__tile" aria-hidden="true" />
                   <span className="btn-line__body">
                     <span className="btn-line__label">LINEで無料ではじめる</span>
@@ -215,7 +218,7 @@ export default function HomePage() {
                 {/* R4 E.1-2: 既存の無料表記に「連絡は選んだ1社だけ」を並べ、CTA と同一視野に入れる */}
                 <span>登録・査定・お断りまですべて無料<br />連絡が来るのは、選んだ1社だけ</span>
               </div>
-              <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-line btn-lg">
+              <Link href="/login?callbackUrl=%2Fmypage" className="btn btn-line btn-lg">
                 <span className="btn-line__tile" aria-hidden="true" />
                 <span className="btn-line__body">
                   <span className="btn-line__label">LINEで無料ではじめる</span>
@@ -566,12 +569,14 @@ export default function HomePage() {
         </section>
         <section className="final-actions">
           <div className="container">
-            {/* ラウンド4（12）: リンク先は自社ログイン画面（/login?callbackUrl=%2Fcreate）で、押しても
-                LINE 公式アカウントの友だち追加は起きない。R4 ブリーフ A.1 が据え置きの条件にした
-                「実挙動確認」がこのラウンドで確定したため、他の .btn-line__sub と同じ語に揃える。 */}
+            {/* ラウンド4（12）: リンク先は自社ログイン画面（/login?callbackUrl=%2Fmypage、
+                2026-09-15にユーザー指示で/createから変更）。LINEログイン成功時にbot_prompt
+                （auth.ts）で友だち追加の確認画面を挟むようになった。
+                [要確認] 直下のコピー「すぐに出品をはじめられます」は/create直行だった頃の
+                文言のまま。着地先変更に合わせた見直しは未対応（ユーザー確認待ち）。 */}
             <p>まずは1枚、撮ってみることから。LINEアカウントでログインすれば、すぐに出品をはじめられます。登録・査定は無料です。</p>
             <div className="final-cta">
-              <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-line btn-lg">
+              <Link href="/login?callbackUrl=%2Fmypage" className="btn btn-line btn-lg">
                 <span className="btn-line__tile" aria-hidden="true" />
                 <span className="btn-line__body">
                   <span className="btn-line__label">LINEではじめる</span>
