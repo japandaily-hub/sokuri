@@ -25,6 +25,7 @@ import {
   ADMIN_LIST_DEFAULT_LIMIT,
   adminBulkCreateInvites,
   adminCreateInvite,
+  adminDeleteOperator,
   adminGetCellDensity,
   adminGetOperatorLicenseImage,
   adminListContacts,
@@ -103,6 +104,8 @@ export default function AdminPage() {
   const [suspendModalError, setSuspendModalError] = useState<string | null>(null);
   const [verifyTarget, setVerifyTarget] = useState<OperatorOut | null>(null);
   const [verifyModalError, setVerifyModalError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<OperatorOut | null>(null);
+  const [deleteModalError, setDeleteModalError] = useState<string | null>(null);
 
   /* ---- 許可証画像確認モーダル ---- */
   const [licenseModalOperator, setLicenseModalOperator] = useState<OperatorOut | null>(null);
@@ -328,6 +331,16 @@ export default function AdminPage() {
     setVerifyTarget(null);
   }
 
+  function openDeleteModal(op: OperatorOut) {
+    setDeleteModalError(null);
+    setDeleteTarget(op);
+  }
+
+  function closeDeleteModal() {
+    setDeleteModalError(null);
+    setDeleteTarget(null);
+  }
+
   // 停止／停止解除。停止中は業者の既存トークンが全て 403 になりログインも拒否される。
   // r4回帰是正: window.confirm ではなく ConfirmModal（自前ダイアログ）で確認する（依頼者一覧と同型）。
   async function confirmSuspendChange(op: OperatorOut) {
@@ -343,6 +356,22 @@ export default function AdminPage() {
       // r5-fix-frontend M-2 是正: 失敗時はモーダルを閉じず、ConfirmModal の error prop に
       // 表示する（モーダルを閉じた後の画面上部 Notice は見落とされやすいため）。
       setSuspendModalError(toDisplayMessage(e, "更新に失敗しました"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // 業者アカウントの強制削除（匿名化）。本人退会と同じ処理を admin 権限で実行する。
+  async function confirmDelete(op: OperatorOut) {
+    if (!token || busy) return;
+    setBusy(true);
+    setDeleteModalError(null);
+    try {
+      await adminDeleteOperator(op.id, token);
+      closeDeleteModal();
+      await reload();
+    } catch (e) {
+      setDeleteModalError(toDisplayMessage(e, "削除に失敗しました"));
     } finally {
       setBusy(false);
     }
@@ -745,6 +774,14 @@ export default function AdminPage() {
                       >
                         {op.is_suspended ? "停止を解除" : "停止する"}
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => openDeleteModal(op)}
+                        disabled={busy}
+                        className={btnDanger}
+                      >
+                        削除する
+                      </button>
                     </div>
                   )}
                 </li>
@@ -916,6 +953,19 @@ export default function AdminPage() {
           busy={busy}
           onCancel={closeVerifyModal}
           onConfirm={() => void confirmVerifyChange(verifyTarget)}
+        />
+      ) : null}
+
+      {deleteTarget ? (
+        <ConfirmModal
+          title={`${deleteTarget.company_name}を削除します`}
+          message="削除すると、この業者は匿名化されログイン・入札ができなくなります。取引・レビュー・キャンセル記録は依頼者側の記録として保持されますが、この操作は取り消せません。よろしいですか？"
+          confirmLabel="削除する"
+          danger
+          error={deleteModalError}
+          busy={busy}
+          onCancel={closeDeleteModal}
+          onConfirm={() => void confirmDelete(deleteTarget)}
         />
       ) : null}
     </div>

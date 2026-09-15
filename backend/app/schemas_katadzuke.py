@@ -1057,6 +1057,13 @@ class OperatorSuspendRequest(BaseModel):
     suspended: bool
 
 
+class AdminOperatorDeleteResponse(BaseModel):
+    """運営による業者アカウント強制削除（匿名化）のレスポンス。"""
+
+    id: uuid.UUID
+    detail: str
+
+
 class AdminCaseListItem(BaseModel):
     """案件一覧（GET /admin/cases）の1行。admin向けのため依頼者メールはマスクしない。"""
 

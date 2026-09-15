@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_admin, get_ops_or_admin
+from app.api.v1.endpoints.operator_profile import _delete_and_anonymize_operator
 from app.api.v1.endpoints.users import _delete_and_anonymize_user
 from app.config import get_settings
 from app.core.crypto import decrypt_json
@@ -64,6 +65,7 @@ from app.schemas_katadzuke import (
     InviteBulkCreateResponse,
     InviteCreateRequest,
     InviteOut,
+    AdminOperatorDeleteResponse,
     KeyFingerprintResult,
     MailProbeResult,
     OperatorApplicationApproveResponse,
@@ -478,6 +480,52 @@ async def suspend_operator(
         "admin_operator_suspend admin=%s operator=%s suspended=%s", admin.id, operator.id, body.suspended
     )
     return OperatorOut.model_validate(operator)
+
+
+@router.delete("/admin/operators/{operator_id}", response_model=AdminOperatorDeleteResponse)
+async def delete_operator(
+    operator_id: uuid.UUID,
+    admin: User = Depends(get_current_admin),
+    session: AsyncSession = Depends(get_session),
+) -> AdminOperatorDeleteResponse:
+    """業者アカウントを運営が強制退会させる（匿名化。物理削除ではない）。
+
+    本人退会（operator_profile.delete_my_operator_account）と同じ匿名化処理
+    （``operator_profile._delete_and_anonymize_operator``）を、パスワード再認証を
+    経ずに admin 権限で実行する。取引・レビュー・キャンセル記録は依頼者側の記録
+    として保持し、Operator 行のPIIのみ匿名化した上で deleted_at を設定する
+    （旧JWTは deps.py の失効ゲートで即時無効化）。
+
+    verify_operator/suspend_operator と同じ安全策として、既に退会済みの業者は
+    対象外（409）とする。進行中の取引がある場合は _delete_and_anonymize_operator
+    内のガードにより 409 で拒否される（依頼者側の記録整合性を壊さないため、admin
+    であっても迂回不可）。
+    """
+    operator = await session.get(Operator, operator_id)
+    if operator is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Operator not found.")
+    if operator.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="退会済みの業者です。")
+
+    operator_email = operator.contact_email
+    operator_id_value = operator.id
+    await _delete_and_anonymize_operator(session, operator)
+
+    logger.warning(
+        "admin_operator_delete admin=%s operator=%s email=%s",
+        admin.id,
+        operator_id_value,
+        operator_email,
+    )
+    alerts.fire_and_forget(
+        alerts.send_alert(
+            "運営が業者アカウントを削除しました",
+            f"email={operator_email}\noperator_id={operator_id_value}\ndeleted_by={admin.id}",
+            severity="critical",
+            key=f"admin-operator-delete:{operator_id_value}",
+        )
+    )
+    return AdminOperatorDeleteResponse(id=operator_id_value, detail="アカウントを削除しました。")
 
 
 @router.patch("/admin/reviews/{review_id}/hide", response_model=ReviewOut)

@@ -1982,6 +1982,27 @@ export function adminSuspendOperator(
   });
 }
 
+export interface AdminOperatorDeleteResponse {
+  id: string;
+  detail: string;
+}
+
+/**
+ * admin が業者アカウントを強制削除する。物理削除ではなく匿名化（本人退会
+ * DELETE /operator/me と同じ処理）で、取引・レビュー・キャンセル記録は依頼者側の
+ * 記録として保持される。既に退会済みの業者を対象にした場合や、進行中の取引がある
+ * 場合は対象外（backend側で409拒否）。
+ */
+export function adminDeleteOperator(
+  operatorId: string,
+  token: string,
+): Promise<AdminOperatorDeleteResponse> {
+  return request(`/admin/operators/${encodeURIComponent(operatorId)}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
 /**
  * admin が業者の古物商許可証画像を確認する（画像バイナリ）。
  * request<T>() は JSON専用のためここでも生 fetch を使い、Blob をそのまま返す
