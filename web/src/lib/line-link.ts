@@ -64,6 +64,10 @@ export function buildLineAuthorizeUrl(state: string, redirectUri: string): strin
     redirect_uri: redirectUri,
     state,
     scope: "profile openid",
+    // bot_prompt: 認可の途中に「友だち追加」確認画面を挟む公式パラメータ。
+    // この連携はまさに通知(push)を受け取るための紐付けなので、既定でオンにする
+    // （未対応だと通知を有効化したつもりでも友だち未追加のままpushが届かない）。
+    bot_prompt: "normal",
   });
   return `${LINE_AUTHORIZE_URL}?${params.toString()}`;
 }

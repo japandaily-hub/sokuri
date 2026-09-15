@@ -184,6 +184,11 @@ function buildProviders(): Provider[] {
       LINE({
         clientId: process.env.LINE_CLIENT_ID,
         clientSecret: process.env.LINE_CLIENT_SECRET,
+        // bot_prompt: LINEログイン（新規登録/ログイン）の途中に「友だち追加」の確認画面を
+        // 挟む公式パラメータ（"normal"|"aggressive"）。これが無いと、LINE Login チャネルと
+        // Messaging API チャネルを紐付けていても友だち追加は自動では起きない（LINE通知
+        // push_bid_selected 等が届かない）。未対応だった経緯は [[katazuke-line-notify-setup]]。
+        authorization: { params: { bot_prompt: "normal" } },
       }),
     );
   }
