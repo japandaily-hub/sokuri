@@ -207,12 +207,12 @@ export default function OperatorTransactionPage() {
             <div className="op-card">
               <h2>成約後の進め方</h2>
               <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.85, marginTop: 8 }}>
-                <strong style={{ color: "var(--navy)" }}>買取代金は依頼者と直接精算します</strong>
+                <strong style={{ color: "var(--navy)" }}>買取代金はユーザーと直接精算します</strong>
                 （現金またはお振込み。方法はチャットで調整。カタヅケは送金を仲介しません）。
               </p>
               <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.85, marginTop: 8 }}>
-                <strong style={{ color: "var(--navy)" }}>作業完了は依頼者が確定します。</strong>
-                訪問・引き取り後、依頼者にチャットで完了確定を依頼してください。
+                <strong style={{ color: "var(--navy)" }}>作業完了はユーザーが確定します。</strong>
+                訪問・引き取り後、ユーザーにチャットで完了確定を依頼してください。
               </p>
             </div>
           ) : null}
@@ -238,7 +238,7 @@ export default function OperatorTransactionPage() {
               で固定されていた。理由を明示する。 */}
           {txn.user_suspended ? (
             <div className="op-alert warn">
-              この依頼者は現在利用停止中です。運営にお問い合わせください。返信が来ない場合があります。
+              このユーザーは現在利用停止中です。運営にお問い合わせください。返信が来ない場合があります。
             </div>
           ) : null}
 
@@ -477,7 +477,7 @@ export default function OperatorTransactionPage() {
           <div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="cancelModalTitle">
             <h2 className="modal-title" id="cancelModalTitle">本当にキャンセルしますか？</h2>
             <p className="modal-sub">
-              <strong>キャンセルは記録され、運営が確認します。入力した理由はそのまま依頼者に表示されます。</strong>
+              <strong>キャンセルは記録され、運営が確認します。入力した理由はそのままユーザーに表示されます。</strong>
               <br />
               理由を入力してください。
             </p>

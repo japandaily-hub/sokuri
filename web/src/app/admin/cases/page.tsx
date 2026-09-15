@@ -118,7 +118,7 @@ export default function AdminCasesPage() {
                   if (e.key === "Enter") runSearch();
                 }}
                 className={inputBase}
-                placeholder="案件ID（完全一致）・依頼者メール（部分一致）で検索"
+                placeholder="案件ID（完全一致）・ユーザーメール（部分一致）で検索"
               />
               <button type="button" onClick={runSearch} className={`${btnPrimary} shrink-0`}>
                 検索
@@ -134,7 +134,7 @@ export default function AdminCasesPage() {
                   <th className="pb-2 pr-4">ID</th>
                   <th className="pb-2 pr-4">状態</th>
                   <th className="pb-2 pr-4">依頼日時</th>
-                  <th className="pb-2 pr-4">依頼者</th>
+                  <th className="pb-2 pr-4">ユーザー</th>
                   <th className="pb-2 pr-4">用途／所在地</th>
                   <th className="pb-2 pr-4">業者</th>
                   <th className="pb-2 pr-4 text-right">金額</th>
@@ -165,7 +165,7 @@ export default function AdminCasesPage() {
                     </td>
                     <td className="py-2 text-right">
                       <Link href={`/cases/${c.id}`} className={btnSecondary}>
-                        依頼者画面で開く
+                        ユーザー画面で開く
                       </Link>
                     </td>
                   </tr>

@@ -633,6 +633,14 @@
      ページ CSS（operator-auth.css）には object-position を書かない規約のため core に置く。
      /operator/signup（os-side・人物なし）には当てないよう src で限定する。 */
   .operator-auth .auth-side > img[src*="ol-side"] { object-position: 50% 14%; }
+  /* 2026-09-15 実機報告（/login）: li-side も同じ理由で頭が切れていた。行 639 の
+     「画像が未生成」段階では su-side/li-side にこの対応が漏れていたまま、後日
+     画像だけ追加されて放置されていた。li-side は頭頂が画像高の約4%（実測: 900x1350の
+     元画像を上から300pxクロップして確認、毛先は約55px≒4.1%）と ol-side（18%）よりずっと
+     浅い位置にあるため、既定 50% 40% は言うに及ばず ol-side と同じ 14% でもまだ深すぎる。
+     同じ余白の考え方（offset = (1 - 0.27) × P）で offset を頭頂よりわずかに浅い約4%に
+     収める P=6% を採用（P=.06→offset≈4.4%）。 */
+  .login-page .auth-side > img[src*="li-side"] { object-position: 50% 6%; }
   /* BRIEF §1.10「859px 以下は帯に畳み、文字は非表示」に戻す。ラウンド2 では
      「無文字だと情報量ゼロの濃紺スラブになる」として 1 行だけ残していたが、
      その 1 行は実測 17.94px で、§1.2 の「帯上に置ける文字は 24px 以上の見出しのみ」に反する。

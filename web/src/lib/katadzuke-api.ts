@@ -253,7 +253,7 @@ export interface TransactionCancellation {
 
 /** cancelled_by の表示ラベル。 */
 export const CANCELLED_BY_LABEL: Record<TransactionCancellation["cancelled_by"], string> = {
-  user: "依頼者",
+  user: "ユーザー",
   operator: "業者",
   admin: "運営",
 };

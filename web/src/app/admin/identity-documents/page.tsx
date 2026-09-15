@@ -237,7 +237,7 @@ export default function AdminIdentityDocumentsPage() {
       <AppHeader showBell={false} />
       <PageShell
         title="本人確認書類の審査"
-        description="依頼者から提出された本人確認書類を確認し、承認・却下します。"
+        description="ユーザーから提出された本人確認書類を確認し、承認・却下します。"
         actions={
           <Link href="/admin" className={btnSecondary}>
             管理画面トップへ
@@ -455,7 +455,7 @@ export default function AdminIdentityDocumentsPage() {
       {showApproveConfirm && selected ? (
         <ConfirmModal
           title={`${selected.user_name ?? selected.user_email}の本人確認を承認します`}
-          message="承認すると、依頼者は本人確認済みの状態になります。よろしいですか？"
+          message="承認すると、ユーザーは本人確認済みの状態になります。よろしいですか？"
           confirmLabel="承認する"
           error={approveModalError}
           busy={busy}
