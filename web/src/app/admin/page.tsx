@@ -959,7 +959,7 @@ export default function AdminPage() {
       {deleteTarget ? (
         <ConfirmModal
           title={`${deleteTarget.company_name}を削除します`}
-          message="削除すると、この業者は匿名化されログイン・入札ができなくなります。取引・レビュー・キャンセル記録は依頼者側の記録として保持されますが、この操作は取り消せません。よろしいですか？"
+          message="削除すると、この業者は匿名化されログイン・入札ができなくなります。取引・レビュー・キャンセル記録はユーザー側の記録として保持されますが、この操作は取り消せません。よろしいですか？"
           confirmLabel="削除する"
           danger
           error={deleteModalError}
