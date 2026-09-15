@@ -22,6 +22,7 @@ import {
   adminSuspendUser,
   adminPromoteUser,
   adminDemoteUser,
+  adminDeleteUser,
   toDisplayMessage,
   type AdminUserListItem,
   type AdminUserListResponse,
@@ -53,10 +54,12 @@ export default function AdminUsersPage() {
 
   const [suspendTarget, setSuspendTarget] = useState<AdminUserListItem | null>(null);
   const [roleTarget, setRoleTarget] = useState<RoleActionTarget | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AdminUserListItem | null>(null);
   // r5-fix-frontend M-2: 失敗時にモーダルを閉じず、ConfirmModal の error prop へ表示する
   // （画面下部の行を操作した場合、ページ上部 Notice は画面外に出て見落とされやすいため）。
   const [suspendModalError, setSuspendModalError] = useState<string | null>(null);
   const [roleModalError, setRoleModalError] = useState<string | null>(null);
+  const [deleteModalError, setDeleteModalError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     if (!token) return;
@@ -108,6 +111,22 @@ export default function AdminUsersPage() {
     }
   }
 
+  async function confirmDelete() {
+    if (!deleteTarget || !token || busy) return;
+    setBusy(true);
+    setDeleteModalError(null);
+    setNotice(null);
+    try {
+      await adminDeleteUser(deleteTarget.id, token);
+      setDeleteTarget(null);
+      await reload();
+    } catch (e) {
+      setDeleteModalError(toDisplayMessage(e, "削除に失敗しました"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function confirmRoleChange() {
     if (!roleTarget || !token || busy) return;
     const { user: target, action } = roleTarget;
@@ -149,8 +168,8 @@ export default function AdminUsersPage() {
     <div className="admin-page">
       <AppHeader showBell={false} />
       <PageShell
-        title="依頼者一覧"
-        description="依頼者アカウントを検索・閲覧し、必要に応じて停止／解除できます。"
+        title="ユーザー一覧"
+        description="ユーザーアカウントを検索・閲覧し、必要に応じて停止／解除・削除できます。"
         actions={
           <Link href="/admin" className={btnSecondary}>
             管理画面トップへ
@@ -212,7 +231,7 @@ export default function AdminUsersPage() {
             </label>
           </div>
 
-          <div className="mt-4 overflow-x-auto" tabIndex={0} role="region" aria-label="依頼者一覧">
+          <div className="mt-4 overflow-x-auto" tabIndex={0} role="region" aria-label="ユーザー一覧">
             <table className="w-full min-w-[960px] text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
@@ -296,6 +315,19 @@ export default function AdminUsersPage() {
                             {u.is_suspended ? "停止を解除" : "停止する"}
                           </button>
                         )}
+                        {u.email !== myEmail && u.role !== "admin" ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDeleteModalError(null);
+                              setDeleteTarget(u);
+                            }}
+                            disabled={busy}
+                            className={btnDanger}
+                          >
+                            削除する
+                          </button>
+                        ) : null}
                       </div>
                       )}
                     </td>
@@ -305,7 +337,7 @@ export default function AdminUsersPage() {
               </tbody>
             </table>
             {data && data.items.length === 0 ? (
-              <p className="py-6 text-center text-sm text-slate-500">該当する依頼者はいません。</p>
+              <p className="py-6 text-center text-sm text-slate-500">該当するユーザーはいません。</p>
             ) : null}
             {busy && !suspendTarget ? (
               <div className="flex items-center gap-2 py-3 text-sm text-slate-600">
@@ -374,6 +406,22 @@ export default function AdminUsersPage() {
             setRoleTarget(null);
           }}
           onConfirm={() => void confirmRoleChange()}
+        />
+      ) : null}
+
+      {deleteTarget ? (
+        <ConfirmModal
+          title={`${deleteTarget.email} を削除します`}
+          message="削除すると、このユーザーは匿名化されログイン・案件作成ができなくなります。取引・メッセージ・レビューは業者側の記録として保持されますが、この操作は取り消せません。よろしいですか？"
+          confirmLabel="削除する"
+          danger
+          error={deleteModalError}
+          busy={busy}
+          onCancel={() => {
+            setDeleteModalError(null);
+            setDeleteTarget(null);
+          }}
+          onConfirm={() => void confirmDelete()}
         />
       ) : null}
     </div>

@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_admin, get_ops_or_admin
+from app.api.v1.endpoints.users import _delete_and_anonymize_user
 from app.config import get_settings
 from app.core.crypto import decrypt_json
 from app.db.models.bid import Bid
@@ -51,6 +52,7 @@ from app.schemas_katadzuke import (
     AdminTransactionCancelResponse,
     AdminTransactionListItem,
     AdminTransactionListResponse,
+    AdminUserDeleteResponse,
     AdminUserListItem,
     AdminUserListResponse,
     AdminUserRoleResponse,
@@ -1165,6 +1167,60 @@ async def demote_admin_to_user(
         )
     )
     return AdminUserRoleResponse(id=target.id, role=target.role)
+
+
+@router.delete("/admin/users/{user_id}", response_model=AdminUserDeleteResponse)
+async def delete_user(
+    user_id: uuid.UUID,
+    background: BackgroundTasks,
+    admin: User = Depends(get_current_admin),
+    session: AsyncSession = Depends(get_session),
+) -> AdminUserDeleteResponse:
+    """依頼者アカウントを運営が強制退会させる（匿名化。物理削除ではない）。
+
+    本人退会（users.delete_my_account）と同じ匿名化処理
+    （``users._delete_and_anonymize_user``）を、パスワード再認証を経ずに admin 権限で
+    実行する。取引・メッセージ・レビューは業者側の記録として保持し、User 行のPIIのみ
+    匿名化した上で deleted_at を設定する（旧JWTは deps.py の失効ゲートで即時無効化）。
+
+    suspend_user/demote_admin_to_user と同じ安全策として、自分自身・role="admin"・
+    既に退会済みのアカウントは対象外（409/404）とする。進行中の取引（pending/visiting）
+    がある場合は _delete_and_anonymize_user 内のガードにより 409 で拒否される
+    （業者側の会計整合性を壊さないため、admin であっても迂回不可）。
+    """
+    if user_id == admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="自分自身のアカウントは削除できません。",
+        )
+    target = await session.get(User, user_id)
+    if target is None or target.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+    if target.role == "admin":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="管理者アカウントは削除できません。先に管理者権限を解除してください。",
+        )
+
+    target_email = target.email
+    target_id = target.id
+    await _delete_and_anonymize_user(session, background, target)
+
+    logger.warning(
+        "admin_user_delete admin=%s user=%s email=%s",
+        admin.id,
+        target_id,
+        target_email,
+    )
+    alerts.fire_and_forget(
+        alerts.send_alert(
+            "運営が依頼者アカウントを削除しました",
+            f"email={target_email}\nuser_id={target_id}\ndeleted_by={admin.id}",
+            severity="critical",
+            key=f"admin-user-delete:{target_id}",
+        )
+    )
+    return AdminUserDeleteResponse(id=target_id, detail="アカウントを削除しました。")
 
 
 # ──────────────────────────── 業者事前申込（審査） ────────────────────────────

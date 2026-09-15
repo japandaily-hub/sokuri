@@ -1160,6 +1160,13 @@ class AdminUserRoleResponse(BaseModel):
     role: str
 
 
+class AdminUserDeleteResponse(BaseModel):
+    """運営による依頼者アカウント強制削除（匿名化）のレスポンス。"""
+
+    id: uuid.UUID
+    detail: str
+
+
 # ──────────────────────────── 業者事前申込（/business） ────────────────────────────
 
 

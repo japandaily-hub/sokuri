@@ -550,3 +550,96 @@ async def test_has_other_active_admin_returns_false_for_sole_admin(
         await _has_other_active_admin(db_session, exclude_user_id=uuid.UUID(admin_id))
         is True
     )
+
+
+# ──────────────────────────── admin による強制削除（依頼者一覧「削除」ボタン対応） ────────────────────────────
+
+
+async def test_admin_delete_user_anonymizes_and_revokes_access(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """admin が依頼者を削除すると、本人退会（DELETE /users/me）と同じ匿名化が
+    パスワード再認証なしで行われ、以後ログイン・旧トークンいずれも失効する。"""
+    admin_token, admin_id = await _make_admin(client, db_session)
+    user_token, user_id = await _signup_user(client, "uctl_admindel1@example.com")
+
+    r = await client.delete(
+        f"/api/v1/admin/users/{user_id}",
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["id"] == user_id
+    assert r.json()["detail"]
+
+    user = await db_session.get(User, uuid.UUID(user_id))
+    await db_session.refresh(user)
+    assert user.email == f"deleted-{user.id}@deleted.katazuke.internal"
+    assert user.password_hash is None
+    assert user.name is None
+    assert user.deleted_at is not None
+
+    # 旧トークンは失効し、同一emailでの再ログインもできない。
+    r = await client.get("/api/v1/auth/me", headers=_auth(user_token))
+    assert r.status_code == 401
+    r = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "uctl_admindel1@example.com", "password": _USER_PASSWORD},
+    )
+    assert r.status_code == 401
+
+    # 一覧に既定では出てこず、include_deleted=true で退会済みとして現れる。
+    r = await client.get("/api/v1/admin/users", headers=_auth(admin_token))
+    assert r.status_code == 200, r.text
+    assert all(item["id"] != user_id for item in r.json()["items"])
+    r = await client.get(
+        "/api/v1/admin/users?include_deleted=true", headers=_auth(admin_token)
+    )
+    assert r.status_code == 200, r.text
+    deleted_item = next(item for item in r.json()["items"] if item["id"] == user_id)
+    assert deleted_item["deleted_at"] is not None
+
+
+async def test_admin_delete_user_requires_admin_and_existing_user_and_rejects_self_or_admin_targets(
+    client: AsyncClient, db_session: AsyncSession
+):
+    admin_token, admin_id = await _make_admin(client, db_session)
+    user_token, user_id = await _signup_user(client, "uctl_admindel2@example.com")
+
+    # 依頼者トークン（role=user）では admin ゲートを通過できない
+    r = await client.delete(f"/api/v1/admin/users/{user_id}", headers=_auth(user_token))
+    assert r.status_code in (401, 403), r.text
+
+    # 未認証
+    r = await client.delete(f"/api/v1/admin/users/{user_id}")
+    assert r.status_code in (401, 403), r.text
+
+    # 存在しない依頼者
+    r = await client.delete(
+        f"/api/v1/admin/users/{uuid.uuid4()}", headers=_auth(admin_token)
+    )
+    assert r.status_code == 404, r.text
+
+    # admin 自身は削除不可
+    r = await client.delete(f"/api/v1/admin/users/{admin_id}", headers=_auth(admin_token))
+    assert r.status_code == 409, r.text
+
+    # role=admin の別ユーザーも削除不可
+    other_admin = User(
+        email="uctl_admindel_other_admin@katadzoku.jp",
+        password_hash=hash_password("adminpass123"),
+        name="別の管理者",
+        role="admin",
+    )
+    db_session.add(other_admin)
+    await db_session.commit()
+    await db_session.refresh(other_admin)
+    r = await client.delete(
+        f"/api/v1/admin/users/{other_admin.id}", headers=_auth(admin_token)
+    )
+    assert r.status_code == 409, r.text
+
+    # 削除済みの依頼者を再度削除しようとすると 404（既に deleted_at 設定済み）
+    r = await client.delete(f"/api/v1/admin/users/{user_id}", headers=_auth(admin_token))
+    assert r.status_code == 200, r.text
+    r = await client.delete(f"/api/v1/admin/users/{user_id}", headers=_auth(admin_token))
+    assert r.status_code == 404, r.text

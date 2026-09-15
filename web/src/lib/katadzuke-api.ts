@@ -2253,6 +2253,27 @@ export function adminDemoteUser(userId: string, token: string): Promise<AdminUse
   });
 }
 
+export interface AdminUserDeleteResponse {
+  id: string;
+  detail: string;
+}
+
+/**
+ * admin がユーザーアカウントを強制削除する。物理削除ではなく匿名化（本人退会
+ * DELETE /users/me と同じ処理）で、取引・メッセージ・レビューは業者側の記録として
+ * 保持される。自分自身・role=admin のユーザー・既に退会済みのユーザーを対象にした
+ * 場合や、進行中の取引（pending/visiting）がある場合は対象外（backend側で409/404拒否）。
+ */
+export function adminDeleteUser(
+  userId: string,
+  token: string,
+): Promise<AdminUserDeleteResponse> {
+  return request(`/admin/users/${encodeURIComponent(userId)}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // 表示ユーティリティ
 // ---------------------------------------------------------------------------
