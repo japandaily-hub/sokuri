@@ -117,6 +117,38 @@
   height: 16px;
 }
 
+/* 銀行名・支店名のオートコンプリート（bank.teraren.com 候補のドロップダウン） */
+.bank-page .bank-autocomplete {
+  position: relative;
+}
+.bank-page .bank-autocomplete-list {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--white);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-s);
+  box-shadow: 0 8px 24px rgba(32, 36, 46, 0.12);
+  max-height: 240px;
+  overflow-y: auto;
+}
+.bank-page .bank-autocomplete-option {
+  padding: 9px 10px;
+  font-size: 14px;
+  color: var(--navy);
+  border-radius: var(--radius-s);
+  cursor: pointer;
+}
+.bank-page .bank-autocomplete-option.is-active,
+.bank-page .bank-autocomplete-option:hover {
+  background: var(--pale-2);
+}
+
 /* 保存トースト: 共通 .kdz-toast（katazuke-pages.css）を使用（デザイン監査2026-09-15是正）。 */
 
 @media (max-width: 480px) {

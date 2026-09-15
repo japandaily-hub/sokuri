@@ -26,7 +26,7 @@ import "./dashboard.css";
 
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Ic, type IcName } from "@/components/kdz/Icons";
 import { OperatorHeader } from "@/components/kdz/OperatorHeader";
 import { ApprovalPendingNotice } from "@/components/kdz/ApprovalPendingNotice";
@@ -76,6 +76,69 @@ const CAT_ICON: Record<string, IcName> = {
 const catIcon = (name: string): IcName => CAT_ICON[name] ?? "box";
 
 const yen = (n: number) => n.toLocaleString("ja-JP");
+
+/* ============================================================
+   状態変化トラッキング（localStorage・サーバー保存なし）
+   「何が動いたか分からない」不安の解消のため、案件一覧・入札中・交渉中で
+   前回セッション以降に変化した項目を検出して上位表示 + ドット表示する。
+   backend に updated_at 等の差分検知用フィールドが無い（案件の入札状況は
+   他社の Bid 追加であり Case 行自体は更新されないため case.updated_at でも
+   検知できない）ため、フロント側で直近の主要フィールドをスナップショットし
+   前回値との差分を「変化あり」とみなす設計にした。
+   ============================================================ */
+const LOT_SNAPSHOT_KEY = "kdz_operator_lot_snapshot_v1";
+const TXN_SNAPSHOT_KEY = "kdz_operator_txn_snapshot_v1";
+const DENSITY_STORAGE_KEY = "kdz_operator_lot_density_v1";
+
+/**
+ * 状態変化スナップショットのキーはセッションのメールアドレスでスコープする
+ * （セキュリティレビュー指摘対応: 共有端末で業者アカウントを切り替えた場合に、
+ * 前アカウントの入札状況・取引状況が新しいログインユーザーの画面に残留・
+ * 混在するのを防ぐ）。密度切替（表示の好み）は機密情報を含まないため対象外。
+ */
+function lotSnapshotKey(userKey: string): string {
+  return `${LOT_SNAPSHOT_KEY}:${userKey}`;
+}
+function txnSnapshotKey(userKey: string): string {
+  return `${TXN_SNAPSHOT_KEY}:${userKey}`;
+}
+
+type LotSnapshot = Record<
+  string,
+  { bidCount: number; topBidAmount: number | null; status: LotStatus }
+>;
+type TxnSnapshot = Record<
+  string,
+  { status: string; unreadCount: number; finalAmount: number | null; visitDate: string | null }
+>;
+
+/** localStorage 読み込み（プライベートモード等の例外・SSR を安全に無視する）。 */
+function readJson<T>(key: string): T | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
+}
+/** localStorage 書き込み（保存に失敗しても表示自体は継続させる）。 */
+function writeJson(key: string, value: unknown): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // 保存不可（プライベートモード・容量超過等）でも致命的にしない
+  }
+}
+
+/** 変化があったID を先頭に寄せる安定ソート（それ以外は元の順序を保つ）。 */
+function sortByChanged<T extends { id: string }>(items: T[], changed: Set<string>): T[] {
+  if (changed.size === 0) return items;
+  return [...items].sort((a, b) => Number(changed.has(b.id)) - Number(changed.has(a.id)));
+}
+
+type LotDensity = "cozy" | "compact";
 
 /**
  * 自社入札の状態（selected=落札）のみを表示する。他社の最高額との比較（自社が
@@ -131,6 +194,7 @@ function LotCard({
   busy,
   canBid,
   statusLoading,
+  changed,
   onBid,
 }: {
   lot: Lot;
@@ -139,6 +203,8 @@ function LotCard({
   canBid: boolean;
   /** vendor_status 取得中（フォームのチラつき防止）。 */
   statusLoading: boolean;
+  /** 前回セッション以降に入札状況・落札状態が変化したか（交渉中・入札中タブの上位表示と対にした軽量インジケータ）。 */
+  changed: boolean;
   onBid: (lotId: string, value: number) => void;
 }) {
   const [draft, setDraft] = useState("");
@@ -179,6 +245,12 @@ function LotCard({
         {/* 案件情報 */}
         <div className="lot-info">
           <div className="lot-info-top">
+            {changed ? (
+              <span className="lot-changed-indicator" title="状態が更新されました">
+                <span className="live-dot" aria-hidden="true" />
+                <span className="sr-only">状態が更新されました</span>
+              </span>
+            ) : null}
             <span className="lot-id lot-items" title={`案件ID ${lot.id.slice(0, 8)}`}>{lot.itemsLabel}</span>
             {statusTag}
           </div>
@@ -285,6 +357,98 @@ function LotCard({
 }
 
 /* ============================================================
+   案件カード（簡易表示・密度切替）
+   多件表示時のスキャナビリティ向上のため、写真グリッド・入札フォームを含む
+   フルカード（LotCard）の代わりに、最高額・自社の入札状況を1行で視認できる
+   簡易行として表示する。入札そのものは案件詳細ページに委ねる。
+   ============================================================ */
+function LotCompactRow({ lot, changed }: { lot: Lot; changed: boolean }) {
+  const [photoErr, setPhotoErr] = useState(false);
+  return (
+    <Link
+      href={`/operator/cases/${lot.id}`}
+      className={`lot-compact-row${lot.status === "won" ? " winning" : ""}`}
+    >
+      <div className="lot-compact-thumb">
+        {lot.photoUrl && !photoErr ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={photoSrc(lot.photoUrl)} alt="" onError={() => setPhotoErr(true)} />
+        ) : (
+          <Ic name={catIcon(lot.purpose)} />
+        )}
+      </div>
+      <div className="lot-compact-main">
+        <div className="lot-compact-title">
+          {changed ? (
+            <span className="lot-changed-indicator" title="状態が更新されました">
+              <span className="live-dot" aria-hidden="true" />
+              <span className="sr-only">状態が更新されました</span>
+            </span>
+          ) : null}
+          <span className="lot-compact-items">{lot.itemsLabel}</span>
+          {lot.status === "won" ? <span className="lot-tag green">落札</span> : null}
+        </div>
+        <div className="lot-compact-meta">
+          <span>
+            <Ic name="pin" />
+            {lot.area}
+          </span>
+          <span>{formatPurposeLabel(lot.purpose)}</span>
+          <span>
+            <strong>{lot.bidCount}</strong>社が入札中
+          </span>
+        </div>
+      </div>
+      <div className="lot-compact-figures">
+        {lot.topBidAmount != null ? (
+          <span className={`status-chip ${lot.isTopBidder ? "live" : "negotiating"}`}>
+            最高額 ¥{yen(lot.topBidAmount)}
+          </span>
+        ) : lot.topBidAmount === null && lot.bidCount === 0 ? (
+          <span className="status-chip done">入札なし</span>
+        ) : null}
+        {lot.myBid ? (
+          <span className="lot-compact-mybid">
+            自社 <strong>¥{yen(lot.myBid)}</strong>
+            {lot.isTopBidder != null ? (lot.isTopBidder ? "・自社が最高額" : "・他社が上回り中") : ""}
+          </span>
+        ) : null}
+      </div>
+    </Link>
+  );
+}
+
+/** カード表示 / 簡易表示の切替（localStorage に好みを保存するのみ・サーバー保存なし）。 */
+function DensityToggle({
+  density,
+  onChange,
+}: {
+  density: LotDensity;
+  onChange: (next: LotDensity) => void;
+}) {
+  return (
+    <div className="density-toggle" role="group" aria-label="案件の表示形式">
+      <button
+        type="button"
+        className={`density-btn${density === "cozy" ? " active" : ""}`}
+        aria-pressed={density === "cozy"}
+        onClick={() => onChange("cozy")}
+      >
+        カード表示
+      </button>
+      <button
+        type="button"
+        className={`density-btn${density === "compact" ? " active" : ""}`}
+        aria-pressed={density === "compact"}
+        onClick={() => onChange("compact")}
+      >
+        簡易表示
+      </button>
+    </div>
+  );
+}
+
+/* ============================================================
    ページ本体
    ============================================================ */
 
@@ -292,6 +456,11 @@ export default function OperatorDashboardPage() {
   const { token, loading } = useToken();
   const { data: session } = useSession();
   const companyName = session?.user?.name ?? "";
+  // セッションのメールアドレスが解決するまでは null（初回クライアント描画では
+  // SessionProvider がまだ /api/auth/session を取得中で undefined になり得るため、
+  // 下記スナップショット初期化はこれが解決してから行う＝早すぎる初期化で
+  // 別アカウント用のキーに固定されてしまう事故を避ける）。
+  const userKey = session?.user?.email ?? null;
   const [activeTab, setActiveTab] = useState<TabKey>("lots");
 
   const [cases, setCases] = useState<CaseMasked[] | null>(null);
@@ -327,6 +496,45 @@ export default function OperatorDashboardPage() {
     setToast(msg);
     window.setTimeout(() => setToast(null), 3000);
   }
+
+  // ---------------------------------------------------------------------
+  // 密度切替（案件カード / 簡易表示）。好みは localStorage にのみ保存する。
+  // ---------------------------------------------------------------------
+  const [density, setDensity] = useState<LotDensity>("cozy");
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(DENSITY_STORAGE_KEY);
+      if (saved === "compact" || saved === "cozy") setDensity(saved);
+    } catch {
+      // プライベートモード等で読めなくても既定表示のまま続行する
+    }
+  }, []);
+  function updateDensity(next: LotDensity) {
+    setDensity(next);
+    try {
+      window.localStorage.setItem(DENSITY_STORAGE_KEY, next);
+    } catch {
+      // 保存できなくても表示切替自体は継続する
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // 状態変化トラッキング（「何が動いたか分からない」不安の解消）。
+  // 前回セッション終了時点のスナップショット（localStorage）を固定の基準値として
+  // 保持し、現在値との差分を「変化あり」とみなす。基準値自体は今回セッション中
+  // 書き換えない（同一セッション内での自分の操作による再取得のたびに変化判定が
+  // 変わってしまうのを防ぐため）。
+  // ---------------------------------------------------------------------
+  const lotBaselineRef = useRef<LotSnapshot | null>(null);
+  if (lotBaselineRef.current === null && userKey) {
+    lotBaselineRef.current = readJson<LotSnapshot>(lotSnapshotKey(userKey)) ?? {};
+  }
+  const txnBaselineRef = useRef<TxnSnapshot | null>(null);
+  if (txnBaselineRef.current === null && userKey) {
+    txnBaselineRef.current = readJson<TxnSnapshot>(txnSnapshotKey(userKey)) ?? {};
+  }
+  const [changedLotIds, setChangedLotIds] = useState<Set<string>>(new Set());
+  const [changedTxnIds, setChangedTxnIds] = useState<Set<string>>(new Set());
 
   const reload = useCallback(async () => {
     if (!token) return;
@@ -439,6 +647,68 @@ export default function OperatorDashboardPage() {
     () => (transactions ?? []).filter((t) => t.status === "pending" || t.status === "visiting"),
     [transactions],
   );
+
+  // 入札状況（入札件数・最高額・落札状態）が前回セッション以降に変化した案件を検出する。
+  // Case 行自体は他社の入札追加では更新されない（Bid は別テーブル）ため、案件一覧・
+  // 入札中タブに限らずフロント側スナップショットで判定する。
+  useEffect(() => {
+    if (!cases || !userKey) return;
+    const baseline = lotBaselineRef.current ?? {};
+    const next: LotSnapshot = { ...baseline };
+    const changed = new Set<string>();
+    for (const lot of lots) {
+      const before = baseline[lot.id];
+      if (
+        before &&
+        (before.bidCount !== lot.bidCount ||
+          before.topBidAmount !== (lot.topBidAmount ?? null) ||
+          before.status !== lot.status)
+      ) {
+        changed.add(lot.id);
+      }
+      next[lot.id] = { bidCount: lot.bidCount, topBidAmount: lot.topBidAmount ?? null, status: lot.status };
+    }
+    writeJson(lotSnapshotKey(userKey), next);
+    setChangedLotIds(changed);
+  }, [cases, lots, userKey]);
+
+  // 交渉中の取引について、ステータス・未読メッセージ数・確定額・訪問日のいずれかが
+  // 前回セッション以降に変化していれば「新着」とみなす（依頼者からの新着メッセージ・
+  // 訪問日確定・減額対応後の確定額変更などを包括的に検知する）。
+  useEffect(() => {
+    if (!transactions || !userKey) return;
+    const baseline = txnBaselineRef.current ?? {};
+    const next: TxnSnapshot = { ...baseline };
+    const changed = new Set<string>();
+    for (const t of transactions) {
+      const before = baseline[t.id];
+      const sig = {
+        status: t.status,
+        unreadCount: t.unread_count,
+        finalAmount: t.final_amount,
+        visitDate: t.visit_date,
+      };
+      const isDifferent =
+        !!before &&
+        (before.status !== sig.status ||
+          before.unreadCount !== sig.unreadCount ||
+          before.finalAmount !== sig.finalAmount ||
+          before.visitDate !== sig.visitDate);
+      // 未読メッセージがある場合は、前回スナップショットが無い（初回訪問）場合でも
+      // 「新着」として案内してよい（unread_count 自体が既に「未読」という事実のため）。
+      if (isDifferent || (!before && sig.unreadCount > 0)) {
+        changed.add(t.id);
+      }
+      next[t.id] = sig;
+    }
+    writeJson(txnSnapshotKey(userKey), next);
+    setChangedTxnIds(changed);
+  }, [transactions, userKey]);
+
+  /** 「入札中」タブ: 変化があった案件をリスト上位に寄せる。 */
+  const sortedBiddingLots = sortByChanged(biddingLots, changedLotIds);
+  /** 「交渉中」タブ: 同上。 */
+  const sortedNegotiatingTxns = sortByChanged(negotiatingTxns, changedTxnIds);
 
   const now = new Date();
   /**
@@ -596,6 +866,7 @@ export default function OperatorDashboardPage() {
           <div className={`tab-content${activeTab === "lots" ? " active" : ""}`}>
             <div className="filter-row">
               <span className="filter-count">{lots.length}件</span>
+              <DensityToggle density={density} onChange={updateDensity} />
             </div>
 
             {awaitingApproval ? null : lots.length === 0 ? (
@@ -606,10 +877,24 @@ export default function OperatorDashboardPage() {
                 <h3>現在、入札可能な案件はありません</h3>
                 <p>新しい案件が出品されると、ここに表示されます。</p>
               </div>
+            ) : density === "compact" ? (
+              <div className="lot-compact-list">
+                {lots.map((lot) => (
+                  <LotCompactRow key={lot.id} lot={lot} changed={changedLotIds.has(lot.id)} />
+                ))}
+              </div>
             ) : (
               <div className="lot-grid">
                 {lots.map((lot) => (
-                  <LotCard key={lot.id} lot={lot} busy={bidBusy} canBid={canBid} statusLoading={statusLoading} onBid={requestBid} />
+                  <LotCard
+                    key={lot.id}
+                    lot={lot}
+                    busy={bidBusy}
+                    canBid={canBid}
+                    statusLoading={statusLoading}
+                    changed={changedLotIds.has(lot.id)}
+                    onBid={requestBid}
+                  />
                 ))}
               </div>
             )}
@@ -624,12 +909,34 @@ export default function OperatorDashboardPage() {
 
           {/* ---------- 入札中タブ ---------- */}
           <div className={`tab-content${activeTab === "bids" ? " active" : ""}`}>
-            {biddingLots.length ? (
-              <div className="lot-grid">
-                {biddingLots.map((lot) => (
-                  <LotCard key={lot.id} lot={lot} busy={bidBusy} canBid={canBid} statusLoading={statusLoading} onBid={requestBid} />
-                ))}
-              </div>
+            {sortedBiddingLots.length ? (
+              <>
+                <div className="filter-row">
+                  <span className="filter-count">{sortedBiddingLots.length}件</span>
+                  <DensityToggle density={density} onChange={updateDensity} />
+                </div>
+                {density === "compact" ? (
+                  <div className="lot-compact-list">
+                    {sortedBiddingLots.map((lot) => (
+                      <LotCompactRow key={lot.id} lot={lot} changed={changedLotIds.has(lot.id)} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="lot-grid">
+                    {sortedBiddingLots.map((lot) => (
+                      <LotCard
+                        key={lot.id}
+                        lot={lot}
+                        busy={bidBusy}
+                        canBid={canBid}
+                        statusLoading={statusLoading}
+                        changed={changedLotIds.has(lot.id)}
+                        onBid={requestBid}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
             ) : (
               <div className="empty-state">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -643,7 +950,7 @@ export default function OperatorDashboardPage() {
 
           {/* ---------- 交渉中タブ ---------- */}
           <div className={`tab-content${activeTab === "neg" ? " active" : ""}`}>
-            {negotiatingTxns.length === 0 ? (
+            {sortedNegotiatingTxns.length === 0 ? (
               <div className="empty-state">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M4 7h16M4 12h16M4 17h10" />
@@ -653,7 +960,7 @@ export default function OperatorDashboardPage() {
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                {negotiatingTxns.map((t) => (
+                {sortedNegotiatingTxns.map((t) => (
                   <Link
                     href={`/operator/transactions/${t.id}`}
                     className="negotiation-card"
@@ -663,7 +970,15 @@ export default function OperatorDashboardPage() {
                       <Ic name="chat" />
                     </div>
                     <div className="neg-info">
-                      <div className="neg-lot">{formatPurposeLabel(t.purpose)}</div>
+                      <div className="neg-lot">
+                        {changedTxnIds.has(t.id) ? (
+                          <span className="lot-changed-indicator" title="更新があります">
+                            <span className="live-dot" aria-hidden="true" />
+                            <span className="sr-only">更新があります</span>
+                          </span>
+                        ) : null}
+                        {formatPurposeLabel(t.purpose)}
+                      </div>
                       <div className="neg-preview">
                         {t.prefecture} {t.city}　{TXN_STATUS_LABEL[t.status]}
                       </div>

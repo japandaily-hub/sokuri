@@ -60,6 +60,85 @@ const isActiveCase = (c: CaseOut): boolean => !DONE_STATUSES.includes(c.status);
 const isDoneCase = (c: CaseOut): boolean => DONE_STATUSES.includes(c.status);
 const isBiddingCase = (c: CaseOut): boolean => c.status === "open";
 
+/**
+ * 出品カードの「更新あり」判定・並べ替え。
+ *
+ * CaseOut は created_at のみを返し、案件レベルの updated_at をAPIが
+ * 公開していない（backend の Case モデル自体は TimestampMixin で
+ * updated_at カラムを持つが、入札追加時は bid_count の再集計のみで
+ * Case行自体を更新しないため、そのカラムを露出しても2件目以降の入札を
+ * 正しく検知できない。schemas_katadzuke.CaseOut への追加は本タスクの
+ * 対応範囲外のため行わず、フロント側のみで完結する方式にした）。
+ * 代わりに、直近ブラウザで見た時点の状態（status・bid_count）を
+ * localStorage に保存し、現在値との差分で「新着」を判定する。
+ * 案件を開く（カードをクリックする）とその時点の状態でスナップショットを
+ * 更新し、以後は差分が無くなるまでハイライトしない。
+ */
+/**
+ * ストレージキーはセッションのメールアドレスでスコープする（セキュリティレビュー
+ * 指摘対応: 共有端末で複数アカウントを切り替えた場合に、前のユーザーの案件状態
+ * （ステータス・入札件数）が新しいログインユーザーの画面に残留・混在するのを防ぐ）。
+ * 未ログイン時（理論上表示されないが念のため）は "anon" にフォールバックする。
+ */
+function caseSeenStorageKey(userKey: string): string {
+  return `katazuke:mypage:case-seen-state:v1:${userKey}`;
+}
+
+interface CaseSeenSnapshot {
+  status: CaseStatus;
+  bidCount: number;
+}
+
+type CaseSeenMap = Record<string, CaseSeenSnapshot>;
+
+function loadCaseSeenMap(userKey: string): CaseSeenMap {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(caseSeenStorageKey(userKey));
+    if (!raw) return {};
+    const parsed: unknown = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? (parsed as CaseSeenMap) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveCaseSeenMap(map: CaseSeenMap, userKey: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(caseSeenStorageKey(userKey), JSON.stringify(map));
+  } catch {
+    // localStorage が使えない環境（プライベートモード等）でも表示自体は成立するため無視する。
+  }
+}
+
+/** カードを開いた（見た）時点の状態を記録し、以後の「更新あり」判定から外す。 */
+function markCaseSeen(c: CaseOut, userKey: string): void {
+  const map = loadCaseSeenMap(userKey);
+  map[c.id] = { status: c.status, bidCount: c.bid_count };
+  saveCaseSeenMap(map, userKey);
+}
+
+/**
+ * 「更新あり」= 前回見た状態からステータスが変わった、または入札件数が増えた案件。
+ * まだ見た記録が無い案件（新規出品直後を含む）は誤って新着扱いしないよう false。
+ */
+function caseHasUpdate(c: CaseOut, seenMap: CaseSeenMap): boolean {
+  const seen = seenMap[c.id];
+  if (!seen) return false;
+  return seen.status !== c.status || c.bid_count > seen.bidCount;
+}
+
+/** 更新ありの案件を先頭に集める（元の並び順は各グループ内で維持する安定並べ替え）。 */
+function sortCasesByUpdate(list: CaseOut[], seenMap: CaseSeenMap): CaseOut[] {
+  const updated: CaseOut[] = [];
+  const rest: CaseOut[] = [];
+  for (const c of list) {
+    (caseHasUpdate(c, seenMap) ? updated : rest).push(c);
+  }
+  return [...updated, ...rest];
+}
+
 function statusChipInfo(c: CaseOut): { label: string; cls: string } {
   if (c.status === "cancelled") return { label: "キャンセル", cls: "done" };
   if (c.status === "closed") return { label: "業者決定済み", cls: "negotiating" };
@@ -78,15 +157,26 @@ function LotCard({
   c,
   unreadCount,
   visitInfo,
+  hasUpdate,
+  userKey,
 }: {
   c: CaseOut;
   unreadCount?: number;
   visitInfo?: string;
+  /** 前回見た時点から状態が変化した案件か（新着入札・ステータス変化）。r-mypage-update 対応。 */
+  hasUpdate?: boolean;
+  /** 「更新あり」状態の保存先をユーザーごとに分離するためのキー(セッションのメールアドレス)。 */
+  userKey: string;
 }) {
   const { label, cls } = statusChipInfo(c);
   const isDone = c.status === "closed" || c.status === "cancelled";
   return (
-    <Link href={`/cases/${c.id}`} className={`lot-card ${cls}`} style={{ textDecoration: "none" }}>
+    <Link
+      href={`/cases/${c.id}`}
+      className={`lot-card ${cls}${hasUpdate ? " has-update" : ""}`}
+      style={{ textDecoration: "none" }}
+      onClick={() => markCaseSeen(c, userKey)}
+    >
       <div className="lot-card-inner">
         <div className="lot-thumb" aria-hidden="true">
           {c.photos.length > 0 ? (
@@ -107,6 +197,12 @@ function LotCard({
 
         <div className="lot-info">
           <div className="lot-info-top">
+            {hasUpdate ? (
+              <span className="lot-update-indicator" title="前回確認時から動きがありました">
+                <span className="lot-update-dot" aria-hidden="true" />
+                <span className="sr-only">更新あり</span>
+              </span>
+            ) : null}
             <span className="lot-id lot-items" title={`案件ID ${c.id.slice(0, 8)}`}>{caseItemsLabel(c) ?? c.id.slice(0, 8).toUpperCase()}</span>
             {unreadCount ? <span className="status-chip unread">未読{unreadCount}</span> : null}
             <span className={`status-chip ${cls}`}>{label}</span>
@@ -233,6 +329,29 @@ function MyPageContent() {
     void reload();
   }, [reload]);
 
+  /**
+   * 「更新あり」ハイライト用のスナップショット（r-mypage-update 対応）。
+   * 案件一覧が取得できたら、まだ記録の無い案件（新規出品直後を含む）にだけ
+   * 現在値でベースラインを追加する。既に記録がある案件の値は上書きしない
+   * （＝差分が残ったままハイライトを維持し、カードを開いた時点で
+   * markCaseSeen により更新される）。
+   */
+  const userKey = sessionData?.user?.email ?? "anon";
+  const [caseSeenMap, setCaseSeenMap] = useState<CaseSeenMap>({});
+  useEffect(() => {
+    if (!cases) return;
+    const map = loadCaseSeenMap(userKey);
+    let changed = false;
+    for (const c of cases) {
+      if (!map[c.id]) {
+        map[c.id] = { status: c.status, bidCount: c.bid_count };
+        changed = true;
+      }
+    }
+    if (changed) saveCaseSeenMap(map, userKey);
+    setCaseSeenMap(map);
+  }, [cases, userKey]);
+
   const userName = sessionData?.user?.name ?? "ゲスト";
   const userInitial = userName.slice(0, 1);
 
@@ -256,6 +375,20 @@ function MyPageContent() {
 
   const activeLots = useMemo(() => (cases ?? []).filter(isActiveCase), [cases]);
   const doneLots = useMemo(() => (cases ?? []).filter(isDoneCase), [cases]);
+
+  /** 各タブの表示順（更新ありを先頭に集約。r-mypage-update 対応）。 */
+  const sortedAllCases = useMemo(
+    () => sortCasesByUpdate(cases ?? [], caseSeenMap),
+    [cases, caseSeenMap],
+  );
+  const sortedActiveLots = useMemo(
+    () => sortCasesByUpdate(activeLots, caseSeenMap),
+    [activeLots, caseSeenMap],
+  );
+  const sortedDoneLots = useMemo(
+    () => sortCasesByUpdate(doneLots, caseSeenMap),
+    [doneLots, caseSeenMap],
+  );
   /** 案件ID → 紐づく取引の未読チャット件数（r6-flow M-3 対応）。 */
   const unreadByCaseId = useMemo(() => {
     const map = new Map<string, number>();
@@ -452,8 +585,17 @@ function MyPageContent() {
         {/* すべて */}
         {tab === "all" ? (
           <div className="lot-list">
-            {(cases ?? []).length ? (
-              (cases ?? []).map((c) => <LotCard key={c.id} c={c} unreadCount={unreadByCaseId.get(c.id)} visitInfo={visitInfoByCaseId.get(c.id)} />)
+            {sortedAllCases.length ? (
+              sortedAllCases.map((c) => (
+                <LotCard
+                  key={c.id}
+                  c={c}
+                  unreadCount={unreadByCaseId.get(c.id)}
+                  visitInfo={visitInfoByCaseId.get(c.id)}
+                  hasUpdate={caseHasUpdate(c, caseSeenMap)}
+                  userKey={userKey}
+                />
+              ))
             ) : (
               <EmptyState title="まだ出品がありません" sub="最初の出品をしてみましょう。" />
             )}
@@ -463,8 +605,17 @@ function MyPageContent() {
         {/* 進行中 */}
         {tab === "active" ? (
           <div className="lot-list">
-            {activeLots.length ? (
-              activeLots.map((c) => <LotCard key={c.id} c={c} unreadCount={unreadByCaseId.get(c.id)} visitInfo={visitInfoByCaseId.get(c.id)} />)
+            {sortedActiveLots.length ? (
+              sortedActiveLots.map((c) => (
+                <LotCard
+                  key={c.id}
+                  c={c}
+                  unreadCount={unreadByCaseId.get(c.id)}
+                  visitInfo={visitInfoByCaseId.get(c.id)}
+                  hasUpdate={caseHasUpdate(c, caseSeenMap)}
+                  userKey={userKey}
+                />
+              ))
             ) : (
               <EmptyState title="進行中の出品はありません" sub="新しく出品してみましょう。" />
             )}
@@ -474,8 +625,17 @@ function MyPageContent() {
         {/* 成約済み */}
         {tab === "done" ? (
           <div className="lot-list">
-            {doneLots.length ? (
-              doneLots.map((c) => <LotCard key={c.id} c={c} unreadCount={unreadByCaseId.get(c.id)} visitInfo={visitInfoByCaseId.get(c.id)} />)
+            {sortedDoneLots.length ? (
+              sortedDoneLots.map((c) => (
+                <LotCard
+                  key={c.id}
+                  c={c}
+                  unreadCount={unreadByCaseId.get(c.id)}
+                  visitInfo={visitInfoByCaseId.get(c.id)}
+                  hasUpdate={caseHasUpdate(c, caseSeenMap)}
+                  userKey={userKey}
+                />
+              ))
             ) : (
               <EmptyState title="成約済みの出品はありません" />
             )}

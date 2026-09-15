@@ -262,6 +262,98 @@
 .op-dash .tab-content { display: none; }
 .op-dash .tab-content.active { display: block; }
 
+/* ---------- 状態変化インジケータ（案件一覧・入札中・交渉中 共通） ----------
+   「何が動いたか分からない」不安の解消用。ドット自体は既存の .live-dot
+   （--primary-l・点滅アニメーション）をそのまま流用し、新規トークンは追加しない。 */
+.op-dash .lot-changed-indicator { display: inline-flex; align-items: center; align-self: center; }
+.op-dash .neg-lot .lot-changed-indicator { margin-right: 6px; }
+
+/* ---------- 密度切替（カード表示 / 簡易表示） ---------- */
+.op-dash .density-toggle {
+  display: inline-flex;
+  border: 1.5px solid var(--line);
+  border-radius: 0;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.op-dash .density-btn {
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--body-soft);
+  background: var(--white);
+  border: none;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: background .2s, color .2s;
+  white-space: nowrap;
+}
+.op-dash .density-btn + .density-btn { border-left: 1px solid var(--line); }
+.op-dash .density-btn.active { background: var(--pale); color: var(--blue); }
+.op-dash .density-btn:hover { color: var(--ink); }
+.op-dash .density-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+
+/* ---------- 簡易表示（密度切替: compact）----------
+   写真グリッド・入札フォームを含むフルカード（.lot-card）の代わりに、最高額・
+   自社の入札状況を1行で視認できる簡易リストを表示する（多件時のスキャナビリティ向上）。
+   入札操作自体は行わず案件詳細への導線のみを持つ。 */
+.op-dash .lot-compact-list { display: flex; flex-direction: column; gap: 8px; }
+.op-dash .lot-compact-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  background: var(--white);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color .2s;
+}
+.op-dash a.lot-compact-row:hover { border-color: var(--primary-l); }
+.op-dash .lot-compact-row.winning { border-color: var(--primary-l); }
+.op-dash .lot-compact-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 0;
+  overflow: hidden;
+  background: var(--pale);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.op-dash .lot-compact-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.op-dash .lot-compact-thumb .ic { width: 18px; height: 18px; stroke: var(--body-soft); }
+.op-dash .lot-compact-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.op-dash .lot-compact-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.op-dash .lot-compact-items { font-size: 13.5px; font-weight: 600; color: var(--navy); }
+.op-dash .lot-compact-meta { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--body-soft); }
+.op-dash .lot-compact-meta span { display: inline-flex; align-items: center; gap: 4px; }
+.op-dash .lot-compact-meta .ic { width: 12px; height: 12px; stroke: var(--body-soft); flex-shrink: 0; }
+.op-dash .lot-compact-meta strong { color: var(--ink); font-family: var(--head); }
+.op-dash .lot-compact-figures {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+  text-align: right;
+}
+.op-dash .lot-compact-mybid { font-size: 12px; font-weight: 600; color: var(--body-soft); white-space: nowrap; }
+.op-dash .lot-compact-mybid strong { color: var(--ink); }
+
+@media (max-width: 640px) {
+  .op-dash .lot-compact-row { flex-wrap: wrap; }
+  .op-dash .lot-compact-figures {
+    align-items: flex-start;
+    text-align: left;
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}
+
 /* ---------- 交渉中タブ ---------- */
 .op-dash .negotiation-card {
   border: 1.5px solid var(--line);

@@ -419,3 +419,24 @@
 @media (max-width: 440px) {
   .chat-page .biz-sidebar { display: none; }
 }
+
+/* ============================================================
+   埋め込み表示（cases/[id] の成約パネル内にインライン表示する ChatPanel）
+   .chat-page 直下の各要素セレクタ（.chat-page .xxx）はそのまま効かせつつ、
+   全画面(100vh)前提のトップレベル寸法だけをこの修飾クラスで上書きする。
+   ============================================================ */
+.chat-page.chat-embed-panel {
+  height: 560px;
+  min-height: 0;
+  border: 1px solid var(--line);
+}
+@media (max-width: 480px) {
+  .chat-page.chat-embed-panel { height: 460px; }
+}
+
+/* QAレビュー指摘対応: ページ側（サイドバーの成約一覧取得エラー）のトーストと、
+   ChatPanel 内部のトースト（送信失敗・日程確定失敗等）が同一座標(.kdz-toast既定位置)
+   に同時表示されると重なって読めなくなる。ページ側のみ位置をずらして分離する。 */
+.chat-page .kdz-toast.side-toast {
+  bottom: 76px;
+}
