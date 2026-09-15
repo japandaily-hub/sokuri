@@ -15,7 +15,7 @@
  *    （モック/デモ挙動の温存は禁止 — 2026-07-16 に一度 redirect 化された経緯があるため）。
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { AppHeader } from "@/components/kdz/AppHeader";
@@ -35,6 +35,7 @@ import {
   type AddressOut,
   type UserProfile,
 } from "@/lib/katadzuke-api";
+import { lookupPostalCode, normalizePostalDigits } from "@/lib/postal-lookup";
 import "./profile.css";
 
 /* セクションタイトル用アイコン（デザインHTMLの線画パスをそのまま移植） */
@@ -138,6 +139,12 @@ export default function ProfileEditPage() {
   const [prefErr, setPrefErr] = useState<string | null>(null);
   const [cityErr, setCityErr] = useState<string | null>(null);
   const [line1Err, setLine1Err] = useState<string | null>(null);
+  // 郵便番号からの住所自動補完（よくある郵便番号検索の仕組み。zipcloud 公開APIを使用）。
+  // 通信状況の可視化用（結果自体は都道府県・市区町村欄への反映で分かるため、
+  // ここでは「探しています」「見つかりませんでした」の一言だけを出す）。
+  const [postalLookupState, setPostalLookupState] = useState<"idle" | "loading" | "notfound">(
+    "idle",
+  );
 
   // 変更検知・保存状態
   const [dirty, setDirty] = useState(false);
@@ -201,6 +208,44 @@ export default function ProfileEditPage() {
   const markAddressDirty = () => {
     setAddressDirty(true);
     setAddressSaved(false);
+  };
+
+  // 直近の郵便番号自動補完リクエストを保持し、入力し直された場合に古いレスポンスで
+  // 都道府県・市区町村を上書きしないようキャンセルする。
+  const postalLookupAbortRef = useRef<AbortController | null>(null);
+
+  /** 郵便番号欄の onChange。7桁に達した時点でだけ zipcloud を叩き、都道府県・市区町村を
+   *  自動入力する（よくある郵便番号→住所の自動補完）。入力中の途中経過（1〜6桁）や
+   *  8桁以上（誤入力）では叩かない。番地（addressLine1）は既に何か入力済みなら上書きしない
+   *  （手入力した番地を消してしまわないため）。あくまで入力の補助であり、失敗しても
+   *  都道府県・市区町村は従来どおり手入力できる。 */
+  const onPostalCodeChange = (raw: string) => {
+    setPostalCode(raw);
+    markAddressDirty();
+    setPostalErr(null);
+
+    postalLookupAbortRef.current?.abort();
+    const digits = normalizePostalDigits(raw);
+    if (!digits) {
+      setPostalLookupState("idle");
+      return;
+    }
+    const controller = new AbortController();
+    postalLookupAbortRef.current = controller;
+    setPostalLookupState("loading");
+    void lookupPostalCode(digits, controller.signal).then((result) => {
+      if (controller.signal.aborted) return;
+      if (!result) {
+        setPostalLookupState("notfound");
+        return;
+      }
+      setPostalLookupState("idle");
+      setPrefecture(result.prefecture);
+      setPrefErr(null);
+      setCity(result.city);
+      setCityErr(null);
+      setAddressLine1((prev) => (prev.trim() ? prev : result.town));
+    });
   };
 
   const onSaveAddress = async () => {
@@ -600,12 +645,19 @@ export default function ProfileEditPage() {
                 value={postalCode}
                 inputMode="numeric"
                 placeholder="123-4567"
-                onChange={(e) => {
-                  setPostalCode(e.target.value);
-                  markAddressDirty();
-                }}
+                onChange={(e) => onPostalCodeChange(e.target.value)}
               />
-              {postalErr ? <div className="field-error">{postalErr}</div> : null}
+              {postalErr ? (
+                <div className="field-error">{postalErr}</div>
+              ) : postalLookupState === "loading" ? (
+                <div className="field-hint">住所を検索しています…</div>
+              ) : postalLookupState === "notfound" ? (
+                <div className="field-hint">
+                  この郵便番号に該当する住所が見つかりませんでした。都道府県・市区町村を直接入力してください。
+                </div>
+              ) : (
+                <div className="field-hint">7桁入力すると都道府県・市区町村を自動入力します</div>
+              )}
             </div>
             <div className={`field${prefErr ? " has-error" : ""}`}>
               <label htmlFor="inp-prefecture">
