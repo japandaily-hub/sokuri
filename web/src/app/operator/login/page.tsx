@@ -137,7 +137,7 @@ function OperatorLoginForm() {
 
             {otherAccountSignedIn ? (
               <div className="auth-error" role="alert" style={{ flexDirection: "column", alignItems: "flex-start", gap: 8 }}>
-                <span>現在は依頼者アカウントでログイン中です。業者としてご利用になる場合は、いったんサインアウトしてください。</span>
+                <span>現在はユーザーアカウントでログイン中です。業者としてご利用になる場合は、いったんサインアウトしてください。</span>
                 <button
                   type="button"
                   className="btn btn-ghost btn-block"

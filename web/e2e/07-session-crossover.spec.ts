@@ -18,7 +18,7 @@ test("業者セッションで /login を開くとサインアウト導線が出
   await expect(page).toHaveURL(/\/login(\?|$)/);
   await expect(page.getByText(/現在は業者アカウントでログイン中です/)).toBeVisible({ timeout: 30_000 });
 
-  const signOut = page.getByRole("button", { name: /サインアウトして依頼者ログインへ/ });
+  const signOut = page.getByRole("button", { name: /サインアウトしてユーザーログインへ/ });
   await expect(signOut).toBeVisible();
   await signOut.click();
 

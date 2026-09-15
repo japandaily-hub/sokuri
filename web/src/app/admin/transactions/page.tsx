@@ -159,7 +159,7 @@ export default function AdminTransactionsPage() {
                   if (e.key === "Enter") runSearch();
                 }}
                 className={inputBase}
-                placeholder="取引ID・案件ID（完全一致）／依頼者メール・業者名（部分一致）で検索"
+                placeholder="取引ID・案件ID（完全一致）／ユーザーメール・業者名（部分一致）で検索"
               />
               <button type="button" onClick={runSearch} className={`${btnPrimary} shrink-0`}>
                 検索
@@ -175,7 +175,7 @@ export default function AdminTransactionsPage() {
                   <th className="pb-2 pr-4">ID</th>
                   <th className="pb-2 pr-4">状態</th>
                   <th className="pb-2 pr-4">成約日時</th>
-                  <th className="pb-2 pr-4">依頼者</th>
+                  <th className="pb-2 pr-4">ユーザー</th>
                   <th className="pb-2 pr-4">業者</th>
                   <th className="pb-2 pr-4 text-right">金額</th>
                   <th className="pb-2 pr-4">訪問予定</th>
@@ -204,7 +204,7 @@ export default function AdminTransactionsPage() {
                     <td className="py-2 pr-4 text-slate-500">{cancelledByLabel(t.cancelled_by)}</td>
                     <td className="py-2 text-right whitespace-nowrap">
                       <Link href={`/chat/${t.id}`} className={btnSecondary}>
-                        依頼者画面で開く
+                        ユーザー画面で開く
                       </Link>
                       {t.status !== "cancelled" && t.status !== "completed" ? (
                         <button
@@ -250,7 +250,7 @@ export default function AdminTransactionsPage() {
       {cancelTarget ? (
         <ConfirmModal
           title="この取引を強制終了しますか？"
-          message="依頼者・業者どちらも応答不能等で進行不能な取引を、運営の判断で終了します。入力した理由は依頼者・業者の双方に表示されます。この操作は元に戻せません。"
+          message="ユーザー・業者どちらも応答不能等で進行不能な取引を、運営の判断で終了します。入力した理由はユーザー・業者の双方に表示されます。この操作は元に戻せません。"
           confirmLabel="強制終了する"
           danger
           withReason

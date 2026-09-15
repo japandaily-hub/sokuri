@@ -336,8 +336,8 @@ export default function AdminUsersPage() {
           }
           message={
             suspendTarget.is_suspended
-              ? "停止を解除すると、依頼者は再びログイン・案件作成ができるようになります。よろしいですか？"
-              : "停止すると、依頼者の既存トークンは失効しログインができなくなります。よろしいですか？"
+              ? "停止を解除すると、ユーザーは再びログイン・案件作成ができるようになります。よろしいですか？"
+              : "停止すると、ユーザーの既存トークンは失効しログインができなくなります。よろしいですか？"
           }
           confirmLabel={suspendTarget.is_suspended ? "停止を解除する" : "停止する"}
           danger={!suspendTarget.is_suspended}
@@ -362,8 +362,8 @@ export default function AdminUsersPage() {
           }
           message={
             roleTarget.action === "promote"
-              ? "管理者にすると、このユーザーは依頼者・業者アカウントの停止／解除や管理者権限の付与ができるようになります。よろしいですか？"
-              : "管理者権限を解除すると、このユーザーは一般の依頼者アカウントに戻ります。よろしいですか？"
+              ? "管理者にすると、このユーザーはユーザー・業者アカウントの停止／解除や管理者権限の付与ができるようになります。よろしいですか？"
+              : "管理者権限を解除すると、このユーザーは一般のユーザーアカウントに戻ります。よろしいですか？"
           }
           confirmLabel={roleTarget.action === "promote" ? "管理者にする" : "解除する"}
           danger={roleTarget.action === "demote"}

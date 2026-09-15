@@ -148,14 +148,14 @@ function LoginForm() {
 
             {otherAccountSignedIn ? (
               <div className="auth-error" role="alert" style={{ flexDirection: "column", alignItems: "flex-start", gap: 8 }}>
-                <span>現在は業者アカウントでログイン中です。依頼者としてご利用になる場合は、いったんサインアウトしてください。</span>
+                <span>現在は業者アカウントでログイン中です。ユーザーとしてご利用になる場合は、いったんサインアウトしてください。</span>
                 <button
                   type="button"
                   className="btn btn-ghost btn-block"
                   onClick={() => void onSignOutToUserLogin()}
                   disabled={signOutBusy}
                 >
-                  {signOutBusy ? "サインアウト中…" : "サインアウトして依頼者ログインへ"}
+                  {signOutBusy ? "サインアウト中…" : "サインアウトしてユーザーログインへ"}
                 </button>
               </div>
             ) : null}

@@ -31,9 +31,9 @@ function ForbiddenBody() {
   if (reason === "account_type") {
     if (session?.accountType === "operator") {
       line1 = "業者アカウントでログイン中です。";
-      line2 = "依頼者向けページは依頼者アカウントでご利用ください。";
+      line2 = "ユーザー向けページはユーザーアカウントでご利用ください。";
     } else if (session?.accountType === "user") {
-      line1 = "依頼者アカウントでログイン中です。";
+      line1 = "ユーザーアカウントでログイン中です。";
       line2 = "業者向けページは業者アカウントでご利用ください。";
     } else {
       line1 = "現在ログイン中のアカウントでは、このページをご利用いただけません。";
