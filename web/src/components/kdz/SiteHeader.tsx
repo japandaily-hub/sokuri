@@ -34,7 +34,9 @@ const DEFAULT_MOBILE: NavItem[] = [
 export function SiteHeader({
   nav = DEFAULT_NAV,
   mobileNav = DEFAULT_MOBILE,
-  ctaHref = "/login?callbackUrl=%2Fcreate",
+  // 2026-09-15 ユーザー指示: LINEログイン後の着地先を /create から /mypage へ変更
+  // （page.tsx CTA・chrome.tsx Dock と同じ理由）。
+  ctaHref = "/login?callbackUrl=%2Fmypage",
   ctaLabel = "LINEではじめる",
 }: {
   nav?: NavItem[];

@@ -191,7 +191,8 @@ export default function ContactPage() {
             </div>
             {/* LINE CTA は 7 箇所共通の 2 トーン構造（主色ブルーの面＋左端に LINE 緑のタイル）。
                 タイルは aria-hidden の純装飾で、アクセシブル名はラベル＋補足の文字が担う。 */}
-            <Link href="/login?callbackUrl=%2Fcreate" className="btn btn-line btn-lg">
+            {/* 2026-09-15 ユーザー指示: LINEログイン着地先を/createから/mypageへ変更（他CTAと統一） */}
+            <Link href="/login?callbackUrl=%2Fmypage" className="btn btn-line btn-lg">
               <span className="btn-line__tile" aria-hidden="true" />
               <span className="btn-line__body">
                 <span className="btn-line__label">LINEではじめる</span>
