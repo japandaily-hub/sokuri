@@ -6,7 +6,7 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signIn, signOut, useSession } from "next-auth/react";
+import { getSession, signIn, signOut, useSession } from "next-auth/react";
 import { AuthBar, Field, PasswordField, LineAuthButton, TrustRow } from "@/components/kdz/auth";
 import { safeInternalPath } from "@/lib/safe-path";
 import { clearRedirectLoopStorage } from "@/lib/katadzuke-api";
@@ -18,6 +18,11 @@ function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   // オープンリダイレクト対策: サイト内パスのみ許可
+  // 運営ログイン是正: callbackUrl が明示されていない直入店（/login を直接開いた場合）は
+  // 既定で /cases（依頼者のマイ案件）へ送っていたため、role=admin でログインしても
+  // 管理画面(/admin)ではなく一般ユーザー画面に着地していた。callbackUrl が省略された
+  // ケースかどうかを区別し、role 判明後に admin だけ /admin へ振り分ける（下記参照）。
+  const hasExplicitCallbackUrl = params.get("callbackUrl") != null;
   const callbackUrl = safeInternalPath(params.get("callbackUrl"), "/cases");
   const toCreate = callbackUrl.startsWith("/create");
   // r3 セキュリティレビュー L-2 是正: backend が停止アカウントを 403
@@ -42,11 +47,15 @@ function LoginForm() {
     const reachable =
       !callbackUrl.startsWith("/operator") &&
       (!callbackUrl.startsWith("/admin") || role === "admin");
+    // 運営ログイン是正: callbackUrl 省略時の既定 "/cases" は依頼者向けで、
+    // role=admin にとっては行き止まり（マイ案件に案件が無いだけの画面）になる。
+    // 明示的な callbackUrl が無い場合に限り、admin は /admin へ送る。
+    const fallback = !hasExplicitCallbackUrl && role === "admin" ? "/admin" : "/cases";
     // ログイン済み（LINE等の経路含む）でここへ到達した成功ケースなので、
     // ループ検知の発火履歴をリセットする（N-8と同趣旨）。
     clearRedirectLoopStorage();
-    router.replace(reachable ? callbackUrl : "/cases");
-  }, [status, session, callbackUrl, router]);
+    router.replace(reachable ? callbackUrl : fallback);
+  }, [status, session, callbackUrl, hasExplicitCallbackUrl, router]);
 
   // r3 再レビュー3回目 是正: 業者アカウントでログイン中に /login を開いた場合、
   // フォームは表示したまま上部に案内バナー＋サインアウト導線を出す（行き止まり解消）。
@@ -110,7 +119,14 @@ function LoginForm() {
     }
     // r3 再レビュー N-8 是正: ログイン成功時にループ検知の発火履歴をリセットする。
     clearRedirectLoopStorage();
-    router.push(callbackUrl);
+    // 運営ログイン是正: callbackUrl 省略時（/login 直入店）の既定 "/cases" は依頼者向け。
+    // role=admin の場合だけ /admin へ送る（callbackUrl が明示されている場合は従来どおり尊重）。
+    let destination = callbackUrl;
+    if (!hasExplicitCallbackUrl) {
+      const freshSession = await getSession();
+      if (freshSession?.role === "admin") destination = "/admin";
+    }
+    router.push(destination);
     router.refresh();
   }
 
