@@ -162,15 +162,15 @@ section:has(> .vt){position:relative;}
 .btn:hover{opacity:.8;}
 .btn:active{opacity:.65;}
 .btn-primary{background:var(--primary);color:#fff;}
-/* LINE CTA: 主色ブルーの面＋左端に LINE 緑のタイル。緑はタイル1枚に閉じる（他社ブランド色の面積を最小化）。
+/* LINE CTA: ユーザー指示によりブルー面＋緑タイルの2トーン案から LINE 公式グリーン一色に戻した
+   （元は「他社ブランド色の面積を最小化」目的でブルー化していたが、ブランド視認性を優先する方針に変更）。
    タイルは aria-hidden の純装飾（意味はラベルの文字が持つ）＝ WCAG 1.4.11（非テキストコントラスト）の対象外。
    タイル内にアイコンを置かない（緑地＋白吹き出しは LINE アプリアイコンの模倣になるため）。
    .btn-lg{padding:18px 44px}(0,1,0) に勝つよう .btn.btn-line(0,2,0) で書く。
-   コントラスト実測: 白 on --primary(#1447e0)=6.99:1／rgba(255,255,255,.86) 合成 on --primary=5.57:1（いずれも AA）。
    ホバー/アクティブは .btn の opacity だけ（色は動かさない）。overflow:hidden を付けない（:focus-visible リングを切らないため）。 */
-.btn.btn-line{background:var(--primary);color:#fff;padding:0;gap:0;
+.btn.btn-line{background:#06c755;color:#fff;padding:0;gap:0;
   align-items:stretch;text-align:left;min-height:60px;white-space:normal;flex:0 0 auto;}
-.btn.btn-line:hover,.btn.btn-line:active{background:var(--primary);color:#fff;}
+.btn.btn-line:hover,.btn.btn-line:active{background:#06c755;color:#fff;}
 /* R4 ラウンド4 指摘（4/36/7）: 56px の無地タイルは「アイコンが抜け落ちた枠／色見本」に見え、
    2トーンが意図として読めない。タイルを縦罫（10〜14px）まで絞り「主色ブルーのボタン＋左端の
    LINE 合図」として読ませる。高さいっぱいに敷く（A.0-3）・アイコンを置かない（A.0-1）は不変で、
