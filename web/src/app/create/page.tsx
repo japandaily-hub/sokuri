@@ -475,7 +475,7 @@ export default function CreateCasePage() {
           : isTimeout
             ? "送信に時間がかかっています。しばらくしてからマイページをご確認ください。同じ内容で再送信しても重複登録されません"
             : isSessionExpired
-              ? "セッションの有効期限が切れました。別のタブでログインし直してから、もう一度送信してください（写真と入力内容はこの画面に残ります）"
+              ? "セッションの有効期限が切れました。再度ログインしてください（写真と入力内容はこの画面に残ります。別のタブでログインし直してから、もう一度送信してください）"
               : toDisplayMessage(err, "送信に失敗しました。もう一度お試しください。"),
       );
       setSubmitting(false);
@@ -614,7 +614,7 @@ export default function CreateCasePage() {
                           {loosePhotos.map((p) => (
                             <div key={p.id} className="photo-thumb">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={p.previewUrl} alt={p.file.name} />
+                              <img src={p.previewUrl} alt="" />
                               <button type="button" className="photo-remove" onClick={() => removeLoosePhoto(p.id)} aria-label={`${p.file.name} を削除`}>
                                 <Ic name="x" />
                               </button>
@@ -700,7 +700,7 @@ export default function CreateCasePage() {
                     {currentItem.photos.map((p) => (
                       <div key={p.id} className="photo-thumb">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={p.previewUrl} alt={p.file.name} />
+                        <img src={p.previewUrl} alt="" />
                         <button
                           type="button"
                           className="photo-remove"
@@ -768,7 +768,7 @@ export default function CreateCasePage() {
             <div>
               <h2 className="step-title">住居情報を入力</h2>
               <p className="step-desc">
-                番地・建物名は業者決定まで公開されません（市区町村までを業者に提示します）。
+                番地・建物名は業者決定まで開示されません（市区町村までを業者に提示します）。
                 出品の対応エリアは東京都・神奈川県・埼玉県・千葉県の4都県のみです。
               </p>
               <div className="form-card">
@@ -787,7 +787,7 @@ export default function CreateCasePage() {
                   </div>
                 </div>
                 <div className="field">
-                  <label>番地・建物名・部屋番号<span className="opt">業者決定後に開示</span></label>
+                  <label>番地・建物名・部屋番号<span className="opt">任意・業者決定後に開示</span></label>
                   <input type="text" value={addressDetail} onChange={(e) => setAddressDetail(e.target.value)} placeholder="桜丘1-2-3 メゾン桜 101号室" />
                 </div>
                 <div className="field-row">
@@ -838,7 +838,7 @@ export default function CreateCasePage() {
                   ],
                   ["利用目的", purpose],
                   ["エリア", `${prefecture} ${city}`],
-                  ["住所詳細", addressDetail || "（未入力・任意）"],
+                  ["番地・建物名・部屋番号", addressDetail || "（未入力・任意）"],
                   ["住居", `${housingType} / ${floorPlan}`],
                   ["階数・EV", `${floorNumber ? `${floorNumber}階` : "—"} / EV${hasElevator ? "あり" : "なし"}`],
                 ].map(([k, v]) => (

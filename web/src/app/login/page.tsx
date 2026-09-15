@@ -114,7 +114,7 @@ function LoginForm() {
       return;
     }
     if (res?.error) {
-      setAuthErr("メールアドレスまたはパスワードが正しくありません");
+      setAuthErr("メールアドレスまたはパスワードが正しくありません。");
       return;
     }
     // r3 再レビュー N-8 是正: ログイン成功時にループ検知の発火履歴をリセットする。
@@ -143,7 +143,7 @@ function LoginForm() {
           <div className="auth-card">
             <div className="auth-head">
               <h1 className="auth-title">ログイン</h1>
-              <p className="auth-sub">{toCreate ? "出品（撮影）に進む前にログインしてください。LINEなら1タップで登録できます。" : "入札状況や業者との交渉はログイン後に確認できます"}</p>
+              <p className="auth-sub">{toCreate ? "出品（撮影）に進む前にログインしてください。LINEなら1タップで登録できます。" : "入札状況や業者との交渉はログイン後に確認できます。"}</p>
             </div>
 
             {otherAccountSignedIn ? (
@@ -161,7 +161,7 @@ function LoginForm() {
             ) : null}
 
             <p style={{ fontSize: 13, color: "var(--body-soft)", lineHeight: 1.75, textAlign: "center", marginBottom: 10 }}>
-              LINEではじめた方は、こちらを押してください
+              LINEで登録した方は、下のボタンからログインできます。
             </p>
             <LineAuthButton callbackUrl={callbackUrl} />
             {/* 同意文は LINE ボタンと同一視野に置く（押す前に規約・ポリシーへ到達できる） */}
@@ -196,7 +196,7 @@ function LoginForm() {
                   <circle cx="12" cy="12" r="9" />
                   <path d="M12 8v4M12 16h.01" />
                 </svg>
-                <span>しばらく時間をおいてから再度お試しください（短時間に試行が集中しました）</span>
+                <span>短時間に試行が集中したため、しばらく時間をおいてから再度お試しください。</span>
               </div>
             ) : null}
 
@@ -206,7 +206,7 @@ function LoginForm() {
                   <circle cx="12" cy="12" r="9" />
                   <path d="M12 8v4M12 16h.01" />
                 </svg>
-                <span>サーバーに接続できませんでした。時間をおいて再度お試しください</span>
+                <span>サーバーに接続できませんでした。時間をおいて再度お試しください。</span>
               </div>
             ) : null}
 

@@ -32,6 +32,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Spinner } from "@/components/Icon";
 import { AppHeader } from "@/components/kdz/AppHeader";
+import { Notice } from "@/components/kdz/Notice";
 import { Field, PasswordField } from "@/components/kdz/auth";
 import { useToken } from "@/components/kdz/Ui";
 import {
@@ -361,58 +362,19 @@ function NotificationsContent() {
           </div>
 
           {lineNotice ? (
-            <div
-              role="alert"
-              style={{
-                marginBottom: 20,
-                padding: "12px 16px",
-                borderRadius: "var(--radius-s)",
-                background: lineNotice.tone === "success" ? "#e8faf0" : "rgba(215,0,53,.06)",
-                color: lineNotice.tone === "success" ? "var(--green)" : "var(--danger)",
-                fontSize: 13,
-                border: `1px solid ${lineNotice.tone === "success" ? "#86efac" : "rgba(215,0,53,.35)"}`,
-              }}
-            >
-              {lineNotice.text}
-            </div>
+            <Notice tone={lineNotice.tone === "success" ? "success" : "danger"}>{lineNotice.text}</Notice>
           ) : null}
 
           {sessionExpired ? (
-            <div
-              role="alert"
-              style={{
-                marginBottom: 20,
-                padding: "12px 16px",
-                borderRadius: "var(--radius-s)",
-                background: "rgba(215,0,53,.06)",
-                color: "var(--danger)",
-                fontSize: 13,
-                border: "1px solid rgba(215,0,53,.35)",
-              }}
-            >
-              セッションが切れました。再ログインしてください。
+            <Notice tone="danger">
+              セッションの有効期限が切れました。再度ログインしてください。
               <Link href="/login" style={{ marginLeft: 8, fontWeight: 600, textDecoration: "underline" }}>
                 ログインへ
               </Link>
-            </div>
+            </Notice>
           ) : null}
 
-          {error ? (
-            <div
-              role="alert"
-              style={{
-                marginBottom: 20,
-                padding: "12px 16px",
-                borderRadius: "var(--radius-s)",
-                background: "rgba(215,0,53,.06)",
-                color: "var(--danger)",
-                fontSize: 13,
-                border: "1px solid rgba(215,0,53,.35)",
-              }}
-            >
-              {error}
-            </div>
-          ) : null}
+          {error ? <Notice tone="danger">{error}</Notice> : null}
 
           {sessionExpired ? null : isLoading ? (
             <div className="flex min-h-[30vh] items-center justify-center">

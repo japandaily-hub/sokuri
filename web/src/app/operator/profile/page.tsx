@@ -520,11 +520,11 @@ export default function OperatorProfilePage() {
                         <button
                           type="button"
                           className={`cat-star${starred ? " starred" : ""}`}
-                          aria-label={`${c.name}を得意カテゴリに${starred ? "外す" : "設定"}`}
+                          aria-label={`${c.name}を得意カテゴリ${starred ? "から外す" : "に設定"}`}
                           aria-pressed={starred}
                           disabled={!on}
                           onClick={() => toggleStrong(c.id)}
-                          title={on ? "得意カテゴリに設定" : "先に取扱カテゴリをオンにしてください"}
+                          title={!on ? "先に取扱カテゴリをオンにしてください" : starred ? "得意カテゴリから外す" : "得意カテゴリに設定"}
                         >
                           ★
                         </button>
@@ -731,7 +731,7 @@ export default function OperatorProfilePage() {
                     <Ic name="yen" />
                   </span>
                   <div>
-                    <h4>手数料は成約額の8%（税別）</h4>
+                    <h4>手数料は買取額の8%（税別）</h4>
                     <p>初期費用・月額費用は無料。費用が発生するのは成約時のみです（買取金額の8%・消費税を別途加算）。料金の詳細は登録時の規約に準じます。※ サービス開始当初（β期間）は手数料を請求しません。請求開始の際は事前にメールでお知らせします。</p>
                   </div>
                 </div>
@@ -741,7 +741,7 @@ export default function OperatorProfilePage() {
             {/* 退会（r8-fix-frontend2 M6 対応） */}
             <section className="prof-card flush">
               <div className="prof-card-body">
-                <p style={{ fontSize: 12.5, color: "var(--body-soft, #6b7280)", lineHeight: 1.7 }}>
+                <p style={{ fontSize: 12.5, color: "var(--body-soft)", lineHeight: 1.7 }}>
                   アカウントの退会をご希望の場合はこちらから手続きできます。進行中の取引がある場合は退会できません（先に取引を完了・キャンセルしてください）。
                 </p>
                 <button
@@ -750,7 +750,7 @@ export default function OperatorProfilePage() {
                     setWithdrawError(null);
                     setWithdrawModalOpen(true);
                   }}
-                  style={{ marginTop: 10, fontSize: 13, fontWeight: 600, color: "#dc2626", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", padding: 0 }}
+                  style={{ marginTop: 10, fontSize: 13, fontWeight: 600, color: "var(--danger)", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", padding: 0 }}
                 >
                   退会する
                 </button>

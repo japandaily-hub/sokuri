@@ -313,7 +313,7 @@ export default function AdminOperatorApplicationsPage() {
             ) : null}
           </div>
 
-          {data ? (
+          {data && !error ? (
             <AdminPagination
               total={data.total}
               limit={ADMIN_LIST_DEFAULT_LIMIT}

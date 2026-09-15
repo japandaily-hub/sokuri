@@ -28,7 +28,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse 70% 60% at 110% 0%, rgba(82,126,82,.5) 0%, transparent 60%);
+  background: radial-gradient(ellipse 70% 60% at 110% 0%, rgba(var(--primary-rgb),.5) 0%, transparent 60%);
   pointer-events: none;
 }
 .op-profile .prof-hero-inner {
@@ -471,6 +471,10 @@
 }
 .op-profile .upload-btn:hover {
   border-color: var(--blue);
+}
+.op-profile .upload-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 /* ---------- 公開情報トグル ---------- */

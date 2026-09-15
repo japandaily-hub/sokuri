@@ -3,12 +3,17 @@
    デザイン正典: docs/design_handoff_katazuke/業者ダッシュボード.html を移植。
    共通クラス（.container .section .btn .field .kdz-toast .kdz-overlay
    .kdz-modal .spinning 等）はここで再定義しない。
+   デザイン監査是正: .op-alert / .status-chip / .empty-state / .modal-overlay・
+   .modal-card / .yen-input-wrap は operator-shared.css の共通実装を使う
+   （旧: dashboard.css 独自の二重実装だった）。
    すべて .op-dash ラッパ配下にスコープする。keyframes はページ固有名。
    ============================================================ */
 
+@import "./operator-shared.css";
+
 .op-dash {
   min-height: 100vh;
-  background: #fff;
+  background: var(--white);
   font-family: var(--sans);
   color: var(--body);
 }
@@ -49,13 +54,14 @@
   white-space: nowrap;
 }
 .op-dash .dash-tab:hover { color: var(--ink); }
+.op-dash .dash-tab:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; color: var(--ink); }
 .op-dash .dash-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
 .op-dash .dash-tab .ic { width: 15px; height: 15px; stroke-width: 2; }
 .op-dash .tab-badge {
   font-size: 11px;
   font-weight: 600;
   background: var(--blue);
-  color: #fff;
+  color: var(--white);
   border-radius: 0;
   padding: 1px 7px;
   font-family: var(--head);
@@ -73,7 +79,7 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-s);
   padding: 18px 20px;
-  background: #fff;
+  background: var(--white);
 }
 .op-dash .sum-label { font-size: 12px; font-weight: 600; color: var(--body-soft); margin-bottom: 8px; }
 .op-dash .sum-val { font-family: var(--ui); font-variant-numeric: tabular-nums; font-size: 26px; font-weight: 600; color: var(--navy); line-height: 1; }
@@ -94,7 +100,7 @@
   font-family: var(--sans);
   font-size: 13.5px;
   color: var(--ink);
-  background: #fff;
+  background: var(--white);
   border: 1.5px solid var(--line);
   border-radius: 0;
   padding: 8px 32px 8px 12px;
@@ -114,7 +120,7 @@
 .op-dash .lot-card {
   border: 1.5px solid var(--line);
   border-radius: var(--radius);
-  background: #fff;
+  background: var(--white);
   overflow: hidden;
   transition: border-color .2s;
 }
@@ -221,7 +227,7 @@
 }
 .op-dash .current-amount span { font-size: 12px; color: var(--body-soft); font-weight: 600; margin-left: 2px; }
 .op-dash .my-bid-row {
-  background: #fff;
+  background: var(--white);
   border: 1.5px solid var(--line);
   border-radius: 0;
   padding: 10px 12px;
@@ -230,50 +236,14 @@
 }
 .op-dash .my-bid-row strong { color: var(--ink); font-size: 14px; }
 
-/* 入札フォーム */
+/* 入札フォーム（金額入力欄は operator-shared.css の .yen-input-wrap を使用。
+   旧 .bid-input-wrap 独自実装は廃止・二重管理を解消） */
 .op-dash .bid-form { display: flex; flex-direction: column; gap: 8px; }
-.op-dash .bid-input-wrap {
-  display: flex;
-  align-items: center;
-  background: #fff;
-  border: 2px solid var(--line);
-  border-radius: 0;
-  overflow: hidden;
-  transition: border-color .2s;
-}
-.op-dash .bid-input-wrap:focus-within { border-color: var(--blue); }
-.op-dash .bid-yen {
-  padding: 0 10px;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--body-soft);
-  border-right: 1px solid var(--line-soft);
-  height: 40px;
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-}
-.op-dash .bid-input {
-  flex: 1;
-  border: none;
-  font-family: var(--ui);
-  font-variant-numeric: tabular-nums;
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--navy);
-  padding: 0 10px;
-  height: 40px;
-  background: transparent;
-  min-width: 0;
-  letter-spacing: .02em;
-}
-.op-dash .bid-input::placeholder { color: var(--body-soft); font-size: 14px; font-weight: 400; }
-.op-dash .bid-en { padding: 0 10px; font-size: 13px; color: var(--body-soft); flex-shrink: 0; }
 .op-dash .bid-submit {
   width: 100%;
   padding: 11px;
   background: var(--blue);
-  color: #fff;
+  color: var(--white);
   border: none;
   border-radius: 0;
   font-family: var(--head);
@@ -283,7 +253,8 @@
   transition: .2s;
 }
 .op-dash .bid-submit:hover { background: var(--blue-d); }
-.op-dash .bid-submit.update { background: #fff; color: var(--blue); border: 1.5px solid var(--blue); }
+.op-dash .bid-submit:disabled { opacity: .6; cursor: not-allowed; }
+.op-dash .bid-submit.update { background: var(--white); color: var(--blue); border: 1.5px solid var(--blue); }
 .op-dash .bid-submit.update:hover { background: var(--pale); }
 .op-dash .bid-hint { font-size: 11px; color: var(--body-soft); text-align: center; line-height: 1.5; }
 
@@ -300,7 +271,7 @@
   align-items: center;
   gap: 20px;
   margin-bottom: 14px;
-  background: #fff;
+  background: var(--white);
   transition: border-color .2s;
   text-decoration: none;
   color: inherit;
@@ -329,59 +300,24 @@
 .op-dash .neg-time { font-size: 11.5px; color: var(--body-soft); }
 .op-dash .unread-chip {
   font-size: 11px; font-weight: 600;
-  background: var(--blue); color: #fff;
+  background: var(--blue); color: var(--white);
   border-radius: 0; padding: 2px 8px;
   font-family: var(--head);
 }
 
-/* ---------- 空状態 ---------- */
-.op-dash .empty-state {
-  text-align: center;
-  padding: 60px 20px;
-  color: var(--body-soft);
-}
-.op-dash .empty-state .ic { width: 40px; height: 40px; stroke: var(--line); stroke-width: 1.5; margin-bottom: 16px; }
-.op-dash .empty-state p { font-size: 14px; line-height: 1.8; }
+/* ---------- 空状態 ----------
+   デザイン監査是正: operator-shared.css の共通 .empty-state（見出し+文+SVG）に統一。
+   旧 .op-dash 独自実装（アイコンのみ・見出しなし）は廃止。 */
 
-/* ---------- 入札確認モーダル ---------- */
-.op-dash .modal-overlay {
-  position: fixed; inset: 0;
-  background: rgba(51,51,51,.45);
-  z-index: 200;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  opacity: 0;
-  pointer-events: none;
-  /* 閉時は視覚的に隠すだけでなく支援技術・フォーカスからも外す（visibilityはフェードアウト完了後に切替）。 */
-  visibility: hidden;
-  transition: opacity .25s, visibility 0s linear .25s;
-}
-.op-dash .modal-overlay.open { opacity: 1; pointer-events: all; visibility: visible; transition: opacity .25s; }
-.op-dash .modal {
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 0;
-  padding: 32px 28px 24px;
-  max-width: 400px;
-  width: 100%;
-  box-shadow: none;
-  transform: translateY(10px);
-  transition: transform .3s;
-}
-.op-dash .modal-overlay.open .modal { transform: translateY(0); }
-.op-dash .modal h3 { font-size: 18px; color: var(--navy); margin-bottom: 8px; }
-.op-dash .modal-body { font-size: 14px; color: var(--body-soft); line-height: 1.8; margin-bottom: 20px; }
+/* ---------- 入札確認モーダル ----------
+   デザイン監査是正: 土台（overlay + カード + アクション行 + ボタン）は
+   operator-shared.css の .modal-overlay/.modal-card/.modal-title/.modal-sub/
+   .modal-actions/.btn-modal-cancel/.btn-modal-confirm を使用。
+   ここでは本ページ固有のパーツ（金額表示・注意書き）のみ追加定義する。 */
 .op-dash .modal-amount { font-family: var(--ui); font-variant-numeric: tabular-nums; font-size: 32px; font-weight: 600; color: var(--navy); text-align: center; padding: 16px; background: var(--pale); border-radius: 0; margin-bottom: 20px; }
 .op-dash .modal-amount span { font-size: 15px; font-weight: 600; color: var(--body-soft); }
 .op-dash .modal-warn { font-size: 12.5px; color: var(--gold-text); background: var(--warm); border-radius: 0; padding: 10px 14px; margin-bottom: 20px; line-height: 1.7; display: flex; gap: 8px; align-items: flex-start; }
 .op-dash .modal-warn .ic { width: 16px; height: 16px; stroke: var(--gold); flex-shrink: 0; margin-top: 1px; }
-.op-dash .modal-actions { display: flex; gap: 10px; }
-.op-dash .btn-cancel { flex: 1; padding: 13px; border-radius: 0; border: 1.5px solid var(--line); background: #fff; color: var(--ink); font-family: var(--head); font-weight: 600; font-size: 14px; cursor: pointer; transition: .2s; }
-.op-dash .btn-cancel:hover { border-color: var(--blue); color: var(--blue); }
-.op-dash .btn-confirm { flex: 1; padding: 13px; border-radius: 0; border: none; background: var(--blue); color: #fff; font-family: var(--head); font-weight: 600; font-size: 14px; cursor: pointer; box-shadow: none; transition: .2s; }
-.op-dash .btn-confirm:hover { background: var(--blue-d); }
 
 /* ---------- 入札成功トースト ---------- */
 .op-dash .toast {
@@ -390,7 +326,7 @@
   left: 50%;
   transform: translateX(-50%) translateY(80px);
   background: var(--deep);
-  color: #fff;
+  color: var(--white);
   border-radius: 0;
   padding: 13px 24px;
   font-size: 14px;
@@ -416,7 +352,7 @@
   justify-content: center;
   gap: 20px;
   flex-wrap: wrap;
-  background: #fff;
+  background: var(--white);
   font-size: 12px;
 }
 .op-dash .biz-footer span { color: var(--body-soft); }

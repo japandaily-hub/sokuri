@@ -11,7 +11,7 @@
 .cases-hero {
   /* 注記をカード群の直前へ移したぶん、ヒーローの下は見出し・リードと数値バーの間合いだけ */
   padding: clamp(56px, 7vw, 88px) 0 clamp(32px, 4vw, 48px);
-  background: #fff;
+  background: var(--white);
 }
 /* 見出しの語中改行を止める（ラウンド6 指摘 15 の「同ページ内の他の見出しにも同じ指定」）。
    「利用イメージ（モデルケース）」は全角括弧で折れるので 390px でも 2 行に収まる。 */
@@ -85,7 +85,7 @@
   border-bottom: 1px solid var(--line);
   position: sticky;
   top: 73px;
-  background: #fff;
+  background: var(--white);
   z-index: 20;
   /* チップ列（.filter-inner）と架空明示（.filter-note）を1行に並べる。
      859px 以下はチップ列だけが横スクロールするので、.filter-note は列の外に出す */
@@ -108,13 +108,13 @@
   padding: 7px 16px;
   border-radius: 0;
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--white);
   color: var(--body-soft);
   cursor: pointer;
   transition: border-color .2s, color .2s;
 }
 .filter-chip:hover { border-color: var(--primary); color: var(--primary); }
-.filter-chip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.filter-chip.active { background: var(--primary); border-color: var(--primary); color: var(--white); }
 .filter-count { margin-left: auto; font-family: var(--ui); font-size: 13px; color: var(--body-soft); white-space: nowrap; }
 /* 架空である旨の常設ラベル（打消し表示の補助）。件数の隣に置き、絞り込み操作中も消えない。
    本体の打消し表示はカード群直前の .cases-hero-note と各カードの .model-chip が担う */
@@ -361,7 +361,7 @@
     height: 36px;
     right: 0;
     width: 44px;
-    background: linear-gradient(to right, rgba(255, 255, 255, 0), #fff 60%);
+    background: linear-gradient(to right, rgba(255, 255, 255, 0), var(--white) 60%);
     pointer-events: none;
   }
 

@@ -22,12 +22,12 @@
 @media (min-width: 520px) { .create-page .photo-grid { grid-template-columns: repeat(5, 1fr); } }
 .create-page .photo-thumb { position: relative; aspect-ratio: 1; border-radius: 0; overflow: hidden; border: 1px solid var(--line); background: var(--pale); }
 .create-page .photo-thumb img { width: 100%; height: 100%; object-fit: cover; }
-.create-page .photo-remove { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 50%; background: rgba(47,74,48,.7); color: #fff; border: none; cursor: pointer; display: grid; place-items: center; }
+.create-page .photo-remove { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 50%; background: rgba(32,36,46,.7); color: var(--white); border: none; cursor: pointer; display: grid; place-items: center; }
 .create-page .photo-remove .ic { font-size: 13px; stroke-width: 2.4; }
 .create-page .photo-count { font-size: 12px; color: var(--body-soft); margin-top: 8px; }
 
-.create-page .photo-quality-hint { background: linear-gradient(135deg, #fff8e6, #fdf3d0); border: 1px solid #f0d080; border-radius: 0; padding: 10px 14px; margin-top: 14px; font-size: 12.5px; color: #7a5700; line-height: 1.7; display: flex; gap: 8px; align-items: flex-start; }
-.create-page .photo-quality-hint strong { color: #5a3e00; }
+.create-page .photo-quality-hint { background: var(--warm); border: 1px solid var(--gold); border-radius: 0; padding: 10px 14px; margin-top: 14px; font-size: 12.5px; color: var(--gold-text); line-height: 1.7; display: flex; gap: 8px; align-items: flex-start; }
+.create-page .photo-quality-hint strong { color: var(--gold-text); }
 .create-page .photo-quality-hint .ic { color: var(--gold); flex-shrink: 0; margin-top: 1px; }
 .create-page .photo-quality-hint .pqh-body { flex: 1; min-width: 0; }
 .create-page .photo-quality-hint .pqh-lead { margin: 0 0 8px; }
@@ -52,7 +52,7 @@
 
 /* STEP1: 撮影の流れと査定のコツ（人の森作法: 白地・ヘアライン・直角・明朝） */
 .create-page .shoot-guide {
-  margin-top: 24px; padding: 20px 18px 16px; background: #fff;
+  margin-top: 24px; padding: 20px 18px 16px; background: var(--white);
   border: 1px solid var(--line); border-radius: 0;
 }
 .create-page .shoot-guide .sg-title {
@@ -64,7 +64,7 @@
 .create-page .sg-flow li { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; color: var(--body); line-height: 1.7; }
 .create-page .sg-n {
   flex-shrink: 0; width: 22px; height: 22px; display: grid; place-items: center; margin-top: 1px;
-  font-family: var(--en-display); font-size: 13px; color: #fff; background: var(--primary);
+  font-family: var(--en-display); font-size: 13px; color: var(--white); background: var(--primary);
 }
 .create-page .sg-tips { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .create-page .sg-tips li {
@@ -86,7 +86,7 @@
 .create-page .item-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
 .create-page .item-card {
   display: flex; align-items: center; gap: 14px;
-  background: #fff; border: 1.5px solid var(--line); border-radius: var(--radius-s);
+  background: var(--white); border: 1.5px solid var(--line); border-radius: var(--radius-s);
   padding: 12px 16px;
 }
 .create-page .item-card-thumb {
@@ -100,17 +100,17 @@
 .create-page .item-card-count { font-size: 12px; color: var(--body-soft); margin-top: 2px; }
 .create-page .item-card-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .create-page .item-card-actions button {
-  border: 1.5px solid var(--line); background: #fff; border-radius: 0; padding: 6px 14px;
+  border: 1.5px solid var(--line); background: var(--white); border-radius: 0; padding: 6px 14px;
   font-size: 12.5px; font-weight: 600; color: var(--body); cursor: pointer; transition: .2s;
 }
 .create-page .item-card-actions button:hover { border-color: var(--blue); color: var(--blue); }
-.create-page .item-card-actions button:last-child:hover { border-color: #e08a8a; color: #cc3333; }
+.create-page .item-card-actions button:last-child:hover { border-color: var(--danger); color: var(--danger); }
 
 .create-page .item-list-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-bottom: 14px; }
 .create-page .btn-add-item {
   display: inline-flex; align-items: center; gap: 8px; border: none; border-radius: 0;
-  background: var(--blue); color: #fff; font-family: var(--head); font-size: 14px; font-weight: 600;
-  padding: 12px 22px; cursor: pointer; box-shadow: none; transition: .2s;
+  background: var(--blue); color: var(--white); font-family: var(--head); font-size: 14px; font-weight: 600;
+  padding: 12px 22px; cursor: pointer; box-shadow: none; transition: .2s; white-space: normal;
 }
 .create-page .btn-add-item:hover { background: var(--blue-d); }
 .create-page .btn-add-item:disabled { background: var(--line); box-shadow: none; cursor: not-allowed; }
@@ -129,22 +129,22 @@
 .create-page .step1-back-link:hover { color: var(--blue); }
 .create-page .step1-back-link .ic { font-size: 13px; }
 .create-page .item-name-warn {
-  display: flex; align-items: center; gap: 6px; font-size: 12px; color: #9a6200;
-  background: #fff8e6; border: 1px solid #f0d080; border-radius: 0; padding: 8px 12px; margin-top: 8px;
+  display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--gold-text);
+  background: var(--warm); border: 1px solid var(--gold); border-radius: 0; padding: 8px 12px; margin-top: 8px;
 }
 .create-page .item-name-warn .ic { color: var(--gold); font-size: 13px; flex-shrink: 0; }
 .create-page .item-delete-link {
   display: block; margin-top: 16px; border: none; background: none; font-size: 13px;
   font-weight: 600; color: var(--body-soft); text-decoration: underline; cursor: pointer;
 }
-.create-page .item-delete-link:hover { color: #cc3333; }
+.create-page .item-delete-link:hover { color: var(--danger); }
 
 .create-page .pqh-check-label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .create-page .pqh-check-label input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--gold); cursor: pointer; flex-shrink: 0; }
 /* 撮影完了の前提となる確認レ点（コツ枠の下に区切って配置） */
 .create-page .pqh-confirm {
   display: flex; align-items: flex-start; gap: 10px; margin-top: 12px; padding: 12px 12px;
-  background: #fff; border: 1px solid var(--primary); cursor: pointer;
+  background: var(--white); border: 1px solid var(--primary); cursor: pointer;
   font-family: var(--head); font-size: 14px; font-weight: 600; color: var(--ink); line-height: 1.6;
 }
 .create-page .pqh-confirm input[type="checkbox"] { width: 20px; height: 20px; margin-top: 1px; accent-color: var(--primary); cursor: pointer; flex-shrink: 0; }
@@ -158,7 +158,7 @@
 
 /* 利用目的チップ */
 .create-page .purpose-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.create-page .purpose-card { border: 1.5px solid var(--line); border-radius: var(--radius-s); padding: 14px 16px; cursor: pointer; font-family: var(--head); font-weight: 600; font-size: 14.5px; color: var(--ink); text-align: left; background: #fff; transition: border-color .2s, background .2s, box-shadow .2s; }
+.create-page .purpose-card { border: 1.5px solid var(--line); border-radius: var(--radius-s); padding: 14px 16px; cursor: pointer; font-family: var(--head); font-weight: 600; font-size: 14.5px; color: var(--ink); text-align: left; background: var(--white); transition: border-color .2s, background .2s, box-shadow .2s; }
 .create-page .purpose-card:hover { border-color: var(--blue); background: var(--pale); }
 .create-page .purpose-card.selected { border-color: var(--blue); background: var(--pale); box-shadow: none; color: var(--blue); }
 
@@ -183,7 +183,7 @@
   display: flex; align-items: center; justify-content: center; padding: 20px;
 }
 .create-page .leave-modal {
-  background: #fff; border: 1px solid var(--line); border-radius: var(--radius-s);
+  background: var(--white); border: 1px solid var(--line); border-radius: var(--radius-s);
   max-width: 380px; width: 100%; padding: 24px 22px;
 }
 .create-page .leave-modal h3 {

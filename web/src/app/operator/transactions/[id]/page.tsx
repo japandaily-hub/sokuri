@@ -242,14 +242,14 @@ export default function OperatorTransactionPage() {
             </div>
           ) : null}
 
-          {/* お客様とのやり取り導線（チャット・日程調整はチャット画面から行う） */}
+          {/* ユーザーとのやり取り導線（チャット・日程調整はチャット画面から行う） */}
           {txn.status !== "cancelled" ? (
             <Link
               href={`/operator/chat/${txn.id}`}
               className="btn btn-primary"
               style={{ display: "inline-flex" }}
             >
-              お客様とチャット（日程調整）
+              ユーザーとチャット（日程調整）
             </Link>
           ) : null}
 
@@ -259,7 +259,7 @@ export default function OperatorTransactionPage() {
               <div style={{ fontFamily: "var(--head)", fontWeight: 600, fontSize: 17, color: "var(--navy)" }}>
                 {txn.address.prefecture} {txn.address.city} {txn.address.address_detail ?? ""}
               </div>
-              {txn.contact_email ? <p className="listing-meta" style={{ marginTop: 6 }}>お客様連絡先: {txn.contact_email}</p> : null}
+              {txn.contact_email ? <p className="listing-meta" style={{ marginTop: 6 }}>ユーザー連絡先: {txn.contact_email}</p> : null}
             </div>
           ) : txn.awaiting_approval ? null : (
             <div className="op-alert warn">住所詳細は表示できません（キャンセル済みの可能性）。</div>
@@ -347,19 +347,19 @@ export default function OperatorTransactionPage() {
                     onChange={(e) => setReason(e.target.value)}
                     placeholder="現地確認の結果、想定より家電の破損が多く再販価値が下がるため"
                   />
-                  <p style={{ fontSize: 11.5, color: "var(--body-soft)", marginTop: 5 }}>お客様に表示されます。</p>
+                  <p style={{ fontSize: 11.5, color: "var(--body-soft)", marginTop: 5 }}>ユーザーに表示されます。</p>
                 </div>
                 <button type="submit" ref={reductionSubmitRef} disabled={busy} className="btn btn-primary">
                   減額を申請する
                 </button>
               </form>
             ) : null}
-            {pendingReduction ? <div className="op-alert warn" style={{ marginTop: 14, marginBottom: 0 }}>お客様の回答待ちの申請があります。</div> : null}
+            {pendingReduction ? <div className="op-alert warn" style={{ marginTop: 14, marginBottom: 0 }}>ユーザーの回答待ちの申請があります。</div> : null}
             {/* r10 M4 是正: 上限到達時はフォームを出さず、出せない理由を明示する。 */}
             {active && !pendingReduction && reductionRemaining === 0 ? (
               <p style={{ fontSize: 13, color: "var(--body-soft)", marginTop: 8, lineHeight: 1.8 }}>
                 減額申請は1取引につき{reductionLimit}回までです。上限に達しているため、これ以上申請できません。
-                金額の相談が必要な場合はチャットでお客様とお話しください。
+                金額の相談が必要な場合はチャットでユーザーとお話しください。
               </p>
             ) : null}
             {!active ? <p style={{ fontSize: 13, color: "var(--body-soft)", marginTop: 8 }}>この取引では申請できません。</p> : null}
@@ -380,8 +380,7 @@ export default function OperatorTransactionPage() {
                   setCancelReason("");
                   setModal({ kind: "cancel" });
                 }}
-                className="btn"
-                style={{ border: "1.5px solid var(--danger)", color: "var(--danger)", background: "#fff" }}
+                className="btn btn-danger-ghost"
               >
                 この取引をキャンセルする
               </button>
@@ -391,7 +390,7 @@ export default function OperatorTransactionPage() {
           {/* ===== レビュー ===== */}
           {txn.status === "completed" && (
             <div className="review-card">
-              <h4>お客様を評価する</h4>
+              <h4>ユーザーを評価する</h4>
               {myReview ? (
                 <p style={{ marginTop: 10 }}>レビュー投稿済み（★{myReview.rating}）ありがとうございました。</p>
               ) : (
@@ -437,9 +436,9 @@ export default function OperatorTransactionPage() {
         {modal?.kind === "reduction" && (
           <div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="reductionModalTitle">
             <h2 className="modal-title" id="reductionModalTitle">減額を申請しますか？</h2>
-            <p className="modal-sub">お客様の承認後に金額が確定します。承認されるまでは現在の金額のままです。</p>
+            <p className="modal-sub">ユーザーの承認後に金額が確定します。承認されるまでは現在の金額のままです。</p>
             <div className="modal-biz">
-              <div className="modal-biz-avatar" style={{ background: "var(--gold, #b9892f)" }}>
+              <div className="modal-biz-avatar" style={{ background: "var(--gold)" }}>
                 ¥
               </div>
               <div>
@@ -477,6 +476,8 @@ export default function OperatorTransactionPage() {
           <div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="cancelModalTitle">
             <h2 className="modal-title" id="cancelModalTitle">本当にキャンセルしますか？</h2>
             <p className="modal-sub">
+              <strong>この操作は取り消せません。キャンセル後は同じ取引を再開できません。</strong>
+              <br />
               <strong>キャンセルは記録され、運営が確認します。入力した理由はそのままユーザーに表示されます。</strong>
               <br />
               理由を入力してください。

@@ -14,6 +14,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Ic } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
+import { Notice } from "@/components/kdz/Notice";
 import { Reveal, FaqAccordion } from "@/components/kdz/interactions";
 import { submitOperatorApplication, toDisplayMessage } from "@/lib/katadzuke-api";
 import { MODEL_CASE_CHIP, VENDOR_CASES, VENDOR_CASE_NOTE } from "@/lib/model-cases";
@@ -234,10 +235,35 @@ const REQUIRED_KEYS: (keyof FormState)[] = [
   "accountHolder",
 ];
 
+/** 必須項目が未入力のときのインラインエラー文言。select 系は「選択」、それ以外は「入力」で言い切る。 */
+const REQUIRED_MESSAGE: Partial<Record<keyof FormState, string>> = {
+  company: "必須項目です",
+  rep: "必須項目です",
+  repName: "必須項目です",
+  registeredAddress: "必須項目です",
+  email: "必須項目です",
+  phone: "必須項目です",
+  bizType: "選択してください",
+  area: "選択してください",
+  licenseNumber: "必須項目です",
+  bankName: "必須項目です",
+  branchName: "必須項目です",
+  accountType: "選択してください",
+  accountNumber: "必須項目です",
+  accountHolder: "必須項目です",
+};
+
+/** 古物商許可番号は必須チェックとは別に、文字数の下限を持つ（形式チェック）。 */
+const LICENSE_NUMBER_MIN_LENGTH = 5;
+const LICENSE_NUMBER_TOO_SHORT_MESSAGE = `古物商許可番号は${LICENSE_NUMBER_MIN_LENGTH}文字以上で入力してください`;
+const AGREE_REQUIRED_MESSAGE = "内容をご確認のうえ、チェックを入れてください";
+
 export default function BusinessPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
-  const [invalid, setInvalid] = useState<Set<string>>(new Set());
+  /* キー→エラー文言。値が無ければエラー無し（フィールド直下にそのまま表示できるよう
+     真偽値の Set ではなく文言そのものを保持する）。 */
+  const [invalid, setInvalid] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -265,10 +291,10 @@ export default function BusinessPage() {
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
-    if (invalid.has(key)) {
+    if (invalid[key]) {
       setInvalid((prev) => {
-        const next = new Set(prev);
-        next.delete(key);
+        const next = { ...prev };
+        delete next[key];
         return next;
       });
     }
@@ -276,15 +302,17 @@ export default function BusinessPage() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const next = new Set<string>();
+    const next: Record<string, string> = {};
     REQUIRED_KEYS.forEach((k) => {
       const v = form[k];
-      if (typeof v === "string" && !v.trim()) next.add(k);
+      if (typeof v === "string" && !v.trim()) next[k] = REQUIRED_MESSAGE[k] ?? "必須項目です";
     });
-    if (form.licenseNumber.trim() && form.licenseNumber.trim().length < 5) next.add("licenseNumber");
-    if (!form.agree) next.add("agree");
+    if (form.licenseNumber.trim() && form.licenseNumber.trim().length < LICENSE_NUMBER_MIN_LENGTH) {
+      next.licenseNumber = LICENSE_NUMBER_TOO_SHORT_MESSAGE;
+    }
+    if (!form.agree) next.agree = AGREE_REQUIRED_MESSAGE;
     setInvalid(next);
-    if (next.size > 0) return;
+    if (Object.keys(next).length > 0) return;
 
     setSubmitError(null);
     setBusy(true);
@@ -321,7 +349,10 @@ export default function BusinessPage() {
     }
   };
 
-  const invClass = (key: string) => (invalid.has(key) ? " is-invalid" : "");
+  const invClass = (key: string) => (invalid[key] ? " has-error" : "");
+  /** フィールド直下に置くインラインエラー。無ければ何も描画しない
+   *  （JSX を返す関数であってコンポーネントではないため、レンダーごとの再定義でも再マウントは起きない）。 */
+  const fieldError = (key: string) => (invalid[key] ? <p className="field-error">{invalid[key]}</p> : null);
 
   return (
     <div className="business-page bare-scope">
@@ -347,6 +378,7 @@ export default function BusinessPage() {
             className="hamburger"
             aria-label="メニュー"
             aria-expanded={menuOpen}
+            aria-controls="mobile-menu"
             onClick={() => setMenuOpen((o) => !o)}
           >
             <Ic name={menuOpen ? "x" : "menu"} />
@@ -783,6 +815,7 @@ export default function BusinessPage() {
                           value={form.company}
                           onChange={(e) => update("company", e.target.value)}
                         />
+                        {fieldError("company")}
                       </div>
                       <div className="field">
                         <label htmlFor="rep">
@@ -797,6 +830,7 @@ export default function BusinessPage() {
                           value={form.rep}
                           onChange={(e) => update("rep", e.target.value)}
                         />
+                        {fieldError("rep")}
                       </div>
                     </div>
 
@@ -814,6 +848,7 @@ export default function BusinessPage() {
                           value={form.repName}
                           onChange={(e) => update("repName", e.target.value)}
                         />
+                        {fieldError("repName")}
                       </div>
                       <div className="field">
                         <label htmlFor="registered-address">
@@ -828,6 +863,7 @@ export default function BusinessPage() {
                           value={form.registeredAddress}
                           onChange={(e) => update("registeredAddress", e.target.value)}
                         />
+                        {fieldError("registeredAddress")}
                       </div>
                     </div>
 
@@ -844,6 +880,7 @@ export default function BusinessPage() {
                         value={form.email}
                         onChange={(e) => update("email", e.target.value)}
                       />
+                      {fieldError("email")}
                     </div>
 
                     <div className="field">
@@ -859,6 +896,7 @@ export default function BusinessPage() {
                         value={form.phone}
                         onChange={(e) => update("phone", e.target.value)}
                       />
+                      {fieldError("phone")}
                     </div>
 
                     <div className="field">
@@ -880,6 +918,7 @@ export default function BusinessPage() {
                           <option value="sole">個人事業主</option>
                         </select>
                       </div>
+                      {fieldError("bizType")}
                     </div>
                   </div>
 
@@ -902,6 +941,7 @@ export default function BusinessPage() {
                           value={form.licenseNumber}
                           onChange={(e) => update("licenseNumber", e.target.value)}
                         />
+                        {fieldError("licenseNumber")}
                       </div>
                       <div className="field">
                         <label htmlFor="invoice-number">
@@ -940,6 +980,7 @@ export default function BusinessPage() {
                           <option value="multi">複数都県</option>
                         </select>
                       </div>
+                      {fieldError("area")}
                     </div>
 
                     <div className="field">
@@ -1008,6 +1049,7 @@ export default function BusinessPage() {
                           value={form.bankName}
                           onChange={(e) => update("bankName", e.target.value)}
                         />
+                        {fieldError("bankName")}
                       </div>
                       <div className="field">
                         <label htmlFor="branch-name">
@@ -1022,6 +1064,7 @@ export default function BusinessPage() {
                           value={form.branchName}
                           onChange={(e) => update("branchName", e.target.value)}
                         />
+                        {fieldError("branchName")}
                       </div>
                     </div>
 
@@ -1045,6 +1088,7 @@ export default function BusinessPage() {
                             <option value="checking">当座</option>
                           </select>
                         </div>
+                        {fieldError("accountType")}
                       </div>
                       <div className="field">
                         <label htmlFor="account-number">
@@ -1059,6 +1103,7 @@ export default function BusinessPage() {
                           value={form.accountNumber}
                           onChange={(e) => update("accountNumber", e.target.value)}
                         />
+                        {fieldError("accountNumber")}
                       </div>
                     </div>
 
@@ -1075,10 +1120,11 @@ export default function BusinessPage() {
                         value={form.accountHolder}
                         onChange={(e) => update("accountHolder", e.target.value)}
                       />
+                      {fieldError("accountHolder")}
                     </div>
                   </div>
 
-                  <div className={`check-field${invalid.has("agree") ? " is-invalid" : ""}`}>
+                  <div className={`check-field${invalid.agree ? " has-error" : ""}`}>
                     <input
                       type="checkbox"
                       id="agree"
@@ -1094,13 +1140,10 @@ export default function BusinessPage() {
                           業者利用規約へ直接届くよう #biz アンカーへ配線する。 */}
                       <Link href="/terms#biz">業者利用規約</Link>に同意します
                     </label>
+                    {fieldError("agree")}
                   </div>
 
-                  {submitError ? (
-                    <p className="biz-submit-error" role="alert">
-                      {submitError}
-                    </p>
-                  ) : null}
+                  {submitError ? <Notice tone="danger">{submitError}</Notice> : null}
 
                   <div className="submit-area">
                     <button type="submit" className="btn-submit" disabled={busy}>

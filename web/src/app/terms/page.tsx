@@ -91,7 +91,7 @@ export default function TermsPage() {
 
       <section className="terms-points" aria-labelledby="terms-points-title">
         <div className="terms-points__inner">
-          <h2 className="terms-points__title" id="terms-points-title">
+          <h2 className="doc-section-title" id="terms-points-title">
             ユーザーの方へ　この規約の要点
           </h2>
           <ol className="terms-points__list">

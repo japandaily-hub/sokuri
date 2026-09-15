@@ -523,12 +523,13 @@ export default function OperatorChatPage() {
                   />
                   <button
                     type="button"
-                    className="btn-send"
-                    aria-label="送信"
+                    className={`btn-send${sending ? " is-sending" : ""}`}
+                    aria-label={sending ? "送信中…" : "送信"}
+                    aria-busy={sending}
                     disabled={!draft.trim() || sending}
                     onClick={() => void handleSend()}
                   >
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" className={sending ? "spinning" : undefined}>
                       <path d="M22 2L11 13" />
                       <path d="M22 2L15 22l-4-9-9-4 20-7z" />
                     </svg>

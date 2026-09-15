@@ -262,7 +262,7 @@ export default function ExamplesPage() {
           {/* ============ 事例グリッド ============ */}
           <div className="cases-grid">
             {filtered.length === 0 ? (
-              <div className="cases-empty">該当する事例が見つかりませんでした。</div>
+              <div className="cases-empty">該当する事例が見つかりませんでした。「すべて」から他のケースをご覧ください。</div>
             ) : (
               filtered.map((c, i) => <CaseCard key={c.id} c={c} index={i} />)
             )}

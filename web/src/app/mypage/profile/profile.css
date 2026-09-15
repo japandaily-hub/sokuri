@@ -2,8 +2,12 @@
    プロフィール編集ページ固有スタイル
    共通クラス(.field/.btn/.pw-wrap/.pw-toggle/.kdz-toast/.spinning 等)は
    katazuke.css / katazuke-pages.css の正典を使用。ここでは重複定義しない。
+   .form-card/.edit-section-title/.pw-change-error は bank-account/identity と
+   共有のため ../_shared-forms.css に集約済み（デザイン監査2026-09-15是正）。
    このページ独自の要素のみを .profile-page 配下にスコープして定義する。
    ============================================================ */
+
+@import "../_shared-forms.css";
 
 .profile-page {
   min-height: 100vh;
@@ -14,34 +18,6 @@
   max-width: 560px;
   margin: 0 auto;
   padding: 24px 20px 96px;
-}
-
-/* セクションタイトル */
-.profile-page .edit-section-title {
-  font-family: var(--head);
-  font-size: 14px;
-  font-weight: 400;
-  color: var(--navy);
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.profile-page .edit-section-title .ic {
-  width: 16px;
-  height: 16px;
-  stroke: var(--blue);
-  stroke-width: 2;
-}
-
-/* フォームカード */
-.profile-page .form-card {
-  background: #fff;
-  border-radius: var(--radius);
-  box-shadow: none;
-  border: 1px solid var(--line-soft);
-  padding: 22px 20px;
-  margin-bottom: 16px;
 }
 
 /* このページのフィールドはデザイン指定の文字サイズ・余白に合わせる */
@@ -194,9 +170,13 @@
   border-bottom: 1px solid var(--line-soft);
   text-decoration: none;
   color: inherit;
+  transition: background 0.15s;
 }
 .profile-page .link-card-row:last-child {
   border-bottom: none;
+}
+.profile-page .link-card-row:hover {
+  background: var(--pale-2);
 }
 .profile-page .link-card-ic {
   flex-shrink: 0;
@@ -296,17 +276,6 @@
   transform: translateX(20px);
 }
 
-/* パスワード変更インラインエラー */
-.profile-page .pw-change-error {
-  font-size: 12.5px;
-  color: #e05c5c;
-  margin-bottom: 10px;
-  padding: 10px 14px;
-  background: #fff3f3;
-  border-radius: 0;
-  border: 1px solid #ffc0c0;
-}
-
 /* メール無効入力 */
 .profile-page .input-disabled {
   background: var(--line-soft) !important;
@@ -314,11 +283,11 @@
   cursor: not-allowed;
 }
 
-/* 危険ゾーン */
+/* 危険ゾーン（白地は意図的なため背景は維持し、枠・文字色を --danger に統一） */
 .profile-page .danger-zone {
   margin-top: 8px;
   padding: 18px 20px;
-  border: 1.5px solid #ffd0d0;
+  border: 1.5px solid var(--danger);
   border-radius: var(--radius);
   background: #fff;
 }
@@ -326,7 +295,7 @@
   font-family: var(--head);
   font-size: 14px;
   font-weight: 400;
-  color: #cc3333;
+  color: var(--danger);
   margin-bottom: 8px;
 }
 .profile-page .danger-zone .danger-desc {
@@ -338,7 +307,7 @@
 .profile-page .danger-zone .danger-link {
   font-size: 13px;
   font-weight: 600;
-  color: #cc3333;
+  color: var(--danger);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -376,39 +345,8 @@
   padding: 12px 22px;
 }
 
-/* 保存トースト */
-.profile-toast {
-  position: fixed;
-  bottom: 80px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--deep);
-  color: #fff;
-  font-family: var(--head);
-  font-size: 14px;
-  font-weight: 600;
-  padding: 13px 22px;
-  border-radius: 0;
-  z-index: 200;
-  box-shadow: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  white-space: nowrap;
-  animation: profile-toast-fade 2.5s ease forwards;
-}
-.profile-toast .ic {
-  width: 16px;
-  height: 16px;
-  stroke: #fff;
-  stroke-width: 2.2;
-  flex-shrink: 0;
-}
-@keyframes profile-toast-fade {
-  0% { opacity: 1; }
-  80% { opacity: 1; }
-  100% { opacity: 0; }
-}
+/* 保存トースト: 共通 .kdz-toast（katazuke-pages.css）を使用（デザイン監査2026-09-15是正）。
+   ページ固有の追加スタイルは無し。 */
 
 @media (max-width: 480px) {
   .profile-page .row-2 { grid-template-columns: 1fr; }

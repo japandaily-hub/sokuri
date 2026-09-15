@@ -176,9 +176,13 @@
   border-bottom: 1px solid var(--line-soft);
   text-decoration: none;
   color: inherit;
+  transition: background 0.15s;
 }
 .member-status-row:last-child {
   border-bottom: none;
+}
+.member-status-row:hover {
+  background: var(--pale-2);
 }
 .member-status-label {
   font-size: 14px;

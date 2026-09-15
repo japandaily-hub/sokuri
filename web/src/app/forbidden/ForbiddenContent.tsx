@@ -56,7 +56,7 @@ function ForbiddenBody() {
 
         <Link href="/" className="nf-back">
           <Ic name="arrow" style={{ transform: "scaleX(-1)" }} />
-          トップページへ戻る
+          トップへ戻る
         </Link>
         {session ? (
           <button

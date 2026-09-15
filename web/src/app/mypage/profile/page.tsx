@@ -19,6 +19,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { AppHeader } from "@/components/kdz/AppHeader";
+import { Notice } from "@/components/kdz/Notice";
 import { PasswordField } from "@/components/kdz/auth";
 import { StatusBadge, useToken } from "@/components/kdz/Ui";
 import {
@@ -80,26 +81,6 @@ const ICON_LINE = (
     <path d="M5 5h14a2 2 0 012 2v8a2 2 0 01-2 2H9l-4 4V7a2 2 0 012-2z" />
   </svg>
 );
-
-/** サーバー未到達・想定外エラー時のアラート帯（mypage/page.tsx と同じスタイル）。 */
-function ErrorBanner({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      role="alert"
-      style={{
-        marginBottom: 20,
-        padding: "12px 16px",
-        borderRadius: "var(--radius-s)",
-        background: "rgba(215,0,53,.06)",
-        color: "var(--danger)",
-        fontSize: 13,
-        border: "1px solid rgba(215,0,53,.35)",
-      }}
-    >
-      {children}
-    </div>
-  );
-}
 
 export default function ProfileEditPage() {
   const { data: sessionData, update } = useSession();
@@ -419,12 +400,12 @@ export default function ProfileEditPage() {
         <AppHeader />
         <main id="main">
           <div className="profile-wrap">
-            <ErrorBanner>
+            <Notice tone="danger">
               セッションが切れました。再ログインしてください。
               <Link href="/login" style={{ marginLeft: 8, fontWeight: 600, textDecoration: "underline" }}>
                 ログインへ
               </Link>
-            </ErrorBanner>
+            </Notice>
           </div>
         </main>
       </div>
@@ -450,7 +431,7 @@ export default function ProfileEditPage() {
         <AppHeader />
         <main id="main">
           <div className="profile-wrap">
-            <ErrorBanner>
+            <Notice tone="danger">
               {loadError ?? "プロフィールの取得に失敗しました"}
               <button
                 type="button"
@@ -459,7 +440,7 @@ export default function ProfileEditPage() {
               >
                 再読み込み
               </button>
-            </ErrorBanner>
+            </Notice>
           </div>
         </main>
       </div>
@@ -472,7 +453,7 @@ export default function ProfileEditPage() {
 
       <main id="main">
         <div className="profile-wrap">
-          {saveError ? <ErrorBanner>{saveError}</ErrorBanner> : null}
+          {saveError ? <Notice tone="danger">{saveError}</Notice> : null}
 
           {/* アバター */}
           <div className="form-card">
@@ -623,7 +604,7 @@ export default function ProfileEditPage() {
                 readOnly
               />
               <div className="field-hint">
-                メールアドレスの変更はサポートまでお問い合わせください
+                メールアドレスの変更は<Link href="/contact">お問い合わせフォーム</Link>までご連絡ください
               </div>
             </div>
           </div>
@@ -729,12 +710,13 @@ export default function ProfileEditPage() {
                   markAddressDirty();
                 }}
               />
-              <div className="field-hint">
-                保存すると下の「お住まいのエリア」も自動的に更新されます
-              </div>
             </div>
 
             {addressError ? <div className="pw-change-error">{addressError}</div> : null}
+
+            <div className="field-hint">
+              保存すると下の「お住まいのエリア」も自動的に更新されます
+            </div>
 
             <button
               type="button"
@@ -854,14 +836,12 @@ export default function ProfileEditPage() {
                       setPwCur(v);
                       setPwDone(false);
                     }}
-                    placeholder="現在のパスワード"
+                    placeholder="現在のパスワードを入力"
                     autoComplete="current-password"
                   />
                 </div>
                 <div className="field">
-                  <label htmlFor="inp-pw-new">
-                    新しいパスワード<span className="opt">8文字以上</span>
-                  </label>
+                  <label htmlFor="inp-pw-new">新しいパスワード</label>
                   <PasswordField
                     id="inp-pw-new"
                     value={pwNew}
@@ -869,9 +849,10 @@ export default function ProfileEditPage() {
                       setPwNew(v);
                       setPwDone(false);
                     }}
-                    placeholder="新しいパスワード"
+                    placeholder="新しいパスワードを入力"
                     autoComplete="new-password"
                   />
+                  <p className="field-hint">8文字以上で設定してください</p>
                 </div>
                 <div className="field">
                   <label htmlFor="inp-pw-conf">新しいパスワード（確認）</label>
@@ -935,14 +916,14 @@ export default function ProfileEditPage() {
             キャンセル
           </Link>
           <button type="button" className="btn btn-primary" onClick={() => void onSave()} disabled={saving}>
-            {saving ? <span className="spinning">↻</span> : "変更を保存"}
+            {saving ? <span className="spinning">↻</span> : "変更を保存する"}
           </button>
         </div>
       </div>
 
       {/* 保存トースト */}
       {showToast ? (
-        <div className="profile-toast" role="status">
+        <div className="kdz-toast" role="status">
           {ICON_CHECK}
           プロフィールを保存しました
         </div>

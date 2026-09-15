@@ -18,8 +18,6 @@ export default function PasswordResetPage() {
       <div className="reset-card">
         <div className="reset-panel-title">パスワード再設定は準備中です</div>
         <p className="reset-panel-sub">
-          パスワード再設定は現在準備中です。
-          <br />
           ログインできない場合は、お問い合わせフォームからご連絡ください（登録メールアドレスを添えてください）。
         </p>
         <Link href="/contact" className="btn btn-primary btn-block btn-lg">

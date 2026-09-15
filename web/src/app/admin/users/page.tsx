@@ -216,7 +216,7 @@ export default function AdminUsersPage() {
                   setIncludeDeleted(e.target.checked);
                 }}
               />
-              退会済みを含む
+              退会済みを含める
             </label>
             <label className="flex items-center gap-1.5 text-xs text-slate-500">
               <input
@@ -346,7 +346,7 @@ export default function AdminUsersPage() {
             ) : null}
           </div>
 
-          {data ? (
+          {data && !error ? (
             <AdminPagination
               total={data.total}
               limit={ADMIN_LIST_DEFAULT_LIMIT}
@@ -369,7 +369,7 @@ export default function AdminUsersPage() {
           message={
             suspendTarget.is_suspended
               ? "停止を解除すると、ユーザーは再びログイン・案件作成ができるようになります。よろしいですか？"
-              : "停止すると、ユーザーの既存トークンは失効しログインができなくなります。よろしいですか？"
+              : "停止すると、ユーザーの既存トークンは失効し、ログイン・案件作成ができなくなります。よろしいですか？"
           }
           confirmLabel={suspendTarget.is_suspended ? "停止を解除する" : "停止する"}
           danger={!suspendTarget.is_suspended}
@@ -394,7 +394,7 @@ export default function AdminUsersPage() {
           }
           message={
             roleTarget.action === "promote"
-              ? "管理者にすると、このユーザーはユーザー・業者アカウントの停止／解除や管理者権限の付与ができるようになります。よろしいですか？"
+              ? "管理者にすると、このユーザーはユーザー・業者アカウントの停止／削除、取引の強制終了、本人確認情報の閲覧など管理画面の操作全般ができるようになります。よろしいですか？"
               : "管理者権限を解除すると、このユーザーは一般のユーザーアカウントに戻ります。よろしいですか？"
           }
           confirmLabel={roleTarget.action === "promote" ? "管理者にする" : "解除する"}

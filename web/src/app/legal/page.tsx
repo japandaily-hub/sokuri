@@ -322,7 +322,7 @@ export default function LegalPage() {
           <Link href="/privacy">プライバシーポリシー</Link>
           <Link href="/terms">利用規約・業者利用規約</Link>
           <Link href="/contact">お問い合わせ</Link>
-          <Link href="/">トップページへ戻る</Link>
+          <Link href="/">トップへ戻る</Link>
         </div>
       </div>
     </main>

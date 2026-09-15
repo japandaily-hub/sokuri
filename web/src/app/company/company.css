@@ -176,7 +176,7 @@
 
 /* ---------- 理念引用（白地＋左 3px 青罫。灰色面は使わない） ---------- */
 .mission-card {
-  background: #fff;
+  background: var(--white);
   border: 0;
   border-left: 3px solid var(--primary);
   border-radius: 0;
@@ -226,7 +226,7 @@
   }
 }
 .value-card {
-  background: #fff;
+  background: var(--white);
   border-radius: 0;
   border: 0;
   padding: 0;

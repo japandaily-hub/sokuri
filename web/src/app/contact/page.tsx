@@ -42,11 +42,12 @@ export default function ContactPage() {
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [errors, setErrors] = useState<Record<FieldId, boolean>>({
-    name: false,
-    email: false,
-    category: false,
-    message: false,
+  /* インラインエラー文言。空文字列 = エラー無し（mypage/profile の seiErr 等と同じ運用）。 */
+  const [errors, setErrors] = useState<Record<FieldId, string>>({
+    name: "",
+    email: "",
+    category: "",
+    message: "",
   });
 
   /** 送信完了パネルの見出し。フォームが消えてパネルに差し替わるため、
@@ -58,18 +59,26 @@ export default function ContactPage() {
   }, [sent]);
 
   function clearError(id: FieldId) {
-    setErrors((prev) => (prev[id] ? { ...prev, [id]: false } : prev));
+    setErrors((prev) => (prev[id] ? { ...prev, [id]: "" } : prev));
   }
+
+  /** 必須項目ごとの文言。フィールド名を主語にして「何を・どう直せばよいか」まで書く。 */
+  const REQUIRED_MESSAGE: Record<FieldId, string> = {
+    name: "お名前を入力してください",
+    email: "メールアドレスを入力してください",
+    category: "お問い合わせ種別を選択してください",
+    message: "お問い合わせ内容を入力してください",
+  };
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (sending) return; // 二重送信防止
     const form = e.currentTarget;
-    const next: Record<FieldId, boolean> = {
-      name: false,
-      email: false,
-      category: false,
-      message: false,
+    const next: Record<FieldId, string> = {
+      name: "",
+      email: "",
+      category: "",
+      message: "",
     };
     let ok = true;
     for (const id of REQUIRED) {
@@ -79,11 +88,11 @@ export default function ContactPage() {
         | HTMLTextAreaElement
         | null;
       if (!el || !el.value.trim()) {
-        next[id] = true;
+        next[id] = REQUIRED_MESSAGE[id];
         ok = false;
       } else if (id === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(el.value.trim())) {
         // メール形式の検証（noValidate のためネイティブ検証は効かない）
-        next[id] = true;
+        next[id] = "メールアドレスの形式が正しくありません";
         ok = false;
       }
     }
@@ -195,7 +204,7 @@ export default function ContactPage() {
             <Link href="/login?callbackUrl=%2Fmypage" className="btn btn-line btn-lg">
               <span className="btn-line__tile" aria-hidden="true" />
               <span className="btn-line__body">
-                <span className="btn-line__label">LINEではじめる</span>
+                <span className="btn-line__label">LINEではじめる（無料）</span>
                 <span className="btn-line__sub">LINEアカウントでログインできます</span>
               </span>
               <Ic name="arrow" className="btn-line__arr" />
@@ -262,6 +271,7 @@ export default function ContactPage() {
                         className={errors.name ? "has-error" : undefined}
                         onInput={() => clearError("name")}
                       />
+                      {errors.name ? <p className="field-error">{errors.name}</p> : null}
                     </div>
                     <div className="field">
                       <label htmlFor="kana">
@@ -291,6 +301,7 @@ export default function ContactPage() {
                       className={errors.email ? "has-error" : undefined}
                       onInput={() => clearError("email")}
                     />
+                    {errors.email ? <p className="field-error">{errors.email}</p> : null}
                   </div>
 
                   <div className="field">
@@ -347,6 +358,7 @@ export default function ContactPage() {
                         <option value="other">その他</option>
                       </select>
                     </div>
+                    {errors.category ? <p className="field-error">{errors.category}</p> : null}
                   </div>
 
                   <div className="field">
@@ -360,6 +372,7 @@ export default function ContactPage() {
                       className={errors.message ? "has-error" : undefined}
                       onInput={() => clearError("message")}
                     />
+                    {errors.message ? <p className="field-error">{errors.message}</p> : null}
                   </div>
 
                   <div className="submit-area">

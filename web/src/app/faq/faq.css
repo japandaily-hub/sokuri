@@ -7,7 +7,7 @@
  * .faq-page / .faq-body / .container に overflow を書かない。 */
 
 .faq-page {
-  background: #fff;
+  background: var(--white);
 }
 
 /* ---------- ヒーロー写真帯（高さ・veil・画像位置は .hero-band の正典） ---------- */
@@ -32,7 +32,7 @@
    ラウンド6 指摘（5/9）: DOM 順は 帯 → リード文 → 検索窓。検索窓の上は余白だけで切り、
    ヘアラインは置かない（帯とフォームが1つの塊に見えるのを、罫ではなく間合いで解く）。 */
 .faq-page .faq-searchbar {
-  background: #fff;
+  background: var(--white);
   padding: clamp(16px, 2vw, 24px) 0 clamp(12px, 1.4vw, 18px);
 }
 .faq-page .faq-search-wrap {
@@ -48,7 +48,7 @@
   font-size: 15px;
   font-family: var(--ui);
   color: var(--ink);
-  background: #fff;
+  background: var(--white);
   transition: border-color .2s;
 }
 .faq-page .faq-search::placeholder { color: var(--body-soft); }
@@ -91,7 +91,7 @@
 /* 帯を受ける余白はこの面の上パディングが持つ（ラウンド6 指摘 5: モバイルで検索窓が帯の
    下端に接し、帯とフォームが1つの塊に見えていた）。下は検索窓が続くので詰める。 */
 .faq-page .faq-lead {
-  background: #fff;
+  background: var(--white);
   padding: clamp(20px, 5vw, 32px) 0 0;
 }
 .faq-page .faq-lead p {
@@ -119,7 +119,7 @@
   border-bottom: 1px solid var(--line-soft);
   position: sticky;
   top: 73px;
-  background: #fff;
+  background: var(--white);
   z-index: 20;
 }
 .faq-page .faq-cats-inner {
@@ -134,7 +134,7 @@
   padding: 7px 14px;
   border-radius: 0;
   border: 1px solid var(--line);
-  background: #fff;
+  background: var(--white);
   color: var(--body-soft);
   cursor: pointer;
   transition: border-color .2s, color .2s;
@@ -144,7 +144,7 @@
   flex: 0 0 auto;
 }
 .faq-page .cat-chip:hover { border-color: var(--primary); color: var(--primary); }
-.faq-page .cat-chip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.faq-page .cat-chip.active { background: var(--primary); border-color: var(--primary); color: var(--white); }
 .faq-page .cat-chip .ic { font-size: 14px; stroke-width: 1.8; }
 
 /* ---------- コンテンツレイアウト ---------- */
@@ -289,7 +289,7 @@
   border-bottom: 1px solid var(--line-soft);
   border-radius: 0;
   margin-bottom: 0;
-  background: #fff;
+  background: var(--white);
   box-shadow: none;
 }
 

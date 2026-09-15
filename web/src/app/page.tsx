@@ -43,7 +43,7 @@ const FAQ_ITEMS = [
   { q: "しつこい営業電話は来ますか？", a: "連絡が来るのは、あなたが選んだ1社だけ。選ぶまで連絡先は業者に開示されず、選ばなかった業者には自動でお断りが入るため、一斉架電は起こりません。" },
   { q: "個人情報はどう扱われますか？", a: "査定段階で業者に渡るのは、写真・品目・地域（都道府県・市区町村）・住居情報などの出品内容のみ。お名前や電話番号が業者に渡ることはなく、詳細住所と連絡用のメールアドレスも交渉が成立した1社にのみ開示されます。" },
   { q: "利用にお金はかかりますか？", a: "出品・査定・成約まで、すべて無料です。費用は一切かかりません。" },
-  { q: "訪問買取に不安があります", a: "参加するのは、古物商許可番号の登録を必須とし、運営が許可証を確認した登録事業者のみ。訪問による買取には特定商取引法（訪問購入）の規定が適用される場合があり、クーリング・オフの可否は品目や契約に至った経緯によって異なります。業者から交付される書面をご確認ください。" },
+  { q: "訪問買取は安全ですか？", a: "参加するのは、古物商許可番号の登録を必須とし、運営が許可証を確認した登録事業者のみ。訪問による買取には特定商取引法（訪問購入）の規定が適用される場合があり、クーリング・オフの可否は品目や契約に至った経緯によって異なります。業者から交付される書面をご確認ください。" },
 ];
 
 /** ご利用の流れ。ラウンド5 までは既存 3D シリーズ（/img/real/how-*.webp）を 220px の枠で使っていたが、
@@ -119,7 +119,7 @@ export default function HomePage() {
                 <Link href="/login?callbackUrl=%2Fmypage" className="btn btn-line btn-lg">
                   <span className="btn-line__tile" aria-hidden="true" />
                   <span className="btn-line__body">
-                    <span className="btn-line__label">LINEで無料ではじめる</span>
+                    <span className="btn-line__label">LINEではじめる（無料）</span>
                     <span className="btn-line__sub">LINEアカウントでログインできます</span>
                   </span>
                   <Ic name="arrow" className="btn-line__arr" />
@@ -221,7 +221,7 @@ export default function HomePage() {
               <Link href="/login?callbackUrl=%2Fmypage" className="btn btn-line btn-lg">
                 <span className="btn-line__tile" aria-hidden="true" />
                 <span className="btn-line__body">
-                  <span className="btn-line__label">LINEで無料ではじめる</span>
+                  <span className="btn-line__label">LINEではじめる（無料）</span>
                   {/* ラウンド6 指摘（10）: 補足が左の .scta-text「登録・査定・お断りまですべて無料」と
                       同内容で、同一視野に同じ文が 2 回出ていた。無料の条件は左のテキスト側に持たせ、
                       ボタン内はヒーロー／最終 CTA と同じ「押した先で何が起きるか」に戻す。 */}
@@ -444,7 +444,7 @@ export default function HomePage() {
                       対応エリアは .assure 帯・/vendors と同じ 4 都県、審査の運用は /business
                       （審査制）と /vendors の空状態文（「運営が承認した業者のみを掲載します」）の
                       再掲で、新しい約束・期間・効果は足していない。 */}
-                  <div className="ti-body"><h3>登録制の事業者のみ</h3><p>査定に参加するのは登録された買取事業者だけ。古物営業に必要な古物商許可を、登録時・取引前に確認します。対応エリアは東京・千葉・埼玉・神奈川で、審査を通過した業者から順に参加します。</p></div>
+                  <div className="ti-body"><h3>登録事業者のみ</h3><p>査定に参加するのは登録された買取事業者だけ。古物営業に必要な古物商許可を、登録時・取引前に確認します。対応エリアは東京・千葉・埼玉・神奈川で、審査を通過した業者から順に参加します。</p></div>
                 </article>
                 <article className="trust-item">
                   <span className="ti-ic"><Ic name="lock" /></span>
@@ -571,15 +571,13 @@ export default function HomePage() {
           <div className="container">
             {/* ラウンド4（12）: リンク先は自社ログイン画面（/login?callbackUrl=%2Fmypage、
                 2026-09-15にユーザー指示で/createから変更）。LINEログイン成功時にbot_prompt
-                （auth.ts）で友だち追加の確認画面を挟むようになった。
-                [要確認] 直下のコピー「すぐに出品をはじめられます」は/create直行だった頃の
-                文言のまま。着地先変更に合わせた見直しは未対応（ユーザー確認待ち）。 */}
-            <p>まずは1枚、撮ってみることから。LINEアカウントでログインすれば、すぐに出品をはじめられます。登録・査定は無料です。</p>
+                （auth.ts）で友だち追加の確認画面を挟むようになった。 */}
+            <p>まずは1枚、撮ってみることから。LINEアカウントでログインして、マイページから出品をはじめましょう。登録・査定は無料です。</p>
             <div className="final-cta">
               <Link href="/login?callbackUrl=%2Fmypage" className="btn btn-line btn-lg">
                 <span className="btn-line__tile" aria-hidden="true" />
                 <span className="btn-line__body">
-                  <span className="btn-line__label">LINEではじめる</span>
+                  <span className="btn-line__label">LINEではじめる（無料）</span>
                   <span className="btn-line__sub">LINEアカウントでログインできます</span>
                 </span>
                 <Ic name="arrow" className="btn-line__arr" />

@@ -43,7 +43,7 @@ import {
 const STATUS_OPTIONS: { value: AdminIdentityStatusFilter; label: string }[] = [
   { value: "pending", label: "審査待ち" },
   { value: "approved", label: "承認済み" },
-  { value: "rejected", label: "差し戻し" },
+  { value: "rejected", label: "却下" },
   { value: "all", label: "すべて" },
 ];
 
@@ -316,7 +316,7 @@ export default function AdminIdentityDocumentsPage() {
               <p className="py-6 text-center text-sm text-slate-500">該当する提出はありません。</p>
             ) : null}
           </div>
-          {data ? (
+          {data && !error ? (
             <AdminPagination
               total={data.total}
               limit={ADMIN_LIST_DEFAULT_LIMIT}
@@ -387,13 +387,13 @@ export default function AdminIdentityDocumentsPage() {
               ) : null}
             </div>
             {imagesError ? (
-              <p className="mt-2 text-xs text-red-600">{imagesError}</p>
+              <p className="mt-2 text-xs text-kdz-danger">{imagesError}</p>
             ) : null}
 
             {showRejectForm ? (
               <div className="mt-4">
                 <label className="text-xs text-slate-500" htmlFor="reject-reason">
-                  却下理由（本人に表示されます）
+                  却下理由（必須・本人に表示されます）
                 </label>
                 <textarea
                   id="reject-reason"
@@ -404,7 +404,7 @@ export default function AdminIdentityDocumentsPage() {
                   placeholder="例: 書類の住所が登録住所と一致していません"
                 />
                 {rejectFormError ? (
-                  <p className="mt-1 text-xs text-red-600">{rejectFormError}</p>
+                  <p className="mt-1 text-xs text-kdz-danger">{rejectFormError}</p>
                 ) : null}
                 <div className="mt-2 flex justify-end gap-2">
                   <button

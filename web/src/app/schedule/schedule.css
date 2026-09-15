@@ -173,6 +173,7 @@
   justify-content: center;
   transition: .15s;
   color: var(--ink);
+  white-space: normal;
 }
 .schedule-page .cal-nav-btn:hover { border-color: var(--blue); color: var(--blue); }
 .schedule-page .cal-nav-btn svg {
@@ -367,6 +368,8 @@
 .schedule-page .confirm-val { color: var(--ink); font-weight: 600; }
 .schedule-page .confirm-val.pending { color: var(--line); font-weight: 600; font-style: italic; }
 
+.schedule-page .confirm-error { margin-top: 10px; margin-bottom: 0; }
+
 .schedule-page .confirm-btn {
   width: 100%;
   padding: 14px;
@@ -384,6 +387,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
+  white-space: normal;
 }
 .schedule-page .confirm-btn:hover:not(:disabled) { background: var(--blue-d); }
 .schedule-page .confirm-btn:disabled { background: var(--line); cursor: not-allowed; transform: none; }

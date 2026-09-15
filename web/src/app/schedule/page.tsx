@@ -8,6 +8,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { Ic } from "@/components/kdz/Icons";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import { useToken } from "@/components/kdz/Ui";
+import { Notice } from "@/components/kdz/Notice";
 import {
   confirmSchedule,
   getTransaction,
@@ -495,7 +496,7 @@ function SchedulePageInner() {
               </span>
             </div>
             {submitError ? (
-              <p style={{ marginTop: 10, fontSize: 12.5, color: "var(--danger)" }}>{submitError}</p>
+              <Notice tone="danger" className="confirm-error">{submitError}</Notice>
             ) : null}
             <button type="button" className="confirm-btn" disabled={!canConfirm} onClick={() => void handleConfirm()}>
               <Ic name="check" />
@@ -536,12 +537,9 @@ function SchedulePageInner() {
               業者に通知しました。確定内容はマイページとチャットで確認できます。
             </p>
             <div className="sch-modal-btns">
-              <Link href="/mypage" className="btn btn-primary btn-lg">
-                申し込み状況を確認する
+              <Link href={`/cases/${detail.case_id}`} className="btn btn-primary btn-lg">
+                マイ案件を確認する
                 <Ic name="arrow" />
-              </Link>
-              <Link href="/mypage" className="btn btn-ghost btn-lg">
-                マイページへ
               </Link>
             </div>
           </div>

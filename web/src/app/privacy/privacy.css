@@ -114,14 +114,14 @@
   letter-spacing: .04em;
   line-height: 1.6;
   color: var(--body-soft);
-  background: #fff;
+  background: var(--white);
   border: 1px solid var(--line);
   border-radius: 0;
   padding: 0 6px;
   white-space: nowrap;
 }
 .legal-body.privacy-body .pp-tag--req {
-  color: #fff;
+  color: var(--white);
   background: var(--blue);
   border-color: var(--blue);
 }

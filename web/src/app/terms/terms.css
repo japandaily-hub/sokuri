@@ -50,7 +50,7 @@
 /* 要点3つ（本文の要約。根拠となる条を併記する） */
 .terms-points { padding: clamp(28px, 4vw, 44px) 0 clamp(28px, 4vw, 44px); }
 .terms-points__inner { max-width: 760px; margin: 0 auto; padding-inline: 24px; }
-.terms-points__title {
+.doc-section-title {
   font-family: var(--head); font-weight: 600; font-size: 17px; color: var(--ink);
   padding-bottom: 12px; border-bottom: 1px solid var(--line); margin-bottom: 4px;
 }

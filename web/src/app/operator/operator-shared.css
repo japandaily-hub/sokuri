@@ -62,9 +62,9 @@
   line-height: 1.75;
   margin-bottom: 16px;
 }
-.op-alert.success { background: #eef7f0; color: #1f5c33; border-color: #b9dcc3; }
+.op-alert.success { background: var(--mint); color: #1f5c33; border-color: #b9dcc3; }
 .op-alert.warn { background: var(--warm); color: var(--gold-text); border: 1px solid var(--gold); }
-.op-alert.error { background: rgba(215,0,53,.08); color: var(--danger); border: 1px solid var(--danger); }
+.op-alert.error { background: var(--danger-bg-soft); color: var(--danger); border: 1px solid var(--danger-border-soft); }
 .op-alert.info { background: var(--pale); color: var(--body); border: 1px solid var(--line); }
 
 /* 減額申請中などの注意チップ（cases.css の .status-chip に無い amber バリアント） */
@@ -445,6 +445,15 @@
 .btn-modal-confirm.danger { background: var(--danger); box-shadow: none; }
 .btn-modal-confirm.danger:hover { opacity: .85; }
 
+/* 危険操作ボタン（取引キャンセル等）。.btn の危険バリアント。 */
+.btn.btn-danger-ghost {
+  background: var(--white);
+  color: var(--danger);
+  border: 1.5px solid var(--danger);
+}
+.btn.btn-danger-ghost:hover { background: var(--danger-bg-soft); }
+.btn.btn-danger-ghost:disabled { opacity: .6; cursor: not-allowed; }
+
 /* 案件一覧の絞り込み行（/operator/cases） */
 .lot-filters {
   display: flex;
@@ -460,14 +469,15 @@
 .lot-filters .lot-filter { display: inline-flex; align-items: center; gap: 8px; color: var(--body); }
 .lot-filters .lot-filter select {
   font: inherit;
-  font-family: var(--body-font, inherit);
+  font-family: var(--ui);
   padding: 6px 10px;
   border: 1px solid var(--line);
   border-radius: 0;
-  background: #fff;
+  background: var(--white);
   color: var(--ink);
   max-width: 100%;
 }
+.lot-filters .lot-filter select:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 .lot-filters .lot-filter-check input { width: 16px; height: 16px; accent-color: var(--primary); }
 .lot-filters .lot-filter-count { margin-left: auto; color: var(--body-soft); }
 .lot-filter-empty { padding: 28px 0; text-align: center; color: var(--body-soft); font-size: 13.5px; }

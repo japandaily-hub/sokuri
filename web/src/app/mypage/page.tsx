@@ -24,6 +24,7 @@ import { useSearchParams } from "next/navigation";
 import { Spinner } from "@/components/Icon";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import { Ic } from "@/components/kdz/Icons";
+import { Notice } from "@/components/kdz/Notice";
 import { caseItemsLabel, formatPurposeLabel } from "@/lib/case-labels";
 import { formatVisitSchedule } from "@/lib/categories";
 import { StatusBadge, useToken } from "@/components/kdz/Ui";
@@ -291,22 +292,12 @@ function MyPageContent() {
       <div className="mypage-page">
         <AppHeader />
         <main id="main" className="my-wrap">
-          <div
-            role="alert"
-            style={{
-              padding: "12px 16px",
-              borderRadius: "var(--radius-s)",
-              background: "rgba(215,0,53,.06)",
-              color: "var(--danger)",
-              fontSize: 13,
-              border: "1px solid rgba(215,0,53,.35)",
-            }}
-          >
+          <Notice tone="danger">
             セッションが切れました。再ログインしてください。
             <Link href="/login" style={{ marginLeft: 8, fontWeight: 600, textDecoration: "underline" }}>
               ログインへ
             </Link>
-          </div>
+          </Notice>
         </main>
       </div>
     );
@@ -328,22 +319,7 @@ function MyPageContent() {
       <AppHeader />
 
       <main id="main" className="my-wrap">
-        {error ? (
-          <div
-            role="alert"
-            style={{
-              marginBottom: 20,
-              padding: "12px 16px",
-              borderRadius: "var(--radius-s)",
-              background: "rgba(215,0,53,.06)",
-              color: "var(--danger)",
-              fontSize: 13,
-              border: "1px solid rgba(215,0,53,.35)",
-            }}
-          >
-            {error}
-          </div>
-        ) : null}
+        {error ? <Notice tone="danger">{error}</Notice> : null}
 
         {/* ユーザーカード */}
         <div className="user-card">
@@ -384,7 +360,7 @@ function MyPageContent() {
             <div className="sum-sub">業者からの入札を受付中です</div>
           </Link>
           <Link href="/mypage?tab=done" className="sum-card" style={{ textDecoration: "none" }}>
-            <div className="sum-label">交渉中</div>
+            <div className="sum-label">訪問調整中</div>
             <div className="sum-val">
               {negotiatingCount}
               <span>件</span>
@@ -415,7 +391,7 @@ function MyPageContent() {
           <div className="user-card-info" style={{ fontSize: 13, color: "var(--body-soft)" }}>
             入札の通知は、LINE連携済みの方はLINEで、未連携の方はメールでお知らせします。チャットの新着通知はLINE連携済みの方のみに届きます。
             <Link href="/notifications" style={{ marginLeft: 6, fontWeight: 600 }}>
-              通知設定を見る（本人確認のためパスワード入力があります）→
+              通知設定を見る →
             </Link>
           </div>
         </div>

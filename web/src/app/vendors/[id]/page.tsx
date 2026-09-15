@@ -65,7 +65,7 @@ export default function VendorDetailPage() {
           <div className="vendor-wrap">
             <Notice tone="error">{error ?? "業者情報が見つかりません。"}</Notice>
             <Link href="/mypage" className="vendor-back" style={{ marginTop: 16 }}>
-              <svg viewBox="0 0 24 24">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M19 12H5M11 6l-6 6 6 6" />
               </svg>
               マイ案件一覧に戻る
@@ -87,7 +87,7 @@ export default function VendorDetailPage() {
         <div className="vendor-wrap">
           {/* 業者一覧に戻る */}
           <Link href="/vendors" className="vendor-back">
-            <svg viewBox="0 0 24 24">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M19 12H5M11 6l-6 6 6 6" />
             </svg>
             登録業者一覧に戻る

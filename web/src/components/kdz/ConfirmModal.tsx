@@ -158,7 +158,7 @@ export function ConfirmModal({
               個人情報や誹謗中傷は記載しないでください（残り{REASON_MAX_LENGTH - reason.length}文字）
             </p>
             {reasonMissing ? (
-              <p className="mt-1 text-xs text-red-600">理由を入力してください</p>
+              <p className="mt-1 text-xs text-kdz-danger">理由を入力してください</p>
             ) : null}
           </div>
         ) : null}
@@ -184,7 +184,7 @@ export function ConfirmModal({
               }}
             />
             {passwordMissing ? (
-              <p className="mt-1 text-xs text-red-600">パスワードを入力してください</p>
+              <p className="mt-1 text-xs text-kdz-danger">パスワードを入力してください</p>
             ) : null}
           </div>
         ) : null}

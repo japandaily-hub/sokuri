@@ -1105,9 +1105,9 @@ export type IdentityDocType =
 
 export const IDENTITY_STATUS_LABEL: Record<IdentityStatus, string> = {
   unverified: "未提出",
-  pending: "審査中",
+  pending: "審査待ち",
   approved: "承認済み",
-  rejected: "差し戻し",
+  rejected: "却下",
 };
 
 /** 提出フォームの書類種別 select 選択肢（裏面要否・注記を含む）。この配列が唯一の情報源。 */

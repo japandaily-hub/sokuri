@@ -433,6 +433,9 @@
 }
 .opchat-page .btn-send:hover { background: var(--blue-d); }
 .opchat-page .btn-send:disabled { opacity: .5; cursor: not-allowed; }
+/* 送信中の視覚フィードバック（アイコンのみのボタンのため、他の送信系ボタンのようなテキスト
+   切替ができない。送信アイコンの回転で送信中であることを示す）。 */
+.opchat-page .btn-send.is-sending { opacity: .7; }
 .opchat-page .btn-send svg {
   width: 18px;
   height: 18px;

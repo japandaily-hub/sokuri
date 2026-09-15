@@ -196,7 +196,7 @@ function ReviewPageInner() {
             <Notice tone="error">この取引はキャンセルされました。</Notice>
           ) : (
             <Notice tone="info">
-              取引が進行中です（{TXN_STATUS_LABEL[txn.status]}）。作業完了後に業者を評価できます。
+              取引が進行中です（{TXN_STATUS_LABEL[txn.status]}）。
             </Notice>
           )}
 
@@ -288,7 +288,7 @@ function ReviewPageInner() {
               <div className="tag-title">コメント（任意）</div>
               <textarea
                 className="review-textarea"
-                placeholder="業者の対応や査定の印象をご記入ください。"
+                placeholder="業者の対応の感想（任意）"
                 maxLength={MAX_COMMENT}
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}

@@ -63,6 +63,7 @@ function VerifyEmailContent() {
             <span
               key={i}
               className="confetti-dot"
+              aria-hidden="true"
               style={{
                 background: d.background,
                 left: d.left,
@@ -75,12 +76,12 @@ function VerifyEmailContent() {
         </div>
 
         <h1 className="confirm-title">
-          ご登録
+          メールアドレスの確認が
           <br />
-          ありがとうございます。
+          完了しました。
         </h1>
         <p className="confirm-sub">
-          登録いただいたメールアドレスはこちらです。
+          ご登録ありがとうございます。下記のメールアドレスで受け付けました。
           <br />
           さっそく出品を始めましょう。
         </p>
@@ -116,7 +117,7 @@ function VerifyEmailContent() {
           <Ic name="arrow" />
         </Link>
         <Link href="/" className="btn btn-ghost btn-block" style={{ marginTop: 10 }}>
-          トップページへ
+          トップへ戻る
         </Link>
       </div>
 

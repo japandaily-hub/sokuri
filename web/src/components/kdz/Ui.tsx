@@ -38,9 +38,9 @@ export function PageShell({
     <div className="container-aw py-10">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-normal text-slate-900">{title}</h1>
+          <h1 className="text-2xl font-normal text-kdz-ink">{title}</h1>
           {description ? (
-            <p className="mt-1.5 text-sm text-slate-500">{description}</p>
+            <p className="mt-1.5 text-sm text-kdz-bodysoft">{description}</p>
           ) : null}
         </div>
         {actions}
@@ -59,7 +59,7 @@ export function Card({
 }) {
   return (
     <div
-      className={`rounded-none border border-slate-200 bg-white p-5 ${className}`}
+      className={`rounded-none border border-kdz-line bg-white p-5 ${className}`}
     >
       {children}
     </div>
@@ -123,7 +123,7 @@ export function StatusBadge({
 export const btnPrimary =
   "inline-flex items-center justify-center gap-1.5 rounded-none bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50";
 export const btnSecondary =
-  "inline-flex items-center justify-center gap-1.5 rounded-none border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex items-center justify-center gap-1.5 rounded-none border border-kdz-line bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50";
 export const btnDanger =
   "inline-flex items-center justify-center gap-1.5 rounded-none border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50";
 export const inputBase =

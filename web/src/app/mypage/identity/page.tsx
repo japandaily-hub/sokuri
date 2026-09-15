@@ -19,6 +19,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AppHeader } from "@/components/kdz/AppHeader";
+import { Notice } from "@/components/kdz/Notice";
 import { StatusBadge, useToken } from "@/components/kdz/Ui";
 import {
   getMyIdentity,
@@ -48,25 +49,6 @@ const ICON_UP = (
     <path d="M12 19V6M6 12l6-6 6 6" />
   </svg>
 );
-
-function ErrorBanner({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      role="alert"
-      style={{
-        marginBottom: 20,
-        padding: "12px 16px",
-        borderRadius: "var(--radius-s)",
-        background: "rgba(215,0,53,.06)",
-        color: "var(--danger)",
-        fontSize: 13,
-        border: "1px solid rgba(215,0,53,.35)",
-      }}
-    >
-      {children}
-    </div>
-  );
-}
 
 /** 選択済み/取得済み画像の小サムネイル表示。Blob URL の生成・破棄は呼び出し側が行う。 */
 function ImageThumb({ label, src }: { label: string; src: string | null }) {
@@ -258,12 +240,12 @@ export default function IdentityPage() {
         <AppHeader />
         <main id="main">
           <div className="identity-wrap">
-            <ErrorBanner>
+            <Notice tone="danger">
               セッションが切れました。再ログインしてください。
               <Link href="/login" style={{ marginLeft: 8, fontWeight: 600, textDecoration: "underline" }}>
                 ログインへ
               </Link>
-            </ErrorBanner>
+            </Notice>
           </div>
         </main>
       </div>
@@ -289,7 +271,7 @@ export default function IdentityPage() {
         <AppHeader />
         <main id="main">
           <div className="identity-wrap">
-            <ErrorBanner>
+            <Notice tone="danger">
               {loadError ?? "本人確認状況の取得に失敗しました"}
               <button
                 type="button"
@@ -298,7 +280,7 @@ export default function IdentityPage() {
               >
                 再読み込み
               </button>
-            </ErrorBanner>
+            </Notice>
           </div>
         </main>
       </div>
@@ -313,7 +295,7 @@ export default function IdentityPage() {
       <AppHeader />
       <main id="main">
         <div className="identity-wrap">
-          {loadError ? <ErrorBanner>{loadError}</ErrorBanner> : null}
+          {loadError ? <Notice tone="danger">{loadError}</Notice> : null}
 
           <div className="edit-section-title">
             {ICON_SHIELD}
@@ -373,7 +355,7 @@ export default function IdentityPage() {
           <div className="id-notice-box">
             <ul>
               <li>ご提出は任意です。いただいた書類・生年月日・職業は、なりすまし・不正出品の防止、および運営からの本人確認のために利用し、業者へお渡しすることはありません。</li>
-              <li>訪問時に、業者から古物営業法に基づく本人確認（住所・氏名・職業・年齢の確認のための身分証のご提示）を求められることがあります。買取金額が1万円以上の場合のほか、ゲームソフト・CD/DVD・書籍・バイク等の一部の品目は、金額にかかわらず確認の対象です。</li>
+              <li>訪問時、業者から本人確認のため身分証の提示を求められることがあります（古物営業法に基づくものです）。買取金額が1万円以上の場合や、ゲームソフト・CD/DVD・書籍・バイクなど一部の品目では、金額にかかわらず確認が必要です。</li>
               <li>有効期限内の書類をご提出ください。</li>
               <li>書類に記載の住所が、プロフィールに登録した住所と一致している必要があります。</li>
               <li>健康保険証は住所記載がない場合があるため、承認できないことがあります。</li>

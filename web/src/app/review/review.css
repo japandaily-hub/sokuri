@@ -132,7 +132,7 @@
 .review-page .next-action-btn {
   display: flex; align-items: center; gap: 12px;
   background: #fff; border-radius: 0; border: 1px solid var(--line-soft);
-  padding: 14px 16px; text-decoration: none; transition: .2s;
+  padding: 14px 16px; text-decoration: none; transition: .2s; white-space: normal;
 }
 .review-page .next-action-btn:hover { box-shadow: none; }
 .review-page .next-action-ic {

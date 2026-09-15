@@ -6,13 +6,13 @@
 
 /* ---------- 認証・フォーム共通（ログイン/新規登録/PWリセット等） ---------- */
 /* 認証画面: 人の森の作法＝白地に淡い若草の blob。カードは 1px ヘアラインで区切る（面は使わない） */
-.auth-page { background: #fff; min-height: 100vh; position: relative; overflow: hidden; }
-.auth-page::before { content: ""; position: absolute; right: -18vw; top: -34vh; width: 62vw; height: 110vh; background: #e8effc;
+.auth-page { background: var(--white); min-height: 100vh; position: relative; overflow: hidden; }
+.auth-page::before { content: ""; position: absolute; right: -18vw; top: -34vh; width: 62vw; height: 110vh; background: var(--pale);
   border-radius: 42% 58% 55% 45% / 48% 42% 58% 52%; pointer-events: none; z-index: 0; }
 .auth-page > * { position: relative; z-index: 1; }
 
 .auth-bar {
-  background: #fff;
+  background: var(--white);
   border-bottom: 1px solid var(--line);
   padding: 0 24px;
   height: 68px;
@@ -26,7 +26,7 @@
 .auth-wrap { max-width: 440px; margin: 0 auto; padding: 40px 20px 80px; }
 
 .auth-card {
-  background: #fff;
+  background: var(--white);
   border-radius: 0;
   box-shadow: none;
   padding: 36px 32px 32px;
@@ -57,12 +57,12 @@
 .forget-link:hover { text-decoration: underline; }
 .field input, .field textarea, .field select {
   width: 100%; font-size: 15px; color: var(--ink);
-  background: #fff; border: 1px solid #ddd; border-radius: 0;
+  background: var(--white); border: 1px solid var(--line); border-radius: 0;
   padding: 12px 14px; transition: border-color .2s;
 }
-.field input::placeholder { color: #999; }
+.field input::placeholder { color: var(--body-soft); }
 .field input:focus, .field textarea:focus, .field select:focus {
-  border-color: var(--primary); background: #fff;
+  border-color: var(--primary); background: var(--white);
 }
 .field.has-error input, .field.has-error textarea { border-color: var(--danger); }
 .field-error { font-size: 12px; color: var(--danger); margin-top: 5px; }
@@ -80,7 +80,7 @@
 
 /* エラーバナー */
 .auth-error {
-  background: #fff; border: 1px solid var(--danger); border-radius: 0;
+  background: var(--white); border: 1px solid var(--danger); border-radius: 0;
   padding: 11px 14px; font-size: 14px; color: var(--danger); margin-bottom: 18px;
   display: flex; align-items: center; gap: 8px; line-height: 1.6;
 }
@@ -90,6 +90,26 @@
    はみ出す。@media(max-width:480px) 版の安全弁はビューポート判定のためデスクトップ幅
    では効かず、ここでは常時折り返し可能にする。 */
 .auth-error .btn-ghost { white-space: normal; line-height: 1.4; }
+
+/* 汎用通知バナー（デザイン監査 2026-09-15 是正）
+   mypage/operator/create 配下で rgba(215,0,53,.06〜.35) や #fff3f3/#ffc0c0/#e05c5c、
+   独自の warning パレット(#fff8e6等)が各ページ・各CSSファイルに個別に直書きされ、
+   同じ「エラー/警告/成功/情報」バナーが見た目バラバラに重複実装されていた。
+   非admin画面（依頼者/業者向け）はこれを正典として使う。admin配下は既存の
+   components/kdz/Ui.tsx の Notice（Tailwind版）を引き続き使用する（別レイヤーのため統合しない）。
+   使い方: <div className="notice notice--danger">…</div>（または components/kdz/Notice.tsx の <Notice tone="danger">）。 */
+.notice {
+  border-radius: var(--radius-s); padding: 11px 14px; font-size: 14px;
+  line-height: 1.6; margin-bottom: 18px; display: flex; align-items: flex-start; gap: 8px;
+  border: 1px solid transparent;
+}
+.notice .notice-ic { flex-shrink: 0; width: 16px; height: 16px; margin-top: 2px; }
+.notice--danger { background: var(--danger-bg-soft); color: var(--danger); border-color: var(--danger-border-soft); }
+.notice--warn { background: var(--warm); color: var(--gold-text); border-color: var(--gold); }
+.notice--success { background: var(--mint); color: #1f5c33; border-color: #b9dcc3; }
+.notice--info { background: var(--pale); color: var(--body); border-color: var(--line); }
+/* バナー内のボタンも .auth-error と同じく長文言の折り返しを既定にする（再発防止）。 */
+.notice .btn-ghost, .notice .btn { white-space: normal; line-height: 1.4; }
 
 /* 信頼行 */
 .trust-row { display: flex; gap: 18px; margin-top: 22px; justify-content: center; flex-wrap: wrap; }
@@ -108,12 +128,14 @@
    マークを再び出すときは公式素材を <img> で置くこと（path の自作・再描画はしない）。 */
 .btn-line-auth {
   width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;
-  background: #06c755; color: #fff; border: none; border-radius: 99px; padding: 16px 20px;
+  /* #06c755 は LINE 公式ブランドカラー固定値（デザイン監査2026-09-15で確認済み。
+     トークン化はせず、hover含め意図的にこの2箇所で直書きを維持する）。 */
+  background: #06c755; color: var(--white); border: none; border-radius: 99px; padding: 16px 20px;
   max-width: 360px; margin-left: auto; margin-right: auto; /* 巨大ピルが版面の重心を支配しないよう幅を抑える（外形は公式ボタンに寄せるが、公式ボタンそのものではない） */
   font-family: var(--head); font-size: 16px; font-weight: 600; letter-spacing: .08em; cursor: pointer;
   box-shadow: none; transition: opacity .25s;
 }
-.btn-line-auth:hover { background: #06c755; opacity: .8; }
+.btn-line-auth:hover { background: #06c755; /* 同上: LINEブランド色を維持（hover時も色相を変えない） */ opacity: .8; }
 .btn-line-auth:disabled { opacity: .7; cursor: default; }
 
 /* トースト通知 */
@@ -128,7 +150,7 @@
   position: fixed; inset: 0; background: rgba(51,51,51,.45); backdrop-filter: none;
   z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px;
 }
-.kdz-modal { background: #fff; border: 1px solid var(--line); border-radius: 0; max-width: 400px; width: 100%; padding: 32px 28px; box-shadow: none; }
+.kdz-modal { background: var(--white); border: 1px solid var(--line); border-radius: 0; max-width: 400px; width: 100%; padding: 32px 28px; box-shadow: none; }
 .kdz-modal h2 { font-family: var(--head); font-size: 21px; font-weight: 400; color: var(--ink); margin-bottom: 8px; }
 .kdz-modal .modal-sub { font-size: 15px; color: var(--body-soft); line-height: 1.75; margin-bottom: 22px; }
 
@@ -147,15 +169,15 @@
 /* ---------- フロー共通（新規登録 / 出品登録 で共有: flow-header / footer / form-card） ---------- */
 .flow-bg { background: var(--pale); min-height: 100vh; }
 
-.flow-header { position: sticky; top: 0; z-index: 60; background: #fff; border-bottom: 1px solid var(--line); box-shadow: none; }
+.flow-header { position: sticky; top: 0; z-index: 60; background: var(--white); border-bottom: 1px solid var(--line); box-shadow: none; }
 .flow-header-inner { max-width: 600px; margin: 0 auto; padding: 14px 20px; display: flex; align-items: center; gap: 16px; }
 .flow-steps { flex: 1; display: flex; gap: 0; align-items: center; }
 .flow-step { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; position: relative; }
 .flow-step + .flow-step::before { content: ""; position: absolute; left: -50%; top: 12px; width: 100%; height: 1px; background: var(--line); z-index: 0; transition: background .4s; }
 .flow-step.done + .flow-step::before, .flow-step.active + .flow-step::before { background: var(--primary); }
-.fs-dot { width: 24px; height: 24px; border-radius: 0; border: 1px solid var(--line); background: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500; color: var(--body-soft); font-family: var(--ui); position: relative; z-index: 1; transition: background .3s, color .3s, border-color .3s; }
-.flow-step.done .fs-dot { background: var(--primary); border-color: var(--primary); color: #fff; }
-.flow-step.active .fs-dot { background: var(--primary); border-color: var(--primary); color: #fff; }
+.fs-dot { width: 24px; height: 24px; border-radius: 0; border: 1px solid var(--line); background: var(--white); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500; color: var(--body-soft); font-family: var(--ui); position: relative; z-index: 1; transition: background .3s, color .3s, border-color .3s; }
+.flow-step.done .fs-dot { background: var(--primary); border-color: var(--primary); color: var(--white); }
+.flow-step.active .fs-dot { background: var(--primary); border-color: var(--primary); color: var(--white); }
 .fs-label { font-size: 10px; color: var(--body-soft); white-space: nowrap; }
 .flow-step.active .fs-label { color: var(--primary); }
 .flow-step.done .fs-label { color: var(--ink); }
@@ -165,27 +187,28 @@
 .step-title::first-letter { color: var(--primary); }
 .step-desc { font-size: 15px; color: var(--body); line-height: 1.75; margin-bottom: 24px; }
 
-.form-card { background: #fff; border: 1px solid var(--line); border-radius: 0; box-shadow: none; padding: 26px 24px; margin-bottom: 16px; }
+.form-card { background: var(--white); border: 1px solid var(--line); border-radius: 0; box-shadow: none; padding: 26px 24px; margin-bottom: 16px; }
 /* .field-top .req/.opt: Field コンポーネント（components/kdz/auth.tsx）の rightSlot に
    直接 .req/.opt バッジを渡すケース（label 文字列に埋め込めないため）。ラベル内埋め込み版
    （.field label .req/.opt）と見た目を統一する。値は katazuke.css の .req/.opt と同一。 */
-.field label .req, .field-top .req { font-family: var(--ui); font-size: 12px; font-weight: 500; color: #fff; background: var(--primary); padding: 2px 10px; border-radius: 0; margin-left: 6px; vertical-align: middle; }
-.field label .opt, .field-top .opt { font-family: var(--ui); font-size: 12px; font-weight: 500; color: #fff; background: #808080; padding: 2px 10px; border-radius: 0; margin-left: 6px; vertical-align: middle; }
+.field label .req, .field-top .req { font-family: var(--ui); font-size: 12px; font-weight: 500; color: var(--white); background: var(--primary); padding: 2px 10px; border-radius: 0; margin-left: 6px; vertical-align: middle; }
+.field label .opt, .field-top .opt { font-family: var(--ui); font-size: 12px; font-weight: 500; color: var(--white); background: #808080; padding: 2px 10px; border-radius: 0; margin-left: 6px; vertical-align: middle; }
 
 .select-wrap { position: relative; }
 .select-wrap::after { content: ""; position: absolute; right: 14px; top: 50%; transform: translateY(-50%); width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid var(--body-soft); pointer-events: none; }
-.select-wrap select { width: 100%; font-size: 15px; color: var(--ink); background: #fff; border: 1px solid #ddd; border-radius: 0; padding: 12px 36px 12px 14px; appearance: none; cursor: pointer; }
-.select-wrap select:focus { border-color: var(--primary); background: #fff; }
+.select-wrap select { width: 100%; font-size: 15px; color: var(--ink); background: var(--white); border: 1px solid var(--line); border-radius: 0; padding: 12px 36px 12px 14px; appearance: none; cursor: pointer; }
+.select-wrap select:focus { border-color: var(--primary); background: var(--white); }
 
 .pw-strength { margin-top: 8px; display: flex; gap: 5px; align-items: center; }
 .pw-strength-bar { flex: 1; height: 4px; border-radius: 0; background: var(--line); transition: background .3s; }
 .pw-strength-label { font-size: 11px; color: var(--body-soft); min-width: 36px; text-align: right; }
 
-.flow-footer { position: fixed; bottom: 0; left: 0; right: 0; z-index: 50; background: #fff; border-top: 1px solid var(--line); box-shadow: none; }
+.flow-footer { position: fixed; bottom: 0; left: 0; right: 0; z-index: 50; background: var(--white); border-top: 1px solid var(--line); box-shadow: none; }
 .flow-footer .inner { max-width: 600px; margin: 0 auto; padding: 14px 20px; display: flex; gap: 12px; justify-content: flex-end; align-items: center; }
-.btn-flow-back { padding: 14px 24px; border-radius: 0; border: 1px solid #333; background: #fff; color: #333; font-family: var(--head); font-size: 15px; font-weight: 600; letter-spacing: .08em; cursor: pointer; transition: opacity .25s; }
+.btn-flow-back { padding: 14px 24px; border-radius: 0; border: 1px solid #333; background: var(--white); color: #333; font-family: var(--head); font-size: 15px; font-weight: 600; letter-spacing: .08em; cursor: pointer; transition: opacity .25s; white-space: normal; }
 .btn-flow-back:hover { opacity: .8; }
-.btn-flow-next { padding: 14px 30px; border-radius: 0; border: none; background: var(--primary); color: #fff; font-family: var(--head); font-size: 15px; font-weight: 600; letter-spacing: .08em; cursor: pointer; box-shadow: none; transition: opacity .25s; display: flex; align-items: center; gap: 8px; }
+.btn-flow-back:disabled { border-color: var(--line-soft); color: var(--body-soft); background: var(--line-soft); cursor: not-allowed; opacity: 1; }
+.btn-flow-next { padding: 14px 30px; border-radius: 0; border: none; background: var(--primary); color: var(--white); font-family: var(--head); font-size: 15px; font-weight: 600; letter-spacing: .08em; cursor: pointer; box-shadow: none; transition: opacity .25s; display: flex; align-items: center; gap: 8px; white-space: normal; }
 .btn-flow-next:hover { opacity: .8; }
 .btn-flow-next:disabled { background: var(--line-soft); color: var(--body-soft); box-shadow: none; cursor: not-allowed; opacity: 1; }
 

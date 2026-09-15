@@ -234,7 +234,7 @@ export default function AdminTransactionsPage() {
             ) : null}
           </div>
 
-          {data ? (
+          {data && !error ? (
             <AdminPagination
               total={data.total}
               limit={ADMIN_LIST_DEFAULT_LIMIT}

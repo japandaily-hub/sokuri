@@ -1,0 +1,83 @@
+/* ============================================================
+   マイページ配下（profile / bank-account / identity）共通フォーム部品
+   デザイン監査(2026-09-15)是正: .form-card / .edit-section-title /
+   .pw-change-error / .id-notice-box / .id-back-link が各ページの
+   *.css にほぼ/完全一致で重複していたため、実体をここへ集約する。
+   クラス名・見た目・「ページ間でクラスを共有しない」既存のスコープ方式
+   （.xxx-page 配下）は変更しない。各ページの *.css 先頭で
+   `@import "../_shared-forms.css";` して読み込むこと。
+   ============================================================ */
+
+/* セクション見出し */
+.profile-page .edit-section-title,
+.bank-page .edit-section-title,
+.identity-page .edit-section-title {
+  font-family: var(--head);
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--navy);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.profile-page .edit-section-title .ic,
+.bank-page .edit-section-title .ic,
+.identity-page .edit-section-title .ic {
+  width: 16px;
+  height: 16px;
+  stroke: var(--blue);
+  stroke-width: 2;
+}
+
+/* フォームカード */
+.profile-page .form-card,
+.bank-page .form-card,
+.identity-page .form-card {
+  background: #fff;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-soft);
+  padding: 22px 20px;
+  margin-bottom: 16px;
+}
+
+/* インラインエラー（パスワード変更・保存/提出失敗など） */
+.profile-page .pw-change-error,
+.bank-page .pw-change-error,
+.identity-page .pw-change-error {
+  font-size: 12.5px;
+  color: var(--danger);
+  margin-bottom: 10px;
+  padding: 10px 14px;
+  background: var(--danger-bg-soft);
+  border-radius: 0;
+  border: 1px solid var(--danger-border-soft);
+}
+
+/* 注意事項ボックス（bank-account / identity） */
+.bank-page .id-notice-box,
+.identity-page .id-notice-box {
+  background: var(--pale);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+.bank-page .id-notice-box ul,
+.identity-page .id-notice-box ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  line-height: 1.9;
+  color: var(--body-soft);
+}
+
+/* 「マイページ・設定にもどる」リンク（bank-account / identity） */
+.bank-page .id-back-link,
+.identity-page .id-back-link {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { AppHeader } from "@/components/kdz/AppHeader";
+import { Notice } from "@/components/kdz/Notice";
 import { Field, PasswordField } from "@/components/kdz/auth";
 import { useToken } from "@/components/kdz/Ui";
 import {
@@ -41,25 +42,6 @@ const ICON_BANK = (
 
 /** 全角カタカナ + 全角スペースのみ許容（半角混在を防ぐ）。 */
 const KANA_PATTERN = /^[ァ-ヶー　]+$/;
-
-function ErrorBanner({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      role="alert"
-      style={{
-        marginBottom: 20,
-        padding: "12px 16px",
-        borderRadius: "var(--radius-s)",
-        background: "rgba(215,0,53,.06)",
-        color: "var(--danger)",
-        fontSize: 13,
-        border: "1px solid rgba(215,0,53,.35)",
-      }}
-    >
-      {children}
-    </div>
-  );
-}
 
 export default function BankAccountPage() {
   const { token, loading: tokenLoading } = useToken();
@@ -239,12 +221,12 @@ export default function BankAccountPage() {
         <AppHeader />
         <main id="main">
           <div className="bank-wrap">
-            <ErrorBanner>
+            <Notice tone="danger">
               セッションが切れました。再ログインしてください。
               <Link href="/login" style={{ marginLeft: 8, fontWeight: 600, textDecoration: "underline" }}>
                 ログインへ
               </Link>
-            </ErrorBanner>
+            </Notice>
           </div>
         </main>
       </div>
@@ -270,7 +252,7 @@ export default function BankAccountPage() {
         <AppHeader />
         <main id="main">
           <div className="bank-wrap">
-            <ErrorBanner>
+            <Notice tone="danger">
               {loadError ?? "口座情報の取得に失敗しました"}
               <button
                 type="button"
@@ -279,7 +261,7 @@ export default function BankAccountPage() {
               >
                 再読み込み
               </button>
-            </ErrorBanner>
+            </Notice>
           </div>
         </main>
       </div>
@@ -291,7 +273,7 @@ export default function BankAccountPage() {
       <AppHeader />
       <main id="main">
         <div className="bank-wrap">
-          {loadError ? <ErrorBanner>{loadError}</ErrorBanner> : null}
+          {loadError ? <Notice tone="danger">{loadError}</Notice> : null}
 
           <div className="edit-section-title">
             {ICON_BANK}
@@ -302,7 +284,7 @@ export default function BankAccountPage() {
             <ul>
               <li>買取代金の受け取り方法（現金・お振込み）は、成約後に業者とチャットで調整します。お振込みを希望する場合に業者へお伝えする口座情報を、あらかじめここに保存できます。</li>
               <li>保存した口座情報は暗号化して保管し、業者へ自動で開示することはありません。</li>
-              <li>ゆうちょ銀行は振込用の店名・口座番号（7桁）を入力してください。</li>
+              <li>支店名の欄に、ゆうちょ銀行の振込用店名（例：〇一八店）を入力してください。</li>
             </ul>
           </div>
 
@@ -526,7 +508,7 @@ export default function BankAccountPage() {
       </main>
 
       {toastMessage ? (
-        <div className="bank-toast" role="status">
+        <div className="kdz-toast" role="status">
           {toastMessage}
         </div>
       ) : null}

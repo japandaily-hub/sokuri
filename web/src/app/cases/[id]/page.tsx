@@ -210,7 +210,7 @@ export default function UserCaseDetailPage() {
     if (!token || isItemBusy(item.id)) return;
     setConfirmState({
       title: "商品を削除しますか？",
-      message: "この商品を削除しますか？紐づく写真も削除されます。",
+      message: "紐づく写真もすべて削除されます。この操作は元に戻せません。",
       confirmLabel: "削除する",
       danger: true,
       onConfirm: () => {
@@ -242,7 +242,7 @@ export default function UserCaseDetailPage() {
     if (busyOps.has(key)) return;
     setConfirmState({
       title: "写真を削除しますか？",
-      message: "この写真を削除しますか？",
+      message: "この操作は元に戻せません。",
       confirmLabel: "削除する",
       danger: true,
       onConfirm: () => {
@@ -421,7 +421,7 @@ export default function UserCaseDetailPage() {
     <div className="container-aw max-w-3xl space-y-6 py-10">
       {search.get("created") ? (
         <Notice tone="success">
-          依頼を受け付けました。業者から入札が届くと、LINE連携済みの方はLINEで、未連携の方はメールでお知らせします。
+          出品を受け付けました。業者から入札が届くと、LINE連携済みの方はLINEで、未連携の方はメールでお知らせします。
         </Notice>
       ) : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
@@ -726,7 +726,11 @@ export default function UserCaseDetailPage() {
                     ) : null}
                     {b.operator_suspended ? (
                       <p className="mt-2 max-w-md text-xs font-semibold leading-relaxed text-red-600" role="alert">
-                        この業者は現在利用停止中です。運営（<Link href="/contact" className="underline">/contact</Link>）にお問い合わせください。
+                        この業者は現在利用停止中です。運営（
+                        <Link href="/contact" className="underline">
+                          お問い合わせフォーム
+                        </Link>
+                        ）にお問い合わせください。
                       </p>
                     ) : null}
                   </div>
@@ -820,7 +824,7 @@ export default function UserCaseDetailPage() {
             <div className="mt-3 rounded-none border border-red-200 bg-red-50 p-3 text-sm leading-relaxed text-red-700" role="alert">
               この業者は現在利用停止中です。運営（
               <Link href="/contact" className="underline">
-                /contact
+                お問い合わせフォーム
               </Link>
               ）にお問い合わせください。
             </div>
@@ -922,7 +926,7 @@ export default function UserCaseDetailPage() {
                   onClick={() =>
                     setConfirmState({
                       title: "減額を承認しますか？",
-                      message: "減額を承認しますか？確定額が更新されます。",
+                      message: "確定額が更新されます。",
                       confirmLabel: "承認する",
                       onConfirm: () => {
                         setConfirmState(null);
@@ -940,7 +944,7 @@ export default function UserCaseDetailPage() {
                   onClick={() =>
                     setConfirmState({
                       title: "減額申請を却下しますか？",
-                      message: "減額申請を却下しますか？この操作は元に戻せません。",
+                      message: "この操作は元に戻せません。",
                       confirmLabel: "却下する",
                       danger: true,
                       onConfirm: () => {
@@ -969,7 +973,7 @@ export default function UserCaseDetailPage() {
                   onClick={() =>
                     setConfirmState({
                       title: "作業完了を確定しますか？",
-                      message: "作業の完了を確定しますか？確定後はレビューを投稿できます。",
+                      message: "確定後は評価を投稿できます。",
                       confirmLabel: "確定する",
                       onConfirm: () => {
                         setConfirmState(null);
@@ -987,8 +991,8 @@ export default function UserCaseDetailPage() {
                 disabled={busy}
                 onClick={() => {
                   setConfirmState({
-                    title: "本当にキャンセルしますか？",
-                    message: "本当にキャンセルしますか？案件ごと終了し、入札は戻せません。理由は業者に共有されます。",
+                    title: "キャンセルしますか？",
+                    message: "案件は終了し、この操作は元に戻せません。理由は業者に共有されます。",
                     confirmLabel: "キャンセルする",
                     danger: true,
                     withReason: true,
@@ -1017,7 +1021,7 @@ export default function UserCaseDetailPage() {
             (myReview ? (
               <div>
                 <Notice tone="success">
-                  レビュー投稿済み（★{myReview.rating}）ありがとうございました。
+                  評価投稿済み（★{myReview.rating}）ありがとうございました。
                 </Notice>
                 {/* r10-M7 是正: 評価投稿後の導線が「← マイ案件一覧へ」1本しか無く行き止まりだったため、
                     /review と同型の「マイページへ」「また出品する」を並べる。 */}
@@ -1051,7 +1055,7 @@ export default function UserCaseDetailPage() {
                   onChange={(e) => setComment(e.target.value)}
                   className={`${inputBase} mt-3`}
                   rows={3}
-                  placeholder="対応の感想（任意）"
+                  placeholder="業者の対応の感想（任意）"
                 />
                 <button
                   type="button"
@@ -1070,7 +1074,7 @@ export default function UserCaseDetailPage() {
                   }
                   className={`${btnPrimary} mt-3`}
                 >
-                  レビューを投稿
+                  評価を投稿する
                 </button>
                 <Link
                   href={`/review?transaction_id=${txn.id}`}

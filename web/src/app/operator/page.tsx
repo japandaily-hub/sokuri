@@ -231,10 +231,9 @@ function LotCard({
             </div>
           ) : (
             <div className="bid-form">
-              <div className="bid-input-wrap">
-                <span className="bid-yen">¥</span>
+              <div className="yen-input-wrap">
+                <span className="yen-prefix">¥</span>
                 <input
-                  className="bid-input"
                   type="number"
                   placeholder="金額を入力"
                   min={BID_MIN}
@@ -247,7 +246,6 @@ function LotCard({
                   }}
                   aria-label={`${lot.id} の入札金額`}
                 />
-                <span className="bid-en">円</span>
               </div>
               <button
                 type="button"
@@ -527,18 +525,7 @@ export default function OperatorDashboardPage() {
       ) : (
         <div className="dash-wrap">
           {error ? (
-            <div
-              role="alert"
-              style={{
-                marginBottom: 20,
-                padding: "12px 16px",
-                borderRadius: "var(--radius-s)",
-                background: "rgba(215,0,53,.08)",
-                color: "var(--danger)",
-                fontSize: 13,
-                border: "1px solid var(--danger)",
-              }}
-            >
+            <div role="alert" className="op-alert error" style={{ marginBottom: 20 }}>
               {error}
             </div>
           ) : null}
@@ -568,13 +555,13 @@ export default function OperatorDashboardPage() {
                   落札（成約が成立した時点）を数える指標であることを見出しで明示する。
                   r10-review M3 是正: 「今月の落札」は他画面の「成約」表記と揺れて紛らわしいため、
                   集計基準（落札日基準・キャンセル除く）を見出しに明記する。 */}
-              <div className="sum-label">今月の成約（落札日基準・キャンセル除く）</div>
+              <div className="sum-label">今月の成約</div>
               <div className="sum-val">
                 {thisMonthActive.length}
                 <span>件</span>
               </div>
               <div className="sum-sub">
-                うち完了{thisMonthDoneCount}件・成約額 ¥{yen(thisMonthAmount)}（完了分のみ）
+                落札日基準・キャンセル除く・うち完了{thisMonthDoneCount}件・成約額 ¥{yen(thisMonthAmount)}（完了分のみ）
               </div>
             </div>
             <div className="sum-card">
@@ -613,8 +600,11 @@ export default function OperatorDashboardPage() {
 
             {awaitingApproval ? null : lots.length === 0 ? (
               <div className="empty-state">
-                <Ic name="box" />
-                <p>現在、入札可能な案件はありません。</p>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 7h16M4 12h16M4 17h10" />
+                </svg>
+                <h3>現在、入札可能な案件はありません</h3>
+                <p>新しい案件が出品されると、ここに表示されます。</p>
               </div>
             ) : (
               <div className="lot-grid">
@@ -642,12 +632,11 @@ export default function OperatorDashboardPage() {
               </div>
             ) : (
               <div className="empty-state">
-                <Ic name="trend" />
-                <p>
-                  現在入札中の案件はありません。
-                  <br />
-                  「案件一覧」から入札してみましょう。
-                </p>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 7h16M4 12h16M4 17h10" />
+                </svg>
+                <h3>現在入札中の案件はありません</h3>
+                <p>「案件一覧」から入札してみましょう。</p>
               </div>
             )}
           </div>
@@ -656,12 +645,11 @@ export default function OperatorDashboardPage() {
           <div className={`tab-content${activeTab === "neg" ? " active" : ""}`}>
             {negotiatingTxns.length === 0 ? (
               <div className="empty-state">
-                <Ic name="chat" />
-                <p>
-                  現在交渉中の取引はありません。
-                  <br />
-                  成約した取引は「取引」ページからご確認いただけます。
-                </p>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 7h16M4 12h16M4 17h10" />
+                </svg>
+                <h3>現在交渉中の取引はありません</h3>
+                <p>成約した取引は「取引」ページからご確認いただけます。</p>
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -702,8 +690,11 @@ export default function OperatorDashboardPage() {
           <div className={`tab-content${activeTab === "done" ? " active" : ""}`}>
             {doneTxns.length === 0 ? (
               <div className="empty-state">
-                <Ic name="check" />
-                <p>成約済みの取引はまだありません。</p>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 7h16M4 12h16M4 17h10" />
+                </svg>
+                <h3>成約済みの取引はまだありません</h3>
+                <p>成約すると、ここに表示されます。</p>
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -754,27 +745,27 @@ export default function OperatorDashboardPage() {
 
       {/* ---------- 入札確認モーダル ---------- */}
       <div
-        className={`modal-overlay${modalLotId ? " open" : ""}`}
+        className={`modal-overlay${modalLotId ? " show" : ""}`}
         onClick={(e) => {
           if (e.target === e.currentTarget) setModalLotId(null);
         }}
       >
-        <div className="modal" role="dialog" aria-modal="true" aria-label="入札の確認">
-          <h3>入札を確定しますか？</h3>
-          <p className="modal-body">以下の金額でこの案件に入札します。ユーザーに選ばれると成約・取引に進めます。</p>
+        <div className="modal-card" role="dialog" aria-modal="true" aria-label="入札の確認">
+          <h3 className="modal-title">入札を確定しますか？</h3>
+          <p className="modal-sub">以下の金額でこの案件に入札します。ユーザーに選ばれると成約・取引に進めます。入札後は取り消せません（金額の引き上げのみ可能です）。</p>
           <div className="modal-amount">
             ¥{modalAmount ? yen(modalAmount) : "—"}
             <span>円</span>
           </div>
           <p className="modal-warn">
             <Ic name="shield" />
-            提示した金額を大きく下回る減額は、査定現場での顧客合意が必要です。
+            提示した金額を大きく下回る減額は、査定現場でのユーザーの合意が必要です。
           </p>
           <div className="modal-actions">
-            <button type="button" className="btn-cancel" onClick={() => setModalLotId(null)}>
+            <button type="button" className="btn-modal-cancel" onClick={() => setModalLotId(null)}>
               キャンセル
             </button>
-            <button type="button" className="btn-confirm" disabled={bidBusy} onClick={confirmBid}>
+            <button type="button" className="btn-modal-confirm" disabled={bidBusy} onClick={confirmBid}>
               {bidBusy ? "送信中…" : "入札する"}
             </button>
           </div>

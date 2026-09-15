@@ -1,9 +1,11 @@
 /* ============================================================
    振込口座ページ（/mypage/bank-account）固有スタイル
    共通クラス(.field/.btn/.kdz-toast/.spinning 等)は katazuke.css / katazuke-pages.css の正典を使用。
-   form-card / edit-section-title は profile.css の見た目を踏襲しつつ、
-   ページ間でクラスを共有しない既存の慣習に合わせて .bank-page 配下に再定義する。
+   .form-card/.edit-section-title/.pw-change-error/.id-notice-box/.id-back-link は
+   profile/identity と共有のため ../_shared-forms.css に集約済み（デザイン監査2026-09-15是正）。
    ============================================================ */
+
+@import "../_shared-forms.css";
 
 .bank-page {
   min-height: 100vh;
@@ -14,31 +16,6 @@
   max-width: 560px;
   margin: 0 auto;
   padding: 24px 20px 80px;
-}
-
-.bank-page .edit-section-title {
-  font-family: var(--head);
-  font-size: 14px;
-  font-weight: 400;
-  color: var(--navy);
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.bank-page .edit-section-title .ic {
-  width: 16px;
-  height: 16px;
-  stroke: var(--blue);
-  stroke-width: 2;
-}
-
-.bank-page .form-card {
-  background: #fff;
-  border-radius: var(--radius);
-  border: 1px solid var(--line-soft);
-  padding: 22px 20px;
-  margin-bottom: 16px;
 }
 
 .bank-page .field label {
@@ -65,22 +42,6 @@
 }
 .bank-page .field-hint.bank-kana-warn {
   color: var(--danger);
-}
-
-/* 注意事項（identity.css の .id-notice-box と同一の見た目） */
-.bank-page .id-notice-box {
-  background: var(--pale);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 16px 20px;
-  margin-bottom: 16px;
-}
-.bank-page .id-notice-box ul {
-  margin: 0;
-  padding-left: 18px;
-  font-size: 12.5px;
-  line-height: 1.9;
-  color: var(--body-soft);
 }
 
 /* 登録済み口座のサマリー */
@@ -124,13 +85,13 @@
   font-weight: 600;
   color: var(--danger);
   background: #fff;
-  border: 1.5px solid #ffc0c0;
+  border: 1.5px solid var(--danger);
   padding: 12px 22px;
   cursor: pointer;
   transition: 0.2s;
 }
 .bank-page .btn-bank-delete:hover {
-  background: #fff3f3;
+  background: var(--danger-bg-soft);
 }
 .bank-page .btn-bank-delete:disabled {
   opacity: 0.6;
@@ -156,46 +117,7 @@
   height: 16px;
 }
 
-.bank-page .pw-change-error {
-  font-size: 12.5px;
-  color: #e05c5c;
-  margin-bottom: 10px;
-  padding: 10px 14px;
-  background: #fff3f3;
-  border-radius: 0;
-  border: 1px solid #ffc0c0;
-}
-
-.bank-page .id-back-link {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--blue);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.bank-toast {
-  position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--deep);
-  color: #fff;
-  font-family: var(--head);
-  font-size: 14px;
-  font-weight: 600;
-  padding: 13px 22px;
-  border-radius: 0;
-  z-index: 200;
-  max-width: calc(100vw - 32px);
-  text-align: center;
-  animation: bank-toast-fade 3.2s ease forwards;
-}
-@keyframes bank-toast-fade {
-  0% { opacity: 1; }
-  80% { opacity: 1; }
-  100% { opacity: 0; }
-}
+/* 保存トースト: 共通 .kdz-toast（katazuke-pages.css）を使用（デザイン監査2026-09-15是正）。 */
 
 @media (max-width: 480px) {
   .bank-wrap { padding: 16px 14px 60px; }

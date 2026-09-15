@@ -83,7 +83,7 @@
    grid minmax(0,1fr) auto で本文列を可能な限り広く取り（実測で約 60:40）、
    天揃えにしてボタンを見出し1行目の高さに合わせる。 */
 .line-first {
-  background: #fff;
+  background: var(--white);
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   border-radius: var(--radius);
@@ -177,10 +177,10 @@
   display: inline-block;
   font-size: 11px;
   font-weight: 600;
-  color: #fff;
+  color: var(--white);
   background: var(--blue);
   padding: 1px 6px;
-  border-radius: 0;
+  border-radius: var(--radius-s);
   margin-left: 6px;
   vertical-align: middle;
   letter-spacing: .04em;
@@ -190,7 +190,7 @@
   font-size: 11px;
   font-weight: 600;
   color: var(--body-soft);
-  background: #fff; /* 背景を明示（axe が背景を判定できず 1.56:1 と報告した対策・profile と同型） */
+  background: var(--white); /* 背景を明示（axe が背景を判定できず 1.56:1 と報告した対策・profile と同型） */
   border: 1px solid var(--line);
   padding: 0 6px;
   margin-left: 6px;
@@ -203,7 +203,7 @@
   font-family: var(--ui);
   font-size: 15px;
   color: var(--ink);
-  background: #fff;
+  background: var(--white);
   border: 1px solid var(--line);
   border-radius: var(--radius-s);
   padding: 13px 16px;
@@ -217,14 +217,14 @@
 .contact-wrap .field select:focus,
 .contact-wrap .field textarea:focus {
   border-color: var(--blue);
-  background: #fff;
-  box-shadow: 0 0 0 3px rgba(20, 71, 224, .14);
+  background: var(--white);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), .14);
 }
 .contact-wrap .field input.has-error,
 .contact-wrap .field select.has-error,
 .contact-wrap .field textarea.has-error {
   border-color: var(--danger);
-  box-shadow: 0 0 0 3px rgba(215, 0, 53, .12);
+  box-shadow: 0 0 0 3px rgba(var(--danger-rgb), .12);
 }
 .contact-wrap .field textarea { resize: vertical; min-height: 160px; }
 /* 入力欄の下に置く補足（R6 指摘 15 の電話番号欄）。/mypage/* の .field-hint と同じ
@@ -271,28 +271,21 @@
   font-size: 17px;
   padding: 20px 36px;
   background: var(--blue);
-  color: #fff;
-  border-radius: 0;
+  color: var(--white);
+  border-radius: var(--radius);
   font-family: var(--head);
   font-weight: 400;
   border: none;
   cursor: pointer;
   box-shadow: none;
-  transition: .25s var(--ease);
+  transition: opacity .25s var(--ease);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
 }
-.submit-area .btn-submit:hover {
-  background: var(--blue-d);
-  box-shadow: none;
-}
-.submit-area .btn-submit:disabled {
-  opacity: .7;
-  cursor: default;
-  transform: none;
-}
+.submit-area .btn-submit:hover { opacity: .8; }
+.submit-area .btn-submit:disabled { opacity: .6; cursor: not-allowed; }
 .submit-area .note {
   font-size: 12.5px;
   color: var(--body-soft);
@@ -313,9 +306,9 @@
 .thanks-ic {
   width: 64px;
   height: 64px;
-  background: #fff;
+  background: var(--white);
   border: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: var(--radius-s);
   display: flex;
   align-items: center;
   justify-content: center;

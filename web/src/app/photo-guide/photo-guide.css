@@ -83,7 +83,7 @@
 .guide-section-head > div:not(.guide-section-num) { display: contents; }
 .guide-section-num {
   width: 44px; height: 44px;
-  border-radius: 0;
+  border-radius: var(--radius-s);
   background: var(--primary);
   color: #fff;
   font-family: var(--en-display);
@@ -130,7 +130,7 @@
   font-weight: 600;
   font-family: var(--ui);
   padding: 4px 12px;
-  border-radius: 0;
+  border-radius: var(--radius-s);
   flex-shrink: 0;
   color: var(--ink);
   display: inline-flex;
@@ -256,7 +256,7 @@
 }
 .point-ic {
   width: 36px; height: 36px;
-  border-radius: 0;
+  border-radius: var(--radius-s);
   background: var(--pale-2);
   border: 1px solid var(--line);
   flex-shrink: 0;
@@ -282,7 +282,7 @@
 .cat-guide-card {
   border: 0;
   border-top: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: var(--radius);
   padding: 16px 0 0;
   min-width: 0;
 }

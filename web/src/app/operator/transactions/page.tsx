@@ -125,7 +125,11 @@ export default function OperatorTransactionsPage() {
                     {t.has_pending_reduction ? <span className="status-chip warn">減額申請中</span> : null}
                     {/* r8-fix-frontend2 M4 是正: 依頼者が利用停止中の取引を一覧からも判別できるようにする。 */}
                     {t.user_suspended ? (
-                      <span className="status-chip warn" title="このユーザーは現在利用停止中です">
+                      <span
+                        className="status-chip warn"
+                        title="このユーザーは現在利用停止中です"
+                        aria-label="このユーザーは現在利用停止中です"
+                      >
                         ユーザー停止中
                       </span>
                     ) : null}

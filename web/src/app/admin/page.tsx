@@ -47,6 +47,7 @@ const VENDOR_STATUS_LABEL: Record<string, { label: string; badgeValue: string }>
   active: { label: "active（フル稼働）", badgeValue: "completed" },
   limited: { label: "limited（暫定稼働）", badgeValue: "pending" },
   pending: { label: "pending（未承認）", badgeValue: "rejected" },
+  rejected: { label: "rejected（却下済み）", badgeValue: "unverified" },
 };
 
 export default function AdminPage() {
@@ -428,10 +429,10 @@ export default function AdminPage() {
   const c = operatorsData?.counts;
   const operatorStatusOptions: { value: string; label: string; count?: number }[] = [
     { value: "all", label: "すべて", count: c?.all },
-    { value: "active", label: "active", count: c?.active },
-    { value: "limited", label: "limited", count: c?.limited },
-    { value: "pending", label: "pending", count: c?.pending },
-    { value: "rejected", label: "rejected", count: c?.rejected },
+    { value: "active", label: VENDOR_STATUS_LABEL.active.label, count: c?.active },
+    { value: "limited", label: VENDOR_STATUS_LABEL.limited.label, count: c?.limited },
+    { value: "pending", label: VENDOR_STATUS_LABEL.pending.label, count: c?.pending },
+    { value: "rejected", label: VENDOR_STATUS_LABEL.rejected.label, count: c?.rejected },
     { value: "suspended", label: "停止中", count: c?.suspended },
   ];
 
@@ -476,12 +477,12 @@ export default function AdminPage() {
             <Link href="/admin/operator-applications" className={btnSecondary}>
               事前申込の審査へ
               {pendingApplications !== null && pendingApplications > 0 ? (
-                <span className="ml-1.5 rounded-none bg-red-600 px-1.5 py-0.5 text-xs font-semibold text-white">
+                <span className="ml-1.5 rounded-none bg-kdz-danger px-1.5 py-0.5 text-xs font-semibold text-white">
                   {pendingApplications}
                 </span>
               ) : null}
               {pendingApplicationsError ? (
-                <span className="ml-1.5 text-xs font-normal text-red-600">件数取得失敗</span>
+                <span className="ml-1.5 text-xs font-normal text-kdz-danger">件数取得失敗</span>
               ) : null}
             </Link>
             <Link href="/admin/cases" className={btnSecondary}>
@@ -498,24 +499,24 @@ export default function AdminPage() {
             <Link href="/admin/identity-documents" className={btnSecondary}>
               本人確認書類の審査へ
               {pendingIdentityDocs !== null && pendingIdentityDocs > 0 ? (
-                <span className="ml-1.5 rounded-none bg-red-600 px-1.5 py-0.5 text-xs font-semibold text-white">
+                <span className="ml-1.5 rounded-none bg-kdz-danger px-1.5 py-0.5 text-xs font-semibold text-white">
                   {pendingIdentityDocs}
                 </span>
               ) : null}
               {pendingIdentityDocsError ? (
-                <span className="ml-1.5 text-xs font-normal text-red-600">件数取得失敗</span>
+                <span className="ml-1.5 text-xs font-normal text-kdz-danger">件数取得失敗</span>
               ) : null}
             </Link>
             {/* r10 O-M6 是正: お問い合わせの受信箱への導線と未対応件数。 */}
             <Link href="/admin/contacts" className={btnSecondary}>
               お問い合わせへ
               {unhandledContacts !== null && unhandledContacts > 0 ? (
-                <span className="ml-1.5 rounded-none bg-red-600 px-1.5 py-0.5 text-xs font-semibold text-white">
+                <span className="ml-1.5 rounded-none bg-kdz-danger px-1.5 py-0.5 text-xs font-semibold text-white">
                   {unhandledContacts}
                 </span>
               ) : null}
               {unhandledContactsError ? (
-                <span className="ml-1.5 text-xs font-normal text-red-600">件数取得失敗</span>
+                <span className="ml-1.5 text-xs font-normal text-kdz-danger">件数取得失敗</span>
               ) : null}
             </Link>
           </div>
@@ -587,7 +588,7 @@ export default function AdminPage() {
               <li className="py-3 text-sm text-slate-500">まだ発行されていません。</li>
             ) : null}
           </ul>
-          {invites ? (
+          {invites && !inviteError ? (
             <AdminPagination
               total={null}
               limit={ADMIN_LIST_DEFAULT_LIMIT}
@@ -720,7 +721,7 @@ export default function AdminPage() {
                     <div className="mt-1 flex gap-1.5">
                       {isDeleted ? <StatusBadge value="cancelled" label="退会済み" /> : null}
                       <StatusBadge
-                        value={statusInfo.badgeValue as "completed" | "pending" | "rejected"}
+                        value={statusInfo.badgeValue as "completed" | "pending" | "rejected" | "unverified"}
                         label={statusInfo.label}
                       />
                       {op.is_suspended ? <StatusBadge value="cancelled" label="停止中" /> : null}
@@ -756,7 +757,7 @@ export default function AdminPage() {
                           }
                           className={op.vendor_status === "active" ? btnSecondary : btnPrimary}
                         >
-                          {op.vendor_status === "active" ? "承認を取消" : "承認する"}
+                          {op.vendor_status === "active" ? "承認を取り消す" : "承認する"}
                         </button>
                         {op.is_suspended ? (
                           <p className="text-xs text-red-600">停止中です。承認状態の変更は停止解除後に行ってください</p>
@@ -791,7 +792,7 @@ export default function AdminPage() {
               <li className="py-3 text-sm text-slate-500">該当業者はいません。</li>
             ) : null}
           </ul>
-          {operators ? (
+          {operators && !operatorListError ? (
             <AdminPagination
               total={operatorsData?.total ?? null}
               limit={ADMIN_LIST_DEFAULT_LIMIT}

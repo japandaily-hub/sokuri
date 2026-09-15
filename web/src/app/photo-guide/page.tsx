@@ -332,7 +332,7 @@ export default function PhotoGuidePage() {
             <ul className="point-list">
               {POINTS.map((pt) => (
                 <li className="point-item" key={pt.h}>
-                  <span className="point-ic">
+                  <span className="point-ic" aria-hidden="true">
                     <Ic name={pt.icon} />
                   </span>
                   <div className="point-body">

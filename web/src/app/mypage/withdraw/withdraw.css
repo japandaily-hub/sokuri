@@ -24,10 +24,10 @@
   display: block;
 }
 
-/* 警告バナー */
+/* 警告バナー（デザイン監査2026-09-15是正: --danger トークンに統一） */
 .withdraw-page .warn-banner {
-  background: #fff3f3;
-  border: 1.5px solid #ffc0c0;
+  background: var(--danger-bg-soft);
+  border: 1.5px solid var(--danger-border-soft);
   border-radius: 0;
   padding: 18px 20px;
   margin-bottom: 20px;
@@ -39,7 +39,7 @@
   width: 36px;
   height: 36px;
   border-radius: 0;
-  background: #ffe0e0;
+  background: var(--danger-bg-soft);
   flex-shrink: 0;
   display: grid;
   place-items: center;
@@ -48,7 +48,7 @@
   width: 20px;
   height: 20px;
   fill: none;
-  stroke: #cc3333;
+  stroke: var(--danger);
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -58,12 +58,12 @@
   font-family: var(--head);
   font-size: 15px;
   font-weight: 400;
-  color: #cc3333;
+  color: var(--danger);
   margin-bottom: 4px;
 }
 .withdraw-page .warn-body span {
   font-size: 13px;
-  color: #993333;
+  color: var(--danger);
   line-height: 1.75;
 }
 
@@ -90,13 +90,13 @@
   flex-shrink: 0;
   display: grid;
   place-items: center;
-  background: #ffe0e0;
+  background: var(--danger-bg-soft);
 }
 .withdraw-page .del-item-ic svg {
   width: 18px;
   height: 18px;
   fill: none;
-  stroke: #cc3333;
+  stroke: var(--danger);
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -144,12 +144,12 @@
   background: var(--pale-2);
 }
 .withdraw-page .field input:focus {
-  border-color: #e05c5c;
+  border-color: var(--danger);
   background: #fff;
   box-shadow: none;
 }
 .withdraw-page .field.has-error input {
-  border-color: #e05c5c;
+  border-color: var(--danger);
 }
 
 /* 確認チェック */
@@ -169,7 +169,7 @@
   height: 18px;
   flex-shrink: 0;
   margin-top: 2px;
-  accent-color: #e05c5c;
+  accent-color: var(--danger);
   cursor: pointer;
 }
 .withdraw-page .check-row label {
@@ -179,14 +179,15 @@
   cursor: pointer;
 }
 
-/* 削除ボタン */
+/* 削除ボタン（デザイン監査2026-09-15是正: bank-account/profileの破壊的操作と
+   同じ --danger トークンの配色に統一。ホバーで塗りつぶしに反転し強い意図確認を示す） */
 .withdraw-page .btn-delete {
   width: 100%;
   padding: 15px;
   border-radius: 0;
-  border: none;
-  background: #e05c5c;
-  color: #fff;
+  border: 1.5px solid var(--danger);
+  background: var(--danger-bg-soft);
+  color: var(--danger);
   font-family: var(--head);
   font-size: 16px;
   font-weight: 600;
@@ -198,18 +199,20 @@
   gap: 8px;
 }
 .withdraw-page .btn-delete:hover:not(:disabled) {
-  background: #c94040;
-
+  background: var(--danger);
+  color: #fff;
 }
 .withdraw-page .btn-delete:disabled {
   background: var(--line);
+  border-color: var(--line);
+  color: var(--body-soft);
   cursor: not-allowed;
 }
 .withdraw-page .btn-delete svg {
   width: 18px;
   height: 18px;
   fill: none;
-  stroke: #fff;
+  stroke: currentColor;
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
