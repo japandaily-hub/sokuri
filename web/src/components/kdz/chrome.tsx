@@ -77,7 +77,9 @@ export function SiteFooter() {
  * ルート遷移でリセットするため SiteChrome 側は key={pathname} で再マウントする（effect 内 setState を避ける）。
  */
 export function Dock({
-  href = "/login?callbackUrl=%2Fcreate",
+  // 2026-09-15 ユーザー指示: LINEログイン後の着地先を /create から /mypage へ変更
+  // （page.tsx のヒーロー/中段/下部CTAと同じ理由）。
+  href = "/login?callbackUrl=%2Fmypage",
   label = "LINEで無料ではじめる",
   sub = "LINEアカウントでログインできます",
 }: { href?: string; label?: string; sub?: string }) {
