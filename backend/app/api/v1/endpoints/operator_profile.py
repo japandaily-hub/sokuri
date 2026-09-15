@@ -443,8 +443,22 @@ async def delete_my_operator_account(
             raise _OPERATOR_DELETE_WRONG_PASSWORD
         ctx.reset_account(account_key)
 
+    await _delete_and_anonymize_operator(session, operator)
+
+    # 監査ログ（依頼者退会と同様、誰がいつ退会したかを追えるようにする）。
+    logger.info("operator_withdraw operator=%s", operator.id)
+
+
+async def _delete_and_anonymize_operator(session: AsyncSession, operator: Operator) -> None:
+    """業者アカウントの匿名化（論理削除）本体。
+
+    ``delete_my_operator_account``（本人による退会。パスワード再認証・レート制限を
+    経由）と admin.py の ``delete_operator``（運営による強制退会。admin権限と対象の
+    状態チェックを経由）の共通処理。呼び出し側で認可・再認証等のガードを済ませてから
+    呼ぶこと（本関数自体は誰が・なぜ呼んだかを一切検証しない）。
+    """
     # 落札（bids.select_bid）との直列化点。以降の判定・更新は全てこのロックの
-    # 内側で行う（上記docstring参照）。
+    # 内側で行う（delete_my_operator_account のdocstring参照）。
     await lock_operator_row(session, operator.id)
 
     # 未決入札は取り下げる（退会後に落札されると連絡不能の成約が生まれる）。
@@ -502,6 +516,3 @@ async def delete_my_operator_account(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="退会処理に失敗しました。時間をおいて再度お試しください。",
         ) from exc
-
-    # 監査ログ（依頼者退会と同様、誰がいつ退会したかを追えるようにする）。
-    logger.info("operator_withdraw operator=%s", operator.id)

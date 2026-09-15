@@ -598,33 +598,19 @@ async def _cancel_open_case_on_withdrawal(
         )
 
 
-@router.delete(
-    "/users/me",
-    response_model=AccountDeleteResponse,
-    summary="アカウント削除（匿名化。取引・メッセージ・レビューは業者側の記録として保持）",
-)
-async def delete_my_account(
-    body: AccountDeleteRequest,
-    request: Request,
+async def _delete_and_anonymize_user(
+    session: AsyncSession,
     background: BackgroundTasks,
-    user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
-    _rl: object = Depends(RateLimitGuard("account_delete")),
-) -> AccountDeleteResponse:
-    ctx = request.state.rate_limit
-    account_key = str(user.id)
-    ctx.check_account(account_key)
+    user: User,
+) -> None:
+    """依頼者アカウントの匿名化（論理削除）本体。
 
-    if not body.confirm:
-        raise _DELETE_CONFIRM_REQUIRED
-
-    # LINE専用ユーザー（password_hash=None）はパスワード確認不要。
-    if user.password_hash is not None:
-        if not body.password or not verify_password(body.password, user.password_hash):
-            ctx.record_failure(account_key)
-            raise _DELETE_WRONG_PASSWORD
-        ctx.reset_account(account_key)
-
+    ``delete_my_account``（本人による退会。パスワード再認証・確認フラグ・
+    レート制限を経由）と admin.py の ``delete_user``（運営による強制退会。
+    admin権限と対象アカウントの状態チェックを経由）の共通処理。
+    呼び出し側で認可・再認証等のガードを済ませてから呼ぶこと
+    （本関数自体は誰が・なぜ呼んだかを一切検証しない）。
+    """
     active_txn_count = await session.scalar(
         select(func.count())
         .select_from(Transaction)
@@ -746,4 +732,33 @@ async def delete_my_account(
             purpose,
         )
 
+
+@router.delete(
+    "/users/me",
+    response_model=AccountDeleteResponse,
+    summary="アカウント削除（匿名化。取引・メッセージ・レビューは業者側の記録として保持）",
+)
+async def delete_my_account(
+    body: AccountDeleteRequest,
+    request: Request,
+    background: BackgroundTasks,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+    _rl: object = Depends(RateLimitGuard("account_delete")),
+) -> AccountDeleteResponse:
+    ctx = request.state.rate_limit
+    account_key = str(user.id)
+    ctx.check_account(account_key)
+
+    if not body.confirm:
+        raise _DELETE_CONFIRM_REQUIRED
+
+    # LINE専用ユーザー（password_hash=None）はパスワード確認不要。
+    if user.password_hash is not None:
+        if not body.password or not verify_password(body.password, user.password_hash):
+            ctx.record_failure(account_key)
+            raise _DELETE_WRONG_PASSWORD
+        ctx.reset_account(account_key)
+
+    await _delete_and_anonymize_user(session, background, user)
     return AccountDeleteResponse(detail="退会手続きが完了しました。")

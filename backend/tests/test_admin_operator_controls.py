@@ -430,3 +430,77 @@ async def test_admin_operators_excludes_deleted_by_default(
         headers=_auth(admin_token),
     )
     assert r.status_code == 409, r.text
+
+
+# ──────────────────────────── admin による強制削除（業者アカウント一覧「削除」ボタン対応） ────────────────────────────
+
+
+async def test_admin_delete_operator_anonymizes_and_revokes_access(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """admin が業者を削除すると、本人退会（DELETE /operator/me）と同じ匿名化が
+    パスワード再認証なしで行われ、以後ログイン・旧トークンいずれも失効する。"""
+    admin_token = await _make_admin(client, db_session)
+    op_token, op_id = await _signup_invited_operator(client, admin_token, "ctl_admindel1@example.com")
+
+    r = await client.delete(
+        f"/api/v1/admin/operators/{op_id}",
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["id"] == op_id
+    assert r.json()["detail"]
+
+    operator = await db_session.get(Operator, uuid.UUID(op_id))
+    await db_session.refresh(operator)
+    assert operator.contact_email == f"deleted-{operator.id}@deleted.katazuke.internal"
+    assert operator.password_hash is None
+    assert operator.deleted_at is not None
+
+    # 旧トークンは失効し、同一emailでの再ログインもできない。
+    r = await client.get("/api/v1/operator/profile", headers=_auth(op_token))
+    assert r.status_code in (401, 403), r.text
+    r = await client.post(
+        "/api/v1/auth/operator/login",
+        json={"email": "ctl_admindel1@example.com", "password": _OP_PASSWORD},
+    )
+    assert r.status_code in (401, 403), r.text
+
+    # 一覧に既定では出てこず、include_deleted=true で退会済みとして現れる。
+    r = await client.get("/api/v1/admin/operators", headers=_auth(admin_token))
+    assert r.status_code == 200, r.text
+    assert all(item["id"] != op_id for item in r.json()["items"])
+    r = await client.get(
+        "/api/v1/admin/operators",
+        params={"include_deleted": True},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 200, r.text
+    assert any(item["id"] == op_id for item in r.json()["items"])
+
+
+async def test_admin_delete_operator_requires_admin_and_existing_and_rejects_double_delete(
+    client: AsyncClient, db_session: AsyncSession
+):
+    admin_token = await _make_admin(client, db_session)
+    op_token, op_id = await _signup_invited_operator(client, admin_token, "ctl_admindel2@example.com")
+
+    # 業者トークン（typ=operator）では admin ゲートを通過できない
+    r = await client.delete(f"/api/v1/admin/operators/{op_id}", headers=_auth(op_token))
+    assert r.status_code in (401, 403), r.text
+
+    # 未認証
+    r = await client.delete(f"/api/v1/admin/operators/{op_id}")
+    assert r.status_code in (401, 403), r.text
+
+    # 存在しない業者
+    r = await client.delete(
+        f"/api/v1/admin/operators/{uuid.uuid4()}", headers=_auth(admin_token)
+    )
+    assert r.status_code == 404, r.text
+
+    # 削除済みの業者を再度削除しようとすると 409（状態不整合の防止・verify/suspendと同型）
+    r = await client.delete(f"/api/v1/admin/operators/{op_id}", headers=_auth(admin_token))
+    assert r.status_code == 200, r.text
+    r = await client.delete(f"/api/v1/admin/operators/{op_id}", headers=_auth(admin_token))
+    assert r.status_code == 409, r.text

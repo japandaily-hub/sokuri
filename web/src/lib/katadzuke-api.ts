@@ -1982,6 +1982,27 @@ export function adminSuspendOperator(
   });
 }
 
+export interface AdminOperatorDeleteResponse {
+  id: string;
+  detail: string;
+}
+
+/**
+ * admin が業者アカウントを強制削除する。物理削除ではなく匿名化（本人退会
+ * DELETE /operator/me と同じ処理）で、取引・レビュー・キャンセル記録は依頼者側の
+ * 記録として保持される。既に退会済みの業者を対象にした場合や、進行中の取引がある
+ * 場合は対象外（backend側で409拒否）。
+ */
+export function adminDeleteOperator(
+  operatorId: string,
+  token: string,
+): Promise<AdminOperatorDeleteResponse> {
+  return request(`/admin/operators/${encodeURIComponent(operatorId)}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
 /**
  * admin が業者の古物商許可証画像を確認する（画像バイナリ）。
  * request<T>() は JSON専用のためここでも生 fetch を使い、Blob をそのまま返す
@@ -2249,6 +2270,27 @@ export function adminPromoteUser(userId: string, token: string): Promise<AdminUs
 export function adminDemoteUser(userId: string, token: string): Promise<AdminUserRoleResponse> {
   return request(`/admin/users/${encodeURIComponent(userId)}/demote`, {
     method: "POST",
+    token,
+  });
+}
+
+export interface AdminUserDeleteResponse {
+  id: string;
+  detail: string;
+}
+
+/**
+ * admin がユーザーアカウントを強制削除する。物理削除ではなく匿名化（本人退会
+ * DELETE /users/me と同じ処理）で、取引・メッセージ・レビューは業者側の記録として
+ * 保持される。自分自身・role=admin のユーザー・既に退会済みのユーザーを対象にした
+ * 場合や、進行中の取引（pending/visiting）がある場合は対象外（backend側で409/404拒否）。
+ */
+export function adminDeleteUser(
+  userId: string,
+  token: string,
+): Promise<AdminUserDeleteResponse> {
+  return request(`/admin/users/${encodeURIComponent(userId)}`, {
+    method: "DELETE",
     token,
   });
 }
