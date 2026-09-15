@@ -149,8 +149,8 @@ export default function AdminUsersPage() {
     <div className="admin-page">
       <AppHeader showBell={false} />
       <PageShell
-        title="依頼者一覧"
-        description="依頼者アカウントを検索・閲覧し、必要に応じて停止／解除できます。"
+        title="ユーザー一覧"
+        description="ユーザーアカウントを検索・閲覧し、必要に応じて停止／解除できます。"
         actions={
           <Link href="/admin" className={btnSecondary}>
             管理画面トップへ
@@ -212,7 +212,7 @@ export default function AdminUsersPage() {
             </label>
           </div>
 
-          <div className="mt-4 overflow-x-auto" tabIndex={0} role="region" aria-label="依頼者一覧">
+          <div className="mt-4 overflow-x-auto" tabIndex={0} role="region" aria-label="ユーザー一覧">
             <table className="w-full min-w-[960px] text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
@@ -305,7 +305,7 @@ export default function AdminUsersPage() {
               </tbody>
             </table>
             {data && data.items.length === 0 ? (
-              <p className="py-6 text-center text-sm text-slate-500">該当する依頼者はいません。</p>
+              <p className="py-6 text-center text-sm text-slate-500">該当するユーザーはいません。</p>
             ) : null}
             {busy && !suspendTarget ? (
               <div className="flex items-center gap-2 py-3 text-sm text-slate-600">

@@ -462,7 +462,7 @@ export default function AdminPage() {
               取引一覧へ
             </Link>
             <Link href="/admin/users" className={btnSecondary}>
-              依頼者一覧へ
+              ユーザー一覧へ
             </Link>
             {/* r10 O-M1 是正: 審査待ちの本人確認書類が /admin トップから見えず、
                 個別画面を開くまで滞留に気付けなかった。事前申込バッジと同型で出す。 */}
