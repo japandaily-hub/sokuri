@@ -274,6 +274,10 @@
 .lot-card.done {
   opacity: 0.85;
 }
+/* 更新あり（新着入札・ステータス変化・未読返信）。カードを開くと解消される。 */
+.lot-card.has-update {
+  border-color: var(--blue);
+}
 
 .lot-card-inner {
   display: grid;
@@ -352,6 +356,19 @@
 .status-chip.unread {
   background: var(--blue);
   color: #fff;
+}
+/* 更新ありインジケータ（新着入札・ステータス変化。r-mypage-update 対応）。
+   mypage-blink は既存の .live-dot と共用（新規keyframes追加なし）。 */
+.lot-update-indicator {
+  display: inline-flex;
+  align-items: center;
+}
+.lot-update-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--blue);
+  animation: mypage-blink 1.4s infinite;
 }
 
 .lot-cats {

@@ -148,8 +148,8 @@
 /* 送信済み画面 */
 .review-page .submitted-screen { text-align: center; padding: 40px 0; }
 .review-page .submitted-ic {
-  width: 80px; height: 80px; border-radius: 50%; background: var(--pale);
-  margin: 0 auto 18px; display: grid; place-items: center; color: var(--blue);
+  width: 80px; height: 80px; border-radius: 50%; background: var(--ink); border: 1px solid var(--ink);
+  margin: 0 auto 18px; display: grid; place-items: center; color: var(--white);
 }
 .review-page .submitted-ic svg {
   width: 40px; height: 40px; fill: none; stroke: currentColor; stroke-width: 2;

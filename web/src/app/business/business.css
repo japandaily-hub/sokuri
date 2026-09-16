@@ -430,9 +430,9 @@
 .business-page .biz-step-n {
   width: 48px;
   height: 48px;
-  border: 1px solid var(--blue);
-  background: var(--white);
-  color: var(--blue);
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--white);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -470,7 +470,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--blue);
+  color: var(--ink);
 }
 .business-page .req-ic .ic { width: 20px; height: 20px; stroke-width: 1.7; }
 .business-page .req-body h4 { font-size: 15px; margin: 0 0 6px; color: var(--ink); line-height: 1.6; }
@@ -562,6 +562,42 @@
 }
 .business-page .field textarea { resize: vertical; min-height: 160px; }
 .business-page .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+/* 銀行名・支店名のオートコンプリート（bank.teraren.com 候補のドロップダウン） */
+.business-page .bank-autocomplete { position: relative; }
+.business-page .field-hint {
+  font-size: 12px;
+  color: var(--body-soft);
+  margin-top: 5px;
+  line-height: 1.6;
+}
+.business-page .bank-autocomplete-list {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .1);
+  max-height: 240px;
+  overflow-y: auto;
+}
+.business-page .bank-autocomplete-option {
+  padding: 9px 10px;
+  font-size: 14px;
+  color: var(--ink);
+  border-radius: var(--radius-s);
+  cursor: pointer;
+}
+.business-page .bank-autocomplete-option.is-active,
+.business-page .bank-autocomplete-option:hover {
+  background: var(--pale-2);
+}
 
 /* 振込先情報セクション（カードが --pale-2 になったので白面の小パネルとして分ける） */
 .business-page .biz-bank-section {
@@ -655,9 +691,9 @@
   flex: 0 0 auto;
   width: 24px;
   height: 24px;
-  border: 1px solid var(--blue);
-  background: var(--white);
-  color: var(--blue);
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--white);
   display: flex;
   align-items: center;
   justify-content: center;

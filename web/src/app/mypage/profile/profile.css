@@ -73,8 +73,9 @@
   height: 72px;
   border-radius: 50%;
   flex-shrink: 0;
-  background: var(--blue);
-  color: #fff;
+  background: var(--ink);
+  border: 1px solid var(--ink);
+  color: var(--white);
   font-family: var(--head);
   font-size: 28px;
   font-weight: 600;
@@ -183,14 +184,15 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: var(--pale-2);
+  background: var(--ink);
+  border: 1px solid var(--ink);
   display: grid;
   place-items: center;
 }
 .profile-page .link-card-ic .ic {
   width: 17px;
   height: 17px;
-  stroke: var(--blue);
+  stroke: var(--white);
   stroke-width: 1.9;
   fill: none;
 }

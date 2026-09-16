@@ -13,7 +13,7 @@
  * account_number はマスク済み（例 "***4567"）でのみ返る（生の口座番号は保存後に再取得できない）。
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import { Notice } from "@/components/kdz/Notice";
@@ -30,7 +30,129 @@ import {
   type BankAccountType,
   type UserProfile,
 } from "@/lib/katadzuke-api";
+import { useBankSuggestions, useBranchSuggestions } from "@/lib/bank-lookup";
 import "./bank-account.css";
+
+/**
+ * 銀行名・支店名のオートコンプリート入力欄（bank.teraren.com 公開APIの候補を表示）。
+ * postal-lookup と同じ「入力の補助」の思想: 候補が取得できない・0件でも、
+ * 通常の <input> と同じように自由入力を続けられる（何も表示しないだけ）。
+ */
+function BankAutocompleteInput({
+  id,
+  value,
+  onChange,
+  onSelect,
+  suggestions,
+  loading,
+  placeholder,
+  hasError,
+  disabled,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  onSelect: (suggestion: { code: string; name: string }) => void;
+  suggestions: { code: string; name: string }[];
+  loading: boolean;
+  placeholder?: string;
+  hasError?: boolean;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [highlight, setHighlight] = useState(-1);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const listboxId = `${id}-listbox`;
+
+  useEffect(() => {
+    setHighlight(-1);
+  }, [suggestions]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocPointerDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDocPointerDown);
+    return () => document.removeEventListener("mousedown", onDocPointerDown);
+  }, [open]);
+
+  const commit = (s: { code: string; name: string }) => {
+    onSelect(s);
+    setOpen(false);
+  };
+
+  return (
+    <div className="bank-autocomplete" ref={wrapRef}>
+      <input
+        type="text"
+        id={id}
+        value={value}
+        placeholder={placeholder}
+        disabled={disabled}
+        autoComplete="off"
+        role="combobox"
+        aria-expanded={open && suggestions.length > 0}
+        aria-controls={listboxId}
+        aria-autocomplete="list"
+        aria-activedescendant={highlight >= 0 ? `${id}-option-${highlight}` : undefined}
+        className={hasError ? "has-error" : undefined}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => {
+          if (suggestions.length > 0) setOpen(true);
+        }}
+        onBlur={(e) => {
+          // Tab等でフォーカスが自コンポーネント外へ移った場合は候補を閉じる。候補クリックは
+          // onMouseDown(preventDefault)で先に確定させているため、ここでの close と競合しない。
+          if (wrapRef.current && wrapRef.current.contains(e.relatedTarget as Node)) return;
+          setOpen(false);
+        }}
+        onKeyDown={(e) => {
+          if (!open || suggestions.length === 0) return;
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setHighlight((h) => (h + 1) % suggestions.length);
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setHighlight((h) => (h <= 0 ? suggestions.length - 1 : h - 1));
+          } else if (e.key === "Enter") {
+            if (highlight >= 0) {
+              e.preventDefault();
+              commit(suggestions[highlight]);
+            }
+          } else if (e.key === "Escape") {
+            setOpen(false);
+          }
+        }}
+      />
+      {open && suggestions.length > 0 ? (
+        <ul className="bank-autocomplete-list" role="listbox" id={listboxId}>
+          {suggestions.map((s, i) => (
+            <li
+              key={s.code}
+              id={`${id}-option-${i}`}
+              role="option"
+              aria-selected={i === highlight}
+              className={`bank-autocomplete-option${i === highlight ? " is-active" : ""}`}
+              onMouseDown={(e) => {
+                // クリックより先に input の blur が発火し候補が消えてしまうため mousedown で確定する。
+                e.preventDefault();
+                commit(s);
+              }}
+              onMouseEnter={() => setHighlight(i)}
+            >
+              {s.name}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {loading ? <div className="field-hint">候補を検索しています…</div> : null}
+    </div>
+  );
+}
 
 const ICON_BANK = (
   <svg className="ic" viewBox="0 0 24 24" aria-hidden="true">
@@ -52,10 +174,15 @@ export default function BankAccountPage() {
 
   const [editing, setEditing] = useState(false);
   const [bankName, setBankName] = useState("");
+  // 銀行名の候補から選択した場合にだけ入る全銀コード（支店検索の絞り込みに使う）。
+  // 手入力・未選択の間は null のままで、その場合は支店名も自由入力のまま候補を出さない。
+  const [bankCode, setBankCode] = useState<string | null>(null);
   const [branchName, setBranchName] = useState("");
   const [accountType, setAccountType] = useState<BankAccountType>("普通");
   const [accountNumber, setAccountNumber] = useState("");
   const [accountHolderKana, setAccountHolderKana] = useState("");
+  const bankSuggestions = useBankSuggestions(bankName);
+  const branchSuggestions = useBranchSuggestions(bankCode, branchName);
 
   const [bankNameErr, setBankNameErr] = useState<string | null>(null);
   const [branchNameErr, setBranchNameErr] = useState<string | null>(null);
@@ -96,6 +223,9 @@ export default function BankAccountPage() {
 
   function startEdit() {
     setBankName(account?.bank_name ?? "");
+    // 保存済みの銀行名は文字列でしか持っていない（コード不明）ため、支店の絞り込み検索を
+    // 使うには候補から選び直してもらう必要がある。それまでは支店名も従来どおり自由入力できる。
+    setBankCode(null);
     setBranchName(account?.branch_name ?? "");
     setAccountType(account?.account_type ?? "普通");
     setAccountNumber("");
@@ -382,12 +512,21 @@ export default function BankAccountPage() {
                 <label htmlFor="inp-bank-name">
                   銀行名<span className="req">必須</span>
                 </label>
-                <input
-                  type="text"
+                <BankAutocompleteInput
                   id="inp-bank-name"
                   value={bankName}
-                  onChange={(e) => setBankName(e.target.value)}
+                  onChange={(v) => {
+                    setBankName(v);
+                    setBankCode(null);
+                  }}
+                  onSelect={(s) => {
+                    setBankName(s.name);
+                    setBankCode(s.code);
+                  }}
+                  suggestions={bankSuggestions.suggestions}
+                  loading={bankSuggestions.loading}
                   placeholder="カタヅケ銀行"
+                  hasError={!!bankNameErr}
                 />
                 {bankNameErr ? <div className="field-error">{bankNameErr}</div> : null}
               </div>
@@ -395,12 +534,15 @@ export default function BankAccountPage() {
                 <label htmlFor="inp-branch-name">
                   支店名<span className="req">必須</span>
                 </label>
-                <input
-                  type="text"
+                <BankAutocompleteInput
                   id="inp-branch-name"
                   value={branchName}
-                  onChange={(e) => setBranchName(e.target.value)}
+                  onChange={(v) => setBranchName(v)}
+                  onSelect={(s) => setBranchName(s.name)}
+                  suggestions={branchSuggestions.suggestions}
+                  loading={branchSuggestions.loading}
                   placeholder="本店"
+                  hasError={!!branchNameErr}
                 />
                 {branchNameErr ? <div className="field-error">{branchNameErr}</div> : null}
               </div>

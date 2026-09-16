@@ -137,6 +137,20 @@
 }
 
 /* ============================================================
+   #4.5 写真帯（STEPS → 中間CTA の区切り）— 新設のフレームブリード写真帯
+   ============================================================ */
+/* 2026-09-16 ユーザー指摘: ヒーロー以降、STEPS〜AUCTION が図版のないテキスト／アイコン中心の
+   構成になり、「人の森」の世界観の没入感がスクロールとともに急減する。既存の .hero-band
+   （#contact と同じ共有部品。画像・veil・帯高は katazuke-pages.css の正典に従う）をこの区間に
+   もう1箇所増やして区切りにする（実装は page.tsx の .lot-band 参照）。--band-pos は既定の
+   50% 50% のまま（家具が画面中央付近に収まる構図のため上書き不要）。
+   .section-cta は元々「直前の .section の下パディングに乗る」設計（core は padding-top:0）で、
+   直前が STEPS から新設の帯に変わったため、帯自身の padding-block（32〜56px）だけでは
+   .scta-inner（--pale 面・1px 罫のカード）の手前の余白が他区間より詰まって見える。
+   帯の直後だけ、.final-actions（#15）と同じ「帯＋直後セクションの呼吸」に揃える。 */
+.lot-band + .section-cta{padding-top:clamp(28px,3.5vw,44px);}
+
+/* ============================================================
    #5 中間CTA — 補足を 2 行にした分の行間（R4 E.1-2）
    ============================================================ */
 /* 核は .scta-text span{font-size:13px;margin-top:4px}（サイズは変えない）。
@@ -292,7 +306,7 @@
    3D レンダーを 64px 枠に縮小した前案は灰色のにじみにしかならなかった（BRIEF §4-15）。 */
 .trust .trust-item{display:grid;grid-template-columns:56px minmax(0,1fr);gap:18px;align-items:start;}
 .trust .ti-ic{width:56px;height:56px;flex:none;display:grid;place-items:center;
-  background:var(--pale);border:1px solid var(--primary);color:var(--primary);}
+  background:var(--ink);border:1px solid var(--ink);color:var(--white);}
 /* width/height を明示するのは load-bearing。katazuke-pages.css の共有 `.trust-item svg{width:13px;height:13px}`
    （ヒーロー下の信頼バッジ用）が同名クラス経由でここにも効き、.ic の width:1em（特異度 0,1,0）に勝って
    26px 指定が 13px に潰れていた（ラウンド2 実測）。px で上書きして 56px チップの中で 26px に据える。 */
@@ -371,6 +385,36 @@
 @media(min-width:981px){
   .founder .media-split{--ms-img:40fr;--ms-txt:60fr;align-items:start;}
   .founder .founder-photo{width:100%;max-width:460px;aspect-ratio:4/3;}
+}
+
+/* ============================================================
+   #13.5 運営者メッセージ — 対応ブラウザのみのスクロール連動視差
+   ============================================================ */
+/* 2026-09-16 ユーザー指摘: #founder が静止画1カット＋テキストのみで、他の帯に比べて没入感が弱い。
+   このタスクは page.tsx / katazuke-top.css のみ編集可のため新規クライアントコンポーネントは
+   作らず、JS を追加しない CSS Scroll-Driven Animations（animation-timeline:view()）だけで
+   写真にごく弱い視差（拡大＋縦方向のシフト）を付ける。
+   - @supports で機能検出。未対応ブラウザではプロパティごと無視され、静止画のまま崩れない。
+   - 動かすのは transform だけ（scale/translate）。レイアウトに影響する prop は触らないため
+     再レイアウトが起きず、CLS は発生しない。JS のスクロールリスナー（rAF 間引き等）も不要。
+   - prefers-reduced-motion:no-preference の時だけ有効化し、動きを望まない利用者には常に静止画。
+   - .founder-photo は .img-frame（position:relative;overflow:hidden）の子なので、
+     scale(1.08) 分は枠内に収まり、額装（.sp-bleed）からはみ出さない。
+   [要確認] animation-timeline:view() の対応状況は執筆時点で Chromium 系が先行し、ブラウザにより
+   差がある。@supports 越しの加飾なので、未対応環境でも実害なく静止画へ退行するだけ。 */
+@supports (animation-timeline: view()) {
+  @keyframes founder-parallax{
+    from{transform:scale(1.08) translateY(-3%);}
+    to{transform:scale(1.08) translateY(3%);}
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .founder .founder-photo img{
+      animation: founder-parallax linear both;
+      animation-timeline: view();
+      animation-range: cover 0% cover 100%;
+      will-change: transform;
+    }
+  }
 }
 
 /* ============================================================

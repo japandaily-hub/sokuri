@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { Icon, Spinner } from "@/components/Icon";
 import { AppHeader } from "@/components/kdz/AppHeader";
+import { ChatPanel } from "@/components/kdz/ChatPanel";
 import { ConfirmModal } from "@/components/kdz/ConfirmModal";
 import { formatVisitSchedule } from "@/lib/categories";
 import { formatPurposeLabel } from "@/lib/case-labels";
@@ -91,6 +92,9 @@ export default function UserCaseDetailPage() {
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
   const [confirmState, setConfirmState] = useState<ConfirmState>(null);
+  /** 成約後チャットをこの画面内にインライン展開しているか（既定で開く=別ページ遷移なしで
+   *  「業者を選ぶ→そのままチャットで会話開始」を完結させる。r-chat-inline 対応）。 */
+  const [chatOpen, setChatOpen] = useState(true);
 
   // ===== 商品の編集/削除・写真の追加/削除 =====
   // busyOps は進行中の操作キー集合。キー形式は "item:{itemId}:save" / "item:{itemId}:delete" /
@@ -849,27 +853,44 @@ export default function UserCaseDetailPage() {
           ) : null}
 
           {/* 業者とのやり取り導線（チャット/日程調整）。r8-fix-frontend5 対応:
-              業者退会時はチャット送信・日程調整に進めないため導線ごと非表示にする。 */}
+              業者退会時はチャット送信・日程調整に進めないため導線ごと非表示にする。
+              r-chat-inline 対応: チャットは別ページへ遷移せず、この画面内にインライン展開する
+              （開閉はトグル。既定で開いた状態にし、そのまま会話を継続できるようにする）。 */}
           {txn.status !== "cancelled" && !txn.operator_deleted && (
-            <div className="mt-4 flex flex-wrap gap-2">
-              <a href={`/chat/${txn.id}`} className={btnPrimary}>
-                業者とチャット
-                {txn.unread_count > 0 ? `（未読${txn.unread_count}）` : ""}
-              </a>
-              {txn.status === "pending" && txn.visit_date == null ? (
-                <a href={`/schedule?transaction_id=${txn.id}`} className={btnSecondary}>
-                  訪問日程を調整する
-                </a>
-              ) : null}
-              {txn.visit_date ? (
-                <p className="self-center text-sm font-semibold text-slate-600">
-                  訪問予定: {formatVisitSchedule(txn.visit_date, txn.visit_time_slot)}
-                </p>
-              ) : null}
-              {txn.operator_suspended ? (
-                <p className="w-full text-xs font-semibold text-red-600">
-                  ※ 業者が対応できないため、チャット送信・日程調整の返信が届かない場合があります。
-                </p>
+            <div className="mt-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setChatOpen((v) => !v)}
+                  aria-expanded={chatOpen}
+                  className={btnPrimary}
+                >
+                  {chatOpen ? "チャットを閉じる" : "業者とチャット"}
+                  {txn.unread_count > 0 ? `（未読${txn.unread_count}）` : ""}
+                </button>
+                {txn.status === "pending" && txn.visit_date == null ? (
+                  <a href={`/schedule?transaction_id=${txn.id}`} className={btnSecondary}>
+                    訪問日程を調整する
+                  </a>
+                ) : null}
+                {txn.visit_date ? (
+                  <p className="self-center text-sm font-semibold text-slate-600">
+                    訪問予定: {formatVisitSchedule(txn.visit_date, txn.visit_time_slot)}
+                  </p>
+                ) : null}
+                {txn.operator_suspended ? (
+                  <p className="w-full text-xs font-semibold text-red-600">
+                    ※ 業者が対応できないため、チャット送信・日程調整の返信が届かない場合があります。
+                  </p>
+                ) : null}
+              </div>
+              {chatOpen ? (
+                <ChatPanel
+                  transactionId={txn.id}
+                  variant="embedded"
+                  className="mt-3"
+                  onDetailChange={setTxn}
+                />
               ) : null}
             </div>
           )}

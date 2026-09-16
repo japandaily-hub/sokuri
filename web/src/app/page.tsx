@@ -209,6 +209,26 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* ============ 写真帯（世界観の継続） ============ */}
+        {/* ユーザー指摘（2026-09-16）: ヒーローの人物カルーセル直後、STEPS〜AUCTION が図版のない
+            テキスト／アイコン中心の構成に切り替わり、「人の森」の世界観の没入感がスクロールとともに
+            急減する。新規画像は生成せず、既存の .hero-band（フレームブリード写真帯。#contact と同じ
+            共有部品）をこの中間区間にもう1箇所増やして区切りにする。
+            画像は /lib/model-cases.ts の「模様替え」ケースの主役画像（ex-lot-rearrange.webp・
+            1536x1024）を、この帯では装飾画像（alt=""）として転用する。#contact 帯と同様、人物が
+            写っていないため hero-band--face は付けず、veil は既定の --headline
+            （rgba(20,35,92,.55)）のまま。帯に本文は置かず見出しだけ（新しい約束・期間・効果は
+            足さない。景表法上の注意はモデルケース節の MODEL_CASE_NOTE が別途担うため、
+            装飾用途のこの帯では言及しない）。 */}
+        <section className="hero-band hero-band--mid hero-band--headline lot-band">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/img/v2/ex-lot-rearrange.webp" width={1536} height={1024} alt="" loading="lazy" decoding="async" />
+          <div className="hero-band__veil" aria-hidden="true" />
+          <div className="container hero-band__copy">
+            <h2>その一脚も、その一台も。<br className="sp-br" />家のどこかで、出番を待っている。</h2>
+          </div>
+        </section>
+
         {/* ============ 中間CTA ============ */}
         <div className="section-cta">
           <div className="container">

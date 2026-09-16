@@ -18,6 +18,126 @@ import { Notice } from "@/components/kdz/Notice";
 import { Reveal, FaqAccordion } from "@/components/kdz/interactions";
 import { submitOperatorApplication, toDisplayMessage } from "@/lib/katadzuke-api";
 import { MODEL_CASE_CHIP, VENDOR_CASES, VENDOR_CASE_NOTE } from "@/lib/model-cases";
+import { useBankSuggestions, useBranchSuggestions } from "@/lib/bank-lookup";
+
+/**
+ * 銀行名・支店名のオートコンプリート入力欄（bank.teraren.com 公開APIの候補を表示）。
+ * postal-lookup と同じ「入力の補助」の思想: 候補が取得できない・0件でも、
+ * 通常の <input> と同じように自由入力を続けられる（何も表示しないだけ）。
+ */
+function BankAutocompleteInput({
+  id,
+  value,
+  onChange,
+  onSelect,
+  suggestions,
+  loading,
+  placeholder,
+  hasError,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  onSelect: (suggestion: { code: string; name: string }) => void;
+  suggestions: { code: string; name: string }[];
+  loading: boolean;
+  placeholder?: string;
+  hasError?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [highlight, setHighlight] = useState(-1);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const listboxId = `${id}-listbox`;
+
+  useEffect(() => {
+    setHighlight(-1);
+  }, [suggestions]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocPointerDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDocPointerDown);
+    return () => document.removeEventListener("mousedown", onDocPointerDown);
+  }, [open]);
+
+  const commit = (s: { code: string; name: string }) => {
+    onSelect(s);
+    setOpen(false);
+  };
+
+  return (
+    <div className="bank-autocomplete" ref={wrapRef}>
+      <input
+        type="text"
+        id={id}
+        name={id}
+        value={value}
+        placeholder={placeholder}
+        autoComplete="off"
+        role="combobox"
+        aria-expanded={open && suggestions.length > 0}
+        aria-controls={listboxId}
+        aria-autocomplete="list"
+        aria-activedescendant={highlight >= 0 ? `${id}-option-${highlight}` : undefined}
+        className={hasError ? "has-error" : undefined}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => {
+          if (suggestions.length > 0) setOpen(true);
+        }}
+        onBlur={(e) => {
+          // Tab等でフォーカスが自コンポーネント外へ移った場合は候補を閉じる。候補クリックは
+          // onMouseDown(preventDefault)で先に確定させているため、ここでの close と競合しない。
+          if (wrapRef.current && wrapRef.current.contains(e.relatedTarget as Node)) return;
+          setOpen(false);
+        }}
+        onKeyDown={(e) => {
+          if (!open || suggestions.length === 0) return;
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setHighlight((h) => (h + 1) % suggestions.length);
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setHighlight((h) => (h <= 0 ? suggestions.length - 1 : h - 1));
+          } else if (e.key === "Enter") {
+            if (highlight >= 0) {
+              e.preventDefault();
+              commit(suggestions[highlight]);
+            }
+          } else if (e.key === "Escape") {
+            setOpen(false);
+          }
+        }}
+      />
+      {open && suggestions.length > 0 ? (
+        <ul className="bank-autocomplete-list" role="listbox" id={listboxId}>
+          {suggestions.map((s, i) => (
+            <li
+              key={s.code}
+              id={`${id}-option-${i}`}
+              role="option"
+              aria-selected={i === highlight}
+              className={`bank-autocomplete-option${i === highlight ? " is-active" : ""}`}
+              onMouseDown={(e) => {
+                // クリックより先に input の blur が発火し候補が消えてしまうため mousedown で確定する。
+                e.preventDefault();
+                commit(s);
+              }}
+              onMouseEnter={() => setHighlight(i)}
+            >
+              {s.name}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {loading ? <div className="field-hint">候補を検索しています…</div> : null}
+    </div>
+  );
+}
 
 /** 3桁区切り。ロケール実装に依存しないよう自前で整形する（SSR とクライアントで同じ文字列にするため）。 */
 function yen(n: number): string {
@@ -267,6 +387,11 @@ export default function BusinessPage() {
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // 銀行名の候補から選択した場合にだけ入る全銀コード（支店検索の絞り込みに使う）。
+  // 手入力・未選択の間は null のままで、その場合は支店名も自由入力のまま候補を出さない。
+  const [bankCode, setBankCode] = useState<string | null>(null);
+  const bankSuggestions = useBankSuggestions(form.bankName);
+  const branchSuggestions = useBranchSuggestions(bankCode, form.branchName);
   /* R4 r4 #11/#17: 固定バーが常時出ているため、ヒーローのリード文に重なり（390px 実測で
      「…カタヅケで開拓する。」の次の行が隠れる）、同じ文言のボタンが画面に2つ並んでいた。
      監視対象はヒーロー節そのもの（CTA 単体だと、390px では画像 487px の下にある CTA が
@@ -1040,14 +1165,21 @@ export default function BusinessPage() {
                         <label htmlFor="bank-name">
                           銀行名<span className="req">必須</span>
                         </label>
-                        <input
-                          type="text"
+                        <BankAutocompleteInput
                           id="bank-name"
-                          name="bank-name"
-                          placeholder="〇〇銀行"
-                          className={invClass("bankName").trim()}
                           value={form.bankName}
-                          onChange={(e) => update("bankName", e.target.value)}
+                          onChange={(v) => {
+                            update("bankName", v);
+                            setBankCode(null);
+                          }}
+                          onSelect={(s) => {
+                            update("bankName", s.name);
+                            setBankCode(s.code);
+                          }}
+                          suggestions={bankSuggestions.suggestions}
+                          loading={bankSuggestions.loading}
+                          placeholder="〇〇銀行"
+                          hasError={!!invalid.bankName}
                         />
                         {fieldError("bankName")}
                       </div>
@@ -1055,14 +1187,15 @@ export default function BusinessPage() {
                         <label htmlFor="branch-name">
                           支店名<span className="req">必須</span>
                         </label>
-                        <input
-                          type="text"
+                        <BankAutocompleteInput
                           id="branch-name"
-                          name="branch-name"
-                          placeholder="〇〇支店"
-                          className={invClass("branchName").trim()}
                           value={form.branchName}
-                          onChange={(e) => update("branchName", e.target.value)}
+                          onChange={(v) => update("branchName", v)}
+                          onSelect={(s) => update("branchName", s.name)}
+                          suggestions={branchSuggestions.suggestions}
+                          loading={branchSuggestions.loading}
+                          placeholder="〇〇支店"
+                          hasError={!!invalid.branchName}
                         />
                         {fieldError("branchName")}
                       </div>
