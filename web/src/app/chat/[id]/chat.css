@@ -175,8 +175,9 @@
   width: 40px;
   height: 40px;
   border-radius: 0;
-  background: var(--pale);
-  color: var(--blue);
+  background: var(--ink);
+  border: 1px solid var(--ink);
+  color: var(--white);
   font-family: var(--head);
   font-size: 16px;
   font-weight: 600;
@@ -266,8 +267,9 @@
   width: 32px;
   height: 32px;
   border-radius: 0;
-  background: var(--pale);
-  color: var(--blue);
+  background: var(--ink);
+  border: 1px solid var(--ink);
+  color: var(--white);
   font-family: var(--head);
   font-size: 13px;
   font-weight: 600;

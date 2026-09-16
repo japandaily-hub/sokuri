@@ -96,7 +96,7 @@ export default function VendorDetailPage() {
           {/* ヒーロー */}
           <div className="biz-hero">
             <div className="biz-hero-head">
-              <div className="biz-big-avatar" style={{ background: "var(--primary)" }}>
+              <div className="biz-big-avatar" style={{ background: "var(--ink)" }}>
                 {initial}
               </div>
               <div className="biz-hero-info">
@@ -178,7 +178,7 @@ export default function VendorDetailPage() {
               reviews.map((rv) => (
                 <div className="review-item" key={rv.id}>
                   <div className="review-head">
-                    <div className="reviewer-avatar" style={{ background: "var(--primary-l)" }}>
+                    <div className="reviewer-avatar" style={{ background: "var(--ink)" }}>
                       口
                     </div>
                     <div className="reviewer-info">

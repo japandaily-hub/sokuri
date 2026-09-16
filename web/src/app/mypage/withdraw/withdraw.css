@@ -237,7 +237,8 @@
   height: 72px;
   margin: 0 auto 16px;
   border-radius: 50%;
-  background: #eef2fb;
+  background: var(--ink);
+  border: 1px solid var(--ink);
   display: grid;
   place-items: center;
 }
@@ -245,7 +246,7 @@
   width: 34px;
   height: 34px;
   fill: none;
-  stroke: var(--blue);
+  stroke: var(--white);
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
