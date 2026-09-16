@@ -15,6 +15,8 @@
  *   signIn コールバックで LINE の access_token を
  *   バックエンド /auth/line/exchange と交換し、既存 Credentials provider と
  *   同じ形の user オブジェクトに正規化して jwt コールバックへ渡す。
+ *   停止アカウント（403 account_suspended）は "/login?reason=suspended" への
+ *   リダイレクト文字列を返し、Credentials と同じ停止バナーを表示させる。
  *   ログイン済みユーザーの後付け連携（Bearer 付きexchange）は今回スコープ外。
  *   業者（Operator）のLINE単独新規作成はバックエンド側で行われない。
  */
@@ -114,22 +116,36 @@ async function backendLogin(
 /**
  * LINEのアクセストークンをバックエンドJWTへ交換する。
  * 未ログイン時の新規登録/ログインのみが対象（Bearerヘッダは付けない）。
+ * signIn コールバック側で停止アカウント（code: "account_suspended"）を
+ * 判別してリダイレクト先を出し分けられるよう、失敗時も detail.code を保持して返す
+ * （backendLogin と異なり例外は投げない。OAuthプロバイダの signIn コールバックは
+ * true/false/文字列URLを返す設計のため、ここでは判別可能な戻り値にとどめる）。
  * @param lineAccessToken LINE OAuthで取得したアクセストークン
- * @returns 交換成功時はバックエンドの認証レスポンス、失敗時は null
+ * @returns 交換成功時は { ok: true, data }、失敗時は { ok: false, code? }
  */
 async function backendLineExchange(
   lineAccessToken: string,
-): Promise<BackendAuthResponse | null> {
+): Promise<{ ok: true; data: BackendAuthResponse } | { ok: false; code?: string }> {
   try {
     const res = await fetch(`${apiBase()}/auth/line/exchange`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ line_access_token: lineAccessToken }),
     });
-    if (!res.ok) return null;
-    return (await res.json()) as BackendAuthResponse;
+    if (!res.ok) {
+      // backend は停止アカウントの場合 403 { detail: { code: "account_suspended" } } を返す。
+      let code: string | undefined;
+      try {
+        const body = (await res.json()) as { detail?: { code?: unknown } };
+        if (typeof body?.detail?.code === "string") code = body.detail.code;
+      } catch {
+        /* JSON でないレスポンスは無視 */
+      }
+      return { ok: false, code };
+    }
+    return { ok: true, data: (await res.json()) as BackendAuthResponse };
   } catch {
-    return null;
+    return { ok: false };
   }
 }
 
@@ -222,8 +238,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const lineAccessToken = account.access_token;
       if (!lineAccessToken) return false;
 
-      const data = await backendLineExchange(lineAccessToken);
-      if (!data) return false; // 交換失敗時はログインを不成立にする（不完全なセッションを作らない）
+      const result = await backendLineExchange(lineAccessToken);
+      if (!result.ok) {
+        // 停止アカウントのみ、Credentials と同じ停止バナーへ誘導する
+        // （/login?reason=suspended は login/page.tsx が読んで専用文言を表示する）。
+        // それ以外の失敗は従来通り false で不成立にする（不完全なセッションを作らない）。
+        if (result.code === "account_suspended") return "/login?reason=suspended";
+        return false;
+      }
+      const { data } = result;
 
       if (data.account_type === "operator") {
         // 契約上「LINE単独でのOperator新規作成」は行われないため、
