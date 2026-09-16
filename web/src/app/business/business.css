@@ -430,9 +430,9 @@
 .business-page .biz-step-n {
   width: 48px;
   height: 48px;
-  border: 1px solid var(--blue);
-  background: var(--white);
-  color: var(--blue);
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--white);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -470,7 +470,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--blue);
+  color: var(--ink);
 }
 .business-page .req-ic .ic { width: 20px; height: 20px; stroke-width: 1.7; }
 .business-page .req-body h4 { font-size: 15px; margin: 0 0 6px; color: var(--ink); line-height: 1.6; }
@@ -691,9 +691,9 @@
   flex: 0 0 auto;
   width: 24px;
   height: 24px;
-  border: 1px solid var(--blue);
-  background: var(--white);
-  color: var(--blue);
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--white);
   display: flex;
   align-items: center;
   justify-content: center;

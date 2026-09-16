@@ -188,14 +188,15 @@
 .case-avatar {
   width: 44px; height: 44px;
   border-radius: 50%;
-  background: var(--pale);
+  background: var(--ink);
+  border: 1px solid var(--ink);
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--head);
   font-size: 16px;
   font-weight: 400;
-  color: var(--primary);
+  color: var(--white);
   flex-shrink: 0;
 }
 .case-persona-info .name { font-size: 15px; font-weight: 600; color: var(--ink); }

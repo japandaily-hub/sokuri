@@ -64,7 +64,7 @@
 .create-page .sg-flow li { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; color: var(--body); line-height: 1.7; }
 .create-page .sg-n {
   flex-shrink: 0; width: 22px; height: 22px; display: grid; place-items: center; margin-top: 1px;
-  font-family: var(--en-display); font-size: 13px; color: var(--white); background: var(--primary);
+  font-family: var(--en-display); font-size: 13px; color: var(--white); background: var(--ink); border: 1px solid var(--ink);
 }
 .create-page .sg-tips { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .create-page .sg-tips li {

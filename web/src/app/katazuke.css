@@ -399,8 +399,12 @@ section:has(> .vt){position:relative;}
 .assure .container{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;
   padding-block:28px;}
 .assure-item{display:flex;align-items:center;gap:12px;}
-.assure-item .ai{width:56px;height:56px;border-radius:0;background:var(--pale);
-  border:1px solid var(--primary);display:grid;place-items:center;flex:none;color:var(--primary);}
+/* 2026-09-16 ユーザー指摘: 装飾アイコン(クリック不可)が --primary(青=CTA専用色)の
+   淡色アウトラインだと、①青いボタン・リンクと役割が紛らわしい ②同系統の箱がページ内で
+   反復し無機質に見える。装飾アイコンは見出しと同じ --ink の塗り+白アイコンへ統一し、
+   青は実際にクリックできる要素だけに残す(色の意味を一貫させる)。 */
+.assure-item .ai{width:56px;height:56px;border-radius:0;background:var(--ink);
+  border:1px solid var(--ink);display:grid;place-items:center;flex:none;color:var(--white);}
 .assure-item .ai img{width:100%;height:100%;object-fit:cover;}
 .assure-item b{display:block;font-family:var(--head);font-weight:600;font-size:15px;color:var(--ink);line-height:1.6;}
 .assure-item span{font-size:12px;color:var(--body-soft);}
@@ -449,16 +453,18 @@ section:has(> .vt){position:relative;}
 .bundle-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(28px,3.4vw,40px);align-items:stretch;}
 .bundle-c{position:relative;background:transparent;border:0;border-radius:0;
   padding:28px 26px;box-shadow:none;}
-.bundle-c .bc-ic{width:72px;height:72px;border-radius:0;background:var(--pale);
-  border:1px solid var(--primary);color:var(--primary);
+.bundle-c .bc-ic{width:72px;height:72px;border-radius:0;background:var(--ink);
+  border:1px solid var(--ink);color:var(--white);
   display:grid;place-items:center;margin-bottom:16px;}
 .bundle-c .bc-ic img{width:100%;height:100%;object-fit:cover;}
 .bundle-c h3{font-size:19px;color:var(--ink);line-height:1.6;}
 .bundle-c p{font-size:15px;color:var(--body);line-height:1.9;margin-top:11px;}
-/* 強調1枚は枠色ではなく面＋左の緑縦バー（人の森「本社」小見出しの作法） */
-.bundle-c.key{background:var(--pale);border-left:3px solid var(--primary);box-shadow:none;}
-.bundle-c.key .bc-ic{background:var(--pale);border-color:var(--primary);color:var(--primary);}
-.bundle-c .bc-badge{position:absolute;top:0;left:0;background:var(--primary);color:#fff;
+/* 強調1枚は枠色ではなく面＋左の緑縦バー（人の森「本社」小見出しの作法）。
+   アイコンは他の装飾アイコン(--ink)と揃えず --gold-text にして「ここがポイント」の
+   1枚だけを反復から際立たせる（2026-09-16）。 */
+.bundle-c.key{background:var(--pale);border-left:3px solid var(--gold-text);box-shadow:none;}
+.bundle-c.key .bc-ic{background:var(--gold-text);border-color:var(--gold-text);color:var(--white);}
+.bundle-c .bc-badge{position:absolute;top:0;left:0;background:var(--gold-text);color:#fff;
   font-size:11.5px;font-weight:600;font-family:var(--head);padding:6px 13px;border-radius:0;
   letter-spacing:.08em;box-shadow:none;}
 .bundle-note{font-size:13px;color:var(--body-soft);text-align:center;margin-top:26px;}
@@ -606,8 +612,8 @@ section:has(> .vt){position:relative;}
 @media(max-width:560px){.cats-grid{grid-template-columns:repeat(3,1fr);gap:12px;}}
 .cats-note{display:flex;gap:16px;align-items:flex-start;max-width:var(--maxw-text);margin:clamp(30px,4vw,44px) auto 0;
   background:var(--pale);border:1px solid var(--line);border-radius:0;padding:22px 26px;}
-.cats-note .cn-ic{width:56px;height:56px;border-radius:0;background:#fff;
-  border:1px solid var(--primary);color:var(--primary);display:grid;place-items:center;flex:none;}
+.cats-note .cn-ic{width:56px;height:56px;border-radius:0;background:var(--ink);
+  border:1px solid var(--ink);color:var(--white);display:grid;place-items:center;flex:none;}
 .cats-note .cn-ic img{width:100%;height:100%;object-fit:cover;}
 .cats-note h4{font-size:17px;color:var(--ink);}
 .cats-note p{font-size:15px;color:var(--body);margin-top:7px;line-height:1.9;}

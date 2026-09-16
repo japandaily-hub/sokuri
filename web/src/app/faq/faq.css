@@ -229,7 +229,8 @@
   width: 36px;
   height: 36px;
   border-radius: 0;
-  background: var(--pale-2);
+  background: var(--ink);
+  border: 1px solid var(--ink);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -237,7 +238,7 @@
 }
 .faq-page .faq-section-icon .ic {
   font-size: 17px;
-  color: var(--primary);
+  color: var(--white);
   stroke-width: 1.6;
 }
 /* カテゴリ見出しは <h2>（h1「よくある質問」の直下の階層）。

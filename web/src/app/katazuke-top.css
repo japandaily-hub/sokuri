@@ -306,7 +306,7 @@
    3D レンダーを 64px 枠に縮小した前案は灰色のにじみにしかならなかった（BRIEF §4-15）。 */
 .trust .trust-item{display:grid;grid-template-columns:56px minmax(0,1fr);gap:18px;align-items:start;}
 .trust .ti-ic{width:56px;height:56px;flex:none;display:grid;place-items:center;
-  background:var(--pale);border:1px solid var(--primary);color:var(--primary);}
+  background:var(--ink);border:1px solid var(--ink);color:var(--white);}
 /* width/height を明示するのは load-bearing。katazuke-pages.css の共有 `.trust-item svg{width:13px;height:13px}`
    （ヒーロー下の信頼バッジ用）が同名クラス経由でここにも効き、.ic の width:1em（特異度 0,1,0）に勝って
    26px 指定が 13px に潰れていた（ラウンド2 実測）。px で上書きして 56px チップの中で 26px に据える。 */

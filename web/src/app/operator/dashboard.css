@@ -372,14 +372,15 @@
 .op-dash .neg-user-ic {
   width: 44px; height: 44px;
   border-radius: 0;
-  background: var(--pale);
+  background: var(--ink);
+  border: 1px solid var(--ink);
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--head);
   font-size: 16px;
   font-weight: 600;
-  color: var(--blue);
+  color: var(--white);
   flex-shrink: 0;
 }
 .op-dash .neg-user-ic.done { background: var(--pale); color: var(--green); }
