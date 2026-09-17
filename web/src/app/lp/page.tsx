@@ -48,13 +48,15 @@ type FloatIll = {
   spLeft?: string;
   hideSp?: boolean;
 };
+/* r2 B-3: 右側は「ドット列（右 24px）＋縦タブ CTA（右 60px）」の帯を空ける＝left は 86% まで。
+   上中央（h1）と中央（写真の主題）にも重ねない。 */
 const KV_ILLS: FloatIll[] = [
-  { name: "box", top: "18%", left: "6%", w: 104, sway: 1, float: 1, spTop: "50%", spLeft: "10%" },
-  { name: "plant", top: "58%", left: "3%", w: 92, sway: 2, float: 2, hideSp: true },
-  { name: "truck", top: "74%", left: "14%", w: 116, sway: 1, float: 3, spTop: "78%", spLeft: "14%" },
-  { name: "books", top: "20%", left: "92%", w: 96, sway: 2, float: 2, spTop: "52%", spLeft: "88%" },
-  { name: "house-tree", top: "62%", left: "95%", w: 108, sway: 1, float: 1, hideSp: true },
-  { name: "folding-hands", top: "84%", left: "84%", w: 92, sway: 2, float: 3, spTop: "80%", spLeft: "86%" },
+  { name: "box", top: "14%", left: "5%", w: 104, sway: 1, float: 1, spTop: "54%", spLeft: "12%" },
+  { name: "plant", top: "46%", left: "4%", w: 92, sway: 2, float: 2, hideSp: true },
+  { name: "truck", top: "82%", left: "11%", w: 116, sway: 1, float: 3, spTop: "80%", spLeft: "16%" },
+  { name: "books", top: "16%", left: "86%", w: 96, sway: 2, float: 2, spTop: "56%", spLeft: "86%" },
+  { name: "house-tree", top: "50%", left: "84%", w: 108, sway: 1, float: 1, hideSp: true },
+  { name: "folding-hands", top: "84%", left: "80%", w: 92, sway: 2, float: 3, spTop: "82%", spLeft: "84%" },
 ];
 const FEE_ILLS: FloatIll[] = [
   { name: "plant", top: "26%", left: "9%", w: 86, sway: 2, float: 2, spLeft: "12%" },
@@ -462,8 +464,12 @@ export default function LpPage() {
       <LpChrome />
 
       <main id="main">
-        {/* ============ 1. KV（参照 .home-kv） ============ */}
+        {/* ============ 1. KV（参照 .home-kv・フルブリード写真スライダー） ============
+            r2 A-3: 写真を KV 全面に敷き、キャッチは写真の上。可読性は上部だけの淡色グラデ veil で作る
+            （文字色は --ink / 主色のまま）。DOM 順 = 写真 → veil → 浮遊装飾 → キャッチ → 下端の白波形。 */}
         <section id="top" className="lp-kv">
+          <LpSlider slides={KV_SLIDES} />
+          <div className="lp-kv__veil" aria-hidden="true" />
           <div className="lp-kv__deco" aria-hidden="true">
             {KV_ILLS.map((ill) => (
               <FloatIllustration key={`${ill.name}-${ill.top}`} ill={ill} />
@@ -495,15 +501,12 @@ export default function LpPage() {
               </p>
             </div>
           </div>
-          {/* ドット列をビューポート右端中央に置くため、写真枠は .lp-container の外に出す（r1 A-3） */}
-          <div className="lp-kv__stage">
-            <LpSlider slides={KV_SLIDES} />
-          </div>
           <div className="lp-wave lp-wave--bottom lp-wave--white" aria-hidden="true" />
         </section>
 
         {/* ============ 2. MESSAGE（参照 .home-message） ============ */}
-        <section className="lp-message" aria-labelledby="lp-message-en">
+        {/* qa r2 L-7: 英字キャプションを region 名にすると読み上げが「message from katazuke」だけになるため和文で与える */}
+        <section className="lp-message" aria-label="運営事務局からのメッセージ">
           <div className="lp-container lp-message__inner">
             <div className="lp-message__figs">
               <figure className="lp-message__fig lp-message__fig--a img-frame img-frame--1x1">
@@ -523,9 +526,7 @@ export default function LpPage() {
               </figure>
             </div>
             <Reveal className="lp-message__txt" variant="up">
-              <p className="lp-en lp-message__en" id="lp-message-en">
-                message from katazuke
-              </p>
+              <p className="lp-en lp-message__en">message from katazuke</p>
               <p>
                 片付けが進まないのは、やる気の問題ではありません。出品の手間、営業電話の不安、何から手をつけるかの迷い。その一つひとつが、最初の一歩を重くしています。
               </p>
@@ -586,6 +587,7 @@ export default function LpPage() {
             <section className={`lp-point__block lp-point__block--${b.tone}`} key={b.id} aria-labelledby={`lp-point-${b.id}`}>
               <div className="lp-point__plate" aria-hidden="true" />
               <div className="lp-container lp-point__inner">
+                {/* r2 B-1: 見出しは色面の「中」（バッジの右・縦中央）。色面の下に置くと 670px の無地が残るため */}
                 <Reveal className="lp-point__head" variant="up">
                   <span className="lp-point__badge">
                     <span className="lp-point__badge-ja" aria-hidden="true">
@@ -597,6 +599,7 @@ export default function LpPage() {
                   </span>
                   <h2 id={`lp-point-${b.id}`}>{b.title}</h2>
                 </Reveal>
+
 
                 <Reveal className="lp-point__main" variant="up">
                   <div className="lp-point__main-copy">
@@ -784,21 +787,22 @@ export default function LpPage() {
           <div className="lp-cases__intro">
             <div className="lp-wave lp-wave--top lp-wave--primary" aria-hidden="true" />
             <div className="lp-container">
+              {/* r2 B-2: 中身は増やさない（見出し＋その下の極小英字だけ） */}
               <Reveal className="lp-cases__introbody" variant="up">
-                <p className="lp-en">usage images</p>
                 <h2>こんなふうに使えます</h2>
+                <p className="lp-en">usage images</p>
               </Reveal>
             </div>
-            <div className="lp-wave lp-wave--bottom lp-wave--white" aria-hidden="true" />
           </div>
 
           <div className="lp-cases__main">
             <div className="lp-container">
               <Reveal className="lp-cases__head" variant="up">
+                {/* qa r2 L-6: 2 行目が intro 帯の h2 と同文だったため、同一視野の反復を解消する */}
                 <p className="lp-cases__catch">
                   家まるごとの片付けを、
                   <br />
-                  <span>こんなふうに使えます。</span>
+                  <span>撮るところから。</span>
                 </p>
                 <p className="lp-cases__sub">サービスの流れをイメージしていただくための、架空のモデルケースです。</p>
               </Reveal>
@@ -894,10 +898,11 @@ export default function LpPage() {
                   カタヅケに<em>参加</em>しませんか。
                 </h2>
               </Reveal>
+              {/* qa r2 L-8: β 手数料の 1 文はカード群直前の .lp-biz__note が担うため、
+                  リードは出典 `.biz-banner-copy p`（<br /> 区切り 3 文）のうち前 2 文だけにする */}
               <Reveal className="lp-biz__text" variant="up">
                 <p>顧客と業者、双方に無駄がない。だから長く続く。</p>
                 <p>一括出品への入札で、効率的な仕入れルートを開拓できます。</p>
-                <p>※ サービス開始当初（β期間）は手数料を請求しません。請求開始の際は事前にメールでお知らせします。</p>
               </Reveal>
             </div>
             {/* legal M5: 期間限定の条件はカード群の直前・本文サイズで置く */}

@@ -297,28 +297,63 @@ html.js-rv .lp-page .rv--up:not(.in) {
   display: block;
 }
 
-/* 浮遊CTA（参照の黄 blob の位置。LINE 単独導線にしないため下にテキスト導線を添える） */
+/* 浮遊CTA（参照の黄 blob の位置）。LINE 単独導線にしないため必ずテキスト導線を添える。
+   r2 A-2: 従来の横長ブロックは PC/SP とも本文・見出しを恒常的に覆っていた（見出し 9,071px² 等）。
+   PC は版面の外側（右 70px の余白）に収まる 60px 幅の「縦タブ」にする。 */
 .lp-page .lp-float-cta {
   position: fixed;
-  top: 132px;
+  top: 160px;
   right: 0;
   z-index: 65;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 6px;
+  /* 版面（.lp-container）の右余白は 1280 で 58px。56px なら本文の外側に確実に収まる */
+  width: 56px;
+}
+/* MENU オーバーレイを開いている間は隠す（LpChrome が inert を付ける・qa r2 L-4 と同じ扱い） */
+.lp-page .lp-float-cta[inert],
+.lp-page .lp-header__logo[inert] {
+  visibility: hidden;
 }
 .lp-page .lp-float-cta__btn {
-  min-height: 56px;
-  max-width: 236px;
+  width: 56px;
+  min-height: 220px;
+  padding: 0;
+  align-items: stretch;
+}
+/* .btn-line の作法（タイル＋本文）は保ったまま縦組みにする。タイルは上端 12px の帯 */
+.lp-page .lp-float-cta__btn .btn-line__tile {
+  flex: 0 0 12px;
+  width: auto;
+  min-width: 0;
+  height: 12px;
+}
+.lp-page .lp-float-cta__btn .btn-line__body {
+  writing-mode: vertical-rl;
+  padding: 16px 0;
+  align-items: center;
+  justify-content: center;
+}
+.lp-page .lp-float-cta__btn .btn-line__label {
+  letter-spacing: 0.12em;
+}
+/* 縦タブでは sub と矢印は出さない（60px 幅に収めるため。無料である旨は代替導線側と FEE が担う） */
+.lp-page .lp-float-cta__btn .btn-line__sub,
+.lp-page .lp-float-cta__btn .btn-line__arr {
+  display: none;
 }
 .lp-page .lp-float-cta__alt {
-  padding: 5px 10px;
+  writing-mode: vertical-rl;
+  width: 56px;
+  padding: 14px 0;
   background: #fff;
   border: 1px solid var(--line);
+  border-top: 0;
   font-family: var(--head);
-  font-size: 12px;
-  letter-spacing: 0.06em;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-align: center;
   color: var(--ink);
 }
 .lp-page .lp-float-cta__alt:hover {
@@ -471,30 +506,32 @@ html.js-rv .lp-page .rv--up:not(.in) {
 /* ============================================================
    1. KV（参照 .home-kv）
    ============================================================ */
-/* r1 A-2: 実装 1105px（参照 900px・+23%）だったため上下の余白を詰めて 900px 近傍に戻す。
-   ドット列の基準（offset parent）はこの section が持つので position:relative は必須。 */
+/* r2 A-3: 参照どおりフルブリードの写真スライダー。写真は KV 全面、キャッチは写真の上。
+   ドット列の基準（offset parent）はこの section なので position:relative は必須。 */
 .lp-page .lp-kv {
   position: relative;
-  padding: clamp(104px, 8.6vw, 118px) 0 calc(var(--lp-wave-h) + 8px);
+  min-height: clamp(640px, 100svh, 900px);
+  padding: clamp(104px, 8.6vw, 140px) 0 calc(var(--lp-wave-h) + 8px);
   background: var(--pale-2);
   overflow: hidden;
+}
+/* 文字の可読性は「上部だけ淡色のグラデ」で作る（文字色は --ink / 主色のまま） */
+.lp-page .lp-kv__veil {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(244, 247, 252, 0.96) 0 38%, rgba(244, 247, 252, 0) 70%);
 }
 .lp-page .lp-kv__deco {
   position: absolute;
   inset: 0;
-  z-index: 0;
+  z-index: 2;
   pointer-events: none;
 }
 .lp-page .lp-kv__inner {
   position: relative;
-  z-index: 1;
-}
-/* 写真枠の器は版面（.lp-container）ではなく KV の全幅。これで .lp-slider__ctrl の
-   right:24px が「ビューポート右端から 24px」になる（100vw は使わない・r1 A-3）。 */
-.lp-page .lp-kv__stage {
-  position: relative;
-  z-index: 1;
-  width: 100%;
+  z-index: 3;
 }
 .lp-page .lp-kv__catch {
   text-align: center;
@@ -517,14 +554,22 @@ html.js-rv .lp-page .rv--up:not(.in) {
   line-height: 1.9;
   color: var(--body);
 }
-/* KV スライダー（参照 .home-kv__slider.-slow：6000ms 間隔・1600ms クロスフェード） */
+/* KV スライダー（参照 .home-kv__slider.-slow：6000ms 間隔・1600ms クロスフェード）。
+   r2 A-3: 中央の 3:2 額縁をやめ、KV 全面のフルブリードにする。 */
 .lp-page .lp-slider {
-  width: calc(100% - 2 * var(--lp-pad));
-  max-width: 520px;
-  margin: clamp(24px, 3vw, 36px) auto 0;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
 }
 .lp-page .lp-slider__frame {
-  background: var(--pale);
+  position: absolute;
+  inset: 0;
+  aspect-ratio: auto;
+  border: 0;
+  background: var(--pale-2);
+}
+.lp-page .lp-slider__frame img {
+  object-position: 50% 60%;
 }
 .lp-page .lp-slider__slide {
   opacity: 0;
@@ -535,13 +580,14 @@ html.js-rv .lp-page .rv--up:not(.in) {
   opacity: 1;
   transform: none;
 }
-/* r1 A-3: 参照どおりビューポート右端中央に縦並び。一時停止ボタンはドット列の直下。 */
+/* r2 A-3/C-3: 基準は `.lp-kv`（唯一の position:relative な祖先）。写真が全面なので
+   「ビューポート右端 24px」＝写真の右端に隣接する。一時停止ボタンはドット列の直下。 */
 .lp-page .lp-slider__ctrl {
   position: absolute;
   right: 24px;
   top: 50%;
   transform: translateY(-50%);
-  z-index: 2;
+  z-index: 4;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -552,13 +598,14 @@ html.js-rv .lp-page .rv--up:not(.in) {
   flex-direction: column;
   gap: 11px;
 }
+/* 写真の上に載るため、どの明度の写真でも読めるよう白の輪郭を必ず持たせる（活性色は主色のまま） */
 .lp-page .lp-slider__dot {
-  width: 9px;
-  height: 9px;
+  width: 10px;
+  height: 10px;
   padding: 0;
-  border: 1px solid var(--primary-l);
+  border: 1px solid rgba(255, 255, 255, 0.92);
   border-radius: 50%;
-  background: transparent;
+  background: rgba(255, 255, 255, 0.5);
   cursor: pointer;
   transition: opacity 0.25s var(--ease);
 }
@@ -567,7 +614,6 @@ html.js-rv .lp-page .rv--up:not(.in) {
 }
 .lp-page .lp-slider__dot.is-active {
   background: var(--primary);
-  border-color: var(--primary);
 }
 .lp-page .lp-slider__toggle {
   display: grid;
@@ -575,9 +621,9 @@ html.js-rv .lp-page .rv--up:not(.in) {
   width: 30px;
   height: 30px;
   padding: 0;
-  border: 1px solid var(--line);
-  background: #fff;
-  color: var(--ink);
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  background: rgba(20, 35, 92, 0.45);
+  color: #fff;
   cursor: pointer;
   transition: opacity 0.25s var(--ease);
 }
@@ -681,8 +727,10 @@ html.js-rv .lp-page .rv--up:not(.in) {
   text-align: center;
   margin-bottom: clamp(36px, 5vw, 72px);
 }
+/* qa r2 H-1: --lime(#8fb4ff) は --deep 面用の色で、主色帯（#1447e0）上では 3.32:1 しか出ない。
+   11px / 600 は「大きな文字」に該当しないため 4.5:1 必須。白 92%（約 6.1:1）に置換する。 */
 .lp-page .lp-band__head .lp-en {
-  color: var(--lime);
+  color: rgba(255, 255, 255, 0.92);
 }
 .lp-page .lp-band__head h2 {
   margin-top: 12px;
@@ -715,8 +763,9 @@ html.js-rv .lp-page .rv--up:not(.in) {
   background: rgba(255, 255, 255, 0.92);
   border-color: rgba(255, 255, 255, 0.5);
 }
+/* qa r2 M-1: .72 は 4.33:1 で AA 未達。.82 で約 5.2:1（階調差は保てる） */
 .lp-page .lp-about__body .lp-en {
-  color: rgba(255, 255, 255, 0.72);
+  color: rgba(255, 255, 255, 0.82);
 }
 .lp-page .lp-about__body h3 {
   margin-top: 12px;
@@ -762,8 +811,12 @@ html.js-rv .lp-page .rv--up:not(.in) {
 /* r1 A-2/B-4: 参照のブロック高さは 撮 2922 / 選 2520 / 安 1566 と大きく違う。
    色面の高さ（--lp-plate-h）と区画内の余白（--lp-block-gap）をトーンごとに変え、
    同じ骨格のまま 3 ブロックの分量差を作る。 */
+/* r2 B-1/B-4: 色面の高さは 3 ブロック共通 min(46vw,520px)。見出しを色面の中に入れたので、
+   ブロックごとの分量差（参照 撮 2922 / 選 2520 / 安 1566）は区画内の余白 --lp-block-gap だけで作る。
+   ※ fix-r2 B-4 の「+24px」では、色面 800→520 と「色面の下の h2」撤去で失う約 374px を回収できない
+   （撮は -24% まで落ちる）ため、帯域（-15%〜+10%）に収まる値まで引き上げている。 */
 .lp-page .lp-point__block {
-  --lp-plate-h: min(40vw, 460px);
+  --lp-plate-h: min(46vw, 520px);
   --lp-block-gap: clamp(32px, 5vw, 64px);
   position: relative;
   padding: 0 0 var(--lp-block-gap);
@@ -774,21 +827,18 @@ html.js-rv .lp-page .rv--up:not(.in) {
   position: absolute;
   top: 0;
   left: 0;
-  width: 46%;
+  width: 52%;
   height: var(--lp-plate-h);
   pointer-events: none;
 }
 .lp-page .lp-point__block--primary {
-  --lp-plate-h: min(62vw, 800px);
-  --lp-block-gap: clamp(44px, 10vw, 128px);
+  --lp-block-gap: clamp(44px, 18vw, 230px);
 }
 .lp-page .lp-point__block--deep {
-  --lp-plate-h: min(46vw, 560px);
-  --lp-block-gap: clamp(40px, 8vw, 104px);
+  --lp-block-gap: clamp(40px, 12vw, 154px);
 }
 .lp-page .lp-point__block--pale {
-  --lp-plate-h: min(26vw, 320px);
-  --lp-block-gap: clamp(24px, 3.4vw, 46px);
+  --lp-block-gap: clamp(16px, 2vw, 26px);
 }
 .lp-page .lp-point__block--primary .lp-point__plate {
   background: var(--primary);
@@ -805,21 +855,26 @@ html.js-rv .lp-page .rv--up:not(.in) {
 }
 /* 参照 pc-05 と同じ骨格: 巨大な色面の上にはバッジだけを置き、見出しは色面の下（淡色地）から始める。
    見出しを色面に重ねると、色面の幅（46%）を越えた行が淡色地の上の白文字になって読めなくなるため。 */
+/* r2 B-1: バッジと見出しを色面の中に収める（縦中央）。色面の左端は section の左端なので、
+   版面の padding-inline ぶんを差し引いてバッジの左オフセットを clamp(24px,10%,120px) にする。 */
 .lp-page .lp-point__head {
+  display: flex;
+  align-items: center;
+  gap: clamp(16px, 2.4vw, 40px);
+  min-height: var(--lp-plate-h);
+  padding-inline-start: max(0px, calc(clamp(24px, 10%, 120px) - var(--lp-pad)));
+  /* 見出しが色面（幅 52%＝1280 で 666px）からはみ出さないよう、右側に余地を残す */
+  padding-inline-end: 54%;
   margin-bottom: var(--lp-block-gap);
-  /* バッジは色面の上端から 15%・左端から内側へ寄せる（r1 B-4） */
-  padding-top: calc(var(--lp-plate-h) * 0.15);
 }
 .lp-page .lp-point__badge {
   display: grid;
   place-items: center;
   align-content: center;
   gap: 6px;
+  flex: none;
   width: 120px;
   height: 120px;
-  margin-inline-start: clamp(24px, 18%, 220px);
-  /* 見出しが色面の下端より下に来るように（色面に白文字が乗ってはみ出すのを防ぐ） */
-  margin-bottom: max(24px, calc(var(--lp-plate-h) * 0.85 - 120px + clamp(20px, 2.4vw, 40px)));
   background: #fff;
   border: 1px solid var(--line);
 }
@@ -835,8 +890,12 @@ html.js-rv .lp-page .rv--up:not(.in) {
   color: var(--primary);
 }
 .lp-page .lp-point__head h2 {
-  font-size: clamp(21px, 2.7vw, 32px);
-  line-height: 1.6;
+  font-size: clamp(19px, 2.2vw, 27px);
+  line-height: 1.7;
+  color: #fff;
+}
+/* 淡色の色面の上だけ文字色を反転させる */
+.lp-page .lp-point__block--pale .lp-point__head h2 {
   color: var(--ink);
 }
 .lp-page .lp-point__main {
@@ -932,10 +991,13 @@ html.js-rv .lp-page .rv--up:not(.in) {
   background: transparent;
   padding-top: clamp(16px, 2vw, 28px);
 }
-/* 青系の線画が主色地に沈むため、参照の白い雲と同じ役割で白の正方形タイルに載せる */
+/* 青系の線画が主色地に沈むため、参照の白い雲と同じ役割で白の正方形タイルに載せる。
+   r2 A-1: `padding:9%` はタイル幅ではなく包含ブロック（.ill-loop-inner 520px）基準で解決され、
+   内容ボックスが 6px に潰れていた。固定値にし、タイル幅も明示する。 */
 .lp-page .lp-cycle .ill-item {
+  width: clamp(72px, 9vw, 110px);
+  padding: 10px;
   background: #fff;
-  padding: 9%;
 }
 
 /* ============================================================
@@ -1146,29 +1208,36 @@ html.js-rv .lp-page .rv--up:not(.in) {
   background: var(--sky);
   overflow: hidden;
 }
+/* r2 B-2: 583px に対し中身が 2 行だったため、参照の 44.8rem=448px ちょうどに詰める。
+   参照 `__intro` の波形は上端の 1 枚だけ（下端は色の切り替わりで受ける）ので、
+   高さを固定して見出しを波形の下＝帯の下端側に置く（padding で稼がない）。 */
 .lp-page .lp-cases__intro {
   display: flex;
-  align-items: center;
-  min-height: clamp(220px, 41vw, 520px);
-  padding: calc(var(--lp-wave-h) + 16px) 0;
+  align-items: flex-end;
+  height: clamp(240px, 35vw, 448px);
+  padding: 0 0 clamp(28px, 4vw, 56px);
 }
 .lp-page .lp-cases__outro {
-  min-height: clamp(180px, 33vw, 420px);
-  padding: calc(var(--lp-wave-h) + 16px) 0 clamp(28px, 4vw, 56px);
+  display: flex;
+  align-items: flex-end;
+  height: clamp(200px, 33vw, 420px);
+  padding: 0 0 clamp(28px, 4vw, 56px);
 }
 .lp-page .lp-cases__introbody {
   position: relative;
-  z-index: 1;
+  z-index: 3;
   text-align: center;
 }
 .lp-page .lp-cases__introbody .lp-en {
   color: var(--deep);
 }
 .lp-page .lp-cases__introbody h2 {
-  margin-top: 12px;
   font-size: clamp(24px, 3.2vw, 38px);
   line-height: 1.6;
   color: var(--ink);
+}
+.lp-page .lp-cases__introbody .lp-en {
+  margin-top: 10px;
 }
 .lp-page .lp-cases__main {
   padding: clamp(60px, 11vw, 140px) 0;
@@ -1278,7 +1347,7 @@ html.js-rv .lp-page .rv--up:not(.in) {
 }
 .lp-page .lp-cases__area {
   position: relative;
-  z-index: 1;
+  z-index: 3;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1393,8 +1462,12 @@ html.js-rv .lp-page .rv--up:not(.in) {
   position: relative;
   /* r1 B-5: 参照フッターの地は淡色 */
   background: var(--pale-2);
-  padding: calc(var(--lp-wave-h) + clamp(40px, 6vw, 76px)) 0 clamp(48px, 7vw, 110px);
-  overflow: hidden;
+  /* r2 B-4: 687px（参照 838・-18%）だったため padding-block を +40px ずつ */
+  padding: calc(var(--lp-wave-h) + clamp(40px, 6vw, 116px)) 0 clamp(48px, 7vw, 150px);
+  /* qa r2 M-3: overflow:hidden だと pagetop の top:-11px（SP のはみ出し）と
+     :focus-visible リングが切れる。clip＋clip-margin なら波形の横漏れだけを抑えられる。 */
+  overflow: clip;
+  overflow-clip-margin: 16px;
 }
 .lp-page .lp-footer__inner {
   position: relative;
@@ -1469,26 +1542,62 @@ html.js-rv .lp-page .rv--up:not(.in) {
     font-size: 10px;
     letter-spacing: 0.12em;
   }
-  /* 参照 SP は購入CTAが画面下に留まる。pagetop は footer 内なので競合しない */
+  /* r2 A-2: SP は既存サイトの Dock と同じ「画面下の全幅バー」。右下の塊が本文（#biz の
+     本文 11,400px²・#cases の h2 7,295px² 等）を覆っていた問題を、面で分離して解消する。 */
   .lp-page .lp-float-cta {
     top: auto;
     bottom: 0;
     right: 0;
-    left: auto;
-    align-items: stretch;
-    gap: 0;
-    width: 208px;
+    left: 0;
+    width: auto;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    min-height: calc(56px + env(safe-area-inset-bottom));
+    padding: 4px 14px calc(4px + env(safe-area-inset-bottom));
+    background: #fff;
+    border-top: 1px solid var(--line);
   }
   .lp-page .lp-float-cta__btn {
-    min-height: 50px;
-    max-width: none;
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    min-height: 48px;
+    align-items: center;
   }
-  /* r1 A-6 / legal H1: SP でも LINE 単独導線にしないため代替導線を残す（タイルと同じ幅で1行） */
-  .lp-page .lp-float-cta__alt {
+  .lp-page .lp-float-cta__btn .btn-line__tile {
+    flex: 0 0 10px;
+    width: 10px;
+    min-width: 10px;
+    height: auto;
+    align-self: stretch;
+  }
+  .lp-page .lp-float-cta__btn .btn-line__body {
+    writing-mode: horizontal-tb;
+    padding: 4px clamp(14px, 2.2vw, 20px);
+    gap: 1px;
+  }
+  /* バー内は横組みに戻すので sub（無料である旨）も出す */
+  .lp-page .lp-float-cta__btn .btn-line__sub {
     display: block;
-    padding: 4px 8px;
     font-size: 11px;
-    line-height: 1.6;
+    line-height: 1.3;
+  }
+  .lp-page .lp-float-cta__btn .btn-line__label {
+    font-size: 15px;
+    line-height: 1.3;
+    letter-spacing: 0.06em;
+  }
+  /* r1 A-6 / legal H1: SP でも LINE 単独導線にしないため代替導線を残す */
+  .lp-page .lp-float-cta__alt {
+    flex: none;
+    writing-mode: horizontal-tb;
+    width: auto;
+    padding: 6px 2px;
+    border: 0;
+    background: transparent;
+    font-size: 11px;
+    line-height: 1.5;
     text-align: center;
   }
   /* 参照 SP: 幅 118/375 ≒ 31%・高 9.8rem・footer 上端からわずかに飛び出す */
@@ -1524,18 +1633,16 @@ html.js-rv .lp-page .rv--up:not(.in) {
   }
   /* r1 B-6: SP の KV は 682px しかなく画面を満たしていなかった（参照 828 / ビューポート 844） */
   .lp-page .lp-kv {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
     min-height: 100svh;
     padding-top: clamp(84px, 22vw, 116px);
   }
-  .lp-page .lp-slider {
-    width: calc(100% - 2 * var(--lp-pad) - 34px);
+  /* veil は SP では 45% まで（縦長ぶん、文字の載る帯が広い） */
+  .lp-page .lp-kv__veil {
+    background: linear-gradient(180deg, rgba(244, 247, 252, 0.96) 0 45%, rgba(244, 247, 252, 0) 74%);
   }
   /* 参照どおり SP でもドットは縦・右端のまま（r1 A-3） */
   .lp-page .lp-slider__ctrl {
-    right: 10px;
+    right: 12px;
     gap: 10px;
   }
   /* r1 C-5: SP の浮遊イラストは h1 に重ねず、写真枠の四隅付近へ。2 点は間引く。
@@ -1559,6 +1666,10 @@ html.js-rv .lp-page .rv--up:not(.in) {
   .lp-page .lp-about__item:nth-child(odd) {
     direction: ltr;
   }
+  /* r2 B-4: SP の ABOUT は 2041px（参照 2609・-21.8%）。item 間を広げて帯域内に戻す */
+  .lp-page .lp-about__item {
+    margin-bottom: 120px;
+  }
   .lp-page .lp-message__figs {
     min-height: 280px;
     max-width: 420px;
@@ -1571,34 +1682,32 @@ html.js-rv .lp-page .rv--up:not(.in) {
     grid-template-columns: 1fr;
   }
   .lp-page .lp-point__block {
-    --lp-plate-h: clamp(190px, 52vw, 320px);
-  }
-  .lp-page .lp-point__block--primary {
-    --lp-plate-h: clamp(220px, 62vw, 380px);
-  }
-  .lp-page .lp-point__block--deep {
-    --lp-plate-h: clamp(205px, 56vw, 350px);
-  }
-  .lp-page .lp-point__block--pale {
-    --lp-plate-h: clamp(180px, 46vw, 290px);
+    --lp-plate-h: clamp(300px, 78vw, 420px);
   }
   .lp-page .lp-point__plate {
-    width: 62%;
+    width: 84%;
+  }
+  /* SP は幅が足りないのでバッジと見出しを縦に積む（どちらも色面の中に収める） */
+  .lp-page .lp-point__head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 18px;
+    padding-inline-end: 22%;
   }
   .lp-page .lp-point__badge {
     width: 96px;
     height: 96px;
-    margin-inline-start: clamp(12px, 8%, 40px);
   }
   .lp-page .lp-point__badge-ja {
     font-size: 32px;
   }
   /* r1 A-2: SP の DAILY は 4163px（参照 3257）まで伸びていた。小さい写真を 2 列に畳んで詰める。
      大（1・4・7）だけ全幅にし、残りは 2 枚ずつ並べる。 */
+  /* r2 B-4: SP の DAILY は 2617px（参照 3257・-19.6%）まで圧縮しすぎたため row-gap を +32px */
   .lp-page .lp-daily__list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     column-gap: 16px;
-    row-gap: 44px;
+    row-gap: 76px;
   }
   .lp-page .lp-daily__item:nth-child(3n + 1) {
     grid-column: span 2;
@@ -1636,9 +1745,13 @@ html.js-rv .lp-page .rv--up:not(.in) {
     padding-inline-end: 0;
     padding-top: 92px;
   }
-  /* 下部固定の浮遊CTA と本文が重ならないための逃げ代 */
+  /* 画面下の CTA バー（56px＋safe-area）で末尾が隠れないための逃げ代（r2 A-2） */
   .lp-page .lp-footer {
-    padding-bottom: 104px;
+    padding-bottom: calc(56px + env(safe-area-inset-bottom) + 48px);
+  }
+  /* 循環帯のタイルは SP では 2 列グリッドの各セル幅いっぱい（katazuke-motion.css の SP 規則に合わせる） */
+  .lp-page .lp-cycle .ill-item {
+    width: 100%;
   }
 }
 

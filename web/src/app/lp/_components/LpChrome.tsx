@@ -57,6 +57,17 @@ export function LpChrome() {
     buttonRef.current?.focus();
   }, []);
 
+  /* qa r2 L-3: ページ内アンカーで閉じるときは MENU ボタンへ戻さず、移動先の区画へフォーカスを送る
+     （戻すとキーボード利用者だけ画面が動いてもフォーカスがヘッダーに残る）。 */
+  const closeToAnchor = useCallback((href: string) => {
+    setOpen(false);
+    if (!href.startsWith("#")) return;
+    const target = document.getElementById(href.slice(1));
+    if (!target) return;
+    target.setAttribute("tabindex", "-1");
+    target.focus({ preventScroll: true });
+  }, []);
+
   // 開いている間は背面をスクロールさせない（参照と同じ挙動）。閉じたら必ず元に戻す。
   useEffect(() => {
     if (!open) return;
@@ -181,7 +192,7 @@ export function LpChrome() {
           <ul className="lp-menu__list">
             {MENU_ANCHORS.map((a) => (
               <li key={a.href}>
-                <a href={a.href} onClick={close}>
+                <a href={a.href} onClick={() => closeToAnchor(a.href)}>
                   <span className="lp-menu__mark" aria-hidden="true">
                     <Ic name="arrow" />
                   </span>

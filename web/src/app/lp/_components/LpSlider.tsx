@@ -64,15 +64,16 @@ export function LpSlider({
   };
 
   return (
-    /* r1 A-3: ドット列を KV の右端中央（ビューポート基準）に置くため、操作列は写真枠の
-       兄弟として出す。位置指定の基準（offset parent）は .lp-kv 側が持つ。 */
+    /* r2 A-3: 参照どおり KV 全面のフルブリード写真にする（`.lp-slider` を `.lp-kv` いっぱいに敷く）。
+       ドット列は `.lp-kv` を基準にビューポート右端 24px へ絶対配置する（位置指定は lp.css 側）。 */
     <>
       <div className="lp-slider" onMouseEnter={pause} onMouseLeave={resume}>
-        <div className="lp-slider__frame img-frame img-frame--3x2">
+        <div className="lp-slider__frame img-frame">
           {slides.map((s, i) => (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               key={s.id}
+              id={`lp-slide-${s.id}`}
               src={`/img/v2/${s.id}.webp`}
               width={1536}
               height={1024}
@@ -87,7 +88,14 @@ export function LpSlider({
         </div>
       </div>
       {slides.length > 1 && (
-        <div className="lp-slider__ctrl" onFocus={pause} onBlur={resume}>
+        /* qa r2 L-2: ドット列の上にポインタがある間も自動送りを止める（写真枠と同じ扱い） */
+        <div
+          className="lp-slider__ctrl"
+          onFocus={pause}
+          onBlur={resume}
+          onMouseEnter={pause}
+          onMouseLeave={resume}
+        >
           <div className="lp-slider__dots" role="tablist" aria-label="キービジュアルの写真を切り替える">
             {slides.map((s, i) => (
               <button
@@ -95,6 +103,7 @@ export function LpSlider({
                 type="button"
                 role="tab"
                 aria-selected={i === current}
+                aria-controls={`lp-slide-${s.id}`}
                 aria-label={`${i + 1}枚目の写真を表示`}
                 className={`lp-slider__dot${i === current ? " is-active" : ""}`}
                 onClick={() => setCurrent(i)}
