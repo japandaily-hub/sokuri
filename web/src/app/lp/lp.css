@@ -325,9 +325,12 @@ html.js-rv .lp-page .rv--up:not(.in) {
 }
 /* qa r3 M-4: `.btn.btn-line{min-height:60px}`（katazuke.css・同特異度 0,2,0）と順序依存になるため、
    0,4,0 で書いて出力順に依存しないようにする。高さは指示どおり 220〜240px に収める。 */
-.lp-page .lp-float-cta .btn.btn-line {
-  min-height: 220px;
-  max-height: 240px;
+@media (min-width: 860px) {
+  /* r4 H1: 860px 未満は下部バー（56px）なので、縦タブの高さは PC にだけ効かせる */
+  .lp-page .lp-float-cta .btn.btn-line {
+    min-height: 220px;
+    max-height: 240px;
+  }
 }
 /* .btn-line の作法（タイル＋本文）は保ったまま縦組みにする。タイルは上端 12px の帯 */
 .lp-page .lp-float-cta__btn .btn-line__tile {
@@ -887,7 +890,9 @@ html.js-rv .lp-page .rv--up:not(.in) {
   padding-inline-start: max(0px, calc(clamp(24px, 10%, 120px) - var(--lp-pad)));
   /* 見出しが色面（幅 52%＝1280 で 666px）からはみ出さないよう、右側に余地を残す */
   padding-inline-end: 54%;
-  margin-bottom: var(--lp-block-gap);
+  /* r4 M2: 色面の直下に --lp-block-gap（最大 238px）を置くと無地の帯になる。区画内の余白は
+     ブロック末尾の padding（--lp-block-gap）に集約し、色面と 01 主セルの間隔は固定値に絞る */
+  margin-bottom: clamp(40px, 7vw, 96px);
 }
 .lp-page .lp-point__badge {
   display: grid;
@@ -1565,7 +1570,8 @@ html.js-rv .lp-page .rv--up:not(.in) {
     right: 84px;
   }
 }
-@media (min-width: 860px) and (max-width: 1243px) {
+/* r4 L1: 1244〜1299px でも右余白（4.5vw＝56〜58px）が縦タブ 56px と同寸で接触するため上限を広げる */
+@media (min-width: 860px) and (max-width: 1299px) {
   /* フッターの版面は pagetop（右 36%）用に右 38% を既に空けているので対象外にする
      （このメディア規則がファイル末尾＝後勝ちのため、除外しないと 38% が上書きされる） */
   .lp-page .lp-container:not(.lp-footer__inner) {
@@ -1641,6 +1647,7 @@ html.js-rv .lp-page .rv--up:not(.in) {
     flex: none;
     writing-mode: horizontal-tb;
     width: auto;
+    max-height: none;
     padding: 6px 2px;
     border: 0;
     background: transparent;

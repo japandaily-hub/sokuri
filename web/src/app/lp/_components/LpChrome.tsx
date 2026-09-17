@@ -72,8 +72,10 @@ export function LpChrome() {
     const id = href.slice(1);
     requestAnimationFrame(() =>
       requestAnimationFrame(() => {
-        const target = document.getElementById(id);
-        if (!target) return;
+        const section = document.getElementById(id);
+        if (!section) return;
+        // 区画そのものはアクセシブル名を持たないので、区画の先頭見出しへ送る（無ければ区画）
+        const target = section.querySelector<HTMLElement>("h1, h2, h3") ?? section;
         target.setAttribute("tabindex", "-1");
         target.focus({ preventScroll: true });
       })
@@ -140,8 +142,19 @@ export function LpChrome() {
   // 開いた直後は先頭のリンクへフォーカスを移す（キーボード操作でオーバーレイに入れるように）
   useEffect(() => {
     if (!open) return;
-    const first = panelRef.current?.querySelector<HTMLAnchorElement>("a[href]");
-    first?.focus();
+    // is-open 直後の最初のフレームでは computed visibility がまだ hidden で focus() が空振りする
+    // （実測: 1 段目の rAF で失敗・2 段目で成功）。描画が確定した 2 フレーム目で移す。
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => {
+        const first = panelRef.current?.querySelector<HTMLAnchorElement>("a[href]");
+        first?.focus();
+      });
+    });
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+    };
   }, [open]);
 
   /* r3 A-5: フッターがビューポートに入っている間は浮遊CTAを退避する。
