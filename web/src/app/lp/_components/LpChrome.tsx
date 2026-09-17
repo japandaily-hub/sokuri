@@ -1,0 +1,238 @@
+"use client";
+
+/**
+ * /lp の独自クロム（参照LP `.l-header` / `.l-sitemap` / 浮遊CTA の移植）。
+ * `/lp` は SiteChrome の BARE_PREFIXES 対象のため、共通ヘッダー・額装・Dock・共通フッターは付かない。
+ * pagetop は参照どおり footer 内の absolute ブロックなので page.tsx 側が描く（r1 A-1）。
+ *
+ * 参照の実測値（reference-spec.md (b)）:
+ * - MENU ボタンは `position:fixed` の主色ブロック（PC 164×141）。`aria-expanded` / `aria-controls` 付き。
+ * - オーバーレイは `opacity`+`visibility` の 700ms フェード（スライド・拡大は伴わない）。
+ * - 浮遊CTAは画面右上に常時浮遊（PC 220×150 / SP 129×94）。SP は下部に置く。
+ *
+ * カタヅケ側の作法に置換した点:
+ * - 角丸・blob・clip-path のオーバル → すべて直角。
+ * - 参照の黄 blob「たまごを購入する」→ 既存 `.btn.btn-line`（タイル＋ラベル＋sub＋矢印）のコンパクト版。
+ *   LINE 単独導線にしないため、PC / SP とも直下にテキスト導線を併置する（r1 A-6）。
+ */
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { Ic } from "@/components/kdz/Icons";
+import { KdzLogo } from "@/components/kdz/Logo";
+
+/** オーバーレイ内のページ内アンカー（区画の並び順と一致させる） */
+const MENU_ANCHORS: { href: string; label: string }[] = [
+  { href: "#top", label: "トップ" },
+  { href: "#about", label: "カタヅケについて" },
+  { href: "#point", label: "こだわり" },
+  { href: "#daily", label: "出品から引き取りまで" },
+  { href: "#fee", label: "料金" },
+  { href: "#cases", label: "利用イメージ" },
+  { href: "#biz", label: "業者の方へ" },
+];
+
+/** オーバーレイ内の外部リンク（参照の「公式サイト」2枚パネル相当は下段の2枚が担う） */
+const MENU_LINKS: { href: string; label: string }[] = [
+  { href: "/login?callbackUrl=%2Fmypage", label: "ログイン" },
+  { href: "/mypage", label: "マイページ" },
+  { href: "/faq", label: "よくある質問" },
+  { href: "/business", label: "業者登録" },
+];
+
+/** オーバーレイを開いている間 `inert` にする背面要素（r1 A-4 / qa H1）。
+ *  MENU ボタン自身（CLOSE 操作）は対象外にするため、ヘッダー内はロゴだけを個別に指定する。 */
+const INERT_SELECTORS = ["#main", ".lp-footer"];
+
+/** フォーカス可能要素（Tab 循環の両端を求める用） */
+const FOCUSABLE = 'a[href],button:not([disabled]),input,select,textarea,[tabindex]:not([tabindex="-1"])';
+
+export function LpChrome() {
+  const [open, setOpen] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
+
+  const close = useCallback(() => {
+    setOpen(false);
+    buttonRef.current?.focus();
+  }, []);
+
+  // 開いている間は背面をスクロールさせない（参照と同じ挙動）。閉じたら必ず元に戻す。
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  /* qa H1: 開いている間は背面（main・footer）へ Tab が抜けないよう inert を付ける。
+     main / footer はサーバーコンポーネント側の DOM なので、ここから属性で制御する
+     （状態を持ち上げてページ全体を client 化しない）。 */
+  useEffect(() => {
+    if (!open) return;
+    const targets = INERT_SELECTORS.flatMap((sel) => Array.from(document.querySelectorAll<HTMLElement>(sel)));
+    targets.forEach((el) => el.setAttribute("inert", ""));
+    return () => targets.forEach((el) => el.removeAttribute("inert"));
+  }, [open]);
+
+  // Esc で閉じる／Tab・Shift+Tab を nav の内側で循環させる
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        close();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const panel = panelRef.current;
+      if (!panel) return;
+      // 閉じる手段をキーボードから奪わないため、MENU(CLOSE) ボタンも循環の輪に含める
+      const items = [buttonRef.current, ...Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE))].filter(
+        (el): el is HTMLElement => el !== null
+      );
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+      const index = active instanceof HTMLElement ? items.indexOf(active) : -1;
+      if (index === -1) {
+        e.preventDefault();
+        (e.shiftKey ? last : first).focus();
+        return;
+      }
+      if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      } else if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, close]);
+
+  // 開いた直後は先頭のリンクへフォーカスを移す（キーボード操作でオーバーレイに入れるように）
+  useEffect(() => {
+    if (!open) return;
+    const first = panelRef.current?.querySelector<HTMLAnchorElement>("a[href]");
+    first?.focus();
+  }, [open]);
+
+  return (
+    <>
+      {/* qa M1: banner ランドマークにするため <header> で描く */}
+      <header className="lp-header">
+        <Link
+          href="/"
+          className="lp-header__logo"
+          aria-label="カタヅケ トップページへ"
+          inert={open ? true : undefined}
+        >
+          <KdzLogo size={22} />
+        </Link>
+        <button
+          ref={buttonRef}
+          type="button"
+          className="lp-header__menu"
+          aria-expanded={open}
+          aria-controls="lp-sitemap"
+          onClick={() => (open ? close() : setOpen(true))}
+        >
+          <span className="lp-header__menu-icon" aria-hidden="true">
+            <span />
+            <span />
+          </span>
+          <span className="lp-header__menu-label">
+            MENU
+            <span>{open ? "CLOSE" : "OPEN"}</span>
+          </span>
+        </button>
+      </header>
+
+      {/* 浮遊CTA（参照の黄 blob の位置）。PC / SP とも直下にテキスト導線を添え、LINE 単独導線にしない */}
+      <div className="lp-float-cta" inert={open ? true : undefined}>
+        <Link href="/login?callbackUrl=%2Fmypage" className="btn btn-line lp-float-cta__btn">
+          <span className="btn-line__tile" aria-hidden="true" />
+          <span className="btn-line__body">
+            <span className="btn-line__label">LINEではじめる</span>
+            <span className="btn-line__sub">登録・査定・お断りまで無料</span>
+          </span>
+          <Ic name="arrow" className="btn-line__arr" />
+        </Link>
+        <Link href="/faq" className="lp-float-cta__alt">
+          よくある質問を見る
+        </Link>
+      </div>
+
+      <nav
+        id="lp-sitemap"
+        ref={panelRef}
+        className={`lp-menu${open ? " is-open" : ""}`}
+        aria-label="ページ内メニュー"
+      >
+        <div className="lp-menu__visual" aria-hidden="true">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/img/v2/top-cta-band.webp" width={1920} height={1088} alt="" loading="lazy" decoding="async" />
+        </div>
+        <div className="lp-menu__body">
+          <ul className="lp-menu__list">
+            {MENU_ANCHORS.map((a) => (
+              <li key={a.href}>
+                <a href={a.href} onClick={close}>
+                  <span className="lp-menu__mark" aria-hidden="true">
+                    <Ic name="arrow" />
+                  </span>
+                  {a.label}
+                </a>
+              </li>
+            ))}
+            {MENU_LINKS.map((a) => (
+              <li key={a.href}>
+                <Link href={a.href} onClick={close}>
+                  <span className="lp-menu__mark" aria-hidden="true">
+                    <Ic name="arrow" />
+                  </span>
+                  {a.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+
+          <Link href="/login?callbackUrl=%2Fmypage" className="btn btn-line lp-menu__cta" onClick={close}>
+            <span className="btn-line__tile" aria-hidden="true" />
+            <span className="btn-line__body">
+              <span className="btn-line__label">LINEではじめる（無料）</span>
+              <span className="btn-line__sub">LINEアカウントでログインできます</span>
+            </span>
+            <Ic name="arrow" className="btn-line__arr" />
+          </Link>
+
+          <div className="lp-menu__panels">
+            <Link href="/examples" className="lp-menu__panel" onClick={close}>
+              <span className="lp-menu__panel-title">利用イメージ</span>
+              <span className="lp-menu__panel-link">
+                6件のモデルケースを見る
+                <Ic name="arrow" />
+              </span>
+            </Link>
+            <Link href="/business" className="lp-menu__panel" onClick={close}>
+              <span className="lp-menu__panel-title">買取業者の方へ</span>
+              <span className="lp-menu__panel-link">
+                業者登録の詳細を見る
+                <Ic name="arrow" />
+              </span>
+            </Link>
+          </div>
+
+          <p className="lp-menu__foot">
+            <KdzLogo size={18} />
+            <span>東京都・千葉県・埼玉県・神奈川県（順次拡大）</span>
+          </p>
+        </div>
+      </nav>
+    </>
+  );
+}

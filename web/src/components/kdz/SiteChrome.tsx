@@ -32,6 +32,8 @@ const BARE_PREFIXES = [
   // デザインレビュー C-1 対応: /admin も内部ツール画面としてマーケ用
   // SiteHeader/Dock/フッター（LINEではじめる CTA）を抑止する。
   "/admin",
+  // /lp は独自クロム（ヘッダー・全画面メニュー・浮遊CTA・pagetop・フッター）を自前で描く
+  "/lp",
 ];
 
 /**

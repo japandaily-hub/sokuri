@@ -1,0 +1,1672 @@
+/* ============================================================
+   /lp — 参照LP（はばたき農場）の区画構成・構図・装飾の作法・モーションを移植し、
+   色・書体・角の作法・コピー・画像・導線をカタヅケの正典に置き換えたランディング。
+
+   正本: .agent-state/lp-habataki/build-brief.md（区画対応 §2・構図 §2.5・置換規則 §3）
+   実測: .agent-state/lp-habataki/reference-spec.md（寸法・波形高さ・アニメ尺・グリッド）
+
+   規約:
+   - 全セレクタを `.lp-page` 配下にスコープする（共有 CSS を一切汚さない）。
+   - @keyframes 名は `lp-` 接頭辞。角丸 0・影 0・`100vw` 不使用・`!important` 不使用。
+   - 円形はスライダードットのみ（番号は正方形タグ）。参照の blob / clip-path オーバルは全て直角。
+   - `opacity:0` を書く行は `html.js-rv` 配下（スクロール演出）か、JS で開閉する
+     オーバーレイ／スライダーの状態（無 JS でも安全側＝閉じている／1枚目が見える）に限る。
+   ============================================================ */
+
+.lp-page {
+  /* 版面（参照 .c-inner-lg の --base-width:1300 と同じ実効内幅になるよう調整） */
+  --lp-maxw: 1300px;
+  --lp-pad: clamp(20px, 4.5vw, 58px);
+  /* 波形上端の高さ（参照実測 PC 23.1rem=231px / SP 5.8rem=58px） */
+  --lp-wave-h: clamp(56px, 18vw, 231px);
+  /* 参照 --transition-sitemap:700ms / --transition-slider-slow:1600ms */
+  --lp-menu-dur: 700ms;
+  --lp-slide-dur: 1600ms;
+  --lp-wave-top: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath d='M0 0 H1200 V52 C1020 108 840 30 620 62 C420 91 200 112 0 72 Z' fill='%23000'/%3E%3C/svg%3E");
+  --lp-wave-bottom: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath d='M0 120 H1200 V68 C1020 12 840 90 620 58 C420 29 200 8 0 48 Z' fill='%23000'/%3E%3C/svg%3E");
+  /* 参照 bg_texture.webp（紙質・粒状）の代替。SVG feTurbulence の data URI を低不透明度で敷く */
+  --lp-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+  position: relative;
+  overflow-x: clip;
+  background: #fff;
+  color: var(--body);
+}
+
+/* ---------- 版面 ---------- */
+.lp-page .lp-container {
+  width: 100%;
+  max-width: var(--lp-maxw);
+  margin-inline: auto;
+  padding-inline: var(--lp-pad);
+}
+
+/* ---------- 英字キャプション（参照 Comfortaa → --en / Montserrat 600 uppercase） ---------- */
+.lp-page .lp-en {
+  font-family: var(--en);
+  font-weight: 600;
+  font-size: 11px;
+  line-height: 1.6;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+
+/* ---------- 番号（参照の 01/02/03 → --en-display） ---------- */
+.lp-page .lp-num {
+  display: inline-block;
+  margin-inline-start: 0.5em;
+  font-family: var(--en-display);
+  font-weight: 400;
+  font-size: 0.62em;
+  color: var(--primary);
+  vertical-align: 0.6em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- マーカー（帯の上では白の薄膜にする） ---------- */
+.lp-page .lp-mk {
+  font-weight: 400;
+  background: linear-gradient(transparent 68%, var(--marker) 68%);
+}
+
+/* ---------- スクロール演出（Reveal variant="up"）----------
+   opacity:0 / transform は必ず html.js-rv 配下に書く（無 JS・reduced-motion で本文が消えない）。 */
+.lp-page .rv--up {
+  opacity: 1;
+  transform: none;
+}
+html.js-rv .lp-page .rv--up {
+  transition: opacity var(--rv-dur) var(--ease-circ-out), transform var(--rv-dur) var(--ease-expo-out);
+  /* transition の一括指定は delay を 0 に戻すため、katazuke-motion.css の stagger を明示的に引き継ぐ */
+  transition-delay: calc(min(var(--i, 0), 5) * var(--rv-stagger));
+}
+html.js-rv .lp-page .rv--up:not(.in) {
+  transform: translateY(var(--rv-shift));
+}
+/* 閲覧中に OS 設定が reduce に変わった場合の保険（js-rv は初回のみ付与されるため、
+   katazuke.css の同型ルールと同じ理由でここでも移動量を打ち消す）。 */
+@media (prefers-reduced-motion: reduce) {
+  html.js-rv .lp-page .rv--up:not(.in) {
+    transform: none;
+  }
+}
+
+/* ---------- 波形上端／下端（参照 .c-wave2-top を SVG マスクで自作） ---------- */
+.lp-page .lp-wave {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: var(--lp-wave-h);
+  pointer-events: none;
+  z-index: 2;
+}
+.lp-page .lp-wave--top {
+  top: 0;
+  -webkit-mask-image: var(--lp-wave-top);
+  mask-image: var(--lp-wave-top);
+}
+.lp-page .lp-wave--bottom {
+  bottom: 0;
+  -webkit-mask-image: var(--lp-wave-bottom);
+  mask-image: var(--lp-wave-bottom);
+}
+.lp-page .lp-wave--top,
+.lp-page .lp-wave--bottom {
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+.lp-page .lp-wave--white {
+  background: #fff;
+}
+.lp-page .lp-wave--primary {
+  background: var(--primary);
+}
+.lp-page .lp-wave--pale {
+  background: var(--pale-2);
+}
+.lp-page .lp-wave--sky {
+  background: var(--sky);
+}
+/* r1 C-2: 参照 MESSAGE 下端の「丘のような二重波形」。同じ白を位相と不透明度をずらして 2 枚重ねる */
+.lp-page .lp-wave--back {
+  transform: translateY(-40px) scaleX(-1);
+  opacity: 0.55;
+}
+
+/* ---------- テクスチャ（参照 .c-texture の代替） ---------- */
+.lp-page .lp-texture {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.06;
+  background-image: var(--lp-noise);
+  background-size: 180px 180px;
+}
+
+/* ---------- 浮遊イラスト（参照 .c-anime-rotate / .c-anime-fluffy） ----------
+   外側が translate（fluffy）・内側の img が rotate（rotate）。steps(1) のコマ送りで
+   参照の「滑らかに補間しない」独特の質感をそのまま再現する。 */
+.lp-page .lp-ill {
+  position: absolute;
+  top: var(--lp-ill-top, 50%);
+  left: var(--lp-ill-left, 50%);
+  width: var(--lp-ill-w, 96px);
+  margin: calc(var(--lp-ill-w, 96px) / -2);
+  opacity: 0.9;
+}
+.lp-page .lp-ill img {
+  width: 100%;
+  height: auto;
+}
+.lp-page .lp-ill--f1 {
+  animation: lp-float 7s steps(1) infinite;
+}
+.lp-page .lp-ill--f2 {
+  animation: lp-float2 8s steps(1) infinite;
+}
+.lp-page .lp-ill--f3 {
+  animation: lp-float2 9s steps(1) infinite;
+}
+.lp-page .lp-ill__img--s1 {
+  animation: lp-sway 3.5s steps(1) infinite;
+}
+.lp-page .lp-ill__img--s2 {
+  animation: lp-sway2 4s steps(1) infinite;
+}
+@keyframes lp-sway {
+  0% { transform: rotate(3deg); }
+  33% { transform: rotate(-3deg); }
+  66% { transform: rotate(1deg); }
+  100% { transform: rotate(3deg); }
+}
+@keyframes lp-sway2 {
+  0% { transform: rotate(-5deg); }
+  33% { transform: rotate(5deg); }
+  66% { transform: rotate(-2deg); }
+  100% { transform: rotate(-5deg); }
+}
+@keyframes lp-float {
+  0% { transform: translate3d(0, 0, 0); }
+  25% { transform: translate3d(-10%, -4%, 0); }
+  50% { transform: translate3d(-4%, 4%, 0); }
+  75% { transform: translate3d(8%, 2%, 0); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+@keyframes lp-float2 {
+  0% { transform: translate3d(0, 0, 0); }
+  25% { transform: translate3d(-5%, -5%, 0); }
+  50% { transform: translate3d(-9%, 2%, 0); }
+  75% { transform: translate3d(6%, 4%, 0); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-page .lp-ill,
+  .lp-page .lp-ill__img--s1,
+  .lp-page .lp-ill__img--s2 {
+    animation: none;
+  }
+}
+
+/* ---------- ドットのひし形クラスタ（参照の花・葉の点描の代替） ---------- */
+.lp-page .lp-dots {
+  position: absolute;
+  top: var(--lp-dot-top, 50%);
+  left: var(--lp-dot-left, 50%);
+  width: var(--lp-dot-size, 80px);
+  height: var(--lp-dot-size, 80px);
+  margin: calc(var(--lp-dot-size, 80px) / -2);
+  background-image: radial-gradient(circle, var(--primary-l) 1.6px, transparent 1.7px);
+  background-size: 11px 11px;
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  opacity: 0.75;
+}
+
+/* ---------- 足跡の点線（参照 .home-about の鳥の足跡 → 1px の破線） ---------- */
+.lp-page .lp-trail {
+  position: absolute;
+  right: 6%;
+  bottom: -34px;
+  width: 140px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.5);
+  transform: rotate(16deg);
+  pointer-events: none;
+}
+
+/* ============================================================
+   クロム — ヘッダー / MENU / 浮遊CTA / pagetop（参照 .l-header / .l-sitemap）
+   ============================================================ */
+.lp-page .lp-header {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 70;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  pointer-events: none;
+}
+.lp-page .lp-header > * {
+  pointer-events: auto;
+}
+.lp-page .lp-header__logo {
+  display: block;
+  padding: 18px 26px;
+  background: #fff;
+  border-inline-end: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.lp-page .lp-header__menu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 140px;
+  height: 120px;
+  padding: 0;
+  border: none;
+  background: var(--primary);
+  color: #fff;
+  cursor: pointer;
+  transition: opacity 0.25s var(--ease);
+}
+.lp-page .lp-header__menu:hover {
+  opacity: 0.8;
+}
+.lp-page .lp-header__menu-icon {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  width: 30px;
+}
+.lp-page .lp-header__menu-icon span {
+  display: block;
+  height: 1px;
+  background: #fff;
+}
+.lp-page .lp-header__menu-label {
+  font-family: var(--en);
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.45;
+  letter-spacing: 0.16em;
+  text-align: center;
+}
+.lp-page .lp-header__menu-label span {
+  display: block;
+}
+
+/* 浮遊CTA（参照の黄 blob の位置。LINE 単独導線にしないため下にテキスト導線を添える） */
+.lp-page .lp-float-cta {
+  position: fixed;
+  top: 132px;
+  right: 0;
+  z-index: 65;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+.lp-page .lp-float-cta__btn {
+  min-height: 56px;
+  max-width: 236px;
+}
+.lp-page .lp-float-cta__alt {
+  padding: 5px 10px;
+  background: #fff;
+  border: 1px solid var(--line);
+  font-family: var(--head);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+}
+.lp-page .lp-float-cta__alt:hover {
+  color: var(--primary);
+}
+
+/* MENU オーバーレイ（参照 .l-sitemap。700ms の単純フェード。スライド・拡大は伴わない）
+   閉じている間は visibility:hidden ＝ タブ順からも読み上げからも外れる。 */
+.lp-page .lp-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 68;
+  display: grid;
+  grid-template-columns: 45% 1fr;
+  background: var(--pale-2);
+  visibility: hidden;
+  opacity: 0;
+  overflow-y: auto;
+  transition: opacity var(--lp-menu-dur) var(--ease), visibility var(--lp-menu-dur) var(--ease);
+}
+.lp-page .lp-menu.is-open {
+  visibility: visible;
+  opacity: 1;
+}
+.lp-page .lp-menu__visual {
+  position: relative;
+  overflow: hidden;
+  background: var(--deep);
+}
+.lp-page .lp-menu__visual img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 42%;
+}
+.lp-page .lp-menu__body {
+  padding: 132px var(--lp-pad) 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  max-width: 660px;
+}
+.lp-page .lp-menu__list {
+  list-style: none;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 24px;
+}
+.lp-page .lp-menu__list a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--head);
+  font-size: 18px;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  transition: color 0.25s var(--ease);
+}
+.lp-page .lp-menu__list a:hover {
+  color: var(--primary);
+}
+.lp-page .lp-menu__mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  background: var(--primary);
+  color: #fff;
+}
+.lp-page .lp-menu__mark .ic {
+  font-size: 14px;
+}
+.lp-page .lp-menu__cta {
+  width: 100%;
+}
+.lp-page .lp-menu__panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.lp-page .lp-menu__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  background: #fff;
+  border: 1px solid var(--line);
+  transition: opacity 0.25s var(--ease);
+}
+.lp-page .lp-menu__panel:hover {
+  opacity: 0.8;
+}
+.lp-page .lp-menu__panel-title {
+  font-family: var(--head);
+  font-size: 16px;
+  color: var(--ink);
+  letter-spacing: 0.08em;
+}
+.lp-page .lp-menu__panel-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--ui);
+  font-size: 13px;
+  color: var(--primary);
+}
+.lp-page .lp-menu__foot {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-family: var(--ui);
+  font-size: 12px;
+  color: var(--body-soft);
+}
+
+/* pagetop（r1 A-1）: 参照 `.l-footer__pagetop` と同じく **footer 内の absolute ブロック**。
+   旧実装の `position:fixed` チップは本文（POINT の主写真・CASES/BIZ のカード）を恒常的に覆っていた。
+   PC 幅 36%・高 290px（参照 456/1540 幅 × 29rem）。SP は幅 31%・高 98px・上端から少しはみ出す。 */
+.lp-page .lp-pagetop {
+  position: absolute;
+  right: 0;
+  top: 60px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 36%;
+  height: 290px;
+  background: var(--primary);
+  color: #fff;
+  font-family: var(--en);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  transition: opacity 0.25s var(--ease);
+}
+.lp-page .lp-pagetop:hover {
+  opacity: 0.8;
+}
+.lp-page .lp-pagetop .ic {
+  font-size: 24px;
+}
+
+/* ============================================================
+   1. KV（参照 .home-kv）
+   ============================================================ */
+/* r1 A-2: 実装 1105px（参照 900px・+23%）だったため上下の余白を詰めて 900px 近傍に戻す。
+   ドット列の基準（offset parent）はこの section が持つので position:relative は必須。 */
+.lp-page .lp-kv {
+  position: relative;
+  padding: clamp(104px, 8.6vw, 118px) 0 calc(var(--lp-wave-h) + 8px);
+  background: var(--pale-2);
+  overflow: hidden;
+}
+.lp-page .lp-kv__deco {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.lp-page .lp-kv__inner {
+  position: relative;
+  z-index: 1;
+}
+/* 写真枠の器は版面（.lp-container）ではなく KV の全幅。これで .lp-slider__ctrl の
+   right:24px が「ビューポート右端から 24px」になる（100vw は使わない・r1 A-3）。 */
+.lp-page .lp-kv__stage {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+}
+.lp-page .lp-kv__catch {
+  text-align: center;
+  max-width: 34em;
+  margin-inline: auto;
+}
+.lp-page .lp-kv h1 {
+  font-size: clamp(30px, 4.4vw, 54px);
+  line-height: 1.55;
+  letter-spacing: 0.05em;
+  color: var(--ink);
+}
+.lp-page .lp-kv__en {
+  margin-top: 16px;
+  color: var(--body-soft);
+}
+.lp-page .lp-kv__sub {
+  margin-top: 14px;
+  font-size: 15px;
+  line-height: 1.9;
+  color: var(--body);
+}
+/* KV スライダー（参照 .home-kv__slider.-slow：6000ms 間隔・1600ms クロスフェード） */
+.lp-page .lp-slider {
+  width: calc(100% - 2 * var(--lp-pad));
+  max-width: 520px;
+  margin: clamp(24px, 3vw, 36px) auto 0;
+}
+.lp-page .lp-slider__frame {
+  background: var(--pale);
+}
+.lp-page .lp-slider__slide {
+  opacity: 0;
+  transform: scale(1.04);
+  transition: opacity var(--lp-slide-dur) ease, transform calc(var(--lp-slide-dur) * 2.4) ease;
+}
+.lp-page .lp-slider__slide.is-active {
+  opacity: 1;
+  transform: none;
+}
+/* r1 A-3: 参照どおりビューポート右端中央に縦並び。一時停止ボタンはドット列の直下。 */
+.lp-page .lp-slider__ctrl {
+  position: absolute;
+  right: 24px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.lp-page .lp-slider__dots {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.lp-page .lp-slider__dot {
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border: 1px solid var(--primary-l);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  transition: opacity 0.25s var(--ease);
+}
+.lp-page .lp-slider__dot:hover {
+  opacity: 0.7;
+}
+.lp-page .lp-slider__dot.is-active {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.lp-page .lp-slider__toggle {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+  transition: opacity 0.25s var(--ease);
+}
+.lp-page .lp-slider__toggle:hover {
+  opacity: 0.7;
+}
+.lp-page .lp-slider__toggle .ic {
+  font-size: 14px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-page .lp-slider__slide {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* ============================================================
+   2. MESSAGE（参照 .home-message：左に段違いの図版2枚・右に詩文）
+   ============================================================ */
+/* r1 A-2: 実装 650px（参照 976px・-33%）。上下の余白を参照の `padding:0 0 25rem` 相当まで戻す */
+.lp-page .lp-message {
+  position: relative;
+  background: #fff;
+  padding: clamp(60px, 11vw, 140px) 0 clamp(80px, 19.5vw, 250px);
+}
+.lp-page .lp-message__inner {
+  display: grid;
+  grid-template-columns: minmax(0, 48fr) minmax(0, 52fr);
+  gap: clamp(28px, 5vw, 72px);
+  align-items: center;
+}
+.lp-page .lp-message__figs {
+  position: relative;
+  min-height: 560px;
+}
+/* r1 C-2: 参照と同じ「写真 2 枚の段違い」。枠は .img-frame（position:relative）なので絶対配置で上書きする */
+.lp-page .lp-message__fig {
+  position: absolute;
+  margin: 0;
+}
+.lp-page .lp-message__fig--a {
+  top: 0;
+  left: 34%;
+  width: 32%;
+}
+.lp-page .lp-message__fig--b {
+  top: 22%;
+  left: 2%;
+  width: 54%;
+}
+.lp-page .lp-message__en {
+  text-align: right;
+  color: var(--body-soft);
+  margin-bottom: 22px;
+}
+.lp-page .lp-message__txt p {
+  font-size: 15px;
+  line-height: 2.26;
+  letter-spacing: 0.06em;
+  color: var(--body);
+  margin-top: 16px;
+}
+.lp-page .lp-message__txt p:first-of-type {
+  margin-top: 0;
+}
+.lp-page .lp-message__en + p::first-letter {
+  color: var(--primary);
+}
+/* 出典 `.founder-sign` と同じ 2 段構造（小さな名乗り＋本文の 1 行） */
+.lp-page .lp-message__sign {
+  margin-top: 24px;
+  font-family: var(--head);
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1.9;
+  color: var(--ink);
+  letter-spacing: 0.06em;
+}
+.lp-page .lp-message__sign span {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--body-soft);
+  letter-spacing: 0.12em;
+}
+
+/* ============================================================
+   3. ABOUT（参照 .home-about：主色帯・波形上端・テクスチャ・3 item 交互配置）
+   ============================================================ */
+.lp-page .lp-band {
+  position: relative;
+  background: var(--primary);
+  color: #fff;
+  padding: calc(var(--lp-wave-h) + clamp(32px, 6.5vw, 84px)) 0 calc(var(--lp-wave-h) + clamp(32px, 6.5vw, 84px));
+  overflow: hidden;
+}
+.lp-page .lp-band__head {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  margin-bottom: clamp(36px, 5vw, 72px);
+}
+.lp-page .lp-band__head .lp-en {
+  color: var(--lime);
+}
+.lp-page .lp-band__head h2 {
+  margin-top: 12px;
+  font-size: clamp(22px, 2.9vw, 34px);
+  line-height: 1.6;
+  color: #fff;
+}
+.lp-page .lp-about__inner,
+.lp-page .lp-daily__inner {
+  position: relative;
+  z-index: 1;
+}
+/* r1 A-2: 実装 1998px（参照 2829px・-29%）。item 間の余白を参照の呼吸量まで戻し、写真枠も一段大きく */
+.lp-page .lp-about__item {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 48fr) minmax(0, 52fr);
+  gap: clamp(24px, 4vw, 60px);
+  align-items: center;
+  margin-bottom: clamp(56px, 15vw, 192px);
+}
+/* 交互配置（写真 左 / 文 右 → 文 左 / 写真 右 → 写真 左 / 文 右） */
+.lp-page .lp-about__item:nth-child(odd) {
+  direction: rtl;
+}
+.lp-page .lp-about__item:nth-child(odd) > * {
+  direction: ltr;
+}
+.lp-page .lp-about__fig {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+.lp-page .lp-about__body .lp-en {
+  color: rgba(255, 255, 255, 0.72);
+}
+.lp-page .lp-about__body h3 {
+  margin-top: 12px;
+  font-size: clamp(19px, 2.1vw, 25px);
+  line-height: 1.7;
+  color: #fff;
+}
+/* r1 B-1: `--lime` は主色帯の上で約 3.6:1 しか出ない。強調は白文字＋白 32% のマーカー下線にする
+   （--gold はカタヅケでは注意色なので使わない）。 */
+.lp-page .lp-about__body h3 em {
+  font-style: normal;
+  color: #fff;
+  background: linear-gradient(transparent 68%, rgba(255, 255, 255, 0.32) 68%);
+}
+.lp-page .lp-about__p {
+  margin-top: 18px;
+  font-size: 15px;
+  line-height: 2;
+  color: rgba(255, 255, 255, 0.86);
+}
+.lp-page .lp-about__p .lp-mk {
+  background: linear-gradient(transparent 66%, rgba(255, 255, 255, 0.3) 66%);
+}
+/* r1 A-7 / legal M4: 打消し表示は強調表示と同程度に認識できる大きさで。本文 15px・白（不透明度 1.0） */
+.lp-page .lp-about__note {
+  max-width: 46em;
+  margin-inline: auto;
+  font-size: 15px;
+  line-height: 1.9;
+  color: #fff;
+  text-align: center;
+}
+.lp-page .lp-about__note + .lp-about__note {
+  margin-top: 10px;
+}
+
+/* ============================================================
+   4. POINT（参照 .home-point：大きな色面＋バッジ／01 主セル／小見出し3／02・03）
+   ============================================================ */
+.lp-page .lp-point {
+  background: var(--pale-2);
+}
+/* r1 A-2/B-4: 参照のブロック高さは 撮 2922 / 選 2520 / 安 1566 と大きく違う。
+   色面の高さ（--lp-plate-h）と区画内の余白（--lp-block-gap）をトーンごとに変え、
+   同じ骨格のまま 3 ブロックの分量差を作る。 */
+.lp-page .lp-point__block {
+  --lp-plate-h: min(40vw, 460px);
+  --lp-block-gap: clamp(32px, 5vw, 64px);
+  position: relative;
+  padding: 0 0 var(--lp-block-gap);
+  overflow: hidden;
+}
+/* 参照の「左上を占める巨大な丸」→ 直角の大きな色面（右下に淡色地を残す） */
+.lp-page .lp-point__plate {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 46%;
+  height: var(--lp-plate-h);
+  pointer-events: none;
+}
+.lp-page .lp-point__block--primary {
+  --lp-plate-h: min(62vw, 800px);
+  --lp-block-gap: clamp(44px, 10vw, 128px);
+}
+.lp-page .lp-point__block--deep {
+  --lp-plate-h: min(46vw, 560px);
+  --lp-block-gap: clamp(40px, 8vw, 104px);
+}
+.lp-page .lp-point__block--pale {
+  --lp-plate-h: min(26vw, 320px);
+  --lp-block-gap: clamp(24px, 3.4vw, 46px);
+}
+.lp-page .lp-point__block--primary .lp-point__plate {
+  background: var(--primary);
+}
+.lp-page .lp-point__block--deep .lp-point__plate {
+  background: var(--deep);
+}
+.lp-page .lp-point__block--pale .lp-point__plate {
+  background: var(--pale);
+}
+.lp-page .lp-point__inner {
+  position: relative;
+  z-index: 1;
+}
+/* 参照 pc-05 と同じ骨格: 巨大な色面の上にはバッジだけを置き、見出しは色面の下（淡色地）から始める。
+   見出しを色面に重ねると、色面の幅（46%）を越えた行が淡色地の上の白文字になって読めなくなるため。 */
+.lp-page .lp-point__head {
+  margin-bottom: var(--lp-block-gap);
+  /* バッジは色面の上端から 15%・左端から内側へ寄せる（r1 B-4） */
+  padding-top: calc(var(--lp-plate-h) * 0.15);
+}
+.lp-page .lp-point__badge {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 6px;
+  width: 120px;
+  height: 120px;
+  margin-inline-start: clamp(24px, 18%, 220px);
+  /* 見出しが色面の下端より下に来るように（色面に白文字が乗ってはみ出すのを防ぐ） */
+  margin-bottom: max(24px, calc(var(--lp-plate-h) * 0.85 - 120px + clamp(20px, 2.4vw, 40px)));
+  background: #fff;
+  border: 1px solid var(--line);
+}
+.lp-page .lp-point__badge-ja {
+  font-family: var(--head);
+  font-size: 40px;
+  line-height: 1;
+  color: var(--primary);
+}
+.lp-page .lp-point__badge-en {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--primary);
+}
+.lp-page .lp-point__head h2 {
+  font-size: clamp(21px, 2.7vw, 32px);
+  line-height: 1.6;
+  color: var(--ink);
+}
+.lp-page .lp-point__main {
+  display: grid;
+  grid-template-columns: minmax(0, 48fr) minmax(0, 52fr);
+  gap: clamp(24px, 4vw, 56px);
+  align-items: center;
+  margin-bottom: var(--lp-block-gap);
+}
+.lp-page .lp-point__main-copy h3 {
+  font-size: clamp(20px, 2.4vw, 28px);
+  line-height: 1.6;
+  color: var(--ink);
+}
+.lp-page .lp-point__main-copy p {
+  margin-top: 16px;
+  font-size: 15px;
+  line-height: 2;
+  color: var(--body);
+}
+.lp-page .lp-minor h4,
+.lp-page .lp-cell h3 {
+  color: var(--ink);
+}
+.lp-page .lp-point__minors {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(16px, 2.2vw, 28px);
+  margin-bottom: var(--lp-block-gap);
+}
+.lp-page .lp-minor {
+  background: #fff;
+  border: 1px solid var(--line);
+  padding: clamp(20px, 2.2vw, 28px);
+}
+.lp-page .lp-minor h4 {
+  font-size: 17px;
+  line-height: 1.6;
+}
+/* 参照のカード見出し下のドット列 → 1px の主色罫 40px */
+.lp-page .lp-minor h4::after {
+  content: "";
+  display: block;
+  width: 40px;
+  height: 1px;
+  margin-top: 12px;
+  background: var(--primary);
+}
+.lp-page .lp-minor p {
+  margin-top: 12px;
+  font-size: 14.5px;
+  line-height: 1.95;
+  color: var(--body);
+}
+.lp-page .lp-minor p .lp-mk {
+  font-weight: 600;
+  color: var(--ink);
+}
+.lp-page .lp-point__cells {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(24px, 3.6vw, 52px);
+}
+.lp-page .lp-cell h3 {
+  margin-top: 18px;
+  font-size: 19px;
+  line-height: 1.6;
+}
+.lp-page .lp-cell p {
+  margin-top: 10px;
+  font-size: 15px;
+  line-height: 1.95;
+  color: var(--body);
+}
+
+/* 循環イラスト帯（既存 .ill-loop をそのまま使う。見出しだけ /lp 側で持つ）。
+   r1 B-2: 参照 `-cycle` と同じ主色の色帯にする。上端は前の淡色面が食い込む波形、
+   下端は同じ主色の DAILY へそのまま続く（次の区画の上端に淡色の波形リボンで区切りを作る）。 */
+.lp-page .lp-cycle {
+  position: relative;
+  background: var(--primary);
+  color: #fff;
+  padding: calc(var(--lp-wave-h) + clamp(24px, 4vw, 56px)) 0 clamp(40px, 6vw, 88px);
+  overflow: hidden;
+}
+.lp-page .lp-cycle__inner {
+  position: relative;
+  z-index: 1;
+}
+.lp-page .lp-cycle .ill-loop {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  padding-top: clamp(16px, 2vw, 28px);
+}
+/* 青系の線画が主色地に沈むため、参照の白い雲と同じ役割で白の正方形タイルに載せる */
+.lp-page .lp-cycle .ill-item {
+  background: #fff;
+  padding: 9%;
+}
+
+/* ============================================================
+   5. DAILY（参照 .home-daily：主色帯に 01〜09 を大小・段違いで配置）
+   ============================================================ */
+.lp-page .lp-daily__list {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  column-gap: clamp(16px, 2vw, 28px);
+  row-gap: clamp(28px, 4vw, 56px);
+}
+.lp-page .lp-daily__item {
+  position: relative;
+  min-width: 0;
+}
+/* r1 C-3: 参照は区画内に足跡の点線が何本も走る。item 間に 6 本の破線を出す */
+.lp-page .lp-trail--daily {
+  right: auto;
+  left: 88%;
+  bottom: 18%;
+  width: clamp(60px, 9vw, 120px);
+  transform: rotate(24deg);
+}
+.lp-page .lp-daily__item:nth-child(even) .lp-trail--daily {
+  left: auto;
+  right: 88%;
+  transform: rotate(-24deg);
+}
+.lp-page .lp-daily__fig {
+  position: relative;
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+/* 番号は白地の正方形（参照の白丸 → 直角 32px） */
+.lp-page .lp-daily__n {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  background: #fff;
+  color: var(--primary);
+  font-family: var(--en-display);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+/* 工程名のラベル（参照の青ピル → 主色地・白文字の直角タグ） */
+.lp-page .lp-daily__tag {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  z-index: 1;
+  padding: 5px 12px;
+  background: var(--primary);
+  color: #fff;
+  font-family: var(--head);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+.lp-page .lp-daily__cap {
+  margin-top: 14px;
+  max-width: 22em;
+  font-size: 14px;
+  line-height: 1.9;
+  color: #fff;
+}
+/* r1 C-3: 写真を 3 段階（大 6/12=50%・中 4/12=33%・小 3/12=25%）に配り、段違いに置く */
+@media (min-width: 860px) {
+  .lp-page .lp-daily__item:nth-child(1) { grid-column: 1 / 7; grid-row: 1; }
+  .lp-page .lp-daily__item:nth-child(2) { grid-column: 9 / 12; grid-row: 1; margin-top: 120px; }
+  .lp-page .lp-daily__item:nth-child(3) { grid-column: 5 / 9; grid-row: 2; }
+  .lp-page .lp-daily__item:nth-child(4) { grid-column: 1 / 4; grid-row: 2; margin-top: 80px; }
+  .lp-page .lp-daily__item:nth-child(5) { grid-column: 2 / 5; grid-row: 3; }
+  .lp-page .lp-daily__item:nth-child(6) { grid-column: 6 / 10; grid-row: 3; margin-top: 60px; }
+  .lp-page .lp-daily__item:nth-child(7) { grid-column: 10 / 13; grid-row: 3; margin-top: 140px; }
+  .lp-page .lp-daily__item:nth-child(8) { grid-column: 1 / 7; grid-row: 4; }
+  .lp-page .lp-daily__item:nth-child(9) { grid-column: 8 / 12; grid-row: 4; margin-top: 90px; }
+}
+
+/* ============================================================
+   6. FEE（参照 .home-kome：浮遊イラストの余白帯＋巨大パネル＋CTA2本）
+   ============================================================ */
+/* r1 A-2: 実装 1618px（参照 2635px・-39%）。参照はパネルの上に約 500px の「浮遊物だけの空」がある。
+   その空を padding-top の実寸で確保し、パネル内の各ブロックの間隔も広げる。 */
+.lp-page .lp-fee {
+  --lp-wave-h: clamp(19px, 5.6vw, 72px);
+  position: relative;
+  background: #fff;
+  padding: clamp(200px, 46vw, 589px) 0 calc(var(--lp-wave-h) + clamp(40px, 6vw, 90px));
+  overflow: hidden;
+}
+.lp-page .lp-fee__sky {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: clamp(200px, 46vw, 589px);
+  pointer-events: none;
+}
+.lp-page .lp-fee__panel {
+  position: relative;
+  z-index: 1;
+  background: var(--pale);
+  border: 1px solid var(--line);
+  padding: clamp(46px, 11vw, 150px) clamp(20px, 5vw, 80px);
+  text-align: center;
+}
+.lp-page .lp-fee__panel .eyebrow {
+  justify-content: center;
+}
+.lp-page .lp-fee__panel h2 {
+  margin-top: 16px;
+  font-size: clamp(24px, 3.4vw, 42px);
+  line-height: 1.5;
+  color: var(--ink);
+}
+.lp-page .lp-fee__panel > .lp-en {
+  margin-top: 12px;
+  color: var(--body-soft);
+}
+.lp-page .lp-fee__lead {
+  margin-top: 16px;
+  font-size: 15px;
+  line-height: 2;
+  color: var(--body);
+}
+.lp-page .lp-fee__zero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  max-width: 44em;
+  margin: clamp(36px, 5vw, 72px) auto 0;
+  padding: clamp(28px, 3.6vw, 48px);
+  background: #fff;
+  border: 1px solid var(--line);
+}
+.lp-page .lp-fee__label {
+  font-family: var(--head);
+  font-size: 14px;
+  letter-spacing: 0.1em;
+  color: var(--body-soft);
+}
+.lp-page .lp-fee__num {
+  font-family: var(--ui);
+  font-weight: 600;
+  font-size: clamp(46px, 7vw, 86px);
+  line-height: 1.1;
+  color: var(--primary);
+  font-variant-numeric: tabular-nums;
+}
+.lp-page .lp-fee__note {
+  font-size: 15px;
+  line-height: 1.9;
+  color: var(--ink);
+}
+/* 打消し表示は強調表示（¥0）と同一視野・本文サイズで置く */
+.lp-page .lp-fee__caution {
+  font-size: 15px;
+  line-height: 1.9;
+  color: var(--body);
+  max-width: 40em;
+}
+.lp-page .lp-fee__fig {
+  max-width: 70%;
+  margin: clamp(36px, 5vw, 72px) auto 0;
+}
+/* 参照のドット3個 → 直角の小さな印（円形はスライダードットだけに限る） */
+.lp-page .lp-marks {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 36px;
+}
+.lp-page .lp-marks i {
+  display: block;
+  width: 7px;
+  height: 7px;
+  background: var(--primary-l);
+}
+.lp-page .lp-marks i:nth-child(2) {
+  background: var(--primary);
+}
+.lp-page .lp-fee__cta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+  margin-top: clamp(36px, 5vw, 72px);
+}
+.lp-page .lp-fee__cta > .btn {
+  min-height: 60px;
+}
+
+/* ============================================================
+   7. CASES（参照 .home-coco：写真 左／内容 右 の item を縦積み）
+   ============================================================ */
+/* r1 B-3: 参照 COCO は水色の `__intro` / `__outro` 帯で前後を挟み、本体は淡色地。
+   intro（波形＋見出し）→ 本体（大キャッチ＋本文 2 行＋注記＋カード）→ outro（対応エリア）の 3 層にする。 */
+.lp-page .lp-cases {
+  background: #fff;
+}
+.lp-page .lp-cases__intro,
+.lp-page .lp-cases__outro {
+  position: relative;
+  background: var(--sky);
+  overflow: hidden;
+}
+.lp-page .lp-cases__intro {
+  display: flex;
+  align-items: center;
+  min-height: clamp(220px, 41vw, 520px);
+  padding: calc(var(--lp-wave-h) + 16px) 0;
+}
+.lp-page .lp-cases__outro {
+  min-height: clamp(180px, 33vw, 420px);
+  padding: calc(var(--lp-wave-h) + 16px) 0 clamp(28px, 4vw, 56px);
+}
+.lp-page .lp-cases__introbody {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+.lp-page .lp-cases__introbody .lp-en {
+  color: var(--deep);
+}
+.lp-page .lp-cases__introbody h2 {
+  margin-top: 12px;
+  font-size: clamp(24px, 3.2vw, 38px);
+  line-height: 1.6;
+  color: var(--ink);
+}
+.lp-page .lp-cases__main {
+  padding: clamp(60px, 11vw, 140px) 0;
+}
+.lp-page .lp-cases__head {
+  text-align: center;
+  max-width: 46em;
+  margin-inline: auto;
+}
+/* 参照の「2 行の大キャッチ（後半を主色）」 */
+.lp-page .lp-cases__catch {
+  font-family: var(--head);
+  font-size: clamp(22px, 3vw, 36px);
+  line-height: 1.7;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+}
+.lp-page .lp-cases__catch span {
+  color: var(--primary);
+}
+.lp-page .lp-cases__sub {
+  margin-top: 18px;
+  font-size: 15px;
+  line-height: 2;
+  color: var(--body);
+}
+.lp-page .lp-cases .model-note {
+  margin-top: clamp(26px, 3vw, 40px);
+  margin-inline: auto;
+  text-align: left;
+}
+.lp-page .lp-cases__list {
+  margin-top: clamp(40px, 5vw, 72px);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(48px, 8vw, 104px);
+}
+.lp-page .lp-case {
+  display: grid;
+  grid-template-columns: minmax(0, 40fr) minmax(0, 60fr);
+  gap: clamp(22px, 3.4vw, 52px);
+  align-items: start;
+  position: relative;
+}
+/* 打消し表示はカード先頭＝1行目を全幅で占める（肖像・数値より上に必ず出る） */
+.lp-page .lp-case__chip {
+  grid-column: 1 / -1;
+  justify-self: start;
+  margin-bottom: 4px;
+}
+.lp-page .lp-case__fig {
+  background: #fff;
+}
+.lp-page .lp-case__body {
+  padding-inline-end: 180px;
+}
+.lp-page .lp-case__body h3 {
+  margin-top: 0;
+  font-size: clamp(19px, 2.2vw, 24px);
+  color: var(--ink);
+}
+.lp-page .lp-case__attr {
+  margin-top: 6px;
+  font-family: var(--ui);
+  font-size: 13px;
+  color: var(--body-soft);
+}
+.lp-page .lp-case__quote {
+  margin-top: 16px;
+  font-size: 15px;
+  line-height: 2;
+  color: var(--body);
+}
+.lp-page .lp-case__facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.lp-page .lp-case__facts dt {
+  font-family: var(--ui);
+  font-size: 12px;
+  color: var(--body-soft);
+}
+.lp-page .lp-case__facts dd {
+  margin-top: 4px;
+  font-family: var(--ui);
+  font-size: 13px;
+  color: var(--body-soft);
+}
+.lp-page .lp-case__facts dd b {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--primary);
+  font-variant-numeric: tabular-nums;
+  margin-inline-end: 3px;
+}
+/* 参照の「詳しく見る」は item の右上。先頭行の打消しチップと重ならない高さから始める */
+.lp-page .lp-case__more {
+  position: absolute;
+  top: 48px;
+  right: 0;
+  padding: 12px 22px;
+  font-size: 14px;
+}
+.lp-page .lp-cases__area {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px 26px;
+  font-size: 15px;
+  color: var(--ink);
+}
+.lp-page .lp-textlink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--head);
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 0.24em;
+}
+.lp-page .lp-textlink:hover {
+  opacity: 0.8;
+}
+
+/* ============================================================
+   8. BIZ（参照 .home-farm：淡色帯・全幅写真・2列・カード3枚・CTA）
+   ============================================================ */
+.lp-page .lp-biz {
+  position: relative;
+  background: var(--pale-2);
+  padding: calc(var(--lp-wave-h) + clamp(24px, 4vw, 56px)) 0 clamp(60px, 10vw, 132px);
+  overflow: hidden;
+}
+.lp-page .lp-biz__inner {
+  position: relative;
+  z-index: 1;
+}
+.lp-page .lp-biz__band {
+  width: 92%;
+  margin-inline: auto;
+  background: #fff;
+}
+.lp-page .lp-biz__lead {
+  display: grid;
+  grid-template-columns: minmax(0, 44fr) minmax(0, 56fr);
+  gap: clamp(24px, 4vw, 60px);
+  margin-top: clamp(44px, 7vw, 96px);
+}
+.lp-page .lp-biz__copy h2 {
+  margin-top: 12px;
+  font-size: clamp(23px, 3vw, 36px);
+  line-height: 1.6;
+  color: var(--ink);
+}
+.lp-page .lp-biz__copy h2 em {
+  font-style: normal;
+  color: var(--primary);
+}
+.lp-page .lp-biz__text p {
+  font-size: 15px;
+  line-height: 2;
+  color: var(--body);
+}
+.lp-page .lp-biz__cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(20px, 3vw, 40px);
+  margin-top: clamp(24px, 3vw, 40px);
+}
+.lp-page .lp-biz__card-fig {
+  background: #fff;
+}
+.lp-page .lp-biz__card h3 {
+  margin-top: 18px;
+  font-size: 18px;
+  line-height: 1.7;
+  color: var(--ink);
+}
+/* legal M5: β 期間の条件は「本文サイズ」でカード群の直前に置く（最小級の注記にしない） */
+.lp-page .lp-biz__note {
+  margin-top: clamp(44px, 7vw, 96px);
+  text-align: center;
+  font-size: 15px;
+  line-height: 1.9;
+  color: var(--body);
+}
+/* 出典 `.biz-banner-tags` 4 本目のチップ。カード群直下の注記行として並列関係を保つ */
+.lp-page .lp-biz__req {
+  margin-top: clamp(20px, 2.6vw, 32px);
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.9;
+  color: var(--body-soft);
+}
+.lp-page .lp-biz__cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: clamp(28px, 3.6vw, 48px);
+}
+.lp-page .lp-biz__chip {
+  font-family: var(--ui);
+  font-size: 12.5px;
+  color: var(--body-soft);
+}
+
+/* ============================================================
+   9. FOOTER（参照 l-footer：主色の波形上端 → 淡色地）
+   ============================================================ */
+.lp-page .lp-footer {
+  /* フッターの波形だけ低くする（参照は主色の波が右側だけに乗る部分的な形。全幅 231px の
+     主色面にすると帯 1 本ぶんの青が増えて主従が崩れるため、高さで面積を抑える） */
+  --lp-wave-h: clamp(40px, 10vw, 128px);
+  position: relative;
+  /* r1 B-5: 参照フッターの地は淡色 */
+  background: var(--pale-2);
+  padding: calc(var(--lp-wave-h) + clamp(40px, 6vw, 76px)) 0 clamp(48px, 7vw, 110px);
+  overflow: hidden;
+}
+.lp-page .lp-footer__inner {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 34fr) minmax(0, 66fr);
+  gap: clamp(28px, 4vw, 56px);
+  /* 参照の pagetop（290px）がフッター内に収まる高さを確保する */
+  min-height: 320px;
+  /* pagetop の版面（右 36%）に本文が潜り込まないよう、右 38% を空ける */
+  padding-inline-end: 38%;
+}
+.lp-page .lp-footer__brand p {
+  margin-top: 16px;
+  font-family: var(--ui);
+  font-size: 12.5px;
+  line-height: 1.9;
+  color: var(--body-soft);
+}
+.lp-page .lp-footer__nav {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px clamp(20px, 3vw, 44px);
+}
+.lp-page .lp-footer__nav ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+.lp-page .lp-footer__nav a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--head);
+  font-size: 14.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  transition: color 0.25s var(--ease);
+}
+.lp-page .lp-footer__nav a:hover {
+  color: var(--primary);
+}
+.lp-page .lp-footer__copy {
+  position: relative;
+  z-index: 1;
+  margin-top: clamp(30px, 4vw, 52px);
+  text-align: center;
+  font-family: var(--en);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--body-soft);
+}
+
+/* ============================================================
+   レスポンシブ（既存の閾値に揃える: 859px / 560px）
+   ============================================================ */
+@media (max-width: 859px) {
+  .lp-page .lp-header__logo {
+    padding: 12px 16px;
+  }
+  .lp-page .lp-header__menu {
+    width: 84px;
+    height: 62px;
+    gap: 5px;
+  }
+  .lp-page .lp-header__menu-icon {
+    width: 22px;
+    gap: 5px;
+  }
+  .lp-page .lp-header__menu-label {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+  }
+  /* 参照 SP は購入CTAが画面下に留まる。pagetop は footer 内なので競合しない */
+  .lp-page .lp-float-cta {
+    top: auto;
+    bottom: 0;
+    right: 0;
+    left: auto;
+    align-items: stretch;
+    gap: 0;
+    width: 208px;
+  }
+  .lp-page .lp-float-cta__btn {
+    min-height: 50px;
+    max-width: none;
+  }
+  /* r1 A-6 / legal H1: SP でも LINE 単独導線にしないため代替導線を残す（タイルと同じ幅で1行） */
+  .lp-page .lp-float-cta__alt {
+    display: block;
+    padding: 4px 8px;
+    font-size: 11px;
+    line-height: 1.6;
+    text-align: center;
+  }
+  /* 参照 SP: 幅 118/375 ≒ 31%・高 9.8rem・footer 上端からわずかに飛び出す */
+  .lp-page .lp-pagetop {
+    top: -11px;
+    width: 31%;
+    height: 98px;
+    gap: 4px;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+  }
+  .lp-page .lp-pagetop .ic {
+    font-size: 18px;
+  }
+  .lp-page .lp-menu {
+    grid-template-columns: 1fr;
+    grid-template-rows: 26vh auto;
+  }
+  .lp-page .lp-menu__body {
+    padding-top: 32px;
+    max-width: none;
+  }
+  .lp-page .lp-menu__list {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .lp-page .lp-menu__list li {
+    border-bottom: 1px dashed var(--line);
+  }
+  .lp-page .lp-menu__list a {
+    padding: 14px 2px;
+    font-size: 16px;
+  }
+  /* r1 B-6: SP の KV は 682px しかなく画面を満たしていなかった（参照 828 / ビューポート 844） */
+  .lp-page .lp-kv {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 100svh;
+    padding-top: clamp(84px, 22vw, 116px);
+  }
+  .lp-page .lp-slider {
+    width: calc(100% - 2 * var(--lp-pad) - 34px);
+  }
+  /* 参照どおり SP でもドットは縦・右端のまま（r1 A-3） */
+  .lp-page .lp-slider__ctrl {
+    right: 10px;
+    gap: 10px;
+  }
+  /* r1 C-5: SP の浮遊イラストは h1 に重ねず、写真枠の四隅付近へ。2 点は間引く。
+     幅も縮めて float アニメーションの振れ幅ごとビューポート内に収める。 */
+  .lp-page .lp-ill {
+    top: var(--lp-ill-sp-top, 50%);
+    left: var(--lp-ill-sp-left, 50%);
+    width: clamp(56px, 16vw, 72px);
+    margin: calc(clamp(56px, 16vw, 72px) / -2);
+  }
+  .lp-page .lp-ill--sp-off {
+    display: none;
+  }
+  .lp-page .lp-message__inner,
+  .lp-page .lp-about__item,
+  .lp-page .lp-point__main,
+  .lp-page .lp-biz__lead,
+  .lp-page .lp-footer__inner {
+    grid-template-columns: 1fr;
+  }
+  .lp-page .lp-about__item:nth-child(odd) {
+    direction: ltr;
+  }
+  .lp-page .lp-message__figs {
+    min-height: 280px;
+    max-width: 420px;
+    margin-inline: auto;
+    width: 100%;
+  }
+  .lp-page .lp-point__minors,
+  .lp-page .lp-point__cells,
+  .lp-page .lp-biz__cards {
+    grid-template-columns: 1fr;
+  }
+  .lp-page .lp-point__block {
+    --lp-plate-h: clamp(190px, 52vw, 320px);
+  }
+  .lp-page .lp-point__block--primary {
+    --lp-plate-h: clamp(220px, 62vw, 380px);
+  }
+  .lp-page .lp-point__block--deep {
+    --lp-plate-h: clamp(205px, 56vw, 350px);
+  }
+  .lp-page .lp-point__block--pale {
+    --lp-plate-h: clamp(180px, 46vw, 290px);
+  }
+  .lp-page .lp-point__plate {
+    width: 62%;
+  }
+  .lp-page .lp-point__badge {
+    width: 96px;
+    height: 96px;
+    margin-inline-start: clamp(12px, 8%, 40px);
+  }
+  .lp-page .lp-point__badge-ja {
+    font-size: 32px;
+  }
+  /* r1 A-2: SP の DAILY は 4163px（参照 3257）まで伸びていた。小さい写真を 2 列に畳んで詰める。
+     大（1・4・7）だけ全幅にし、残りは 2 枚ずつ並べる。 */
+  .lp-page .lp-daily__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 16px;
+    row-gap: 44px;
+  }
+  .lp-page .lp-daily__item:nth-child(3n + 1) {
+    grid-column: span 2;
+  }
+  .lp-page .lp-daily__item:nth-child(4),
+  .lp-page .lp-daily__item:nth-child(7) {
+    margin-top: 28px;
+  }
+  .lp-page .lp-trail--daily {
+    display: none;
+  }
+  .lp-page .lp-fee__fig {
+    max-width: 100%;
+  }
+  .lp-page .lp-fee__cta > .btn {
+    width: 100%;
+    min-height: 54px;
+  }
+  .lp-page .lp-case {
+    grid-template-columns: 1fr;
+  }
+  .lp-page .lp-case__body {
+    padding-inline-end: 0;
+  }
+  .lp-page .lp-case__more {
+    position: static;
+    align-self: start;
+    justify-self: start;
+  }
+  .lp-page .lp-biz__band {
+    width: 100%;
+  }
+  .lp-page .lp-footer__inner {
+    min-height: 0;
+    padding-inline-end: 0;
+    padding-top: 92px;
+  }
+  /* 下部固定の浮遊CTA と本文が重ならないための逃げ代 */
+  .lp-page .lp-footer {
+    padding-bottom: 104px;
+  }
+}
+
+@media (max-width: 560px) {
+  .lp-page {
+    --lp-pad: 18px;
+    --lp-wave-h: 58px;
+  }
+  .lp-page .lp-fee {
+    --lp-wave-h: 19px;
+  }
+  .lp-page .lp-menu__panels {
+    grid-template-columns: 1fr;
+  }
+  .lp-page .lp-footer__nav {
+    grid-template-columns: 1fr;
+  }
+  .lp-page .lp-case__facts {
+    gap: 8px;
+  }
+  .lp-page .lp-case__facts dd b {
+    font-size: 19px;
+  }
+  /* 375px で版面幅を越えないよう、長いラベルのゴーストは折り返す */
+  .lp-page .lp-case__more,
+  .lp-page .lp-fee__cta .btn-ghost {
+    white-space: normal;
+    max-width: 100%;
+    line-height: 1.5;
+  }
+}
