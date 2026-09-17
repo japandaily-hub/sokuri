@@ -15,8 +15,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        // /lp は本採用前の検証用ランディング（page.tsx 側も robots:noindex）。本採用時にこの1行を外す。
-        disallow: ["/analyzing", "/condition", "/result", "/lp"],
+        disallow: ["/analyzing", "/condition", "/result"],
       },
     ],
     sitemap: `${SITE_URL}/sitemap.xml`,

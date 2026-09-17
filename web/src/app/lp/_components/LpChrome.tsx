@@ -49,8 +49,12 @@ const FOCUSABLE = 'a[href],button:not([disabled]),input,select,textarea,[tabinde
 
 export function LpChrome() {
   const [open, setOpen] = useState(false);
+  /** フッターが見えている間は浮遊CTAを退避する（r3 A-5）。pagetop と操作要素が重なるのを根絶する。 */
+  const [footerInView, setFooterInView] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLElement>(null);
+  // MENU 開時とフッター表示時は同じ「退避状態」として扱う
+  const ctaHidden = open || footerInView;
 
   const close = useCallback(() => {
     setOpen(false);
@@ -58,14 +62,22 @@ export function LpChrome() {
   }, []);
 
   /* qa r2 L-3: ページ内アンカーで閉じるときは MENU ボタンへ戻さず、移動先の区画へフォーカスを送る
-     （戻すとキーボード利用者だけ画面が動いてもフォーカスがヘッダーに残る）。 */
+     （戻すとキーボード利用者だけ画面が動いてもフォーカスがヘッダーに残る）。
+     qa r3 H-4: 同期で focus() すると #main にまだ inert が付いており（解除は effect の
+     クリーンアップ＝コミット後）、inert 部分木は仕様上フォーカス不能なので無言で失敗する。
+     inert が外れた後のフレームまで 2 段の rAF で遅らせる。 */
   const closeToAnchor = useCallback((href: string) => {
     setOpen(false);
     if (!href.startsWith("#")) return;
-    const target = document.getElementById(href.slice(1));
-    if (!target) return;
-    target.setAttribute("tabindex", "-1");
-    target.focus({ preventScroll: true });
+    const id = href.slice(1);
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const target = document.getElementById(id);
+        if (!target) return;
+        target.setAttribute("tabindex", "-1");
+        target.focus({ preventScroll: true });
+      })
+    );
   }, []);
 
   // 開いている間は背面をスクロールさせない（参照と同じ挙動）。閉じたら必ず元に戻す。
@@ -132,6 +144,20 @@ export function LpChrome() {
     first?.focus();
   }, [open]);
 
+  /* r3 A-5: フッターがビューポートに入っている間は浮遊CTAを退避する。
+     縦タブ／下部バーが `.lp-pagetop` と操作領域を奪い合う問題（r1・r2・r3 と 3 度再発）を、
+     「フッターに着いたら CTA は要らない」という単純な規則で根絶する。reduced-motion に依らず動作。 */
+  useEffect(() => {
+    const footer = document.querySelector(".lp-footer");
+    if (!footer) return;
+    if (!("IntersectionObserver" in window)) return;
+    const io = new IntersectionObserver((entries) => setFooterInView(entries.some((e) => e.isIntersecting)), {
+      threshold: 0,
+    });
+    io.observe(footer);
+    return () => io.disconnect();
+  }, []);
+
   return (
     <>
       {/* qa M1: banner ランドマークにするため <header> で描く */}
@@ -164,7 +190,7 @@ export function LpChrome() {
       </header>
 
       {/* 浮遊CTA（参照の黄 blob の位置）。PC / SP とも直下にテキスト導線を添え、LINE 単独導線にしない */}
-      <div className="lp-float-cta" inert={open ? true : undefined}>
+      <div className="lp-float-cta" inert={ctaHidden ? true : undefined}>
         <Link href="/login?callbackUrl=%2Fmypage" className="btn btn-line lp-float-cta__btn">
           <span className="btn-line__tile" aria-hidden="true" />
           <span className="btn-line__body">
@@ -173,8 +199,9 @@ export function LpChrome() {
           </span>
           <Ic name="arrow" className="btn-line__arr" />
         </Link>
+        {/* r3 M-3: 縦書き 9 文字だとタブ全体が 358px まで伸びる。ラベルは「よくある質問」6 文字に */}
         <Link href="/faq" className="lp-float-cta__alt">
-          よくある質問を見る
+          よくある質問
         </Link>
       </div>
 

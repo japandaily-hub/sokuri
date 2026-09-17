@@ -311,16 +311,23 @@ html.js-rv .lp-page .rv--up:not(.in) {
   /* 版面（.lp-container）の右余白は 1280 で 58px。56px なら本文の外側に確実に収まる */
   width: 56px;
 }
-/* MENU オーバーレイを開いている間は隠す（LpChrome が inert を付ける・qa r2 L-4 と同じ扱い） */
+/* MENU オーバーレイを開いている間／フッターが見えている間は隠す（LpChrome が inert を付ける）。
+   r3 A-5: pagetop との操作領域の奪い合いを根絶するため、pointer-events も落とす。 */
 .lp-page .lp-float-cta[inert],
 .lp-page .lp-header__logo[inert] {
   visibility: hidden;
+  pointer-events: none;
 }
 .lp-page .lp-float-cta__btn {
   width: 56px;
-  min-height: 220px;
   padding: 0;
   align-items: stretch;
+}
+/* qa r3 M-4: `.btn.btn-line{min-height:60px}`（katazuke.css・同特異度 0,2,0）と順序依存になるため、
+   0,4,0 で書いて出力順に依存しないようにする。高さは指示どおり 220〜240px に収める。 */
+.lp-page .lp-float-cta .btn.btn-line {
+  min-height: 220px;
+  max-height: 240px;
 }
 /* .btn-line の作法（タイル＋本文）は保ったまま縦組みにする。タイルは上端 12px の帯 */
 .lp-page .lp-float-cta__btn .btn-line__tile {
@@ -346,6 +353,7 @@ html.js-rv .lp-page .rv--up:not(.in) {
 .lp-page .lp-float-cta__alt {
   writing-mode: vertical-rl;
   width: 56px;
+  max-height: 120px;
   padding: 14px 0;
   background: #fff;
   border: 1px solid var(--line);
@@ -511,17 +519,28 @@ html.js-rv .lp-page .rv--up:not(.in) {
 .lp-page .lp-kv {
   position: relative;
   min-height: clamp(640px, 100svh, 900px);
-  padding: clamp(104px, 8.6vw, 140px) 0 calc(var(--lp-wave-h) + 8px);
+  /* 上端の余白と見出しの寸法は veil の第1停止位置（下限 360px）と対で決める。
+     ここを緩めると sub が veil の外に出るので、値を変えるときは両方を見直すこと。 */
+  padding: clamp(84px, 7vw, 108px) 0 calc(var(--lp-wave-h) + 8px);
   background: var(--pale-2);
   overflow: hidden;
 }
-/* 文字の可読性は「上部だけ淡色のグラデ」で作る（文字色は --ink / 主色のまま） */
+/* 文字の可読性は「上部だけ淡色のグラデ」で作る（文字色は --ink / 主色のまま）。
+   r3 A-3: 停止位置が % だと、ビューポート実高 800px 未満のノート PC で sub（15px）の実効不透明度が
+   0.41 まで落ち 1.44:1 になっていた。停止位置を px 基準にし、コピー塊の下端（後述の計算）より
+   常に 40px 以上下に第1停止位置が来るよう clamp の下限を決める。
+   コピー塊の最大下端 = padding-top 108 + h1 2行(46*1.5*2=138) + en(12+17.6) + sub(12+27.8) = 315.4px
+   → 第1停止位置の下限 360px なら常に 40px 以上の余裕がある。 */
 .lp-page .lp-kv__veil {
   position: absolute;
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  background: linear-gradient(180deg, rgba(244, 247, 252, 0.96) 0 38%, rgba(244, 247, 252, 0) 70%);
+  background: linear-gradient(
+    180deg,
+    rgba(244, 247, 252, 0.96) 0 clamp(360px, 40%, 460px),
+    rgba(244, 247, 252, 0) clamp(600px, 72%, 700px)
+  );
 }
 .lp-page .lp-kv__deco {
   position: absolute;
@@ -538,20 +557,21 @@ html.js-rv .lp-page .rv--up:not(.in) {
   max-width: 34em;
   margin-inline: auto;
 }
+/* 寸法は veil の第1停止位置に収めるための固定値（上の .lp-kv のコメント参照） */
 .lp-page .lp-kv h1 {
-  font-size: clamp(30px, 4.4vw, 54px);
-  line-height: 1.55;
+  font-size: clamp(28px, 4vw, 46px);
+  line-height: 1.5;
   letter-spacing: 0.05em;
   color: var(--ink);
 }
 .lp-page .lp-kv__en {
-  margin-top: 16px;
+  margin-top: 12px;
   color: var(--body-soft);
 }
 .lp-page .lp-kv__sub {
-  margin-top: 14px;
+  margin-top: 12px;
   font-size: 15px;
-  line-height: 1.9;
+  line-height: 1.85;
   color: var(--body);
 }
 /* KV スライダー（参照 .home-kv__slider.-slow：6000ms 間隔・1600ms クロスフェード）。
@@ -816,7 +836,8 @@ html.js-rv .lp-page .rv--up:not(.in) {
    ※ fix-r2 B-4 の「+24px」では、色面 800→520 と「色面の下の h2」撤去で失う約 374px を回収できない
    （撮は -24% まで落ちる）ため、帯域（-15%〜+10%）に収まる値まで引き上げている。 */
 .lp-page .lp-point__block {
-  --lp-plate-h: min(46vw, 520px);
+  /* r3 B-5: 520px だと面の下 180px（面積の 35%）が無地のままだった。バッジ＋見出しの実寸に合わせる */
+  --lp-plate-h: min(40vw, 460px);
   --lp-block-gap: clamp(32px, 5vw, 64px);
   position: relative;
   padding: 0 0 var(--lp-block-gap);
@@ -832,7 +853,8 @@ html.js-rv .lp-page .rv--up:not(.in) {
   pointer-events: none;
 }
 .lp-page .lp-point__block--primary {
-  --lp-block-gap: clamp(44px, 18vw, 230px);
+  /* B-5 で色面が 60px 縮むぶんを区画内の余白で補う（撮の許容下限 2484px を割らないため） */
+  --lp-block-gap: clamp(44px, 18.6vw, 238px);
 }
 .lp-page .lp-point__block--deep {
   --lp-block-gap: clamp(40px, 12vw, 154px);
@@ -974,12 +996,21 @@ html.js-rv .lp-page .rv--up:not(.in) {
 /* 循環イラスト帯（既存 .ill-loop をそのまま使う。見出しだけ /lp 側で持つ）。
    r1 B-2: 参照 `-cycle` と同じ主色の色帯にする。上端は前の淡色面が食い込む波形、
    下端は同じ主色の DAILY へそのまま続く（次の区画の上端に淡色の波形リボンで区切りを作る）。 */
+/* r3 B-4: PC 1064px は目標（600〜700px）を +52% 超過。波形を半分の高さにし、
+   タイル（110px）は保ったまま円周配置の直径を詰めて 700px 以内に収める。 */
 .lp-page .lp-cycle {
+  --lp-wave-h: clamp(40px, 9vw, 116px);
   position: relative;
   background: var(--primary);
   color: #fff;
-  padding: calc(var(--lp-wave-h) + clamp(24px, 4vw, 56px)) 0 clamp(40px, 6vw, 88px);
+  padding: calc(var(--lp-wave-h) + 24px) 0 40px;
   overflow: hidden;
+}
+.lp-page .lp-cycle .lp-band__head {
+  margin-bottom: clamp(20px, 2.4vw, 32px);
+}
+.lp-page .lp-cycle .ill-loop-inner {
+  max-width: 360px;
 }
 .lp-page .lp-cycle__inner {
   position: relative;
@@ -989,7 +1020,7 @@ html.js-rv .lp-page .rv--up:not(.in) {
   position: relative;
   z-index: 1;
   background: transparent;
-  padding-top: clamp(16px, 2vw, 28px);
+  padding-block: 8px 0;
 }
 /* 青系の線画が主色地に沈むため、参照の白い雲と同じ役割で白の正方形タイルに載せる。
    r2 A-1: `padding:9%` はタイル幅ではなく包含ブロック（.ill-loop-inner 520px）基準で解決され、
@@ -1462,8 +1493,8 @@ html.js-rv .lp-page .rv--up:not(.in) {
   position: relative;
   /* r1 B-5: 参照フッターの地は淡色 */
   background: var(--pale-2);
-  /* r2 B-4: 687px（参照 838・-18%）だったため padding-block を +40px ずつ */
-  padding: calc(var(--lp-wave-h) + clamp(40px, 6vw, 116px)) 0 clamp(48px, 7vw, 150px);
+  /* r3 B-1: 688px（参照 838・-18%）のままだったため明示値に（PC 1280 で 730〜800px を狙う） */
+  padding-block: clamp(200px, 20vw, 260px) 150px;
   /* qa r2 M-3: overflow:hidden だと pagetop の top:-11px（SP のはみ出し）と
      :focus-visible リングが切れる。clip＋clip-margin なら波形の横漏れだけを抑えられる。 */
   overflow: clip;
@@ -1525,6 +1556,23 @@ html.js-rv .lp-page .rv--up:not(.in) {
 /* ============================================================
    レスポンシブ（既存の閾値に揃える: 859px / 560px）
    ============================================================ */
+/* r3 A-1/A-2: PC では右端 56px を「縦タブの帯」として予約する。
+   - スライダーの操作列（ドット＋一時停止）は縦タブの内側へ逃がす（WCAG 2.2.2 の一時停止機構を覆わせない）
+   - 版面の右余白（clamp(20px,4.5vw,58px)）は vw<1244 で 56px を下回るため、
+     860〜1243px では版面側に 72px を予約して本文と縦タブが重ならないようにする */
+@media (min-width: 860px) {
+  .lp-page .lp-slider__ctrl {
+    right: 84px;
+  }
+}
+@media (min-width: 860px) and (max-width: 1243px) {
+  /* フッターの版面は pagetop（右 36%）用に右 38% を既に空けているので対象外にする
+     （このメディア規則がファイル末尾＝後勝ちのため、除外しないと 38% が上書きされる） */
+  .lp-page .lp-container:not(.lp-footer__inner) {
+    padding-inline-end: max(var(--lp-pad), 72px);
+  }
+}
+
 @media (max-width: 859px) {
   .lp-page .lp-header__logo {
     padding: 12px 16px;
@@ -1636,9 +1684,15 @@ html.js-rv .lp-page .rv--up:not(.in) {
     min-height: 100svh;
     padding-top: clamp(84px, 22vw, 116px);
   }
-  /* veil は SP では 45% まで（縦長ぶん、文字の載る帯が広い） */
+  /* veil は SP では 45% まで（縦長ぶん、文字の載る帯が広い）。PC と同じく px 基準（r3 A-3）。
+     SP のコピー塊の最大下端 = padding-top 116 + h1 2行(28*1.5*2=84) + en(12+17.6) + sub 3行(12+83) ≒ 325px
+     → 第1停止位置の下限 360px で 40px 以上の余裕を確保する。 */
   .lp-page .lp-kv__veil {
-    background: linear-gradient(180deg, rgba(244, 247, 252, 0.96) 0 45%, rgba(244, 247, 252, 0) 74%);
+    background: linear-gradient(
+      180deg,
+      rgba(244, 247, 252, 0.96) 0 clamp(360px, 45%, 420px),
+      rgba(244, 247, 252, 0) clamp(520px, 75%, 600px)
+    );
   }
   /* 参照どおり SP でもドットは縦・右端のまま（r1 A-3） */
   .lp-page .lp-slider__ctrl {
@@ -1745,13 +1799,21 @@ html.js-rv .lp-page .rv--up:not(.in) {
     padding-inline-end: 0;
     padding-top: 92px;
   }
-  /* 画面下の CTA バー（56px＋safe-area）で末尾が隠れないための逃げ代（r2 A-2） */
+  /* 画面下の CTA バー（56px＋safe-area）で末尾が隠れないための逃げ代（r2 A-2 / r3 B-3）。
+     footer 側だけに頼ると footer を詰めた瞬間に © が隠れるため、main の最後の区画にも入れる。 */
   .lp-page .lp-footer {
     padding-bottom: calc(56px + env(safe-area-inset-bottom) + 48px);
   }
-  /* 循環帯のタイルは SP では 2 列グリッドの各セル幅いっぱい（katazuke-motion.css の SP 規則に合わせる） */
+  .lp-page .lp-biz {
+    padding-bottom: calc(60px + 56px + env(safe-area-inset-bottom));
+  }
+  /* 循環帯のタイルは SP では 2 列グリッドの各セル幅いっぱい（katazuke-motion.css の SP 規則に合わせる）。
+     r3 B-4 は「SP は据置き」なので、円周配置の直径も SP では既存値（320px）に戻す。 */
   .lp-page .lp-cycle .ill-item {
     width: 100%;
+  }
+  .lp-page .lp-cycle .ill-loop-inner {
+    max-width: 320px;
   }
 }
 
