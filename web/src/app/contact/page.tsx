@@ -5,11 +5,18 @@
  *  POST /contact（katadzuke-api.ts submitContactMessage）へ配線済み。422/429/5xx は日本語の
  *  案内に変換して表示し、失敗時に偽の完了表示は出さない（運営導線監査 r3-operator.md H1 是正）。 */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { Ic } from "@/components/kdz/Icons";
+import { Reveal } from "@/components/kdz/interactions";
+import { ILLUSTRATIONS, ILL_POSITIONS, illSrc, type IllName } from "@/lib/illustrations";
 import { KdzApiError, submitContactMessage, toDisplayMessage } from "@/lib/katadzuke-api";
 import "./contact.css";
+
+/** 循環イラスト帯（ビジュアル刷新 Phase 3・architect指示）。フォーム主体の軽いページのため、
+ *  トップページの6点フルセットではなく4点に絞る。円周配置(top/24%/76%/98%)上で上下左右に
+ *  1点ずつ散るよう選定し、デスクトップ幅で右側に偏らないようにする(QAレビュー Medium 対応)。 */
+const ILL_LOOP: IllName[] = ["box", "truck", "folding-hands", "plant"];
 
 type FieldId = "name" | "email" | "category" | "message";
 
@@ -175,6 +182,41 @@ export default function ContactPage() {
           <p className="ct-head__faq">
             <Link href="/faq">よくある質問で解決するかもしれません</Link>
           </p>
+        </div>
+      </section>
+
+      {/* ============ 循環イラスト帯 ============
+          ビジュアル刷新 Phase 3（architect指示）: 帯・見出しを読み終えた直後、フォームに入る前の
+          一息の位置に置く（トップページと同じ .ill-loop を再利用。クラス定義は
+          katazuke-motion.css へ移設済みで新規追加はしていない）。フォーム本体には一切かけない
+          （Phase 2 の教訓: 同意チェックボックス等の演出は不可視だが操作可能な状態を生みうる）。
+          装飾のみのため section 全体を aria-hidden にする。 */}
+      <section className="ill-loop" aria-hidden="true">
+        <div className="container">
+          <div className="ill-loop-inner ill-scope">
+            {ILL_LOOP.map((name, i) => {
+              const meta = ILLUSTRATIONS[name];
+              const pos = ILL_POSITIONS[name];
+              return (
+                <Reveal
+                  key={name}
+                  className={`ill-item ill-item--${name}`}
+                  stagger={i}
+                  style={{ "--ill-top": pos.top, "--ill-left": pos.left } as CSSProperties}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={illSrc(name)}
+                    alt={meta.alt}
+                    width={meta.w}
+                    height={meta.h}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </Reveal>
+              );
+            })}
+          </div>
         </div>
       </section>
 

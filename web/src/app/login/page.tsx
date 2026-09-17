@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSession, signIn, signOut, useSession } from "next-auth/react";
 import { AuthBar, Field, PasswordField, LineAuthButton, TrustRow } from "@/components/kdz/auth";
+import { Reveal } from "@/components/kdz/interactions";
 import { safeInternalPath } from "@/lib/safe-path";
 import { clearRedirectLoopStorage } from "@/lib/katadzuke-api";
 import "./login.css";
@@ -134,11 +135,11 @@ function LoginForm() {
     <div className="login-page auth-page auth-page--split">
       <AuthBar rightHref="/signup" rightLabel="新規登録はこちら →" />
       <main id="main">
-        <aside className="auth-side">
+        <Reveal as="aside" variant="zoom" className="auth-side">
           {/* eslint-disable @next/next/no-img-element */}
           <img src="/img/v2/li-side.webp" width={900} height={1350} alt="" loading="lazy" decoding="async" />
           <p className="auth-side__line">入札の結果を、確かめに。</p>
-        </aside>
+        </Reveal>
         <div className="auth-wrap">
           <div className="auth-card">
             <div className="auth-head">
@@ -151,7 +152,7 @@ function LoginForm() {
                 <span>現在は業者アカウントでログイン中です。ユーザーとしてご利用になる場合は、いったんサインアウトしてください。</span>
                 <button
                   type="button"
-                  className="btn btn-ghost btn-block"
+                  className="btn btn-ghost btn-block btn-swipe"
                   onClick={() => void onSignOutToUserLogin()}
                   disabled={signOutBusy}
                 >

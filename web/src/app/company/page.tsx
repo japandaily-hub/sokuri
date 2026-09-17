@@ -1,5 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
+import { Reveal, RevealLines } from "@/components/kdz/interactions";
 import "./company.css";
 
 export const metadata = {
@@ -242,11 +243,11 @@ export default function CompanyPage() {
         {/* ============ 私たちが大切にすること ============ */}
         <div className="about-section">
           <span className="eyebrow">VALUES</span>
-          <h2>私たちが大切にすること</h2>
+          <RevealLines mark="under" lines={["私たちが大切にすること"]} />
           <div className="values-grid">
-            {VALUES.map((v) => (
-              <div className="value-card" key={v.title}>
-                <div className="img-frame img-frame--pale img-frame--1x1 value-img">
+            {VALUES.map((v, i) => (
+              <Reveal as="div" className="value-card" stagger={i} key={v.title}>
+                <Reveal as="figure" variant="zoom" className="img-frame img-frame--pale img-frame--1x1 value-img" stagger={i}>
                   <img
                     src={`/img/v2/${v.img}.webp`}
                     width={v.w}
@@ -255,11 +256,11 @@ export default function CompanyPage() {
                     loading="lazy"
                     decoding="async"
                   />
-                </div>
+                </Reveal>
                 <strong>{v.title}</strong>
                 <p>{v.body}</p>
                 <p className="value-fact">{v.fact}</p>
-              </div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -280,7 +281,7 @@ export default function CompanyPage() {
             <Link href="/create" className="btn btn-primary btn-lg">
               出品してみる
             </Link>
-            <Link href="/contact" className="btn btn-ghost btn-lg">
+            <Link href="/contact" className="btn btn-ghost btn-lg btn-swipe">
               お問い合わせ
             </Link>
           </div>

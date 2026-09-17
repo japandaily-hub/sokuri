@@ -16,6 +16,7 @@
    postcss-import を外すと css-loader 経路に戻り当該不具合が再発するため、依存必須。 */
 @import "./katazuke.css" layer(components);
 @import "./katazuke-pages.css" layer(components);
+@import "./katazuke-motion.css" layer(components);
 
 @tailwind base;
 @tailwind components;

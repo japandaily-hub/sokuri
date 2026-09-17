@@ -116,7 +116,7 @@ function VerifyEmailContent() {
           さっそく出品してみる
           <Ic name="arrow" />
         </Link>
-        <Link href="/" className="btn btn-ghost btn-block" style={{ marginTop: 10 }}>
+        <Link href="/" className="btn btn-ghost btn-block btn-swipe" style={{ marginTop: 10 }}>
           トップへ戻る
         </Link>
       </div>

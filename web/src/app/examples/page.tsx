@@ -30,7 +30,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Ic } from "@/components/kdz/Icons";
-import { Reveal } from "@/components/kdz/interactions";
+import { Reveal, RevealLines } from "@/components/kdz/interactions";
 import {
   CASES,
   caseName,
@@ -71,11 +71,18 @@ function CaseCard({ c, index }: { c: CaseItem; index: number }) {
     <Reveal
       as="article"
       className={`case-card media-split${index % 2 === 1 ? " media-split--rev" : ""}`}
+      stagger={index}
     >
       <div className="case-media">
         {/* data-label: 画像が未着・失敗のとき枠中央に品目名を出す（共有 .img-frame[data-label]::before）。
             画像が届けば img が上に乗って隠れる */}
-        <div className="img-frame img-frame--3x2 sp-bleed" data-label={c.tag}>
+        <Reveal
+          as="figure"
+          variant="zoom"
+          className="img-frame img-frame--3x2 sp-bleed"
+          data-label={c.tag}
+          stagger={index}
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`/img/v2/${c.lot}.webp`}
@@ -85,7 +92,7 @@ function CaseCard({ c, index }: { c: CaseItem; index: number }) {
             loading="lazy"
             decoding="async"
           />
-        </div>
+        </Reveal>
         <div className="case-thumbs">
           {c.thumbs.map((slug) => (
             <div className="img-frame img-frame--1x1 img-frame--pale" key={slug}>
@@ -279,7 +286,7 @@ export default function ExamplesPage() {
           </p>
           <Reveal className="cases-cta">
             <div className="cases-cta-inner">
-              <h2>あなたの家の不用品、いくらになる？</h2>
+              <RevealLines mark="under" lines={["あなたの家の不用品、いくらになる？"]} />
               <p>
                 1点ずつ撮って、業者に競ってもらうだけ。
                 <br />
@@ -290,7 +297,7 @@ export default function ExamplesPage() {
                   無料で出品してみる
                   <Ic name="arrow" />
                 </Link>
-                <Link href="/photo-guide" className="btn btn-ghost btn-lg">
+                <Link href="/photo-guide" className="btn btn-ghost btn-lg btn-swipe">
                   撮影ガイドを見る
                 </Link>
               </div>

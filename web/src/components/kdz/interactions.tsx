@@ -4,6 +4,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type ElementType,
   type ReactNode,
   type Ref,
@@ -37,22 +38,14 @@ export function ScrollProgress() {
 }
 
 /**
- * スクロール到達でフェードイン（デザイン .rv → .in）。
+ * スクロール到達判定（デザイン .rv → .in の共通ロジック）。Reveal / RevealLines から共用する。
  * 非表示（opacity:0）になるのは layout.tsx が <html> に js-rv を付けた時だけ（IO あり・reduced-motion でない）。
  * IO が発火しないケース（レイアウト前の 0 高さ・古い WebView 等）の保険として、マウント後 1200ms で .in を強制付与する。
+ * ここのロジックは元の Reveal 実装から1文字も変えていない（IO の初回コールバックでフォールバックを
+ * 解除する部分を含む）。
  */
-export function Reveal({
-  children,
-  className = "",
-  delay,
-  as: Tag = "div",
-}: {
-  children: ReactNode;
-  className?: string;
-  delay?: 1 | 2 | 3;
-  as?: "div" | "article" | "li" | "section" | "figure";
-}) {
-  const ref = useRef<HTMLElement>(null);
+function useInView<T extends HTMLElement>(): Ref<T> {
+  const ref = useRef<T>(null);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -83,10 +76,98 @@ export function Reveal({
       io.disconnect();
     };
   }, []);
+  return ref as Ref<T>;
+}
+
+/**
+ * スクロール到達でフェードイン（デザイン .rv → .in）。実体は useInView（薄いラッパー）。
+ */
+export function Reveal({
+  children,
+  className = "",
+  delay,
+  variant = "fade",
+  stagger,
+  as: Tag = "div",
+  style: styleProp,
+  ...rest
+}: {
+  children: ReactNode;
+  className?: string;
+  /** @deprecated 固定ディレイ（.08s/.16s/.24s）。新規実装は stagger を使う想定だが後方互換のため残す */
+  delay?: 1 | 2 | 3;
+  /** 演出の種類。既定 "fade" は現行挙動そのまま（opacity のみ）。"zoom" は .img-frame 直下の img でのみ使う契約 */
+  variant?: "fade" | "up" | "up-sm" | "zoom";
+  /** 順送りの遅延に使う index。指定時は CSS 変数 --i として出力し、katazuke-motion.css の
+   *  transition-delay:calc(min(var(--i,0),5) * var(--rv-stagger)) が効く */
+  stagger?: number;
+  as?: "div" | "article" | "li" | "section" | "figure" | "aside";
+  /** 呼び出し側の任意インラインstyle（--ill-top 等のCSS変数を渡す用途）。内部の --i(stagger) と合流する */
+  style?: CSSProperties;
+  /** data-label 等、ラップ先要素（.img-frame 等）が既存 CSS で要求する任意の HTML 属性の素通し用。
+   *  値をプリミティブ型に絞り、将来オブジェクトのスプレッド渡しで dangerouslySetInnerHTML 等が
+   *  紛れ込む経路を型レベルで塞ぐ（セキュリティレビュー対応） */
+  [key: `data-${string}`]: string | number | boolean | undefined;
+}) {
+  const ref = useInView<HTMLElement>();
   const Component = Tag as ElementType;
+  const variantClass = variant !== "fade" ? ` rv--${variant}` : "";
+  // 数値以外・負値・非有限値が紛れ込んでも CSS 変数には安全な整数だけを渡す（0-5 にクランプ）
+  const safeStagger =
+    stagger !== undefined && Number.isFinite(stagger)
+      ? Math.min(Math.max(Math.trunc(stagger), 0), 5)
+      : undefined;
+  const style: CSSProperties | undefined =
+    safeStagger !== undefined || styleProp
+      ? { ...(safeStagger !== undefined ? ({ "--i": safeStagger } as CSSProperties) : null), ...styleProp }
+      : undefined;
   return (
-    <Component ref={ref as Ref<HTMLElement>} className={`rv ${className}`.trim()} data-d={delay}>
+    <Component
+      ref={ref}
+      className={`rv${variantClass} ${className}`.trim()}
+      data-d={delay}
+      style={style}
+      {...rest}
+    >
       {children}
+    </Component>
+  );
+}
+
+/**
+ * 見出しを1行ずつフェード＋上スライドで見せる（デザイン .rvl / .rvl__line、参考: felissimo/gopeace 実測）。
+ * lines は「1要素=1行」を書き手が明示的に分割する契約。DOM 測定による自動折返し検出は行わない
+ * （幅に応じた自動改行と組み合わせると行アニメーションの単位が崩れるため）。
+ */
+export function RevealLines({
+  lines,
+  as: Tag = "h2",
+  mark = "none",
+  className = "",
+  id,
+}: {
+  lines: ReactNode[];
+  as?: "h1" | "h2" | "h3" | "p";
+  mark?: "none" | "under";
+  className?: string;
+  /** 呼び出し側が既存のページ内アンカー（目次リンクの遷移先・aria-labelledby の参照先）を
+   *  維持する用途。未指定時は従来どおり id なしで描画する（既存呼び出しの挙動は変えない） */
+  id?: string;
+}) {
+  const ref = useInView<HTMLElement>();
+  const Component = Tag as ElementType;
+  const markClass = mark === "under" ? " rvl--mark" : "";
+  return (
+    <Component
+      ref={ref}
+      id={id}
+      className={`rv rvl${markClass} ${className}`.trim()}
+    >
+      {lines.map((line, i) => (
+        <span className="rvl__line" style={{ "--i": i } as CSSProperties} key={i}>
+          {line}
+        </span>
+      ))}
     </Component>
   );
 }

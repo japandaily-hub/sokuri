@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import "./terms.css";
 import { TermsTabs } from "./TermsTabs";
+import { RevealLines } from "@/components/kdz/interactions";
 
 export const metadata: Metadata = {
   title: "利用規約",
@@ -91,9 +92,13 @@ export default function TermsPage() {
 
       <section className="terms-points" aria-labelledby="terms-points-title">
         <div className="terms-points__inner">
-          <h2 className="doc-section-title" id="terms-points-title">
-            ユーザーの方へ　この規約の要点
-          </h2>
+          <RevealLines
+            as="h2"
+            mark="under"
+            className="doc-section-title"
+            id="terms-points-title"
+            lines={["ユーザーの方へ　この規約の要点"]}
+          />
           <ol className="terms-points__list">
             {POINTS.map((p) => (
               <li key={p.no}>

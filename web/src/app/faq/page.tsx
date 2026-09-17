@@ -7,9 +7,15 @@
  *  （打消し表示の近接を壊さないため）。サイドバーは既存の線アイコン .ic に一本化する。 */
 
 import "./faq.css";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { Ic, type IcName } from "@/components/kdz/Icons";
+import { Reveal, RevealLines } from "@/components/kdz/interactions";
+import { ILLUSTRATIONS, ILL_POSITIONS, ILL_THIN_ON_MOBILE, illSrc, type IllName } from "@/lib/illustrations";
+
+/** 循環イラスト帯（ビジュアル刷新 Phase 3）。表示順・位置クラスはトップページの
+ *  ILL_LOOP と同じ6点（katazuke-motion.css の .ill-item--<name> 円周配置に対応）。 */
+const ILL_LOOP: IllName[] = ["box", "truck", "house-tree", "folding-hands", "books", "plant"];
 
 type CatKey = "fee" | "privacy" | "item" | "flow" | "area";
 
@@ -386,6 +392,41 @@ export default function FaqPage() {
         </div>
       </div>
 
+      {/* ============ 循環イラスト帯 ============
+          ビジュアル刷新 Phase 3（architect指示）: 検索・カテゴリタブを読み終えた直後、
+          本文の Q&A に入る前の一息の位置に置く（トップページと同じ .ill-loop を再利用。
+          クラス定義は katazuke-motion.css へ移設済みで新規追加はしていない）。装飾のみのため
+          section 全体を aria-hidden にする。 */}
+      <section className="ill-loop" aria-hidden="true">
+        <div className="container">
+          <div className="ill-loop-inner ill-scope">
+            {ILL_LOOP.map((name, i) => {
+              const meta = ILLUSTRATIONS[name];
+              const pos = ILL_POSITIONS[name];
+              return (
+                <Reveal
+                  key={name}
+                  className={`ill-item ill-item--${name}`}
+                  stagger={i}
+                  style={{ "--ill-top": pos.top, "--ill-left": pos.left } as CSSProperties}
+                  data-ill-thin={ILL_THIN_ON_MOBILE.includes(name) ? "" : undefined}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={illSrc(name)}
+                    alt={meta.alt}
+                    width={meta.w}
+                    height={meta.h}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </Reveal>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
       <div className="section">
         <div className="container">
           <div className="faq-body">
@@ -465,7 +506,12 @@ export default function FaqPage() {
                         <div className="faq-section-icon">
                           <Ic name={c.icon} />
                         </div>
-                        <h2 className="faq-section-title">{c.label}</h2>
+                        <RevealLines
+                          as="h2"
+                          mark="under"
+                          className="faq-section-title"
+                          lines={[c.label]}
+                        />
                         <span className="faq-section-count">{c.items.length}問</span>
                         {/* 初期表示を全閉に統一した代わりの一括開閉（ラウンド6 指摘 11）。
                             状態はラベルの文字が持つので aria-expanded は付けない
@@ -484,13 +530,14 @@ export default function FaqPage() {
                         {c.items.map((it, i) => {
                           const key = `${c.key}-${i}`;
                           return (
-                            <FaqItem
-                              key={key}
-                              q={it.q}
-                              a={it.a}
-                              open={openKeys.has(key)}
-                              onToggle={() => toggle(key)}
-                            />
+                            <Reveal key={key} stagger={i}>
+                              <FaqItem
+                                q={it.q}
+                                a={it.a}
+                                open={openKeys.has(key)}
+                                onToggle={() => toggle(key)}
+                              />
+                            </Reveal>
                           );
                         })}
                       </div>
@@ -503,7 +550,7 @@ export default function FaqPage() {
               <div className="faq-contact">
                 <Ic name="chat" />
                 <div className="faq-contact-info">
-                  <h2>解決しない場合はお問い合わせください</h2>
+                  <RevealLines as="h2" mark="under" lines={["解決しない場合はお問い合わせください"]} />
                   <p>フォームよりお気軽にご連絡ください。通常3営業日以内にご返信いたします。</p>
                   <Link href="/contact" className="btn btn-primary faq-contact-btn">
                     お問い合わせフォームへ

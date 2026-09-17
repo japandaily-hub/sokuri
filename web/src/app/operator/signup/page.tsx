@@ -18,6 +18,7 @@ import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { signupOperator, toDisplayMessage } from "@/lib/katadzuke-api";
 import { AuthBar, Field, PasswordField } from "@/components/kdz/auth";
+import { Reveal } from "@/components/kdz/interactions";
 
 export default function OperatorSignupPage() {
   const router = useRouter();
@@ -105,11 +106,11 @@ export default function OperatorSignupPage() {
     <div className="auth-page auth-page--split operator-auth">
       <AuthBar rightHref="/operator/login" rightLabel="ログインはこちら →" />
       <main id="main">
-        <aside className="auth-side">
+        <Reveal as="aside" variant="zoom" className="auth-side">
           {/* eslint-disable @next/next/no-img-element */}
           <img src="/img/v2/os-side.webp" width={900} height={1350} alt="" loading="lazy" decoding="async" />
           <p className="auth-side__line">審査制。古物商許可を確認します。</p>
-        </aside>
+        </Reveal>
         <div className="auth-wrap">
           <div className="auth-card">
             <div className="auth-head">

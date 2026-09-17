@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { RevealLines } from "@/components/kdz/interactions";
 import "./privacy.css";
 
 export const metadata: Metadata = {
@@ -92,12 +93,12 @@ export default function PrivacyPage() {
           </ol>
         </nav>
 
-        <h2 id="pp-1">第1条　基本方針</h2>
+        <RevealLines as="h2" mark="under" id="pp-1" lines={["第1条　基本方針"]} />
         <p>
           カタヅケ運営事務局（以下「当社」）は、ユーザーおよび登録業者（以下総称して「利用者」）の個人情報の保護を重要な責務と捉え、個人情報の保護に関する法律（以下「個人情報保護法」）その他の関連法令を遵守し、適切な取り扱いに努めます。
         </p>
 
-        <h2 id="pp-2">第2条　収集する情報</h2>
+        <RevealLines as="h2" mark="under" id="pp-2" lines={["第2条　収集する情報"]} />
         <p>当社は、サービス提供のため以下の情報を収集します。</p>
         {/* ラウンド5 指摘（16）: 本人確認書類・口座情報の箱が先に目に入り、「業者にどこまで
             渡るのか」が 2 画面あと（第4条の注記）まで分からなかった。第4条・利用規約 第5条の
@@ -132,7 +133,7 @@ export default function PrivacyPage() {
           </tbody>
         </table>
 
-        <h2 id="pp-3">第3条　利用目的</h2>
+        <RevealLines as="h2" mark="under" id="pp-3" lines={["第3条　利用目的"]} />
         <p>収集した個人情報は以下の目的で利用します。</p>
         <ul>
           <li>カタヅケサービスの提供・運営・改善</li>
@@ -144,7 +145,7 @@ export default function PrivacyPage() {
           <li>法令に基づく対応・開示</li>
         </ul>
 
-        <h2 id="pp-4">第4条　第三者への提供</h2>
+        <RevealLines as="h2" mark="under" id="pp-4" lines={["第4条　第三者への提供"]} />
         <p>当社は、以下の場合を除き、利用者の個人情報を第三者に提供しません。</p>
         <ul>
           <li>利用者本人の同意がある場合</li>
@@ -157,7 +158,7 @@ export default function PrivacyPage() {
           査定段階で入札業者に提供されるのは、写真・品目・利用目的・地域（都道府県・市区町村）・住居情報（住居種別・間取り・階数・エレベーターの有無）と、これらに基づくAI要約です。ユーザーの詳細住所（番地・建物名など）と連絡用のメールアドレス（LINE連携のみの場合はLINEでの連絡のご案内）は、交渉が成立した業者にのみ開示され、それ以外の業者には一切渡りません。氏名・電話番号を業者に提供することはありません。なお、古物営業法により、1万円以上の買取など法令で定める場合には、買取業者が住所・氏名・職業・年齢を確認するため、訪問時に業者から身分証のご提示を求められることがあります。
         </div>
 
-        <h2 id="pp-5">第5条　安全管理措置</h2>
+        <RevealLines as="h2" mark="under" id="pp-5" lines={["第5条　安全管理措置"]} />
         <p>当社は、個人情報の漏洩・滅失・毀損を防ぐため、以下の措置を講じます。</p>
         <ul>
           <li>SSL/TLSによる通信の暗号化</li>
@@ -166,12 +167,12 @@ export default function PrivacyPage() {
           <li>従業員への個人情報保護教育</li>
         </ul>
 
-        <h2 id="pp-6">第6条　Cookieの利用</h2>
+        <RevealLines as="h2" mark="under" id="pp-6" lines={["第6条　Cookieの利用"]} />
         <p>
           当社のウェブサイトはCookieを使用しています。Cookieはブラウザの設定から無効にできますが、一部機能が利用できなくなる場合があります。
         </p>
 
-        <h2 id="pp-7">第7条　個人情報の開示・訂正・削除</h2>
+        <RevealLines as="h2" mark="under" id="pp-7" lines={["第7条　個人情報の開示・訂正・削除"]} />
         <p>
           利用者は、当社が保有する自己の個人情報について、開示・訂正・利用停止・削除を請求できます。請求はお問い合わせページよりご連絡ください。本人確認のうえ、合理的な期間内に対応します。
         </p>
@@ -179,12 +180,12 @@ export default function PrivacyPage() {
           ご本人からの削除のお申し出があった場合、または退会された場合、当社が保有する個人情報（本人確認書類の画像・振込口座情報を含みます）は、法令上保存が必要な期間を除き、遅滞なく削除します。
         </p>
 
-        <h2 id="pp-8">第8条　プライバシーポリシーの変更</h2>
+        <RevealLines as="h2" mark="under" id="pp-8" lines={["第8条　プライバシーポリシーの変更"]} />
         <p>
           本ポリシーは、法令の改正やサービス変更に伴い改定することがあります。重要な変更については、ウェブサイト上でお知らせします。
         </p>
 
-        <h2 id="pp-9">第9条　お問い合わせ</h2>
+        <RevealLines as="h2" mark="under" id="pp-9" lines={["第9条　お問い合わせ"]} />
         <p>
           本ポリシーに関するお問い合わせは、
           <Link href="/contact" className="contact-link">

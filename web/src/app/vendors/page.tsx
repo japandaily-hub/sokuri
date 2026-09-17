@@ -8,6 +8,7 @@ import { useSession } from "next-auth/react";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import { SiteHeader } from "@/components/kdz/SiteHeader";
 import { SiteFooter } from "@/components/kdz/chrome";
+import { Reveal, RevealLines } from "@/components/kdz/interactions";
 import { Spinner } from "@/components/Icon";
 import { vendorCategoryName } from "@/lib/categories";
 import { getVendors, toDisplayMessage, type VendorListItem } from "@/lib/katadzuke-api";
@@ -247,7 +248,11 @@ export default function VendorListPage() {
           {isEmpty ? (
             <>
               <section className="vd-empty" aria-label="掲載中の業者">
-                <div className="img-frame img-frame--1x1 img-frame--pale vd-empty-fig">
+                <Reveal
+                  as="figure"
+                  variant="zoom"
+                  className="img-frame img-frame--1x1 img-frame--pale vd-empty-fig"
+                >
                   {/* eslint-disable @next/next/no-img-element */}
                   <img
                     src="/img/v2/vd-empty.webp"
@@ -258,8 +263,8 @@ export default function VendorListPage() {
                     decoding="async"
                   />
                   {/* eslint-enable @next/next/no-img-element */}
-                </div>
-                <h2 className="vd-empty-title">審査を通過した業者から順に掲載します</h2>
+                </Reveal>
+                <RevealLines as="h2" mark="under" className="vd-empty-title" lines={["審査を通過した業者から順に掲載します"]} />
                 {/* r5 #1/#24: 同じ文が帯の直下（.vd-notice）に出るため、ここでは繰り返さない。
                     業者向けの導線は「掲載時に表示する項目」の末尾（.vd-sample-cta）に1本だけ置く。 */}
                 <div className="vd-empty-cta">
@@ -278,8 +283,8 @@ export default function VendorListPage() {
 
           {vendors !== null && vendors.length > 0 ? (
             <ul className="vendors-list">
-              {vendors.map((v) => (
-                <li key={v.operator_id} className="vendor-row">
+              {vendors.map((v, i) => (
+                <Reveal as="li" key={v.operator_id} className="vendor-row" stagger={i}>
                   <div className="vendor-row-main">
                     <div className="vendor-row-head">
                       <Link href={`/vendors/${v.operator_id}`} className="vendor-row-name">
@@ -317,7 +322,7 @@ export default function VendorListPage() {
                   <Link href={`/vendors/${v.operator_id}`} className="vendor-row-link">
                     口コミを見る
                   </Link>
-                </li>
+                </Reveal>
               ))}
             </ul>
           ) : null}

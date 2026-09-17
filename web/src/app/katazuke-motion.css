@@ -1,0 +1,191 @@
+/* ============================================================
+   カタヅケ — モーション拡張（ビジュアル刷新 Phase 0 基盤）
+   正典: architect 設計書（2026-09-17）。katazuke.css の .rv 基盤（Reveal → .in）は
+   一切変更せず、その上に行アニメーション（RevealLines）・ズーム・回転・ボタンスワイプを追加する。
+   globals.css で katazuke.css / katazuke-pages.css の直後に import する（後勝ちで拡張するため）。
+   最重要ルール: このファイル内で opacity:0 を書く行は、必ず html.js-rv セレクタ配下に置く。
+   html.js-rv が付かない環境（JS 無効・低速回線・reduced-motion）では本文が常に見える
+   既存の不変条件（katazuke.css §「スクロール演出」参照）を絶対に壊さない。
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   RevealLines — 見出しを1行ずつフェード＋上スライド
+   ------------------------------------------------------------ */
+.rvl__line{display:block;}
+html.js-rv .rvl__line{
+  opacity:0;
+  transform:translateY(var(--rv-shift));
+  transition:opacity var(--rv-dur) var(--ease-circ-out),
+             transform var(--rv-dur) var(--ease-expo-out);
+  transition-delay:calc(min(var(--i,0),5) * var(--rv-stagger));
+}
+html.js-rv .in .rvl__line{
+  opacity:1;
+  transform:none;
+}
+
+/* マーカー下線（行の下に左→右で描画）。テキストを隠すものではないため html.js-rv の外でも安全。 */
+.rvl--mark .rvl__line{position:relative;}
+.rvl--mark .rvl__line::after{
+  content:"";
+  position:absolute;
+  left:0;
+  bottom:.12em;
+  width:100%;
+  height:var(--marker-h);
+  background:var(--marker-draw);
+  transform:scaleX(0);
+  transform-origin:0 50%;
+  transition:transform .7s var(--ease-expo-out);
+  z-index:-1;
+}
+.rvl--mark.in .rvl__line::after{transform:scaleX(1);}
+
+/* QAレビュー対応(M3): .section-head h2 には katazuke.css の固定アクセント線(h2::after, 48px/primary色)が
+   既に付いている。同じ見出しに新しいマーカー(上記)を重ねると、テキスト直下と18px下に線が2本並んで
+   冗長になるため、mark="under" を使った見出しでは旧アクセント線を消して新マーカーだけにする。 */
+.section-head h2.rvl--mark::after{display:none;}
+
+/* M3と同型の再発(実機検証で発見): /legal・/terms の .doc-section-title は下辺に固定罫線
+   (border-bottom:1px, legal.css/terms.css)を持つ。同じ見出しに mark="under" の新マーカーを
+   重ねると、テキスト直下(新マーカー)と15px程度下(固定罫線)に線が2本近接して見える。
+   .doc-section-title は「節の区切り線」の役目を新マーカーに譲り、固定罫線側を消す。 */
+.doc-section-title.rvl--mark{border-bottom:0;padding-bottom:0;}
+
+/* ------------------------------------------------------------
+   汎用 stagger（Reveal の stagger prop）。
+   既存の data-d="1|2|3" 方式（katazuke.css）とは別属性なので共存する
+   （data-d 側は attribute セレクタで特異度が高く、指定時は常にこちらより優先される）。
+   --i 未指定の要素は calc(min(0,5)*var(--rv-stagger))=0s になるため、既存呼び出し元の見た目は変わらない。
+   ------------------------------------------------------------ */
+html.js-rv .rv{transition-delay:calc(min(var(--i,0),5) * var(--rv-stagger));}
+
+/* セキュリティレビュー対応(Low-1): Phase 3 で FAQ アコーディオンや業者詳細リンクなど対話要素が
+   .rv 配下に入るようになった。katazuke.css の html.js-rv .rv:not(.in){opacity:0} は
+   pointer-events を落とさないため、reveal 前は「不可視だが操作可能」になる。
+   .in 付与と同時に自動解除されるため演出への影響はない。 */
+html.js-rv .rv:not(.in){pointer-events:none;}
+@media (prefers-reduced-motion: reduce){
+  html.js-rv .rv:not(.in){pointer-events:auto;}
+}
+
+/* ------------------------------------------------------------
+   ズームイン（Reveal variant="zoom"。.img-frame 直下の img でのみ使う契約）
+   ------------------------------------------------------------ */
+.rv--zoom img{opacity:1;transform:none;}
+html.js-rv .rv--zoom img{
+  opacity:0;
+  transform:scale(1.2);
+  transition:opacity .9s var(--ease-circ-out),
+             transform 1.1s var(--ease-expo-out);
+}
+html.js-rv .rv--zoom.in img{
+  opacity:1;
+  transform:none;
+}
+
+/* ------------------------------------------------------------
+   常時ゆるやかに回転する装飾アイコン。
+   @keyframes kdz-spin は katazuke-pages.css に既存定義があるためここでは再定義しない。
+   回転対象には呼び出し側で aria-hidden="true" を付ける前提。
+   ------------------------------------------------------------ */
+.kdz-rot{animation:kdz-spin 16s linear infinite;}
+.kdz-rot--fast{animation-duration:8s;}
+.kdz-rot--rev{animation-direction:reverse;}
+
+/* ------------------------------------------------------------
+   ボタンの色マスク・スワイプ（ホバー/フォーカス時に左からスライドイン）
+   ------------------------------------------------------------ */
+.btn-swipe{position:relative;isolation:isolate;overflow:hidden;}
+.btn-swipe::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:-1;
+  background:var(--swipe-fill, var(--primary));
+  transform:translate3d(-110%,0,0);
+  transition:transform .5s var(--ease-power3-out);
+}
+@media (hover:hover){
+  /* disabled中(処理中のサインアウトボタン等)は反応させない。連打による誤操作を防ぐ
+     (セキュリティレビュー対応、:disabled が使えない<a>用に aria-disabled も併記) */
+  .btn-swipe:not(:disabled):not([aria-disabled="true"]):hover::before,
+  .btn-swipe:not(:disabled):not([aria-disabled="true"]):focus-visible::before{transform:none;}
+  .btn-swipe:not(:disabled):not([aria-disabled="true"]):hover,
+  .btn-swipe:not(:disabled):not([aria-disabled="true"]):focus-visible{color:var(--swipe-ink,#fff);}
+}
+
+/* ------------------------------------------------------------
+   イラスト用スコープ。今回は WebP 画像アセットのため直接は使わないが、
+   将来 SVG 化した際に差し色を局所化するための予約スコープ（:root には置かない）。
+   ------------------------------------------------------------ */
+.ill-scope{
+  --ill-terracotta:#c05f43;
+  --ill-sage:#7d9b6a;
+  --ill-bark:#8a6a4f;
+  --ill-paper:#f7f3ec;
+}
+
+/* ------------------------------------------------------------
+   循環イラスト帯（.ill-loop）— 元は Phase 1 #5 でトップ専用 katazuke-top.css に実装。
+   Phase 3 で /faq・/contact にも同じ帯を置くため、ページ非依存の本ファイル（globals.css から
+   全ページに読み込まれる）へ移設した。セレクタ・値はトップページ実装から変更していない。
+   「物が片付く・リユースされ循環していく」イメージ。PC は円周上に緩やかな配置、
+   859px 以下（.sp-bleed と同じ既存の閾値）は横スクロールが起きない 2 列グリッドに切り替える。
+   ------------------------------------------------------------ */
+/* セキュリティレビュー対応(Low-2): 純装飾帯なのでクリック/タップを一切奪わないようにする。
+   overflow:clip は box(top:2%)/folding-hands(top:98%) の上下端アイコンが実際に半分切れて
+   しまうため使わない(円周配置は意図的に .ill-loop-inner の外周にわずかにはみ出す設計)。 */
+.ill-loop{padding:clamp(20px,3.4vw,36px) 0 clamp(4px,1vw,12px);background:#fff;pointer-events:none;}
+.ill-loop-inner{position:relative;width:100%;max-width:520px;aspect-ratio:1/1;margin-inline:auto;}
+/* 円周上の位置は呼び出し側がインラインstyleで --ill-top/--ill-left を渡す方式にしている。
+   当初は .ill-item--box{top:2%;left:50%} のようなBEM修飾子セレクタを6つ並べていたが、
+   このビルド環境(postcss-import + Tailwind layer平坦化)ではその形の時だけ原因不明のまま
+   6ルールが最終CSSから丸ごと消える現象を実機検証で確認したため、CSS変数方式に変更して回避した。
+   同じ問題を作らないよう、position の値は必ずJS側(illustrations.tsのILL_POSITIONS)で
+   一元管理し、このファイルには個別セレクタを増やさないこと。 */
+.ill-item{position:absolute;width:clamp(60px,8.6vw,100px);transform:translate(-50%,-50%);top:var(--ill-top,50%);left:var(--ill-left,50%);}
+.ill-item img{width:100%;height:100%;display:block;}
+@media(max-width:859px){
+  .ill-loop-inner{position:static;display:grid;grid-template-columns:repeat(2,1fr);
+    gap:clamp(14px,4vw,22px);max-width:320px;aspect-ratio:auto;}
+  .ill-item{position:static;width:100%;transform:none;margin-inline:auto;}
+}
+/* 画面が窮屈になる 480px 以下は、2点を間引いて4点構成にする（設計書の許容範囲）。
+   対象は呼び出し側(illustrations.ts の ILL_THIN_ON_MOBILE)が data-ill-thin 属性を付けて示す。
+   `.ill-item--books,.ill-item--plant{display:none}` のようなクラス複数指定セレクタは、
+   このビルド環境で原因不明のまま丸ごと消える現象を確認したため使わない（上の .ill-item 参照）。 */
+@media(max-width:480px){
+  [data-ill-thin]{display:none;}
+}
+
+/* ------------------------------------------------------------
+   reduced-motion: 回転を止め、遅延も無効化する
+   （globals.css の全体ルールで duration 自体は 0.001ms 化されるため、ここは delay のみ担う）
+   ------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce){
+  .kdz-rot{animation:none;}
+  /* [class*="rv"] は "service"/"survey" 等の無関係なクラスにも部分一致するため、
+     対象クラスを明示列挙する(セキュリティレビュー Low-4 対応) */
+  .rv,
+  .rvl__line,
+  .rv--zoom img{transition-delay:0s !important;}
+}
+
+/* ------------------------------------------------------------
+   LCP防御線 — ヒーロー写真（HeroCarousel）はどの演出クラスが付いても必ず即時表示する
+   ------------------------------------------------------------ */
+html.js-rv .hero-photo .rv,
+html.js-rv .hero-photo .rv--zoom img{opacity:1 !important;transform:none !important;}
+
+/* ------------------------------------------------------------
+   印刷防御線（セキュリティレビュー対応） — /legal・/terms・/privacy 等の法定表示は
+   印刷・PDF保存されうる。IntersectionObserver はビューポート外の要素まで発火させないため、
+   スクロールせずに印刷すると未到達の見出し・画像が opacity:0 のまま出力されてしまう。
+   印刷時は演出を全て無効化し、常に完成形で出す。
+   ------------------------------------------------------------ */
+@media print{
+  .rv,
+  .rvl__line,
+  .rv--zoom img{opacity:1 !important;transform:none !important;}
+}

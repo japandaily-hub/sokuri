@@ -1,6 +1,7 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import { Ic } from "@/components/kdz/Icons";
-import { Reveal, FaqAccordion, HeroCarousel, type HeroSlide } from "@/components/kdz/interactions";
+import { Reveal, RevealLines, FaqAccordion, HeroCarousel, type HeroSlide } from "@/components/kdz/interactions";
 import { KdzLogo } from "@/components/kdz/Logo";
 import {
   FEATURED_CASES,
@@ -8,7 +9,11 @@ import {
   MODEL_CASE_CHIP,
   MODEL_CASE_NOTE,
 } from "@/lib/model-cases";
+import { ILLUSTRATIONS, ILL_POSITIONS, ILL_THIN_ON_MOBILE, illSrc, type IllName } from "@/lib/illustrations";
 import "./katazuke-top.css";
+
+/** 循環イラスト帯（Phase 1 #5）。表示順は円周上の位置クラス（ill-item--<name>）と一致させる。 */
+const ILL_LOOP: IllName[] = ["box", "truck", "house-tree", "folding-hands", "books", "plant"];
 
 /** 対応カテゴリ（3Dアイコンで表現） */
 const CATEGORIES: { img: string; name: string; ex: string }[] = [
@@ -84,11 +89,17 @@ export default function HomePage() {
         <section className="hero" id="top">
           <div className="container hero-grid">
             <div className="hero-copy">
-              <h1>
-                片付けたい。でも、
-                <br />
-                <span className="hl">動けない</span>あなたへ。
-              </h1>
+              {/* ビジュアル刷新 Phase 1: RevealLines で行ごとにフェード＋上スライド＋下線を描画する
+                  （参考: felissimo/gopeace 実測の見出し演出）。文言・強調 span（.hl）は既存のまま、
+                  元の2行構成（1行目「片付けたい。でも、」/2行目「動けない」+「あなたへ。」）を維持する。 */}
+              <RevealLines
+                as="h1"
+                mark="under"
+                lines={[
+                  "片付けたい。でも、",
+                  <span key="l2"><span className="hl">動けない</span>あなたへ。</span>,
+                ]}
+              />
               <p className="hero-sub">
                 家じゅうの不用品を、<strong>1点ずつ撮って、あとは待つだけ</strong>。登録業者が<span className="mk">買取総額</span>で競い合い、値がつかない物もまとめて引き取ります。営業電話に追われることはありません。
               </p>
@@ -128,7 +139,9 @@ export default function HomePage() {
                     ならない。着地（このページ内の「入札のしくみ」節）を label に出し、同一ページ内移動を
                     ↓ で示す（/photo-guide の「読んでから決める ↓」と語彙を揃える）。
                     所要時間（「1分でわかる」）は E 章「新しい約束・期間・効果を書かない」に反するため書かない。 */}
-                <Link href="/#auction" className="btn btn-ghost btn-lg">入札のしくみを見る ↓</Link>
+                {/* btn-swipe: ホバー/フォーカスで色マスクが左からスライドイン。LINE ブランドカラーは
+                    反転させない方針のため btn-line には付けない（ユーザー承認済み設計）。 */}
+                <Link href="/#auction" className="btn btn-ghost btn-lg btn-swipe">入札のしくみを見る ↓</Link>
               </div>
             </div>
             <div className="hero-figure">
@@ -143,6 +156,42 @@ export default function HomePage() {
               <figure className="hero-photo hero-photo--2x3 sp-bleed">
                 <HeroCarousel slides={HERO_SLIDES} />
               </figure>
+            </div>
+          </div>
+        </section>
+
+        {/* ============ 循環イラスト帯 ============ */}
+        {/* ビジュアル刷新 Phase 1 #5: 「物が片付く・リユースされ循環していく」イメージを、
+            テキストと写真カルーセルを邪魔しない位置（ヒーロー直後の帯）に置く。イラストは
+            web/public/img/ill/ に配置済みの装飾素材（alt="" は意図的）。PC は円状、
+            859px 以下は横スクロールしない 2 列グリッドに切り替える（katazuke-top.css）。
+            装飾のみのため section 全体を aria-hidden にする。 */}
+        <section className="ill-loop" aria-hidden="true">
+          <div className="container">
+            <div className="ill-loop-inner ill-scope">
+              {ILL_LOOP.map((name, i) => {
+                const meta = ILLUSTRATIONS[name];
+                const pos = ILL_POSITIONS[name];
+                return (
+                  <Reveal
+                    key={name}
+                    className={`ill-item ill-item--${name}`}
+                    stagger={i}
+                    style={{ "--ill-top": pos.top, "--ill-left": pos.left } as CSSProperties}
+                    data-ill-thin={ILL_THIN_ON_MOBILE.includes(name) ? "" : undefined}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={illSrc(name)}
+                      alt={meta.alt}
+                      width={meta.w}
+                      height={meta.h}
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </Reveal>
+                );
+              })}
             </div>
           </div>
         </section>
@@ -259,7 +308,9 @@ export default function HomePage() {
           <span className="vt" aria-hidden="true">まとめ売り</span>
           <div className="container">
             <div className="bundle-lead">
-              <Reveal className="bundle-figure img-frame img-frame--contain">
+              {/* variant="zoom" を試験適用（Phase 1 #4）。この Reveal は img-frame を直接ラップし、
+                  img が直下にあるため .rv--zoom img の契約を満たす。 */}
+              <Reveal className="bundle-figure img-frame img-frame--contain" variant="zoom">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/img/real/bundle-3d.webp" alt="さまざまな不用品がひとつの箱にまとまり、まとめて1つの価格がつくイメージ" width={1536} height={864} loading="lazy" decoding="async" />
               </Reveal>
@@ -304,7 +355,9 @@ export default function HomePage() {
               <p className="sub">あなたが出したのは写真だけ。あとは登録業者どうしが、あなたが出品した商品に買取総額で入札し合います。</p>
             </div>
             <div className="auc-grid">
-              <Reveal className="auc-figure img-frame img-frame--contain">
+              {/* variant="zoom" を試験適用（Phase 1 #4）。この Reveal は img-frame を直接ラップし、
+                  img が直下にあるため .rv--zoom img の契約を満たす。 */}
+              <Reveal className="auc-figure img-frame img-frame--contain" variant="zoom">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/img/real/bid-3d.webp" alt="複数の業者が、まとめた不用品に買取総額を提示して競り合うイメージ" width={1536} height={864} loading="lazy" decoding="async" />
               </Reveal>
@@ -518,18 +571,25 @@ export default function HomePage() {
               <p className="sub">「これって売れる？」のほとんどに対応。迷ったら、まずは撮ってまとめてみてください。</p>
             </div>
             <div className="cats-grid">
-              {CATEGORIES.map((c) => (
-                <Link href="/create" className="cat" key={c.name}>
-                  {/* data-label は画像が読み込めなかったときに枠へ品目名を残すための CSS フォールバック */}
-                  <div className="cat-img img-frame img-frame--1x1" data-label={c.name}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={`/img/real/${c.img}.webp`} alt="" width={512} height={512} loading="lazy" decoding="async" />
-                  </div>
-                  <div className="cat-body">
-                    <div className="cl">{c.name}</div>
-                    <div className="cs">{c.ex}</div>
-                  </div>
-                </Link>
+              {/* Phase 1 #3: 各カードを Reveal でラップし stagger を付与、順にずれてフェードアップする。
+                  <a> を Reveal の div で1段ラップする分だけ、katazuke-top.css 側で
+                  .cat-wrap / .cat に display:block を明示し、見た目（幅・高さ）はゼロ差にしている。
+                  variant="up" 用の CSS は Phase 0 設計に未定義のため、既定 variant="fade"（安全側）のまま
+                  stagger のみ効かせる。 */}
+              {CATEGORIES.map((c, i) => (
+                <Reveal key={c.name} className="cat-wrap" stagger={i}>
+                  <Link href="/create" className="cat">
+                    {/* data-label は画像が読み込めなかったときに枠へ品目名を残すための CSS フォールバック */}
+                    <div className="cat-img img-frame img-frame--1x1" data-label={c.name}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={`/img/real/${c.img}.webp`} alt="" width={512} height={512} loading="lazy" decoding="async" />
+                    </div>
+                    <div className="cat-body">
+                      <div className="cl">{c.name}</div>
+                      <div className="cs">{c.ex}</div>
+                    </div>
+                  </Link>
+                </Reveal>
               ))}
             </div>
             <Reveal className="cats-note">

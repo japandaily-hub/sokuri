@@ -59,6 +59,8 @@ const config: Config = {
           gold: "#e5a323",
           danger: "#d70035",
           line2: "#06c755", // LINE ブランドグリーン（AA 対象外の文書化例外）
+          /** モーション拡張（ビジュアル刷新 Phase 0）: RevealLines のマーカー下線色。katazuke.css --marker-draw と一致 */
+          markerDraw: "#c9dcff",
         },
         /** よく使う面・文字色のショートハンド */
         navy: "#20242e",
@@ -106,6 +108,10 @@ const config: Config = {
       },
       transitionTimingFunction: {
         kdz: "cubic-bezier(.22,.61,.36,1)",
+        /** モーション拡張（ビジュアル刷新 Phase 0）: katazuke.css の --ease-* と一致させる */
+        "expo-out": "var(--ease-expo-out)",
+        "circ-out": "var(--ease-circ-out)",
+        "power3-out": "var(--ease-power3-out)",
       },
       keyframes: {
         "fade-up": {

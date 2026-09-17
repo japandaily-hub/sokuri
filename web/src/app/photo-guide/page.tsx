@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import "./photo-guide.css";
 import { Ic, type IcName } from "@/components/kdz/Icons";
-import { Reveal } from "@/components/kdz/interactions";
+import { Reveal, RevealLines } from "@/components/kdz/interactions";
 
 export const metadata: Metadata = {
   title: "撮影ガイド",
@@ -107,9 +107,6 @@ const CATS: { name: string; items: string[] }[] = [
   { name: "ゲーム", items: ["本体・コントローラーを一緒に", "ソフトはタイトルが読める写真", "付属品・箱があれば一緒に", "動作確認済みは必ず伝える"] },
 ];
 
-/** スクロール演出の遅延（3列グリッド用） */
-const delayOf = (i: number) => ((i % 3 || undefined) as 1 | 2 | undefined);
-
 /** 2桁の通し番号（var(--en-display) で表示する） */
 const numOf = (i: number) => String(i + 1).padStart(2, "0");
 
@@ -161,7 +158,7 @@ export default function PhotoGuidePage() {
               </span>
               <Ic name="arrow" className="btn-line__arr" />
             </Link>
-            <a href="#basics" className="btn btn-ghost btn-lg">
+            <a href="#basics" className="btn btn-ghost btn-lg btn-swipe">
               読んでから決める ↓
             </a>
           </div>
@@ -189,7 +186,7 @@ export default function PhotoGuidePage() {
             <div className="guide-section-head">
               <div className="guide-section-num">1</div>
               <div>
-                <h2>一品ずつ、全体が映るように撮る</h2>
+                <RevealLines mark="under" lines={["一品ずつ、全体が映るように撮る"]} />
                 <p>
                   品物は1点ずつ撮影します。1枚の写真に1つの品物だけを、全体が映るように収めましょう。撮った写真はまとめて1つのアルバムになり、業者はそれを見て買取総額を決めます。
                 </p>
@@ -198,7 +195,7 @@ export default function PhotoGuidePage() {
 
             <div className="compare-grid">
               <figure className="compare-card">
-                <div className="img-frame img-frame--1x1 sp-bleed">
+                <Reveal as="figure" variant="zoom" className="img-frame img-frame--1x1 sp-bleed">
                   <img
                     src="/img/v2/pg-good.webp"
                     width={800}
@@ -207,7 +204,7 @@ export default function PhotoGuidePage() {
                     loading="lazy"
                     decoding="async"
                   />
-                </div>
+                </Reveal>
                 <figcaption className="compare-label">
                   <span className="compare-label-badge is-good">
                     <span aria-hidden="true">○</span>良い例
@@ -217,7 +214,7 @@ export default function PhotoGuidePage() {
               </figure>
 
               <figure className="compare-card">
-                <div className="img-frame img-frame--1x1 sp-bleed">
+                <Reveal as="figure" variant="zoom" className="img-frame img-frame--1x1 sp-bleed">
                   <img
                     src="/img/v2/pg-bad.webp"
                     width={800}
@@ -226,7 +223,7 @@ export default function PhotoGuidePage() {
                     loading="lazy"
                     decoding="async"
                   />
-                </div>
+                </Reveal>
                 <figcaption className="compare-label">
                   <span className="compare-label-badge is-bad">
                     <span aria-hidden="true">△</span>避けたい例
@@ -259,7 +256,7 @@ export default function PhotoGuidePage() {
 
             <ol className="shoot-steps">
               {STEPS.map((s, i) => (
-                <Reveal as="li" className="shoot-step" key={s.h}>
+                <Reveal as="li" className="shoot-step" stagger={i} key={s.h}>
                   <span className="shoot-step-num" aria-hidden="true">
                     {numOf(i)}
                   </span>
@@ -356,7 +353,7 @@ export default function PhotoGuidePage() {
 
             <div className="cat-guide-grid">
               {CATS.map((c, i) => (
-                <Reveal as="div" className="cat-guide-card" delay={delayOf(i)} key={c.name}>
+                <Reveal as="div" className="cat-guide-card" stagger={i} key={c.name}>
                   <div className="cat-name">{c.name}</div>
                   <ul>
                     {c.items.map((li) => (
@@ -382,7 +379,7 @@ export default function PhotoGuidePage() {
       <section className="pg-cta-band">
         <div className="container">
           <span className="deep-band__label">READY</span>
-          <h2>準備ができたら、さっそく出品しよう</h2>
+          <RevealLines mark="under" lines={["準備ができたら、さっそく出品しよう"]} />
           <p>
             1点ずつ撮って、まとめて出すだけ。1点ずつ売る手間も、しつこい営業電話もありません。
             <br />
@@ -399,7 +396,7 @@ export default function PhotoGuidePage() {
               </span>
               <Ic name="arrow" className="btn-line__arr" />
             </Link>
-            <Link href="/" className="btn btn-ghost btn-lg">
+            <Link href="/" className="btn btn-ghost btn-lg btn-swipe">
               サービスの詳細を見る
             </Link>
           </div>

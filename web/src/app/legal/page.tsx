@@ -12,6 +12,7 @@
  */
 import Link from "next/link";
 import "./legal.css";
+import { RevealLines } from "@/components/kdz/interactions";
 
 export const metadata = {
   title: "特定商取引法に基づく表記",
@@ -104,7 +105,13 @@ export default function LegalPage() {
         </nav>
 
         {/* 運営者情報 */}
-        <h2 className="doc-section-title" id="lg-1">サービス運営者情報</h2>
+        <RevealLines
+          as="h2"
+          mark="under"
+          className="doc-section-title"
+          id="lg-1"
+          lines={["サービス運営者情報"]}
+        />
         {/* R6 指摘 14: 表を上から読むと「請求があれば遅滞なく開示します」が3項目続き、
             確定している事実（誰が・どこで運営し・どう連絡が付くか）が表の中に埋もれて
             「最後まで運営者が分からない」読み方になっていた。表の直上に確定値だけを1行置く。
@@ -173,7 +180,13 @@ export default function LegalPage() {
         </table>
 
         {/* サービス内容 */}
-        <h2 className="doc-section-title" id="lg-2">サービス内容・取引条件</h2>
+        <RevealLines
+          as="h2"
+          mark="under"
+          className="doc-section-title"
+          id="lg-2"
+          lines={["サービス内容・取引条件"]}
+        />
         <table className="spec-table">
           <tbody>
             <tr>
@@ -251,7 +264,13 @@ export default function LegalPage() {
         </table>
 
         {/* 返品・キャンセル */}
-        <h2 className="doc-section-title" id="lg-3">返品・キャンセルについて</h2>
+        <RevealLines
+          as="h2"
+          mark="under"
+          className="doc-section-title"
+          id="lg-3"
+          lines={["返品・キャンセルについて"]}
+        />
         <table className="spec-table">
           <tbody>
             <tr>
@@ -299,7 +318,13 @@ export default function LegalPage() {
         </table>
 
         {/* 個人情報 */}
-        <h2 className="doc-section-title" id="lg-4">個人情報の取り扱い</h2>
+        <RevealLines
+          as="h2"
+          mark="under"
+          className="doc-section-title"
+          id="lg-4"
+          lines={["個人情報の取り扱い"]}
+        />
         <table className="spec-table">
           <tbody>
             <tr>

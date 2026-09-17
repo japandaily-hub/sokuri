@@ -58,6 +58,18 @@
   --maxw:1140px;
   --maxw-text:760px;
 
+  /* --- モーション拡張（ビジュアル刷新 Phase 0）: イージング・行アニメーションの尺 --- */
+  --ease-expo-out:cubic-bezier(.16,1,.3,1);
+  --ease-circ-out:cubic-bezier(0,.55,.45,1);
+  --ease-circ-inout:cubic-bezier(.85,0,.15,1);
+  --ease-power3-out:cubic-bezier(.33,1,.68,1);
+  --rv-dur:.7s;
+  --rv-dur-slow:1.1s;
+  --rv-stagger:80ms;
+  --rv-shift:20px;
+  --marker-draw:#c9dcff;
+  --marker-h:.34em;
+
   /* --- 書体：和文は明朝（Noto Serif JP 先頭＝Windows/Android で確実に明朝） --- */
   --serif:var(--font-serif),"Noto Serif JP","Hiragino Mincho ProN","Hiragino Mincho Pro","Yu Mincho","YuMincho","游明朝体",serif;
   --ui:var(--font-ui),"Noto Sans JP","Hiragino Kaku Gothic ProN","Yu Gothic UI",sans-serif;

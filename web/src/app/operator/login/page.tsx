@@ -18,6 +18,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn, signOut, useSession } from "next-auth/react";
 import { AuthBar, Field, PasswordField } from "@/components/kdz/auth";
+import { Reveal } from "@/components/kdz/interactions";
 import { safeInternalPath } from "@/lib/safe-path";
 import { clearRedirectLoopStorage } from "@/lib/katadzuke-api";
 
@@ -103,11 +104,11 @@ function OperatorLoginForm() {
     <div className="auth-page auth-page--split operator-auth">
       <AuthBar rightHref="/operator/signup" rightLabel="業者登録はこちら →" />
       <main id="main">
-        <aside className="auth-side">
+        <Reveal as="aside" variant="zoom" className="auth-side">
           {/* eslint-disable @next/next/no-img-element */}
           <img src="/img/v2/ol-side.webp" width={900} height={1350} alt="" loading="lazy" decoding="async" />
           <p className="auth-side__line">業者の方の入口です。</p>
-        </aside>
+        </Reveal>
         <div className="auth-wrap">
           <div className="auth-card">
             <div className="auth-head">
@@ -126,7 +127,7 @@ function OperatorLoginForm() {
                 </span>
                 <button
                   type="button"
-                  className="btn btn-ghost btn-block"
+                  className="btn btn-ghost btn-block btn-swipe"
                   onClick={() => void onSignOutToOperatorLogin()}
                   disabled={signOutBusy}
                 >
@@ -140,7 +141,7 @@ function OperatorLoginForm() {
                 <span>現在はユーザーアカウントでログイン中です。業者としてご利用になる場合は、いったんサインアウトしてください。</span>
                 <button
                   type="button"
-                  className="btn btn-ghost btn-block"
+                  className="btn btn-ghost btn-block btn-swipe"
                   onClick={() => void onSignOutToOperatorLogin()}
                   disabled={signOutBusy}
                 >

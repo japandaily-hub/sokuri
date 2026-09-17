@@ -15,7 +15,7 @@ import Link from "next/link";
 import { Ic } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
 import { Notice } from "@/components/kdz/Notice";
-import { Reveal, FaqAccordion } from "@/components/kdz/interactions";
+import { Reveal, RevealLines, FaqAccordion } from "@/components/kdz/interactions";
 import { submitOperatorApplication, toDisplayMessage } from "@/lib/katadzuke-api";
 import { MODEL_CASE_CHIP, VENDOR_CASES, VENDOR_CASE_NOTE } from "@/lib/model-cases";
 import { useBankSuggestions, useBranchSuggestions } from "@/lib/bank-lookup";
@@ -194,7 +194,7 @@ const STATS: { num: string; unit: string; label: string }[] = [
 ];
 
 /** 仕入れる3つの理由（画像付き3カラム）。効果の断定は避け、条件と手順で説明する。 */
-const REASONS: { n: string; tag: string; img: string; h: ReactNode; p: string; d?: 1 | 2 }[] = [
+const REASONS: { n: string; tag: string; img: string; h: ReactNode; p: string }[] = [
   {
     n: "01",
     tag: "まとめ",
@@ -214,7 +214,6 @@ const REASONS: { n: string; tag: string; img: string; h: ReactNode; p: string; d
       </>
     ),
     p: "出品情報は写真・品目・地域（都道府県・市区町村）・住居情報などで構成。現物確認の前に買取総額の入札ができるため、下見の移動コストがかかりません。入札はすべてユーザーに一覧で提示されます。",
-    d: 1,
   },
   {
     n: "03",
@@ -222,7 +221,6 @@ const REASONS: { n: string; tag: string; img: string; h: ReactNode; p: string; d
     img: "biz-reason-route",
     h: "入札制で、自社の基準に合う案件だけ選べる",
     p: "複数業者が買取総額で競う入札制。過度な値引き競争ではなく、出品された商品全体の価値に対して金額を提示できます。自社の買取基準や対応エリアに合った案件だけに入札可能です。",
-    d: 2,
   },
 ];
 
@@ -252,11 +250,11 @@ const ASSURANCES: { n: string; h: string; p: string }[] = [
  *  買取総額の近傍に置くと、集計統計を出さない方針の隣で成果の上昇を示唆する（有利誤認の入口）。
  *  差し替え素材（入札票が並ぶ机上・1枚だけ選ばれた札）は今回の画像セットに無いため、
  *  #15 の代替どおり番号＋見出し＋本文のヘアラインリストにして情報量は落とさない。 */
-const FLOW: { n: string; h: string; p: string; d?: 1 | 2 | 3 }[] = [
+const FLOW: { n: string; h: string; p: string }[] = [
   { n: "1", h: "案件を確認", p: "出品された「まとめ」の写真・品目リストを確認。気になる案件に入札します。" },
-  { n: "2", h: "買取総額で入札", p: "出品された商品すべてに対して、買取総額を提示。他社と競い合います。", d: 1 },
-  { n: "3", h: "ユーザーが1社を選択", p: "全入札がユーザーに提示され、見比べて1社を選択。選ばれると連絡先が開示されます。", d: 2 },
-  { n: "4", h: "訪問・引き取り", p: "成約後に訪問日時を決定。まとめて引き取りを行います。", d: 3 },
+  { n: "2", h: "買取総額で入札", p: "出品された商品すべてに対して、買取総額を提示。他社と競い合います。" },
+  { n: "3", h: "ユーザーが1社を選択", p: "全入札がユーザーに提示され、見比べて1社を選択。選ばれると連絡先が開示されます。" },
+  { n: "4", h: "訪問・引き取り", p: "成約後に訪問日時を決定。まとめて引き取りを行います。" },
 ];
 
 /** 登録要件 */
@@ -572,7 +570,7 @@ export default function BusinessPage() {
                     参加メリットを見る
                     <Ic name="arrow" />
                   </a>
-                  <a href="#requirements" className="btn btn-ghost btn-lg">
+                  <a href="#requirements" className="btn btn-ghost btn-lg btn-swipe">
                     登録要件を確認する
                   </a>
                 </div>
@@ -654,12 +652,12 @@ export default function BusinessPage() {
           <div className="container">
             <div className="section-head">
               <span className="eyebrow">カタヅケの強み</span>
-              <h2>カタヅケで仕入れる、3つの理由</h2>
+              <RevealLines mark="under" lines={["カタヅケで仕入れる、3つの理由"]} />
               <p className="sub">家まるごとの一括出品だからこそ、まとめて見に行ける仕入れルートになります。</p>
             </div>
             <div className="biz-reason-grid">
-              {REASONS.map((r) => (
-                <Reveal as="article" className="biz-reason" delay={r.d} key={r.n}>
+              {REASONS.map((r, i) => (
+                <Reveal as="article" className="biz-reason" stagger={i} key={r.n}>
                   <div className="img-frame img-frame--1x1 img-frame--pale biz-reason-fig">
                     {/* eslint-disable @next/next/no-img-element */}
                     <img
@@ -825,13 +823,13 @@ export default function BusinessPage() {
           <div className="container">
             <div className="section-head">
               <span className="eyebrow">入札の流れ</span>
-              <h2>入札から成約までの流れ</h2>
+              <RevealLines mark="under" lines={["入札から成約までの流れ"]} />
               <p className="sub">登録後はシンプルな4ステップ。下見なし・一斉架電なしで進められます。</p>
             </div>
             {/* r5 #15: 画像を外し、番号タイル＋見出し＋本文のヘアラインリストにする（手順なので ol）。 */}
             <ol className="biz-flow">
-              {FLOW.map((f) => (
-                <Reveal as="li" className="biz-step" delay={f.d} key={f.n}>
+              {FLOW.map((f, i) => (
+                <Reveal as="li" className="biz-step" stagger={i} key={f.n}>
                   <div className="biz-step-n" aria-hidden="true">{f.n}</div>
                   <h4>{f.h}</h4>
                   <p>{f.p}</p>
@@ -850,7 +848,7 @@ export default function BusinessPage() {
               <p className="sub">ユーザーの安心のため、登録時に以下を確認させていただきます。</p>
             </div>
             <Reveal className="media-split media-split--rev biz-req-split">
-              <div className="img-frame img-frame--1x1 img-frame--pale biz-req-fig sp-bleed">
+              <Reveal as="figure" variant="zoom" className="img-frame img-frame--1x1 img-frame--pale biz-req-fig sp-bleed">
                 {/* eslint-disable @next/next/no-img-element */}
                 <img
                   src="/img/v2/biz-req-docs.webp"
@@ -861,7 +859,7 @@ export default function BusinessPage() {
                   decoding="async"
                 />
                 {/* eslint-enable @next/next/no-img-element */}
-              </div>
+              </Reveal>
               <ul className="req-list">
                 {REQUIREMENTS.map((r) => (
                   <li className="req-item" key={r.h}>
@@ -901,7 +899,10 @@ export default function BusinessPage() {
               <p className="sub">内容を確認のうえ、担当者よりご連絡いたします。</p>
             </div>
 
-            <Reveal className="reg-card">
+            {/* セキュリティレビュー対応: 個人情報・利用規約同意チェックボックスを含む申込フォーム全体を
+                スクロール演出でラップすると、JS遅延時に「同意UIが不可視だが操作可能」な状態が生じうるため、
+                演出をかけない素のdivに変更する(演出はsection-headの見出し側にのみ残す)。 */}
+            <div className="reg-card">
               {!submitted ? (
                 <form onSubmit={onSubmit} noValidate>
                   {/* R4 r4 #22: フォームの長さと審査期間の予告を冒頭に置く。会社情報 →
@@ -917,7 +918,7 @@ export default function BusinessPage() {
                       気付かなかった。説明の外・フォーム開始位置の直前に .btn-ghost で置く。 */}
                   <div className="biz-form-alt">
                     <p>案件を先に見たい方は、アカウントだけ作ることもできます（入札は審査の通過後）。</p>
-                    <Link href="/operator/signup" className="btn btn-ghost">
+                    <Link href="/operator/signup" className="btn btn-ghost btn-swipe">
                       まずアカウントだけ作って案件を見る
                     </Link>
                   </div>
@@ -1304,16 +1305,16 @@ export default function BusinessPage() {
                   <p style={{ fontSize: 13, lineHeight: 1.9, marginBottom: 10 }}>
                     招待コードがお手元に届いている方は、こちらからアカウントを作成できます。
                   </p>
-                  <Link href="/operator/signup" className="btn btn-ghost btn-lg" style={{ marginBottom: 10 }}>
+                  <Link href="/operator/signup" className="btn btn-ghost btn-lg btn-swipe" style={{ marginBottom: 10 }}>
                     招待コードでアカウントを作成
                     <Ic name="arrow" />
                   </Link>
-                  <Link href="/" className="btn btn-ghost btn-lg">
+                  <Link href="/" className="btn btn-ghost btn-lg btn-swipe">
                     トップページへ戻る
                   </Link>
                 </div>
               )}
-            </Reveal>
+            </div>
           </div>
         </section>
       </main>

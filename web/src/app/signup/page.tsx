@@ -12,6 +12,7 @@ import { signupUser, toDisplayMessage, clearRedirectLoopStorage } from "@/lib/ka
 import { Ic } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
 import { PasswordField, LineAuthButton, TrustRow } from "@/components/kdz/auth";
+import { Reveal } from "@/components/kdz/interactions";
 import "./signup.css";
 
 const STEPS = ["アカウント", "プロフィール", "確認", "完了"];
@@ -128,11 +129,11 @@ export default function SignupPage() {
       </div>
 
       <main id="main">
-        <aside className="auth-side">
+        <Reveal as="aside" variant="zoom" className="auth-side">
           {/* eslint-disable @next/next/no-img-element */}
           <img src="/img/v2/su-side.webp" width={900} height={1350} alt="" loading="lazy" decoding="async" />
           <p className="auth-side__line">撮って、あとは待つだけ。</p>
-        </aside>
+        </Reveal>
         <div className="flow-wrap">
           {/* STEP 1 */}
           {step === 1 && (
@@ -270,7 +271,7 @@ export default function SignupPage() {
                 <Link href="/create" className="btn btn-primary btn-lg">
                   さっそく出品してみる<Ic name="arrow" />
                 </Link>
-                <Link href="/" className="btn btn-ghost btn-lg">トップへ戻る</Link>
+                <Link href="/" className="btn btn-ghost btn-lg btn-swipe">トップへ戻る</Link>
               </div>
             </div>
           )}
