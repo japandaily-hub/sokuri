@@ -10,6 +10,7 @@ import { LpChrome } from "./_components/LpChrome";
 import { LpSlider, type LpSlide } from "./_components/LpSlider";
 import { LpRibbon } from "./_components/LpRibbon";
 import { LpIntro } from "./_components/LpIntro";
+import { D, FloatDeco, type DecoIll } from "./_components/FloatDeco";
 import "./lp.css";
 
 /** 検証用の別案ルート。本採用するまで検索結果に出さない。
@@ -45,17 +46,6 @@ const ILL_LOOP: IllName[] = ["box", "truck", "house-tree", "folding-hands", "boo
  *  版面の外側寄り（左右 6% 以内・区画の上下端）だけを使う。
  *  2026-09-18 ユーザー指摘: FEE 上部の余白（浮遊イラストの空）がスカスカでバランスが悪い。
  *  8 点に増やし、SP でも間引かず（hideSp を使わない）全域に散らす。 */
-type DecoIll = { src: string; top: string; left: string; w: number; sway: 1 | 2; float: 1 | 2 | 3; spTop?: string; spLeft?: string; hideSp?: boolean };
-const D = {
-  box: "/img/lp/deco/deco-box.webp",
-  camera: "/img/lp/deco/deco-camera.webp",
-  clock: "/img/lp/deco/deco-clock.webp",
-  teacup: "/img/lp/deco/deco-teacup.webp",
-  gift: "/img/lp/deco/deco-gift.webp",
-  tote: "/img/lp/deco/deco-tote.webp",
-  lamp: "/img/lp/deco/deco-lamp.webp",
-  plant: "/img/lp/deco/deco-plant2.webp",
-} as const;
 /** 区画ごとの散らし配置（% は区画の箱基準）。SP で窮屈になる分は hideSp で間引く */
 const SECTION_DECO: Record<"about" | "cycle" | "daily" | "cases" | "biz" | "footer", DecoIll[]> = {
   /* 左側は版面外の余白（--lp-pad ≒ 58px）に収まるよう left 2.2%・w 56 に固定（本文・写真に重ねない） */
@@ -460,7 +450,6 @@ const FOOTER_LINKS: { href: string; label: string }[][] = [
   ],
 ];
 
-/** 浮遊デコアイコン1点（外側が translate、内側の img が rotate。2つの transform を別要素に分ける） */
 /** 区画に被せる散らし層（絶対配置・pointer-events なし・aria-hidden）。親は position:relative であること */
 function Deco({ items }: { items: DecoIll[] }) {
   return (
@@ -469,26 +458,6 @@ function Deco({ items }: { items: DecoIll[] }) {
         <FloatDeco key={`${ill.src}-${i}`} ill={ill} />
       ))}
     </div>
-  );
-}
-
-function FloatDeco({ ill }: { ill: DecoIll }) {
-  return (
-    <span
-      className={`lp-ill lp-ill--f${ill.float}${ill.hideSp ? " lp-ill--sp-off" : ""}`}
-      style={
-        {
-          "--lp-ill-top": ill.top,
-          "--lp-ill-left": ill.left,
-          "--lp-ill-sp-top": ill.spTop ?? ill.top,
-          "--lp-ill-sp-left": ill.spLeft ?? ill.left,
-          "--lp-ill-w": `${ill.w}px`,
-        } as CSSProperties
-      }
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img className={`lp-ill__img lp-ill__img--s${ill.sway}`} src={ill.src} alt="" width={512} height={512} loading="lazy" decoding="async" />
-    </span>
   );
 }
 
@@ -509,6 +478,9 @@ export default function LpPage() {
         <section id="top" className="lp-kv">
           <LpSlider slides={KV_SLIDES} />
           <div className="lp-kv__veil" aria-hidden="true" />
+          {/* 2026-09-18: オープニングで右からなびいて入る 3 本の曲線と同じ形・同じ位置。白地が溶けたとき
+              線だけが残って見え、オープニング → トップが 1 本に繋がる */}
+          <LpRibbon variant="b" className="lp-ribbon--kv" stars={false} />
           {/* ユーザー指摘（2026-09-18）: 箱・本・トラック・セーターのイラストに続き、
               ドットのひし形クラスタも被写体に重なって見づらいため撤去。写真のみのシンプルな構成にする。 */}
           <div className="lp-container lp-kv__inner">
