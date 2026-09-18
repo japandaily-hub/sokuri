@@ -176,7 +176,7 @@ function SendIcon({ className }: { className?: string }) {
 /** ヘッダー/モバイル共通ナビ（ページ内アンカー） */
 const NAV: { href: string; label: string }[] = [
   { href: "#merit", label: "参加メリット" },
-  { href: "#flow", label: "掲載の流れ" },
+  { href: "#flow", label: "入札の流れ" },
   { href: "#requirements", label: "登録要件" },
   { href: "#faq", label: "よくある質問" },
 ];
@@ -190,7 +190,7 @@ const STATS: { num: string; unit: string; label: string }[] = [
   { num: "4", unit: "都県", label: "東京・千葉・埼玉・神奈川" },
   { num: "0", unit: "円", label: "初期費用・月額費用" },
   { num: "8", unit: "%", label: "成約時の手数料のみ" },
-  { num: "12", unit: "カテゴリ", label: "家電〜ブランド品まで対応" },
+  { num: "12", unit: "カテゴリ", label: "家電からブランド品まで対応" },
 ];
 
 /** 仕入れる3つの理由（画像付き3カラム）。効果の断定は避け、条件と手順で説明する。 */
@@ -199,7 +199,7 @@ const REASONS: { n: string; tag: string; img: string; h: ReactNode; p: string }[
     n: "01",
     tag: "まとめ",
     img: "biz-reason-bulk",
-    h: "まとめ買いで、1回の訪問がまとまる",
+    h: "まとめ買取で、1回の訪問にまとまる",
     p: "ユーザーは家じゅうの不用品をまとめて出品します。1回の訪問でまとまった点数を見られるため、1点ずつ集める買取に比べて移動・交渉のコストを削減しやすくなります。",
   },
   {
@@ -220,7 +220,7 @@ const REASONS: { n: string; tag: string; img: string; h: ReactNode; p: string }[
     tag: "入札制",
     img: "biz-reason-route",
     h: "入札制で、自社の基準に合う案件だけ選べる",
-    p: "複数業者が買取総額で競う入札制。過度な値引き競争ではなく、出品された商品全体の価値に対して金額を提示できます。自社の買取基準や対応エリアに合った案件だけに入札可能です。",
+    p: "複数業者が買取総額で競う入札制。過度な価格競争ではなく、出品された品物全体の価値に対して金額を提示できます。自社の買取基準や対応エリアに合った案件だけに入札可能です。",
   },
 ];
 
@@ -228,7 +228,7 @@ const REASONS: { n: string; tag: string; img: string; h: ReactNode; p: string }[
 const ASSURANCES: { n: string; h: string; p: string }[] = [
   {
     n: "04",
-    h: "営業電話の一斉架電なし",
+    h: "一斉の営業電話なし",
     p: "ユーザーへ連絡できるのは、選ばれた業者のみ。無駄な営業電話をかける必要がなく、成約に進んだユーザーとだけ丁寧にやりとりできます。信頼関係を築きやすい環境です。",
   },
   {
@@ -251,9 +251,9 @@ const ASSURANCES: { n: string; h: string; p: string }[] = [
  *  差し替え素材（入札票が並ぶ机上・1枚だけ選ばれた札）は今回の画像セットに無いため、
  *  #15 の代替どおり番号＋見出し＋本文のヘアラインリストにして情報量は落とさない。 */
 const FLOW: { n: string; h: string; p: string }[] = [
-  { n: "1", h: "案件を確認", p: "出品された「まとめ」の写真・品目リストを確認。気になる案件に入札します。" },
+  { n: "1", h: "案件を確認", p: "出品された案件の写真・品目リストを確認し、入札する案件を選びます。" },
   { n: "2", h: "買取総額で入札", p: "出品された商品すべてに対して、買取総額を提示。他社と競い合います。" },
-  { n: "3", h: "ユーザーが1社を選択", p: "全入札がユーザーに提示され、見比べて1社を選択。選ばれると連絡先が開示されます。" },
+  { n: "3", h: "ユーザーが1社を選択", p: "すべての入札がユーザーに提示され、ユーザーが見比べて1社を選びます。選ばれると連絡先が開示されます。" },
   { n: "4", h: "訪問・引き取り", p: "成約後に訪問日時を決定。まとめて引き取りを行います。" },
 ];
 
@@ -269,8 +269,8 @@ const REQUIREMENTS: { icon: "shield" | "people" | "tag" | "check-circle"; h: str
 const FAQ_ITEMS = [
   { q: "手数料はいくらですか？", a: "登録・掲載・入札はすべて無料です。費用が発生するのは成約時のみで、買取金額の8%（税別・消費税を別途加算）が手数料として発生します。それ以外の費用は一切かかりません。なお、サービス開始当初（β期間）は手数料を請求しません。請求開始の際は事前にメールでお知らせします。" },
   { q: "古物商許可がなくても登録できますか？", a: "いいえ。カタヅケへの業者登録には、有効な古物商許可証が必要です。許可取得後に改めてお申し込みください。" },
-  { q: "入札した案件はすべて交渉できますか？", a: "ユーザーが届いた入札を見比べて1社を選びます。選ばれた場合のみ連絡先が開示され、取引に進めます。選ばれなかった入札は自動でお断りとなり、ユーザーへの連絡はできません。" },
-  { q: "入札した金額はあとから変更できますか？", a: "ユーザーが業者を選ぶまでの間、案件詳細から入札額を現在の金額より高い方向へ何度でも引き上げられます（引き下げはできません）。他社の入札額は匿名で表示されます（社名・コメントは非開示）。" },
+  { q: "入札した案件は、すべてユーザーと連絡を取れますか？", a: "ユーザーが届いた入札を見比べて1社を選びます。選ばれた場合のみ連絡先が開示され、取引に進めます。選ばれなかった入札は自動でお断りとなり、ユーザーへの連絡はできません。" },
+  { q: "入札した金額はあとから変更できますか？", a: "ユーザーが業者を選ぶまでの間、案件詳細から入札額を何度でも引き上げられます（引き下げはできません）。他社の入札額は匿名で表示されます（社名・コメントは非開示）。" },
   { q: "他社の入札額は見えますか？", a: "案件詳細で「現在の最高額」と、匿名化された他社の入札額（社名・コメントは非開示）を確認できます。自社の入札が最高額でない場合は差額も表示されるため、引き上げの判断材料としてご利用いただけます。" },
   { q: "エリア外の案件に入札できますか？", a: "現在は東京都・千葉県・埼玉県・神奈川県が対応エリアです。エリア外への訪問買取は受け付けていません。" },
   { q: "最終的な買取額は入札額と異なってもいいですか？", a: "提示した買取金額を下回る変更は、査定現場で商品を確認し、理由を明示したうえで顧客の了解を得た場合にのみ可能です。顧客の同意なく一方的に減額することはできません。" },
@@ -560,7 +560,7 @@ export default function BusinessPage() {
                   業者は写真と品目から買取総額を入札し、選ばれた1社だけがユーザーと直接やりとりします。
                   <br />
                   登録・掲載・入札は無料。費用は成約時の
-                  <strong>買取金額8%（税別・消費税を別途加算）のみ</strong>です。
+                  <strong>買取金額の8%（税別・消費税を別途加算）のみ</strong>です。
                 </p>
                 {/* R4 r4 #11: ヒーロー・固定バー・ページ末尾の3か所に同じ「業者登録を申し込む」が
                     並び、どれが正規の入口か分からなかった。確約の CTA は固定バーとページ末尾
@@ -579,7 +579,7 @@ export default function BusinessPage() {
                     反復と 8% 欠落による有利誤認を避けるための判断なので、費用に触れない
                     手続きの1行はその対象外。件数は実際の必須項目数（14）。 */}
                 <p className="biz-hero-steps">
-                  入力は3ステップ（必須14項目）。送信後3営業日以内にご連絡し、審査の通過後に入札できます。
+                  入力は3ステップ（必須14項目）。送信後3営業日以内にご連絡します。審査の通過後に入札できるようになります。
                   {/* r5 #25: 依頼者が「業者の方へ」から入ってしまったとき、ヒーロー付近に
                       戻る導線がなく業者向けの条件だけを読み続けることになっていた。 */}
                   <Link href="/" className="biz-hero-alt">
@@ -653,7 +653,7 @@ export default function BusinessPage() {
             <div className="section-head">
               <span className="eyebrow">カタヅケの強み</span>
               <RevealLines mark="under" lines={["カタヅケで仕入れる、3つの理由"]} />
-              <p className="sub">家まるごとの一括出品だからこそ、まとめて見に行ける仕入れルートになります。</p>
+              <p className="sub">家まるごとの一括出品だからこそ、1回の訪問でまとめて仕入れられるルートになります。</p>
             </div>
             <div className="biz-reason-grid">
               {REASONS.map((r, i) => (
@@ -792,7 +792,7 @@ export default function BusinessPage() {
                   {/* r5 #31: 例示が税別だけだと実際の支払額が読めないため、実額が出るこの箇所だけ
                       税込（消費税10%）を併記する。率とヒーロー・数値帯の 8% 表記は変えない。 */}
                   <p className="vc-fee">
-                    費用は成約時の買取金額8%（税別・消費税を別途加算）のみ。この例では1件あたり約
+                    費用は成約時の買取金額の8%（税別・消費税を別途加算）のみ。この例では1件あたり約
                     {feeApprox(v.month.amount)}円（消費税10%込みで約{feeApproxIncl(v.month.amount)}円）にあたります。
                   </p>
                   <blockquote className="vc-quote">
@@ -823,8 +823,8 @@ export default function BusinessPage() {
           <div className="container">
             <div className="section-head">
               <span className="eyebrow">入札の流れ</span>
-              <RevealLines mark="under" lines={["入札から成約までの流れ"]} />
-              <p className="sub">登録後はシンプルな4ステップ。下見なし・一斉架電なしで進められます。</p>
+              <RevealLines mark="under" lines={["入札から引き取りまでの流れ"]} />
+              <p className="sub">登録後はシンプルな4ステップ。下見なし・一斉の営業電話なしで進められます。</p>
             </div>
             {/* r5 #15: 画像を外し、番号タイル＋見出し＋本文のヘアラインリストにする（手順なので ol）。 */}
             <ol className="biz-flow">
@@ -844,7 +844,7 @@ export default function BusinessPage() {
           <div className="container">
             <div className="section-head">
               <span className="eyebrow">ご利用条件</span>
-              <h2>参加に必要な要件</h2>
+              <h2>登録要件</h2>
               <p className="sub">ユーザーの安心のため、登録時に以下を確認させていただきます。</p>
             </div>
             <Reveal className="media-split media-split--rev biz-req-split">
@@ -908,7 +908,7 @@ export default function BusinessPage() {
                   {/* R4 r4 #22: フォームの長さと審査期間の予告を冒頭に置く。会社情報 →
                       許可・エリア → 精算の3見出しに分け、どこまで進んだか分かるようにする。 */}
                   <p className="biz-form-flow">
-                    入力は3ステップ（必須14項目）。送信後3営業日以内にご連絡し、審査の通過後に入札できます。
+                    入力は3ステップ（必須14項目）。送信後3営業日以内にご連絡します。審査の通過後に入札できるようになります。
                   </p>
                   {/* R4 r4 #23: 重い申込フォームだけが入口に見えていた。/operator/signup は招待コード
                       なしでもアカウントを作成でき、案件の閲覧まで進める（入札は審査の通過後。
@@ -1147,7 +1147,7 @@ export default function BusinessPage() {
                       精算（手数料の請求・返金）
                     </h4>
                     <p className="biz-bank-lead">
-                      手数料の請求・精算（返金が生じた場合の振込先を含む）のためにお伺いします。
+                      手数料の請求・精算（返金が生じた場合の振込先を含む）のために、口座情報をお伺いします。
                       お申し込みの時点では請求は発生せず、請求開始は事前にメールでお知らせします。
                     </p>
                     <p className="biz-bank-note">※お申し込み内容の確認と、手数料の請求・精算に関する連絡（返金が生じた場合の振込先を含む）にのみ使用します</p>
@@ -1282,7 +1282,7 @@ export default function BusinessPage() {
                   <div className="submit-area">
                     <button type="submit" className="btn-submit" disabled={busy}>
                       <SendIcon />
-                      {busy ? "送信中…" : "登録を申し込む"}
+                      {busy ? "送信中…" : "業者登録を申し込む"}
                     </button>
                     <p className="submit-note">送信後、担当者より3営業日以内にご連絡します。</p>
                   </div>
@@ -1300,7 +1300,7 @@ export default function BusinessPage() {
                   <p>
                     ご入力内容を確認のうえ、担当者より3営業日以内にメールでご連絡します。
                     <br />
-                    <strong>承認メールに記載の招待コードでアカウントを作成してください（メール到着までお待ちください）。</strong>
+                    <strong>承認メールが届くまでお待ちください。届きましたら、記載の招待コードでアカウントを作成してください。</strong>
                   </p>
                   <p style={{ fontSize: 13, lineHeight: 1.9, marginBottom: 10 }}>
                     招待コードがお手元に届いている方は、こちらからアカウントを作成できます。
@@ -1353,7 +1353,7 @@ export default function BusinessPage() {
               <h5>業者の方へ</h5>
               <ul>
                 <li><a href="#merit">参加メリット</a></li>
-                <li><a href="#flow">掲載の流れ</a></li>
+                <li><a href="#flow">入札の流れ</a></li>
                 <li><a href="#requirements">登録要件</a></li>
                 <li><a href="#register">業者登録を申し込む</a></li>
                 {/* r5 #18/#29: 業者が同意する文書への導線がページ内に無かった（同意チェックの
@@ -1377,7 +1377,7 @@ export default function BusinessPage() {
               <h5>カタヅケについて</h5>
               <ul>
                 <li><Link href="/#founder">運営者メッセージ</Link></li>
-                <li><Link href="/faq">お問い合わせ</Link></li>
+                <li><Link href="/contact">お問い合わせ</Link></li>
                 <li><Link href="/legal">特定商取引法に基づく表記</Link></li>
                 <li><Link href="/privacy">プライバシーポリシー</Link></li>
                 <li><Link href="/terms">利用規約</Link></li>

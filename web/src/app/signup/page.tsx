@@ -87,7 +87,7 @@ export default function SignupPage() {
     if (step === 1) { if (!validateStep1()) return; goTo(2); return; }
     if (step === 2) { if (!validateStep2()) return; goTo(3); return; }
     if (step === 3) {
-      if (!agree1) { setAuthErr("利用規約への同意が必要です"); return; }
+      if (!agree1) { setAuthErr("利用規約およびプライバシーポリシーへの同意が必要です"); return; }
       setBusy(true);
       setAuthErr(null);
       try {
@@ -225,7 +225,7 @@ export default function SignupPage() {
           {step === 3 && (
             <div>
               <h1 className="step-title">内容を確認して<br />登録を完了してください</h1>
-              <p className="step-desc">以下の内容で登録します。よろしければ同意の上、登録ボタンを押してください。</p>
+              <p className="step-desc">以下の内容で登録します。よろしければ同意のうえ、登録ボタンを押してください。</p>
 
               {authErr && (
                 <div className="auth-error" role="alert" style={{ marginBottom: 16 }}>
@@ -255,7 +255,7 @@ export default function SignupPage() {
 
               <div className="hint-banner">
                 <Ic name="lock" className="hint-ic" />
-                <span>登録後、すぐに出品をはじめられます。アカウントはこのブラウザでログイン状態になります。</span>
+                <span>登録後、すぐに出品をはじめられます。登録が完了すると、このブラウザではログインした状態になります。</span>
               </div>
             </div>
           )}
@@ -264,8 +264,8 @@ export default function SignupPage() {
           {step === 4 && (
             <div className="done-screen">
               <div className="done-circle"><Ic name="check-circle" /></div>
-              <h1>登録が完了しました。</h1>
-              <p>カタヅケへようこそ。<br />さっそく不用品を撮って、<br />業者からの見積もりを受け取りましょう。</p>
+              <h1>登録が完了しました</h1>
+              <p>カタヅケへようこそ。<br />さっそく不用品を撮って、<br />業者からの入札を受け取りましょう。</p>
               <p style={{ fontSize: 12.5, color: "var(--body-soft)" }}>対応エリアは東京・千葉・埼玉・神奈川です。</p>
               <div className="done-actions">
                 <Link href="/create" className="btn btn-primary btn-lg">

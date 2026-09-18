@@ -145,7 +145,7 @@ function CaseCard({ c, index }: { c: CaseItem; index: number }) {
           {/* R4_BRIEF E.1: 「量と流れ」を金額より先に読ませる（金額を主役にしない）。
               金額は 24px に落とし、この行より大きくならないようにしてある */}
           <div className="case-facts">
-            {c.bidCount}社が入札 ／ {c.count}点まとめ ／ {c.days}日で成約
+            {c.bidCount}社が入札 ／ {c.count}点をまとめて出品 ／ {c.days}日で成約
           </div>
           <div className="case-amount-label">買取額の例（架空のモデルケース）</div>
           {/* ラウンド6 指摘（7/13/18）: 1カードに ※ が3本（金額注記・セリフ注記・ページ冒頭の
@@ -282,7 +282,7 @@ export default function ExamplesPage() {
           {/* ============ CTA ============ */}
           {/* 押す直前の安心1行（.section-cta / /signup の既存文言の再掲。新しい約束は足さない） */}
           <p className="cases-assure">
-            登録・査定・お断りまで無料　／　連絡が来るのは、あなたが選んだ1社だけ
+            出品・査定・お断りまで無料　／　連絡が来るのは、あなたが選んだ1社だけ
           </p>
           <Reveal className="cases-cta">
             <div className="cases-cta-inner">
@@ -290,7 +290,7 @@ export default function ExamplesPage() {
               <p>
                 1点ずつ撮って、業者に競ってもらうだけ。
                 <br />
-                出品・査定・お断りまで、ユーザーの費用は一切無料です。
+                出品・査定・お断りまで、ユーザーの費用は一切かかりません。
               </p>
               <div className="cases-cta-actions">
                 <Link href="/create" className="btn btn-primary btn-lg">

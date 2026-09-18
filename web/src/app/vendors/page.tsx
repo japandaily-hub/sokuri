@@ -37,14 +37,14 @@ function starString(rating: number): string {
 function VendorStaticInfo({ showSample }: { showSample: boolean }) {
   return (
     <section className="vd-sample" aria-labelledby="vd-static-h">
-      <h2 id="vd-static-h">掲載している業者の審査</h2>
+      <h2 id="vd-static-h">掲載する業者の審査基準</h2>
       <ul className="vd-criteria">
         <li>
           <b>古物商許可の確認</b>
           古物営業法に基づく古物商許可証を、運営が確認した事業者のみを掲載します。
         </li>
         <li>
-          <b>一斉架電なし</b>
+          <b>一斉の営業電話なし</b>
           連絡できるのは、ユーザーが選んだ1社だけです。選ばれなかった業者に連絡先は渡りません。
         </li>
         <li>
@@ -166,7 +166,7 @@ export default function VendorListPage() {
               帯の直下に出品できることを常設する（審査の通過順に入札が入る、という既存方針の再掲）。 */}
           {error || isEmpty ? (
             <p className="vd-notice">
-              掲載前でも出品はできます。審査を通過した業者から順に入札します。
+              業者の掲載前でも出品できます。審査を通過した業者から順に、入札に参加できるようになります。
             </p>
           ) : null}
           {/* r3 是正: 戻るリンクは末尾（.vd-join の下）へ移した。ページ先頭の最初の導線が
@@ -177,7 +177,6 @@ export default function VendorListPage() {
                 〜にします」の方針表明に直す（CONSTRAINTS §3）。
                 1文目「古物商許可番号を確認し…」は r2 M5 で帯のリードへ移した。 */}
             評価と口コミは、成約したユーザーの投稿をそのまま掲載する方針です。
-            入札の選択は案件詳細から行えます。
             {/* r5 #30: 掲載される側（業者）から見て、事実と異なる投稿の扱いが読めなかった。
                 削除の断定（運営が削除します）は実装済みの運用として確認できていないため、
                 受付窓口（/contact）があることだけを書く。 */}

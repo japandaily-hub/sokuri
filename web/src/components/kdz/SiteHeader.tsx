@@ -8,17 +8,17 @@ import { KdzLogo } from "./Logo";
 export type NavItem = { href: string; label: string };
 
 const DEFAULT_NAV: NavItem[] = [
-  { href: "/#flow", label: "使い方" },
+  { href: "/#daily", label: "使い方" },
   { href: "/examples", label: "利用イメージ" },
   { href: "/photo-guide", label: "撮影ガイド" },
   { href: "/faq", label: "よくある質問" },
 ];
 
 const DEFAULT_MOBILE: NavItem[] = [
-  { href: "/#flow", label: "使い方" },
-  { href: "/#auction", label: "仕組み" },
-  { href: "/#trust", label: "安心" },
-  { href: "/#cats", label: "対応カテゴリ" },
+  { href: "/#daily", label: "使い方" },
+  { href: "/#choose", label: "仕組み" },
+  { href: "/#trust", label: "安心の取り組み" },
+  { href: "/#fee", label: "料金" },
   { href: "/faq", label: "よくある質問" },
   { href: "/login", label: "ログイン" },
   { href: "/mypage", label: "マイページ" },

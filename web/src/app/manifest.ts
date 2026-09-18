@@ -16,7 +16,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "カタヅケ｜不用品を撮るだけAI片付け査定",
     short_name: "カタヅケ",
     description:
-      "部屋にある不用品を撮って送るだけ。AIが片付け・不用品を案件化し、リユース業者の見積もりが届くマッチングサービス。",
+      "家じゅうの不用品を、1点ずつ撮って、あとは待つだけ。登録業者が買取総額で競い合う、家まるごとの片付け買取マッチング。",
     start_url: "/",
     display: "standalone",
     background_color: "#ffffff",

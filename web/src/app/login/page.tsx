@@ -144,7 +144,7 @@ function LoginForm() {
           <div className="auth-card">
             <div className="auth-head">
               <h1 className="auth-title">ログイン</h1>
-              <p className="auth-sub">{toCreate ? "出品（撮影）に進む前にログインしてください。LINEなら1タップで登録できます。" : "入札状況や業者との交渉はログイン後に確認できます。"}</p>
+              <p className="auth-sub">{toCreate ? "出品（撮影）に進む前にログインしてください。LINEなら1タップで登録できます。" : "入札状況や業者とのやり取りは、ログイン後に確認できます。"}</p>
             </div>
 
             {otherAccountSignedIn ? (
@@ -197,7 +197,7 @@ function LoginForm() {
                   <circle cx="12" cy="12" r="9" />
                   <path d="M12 8v4M12 16h.01" />
                 </svg>
-                <span>短時間に試行が集中したため、しばらく時間をおいてから再度お試しください。</span>
+                <span>短時間にログインの試行が続いたため、一時的に制限しています。しばらく時間をおいてから再度お試しください。</span>
               </div>
             ) : null}
 

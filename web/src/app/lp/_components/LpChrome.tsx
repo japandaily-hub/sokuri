@@ -25,7 +25,7 @@ import { KdzLogo } from "@/components/kdz/Logo";
 const MENU_ANCHORS: { href: string; label: string }[] = [
   { href: "#top", label: "トップ" },
   { href: "#about", label: "カタヅケについて" },
-  { href: "#point", label: "こだわり" },
+  { href: "#point", label: "しくみと安心" },
   { href: "#daily", label: "出品から引き取りまで" },
   { href: "#fee", label: "料金" },
   { href: "#cases", label: "利用イメージ" },
@@ -218,7 +218,7 @@ export function LpChrome() {
           <span className="btn-line__tile" aria-hidden="true" />
           <span className="btn-line__body">
             <span className="btn-line__label">LINEではじめる</span>
-            <span className="btn-line__sub">登録・査定・お断りまで無料</span>
+            <span className="btn-line__sub">出品・査定・お断りまで無料</span>
           </span>
           <Ic name="arrow" className="btn-line__arr" />
         </Link>
@@ -290,7 +290,7 @@ export function LpChrome() {
 
           <p className="lp-menu__foot">
             <KdzLogo size={18} />
-            <span>東京都・千葉県・埼玉県・神奈川県（順次拡大）</span>
+            <span>対応エリア：東京都・千葉県・埼玉県・神奈川県（順次拡大）</span>
           </p>
         </div>
       </nav>
