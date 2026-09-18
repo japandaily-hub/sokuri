@@ -55,14 +55,6 @@ const FEE_ILLS: FloatIll[] = [
   { name: "house-tree", top: "68%", left: "80%", w: 76, sway: 2, float: 2, hideSp: true },
 ];
 
-/** CSS で描くドットのひし形クラスタ（参照の花・葉の点描に相当）。すべて装飾。 */
-const DOT_CLUSTERS: { top: string; left: string; size: number }[] = [
-  { top: "34%", left: "13%", size: 92 },
-  { top: "78%", left: "30%", size: 64 },
-  { top: "40%", left: "86%", size: 76 },
-  { top: "88%", left: "66%", size: 58 },
-];
-
 /* ============================================================
    区画 3 ABOUT — 3 item の交互配置（参照 `.home-about__item` ×3）
    ============================================================ */
@@ -462,17 +454,8 @@ export default function LpPage() {
         <section id="top" className="lp-kv">
           <LpSlider slides={KV_SLIDES} />
           <div className="lp-kv__veil" aria-hidden="true" />
-          {/* ユーザー指摘（2026-09-18）: ヒーロー写真の上に浮く箱・本・トラック・たたんだセーターの
-              イラストが被写体と重なって見づらいため撤去。抽象的なドット装飾のみ残す。 */}
-          <div className="lp-kv__deco" aria-hidden="true">
-            {DOT_CLUSTERS.map((d) => (
-              <span
-                key={`${d.top}-${d.left}`}
-                className="lp-dots"
-                style={{ "--lp-dot-top": d.top, "--lp-dot-left": d.left, "--lp-dot-size": `${d.size}px` } as CSSProperties}
-              />
-            ))}
-          </div>
+          {/* ユーザー指摘（2026-09-18）: 箱・本・トラック・セーターのイラストに続き、
+              ドットのひし形クラスタも被写体に重なって見づらいため撤去。写真のみのシンプルな構成にする。 */}
           <div className="lp-container lp-kv__inner">
             <div className="lp-kv__catch">
               <h1>
