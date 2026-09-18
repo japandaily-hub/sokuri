@@ -6,7 +6,7 @@ import uuid
 from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, String, Text
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, String, Text, true
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, TimestampMixin
@@ -94,3 +94,15 @@ class User(Base, TimestampMixin):
     is_suspended: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
     suspended_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     suspended_reason: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+
+    # お知らせメール（入札受信・入札額更新・入札なし/未決定リマインドの4種のみが
+    # 対象。取引上必須の連絡には影響しない）の受け取り可否。既定 True＝従来どおり
+    # 受信（alembic 0036 の server_default=true と一致させる）。判定は
+    # app.services.notify_dispatch 側に集約する。
+    email_notify_opt_in: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=true()
+    )
+    # 本人が明示的に選択・変更した時刻。未選択（既定値のまま）は NULL のまま残す。
+    email_notify_updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )

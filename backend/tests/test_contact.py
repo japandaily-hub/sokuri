@@ -269,6 +269,14 @@ def test_mail_footer_includes_operator_org_name_address_and_contact():
     assert "katazuke.info@gmail.com" in footer_html
 
 
+def test_mail_footer_includes_notification_settings_link():
+    """security review 2026-09-18 Low: フッターに「お知らせメールの受信設定を変更する」
+    リンク（/notifications）が含まれる（Gmail/Yahoo の送信者要件・迷惑メール報告予防）。"""
+    footer_html = notify._wrap("<p>本文</p>")
+    assert "お知らせメールの受信設定を変更する" in footer_html
+    assert f"{get_settings().frontend_base_url}/notifications" in footer_html
+
+
 async def test_contact_notification_uses_japanese_category_label(monkeypatch):
     """QA M5対応: 運営宛メールの件名・本文の「種別」は英字スラッグではなく、
     web/src/app/contact/page.tsx の <option> と同一の日本語ラベルで出す。"""

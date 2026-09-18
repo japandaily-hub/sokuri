@@ -620,6 +620,32 @@ async def test_no_bid_reminder_selects_and_marks_once(db_session: AsyncSession):
     assert dispatch2.await_count == 0
 
 
+async def test_no_bid_reminder_email_skipped_when_owner_opted_out(db_session: AsyncSession):
+    """依頼者の email_notify_opt_in=False では、実際のメール送信まで抑止される。
+
+    dispatch_no_bid_reminder 自体はモックせず（reminders.py が実値を正しく
+    引き渡すかを検証するため）、内側の notify.send_no_bid_reminder のみを
+    モックする。LINE 未連携のためメールが唯一の配送経路——それでも opt-out
+    ユーザーには送らない。
+    """
+    now = datetime.now(timezone.utc)
+    user, _ = await _make_user(db_session, "nobid_optout_owner@example.com")
+    user.email_notify_opt_in = False
+    await db_session.commit()
+
+    stale = await _make_case(db_session, user, created_at=now - timedelta(days=4))
+
+    with patch(
+        "app.services.notify.send_no_bid_reminder", new_callable=AsyncMock
+    ) as email_mock:
+        result = await run_reminders(db_session)
+
+    assert result["no_bid"] == 1
+    email_mock.assert_not_called()
+    await db_session.refresh(stale)
+    assert stale.no_bid_reminded_at is not None, "opt-out でも送信済みマーカーは立てる（二重処理防止）"
+
+
 async def _make_bid_with_created_at(
     db_session: AsyncSession,
     case: Case,
@@ -704,6 +730,36 @@ async def test_bids_pending_reminder_selects_and_marks_once(db_session: AsyncSes
         again = await run_reminders(db_session)
     assert again["bids_pending"] == 0
     assert dispatch2.await_count == 0
+
+
+async def test_bids_pending_reminder_email_skipped_when_owner_opted_out(
+    db_session: AsyncSession,
+):
+    """依頼者の email_notify_opt_in=False では、実際のメール送信まで抑止される
+    （test_no_bid_reminder_email_skipped_when_owner_opted_out と同型の検証）。
+    """
+    now = datetime.now(timezone.utc)
+    user, _ = await _make_user(db_session, "bidspending_optout_owner@example.com")
+    user.email_notify_opt_in = False
+    await db_session.commit()
+    operator, _ = await _make_operator(db_session, "bidspending_optout_op@example.com")
+
+    stale = await _make_case(db_session, user, status="bidding")
+    await _make_bid_with_created_at(
+        db_session, stale, operator, status="pending", created_at=now - timedelta(days=3)
+    )
+
+    with patch(
+        "app.services.notify.send_bids_pending_reminder", new_callable=AsyncMock
+    ) as email_mock, patch(
+        "app.services.notify_dispatch.dispatch_no_bid_reminder", new_callable=AsyncMock
+    ):
+        result = await run_reminders(db_session)
+
+    assert result["bids_pending"] == 1
+    email_mock.assert_not_called()
+    await db_session.refresh(stale)
+    assert stale.bids_pending_reminded_at is not None
 
 
 async def test_bids_pending_reminder_grace_days_boundary(db_session: AsyncSession):

@@ -110,3 +110,16 @@ async def test_admin_bound_alert_is_also_visible_when_key_missing(monkeypatch, c
 
     assert result is False
     assert "BREVO_API_KEY 未設定" in caplog.text
+
+
+async def test_missing_brevo_key_log_masks_destination_email(monkeypatch, caplog):
+    """security review 2026-09-18 Low: 宛先メールアドレスは平文でログへ出さない
+    （mask_email 経由で先頭1文字のみ残す a***@example.com 形式）。"""
+    monkeypatch.setattr(get_settings(), "brevo_api_key", "")
+    monkeypatch.setattr(alerts, "send_alert", AsyncMock(return_value=True))
+
+    with caplog.at_level(logging.ERROR):
+        await notify.send_case_created("sensitive-user@example.com", "case-1")
+
+    assert "sensitive-user@example.com" not in caplog.text
+    assert "s***@example.com" in caplog.text

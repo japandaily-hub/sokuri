@@ -258,18 +258,34 @@ async def dispatch_schedule_confirmed(
 
 @_best_effort
 async def dispatch_bid_received(
-    line_user_id: str | None, email: str | None, case_id: str, company_name: str, amount: int
+    line_user_id: str | None,
+    email: str | None,
+    case_id: str,
+    company_name: str,
+    amount: int,
+    email_notify_opt_in: bool = True,
 ) -> None:
     """新規入札通知（依頼者宛）。LINE優先・失敗/未連携時はメールにフォールバック。
 
     LINE専用ユーザーの仮メール（実メール未設定）宛には送信しない判定は、呼び出し元では
     なくここへ集約する（LINE連携済みなら仮メールでも LINE には届けるため）。
+
+    ``email_notify_opt_in``（お知らせメール受け取り設定・既定 True＝従来どおり）が
+    False のユーザーには、LINE 未連携／LINE失敗時のメールフォールバックのみを
+    スキップする（LINE Push の可否には一切影響しない）。
     """
     if line_user_id:
         ok = await line_notify.push_bid_received(line_user_id, case_id, company_name, amount)
         if ok:
             return
     if not email or notify.is_placeholder_email(email):
+        return
+    if not email_notify_opt_in:
+        logger.info(
+            "notify_dispatch: お知らせメール受信オプトアウトのためスキップ - case_id=%s - %s",
+            case_id,
+            "dispatch_bid_received",
+        )
         return
     await notify.send_bid_received(email, case_id, company_name, amount)
 
@@ -282,11 +298,17 @@ async def dispatch_bid_updated(
     company_name: str,
     old_amount: int,
     new_amount: int,
+    email_notify_opt_in: bool = True,
 ) -> None:
     """入札額の引き上げ通知（依頼者宛）。LINE優先・失敗/未連携時はメールにフォールバック。
 
     dispatch_bid_received と同じ理由で、仮メール判定はここへ集約する
     （LINE連携済みなら仮メールでも LINE には届けるため）。
+
+    ``email_notify_opt_in``（既定 True）が False のユーザーには、LINE 未連携／
+    LINE失敗時のメールフォールバックのみをスキップする（LINE Push には影響しない。
+    security review M-2対応: dispatch_bid_received / dispatch_no_bid_reminder /
+    dispatch_bids_pending_reminder と同じ4種目の対象）。
     """
     if line_user_id:
         ok = await line_notify.push_bid_updated(
@@ -295,6 +317,13 @@ async def dispatch_bid_updated(
         if ok:
             return
     if not email or notify.is_placeholder_email(email):
+        return
+    if not email_notify_opt_in:
+        logger.info(
+            "notify_dispatch: お知らせメール受信オプトアウトのためスキップ - case_id=%s - %s",
+            case_id,
+            "dispatch_bid_updated",
+        )
         return
     await notify.send_bid_updated(email, case_id, company_name, old_amount, new_amount)
 
@@ -324,32 +353,59 @@ async def dispatch_visit_overdue(
 
 @_best_effort
 async def dispatch_no_bid_reminder(
-    line_user_id: str | None, email: str | None, case_id: str
+    line_user_id: str | None,
+    email: str | None,
+    case_id: str,
+    email_notify_opt_in: bool = True,
 ) -> None:
-    """入札ゼロ放置リマインド（依頼者宛・r12 決定3）。LINE優先・未連携/失敗時はメール。"""
+    """入札ゼロ放置リマインド（依頼者宛・r12 決定3）。LINE優先・未連携/失敗時はメール。
+
+    ``email_notify_opt_in``（既定 True）が False のユーザーには、LINE 未連携／
+    LINE失敗時のメールフォールバックのみをスキップする（LINE Push には影響しない）。
+    """
     if line_user_id:
         ok = await line_notify.push_no_bid_reminder(line_user_id, case_id)
         if ok:
             return
     if not email or notify.is_placeholder_email(email):
         return
+    if not email_notify_opt_in:
+        logger.info(
+            "notify_dispatch: お知らせメール受信オプトアウトのためスキップ - case_id=%s - %s",
+            case_id,
+            "dispatch_no_bid_reminder",
+        )
+        return
     await notify.send_no_bid_reminder(email, case_id)
 
 
 @_best_effort
 async def dispatch_bids_pending_reminder(
-    line_user_id: str | None, email: str | None, case_id: str
+    line_user_id: str | None,
+    email: str | None,
+    case_id: str,
+    email_notify_opt_in: bool = True,
 ) -> None:
     """入札未決定リマインド（依頼者宛）。LINE優先・未連携/失敗時はメール。
 
     二重送信の防止は呼び出し元（services/reminders.py）が
     ``cases.bids_pending_reminded_at`` で担保する（dispatch_no_bid_reminder と同じ）。
+
+    ``email_notify_opt_in``（既定 True）が False のユーザーには、LINE 未連携／
+    LINE失敗時のメールフォールバックのみをスキップする（LINE Push には影響しない）。
     """
     if line_user_id:
         ok = await line_notify.push_bids_pending_reminder(line_user_id, case_id)
         if ok:
             return
     if not email or notify.is_placeholder_email(email):
+        return
+    if not email_notify_opt_in:
+        logger.info(
+            "notify_dispatch: お知らせメール受信オプトアウトのためスキップ - case_id=%s - %s",
+            case_id,
+            "dispatch_bids_pending_reminder",
+        )
         return
     await notify.send_bids_pending_reminder(email, case_id)
 

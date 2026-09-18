@@ -607,10 +607,6 @@ export default function OperatorCaseDetailPage() {
                 <p id="bidAmountHint" style={{ fontSize: 12, color: "var(--body-soft)", marginTop: 6, lineHeight: 1.8 }}>
                   他社の入札額は匿名で表示されます（社名・コメントは非開示）
                   <br />
-                  成約時のみ買取額の8%（税別・消費税を別途加算）が手数料
-                  <br />
-                  ※サービス開始当初（β期間）は手数料を請求しません。請求開始の際は事前にメールでお知らせします。
-                  <br />
                   <span style={{ fontSize: 11.5 }}>{BID_RANGE_HINT}</span>
                 </p>
               </div>

@@ -231,12 +231,13 @@ async def _run_no_bid_reminders(session: AsyncSession, now: datetime) -> int:
         return 0
 
     targets = await _load_case_owner_targets(session, claimed_ids)
-    for line_user_id, email, case_id in targets:
+    for line_user_id, email, case_id, email_notify_opt_in in targets:
         await _dispatch_or_warn(
             notify_dispatch.dispatch_no_bid_reminder,
             line_user_id,
             email,
             case_id,
+            email_notify_opt_in,
             context=f"no_bid case_id={case_id}",
         )
     return len(claimed_ids)
@@ -244,11 +245,22 @@ async def _run_no_bid_reminders(session: AsyncSession, now: datetime) -> int:
 
 async def _load_case_owner_targets(
     session: AsyncSession, case_ids: Sequence[uuid.UUID]
-) -> list[tuple[str | None, str | None, str]]:
+) -> list[tuple[str | None, str | None, str, bool]]:
     """確保済みの案件から依頼者の通知先を取り出し、読み取りTxを閉じる。
 
     入札ゼロ放置 (b) と入札未決定 (c) の両方で使う共通ローダー——どちらも
-    「案件から依頼者本人だけに通知する」形が同じため。
+    「案件から依頼者本人だけに通知する」形が同じため。戻り値の4番目は
+    ``email_notify_opt_in``（お知らせメール受け取り設定）で、dispatch 側の
+    メールフォールバック可否判定にそのまま渡す（LINE Push には影響しない）。
+
+    仕様（security review L-1 / QA Low）: 送信済みマーカー（``no_bid_reminded_at`` /
+    ``bids_pending_reminded_at``）は本関数の呼び出し元が **``email_notify_opt_in``
+    の値に関係なく** 既に確保・commit 済みである（claim UPDATE がこの読み取りより
+    前に走る設計。§冒頭「送信フロー」参照）。したがって opt-out 中に対象化された
+    案件は、メールが実際には届かなくてもその周でマーカーが立ち、本人が後から
+    opt-in に戻しても同じ案件のリマインドは再送されない（二重送信防止の設計を
+    優先し、opt-out はあくまで「その時点で送るはずだったメールを止める」だけの
+    副作用に留める）。
     """
     cases = (
         await session.scalars(
@@ -257,11 +269,13 @@ async def _load_case_owner_targets(
     ).all()
     owners = await _load_owners(session, [c.user_id for c in cases])
 
-    targets: list[tuple[str | None, str | None, str]] = []
+    targets: list[tuple[str | None, str | None, str, bool]] = []
     for case in cases:
         owner = owners.get(case.user_id) if case.user_id is not None else None
         if owner is not None and _is_reachable_user(owner):
-            targets.append((owner.line_user_id, owner.email, str(case.id)))
+            targets.append(
+                (owner.line_user_id, owner.email, str(case.id), owner.email_notify_opt_in)
+            )
     await session.commit()
     return targets
 
@@ -330,12 +344,13 @@ async def _run_bids_pending_reminders(session: AsyncSession, now: datetime) -> i
         return 0
 
     targets = await _load_case_owner_targets(session, claimed_ids)
-    for line_user_id, email, case_id in targets:
+    for line_user_id, email, case_id, email_notify_opt_in in targets:
         await _dispatch_or_warn(
             notify_dispatch.dispatch_bids_pending_reminder,
             line_user_id,
             email,
             case_id,
+            email_notify_opt_in,
             context=f"bids_pending case_id={case_id}",
         )
     return len(claimed_ids)

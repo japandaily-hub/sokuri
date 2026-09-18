@@ -5,7 +5,8 @@
   自社の入札額を現在額より高い金額へ何度でも引き上げられること（下げ・同額は409）。
 - 引き上げの都度 bid_amount_history に1行追加され、bids.revision_count が加算されること。
 - 依頼者への通知（notify_dispatch.dispatch_bid_updated）が
-  (line_user_id, email, case_id, company_name, old_amount, new_amount) で呼ばれること。
+  (line_user_id, email, case_id, company_name, old_amount, new_amount,
+  email_notify_opt_in) で呼ばれること。
 - 未入札/終端状態(selected/withdrawn)/案件closed/連絡先混入メッセージ/認可（依頼者トークン・
   未承認業者）が期待通り拒否されること。
 
@@ -151,8 +152,9 @@ async def test_raise_bid_updates_amount_and_notifies_owner(
     assert body["revision_count"] == 1
     assert body["status"] == "pending"
 
+    # 末尾は依頼者の email_notify_opt_in（既定 True。security review M-2対応で追加）。
     dispatch_mock.assert_awaited_once_with(
-        user.line_user_id, user.email, str(case.id), operator.company_name, 30000, 40000
+        user.line_user_id, user.email, str(case.id), operator.company_name, 30000, 40000, True
     )
 
     rows = (
@@ -557,7 +559,8 @@ async def test_raise_notifies_owner_only_when_bid_becomes_top(
         )
         assert r.status_code == 200, r.text
         assert dispatch_mock.await_count == 1
-        assert dispatch_mock.await_args.args[4:] == (40000, 60000)
+        # 末尾は依頼者の email_notify_opt_in（既定 True。security review M-2対応で追加）。
+        assert dispatch_mock.await_args.args[4:] == (40000, 60000, True)
 
         r = await client.patch(
             f"/api/v1/cases/{case.id}/bids/me", json={"amount": 70000}, headers=_auth(op_token)

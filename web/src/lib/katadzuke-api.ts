@@ -856,6 +856,8 @@ export function signupUser(payload: {
   email: string;
   password: string;
   name?: string;
+  /** お知らせメール（入札の通知・リマインド）を受け取るか。省略時はサーバー既定（受け取る）。 */
+  email_notify_opt_in?: boolean;
 }): Promise<AuthTokenResponse> {
   return request("/auth/signup", { method: "POST", body: JSON.stringify(payload) });
 }
@@ -959,6 +961,29 @@ export const RESIDENCE_AREAS = [
 
 export function getMyProfile(token: string): Promise<UserProfile> {
   return request("/users/me/profile", { token });
+}
+
+/** お知らせメールの受け取り設定（GET/PATCH /users/me/notification-settings 共通のレスポンス形）。
+ *  対象は「入札が届いた」「入札額が更新された」「入札がまだ無い／未選択のリマインド」の 4 種だけ。出品の受付・成約・
+ *  訪問日程・減額・キャンセルなど取引に必要な連絡は、この設定に関係なく届く。 */
+export interface NotificationSettings {
+  email_notify_opt_in: boolean;
+  email_notify_updated_at: string | null;
+}
+
+export function getNotificationSettings(token: string): Promise<NotificationSettings> {
+  return request("/users/me/notification-settings", { token });
+}
+
+export function updateNotificationSettings(
+  emailNotifyOptIn: boolean,
+  token: string,
+): Promise<NotificationSettings> {
+  return request("/users/me/notification-settings", {
+    method: "PATCH",
+    body: JSON.stringify({ email_notify_opt_in: emailNotifyOptIn }),
+    token,
+  });
 }
 
 export function updateMyProfile(

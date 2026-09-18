@@ -13,10 +13,12 @@ from __future__ import annotations
 
 import html
 import logging
+from urllib.parse import quote
 
 import httpx
 
 from app.config import get_settings
+from app.core.masking import mask_email
 from app.services import alerts
 
 logger = logging.getLogger(__name__)
@@ -79,7 +81,13 @@ async def _send_raw(to_email: str, subject: str, html: str) -> str | None:
     """
     settings = get_settings()
     if not settings.brevo_api_key:
-        logger.error("notify: BREVO_API_KEY 未設定のため送信スキップ - %s / %s", to_email, subject)
+        # security review 2026-09-18 Low: 宛先メールアドレスを平文でログへ出さない
+        # （本ファイルの他の失敗ログは既に宛先を出さない設計。mask_email で統一）。
+        logger.error(
+            "notify: BREVO_API_KEY 未設定のため送信スキップ - %s / %s",
+            mask_email(to_email),
+            subject,
+        )
         global _brevo_missing_key_alerted
         if not _brevo_missing_key_alerted:
             _brevo_missing_key_alerted = True
@@ -99,6 +107,19 @@ async def _send_raw(to_email: str, subject: str, html: str) -> str | None:
         "to": [{"email": to_email}],
         "subject": subject,
         "htmlContent": html,
+        # Gmail/Yahoo の一括送信者要件・迷惑メール報告予防のため List-Unsubscribe を
+        # 付与する（security review 2026-09-18 Low）。設定変更ページ（要ログイン）と
+        # 問い合わせ先メールの両方を候補として提示する。RFC 8058 のワンクリック
+        # 解除（List-Unsubscribe-Post: One-Click）はログイン不要の匿名解除エンドポイント
+        # が別途必要になるため、本対応では対象外とする（[要確認] 将来的に一括送信量が
+        # 増える場合は匿名トークン式の解除エンドポイント新設を検討）。
+        "headers": {
+            "List-Unsubscribe": (
+                f"<{_notification_settings_url()}>, "
+                f"<mailto:{_UNSUBSCRIBE_CONTACT_EMAIL}"
+                f"?subject={quote('配信停止希望', safe='')}>"
+            ),
+        },
     }
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -144,14 +165,31 @@ async def _send_raw(to_email: str, subject: str, html: str) -> str | None:
         return None
 
 
+#: List-Unsubscribe / フッターの配信停止導線で使う問い合わせ用メールアドレス。
+#: mail_from（noreply@…）は返信を受け付けないため、既存フッターの
+#: 「お問い合わせ」欄と同じ宛先に揃える（security review 2026-09-18 Low）。
+_UNSUBSCRIBE_CONTACT_EMAIL = "katazuke.info@gmail.com"
+
+
+def _notification_settings_url() -> str:
+    """お知らせメールの受信設定変更ページの URL（設定の実体は
+    GET/PATCH /users/me/notification-settings）。フッターと List-Unsubscribe
+    ヘッダーの両方から共通で参照する。"""
+    return f"{get_settings().frontend_base_url}/notifications"
+
+
 def _wrap(body: str) -> str:
+    settings_url = _notification_settings_url()
     return (
         '<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px;">'
         '<h2 style="color:#14B8A6;margin:0 0 16px;">カタヅケ</h2>'
         f"{body}"
         '<p style="color:#888;font-size:12px;margin-top:24px;">'
         "このメールはカタヅケ運営事務局（神奈川県横浜市）から自動送信されています。"
-        "お問い合わせ: katazuke.info@gmail.com</p></div>"
+        "お問い合わせ: katazuke.info@gmail.com</p>"
+        '<p style="color:#888;font-size:12px;margin-top:8px;">'
+        f'<a href="{settings_url}" style="color:#888;">お知らせメールの受信設定を変更する</a>'
+        "</p></div>"
     )
 
 

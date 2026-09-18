@@ -520,3 +520,20 @@ async def test_send_returns_bool_and_send_raw_returns_id(monkeypatch):
     monkeypatch.setattr(notify.httpx, "AsyncClient", _FakeClient)
     assert await notify._send("x@example.com", "件名", "<p>本文</p>") is True
     assert await notify._send_raw("x@example.com", "件名", "<p>本文</p>") == "<msg-2@test>"
+
+
+async def test_send_raw_includes_list_unsubscribe_header(monkeypatch):
+    """security review 2026-09-18 Low: Brevo 送信ペイロードに List-Unsubscribe
+    ヘッダーが付与される（設定変更ページのリンク + 問い合わせ用 mailto の両方）。"""
+    settings = get_settings()
+    monkeypatch.setattr(settings, "brevo_api_key", "test-key")
+    monkeypatch.setattr(settings, "frontend_base_url", "https://katazuke.example.com")
+    _FakeClient.calls = []
+    monkeypatch.setattr(notify.httpx, "AsyncClient", _FakeClient)
+
+    await notify._send_raw("x@example.com", "件名", "<p>本文</p>")
+
+    assert len(_FakeClient.calls) == 1
+    header_value = _FakeClient.calls[0]["headers"]["List-Unsubscribe"]
+    assert "<https://katazuke.example.com/notifications>" in header_value
+    assert "<mailto:katazuke.info@gmail.com" in header_value

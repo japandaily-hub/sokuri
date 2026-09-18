@@ -17,7 +17,9 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.rate_limit_deps import get_rate_limiter
 from app.api.v1.router import api_router
+from app.core.rate_limit import InMemoryRateLimitStore, RateLimitConfig, RateLimitRule, RateLimiter
 from app.core.security import create_access_token, hash_password
 from app.db.models.case import Case
 from app.db.models.operator import Operator
@@ -281,6 +283,230 @@ async def test_update_profile_kana_control_whitespace_422(client: AsyncClient):
     payload["family_name_kana"] = "タナカ　タロウ"  # 全角スペースも許容
     r = await client.put("/api/v1/users/me/profile", json=payload, headers=_auth(token))
     assert r.status_code == 200, r.text
+
+
+# ──────────────────────────── お知らせメール受け取り設定 ────────────────────────────
+
+
+async def test_signup_email_notify_opt_in_true_is_persisted(
+    client: AsyncClient, db_session: AsyncSession
+):
+    r = await client.post(
+        "/api/v1/auth/signup",
+        json={
+            "email": "optin@example.com",
+            "password": "password123",
+            "name": "テスト太郎",
+            "email_notify_opt_in": True,
+        },
+    )
+    assert r.status_code == 201, r.text
+
+    user = await db_session.scalar(select(User).where(User.email == "optin@example.com"))
+    assert user is not None
+    assert user.email_notify_opt_in is True
+    assert user.email_notify_updated_at is not None, "明示的に選択した場合は時刻を記録する"
+
+
+async def test_signup_email_notify_opt_in_false_is_persisted(
+    client: AsyncClient, db_session: AsyncSession
+):
+    r = await client.post(
+        "/api/v1/auth/signup",
+        json={
+            "email": "optout@example.com",
+            "password": "password123",
+            "name": "テスト太郎",
+            "email_notify_opt_in": False,
+        },
+    )
+    assert r.status_code == 201, r.text
+
+    user = await db_session.scalar(select(User).where(User.email == "optout@example.com"))
+    assert user is not None
+    assert user.email_notify_opt_in is False
+    assert user.email_notify_updated_at is not None
+
+
+async def test_signup_email_notify_opt_in_omitted_defaults_to_true_without_timestamp(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """省略（旧クライアント）は「選択なし」＝既定値のまま・updated_atはNULLのまま。"""
+    r = await client.post(
+        "/api/v1/auth/signup",
+        json={
+            "email": "optomit@example.com",
+            "password": "password123",
+            "name": "テスト太郎",
+        },
+    )
+    assert r.status_code == 201, r.text
+
+    user = await db_session.scalar(select(User).where(User.email == "optomit@example.com"))
+    assert user is not None
+    assert user.email_notify_opt_in is True
+    assert user.email_notify_updated_at is None
+
+
+async def test_get_notification_settings_initial(client: AsyncClient):
+    token = await _signup_user(client, "notifysettings_get@example.com")
+    r = await client.get("/api/v1/users/me/notification-settings", headers=_auth(token))
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["email_notify_opt_in"] is True
+    assert data["email_notify_updated_at"] is None
+
+
+async def test_get_notification_settings_unauthenticated_401(client: AsyncClient):
+    r = await client.get("/api/v1/users/me/notification-settings")
+    assert r.status_code == 401
+
+
+async def test_patch_notification_settings_persists(
+    client: AsyncClient, db_session: AsyncSession
+):
+    token = await _signup_user(client, "notifysettings_patch@example.com")
+    r = await client.patch(
+        "/api/v1/users/me/notification-settings",
+        json={"email_notify_opt_in": False},
+        headers=_auth(token),
+    )
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["email_notify_opt_in"] is False
+    assert data["email_notify_updated_at"] is not None
+
+    r = await client.get("/api/v1/users/me/notification-settings", headers=_auth(token))
+    assert r.status_code == 200
+    assert r.json()["email_notify_opt_in"] is False
+
+    user = await db_session.scalar(
+        select(User).where(User.email == "notifysettings_patch@example.com")
+    )
+    assert user is not None
+    assert user.email_notify_opt_in is False
+    assert user.email_notify_updated_at is not None
+
+
+async def test_patch_notification_settings_unauthenticated_401(client: AsyncClient):
+    r = await client.patch(
+        "/api/v1/users/me/notification-settings", json={"email_notify_opt_in": False}
+    )
+    assert r.status_code == 401
+
+
+async def test_patch_notification_settings_non_bool_422(client: AsyncClient):
+    """Pydantic v2 の bool は "yes"/"1" 等の一部文字列を寛容に受理するため、
+    それらに該当しない値（オブジェクト・非対応文字列）で 422 を確認する。
+    """
+    token = await _signup_user(client, "notifysettings_422@example.com")
+    for invalid in ("maybe", {"nested": True}, [1, 2]):
+        r = await client.patch(
+            "/api/v1/users/me/notification-settings",
+            json={"email_notify_opt_in": invalid},
+            headers=_auth(token),
+        )
+        assert r.status_code == 422, f"{invalid!r} が誤って受理された: {r.text}"
+
+
+async def test_patch_notification_settings_missing_field_422(client: AsyncClient):
+    token = await _signup_user(client, "notifysettings_missing@example.com")
+    r = await client.patch(
+        "/api/v1/users/me/notification-settings", json={}, headers=_auth(token)
+    )
+    assert r.status_code == 422
+
+
+async def test_notification_settings_rejects_operator_token(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """業者トークンでは使えない（typ='user' 限定の get_current_user 依存を使うため401）。"""
+    admin_token = await _make_admin(client, db_session)
+    code = await _invite_code(client, admin_token)
+    op_token, _ = await _signup_operator(
+        client, code, "notifysettings_operator@example.com"
+    )
+
+    r = await client.get("/api/v1/users/me/notification-settings", headers=_auth(op_token))
+    assert r.status_code == 401
+
+    r = await client.patch(
+        "/api/v1/users/me/notification-settings",
+        json={"email_notify_opt_in": False},
+        headers=_auth(op_token),
+    )
+    assert r.status_code == 401
+
+
+async def test_notification_settings_rejects_extra_fields_422(client: AsyncClient):
+    token = await _signup_user(client, "notifysettings_extra@example.com")
+    r = await client.patch(
+        "/api/v1/users/me/notification-settings",
+        json={"email_notify_opt_in": False, "unexpected_field": "x"},
+        headers=_auth(token),
+    )
+    assert r.status_code == 422
+
+
+async def test_patch_notification_settings_rate_limited_returns_429(
+    db_session: AsyncSession,
+):
+    """scope=notification_settings の user_id 軸レート制限が上限超過で429を返すことを確認する。
+
+    ``conftest.py`` の既定 ``RATE_LIMIT_ENABLED=false`` に依存せず、
+    test_user_profile_ext.py の bank-account 版と同じパターンでテスト専用の
+    有効な RateLimiter を注入する（security review M-1対応）。
+    """
+    test_app = create_test_app(db_session)
+    limiter = RateLimiter(
+        config=RateLimitConfig(
+            enabled=True,
+            login_account=RateLimitRule(5, 900),
+            login_ip=RateLimitRule(20, 900),
+            sensitive_account=RateLimitRule(1, 900),
+            signup_ip=RateLimitRule(10, 3600),
+            line_ip=RateLimitRule(20, 900),
+            max_keys=10000,
+        ),
+        store=InMemoryRateLimitStore(),
+    )
+    test_app.dependency_overrides[get_rate_limiter] = lambda: limiter
+
+    async with AsyncClient(
+        transport=ASGITransport(app=test_app), base_url="http://test"
+    ) as client:
+        token = await _signup_user(client, "notifysettings_rl@example.com")
+
+        r1 = await client.patch(
+            "/api/v1/users/me/notification-settings",
+            json={"email_notify_opt_in": False},
+            headers=_auth(token),
+        )
+        assert r1.status_code == 200, r1.text
+
+        r2 = await client.patch(
+            "/api/v1/users/me/notification-settings",
+            json={"email_notify_opt_in": True},
+            headers=_auth(token),
+        )
+        assert r2.status_code == 429
+        assert "Retry-After" in r2.headers
+
+
+async def test_patch_notification_settings_logs_user_id_and_new_value_without_pii(
+    client: AsyncClient, caplog
+):
+    """監査ログに user_id と変更後の値のみを残し、メールアドレス等のPIIは出さない。"""
+    token = await _signup_user(client, "notifysettings_audit@example.com")
+    with caplog.at_level("INFO"):
+        r = await client.patch(
+            "/api/v1/users/me/notification-settings",
+            json={"email_notify_opt_in": False},
+            headers=_auth(token),
+        )
+    assert r.status_code == 200, r.text
+    assert "email_notify_opt_in=False" in caplog.text
+    assert "notifysettings_audit@example.com" not in caplog.text
 
 
 # ──────────────────────────── パスワード変更 ────────────────────────────

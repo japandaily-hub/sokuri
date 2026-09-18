@@ -242,7 +242,7 @@ export default function PhotoGuidePage() {
               <div className="guide-section-num">2</div>
               <div>
                 <h2>撮影の手順</h2>
-                <p>5分あれば十分です。この順番で撮ると業者が品物を把握しやすくなります。</p>
+                <p>特別な機材や準備はいりません。スマートフォンで、この順番に撮るだけ。業者が品物を把握しやすくなります。</p>
               </div>
             </div>
 

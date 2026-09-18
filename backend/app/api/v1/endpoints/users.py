@@ -47,6 +47,8 @@ from app.schemas_katadzuke import (
     UserBankAccountDeleteRequest,
     UserBankAccountMaskedOut,
     UserBankAccountUpdateRequest,
+    UserNotificationSettingsOut,
+    UserNotificationSettingsUpdateRequest,
     UserProfileOut,
     UserProfileUpdateRequest,
     prefecture_to_residence_area,
@@ -129,6 +131,58 @@ async def update_my_profile(
     await session.commit()
     await session.refresh(user)
     return _to_profile_out(user)
+
+
+# ──────────────────────────── お知らせメール受け取り設定 ────────────────────────────
+
+
+def _to_notification_settings_out(user: User) -> UserNotificationSettingsOut:
+    return UserNotificationSettingsOut(
+        email_notify_opt_in=user.email_notify_opt_in,
+        email_notify_updated_at=user.email_notify_updated_at,
+    )
+
+
+@router.get(
+    "/users/me/notification-settings",
+    response_model=UserNotificationSettingsOut,
+    summary="お知らせメール受け取り設定の取得",
+)
+async def get_my_notification_settings(
+    user: User = Depends(get_current_user),
+) -> UserNotificationSettingsOut:
+    return _to_notification_settings_out(user)
+
+
+@router.patch(
+    "/users/me/notification-settings",
+    response_model=UserNotificationSettingsOut,
+    summary="お知らせメール受け取り設定の更新（入札受信・入札額更新・入札なし/未決定リマインドの4種のみ対象）",
+)
+async def update_my_notification_settings(
+    body: UserNotificationSettingsUpdateRequest,
+    request: Request,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+    _rl: object = Depends(RateLimitGuard("notification_settings")),
+) -> UserNotificationSettingsOut:
+    # security review M-1対応: bank-account 等の既存更新系と同じ形で、成功/失敗を
+    # 問わず毎リクエストをアカウント軸でカウントする（連打・自動化の抑止）。
+    request.state.rate_limit.hit_account(str(user.id))
+
+    user.email_notify_opt_in = body.email_notify_opt_in
+    user.email_notify_updated_at = datetime.now(timezone.utc)
+
+    await session.commit()
+    await session.refresh(user)
+
+    # 監査ログ: user_id と変更後の値のみを残す（メールアドレス等のPIIは出さない）。
+    logger.info(
+        "users/me/notification-settings PATCH: 更新しました - user_id=%s email_notify_opt_in=%s",
+        user.id,
+        user.email_notify_opt_in,
+    )
+    return _to_notification_settings_out(user)
 
 
 # ──────────────────────────── 住所 ────────────────────────────

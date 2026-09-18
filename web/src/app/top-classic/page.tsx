@@ -684,22 +684,19 @@ export default function HomePage() {
               <div className="biz-banner-copy">
                 <span className="eyebrow">買取業者の方へ</span>
                 <h2>買取業者の方へ。<br />カタヅケに参加しませんか。</h2>
-                <p>顧客と業者、双方に無駄がない。だから長く続く。<br />一括出品への入札で、効率的な仕入れルートを開拓できます。<br />※ サービス開始当初（β期間）は手数料を請求しません。請求開始の際は事前にメールでお知らせします。</p>
+                <p>顧客と業者、双方に無駄がない。だから長く続く。<br />一括出品への入札で、効率的な仕入れルートを開拓できます。<br />※ 料金・契約条件は、業者登録のお申し込み後に個別にご案内します。</p>
                 {/* ラウンド4（7）: flex-wrap のままだと 5 個の幅が極端に不揃いで、長い β の1本が
                     折返しをぎざぎざにしていた。PC は 2 列の等幅グリッドにし、長い β だけを最後段に
                     全幅で送る（katazuke-top.css）。DOM は短い4本の並び順を保ったまま β を末尾へ移す
                     だけで、文言・条件の意味は変えない。 */}
                 <div className="biz-banner-tags">
-                  <span className="biz-tag">初期費用・月額費用 無料</span>
-                  <span className="biz-tag">成約時8%（税別）のみ</span>
-                  <span className="biz-tag">下見なし・一斉架電なし</span>
+                  <span className="biz-tag">下見なし・一斉の営業電話なし</span>
                   <span className="biz-tag">古物商許可が必要</span>
                   {/* ラウンド5 指摘（21）: 1 案件に何社が入るのかが業者側から読めなかった。
                       数値は出さず、実装済みの仕組み（#auction「複数の業者が、出品した商品すべてに
                       対して買取総額を提示します」）の再掲に留める。2 列グリッドの短いチップを
                       5 個にすると 3 段目に半分の穴が空くため、β と同じ全幅（--wide）で置く。 */}
                   <span className="biz-tag biz-tag--wide">1案件に複数社が入札する仕組み</span>
-                  <span className="biz-tag biz-tag--wide">β期間中は手数料0円（期間限定・請求開始は事前にお知らせします）</span>
                 </div>
                 <div className="biz-banner-cta">
                   <Link href="/business" className="btn btn-white btn-lg">業者登録の詳細を見る<Ic name="arrow" /></Link>

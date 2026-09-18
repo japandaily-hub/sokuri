@@ -7,11 +7,15 @@
 
 from __future__ import annotations
 
+from typing import AsyncIterator
+
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
+from app.db.session import get_session
 from app.main import create_app
 
 _STRONG_JWT_SECRET = "a" * 64  # 64桁のダミー強鍵（本物のランダム鍵の代替として長さのみ検証）
@@ -152,3 +156,60 @@ async def test_health_commit_reads_render_git_commit_from_env_var(
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         r = await client.get("/health")
     assert r.json()["commit"] == "deadbee"
+
+
+# ──────────────────────────── 422 バリデーションエラーの送信値反射防止 ────────────────────────────
+# security review 2026-09-18 Medium: FastAPI 既定の RequestValidationError ハンドラは
+# exc.errors() をそのまま返すため、各エラー要素の "input" キーに送信された生の値
+# （例: signup の平文パスワード）がそのまま反射されていた。
+
+
+def _app_with_test_db(db_session: AsyncSession) -> FastAPI:
+    """``create_app()`` のカスタム例外ハンドラを含む実アプリに、テスト用 DB を注入する。"""
+    settings = Settings(_env_file=None)
+    app = create_app(settings)
+
+    async def override_session() -> AsyncIterator[AsyncSession]:
+        yield db_session
+
+    app.dependency_overrides[get_session] = override_session
+    return app
+
+
+async def test_signup_validation_error_does_not_reflect_submitted_password(
+    db_session: AsyncSession,
+):
+    """短すぎるパスワードで signup すると 422 になるが、応答本文に平文パスワードが
+    含まれない（"input" キーが落とされていること）。"""
+    app = _app_with_test_db(db_session)
+    submitted_password = "short1"
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        r = await client.post(
+            "/api/v1/auth/signup",
+            json={"email": "reflect-test@example.com", "password": submitted_password},
+        )
+    assert r.status_code == 422
+    assert submitted_password not in r.text
+    for error in r.json()["detail"]:
+        assert set(error.keys()) == {"type", "loc", "msg"}
+
+
+async def test_validation_error_response_keeps_loc_msg_type_for_web_compat(
+    db_session: AsyncSession,
+):
+    """web 側（katadzuke-api.ts の throwHttpError）が参照する detail の形状
+    （文字列、または {code, message} を持つオブジェクト）はこの応答に存在しない
+    ため互換性への影響は無いが、診断に必要な loc/msg/type は維持されていること。"""
+    app = _app_with_test_db(db_session)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        r = await client.post(
+            "/api/v1/auth/signup",
+            json={"email": "not-an-email", "password": "validpassword123"},
+        )
+    assert r.status_code == 422
+    body = r.json()
+    assert isinstance(body["detail"], list) and body["detail"]
+    error = body["detail"][0]
+    assert error["loc"] == ["body", "email"]
+    assert isinstance(error["msg"], str) and error["msg"]
+    assert isinstance(error["type"], str) and error["type"]

@@ -213,6 +213,14 @@ async def user_signup(
         name=body.name,
         role=role,
     )
+    # 「入札情報・サービスに関するメール通知を受け取る」の任意チェック。
+    # 未送信（None）は「選択なし」として既定値（email_notify_opt_in=True・
+    # email_notify_updated_at=None）のまま据え置く。値が来た場合のみ本人の
+    # 明示的な選択として記録する（LINEログイン専用ユーザーの自動作成経路
+    # ``line_exchange`` はこのフィールドを一切扱わず、常に既定値のまま）。
+    if body.email_notify_opt_in is not None:
+        user.email_notify_opt_in = body.email_notify_opt_in
+        user.email_notify_updated_at = datetime.now(timezone.utc)
     session.add(user)
     await session.commit()
     await session.refresh(user)

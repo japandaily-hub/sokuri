@@ -261,7 +261,7 @@ export default function ContactPage() {
           <p className="ct-biz-note">
             業者登録をご希望の方は
             <Link href="/business">業者登録のお申し込み</Link>
-            へ。審査や手数料のご質問は、このフォーム（種別「業者登録・提携について」）でも承ります。
+            へ。審査や料金のご質問は、このフォーム（種別「業者登録・提携について」）でも承ります。
           </p>
 
           {/* フォームカード */}

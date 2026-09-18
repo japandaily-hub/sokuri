@@ -40,6 +40,8 @@ import {
   listTransactions,
   LIST_MAX_LIMIT,
   getMyProfile,
+  getNotificationSettings,
+  updateNotificationSettings,
   requestLineReauthToken,
   unlinkLine,
   toDisplayMessage,
@@ -48,6 +50,7 @@ import {
   type CaseOut,
   type TransactionListItem,
   type UserProfile,
+  type NotificationSettings,
 } from "@/lib/katadzuke-api";
 import "./notifications.css";
 
@@ -116,6 +119,10 @@ function NotificationsContent() {
   const [cases, setCases] = useState<CaseOut[] | null>(null);
   const [transactions, setTransactions] = useState<TransactionListItem[] | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  /* お知らせメールの受け取り設定。取得に失敗しても一覧の表示は止めない（設定の行を出さないだけ）。 */
+  const [mailSettings, setMailSettings] = useState<NotificationSettings | null>(null);
+  const [mailBusy, setMailBusy] = useState(false);
+  const [mailNotice, setMailNotice] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
@@ -135,7 +142,34 @@ function NotificationsContent() {
     } catch (e) {
       setError((prev) => prev ?? toDisplayMessage(e, "プロフィールの取得に失敗しました"));
     }
+    try {
+      setMailSettings(await getNotificationSettings(token));
+    } catch {
+      // 設定の取得失敗は致命ではない（行を出さないだけ）。通知一覧のエラー表示を上書きしない。
+      setMailSettings(null);
+    }
   }, [token]);
+
+  /** お知らせメールの受け取りを切り替える。失敗時は表示を元に戻し、理由を出す。 */
+  const onToggleMail = useCallback(async () => {
+    if (!token || !mailSettings || mailBusy) return;
+    const next = !mailSettings.email_notify_opt_in;
+    setMailBusy(true);
+    setMailNotice(null);
+    try {
+      setMailSettings(await updateNotificationSettings(next, token));
+      setMailNotice({
+        tone: "success",
+        text: next
+          ? "お知らせメールを受け取る設定にしました。"
+          : "お知らせメールを停止しました。出品の受付・成約・訪問日程など、お取引に必要なご連絡は引き続きお送りします。",
+      });
+    } catch (e) {
+      setMailNotice({ tone: "error", text: toDisplayMessage(e, "設定の変更に失敗しました。時間をおいて再度お試しください。") });
+    } finally {
+      setMailBusy(false);
+    }
+  }, [token, mailSettings, mailBusy]);
 
   useEffect(() => {
     void reload();
@@ -352,6 +386,34 @@ function NotificationsContent() {
               {profile.line_linked && !profile.has_password ? (
                 <p className="notif-settings-note">
                   LINEログイン専用アカウントのため、連携解除はできません。
+                </p>
+              ) : null}
+            </>
+          ) : null}
+
+          {/* お知らせメールの受け取り設定（新規登録時の任意チェックと同じ値。ここで変更できる） */}
+          {mailSettings ? (
+            <>
+              <div className="notif-settings-banner">
+                <NotifIcon name="bell" />
+                <div className="notif-settings-text">
+                  <strong>お知らせメール：{mailSettings.email_notify_opt_in ? "受け取る" : "停止中"}</strong>
+                  <br />
+                  入札が届いたとき・入札額が更新されたとき・入札の確認をお願いするときのメールです。出品の受付・成約・訪問日程など、お取引に必要なご連絡はこの設定に関係なくお送りします。
+                </div>
+                <button
+                  type="button"
+                  className="btn-notif-setting"
+                  disabled={mailBusy}
+                  aria-pressed={mailSettings.email_notify_opt_in}
+                  onClick={onToggleMail}
+                >
+                  {mailSettings.email_notify_opt_in ? "メールを停止する" : "メールを受け取る"}
+                </button>
+              </div>
+              {mailNotice ? (
+                <p className="notif-settings-note" role="status">
+                  {mailNotice.text}
                 </p>
               ) : null}
             </>

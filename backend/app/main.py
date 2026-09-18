@@ -14,6 +14,7 @@ from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
@@ -316,6 +317,31 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.exception_handler(RequestValidationError)
+    async def _validation_error_handler(
+        request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
+        """422 応答から送信値の反射を除去する（security review 2026-09-18 Medium）。
+
+        FastAPI 既定の RequestValidationError ハンドラは ``exc.errors()`` を
+        そのまま ``{"detail": [...]}`` として返す。各エラー要素の ``input``
+        キーには送信された生の値がそのまま入るため、例えば
+        ``POST /api/v1/auth/signup`` に短いパスワードを送ると、平文パスワード
+        がこの 422 レスポンス本文にそのまま反射される（ログ・プロキシ・
+        ブラウザ拡張等での漏洩経路になり得る）。``loc`` / ``msg`` / ``type``
+        のみを返し、``input`` / ``ctx`` / ``url`` は落とす。
+
+        web 側（web/src/lib/katadzuke-api.ts の throwHttpError）は
+        ``detail`` が文字列、または ``{code, message}`` を持つオブジェクトで
+        ある場合しか参照しておらず、配列要素の個々のキー構成までは見ていない
+        ため、この形状変更に互換性への影響は無い。
+        """
+        sanitized_errors = [
+            {"type": err.get("type"), "loc": err.get("loc"), "msg": err.get("msg")}
+            for err in exc.errors()
+        ]
+        return JSONResponse(status_code=422, content={"detail": sanitized_errors})
 
     app.include_router(api_router, prefix="/api/v1")
 

@@ -201,6 +201,7 @@ _SCOPE_MESSAGES: dict[str, str] = {
     "account_delete": "試行回数が上限に達しました。しばらく時間をおいて再度お試しください。",
     "line_link_reauth": "試行回数が上限に達しました。しばらく時間をおいて再度お試しください。",
     "bank_account_update": "振込先口座の変更試行回数が上限に達しました。しばらく時間をおいて再度お試しください。",
+    "notification_settings": "設定変更の試行回数が上限に達しました。しばらく時間をおいて再度お試しください。",
     "identity_submit": "本人確認書類の提出試行回数が上限に達しました。しばらく時間をおいて再度お試しください。",
     "signup": "登録試行が集中しています。しばらく時間をおいて再度お試しください。",
     "line_exchange": "リクエストが集中しています。しばらく時間をおいて再度お試しください。",
@@ -391,6 +392,15 @@ def _scope_spec(scope: str, config: RateLimitConfig) -> _ScopeSpec:
     if scope == "identity_submit":
         # 本人確認書類の提出（画像保存を伴うコストDoS対策も兼ねる）。
         # 同じくアカウント軸のみで password_change 等と同一ルールを共有する。
+        return _ScopeSpec(
+            ip_rule=None, account_rule=config.sensitive_account, count_all=False
+        )
+    if scope == "notification_settings":
+        # お知らせメール受け取り設定の変更（PATCH /users/me/notification-settings）。
+        # security review M-1対応: 連打・自動化による無意味な書き換え連打を止める
+        # のが目的で、パスワード等の総当たり対象ではないため専用の数値は持たず、
+        # bank_account_update / identity_submit と同じ sensitive_account
+        # （アカウント軸のみ・count_all 方式で毎リクエストをカウント）を流用する。
         return _ScopeSpec(
             ip_rule=None, account_rule=config.sensitive_account, count_all=False
         )

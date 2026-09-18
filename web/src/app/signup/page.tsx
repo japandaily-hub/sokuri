@@ -50,7 +50,9 @@ export default function SignupPage() {
   const [password2, setPassword2] = useState("");
   const [name, setName] = useState("");
   const [agree1, setAgree1] = useState(false);
-  const [agree2, setAgree2] = useState(false);
+  /* お知らせメール（入札の通知・リマインド）の受け取り。取引の進行に必要な通知なので既定はオン
+     （オフのままだと入札が届いても気づけない）。値は signupUser で保存し、/notifications で変更できる。 */
+  const [agree2, setAgree2] = useState(true);
 
   const [errs, setErrs] = useState<Record<string, string>>({});
   const [authErr, setAuthErr] = useState<string | null>(null);
@@ -91,7 +93,7 @@ export default function SignupPage() {
       setBusy(true);
       setAuthErr(null);
       try {
-        await signupUser({ email, password, name: name || undefined });
+        await signupUser({ email, password, name: name || undefined, email_notify_opt_in: agree2 });
         const res = await signIn("user-credentials", { email, password, redirect: false });
         if (res?.error) throw new Error("登録後のログインに失敗しました。");
         // r3 再レビュー3回目 是正: 新規登録直後のログイン成功でもループ検知の発火履歴をリセットする。
@@ -204,7 +206,7 @@ export default function SignupPage() {
           {step === 2 && (
             <div>
               <h1 className="step-title">プロフィールを設定する</h1>
-              <p className="step-desc">出品時にお呼びする、お名前を入力してください。</p>
+              <p className="step-desc">マイページなどの表示に使うお名前を入力してください。業者に渡ることはありません。</p>
 
               <div className="form-card">
                 <div className={`field${errs.name ? " has-error" : ""}`}>
@@ -249,7 +251,7 @@ export default function SignupPage() {
                 </div>
                 <div className="agree-row">
                   <input type="checkbox" className="agree-cb" id="agree2" checked={agree2} onChange={(e) => setAgree2(e.target.checked)} />
-                  <label htmlFor="agree2">入札情報・サービスに関するメール通知を受け取ることに同意します（任意）</label>
+                  <label htmlFor="agree2">入札が届いたときなどのお知らせメールを受け取る（任意・あとから通知設定で変更できます）</label>
                 </div>
               </div>
 

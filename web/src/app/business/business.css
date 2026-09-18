@@ -380,14 +380,6 @@
 }
 .business-page .vc-facts dd b { font-size: 20px; font-weight: 600; }
 .business-page .vc-facts dd span { font-size: 12px; font-weight: 600; color: var(--body); margin-left: 3px; }
-/* 利得側（引き取り・成約・買取総額）と同じ視野に業者の負担（成約時8%）を置く。省略不可。 */
-.business-page .vc-fee {
-  font-family: var(--ui);
-  font-size: 13px;
-  line-height: 1.9;
-  color: var(--body);
-  margin: 12px 0 0;
-}
 /* r5 #4: 表（.vc-facts）と引用の間は塊が分かれて見えるまで余白を広げる。 */
 .business-page .vc-quote {
   margin: 28px 0 0;

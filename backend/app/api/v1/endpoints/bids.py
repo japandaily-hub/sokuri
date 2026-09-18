@@ -232,6 +232,7 @@ async def create_bid(
                 str(case.id),
                 operator.company_name,
                 bid.amount,
+                owner.email_notify_opt_in,
             )
     return BidOut.model_validate(bid)
 
@@ -379,6 +380,7 @@ async def update_my_bid(
                 operator.company_name,
                 old_amount,
                 bid.amount,
+                owner.email_notify_opt_in,
             )
     return BidOut.model_validate(bid)
 

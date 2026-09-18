@@ -426,9 +426,9 @@ const DAILY_STEPS: DailyStep[] = [
    （h/p に組み替えると「初期費用無料だから長く続く」のような新しい因果が生まれる）。
    ============================================================ */
 const BIZ_CARDS: { h: string; img: string }[] = [
-  { h: "初期費用・月額費用 無料", img: "biz-reason-bulk" },
-  { h: "成約時8%（税別）のみ", img: "biz-reason-photo" },
-  { h: "下見なし・一斉の営業電話なし", img: "biz-reason-route" },
+  { h: "まとめ買取で、1回の訪問にまとまる", img: "biz-reason-bulk" },
+  { h: "写真と品目から、下見なしで入札", img: "biz-reason-photo" },
+  { h: "一斉の営業電話なし。選ばれた1社だけが連絡", img: "biz-reason-route" },
 ];
 
 /** フッターのリンク（電話番号・住所は書かない） */
@@ -932,7 +932,7 @@ export default function LpPage() {
               </Reveal>
             </div>
             {/* legal M5: 期間限定の条件はカード群の直前・本文サイズで置く */}
-            <p className="lp-biz__note">β期間中は手数料0円（期間限定・請求開始は事前にお知らせします）</p>
+            <p className="lp-biz__note">料金・契約条件は、業者登録のお申し込み後に個別にご案内します。</p>
             <div className="lp-biz__cards">
               {BIZ_CARDS.map((c, i) => (
                 <Reveal as="article" className="lp-biz__card" variant="up" stagger={i} key={c.img}>

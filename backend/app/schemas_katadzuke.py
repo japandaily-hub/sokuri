@@ -35,6 +35,11 @@ class UserSignupRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     name: str | None = Field(default=None, max_length=128)
+    # 「入札情報・サービスに関するメール通知を受け取る」の任意チェック。
+    # 未送信（None・旧クライアント含む）は「選択なし」として扱い、
+    # email_notify_opt_in は既定値 True のまま・email_notify_updated_at も
+    # NULL のままにする（auth.py user_signup 参照）。
+    email_notify_opt_in: bool | None = Field(default=None)
 
 
 class UserLoginRequest(BaseModel):
@@ -227,6 +232,23 @@ class UserProfileUpdateRequest(BaseModel):
         if v is not None and not re.match(_PHONE_RE, v):
             raise ValueError("電話番号の形式が正しくありません。")
         return v
+
+
+class UserNotificationSettingsOut(BaseModel):
+    """GET/PATCH /users/me/notification-settings 共通のレスポンス形。"""
+
+    email_notify_opt_in: bool
+    email_notify_updated_at: datetime | None = None
+
+
+class UserNotificationSettingsUpdateRequest(BaseModel):
+    # extra="forbid"（security review L-3対応。CaseItemUpdateRequest と同じ理由）:
+    # このリクエストは単一フィールドのみを持つ薄いスキーマのため、余計なキーが
+    # 送られてもそのまま無視されると「送ったつもりが反映されない」静かな不具合に
+    # 気づきにくい。未知フィールドは 422 で明示的に拒否する。
+    model_config = ConfigDict(extra="forbid")
+
+    email_notify_opt_in: bool
 
 
 class PasswordChangeRequest(BaseModel):

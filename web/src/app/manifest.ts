@@ -13,7 +13,7 @@ import type { MetadataRoute } from "next";
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "カタヅケ｜不用品を撮るだけAI片付け査定",
+    name: "カタヅケ｜家まるごと、まとめて片付け買取",
     short_name: "カタヅケ",
     description:
       "家じゅうの不用品を、1点ずつ撮って、あとは待つだけ。登録業者が買取総額で競い合う、家まるごとの片付け買取マッチング。",
@@ -39,16 +39,16 @@ export default function manifest(): MetadataRoute.Manifest {
     ],
     shortcuts: [
       {
-        name: "1点を査定",
-        short_name: "単品査定",
-        description: "1 点の不用品を撮影して即時査定",
-        url: "/",
+        name: "出品する",
+        short_name: "出品",
+        description: "不用品を1点ずつ撮って、まとめて出品する",
+        url: "/create",
       },
       {
-        name: "まとめて査定",
-        short_name: "まとめて",
-        description: "部屋にある不用品を撮影して片付け・買取をまとめて依頼",
-        url: "/create",
+        name: "マイページ",
+        short_name: "マイページ",
+        description: "届いた入札や取引の状況を確認する",
+        url: "/mypage",
       },
     ],
   };

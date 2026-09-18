@@ -288,6 +288,220 @@ class TestDispatchBidReceived:
         email_mock.assert_not_called()
 
 
+class TestDispatchEmailNotifyOptOut:
+    """email_notify_opt_in=False は「LINE未連携/失敗時のメールフォールバック」のみを
+    止める（LINE Push の可否・仮メール判定には一切影響しない）。対象は
+    dispatch_bid_received / dispatch_bid_updated / dispatch_no_bid_reminder /
+    dispatch_bids_pending_reminder の4種のみ（設計指示。security review M-2対応で
+    dispatch_bid_updated を追加）。
+    """
+
+    async def test_bid_received_email_skipped_when_opted_out(self, monkeypatch, caplog):
+        push_mock = AsyncMock(return_value=False)
+        email_mock = AsyncMock(return_value=True)
+        monkeypatch.setattr("app.services.line_notify.push_bid_received", push_mock)
+        monkeypatch.setattr("app.services.notify.send_bid_received", email_mock)
+
+        with caplog.at_level("INFO"):
+            await notify_dispatch.dispatch_bid_received(
+                None, "user@example.com", "case1", "A社", 10000, False
+            )
+
+        email_mock.assert_not_called()
+        assert "case1" in caplog.text
+
+    async def test_bid_received_email_sent_when_opted_in(self, monkeypatch):
+        """既定 True（明示的な opt-in・省略どちらも同じ）では従来どおり送る。"""
+        push_mock = AsyncMock(return_value=False)
+        email_mock = AsyncMock(return_value=True)
+        monkeypatch.setattr("app.services.line_notify.push_bid_received", push_mock)
+        monkeypatch.setattr("app.services.notify.send_bid_received", email_mock)
+
+        await notify_dispatch.dispatch_bid_received(
+            None, "user@example.com", "case1", "A社", 10000, True
+        )
+
+        email_mock.assert_called_once_with("user@example.com", "case1", "A社", 10000)
+
+    async def test_bid_received_line_push_unaffected_by_opt_out(self, monkeypatch):
+        """LINE連携済みなら opt_in=False でも LINE Push は届く（対象はメールのみ）。"""
+        push_mock = AsyncMock(return_value=True)
+        email_mock = AsyncMock(return_value=True)
+        monkeypatch.setattr("app.services.line_notify.push_bid_received", push_mock)
+        monkeypatch.setattr("app.services.notify.send_bid_received", email_mock)
+
+        await notify_dispatch.dispatch_bid_received(
+            "U123", "user@example.com", "case1", "A社", 10000, False
+        )
+
+        push_mock.assert_called_once()
+        email_mock.assert_not_called()
+
+    async def test_bid_received_push_attempted_but_email_skipped_when_push_fails_and_opted_out(
+        self, monkeypatch
+    ):
+        """QA Medium対応: LINE連携済み・Push失敗・opt_in=False では、Pushは試行
+        される（＝配送経路として諦めていない）が、フォールバック先のメールは
+        opt-out のため送らない。
+        """
+        push_mock = AsyncMock(return_value=False)
+        email_mock = AsyncMock(return_value=True)
+        monkeypatch.setattr("app.services.line_notify.push_bid_received", push_mock)
+        monkeypatch.setattr("app.services.notify.send_bid_received", email_mock)
+
+        await notify_dispatch.dispatch_bid_received(
+            "U123", "user@example.com", "case1", "A社", 10000, False
+        )
+
+        push_mock.assert_called_once()
+        email_mock.assert_not_called()
+
+    async def test_bid_updated_email_skipped_when_opted_out(self, monkeypatch):
+        push_mock = AsyncMock(return_value=False)
+        email_mock = AsyncMock(return_value=True)
+        monkeypatch.setattr("app.services.line_notify.push_bid_updated", push_mock)
+        monkeypatch.setattr("app.services.notify.send_bid_updated", email_mock)
+
+        await notify_dispatch.dispatch_bid_updated(
+            None, "user@example.com", "case1", "A社", 30000, 40000, False
+        )
+
+        email_mock.assert_not_called()
+
+    async def test_bid_updated_email_sent_when_opted_in(self, monkeypatch):
+        push_mock = AsyncMock(return_value=False)
+        email_mock = AsyncMock(return_value=True)
+        monkeypatch.setattr("app.services.line_notify.push_bid_updated", push_mock)
+        monkeypatch.setattr("app.services.notify.send_bid_updated", email_mock)
+
+        await notify_dispatch.dispatch_bid_updated(
+            None, "user@example.com", "case1", "A社", 30000, 40000, True
+        )
+
+        email_mock.assert_called_once_with("user@example.com", "case1", "A社", 30000, 40000)
+
+    async def test_bid_updated_push_attempted_but_email_skipped_when_push_fails_and_opted_out(
+        self, monkeypatch
+    ):
+        """QA Medium対応（dispatch_bid_updated 版）。"""
+        push_mock = AsyncMock(return_value=False)
+        email_mock = AsyncMock(return_value=True)
+        monkeypatch.setattr("app.services.line_notify.push_bid_updated", push_mock)
+        monkeypatch.setattr("app.services.notify.send_bid_updated", email_mock)
+
+        await notify_dispatch.dispatch_bid_updated(
+            "U123", "user@example.com", "case1", "A社", 30000, 40000, False
+        )
+
+        push_mock.assert_called_once()
+        email_mock.assert_not_called()
+
+    async def test_no_bid_reminder_email_skipped_when_opted_out(self, monkeypatch):
+        push_mock = AsyncMock(return_value=False)
+        email_mock = AsyncMock(return_value=True)
+        monkeypatch.setattr("app.services.line_notify.push_no_bid_reminder", push_mock)
+        monkeypatch.setattr("app.services.notify.send_no_bid_reminder", email_mock)
+
+        await notify_dispatch.dispatch_no_bid_reminder(
+            None, "user@example.com", "case1", False
+        )
+
+        email_mock.assert_not_called()
+
+    async def test_no_bid_reminder_email_sent_when_opted_in(self, monkeypatch):
+        push_mock = AsyncMock(return_value=False)
+        email_mock = AsyncMock(return_value=True)
+        monkeypatch.setattr("app.services.line_notify.push_no_bid_reminder", push_mock)
+        monkeypatch.setattr("app.services.notify.send_no_bid_reminder", email_mock)
+
+        await notify_dispatch.dispatch_no_bid_reminder(
+            None, "user@example.com", "case1", True
+        )
+
+        email_mock.assert_called_once_with("user@example.com", "case1")
+
+    async def test_no_bid_reminder_push_attempted_but_email_skipped_when_push_fails_and_opted_out(
+        self, monkeypatch
+    ):
+        """QA Medium対応（dispatch_no_bid_reminder 版）。"""
+        push_mock = AsyncMock(return_value=False)
+        email_mock = AsyncMock(return_value=True)
+        monkeypatch.setattr("app.services.line_notify.push_no_bid_reminder", push_mock)
+        monkeypatch.setattr("app.services.notify.send_no_bid_reminder", email_mock)
+
+        await notify_dispatch.dispatch_no_bid_reminder(
+            "U123", "user@example.com", "case1", False
+        )
+
+        push_mock.assert_called_once()
+        email_mock.assert_not_called()
+
+    async def test_bids_pending_reminder_email_skipped_when_opted_out(self, monkeypatch):
+        push_mock = AsyncMock(return_value=False)
+        email_mock = AsyncMock(return_value=True)
+        monkeypatch.setattr("app.services.line_notify.push_bids_pending_reminder", push_mock)
+        monkeypatch.setattr("app.services.notify.send_bids_pending_reminder", email_mock)
+
+        await notify_dispatch.dispatch_bids_pending_reminder(
+            None, "user@example.com", "case1", False
+        )
+
+        email_mock.assert_not_called()
+
+    async def test_bids_pending_reminder_email_sent_when_opted_in(self, monkeypatch):
+        push_mock = AsyncMock(return_value=False)
+        email_mock = AsyncMock(return_value=True)
+        monkeypatch.setattr("app.services.line_notify.push_bids_pending_reminder", push_mock)
+        monkeypatch.setattr("app.services.notify.send_bids_pending_reminder", email_mock)
+
+        await notify_dispatch.dispatch_bids_pending_reminder(
+            None, "user@example.com", "case1", True
+        )
+
+        email_mock.assert_called_once_with("user@example.com", "case1")
+
+    async def test_bids_pending_reminder_push_attempted_but_email_skipped_when_push_fails_and_opted_out(
+        self, monkeypatch
+    ):
+        """QA Medium対応（dispatch_bids_pending_reminder 版）。"""
+        push_mock = AsyncMock(return_value=False)
+        email_mock = AsyncMock(return_value=True)
+        monkeypatch.setattr("app.services.line_notify.push_bids_pending_reminder", push_mock)
+        monkeypatch.setattr("app.services.notify.send_bids_pending_reminder", email_mock)
+
+        await notify_dispatch.dispatch_bids_pending_reminder(
+            "U123", "user@example.com", "case1", False
+        )
+
+        push_mock.assert_called_once()
+        email_mock.assert_not_called()
+
+    async def test_gated_dispatch_functions_have_opt_in_param(self):
+        """opt-out の対象4種（設計指示・security review M-2で dispatch_bid_updated を追加）
+        は全て email_notify_opt_in パラメータを持つ。
+        """
+        import inspect
+
+        for fn in (
+            notify_dispatch.dispatch_bid_received,
+            notify_dispatch.dispatch_bid_updated,
+            notify_dispatch.dispatch_no_bid_reminder,
+            notify_dispatch.dispatch_bids_pending_reminder,
+        ):
+            assert "email_notify_opt_in" in inspect.signature(fn).parameters, fn.__name__
+
+    async def test_other_dispatch_functions_are_not_gated_by_opt_in(self, monkeypatch):
+        """出品受付・落札等の取引上必須の通知はフラグの対象外（引数自体を持たない）。"""
+        import inspect
+
+        assert "email_notify_opt_in" not in inspect.signature(
+            notify_dispatch.dispatch_case_created
+        ).parameters
+        assert "email_notify_opt_in" not in inspect.signature(
+            notify_dispatch.dispatch_bid_selected
+        ).parameters
+
+
 class TestDispatchMessageReceived:
     async def test_line_only(self, monkeypatch):
         push_mock = AsyncMock(return_value=True)
@@ -440,8 +654,10 @@ class TestEndpointDispatchWiring:
                 headers=_auth(op_token),
             )
         assert r.status_code == 201, r.text
+        # 末尾は依頼者の email_notify_opt_in（既定 True）。signup 時に明示選択して
+        # いないため既定値のまま渡ることを確認する。
         dispatch_mock.assert_called_once_with(
-            None, "bidrecv_user@example.com", case["id"], "A社", 15000
+            None, "bidrecv_user@example.com", case["id"], "A社", 15000, True
         )
 
     async def _setup_transaction(
