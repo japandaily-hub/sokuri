@@ -2290,3 +2290,18 @@ html.js-rv .lp-page .lp-ribbon__star { transition: opacity 0.8s var(--ease-expo-
 @media (prefers-reduced-motion: reduce) {
   .lp-page .lp-intro { display: none; }
 }
+
+/* ============================================================
+   2026-09-18 ワードマークの和欧バランス（/lp 内の全箇所: ヘッダー・オープニング・フッター・メニュー）
+   実測: 英字は仮名幅の 69%・左寄せだった。英字を仮名の 45% サイズにし、字間 .46em で仮名と同じ幅に揃え、
+   末尾の字間ぶん（仮名 .14em / 英字 .46em）を先頭側のパディングで相殺して見た目の中央を一致させる。
+   ============================================================ */
+.lp-page .kdz-wm { align-items: center; }
+.lp-page .kdz-wm-ja { padding-inline-start: 0.14em; }
+.lp-page .kdz-wm-en {
+  font-size: calc(var(--wm, 22px) * 0.45);
+  letter-spacing: 0.46em;
+  padding-inline-start: 0.46em;
+  margin-top: calc(var(--wm, 22px) * 0.12);
+  line-height: 1;
+}
