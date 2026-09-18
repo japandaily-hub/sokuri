@@ -1365,8 +1365,10 @@ export default function BusinessPage() {
             <div>
               <h5>ユーザーの方へ</h5>
               <ul>
-                <li><Link href="/#flow">使い方</Link></li>
-                <li><Link href="/#auction">仕組み</Link></li>
+                {/* 2026-09-18 本採用: 新トップ(/lp移植)の対応セクションへ retarget
+                    （#flow→#daily、#auction→#choose。#trust/#founder/#fee は同名のまま） */}
+                <li><Link href="/#daily">使い方</Link></li>
+                <li><Link href="/#choose">仕組み</Link></li>
                 <li><Link href="/#trust">安心の取り組み</Link></li>
                 <li><Link href="/faq">よくある質問</Link></li>
               </ul>

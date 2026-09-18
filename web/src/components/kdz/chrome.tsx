@@ -23,7 +23,9 @@ export function SiteFooter() {
           <div>
             <h5>サービス</h5>
             <ul>
-              <li><Link href="/#flow">使い方</Link></li>
+              {/* 2026-09-18 本採用: 新トップ(/lp移植)には旧 #flow が無いため、使い方に相当する
+                  #daily（出品から引き取りまでのタイムライン）へ retarget */}
+              <li><Link href="/#daily">使い方</Link></li>
               <li><Link href="/create">出品する</Link></li>
               <li><Link href="/photo-guide">撮影ガイド</Link></li>
               <li><Link href="/examples">利用イメージ</Link></li>

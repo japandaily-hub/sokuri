@@ -32,8 +32,10 @@ const BARE_PREFIXES = [
   // デザインレビュー C-1 対応: /admin も内部ツール画面としてマーケ用
   // SiteHeader/Dock/フッター（LINEではじめる CTA）を抑止する。
   "/admin",
-  // /lp は独自クロム（ヘッダー・全画面メニュー・浮遊CTA・pagetop・フッター）を自前で描く
-  "/lp",
+  // 2026-09-18 本採用: /lp のデザインがトップ（"/"）に昇格。独自クロム（ヘッダー・全画面メニュー・
+  // 浮遊CTA・pagetop・フッター）を自前で描くため、旧 "/lp" の代わりに "/" をここに置く。
+  // ("/" は完全一致のみ判定される。`${p}/` = "//" で始まる実ルートは存在しないため安全)
+  "/",
 ];
 
 /**
@@ -54,8 +56,9 @@ export function SiteChrome({ children }: { children: React.ReactNode }) {
   if (bare) return <>{children}</>;
 
   // 額装フレーム（.site-frame）はヘッダーの外側に描く。
-  // ランディング(/)だけは page.tsx 側が額を複数枚に割って描くため、ここでは包まない。
-  const framed = pathname !== "/";
+  // 旧トップ(/top-classic)だけは page.tsx 側が額を複数枚に割って描くため、ここでは包まない。
+  // （新トップ "/" は上の bare 判定で早期リターンするため、ここには届かない）
+  const framed = pathname !== "/top-classic";
 
   return (
     <>
