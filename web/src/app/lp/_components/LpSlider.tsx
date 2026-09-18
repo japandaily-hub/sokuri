@@ -21,8 +21,12 @@ import { useEffect, useRef, useState } from "react";
 import { Ic } from "@/components/kdz/Icons";
 
 export type LpSlide = {
-  /** /img/v2/<id>.webp（1536x1024） */
+  /** key と id 用の識別子（ファイル名と一致させる） */
   id: string;
+  /** 画像パス（1536x1024）。省略時は /img/v2/<id>.webp */
+  src?: string;
+  /** 意味のある alt。装飾扱いなら省略（alt=""） */
+  alt?: string;
 };
 
 export function LpSlider({
@@ -74,10 +78,10 @@ export function LpSlider({
             <img
               key={s.id}
               id={`lp-slide-${s.id}`}
-              src={`/img/v2/${s.id}.webp`}
+              src={s.src ?? `/img/v2/${s.id}.webp`}
               width={1536}
               height={1024}
-              alt=""
+              alt={s.alt ?? ""}
               aria-hidden={i === current ? undefined : true}
               className={`lp-slider__slide${i === current ? " is-active" : ""}`}
               loading={i === 0 ? "eager" : "lazy"}

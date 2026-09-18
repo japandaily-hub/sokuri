@@ -541,8 +541,8 @@ html.js-rv .lp-page .rv--up:not(.in) {
   pointer-events: none;
   background: linear-gradient(
     180deg,
-    rgba(244, 247, 252, 0.96) 0 clamp(360px, 40%, 460px),
-    rgba(244, 247, 252, 0) clamp(600px, 72%, 700px)
+    rgba(244, 247, 252, 0.96) 0 clamp(340px, 38%, 380px),
+    rgba(244, 247, 252, 0) clamp(500px, 58%, 540px)
   );
 }
 .lp-page .lp-kv__deco {
@@ -582,6 +582,10 @@ html.js-rv .lp-page .rv--up:not(.in) {
 .lp-page .lp-slider {
   position: absolute;
   inset: 0;
+  /* 2026-09-18 写真差し替え: 生成写真の人物は画面の 35〜60% の高さにいるため、写真の上端を
+     キャッチの帯の下まで下げて、veil（淡色グラデ）が顔に掛からないようにする（参照 KV も
+     キャッチは写真の上の空に載る構図）。上の帯は .lp-kv の淡色地がそのまま見える。 */
+  top: clamp(120px, 15%, 170px);
   z-index: 0;
 }
 .lp-page .lp-slider__frame {
@@ -592,7 +596,7 @@ html.js-rv .lp-page .rv--up:not(.in) {
   background: var(--pale-2);
 }
 .lp-page .lp-slider__frame img {
-  object-position: 50% 60%;
+  object-position: 50% 40%;
 }
 .lp-page .lp-slider__slide {
   opacity: 0;
@@ -1697,9 +1701,13 @@ html.js-rv .lp-page .rv--up:not(.in) {
   .lp-page .lp-kv__veil {
     background: linear-gradient(
       180deg,
-      rgba(244, 247, 252, 0.96) 0 clamp(360px, 45%, 420px),
-      rgba(244, 247, 252, 0) clamp(520px, 75%, 600px)
+      rgba(244, 247, 252, 0.96) 0 clamp(340px, 40%, 380px),
+      rgba(244, 247, 252, 0) clamp(470px, 58%, 520px)
     );
+  }
+  /* SP は写真の上端をコピー塊の直下（約 300px）まで下げ、人物の顔を veil の外に出す */
+  .lp-page .lp-slider {
+    top: 300px;
   }
   /* 参照どおり SP でもドットは縦・右端のまま（r1 A-3） */
   .lp-page .lp-slider__ctrl {

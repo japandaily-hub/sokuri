@@ -21,15 +21,15 @@ export const metadata: Metadata = {
 };
 
 /* ============================================================
-   KV スライダー（参照 `.home-kv__slider` 4枚 → カタヅケは 6枚）
+   KV スライダー（参照 `.home-kv__slider` 4枚 → カタヅケは 3枚）
+   2026-09-18 写真とコピーの整合（image-audit.md）: 品物を並べただけの ex-lot-* では
+   「片付けたい。でも、動けない」→「1点ずつ撮る」→「あとは待つだけ」の流れが写らないため、
+   同じ人物・同じ部屋で 3 場面を描いた生成写真（/img/lp）に差し替え。
    ============================================================ */
 const KV_SLIDES: LpSlide[] = [
-  { id: "ex-lot-jikka" },
-  { id: "ex-lot-moving" },
-  { id: "ex-lot-closet" },
-  { id: "ex-lot-ihin" },
-  { id: "ex-lot-rearrange" },
-  { id: "ex-lot-kitchen" },
+  { id: "kv-stuck", src: "/img/lp/kv-stuck.webp", alt: "使わなくなった物に囲まれて、リビングの床に座り込む30代の女性（イメージ）" },
+  { id: "kv-shoot", src: "/img/lp/kv-shoot.webp", alt: "リビングの床で、不用品を1点ずつスマートフォンで撮影する30代の女性（イメージ）" },
+  { id: "kv-after", src: "/img/lp/kv-after.webp", alt: "片付いたリビングのソファで、お茶を飲んでくつろぐ30代の女性（イメージ）" },
 ];
 
 /** 循環イラスト帯（トップ `/` と同じ並び・同じ位置定義を共有する） */
@@ -48,16 +48,6 @@ type FloatIll = {
   spLeft?: string;
   hideSp?: boolean;
 };
-/* r2 B-3: 右側は「ドット列（右 24px）＋縦タブ CTA（右 60px）」の帯を空ける＝left は 86% まで。
-   上中央（h1）と中央（写真の主題）にも重ねない。 */
-const KV_ILLS: FloatIll[] = [
-  { name: "box", top: "14%", left: "5%", w: 104, sway: 1, float: 1, spTop: "54%", spLeft: "12%" },
-  { name: "plant", top: "46%", left: "4%", w: 92, sway: 2, float: 2, hideSp: true },
-  { name: "truck", top: "82%", left: "11%", w: 116, sway: 1, float: 3, spTop: "80%", spLeft: "16%" },
-  { name: "books", top: "16%", left: "86%", w: 96, sway: 2, float: 2, spTop: "56%", spLeft: "86%" },
-  { name: "house-tree", top: "50%", left: "84%", w: 108, sway: 1, float: 1, hideSp: true },
-  { name: "folding-hands", top: "84%", left: "80%", w: 92, sway: 2, float: 3, spTop: "82%", spLeft: "84%" },
-];
 const FEE_ILLS: FloatIll[] = [
   { name: "plant", top: "26%", left: "9%", w: 86, sway: 2, float: 2, spLeft: "12%" },
   { name: "box", top: "62%", left: "17%", w: 74, sway: 1, float: 1, hideSp: true },
@@ -210,17 +200,17 @@ const POINT_BLOCKS: PointBlock[] = [
         n: "02",
         h: "査定が届く",
         p: <>買取業者があなたの出品した商品に入札。あなたは待つだけで査定が集まります。</>,
-        img: { src: "/img/v2/top-scene-danshari.webp", alt: "", w: 800, h: 800 },
+        img: { src: "/img/lp/bids-arrive.webp", alt: "食卓のスマートフォンに、届いた査定の通知が並ぶイメージ", w: 1024, h: 1024 },
       },
       {
         n: "03",
         h: "査定を見比べて選ぶ",
         p: <>届いた査定を一覧で見比べて、納得の1社を選ぶだけ。選ぶまで、業者から連絡は来ません。</>,
         img: {
-          src: "/img/v2/top-hero-man-20s.webp",
-          alt: "リビングの床で、不用品をスマートフォンで撮影する20代の男性（イメージ）",
-          w: 900,
-          h: 1350,
+          src: "/img/lp/compare-offers.webp",
+          alt: "食卓でスマートフォンの査定一覧を見比べる40代の女性（イメージ）",
+          w: 1024,
+          h: 1536,
           pos: "50% 30%",
         },
       },
@@ -241,11 +231,10 @@ const POINT_BLOCKS: PointBlock[] = [
         </>
       ),
       img: {
-        src: "/img/real/bid-3d.webp",
-        alt: "複数の業者が、まとめた不用品に買取総額を提示して競り合うイメージ",
+        src: "/img/lp/buyer-views-listing.webp",
+        alt: "買取店の事務所で、届いた出品内容（写真と品目）をタブレットで確認する店主（イメージ）",
         w: 1536,
-        h: 864,
-        contain: true,
+        h: 1024,
       },
     },
     minors: [
@@ -261,7 +250,12 @@ const POINT_BLOCKS: PointBlock[] = [
         n: "02",
         h: "登録業者が買取総額で入札",
         p: <>複数の業者が、出品した商品すべてに対して買取総額を提示します。提示された総額は、すべて一覧で見比べられます。</>,
-        img: { src: "/img/v2/top-worry-phone.webp", alt: "", w: 800, h: 800 },
+        img: {
+          src: "/img/lp/buyers-bidding.webp",
+          alt: "店舗・倉庫・車内で、それぞれの業者がタブレットから入札するイメージ",
+          w: 1024,
+          h: 1024,
+        },
       },
       {
         n: "03",
@@ -330,8 +324,8 @@ const POINT_BLOCKS: PointBlock[] = [
           </>
         ),
         img: {
-          src: "/img/v2/top-handover.webp",
-          alt: "玄関先で、まとめた品物を業者に引き渡す場面（イメージ）",
+          src: "/img/lp/doorstep-docs.webp",
+          alt: "玄関先で、業者が依頼者に書面を手渡す場面（イメージ）",
           w: 1536,
           h: 1024,
         },
@@ -357,44 +351,42 @@ type DailyStep = {
 };
 const DAILY_STEPS: DailyStep[] = [
   { n: "01", img: "/img/v2/top-hero-woman-20s.webp", w: 900, h: 1350, pos: "50% 30%", tag: "撮る", trail: true, p: "家じゅうの不用品を1点ずつ撮影。" },
-  { n: "02", img: "/img/v2/top-scene-moving.webp", w: 800, h: 800, trail: true, p: "写真と品目をまとめて登録するだけで出品完了です。" },
+  { n: "02", img: "/img/lp/register-listing.webp", w: 1024, h: 1024, trail: true, p: "写真と品目をまとめて登録するだけで出品完了です。" },
   {
     n: "03",
-    img: "/img/real/bid-3d.webp",
+    img: "/img/lp/buyer-views-listing.webp",
     w: 1536,
-    h: 864,
-    contain: true,
+    h: 1024,
     p: "業者に届くのは、写真・品目・地域（都道府県・市区町村）・住居情報などの出品内容のみ。",
   },
   {
     n: "04",
-    img: "/img/v2/top-hero-couple-child.webp",
-    w: 900,
-    h: 1350,
-    pos: "50% 30%",
+    img: "/img/lp/buyers-bidding.webp",
+    w: 1024,
+    h: 1024,
     tag: "業者が競う",
     trail: true,
     p: "複数の業者が、出品した商品すべてに対して買取総額を提示します。",
   },
-  { n: "05", img: "/img/v2/top-scene-jikka.webp", w: 800, h: 800, tag: "見比べて選ぶ", trail: true, p: "提示された総額は、すべて一覧で見比べられます。" },
+  { n: "05", img: "/img/lp/compare-offers.webp", w: 1024, h: 1536, pos: "50% 30%", tag: "見比べて選ぶ", trail: true, p: "提示された総額は、すべて一覧で見比べられます。" },
   {
     n: "06",
-    img: "/img/v2/top-hero-couple-60s.webp",
-    w: 900,
-    h: 1350,
-    pos: "50% 30%",
+    img: "/img/lp/choose-one.webp",
+    w: 1024,
+    h: 1536,
+    pos: "50% 45%",
     p: "提示を見比べて1社を選択。選ばなかった業者には自動でお断りが入ります。",
   },
-  { n: "07", img: "/img/v2/top-scene-ihin.webp", w: 800, h: 800, trail: true, p: "成立後に連絡先を開示し、引き取り日時を決めます。" },
+  { n: "07", img: "/img/lp/schedule-visit.webp", w: 1024, h: 1024, trail: true, p: "成立後に連絡先を開示し、引き取り日時を決めます。" },
   {
     n: "08",
-    img: "/img/v2/top-handover.webp",
+    img: "/img/lp/onsite-check.webp",
     w: 1536,
     h: 1024,
     trail: true,
     p: "訪問時の現物確認で写真と状態が違えば、業者から金額のご相談が届くことがあります。納得できなければお断りできます。",
   },
-  { n: "09", img: "/img/v2/top-cta-band.webp", w: 1920, h: 1088, pos: "50% 42%", tag: "引き取り完了", p: "玄関先で渡すだけで、片付け完了です。" },
+  { n: "09", img: "/img/v2/top-handover.webp", w: 1536, h: 1024, tag: "引き取り完了", p: "玄関先で渡すだけで、片付け完了です。" },
 ];
 
 /* ============================================================
@@ -470,10 +462,9 @@ export default function LpPage() {
         <section id="top" className="lp-kv">
           <LpSlider slides={KV_SLIDES} />
           <div className="lp-kv__veil" aria-hidden="true" />
+          {/* ユーザー指摘（2026-09-18）: ヒーロー写真の上に浮く箱・本・トラック・たたんだセーターの
+              イラストが被写体と重なって見づらいため撤去。抽象的なドット装飾のみ残す。 */}
           <div className="lp-kv__deco" aria-hidden="true">
-            {KV_ILLS.map((ill) => (
-              <FloatIllustration key={`${ill.name}-${ill.top}`} ill={ill} />
-            ))}
             {DOT_CLUSTERS.map((d) => (
               <span
                 key={`${d.top}-${d.left}`}
@@ -754,7 +745,7 @@ export default function LpPage() {
 
               <div className="lp-fee__fig img-frame img-frame--3x2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/img/v2/top-founder-desk.webp" alt="" width={1536} height={1024} loading="lazy" decoding="async" />
+                <img src="/img/lp/fee-empty-room.webp" alt="" width={1536} height={1024} loading="lazy" decoding="async" />
               </div>
 
               <span className="lp-marks" aria-hidden="true">
