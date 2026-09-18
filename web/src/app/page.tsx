@@ -466,9 +466,10 @@ export default function LpPage() {
        lp.css のスコープは根の .lp-page が引き続き担う。 */
     <div className="lp-page">
       {/* 2026-09-18 ユーザー指示: いきなり本編を映さず、白地に「カタヅケ」が浮かび上がってから始める。
-          本採用（正式トップ化）に伴い oncePerSession を有効化: 同じタブでの再訪・戻る操作のたびに
-          4.8秒の演出を強制すると離脱リスクがあるため、同じセッションでは初回のみ再生する。 */}
-      <LpIntro oncePerSession />
+          本採用時に oncePerSession を試験導入したが、同じタブで再訪すると sessionStorage の
+          "lp-intro-seen" によりアニメーションが一切流れなくなり「動かない」という報告に直結したため撤回。
+          意図通りの動作（毎回再生）に戻す。再訪時の抑制は、必要になった時点で改めて相談する。 */}
+      <LpIntro />
       <LpChrome />
 
       <main id="main">
