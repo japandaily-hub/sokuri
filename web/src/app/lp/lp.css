@@ -672,7 +672,17 @@ html.js-rv .lp-page .rv--up:not(.in) {
   background: #fff;
   padding: clamp(60px, 11vw, 140px) 0 clamp(80px, 19.5vw, 250px);
 }
+/* 2026-09-18: ページ全体に彩りを出すデコアイコン（FEE と共通の /img/lp/deco 素材）。
+   上下の padding 内に収まる位置だけを使い、写真・文章の上に重ねない（pointer-events も落とす）。 */
+.lp-page .lp-message__deco {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
 .lp-page .lp-message__inner {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: minmax(0, 48fr) minmax(0, 52fr);
   gap: clamp(28px, 5vw, 72px);

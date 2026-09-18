@@ -36,24 +36,19 @@ const KV_SLIDES: LpSlide[] = [
 /** 循環イラスト帯（トップ `/` と同じ並び・同じ位置定義を共有する） */
 const ILL_LOOP: IllName[] = ["box", "truck", "house-tree", "folding-hands", "books", "plant"];
 
-/** KV・料金区画に散らす浮遊イラスト（参照の鶏・花・雲の位置に相当）。すべて装飾。
- *  r1 B-6/C-5: SP では h1 の帯に重ねず写真枠の四隅付近へ寄せ、2 点は間引く。 */
-type FloatIll = {
-  name: IllName;
-  top: string;
-  left: string;
-  w: number;
-  sway: 1 | 2;
-  float: 1 | 2 | 3;
-  spTop?: string;
-  spLeft?: string;
-  hideSp?: boolean;
-};
-const FEE_ILLS: FloatIll[] = [
-  { name: "plant", top: "26%", left: "9%", w: 86, sway: 2, float: 2, spLeft: "12%" },
-  { name: "box", top: "62%", left: "17%", w: 74, sway: 1, float: 1, hideSp: true },
-  { name: "books", top: "30%", left: "88%", w: 82, sway: 1, float: 3, spLeft: "86%" },
-  { name: "house-tree", top: "68%", left: "80%", w: 76, sway: 2, float: 2, hideSp: true },
+/** 手描き風・多色のデコアイコン（/img/lp/deco）。ILL_LOOP 用の青系イラストとは別系統の彩り装飾。
+ *  2026-09-18 ユーザー指摘: FEE 上部の余白（浮遊イラストの空）がスカスカでバランスが悪い。
+ *  8 点に増やし、SP でも間引かず（hideSp を使わない）全域に散らす。 */
+type DecoIll = { src: string; top: string; left: string; w: number; sway: 1 | 2; float: 1 | 2 | 3; spTop?: string; spLeft?: string };
+const FEE_DECO: DecoIll[] = [
+  { src: "/img/lp/deco/deco-box.webp", top: "10%", left: "8%", w: 88, sway: 1, float: 1 },
+  { src: "/img/lp/deco/deco-camera.webp", top: "58%", left: "6%", w: 92, sway: 2, float: 2, spTop: "48%" },
+  { src: "/img/lp/deco/deco-clock.webp", top: "18%", left: "90%", w: 78, sway: 1, float: 3, spLeft: "86%" },
+  { src: "/img/lp/deco/deco-teacup.webp", top: "66%", left: "88%", w: 84, sway: 2, float: 1, spLeft: "84%", spTop: "70%" },
+  { src: "/img/lp/deco/deco-gift.webp", top: "40%", left: "24%", w: 68, sway: 1, float: 2 },
+  { src: "/img/lp/deco/deco-tote.webp", top: "80%", left: "42%", w: 82, sway: 2, float: 3, spTop: "84%" },
+  { src: "/img/lp/deco/deco-lamp.webp", top: "8%", left: "50%", w: 74, sway: 1, float: 1, spLeft: "56%" },
+  { src: "/img/lp/deco/deco-plant2.webp", top: "44%", left: "74%", w: 88, sway: 2, float: 2 },
 ];
 
 /* ============================================================
@@ -411,12 +406,11 @@ const FOOTER_LINKS: { href: string; label: string }[][] = [
   ],
 ];
 
-/** 浮遊イラスト1点（外側が translate、内側の img が rotate。2つの transform を別要素に分ける） */
-function FloatIllustration({ ill }: { ill: FloatIll }) {
-  const meta = ILLUSTRATIONS[ill.name];
+/** 浮遊デコアイコン1点（外側が translate、内側の img が rotate。2つの transform を別要素に分ける） */
+function FloatDeco({ ill }: { ill: DecoIll }) {
   return (
     <span
-      className={`lp-ill lp-ill--f${ill.float}${ill.hideSp ? " lp-ill--sp-off" : ""}`}
+      className={`lp-ill lp-ill--f${ill.float}`}
       style={
         {
           "--lp-ill-top": ill.top,
@@ -428,15 +422,7 @@ function FloatIllustration({ ill }: { ill: FloatIll }) {
       }
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        className={`lp-ill__img lp-ill__img--s${ill.sway}`}
-        src={illSrc(ill.name)}
-        alt=""
-        width={meta.w}
-        height={meta.h}
-        loading="lazy"
-        decoding="async"
-      />
+      <img className={`lp-ill__img lp-ill__img--s${ill.sway}`} src={ill.src} alt="" width={512} height={512} loading="lazy" decoding="async" />
     </span>
   );
 }
@@ -481,6 +467,12 @@ export default function LpPage() {
         {/* ============ 2. MESSAGE（参照 .home-message） ============ */}
         {/* qa r2 L-7: 英字キャプションを region 名にすると読み上げが「message from katazuke」だけになるため和文で与える */}
         <section className="lp-message" aria-label="運営事務局からのメッセージ">
+          {/* 2026-09-18 ユーザー指摘: ページ全体に手描き風アイコンを散りばめて彩りを出す（FEE で
+              生成した素材を再利用・追加コストなし）。上下の余白（padding）の中に収め、写真・文章には重ねない。 */}
+          <div className="lp-message__deco" aria-hidden="true">
+            <FloatDeco ill={{ src: "/img/lp/deco/deco-clock.webp", top: "4%", left: "84%", w: 64, sway: 2, float: 3 }} />
+            <FloatDeco ill={{ src: "/img/lp/deco/deco-teacup.webp", top: "94%", left: "8%", w: 70, sway: 1, float: 1, spLeft: "78%" }} />
+          </div>
           <div className="lp-container lp-message__inner">
             <div className="lp-message__figs">
               {/* 2026-09-18 ユーザー指摘: 60代夫婦の写真がKVの新ペルソナ構成と重複して見えるため、
@@ -707,8 +699,8 @@ export default function LpPage() {
         {/* ============ 6. FEE（参照 .home-kome・巨大パネル＋CTA2本） ============ */}
         <section id="fee" className="lp-fee">
           <div className="lp-fee__sky" aria-hidden="true">
-            {FEE_ILLS.map((ill) => (
-              <FloatIllustration key={`${ill.name}-${ill.top}`} ill={ill} />
+            {FEE_DECO.map((ill) => (
+              <FloatDeco key={ill.src} ill={ill} />
             ))}
           </div>
           <div className="lp-container">
