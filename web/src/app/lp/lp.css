@@ -223,6 +223,99 @@ html.js-rv .lp-page .rv--up:not(.in) {
   opacity: 0.75;
 }
 
+/* ---------- スクロール連動リボン（水＝青・新緑＝緑・星＝黄の 3 曲線）----------
+   2026-09-18 ユーザー要望: スクロール時の動き＋自然を感じる彩り。
+   基本動作（全ブラウザ）: Reveal の .in で stroke-dashoffset 1→0 のトランジション＝画面に入ると線が伸びる。
+   対応ブラウザ（animation-timeline: view()）: トランジションを止め、スクロール量に追従して描画＋軽い視差。
+   reduced-motion: 常に描き終わった静止状態（opacity:0 は html.js-rv 配下のみ＝不変条件を守る）。 */
+.lp-page {
+  --lp-water: #5f86ee;
+  --lp-leaf: #6fbf84;
+  --lp-star: #f2c14e;
+}
+.lp-page .lp-ribbon {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+}
+.lp-page .lp-ribbon__inner,
+.lp-page .lp-ribbon svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.lp-page .lp-ribbon__line {
+  fill: none;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  opacity: 0.85;
+}
+.lp-page .lp-ribbon__line--1 { stroke: var(--lp-water); }
+.lp-page .lp-ribbon__line--2 { stroke: var(--lp-leaf); }
+.lp-page .lp-ribbon__line--3 { stroke: var(--lp-star); }
+.lp-page .lp-ribbon__star {
+  fill: var(--lp-star);
+  opacity: 0.9;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+/* 基本の描き込み（Reveal .in で発火）。線ごとに少しずつ遅らせて 3 本が追いかけるように */
+html.js-rv .lp-page .lp-ribbon__inner:not(.in) .lp-ribbon__line { stroke-dashoffset: 1; }
+html.js-rv .lp-page .lp-ribbon__inner:not(.in) .lp-ribbon__star { opacity: 0; }
+html.js-rv .lp-page .lp-ribbon__line { transition: stroke-dashoffset 1.6s var(--ease-expo-out); }
+html.js-rv .lp-page .lp-ribbon__line--2 { transition-delay: 0.15s; }
+html.js-rv .lp-page .lp-ribbon__line--3 { transition-delay: 0.3s; }
+html.js-rv .lp-page .lp-ribbon__star { transition: opacity 0.8s var(--ease-expo-out) 0.9s; }
+/* 星のきらめき（滑らかな明滅・拡縮）。星ごとに位相をずらす */
+@keyframes lp-twinkle {
+  0%, 100% { opacity: 0.35; transform: scale(0.75) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1.1) rotate(15deg); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .lp-page .lp-ribbon__inner.in .lp-ribbon__star {
+    animation: lp-twinkle 3.2s ease-in-out infinite;
+    animation-delay: calc(var(--lp-star-i, 0) * -0.7s);
+  }
+}
+/* スクロール追従（対応ブラウザのみ）。描画はスクロール量で、視差は区画の通過量で決める */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    @keyframes lp-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+    @keyframes lp-drift { from { transform: translateY(6%); } to { transform: translateY(-6%); } }
+    html.js-rv .lp-page .lp-ribbon__line {
+      transition: none;
+      animation: lp-draw linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 55%;
+    }
+    html.js-rv .lp-page .lp-ribbon__line--2 { animation-range: entry 10% cover 65%; }
+    html.js-rv .lp-page .lp-ribbon__line--3 { animation-range: entry 20% cover 75%; }
+    .lp-page .lp-ribbon svg {
+      animation: lp-drift linear both;
+      animation-timeline: view();
+      animation-range: cover 0% cover 100%;
+      will-change: transform;
+    }
+  }
+}
+/* 配置（区画ごと）。overflow-x:clip は .lp-page が持つので右へはみ出しても横スクロールは出ない */
+.lp-page .lp-ribbon--message { right: -6%; bottom: 4%; width: min(72vw, 900px); }
+.lp-page .lp-ribbon--about { left: -6%; top: 1%; width: min(66vw, 820px); opacity: 0.6; }
+.lp-page .lp-ribbon--daily { right: -8%; bottom: -3%; width: min(70vw, 860px); opacity: 0.6; }
+.lp-page .lp-ribbon--fee { left: 4%; top: -4%; width: min(88vw, 1040px); }
+@media (max-width: 859px) {
+  .lp-page .lp-ribbon__line { stroke-width: 2; }
+  /* SP は本文の直下（署名の下の余白）へ下げ、文字に掛からないよう薄くする */
+  .lp-page .lp-ribbon--message { right: -20%; bottom: -10%; width: 120%; opacity: 0.6; }
+  .lp-page .lp-ribbon--about { left: -18%; top: 0; width: 120%; }
+  .lp-page .lp-ribbon--daily { right: -20%; bottom: -1%; width: 120%; }
+  .lp-page .lp-ribbon--fee { left: -10%; top: -2%; width: 118%; }
+}
+
 /* ---------- 足跡の点線（参照 .home-about の鳥の足跡 → 1px の破線） ---------- */
 .lp-page .lp-trail {
   position: absolute;

@@ -8,6 +8,7 @@ import { FEATURED_CASES, caseName, MODEL_CASE_CHIP, MODEL_CASE_NOTE } from "@/li
 import { ILLUSTRATIONS, ILL_POSITIONS, ILL_THIN_ON_MOBILE, illSrc, type IllName } from "@/lib/illustrations";
 import { LpChrome } from "./_components/LpChrome";
 import { LpSlider, type LpSlide } from "./_components/LpSlider";
+import { LpRibbon } from "./_components/LpRibbon";
 import "./lp.css";
 
 /** 検証用の別案ルート。本採用するまで検索結果に出さない。
@@ -469,6 +470,8 @@ export default function LpPage() {
         <section className="lp-message" aria-label="運営事務局からのメッセージ">
           {/* 2026-09-18 ユーザー指摘: ページ全体に手描き風アイコンを散りばめて彩りを出す（FEE で
               生成した素材を再利用・追加コストなし）。上下の余白（padding）の中に収め、写真・文章には重ねない。 */}
+          {/* スクロール連動の 3 曲線（水・新緑・星）。写真の後ろ・右下へ抜ける */}
+          <LpRibbon variant="a" className="lp-ribbon--message" />
           <div className="lp-message__deco" aria-hidden="true">
             <FloatDeco ill={{ src: "/img/lp/deco/deco-clock.webp", top: "4%", left: "84%", w: 64, sway: 2, float: 3 }} />
             <FloatDeco ill={{ src: "/img/lp/deco/deco-teacup.webp", top: "94%", left: "8%", w: 70, sway: 1, float: 1, spLeft: "78%" }} />
@@ -520,6 +523,7 @@ export default function LpPage() {
         <section id="about" className="lp-band lp-about">
           <div className="lp-wave lp-wave--top lp-wave--white" aria-hidden="true" />
           <div className="lp-texture" aria-hidden="true" />
+          <LpRibbon variant="b" className="lp-ribbon--about" stars={false} />
           <div className="lp-container lp-about__inner">
             <Reveal className="lp-band__head" variant="up">
               <p className="lp-en">about katazuke</p>
@@ -668,6 +672,7 @@ export default function LpPage() {
           {/* 循環帯と同じ主色が続くため、区切りは淡色の波形リボンで作る */}
           <div className="lp-wave lp-wave--top lp-wave--pale" aria-hidden="true" />
           <div className="lp-texture" aria-hidden="true" />
+          <LpRibbon variant="b" className="lp-ribbon--daily" stars={false} />
           <div className="lp-container lp-daily__inner">
             <Reveal className="lp-band__head" variant="up">
               <p className="lp-en">from listing to pickup</p>
@@ -699,6 +704,7 @@ export default function LpPage() {
         {/* ============ 6. FEE（参照 .home-kome・巨大パネル＋CTA2本） ============ */}
         <section id="fee" className="lp-fee">
           <div className="lp-fee__sky" aria-hidden="true">
+            <LpRibbon variant="a" className="lp-ribbon--fee" />
             {FEE_DECO.map((ill) => (
               <FloatDeco key={ill.src} ill={ill} />
             ))}
