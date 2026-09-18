@@ -59,7 +59,8 @@ const D = {
 const SECTION_DECO: Record<"about" | "cycle" | "daily" | "cases" | "biz" | "footer", DecoIll[]> = {
   /* 左側は版面外の余白（--lp-pad ≒ 58px）に収まるよう left 2.2%・w 56 に固定（本文・写真に重ねない） */
   about: [
-    { src: D.teacup, top: "9%", left: "93%", w: 72, sway: 2, float: 1, spLeft: "88%", spTop: "3%" },
+    /* 直前の MESSAGE 末尾（右下）にティーカップがあるため、隣接区画では同じ絵柄・同じ側を避ける */
+    { src: D.tote, top: "9%", left: "93%", w: 72, sway: 2, float: 1, spLeft: "88%", spTop: "3%" },
     { src: D.plant, top: "46%", left: "2.2%", w: 56, sway: 1, float: 2, hideSp: true },
     { src: D.gift, top: "90%", left: "92%", w: 64, sway: 2, float: 3, spLeft: "86%", spTop: "96%" },
   ],
@@ -529,7 +530,7 @@ export default function LpPage() {
           <LpRibbon variant="a" className="lp-ribbon--message" />
           <div className="lp-message__deco" aria-hidden="true">
             <FloatDeco ill={{ src: "/img/lp/deco/deco-clock.webp", top: "4%", left: "84%", w: 64, sway: 2, float: 3 }} />
-            <FloatDeco ill={{ src: "/img/lp/deco/deco-teacup.webp", top: "94%", left: "8%", w: 70, sway: 1, float: 1, spLeft: "78%" }} />
+            <FloatDeco ill={{ src: "/img/lp/deco/deco-teacup.webp", top: "94%", left: "8%", w: 70, sway: 1, float: 1, spLeft: "14%", spTop: "96%" }} />
           </div>
           <div className="lp-container lp-message__inner">
             <div className="lp-message__figs">
