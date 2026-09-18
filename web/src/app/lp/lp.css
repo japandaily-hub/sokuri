@@ -766,11 +766,12 @@ html.js-rv .lp-page .lp-ribbon__star { transition: opacity 0.8s var(--ease-expo-
   padding: clamp(60px, 11vw, 140px) 0 clamp(80px, 19.5vw, 250px);
 }
 /* 2026-09-18: ページ全体に彩りを出すデコアイコン（FEE と共通の /img/lp/deco 素材）。
-   上下の padding 内に収まる位置だけを使い、写真・文章の上に重ねない（pointer-events も落とす）。 */
+   上下の padding 内に収まる位置だけを使い、写真・文章の上に重ねない（pointer-events も落とす）。
+   z-index は .lp-deco と同じ理由で .lp-wave（2）より前面（.lp-message は末尾に波形 2 枚を持つ）。 */
 .lp-page .lp-message__deco {
   position: absolute;
   inset: 0;
-  z-index: 0;
+  z-index: 3;
   pointer-events: none;
 }
 .lp-page .lp-message__inner {
@@ -2103,11 +2104,14 @@ html.js-rv .lp-page .lp-ribbon__star { transition: opacity 0.8s var(--ease-expo-
   color: var(--body);
 }
 .lp-page .lp-band__sub strong { color: var(--ink); }
-/* 区画に被せる散らし層。内容（.lp-container 等）は各区画側で z-index:1 以上にして前面に出す */
+/* 区画に被せる散らし層。内容（.lp-container 等）は各区画側で z-index:1 以上にして前面に出す。
+   2026-09-18 バグ修正: z-index が .lp-wave（2）より低いと、区画の上下端に近いアイコンが波形の
+   白い塗りで下半分だけ隠れて見える不具合（実機ユーザー報告で発見）。波形より前面に出す。
+   デコは写真・文章の上には重ねない配置なので、content(1) より高くても実害はない。 */
 .lp-page .lp-deco {
   position: absolute;
   inset: 0;
-  z-index: 0;
+  z-index: 3;
   pointer-events: none;
 }
 .lp-page .lp-deco .lp-ill { opacity: 0.85; }
