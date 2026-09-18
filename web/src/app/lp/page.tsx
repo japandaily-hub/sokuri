@@ -623,6 +623,8 @@ export default function LpPage() {
           {POINT_BLOCKS.map((b, bi) => (
             <section className={`lp-point__block lp-point__block--${b.tone}`} key={b.id} aria-labelledby={`lp-point-${b.id}`}>
               <div className="lp-point__plate" aria-hidden="true" />
+              {/* 2026-09-18: 長い読み物区間が単調にならないよう、各ブロックの背景に 3 色リボンを 1 本（向きは交互） */}
+              <LpRibbon variant={bi % 2 === 0 ? "b" : "a"} className="lp-ribbon--point" stars={false} />
               <Deco items={[POINT_DECO[bi % POINT_DECO.length]]} />
               <div className="lp-container lp-point__inner">
                 {/* r2 B-1: 見出しは色面の「中」（バッジの右・縦中央）。色面の下に置くと 670px の無地が残るため */}
