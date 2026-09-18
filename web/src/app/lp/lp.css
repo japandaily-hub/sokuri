@@ -1950,3 +1950,143 @@ html.js-rv .lp-page .lp-ribbon__star { transition: opacity 0.8s var(--ease-expo-
     line-height: 1.5;
   }
 }
+
+/* ============================================================
+   自然色テーマ v2（2026-09-18 ユーザー指示）
+   - 濃い青（#1447e0 / #14235c）を使わない。水（淡い空色）・山（クリーム系の緑）・陽（やわらかな黄）・砂（生成り）
+   - オレンジ枠の3要素（ロゴ・MENU・LINEバー）を雲のような柔らかい曲線に。ページ全体もカード・写真枠を丸める
+   - ファイル末尾に置き、同じ特異度の既存ルールに後勝ちで上書きする（値の変更点だけを書く）
+   ============================================================ */
+.lp-page {
+  /* 主色は「山の稜線の影」のようなくすんだ青灰（白地で 5.0:1・11px 英字でも AA）。塗り面には使わない */
+  --primary: #4f6f8f;
+  --primary-rgb: 79, 111, 143;
+  --primary-d: #40596f;
+  --primary-l: #9db8cf;
+  --deep: #d8e6ef;          /* 旧・濃紺の面 → 淡い水色 */
+  --sky: #e4eef5;           /* 水 */
+  --marker: #e6efdd;        /* 強調マーカー → クリーム系の緑 */
+  --lp-sky: #e4eef5;        /* 水 */
+  --lp-moss: #e6eddc;       /* 山（クリーム系の緑） */
+  --lp-moss-d: #cfdcc0;     /* 山・濃（罫・ボタン地） */
+  --lp-sand: #f8f2e7;       /* 砂・生成り */
+  --lp-water: #86aed6;      /* リボン：水 */
+  --lp-leaf: #9ec49b;       /* リボン：新緑 */
+  --lp-star: #f1c75c;       /* リボン：星 */
+  --lp-cloud: 46% 54% 42% 58% / 58% 44% 56% 42%; /* 雲の輪郭（非対称の楕円角） */
+}
+
+/* --- ロゴ（左上）: 白い雲。角は右下へ流れる大きな曲線 --- */
+.lp-page .lp-header__logo {
+  padding: 18px 34px 20px 26px;
+  border: 0;
+  border-radius: 0 0 56px 28px / 0 0 44px 64px;
+  box-shadow: 0 10px 28px rgba(79, 111, 143, 0.12);
+}
+/* --- MENU（右上）: クリーム緑の雲。文字・線は墨 --- */
+.lp-page .lp-header__menu {
+  background: var(--lp-moss);
+  color: var(--ink);
+  border-radius: 0 0 40px 52px / 0 0 64px 40px;
+  box-shadow: 0 10px 28px rgba(79, 111, 143, 0.12);
+}
+.lp-page .lp-header__menu-icon span {
+  background: var(--ink);
+}
+/* --- 浮遊CTA（PC 縦タブ）: 右端から生える雲 --- */
+.lp-page .lp-float-cta .btn.btn-line {
+  border-radius: 30px 0 0 30px;
+  box-shadow: 0 10px 28px rgba(79, 111, 143, 0.14);
+}
+.lp-page .lp-float-cta__alt {
+  border: 0;
+  background: var(--lp-sand);
+  border-radius: 0 0 0 30px;
+}
+/* --- pagetop（フッター右）: 雲 --- */
+.lp-page .lp-pagetop {
+  background: var(--lp-moss);
+  color: var(--ink);
+  border-radius: var(--lp-cloud);
+}
+/* --- MENU オーバーレイ: 矢印は丸、パネルは丸角 --- */
+.lp-page .lp-menu__mark {
+  background: var(--lp-moss-d);
+  color: var(--ink);
+  border-radius: 50%;
+}
+.lp-page .lp-menu__panel {
+  border-radius: 24px;
+  border-color: var(--lp-moss-d);
+}
+/* --- 帯の色: ABOUT＝水、循環帯＝砂、DAILY＝山 --- */
+.lp-page .lp-about { background: var(--lp-sky); }
+.lp-page .lp-cycle { background: var(--lp-sand); }
+.lp-page .lp-daily { background: var(--lp-moss); }
+.lp-page .lp-wave--primary { background: var(--lp-moss); }
+/* --- POINT の色面: 撮＝山、選＝水、安＝砂（濃紺・主色ベタを廃止）。見出しはすべて墨 --- */
+.lp-page .lp-point__block--primary .lp-point__plate { background: var(--lp-moss); }
+.lp-page .lp-point__block--deep .lp-point__plate { background: var(--lp-sky); }
+.lp-page .lp-point__block--pale .lp-point__plate { background: var(--lp-sand); }
+.lp-page .lp-point__head h2 { color: var(--ink); }
+.lp-page .lp-point__badge {
+  border: 0;
+  border-radius: var(--lp-cloud);
+  box-shadow: 0 8px 22px rgba(79, 111, 143, 0.12);
+}
+.lp-page .lp-minor { border: 0; border-radius: 22px; box-shadow: 0 8px 22px rgba(79, 111, 143, 0.08); }
+/* --- DAILY のタグ・番号 --- */
+.lp-page .lp-daily__tag { background: var(--lp-moss-d); color: var(--ink); border-radius: 999px; margin: 0 0 10px 10px; }
+.lp-page .lp-daily__n { border-radius: 50%; margin: 8px 8px 0 0; }
+/* --- CASES intro の英字（旧・濃紺）→ 主色 --- */
+.lp-page .lp-cases__introbody .lp-en { color: var(--primary); }
+/* --- FEE パネル・カード類・写真枠・ボタン: 角を丸める --- */
+.lp-page .lp-fee__panel { border: 0; border-radius: 40px; background: var(--lp-sand); }
+.lp-page .lp-fee__zero { border: 0; border-radius: 28px; box-shadow: 0 8px 22px rgba(79, 111, 143, 0.08); }
+.lp-page .img-frame { border-radius: 20px; border-color: rgba(79, 111, 143, 0.12); }
+.lp-page .lp-message__fig { border-radius: 24px; }
+.lp-page .lp-biz__card { border-radius: 24px; }
+.lp-page .lp-case { border-radius: 24px; }
+.lp-page .btn { border-radius: 999px; }
+.lp-page .btn-ghost { border-color: var(--lp-moss-d); color: var(--ink); background: #fff; }
+/* --- KV の操作列: 一時停止ボタンの地も濃紺→主色の半透明 --- */
+.lp-page .lp-slider__toggle { background: rgba(79, 111, 143, 0.55); border-radius: 50%; }
+
+@media (max-width: 859px) {
+  /* --- 浮遊CTA（SP）: 画面下に浮かぶ雲のピル。全幅バーではなく左右に余白を持たせて浮かせる --- */
+  .lp-page .lp-float-cta {
+    left: 12px;
+    right: 12px;
+    bottom: 10px;
+    padding: 6px 12px 6px 6px;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 10px 28px rgba(79, 111, 143, 0.18);
+    backdrop-filter: blur(6px);
+  }
+  .lp-page .lp-float-cta .btn.btn-line {
+    border-radius: 999px;
+    box-shadow: none;
+  }
+  .lp-page .lp-float-cta__alt {
+    background: transparent;
+    border-radius: 0;
+  }
+  .lp-page .lp-header__logo {
+    padding: 12px 22px 14px 16px;
+    border-radius: 0 0 36px 20px / 0 0 30px 44px;
+  }
+  .lp-page .lp-header__menu {
+    border-radius: 0 0 26px 34px / 0 0 42px 26px;
+  }
+  .lp-page .lp-pagetop { border-radius: 0 0 0 40px / 0 0 0 60px; }
+}
+
+/* --- LINE ボタンの左端タイル（12px の帯）が丸みの外へ四角く突き出るのを防ぐ。
+   要素自身の :focus-visible の outline は overflow の影響を受けないため、ここでは clip で収める --- */
+.lp-page .btn.btn-line { overflow: clip; }
+.lp-page .lp-float-cta__btn .btn-line__tile { border-radius: 30px 0 0 0; }
+@media (max-width: 859px) {
+  .lp-page .lp-float-cta__btn .btn-line__tile { border-radius: 999px 0 0 999px; }
+}
