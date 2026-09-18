@@ -2394,3 +2394,46 @@ html.js-rv .lp-page .lp-ribbon__star { transition: opacity 0.8s var(--ease-expo-
 .lp-page [id] {
   scroll-margin-top: var(--lp-anchor-offset);
 }
+
+/* ============================================================
+   2026-09-18 オープニング v3: アイコンの動きをなめらかに（ユーザー指摘「カクカク動くのは微妙」）
+   本編の浮遊デコは参照 LP 由来の steps(1)（コマ送り）だが、白地でロゴを囲むオープニングでは
+   粗さだけが目立つ。ここだけ次の 3 つに置き換える:
+     1) 灯り方: ぼかしが抜けながら、ふわっと少し大きくなって現れる（scale / filter / opacity）
+     2) 漂い方: ゆっくり上下にたゆたう（translate・ease-in-out・アイコンごとに周期と位相をずらす）
+     3) 傾き方: ごくわずかに揺れる（rotate ±2.5deg）
+   transform を取り合わないよう、個別変形プロパティ（translate / rotate / scale）で分担する。
+   ============================================================ */
+@keyframes lp-intro-ill-in {
+  from { opacity: 0; scale: 0.82; filter: blur(8px); }
+  60%  { filter: blur(0); }
+  to   { opacity: 1; scale: 1; filter: blur(0); }
+}
+@keyframes lp-intro-bob {
+  0%, 100% { translate: 0 5px; }
+  50%      { translate: 0 -7px; }
+}
+@keyframes lp-intro-tilt {
+  0%, 100% { rotate: -2.5deg; }
+  50%      { rotate: 2.5deg; }
+}
+.lp-page .lp-intro__deco .lp-ill,
+.lp-page .lp-intro__deco .lp-ill--f1,
+.lp-page .lp-intro__deco .lp-ill--f2,
+.lp-page .lp-intro__deco .lp-ill--f3 {
+  animation: lp-intro-bob calc(5.2s + var(--lp-ill-i, 0) * 0.35s) ease-in-out calc(var(--lp-ill-i, 0) * -0.8s) infinite;
+  will-change: translate;
+}
+.lp-page .lp-intro__deco .lp-ill img,
+.lp-page .lp-intro__deco .lp-ill .lp-ill__img--s1,
+.lp-page .lp-intro__deco .lp-ill .lp-ill__img--s2 {
+  opacity: 0;
+  animation:
+    lp-intro-ill-in 2s var(--ease-expo-out) calc(0.9s + var(--lp-ill-i, 0) * 0.16s) forwards,
+    lp-intro-tilt calc(6.4s + var(--lp-ill-i, 0) * 0.3s) ease-in-out calc(var(--lp-ill-i, 0) * -1.1s) infinite;
+}
+/* 曲線がワードマークに掛からないよう、SP は「画面中央より上」を基準に置く
+   （top:% だと縦長の端末で線の右端がロゴの高さまで下りてくる。実機スクショで「ケ」に接触）。 */
+@media (max-width: 859px) {
+  .lp-page .lp-intro__ribbon { top: auto; bottom: calc(50% + 64px); }
+}
