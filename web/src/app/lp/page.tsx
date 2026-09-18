@@ -9,6 +9,7 @@ import { ILLUSTRATIONS, ILL_POSITIONS, ILL_THIN_ON_MOBILE, illSrc, type IllName 
 import { LpChrome } from "./_components/LpChrome";
 import { LpSlider, type LpSlide } from "./_components/LpSlider";
 import { LpRibbon } from "./_components/LpRibbon";
+import { LpIntro } from "./_components/LpIntro";
 import "./lp.css";
 
 /** 検証用の別案ルート。本採用するまで検索結果に出さない。
@@ -496,6 +497,9 @@ export default function LpPage() {
     /* r1 A-5: <footer> を <main> の外へ出して contentinfo ランドマークを取り戻す。
        lp.css のスコープは根の .lp-page が引き続き担う。 */
     <div className="lp-page">
+      {/* 2026-09-18 ユーザー指示: いきなり本編を映さず、白地に「カタヅケ」が浮かび上がってから始める。
+          oncePerSession を true にすると同じタブでは初回だけ流す（本採用時の既定候補） */}
+      <LpIntro />
       <LpChrome />
 
       <main id="main">

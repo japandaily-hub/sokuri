@@ -2240,3 +2240,53 @@ html.js-rv .lp-page .lp-ribbon__star { transition: opacity 0.8s var(--ease-expo-
   .lp-page .lp-about__item + .lp-about__item::before { top: -60px; left: 6%; right: 6%; }
   .lp-page .lp-cell { padding: 14px; }
 }
+
+/* ============================================================
+   2026-09-18 オープニング（LpIntro）: 白地に「カタヅケ」がやわらかく浮かび上がり、本編へ溶ける
+   時間割: 0.15s 待ち → 1.2s でロゴが浮かぶ（ぼかし解除＋わずかな上昇）→ 0.5s 静止 → 0.9s で白地が溶ける
+   ============================================================ */
+@keyframes lp-intro-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); filter: blur(8px); }
+  to   { opacity: 1; transform: none; filter: blur(0); }
+}
+@keyframes lp-intro-glow {
+  from { opacity: 0; transform: scale(0.8); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes lp-intro-out {
+  from { opacity: 1; }
+  to   { opacity: 0; visibility: hidden; }
+}
+.lp-page .lp-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  cursor: pointer;
+  animation: lp-intro-out 0.9s var(--ease) 1.85s forwards;
+}
+/* 山（クリーム緑）と水（淡い空色）の柔らかい光をロゴの後ろに */
+.lp-page .lp-intro__glow {
+  position: absolute;
+  width: min(70vw, 520px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 40% 45%, rgba(230, 237, 220, 0.9), rgba(230, 237, 220, 0) 60%),
+    radial-gradient(circle at 62% 58%, rgba(228, 238, 245, 0.9), rgba(228, 238, 245, 0) 62%);
+  filter: blur(6px);
+  opacity: 0;
+  animation: lp-intro-glow 1.4s var(--ease-expo-out) 0.05s forwards;
+}
+.lp-page .lp-intro__mark {
+  position: relative;
+  opacity: 0;
+  animation: lp-intro-in 1.2s var(--ease-expo-out) 0.15s forwards;
+}
+.lp-page .lp-intro__mark .kdz-wm { color: var(--ink); }
+.lp-page .lp-intro__mark .kdz-wm-en { color: var(--primary); }
+@media (prefers-reduced-motion: reduce) {
+  .lp-page .lp-intro { display: none; }
+}
