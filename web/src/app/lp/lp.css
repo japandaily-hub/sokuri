@@ -2379,3 +2379,18 @@ html.js-rv .lp-page .lp-ribbon__star { transition: opacity 0.8s var(--ease-expo-
 @media (max-width: 859px) {
   .lp-page .lp-ribbon--kv { right: -18%; top: 21%; width: 125%; }
 }
+
+/* ============================================================
+   2026-09-18 バグ修正: ページ内アンカー（メニュー・/business・共通フッターの #id リンク、
+   URLの #id 直リンク含む）で移動すると、区画の先頭が固定ヘッダー（ロゴ/MENUボタン）の
+   真下に来て見出し・バッジが隠れる不具合。header は左上ロゴ・右上MENUの2枚の角丸カードで
+   全幅の帯ではないため通常スクロールでは気づきにくいが、ハッシュジャンプは区画の上端を
+   ビューポート最上部にぴったり合わせるため必ず頭を隠す（#shoot の「撮」バッジで実機確認）。
+   固定ヘッダーの最大高さ分だけ着地位置を下げる。 */
+.lp-page { --lp-anchor-offset: 132px; }
+@media (max-width: 859px) {
+  .lp-page { --lp-anchor-offset: 76px; }
+}
+.lp-page [id] {
+  scroll-margin-top: var(--lp-anchor-offset);
+}

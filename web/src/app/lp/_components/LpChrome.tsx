@@ -65,15 +65,25 @@ export function LpChrome() {
      （戻すとキーボード利用者だけ画面が動いてもフォーカスがヘッダーに残る）。
      qa r3 H-4: 同期で focus() すると #main にまだ inert が付いており（解除は effect の
      クリーンアップ＝コミット後）、inert 部分木は仕様上フォーカス不能なので無言で失敗する。
-     inert が外れた後のフレームまで 2 段の rAF で遅らせる。 */
-  const closeToAnchor = useCallback((href: string) => {
+     inert が外れた後のフレームまで 2 段の rAF で遅らせる。
+     2026-09-18 バグ修正: 従来は <a href="#id"> のブラウザ既定動作（ハッシュ遷移＋スクロール）任せ
+     だったが、メニュー表示中は下の useEffect が body.style.overflow="hidden" を立てており、
+     クリックした瞬間はまだ（React の effect クリーンアップは非同期のため）overflow:hidden が
+     外れておらず、既定のスクロールが丸ごと無効になっていた（実機再現：メニューからの遷移が
+     一切スクロールしない）。既定動作を止め、overflow を同期的に戻したうえで自前でスクロールする。
+     scroll-margin-top（lp.css）により固定ヘッダーの下に正しく着地する。 */
+  const closeToAnchor = useCallback((e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    e.preventDefault();
     setOpen(false);
+    document.body.style.overflow = "";
     if (!href.startsWith("#")) return;
     const id = href.slice(1);
     requestAnimationFrame(() =>
       requestAnimationFrame(() => {
         const section = document.getElementById(id);
         if (!section) return;
+        section.scrollIntoView({ block: "start" });
+        history.pushState(null, "", `#${id}`);
         // 区画そのものはアクセシブル名を持たないので、区画の先頭見出しへ送る（無ければ区画）
         const target = section.querySelector<HTMLElement>("h1, h2, h3") ?? section;
         target.setAttribute("tabindex", "-1");
@@ -232,7 +242,7 @@ export function LpChrome() {
           <ul className="lp-menu__list">
             {MENU_ANCHORS.map((a) => (
               <li key={a.href}>
-                <a href={a.href} onClick={() => closeToAnchor(a.href)}>
+                <a href={a.href} onClick={(e) => closeToAnchor(e, a.href)}>
                   <span className="lp-menu__mark" aria-hidden="true">
                     <Ic name="arrow" />
                   </span>
