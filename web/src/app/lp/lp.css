@@ -2090,3 +2090,43 @@ html.js-rv .lp-page .lp-ribbon__star { transition: opacity 0.8s var(--ease-expo-
 @media (max-width: 859px) {
   .lp-page .lp-float-cta__btn .btn-line__tile { border-radius: 999px 0 0 999px; }
 }
+
+/* ============================================================
+   2026-09-18 散らし v2: サブコピーの移動先・区画ごとの散らし層・リボンの追加配置
+   ============================================================ */
+/* KV から移したサブコピー（ABOUT 見出し直下） */
+.lp-page .lp-band__sub {
+  margin: 14px auto 0;
+  max-width: 34em;
+  font-size: 15px;
+  line-height: 1.9;
+  color: var(--body);
+}
+.lp-page .lp-band__sub strong { color: var(--ink); }
+/* 区画に被せる散らし層。内容（.lp-container 等）は各区画側で z-index:1 以上にして前面に出す */
+.lp-page .lp-deco {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.lp-page .lp-deco .lp-ill { opacity: 0.85; }
+.lp-page .lp-point__block .lp-deco .lp-ill { opacity: 0.9; }
+/* 散らし層より前面に出す内容側 */
+.lp-page .lp-biz__inner,
+.lp-page .lp-footer__inner,
+.lp-page .lp-cases__main,
+.lp-page .lp-cases__area { position: relative; z-index: 1; }
+.lp-page .lp-cases { position: relative; }
+/* リボンの追加配置 */
+.lp-page .lp-ribbon--cycle  { left: -4%;  top: 4%;     width: min(58vw, 720px);  opacity: 0.55; }
+.lp-page .lp-ribbon--cases  { right: -8%; top: 0;      width: min(62vw, 780px);  opacity: 0.7; }
+.lp-page .lp-ribbon--biz    { left: -8%;  bottom: -3%; width: min(64vw, 800px);  opacity: 0.55; }
+.lp-page .lp-ribbon--footer { right: -10%; bottom: 8%; width: min(52vw, 640px);  opacity: 0.55; }
+@media (max-width: 859px) {
+  .lp-page .lp-ribbon--cycle  { left: -18%;  top: 2%;     width: 120%; }
+  .lp-page .lp-ribbon--cases  { right: -20%; top: 0;      width: 120%; }
+  .lp-page .lp-ribbon--biz    { left: -20%;  bottom: -2%; width: 120%; }
+  .lp-page .lp-ribbon--footer { right: -22%; bottom: 4%;  width: 118%; }
+  .lp-page .lp-band__sub { font-size: 14px; }
+}

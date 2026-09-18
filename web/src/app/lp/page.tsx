@@ -39,9 +39,59 @@ const KV_SLIDES: LpSlide[] = [
 const ILL_LOOP: IllName[] = ["box", "truck", "house-tree", "folding-hands", "books", "plant"];
 
 /** 手描き風・多色のデコアイコン（/img/lp/deco）。ILL_LOOP 用の青系イラストとは別系統の彩り装飾。
+ *  2026-09-18: ページ全体を「鮮やかで柔らかい」印象にするため、FEE 以外の区画（ABOUT・POINT・循環帯・
+ *  DAILY・CASES・BIZ・フッター）の余白にも同じ素材を散らす（SECTION_DECO）。写真・文章の上には置かず、
+ *  版面の外側寄り（左右 6% 以内・区画の上下端）だけを使う。
  *  2026-09-18 ユーザー指摘: FEE 上部の余白（浮遊イラストの空）がスカスカでバランスが悪い。
  *  8 点に増やし、SP でも間引かず（hideSp を使わない）全域に散らす。 */
-type DecoIll = { src: string; top: string; left: string; w: number; sway: 1 | 2; float: 1 | 2 | 3; spTop?: string; spLeft?: string };
+type DecoIll = { src: string; top: string; left: string; w: number; sway: 1 | 2; float: 1 | 2 | 3; spTop?: string; spLeft?: string; hideSp?: boolean };
+const D = {
+  box: "/img/lp/deco/deco-box.webp",
+  camera: "/img/lp/deco/deco-camera.webp",
+  clock: "/img/lp/deco/deco-clock.webp",
+  teacup: "/img/lp/deco/deco-teacup.webp",
+  gift: "/img/lp/deco/deco-gift.webp",
+  tote: "/img/lp/deco/deco-tote.webp",
+  lamp: "/img/lp/deco/deco-lamp.webp",
+  plant: "/img/lp/deco/deco-plant2.webp",
+} as const;
+/** 区画ごとの散らし配置（% は区画の箱基準）。SP で窮屈になる分は hideSp で間引く */
+const SECTION_DECO: Record<"about" | "cycle" | "daily" | "cases" | "biz" | "footer", DecoIll[]> = {
+  /* 左側は版面外の余白（--lp-pad ≒ 58px）に収まるよう left 2.2%・w 56 に固定（本文・写真に重ねない） */
+  about: [
+    { src: D.teacup, top: "9%", left: "93%", w: 72, sway: 2, float: 1, spLeft: "88%", spTop: "3%" },
+    { src: D.plant, top: "46%", left: "2.2%", w: 56, sway: 1, float: 2, hideSp: true },
+    { src: D.gift, top: "90%", left: "92%", w: 64, sway: 2, float: 3, spLeft: "86%", spTop: "96%" },
+  ],
+  cycle: [
+    { src: D.box, top: "22%", left: "8%", w: 76, sway: 1, float: 2, spLeft: "10%", spTop: "10%" },
+    { src: D.tote, top: "74%", left: "92%", w: 70, sway: 2, float: 1, spLeft: "88%", spTop: "92%" },
+  ],
+  daily: [
+    { src: D.clock, top: "6%", left: "91%", w: 70, sway: 1, float: 3, spLeft: "90%", spTop: "3%" },
+    { src: D.plant, top: "52%", left: "2.2%", w: 56, sway: 2, float: 1, hideSp: true },
+    { src: D.gift, top: "94%", left: "6%", w: 60, sway: 1, float: 2, spLeft: "8%", spTop: "98%" },
+  ],
+  cases: [
+    { src: D.camera, top: "10%", left: "92%", w: 80, sway: 2, float: 2, spLeft: "88%", spTop: "2%" },
+    { src: D.lamp, top: "58%", left: "2.2%", w: 56, sway: 1, float: 3, hideSp: true },
+    { src: D.teacup, top: "96%", left: "90%", w: 66, sway: 2, float: 1, spLeft: "86%" },
+  ],
+  biz: [
+    { src: D.box, top: "8%", left: "93%", w: 74, sway: 1, float: 1, spLeft: "88%", spTop: "4%" },
+    { src: D.plant, top: "70%", left: "2.2%", w: 56, sway: 2, float: 2, hideSp: true },
+  ],
+  footer: [
+    { src: D.teacup, top: "24%", left: "8%", w: 64, sway: 2, float: 3, spLeft: "10%", spTop: "12%" },
+    { src: D.gift, top: "78%", left: "40%", w: 56, sway: 1, float: 1, hideSp: true },
+  ],
+};
+/** POINT 3 ブロック（撮／選／安）の右上の余白に 1 点ずつ */
+const POINT_DECO: DecoIll[] = [
+  { src: D.lamp, top: "6%", left: "90%", w: 74, sway: 1, float: 2, spLeft: "88%", spTop: "3%" },
+  { src: D.camera, top: "6%", left: "90%", w: 80, sway: 2, float: 1, spLeft: "88%", spTop: "3%" },
+  { src: D.clock, top: "6%", left: "90%", w: 72, sway: 1, float: 3, spLeft: "88%", spTop: "3%" },
+];
 const FEE_DECO: DecoIll[] = [
   { src: "/img/lp/deco/deco-box.webp", top: "10%", left: "8%", w: 88, sway: 1, float: 1 },
   { src: "/img/lp/deco/deco-camera.webp", top: "58%", left: "6%", w: 92, sway: 2, float: 2, spTop: "48%" },
@@ -409,10 +459,21 @@ const FOOTER_LINKS: { href: string; label: string }[][] = [
 ];
 
 /** 浮遊デコアイコン1点（外側が translate、内側の img が rotate。2つの transform を別要素に分ける） */
+/** 区画に被せる散らし層（絶対配置・pointer-events なし・aria-hidden）。親は position:relative であること */
+function Deco({ items }: { items: DecoIll[] }) {
+  return (
+    <div className="lp-deco" aria-hidden="true">
+      {items.map((ill, i) => (
+        <FloatDeco key={`${ill.src}-${i}`} ill={ill} />
+      ))}
+    </div>
+  );
+}
+
 function FloatDeco({ ill }: { ill: DecoIll }) {
   return (
     <span
-      className={`lp-ill lp-ill--f${ill.float}`}
+      className={`lp-ill lp-ill--f${ill.float}${ill.hideSp ? " lp-ill--sp-off" : ""}`}
       style={
         {
           "--lp-ill-top": ill.top,
@@ -452,15 +513,8 @@ export default function LpPage() {
                 <br />
                 <span className="hl">動けない</span>あなたへ。
               </h1>
-              <p className="lp-kv__sub">
-                家じゅうの不用品を、
-                <strong>
-                  1点ずつ撮って、
-                  <br className="sp-br" />
-                  あとは待つだけ
-                </strong>
-                。
-              </p>
+              {/* 2026-09-18 ユーザー指示: サブコピー「家じゅうの不用品を、1点ずつ撮って、あとは待つだけ。」は
+                  KV から外し、ABOUT の見出し直下（.lp-band__sub）へ移した。KV は見出しと写真だけにする */}
             </div>
           </div>
           <div className="lp-wave lp-wave--bottom lp-wave--white" aria-hidden="true" />
@@ -525,10 +579,21 @@ export default function LpPage() {
           <div className="lp-wave lp-wave--top lp-wave--white" aria-hidden="true" />
           <div className="lp-texture" aria-hidden="true" />
           <LpRibbon variant="b" className="lp-ribbon--about" stars={false} />
+          <Deco items={SECTION_DECO.about} />
           <div className="lp-container lp-about__inner">
             <Reveal className="lp-band__head" variant="up">
               <p className="lp-en">about katazuke</p>
               <h2>カタヅケは、まとめ売りの買取マッチングです。</h2>
+              {/* KV から移動（文言は出典 .hero-sub の 1 文そのまま） */}
+              <p className="lp-band__sub">
+                家じゅうの不用品を、
+                <strong>
+                  1点ずつ撮って、
+                  <br className="sp-br" />
+                  あとは待つだけ
+                </strong>
+                。
+              </p>
             </Reveal>
             {ABOUT_ITEMS.map((it, i) => (
               <Reveal as="article" className="lp-about__item" variant="up" key={it.en} stagger={i}>
@@ -541,7 +606,6 @@ export default function LpPage() {
                   <h3>{it.head}</h3>
                   <p className="lp-about__p">{it.body}</p>
                 </div>
-                <span className="lp-trail" aria-hidden="true" />
               </Reveal>
             ))}
             {/* legal H2/M4: 「値がつかない物も回収」に対応する出典の打消しを併記し、強調と同じ本文サイズで置く */}
@@ -556,9 +620,10 @@ export default function LpPage() {
 
         {/* ============ 4. POINT（参照 .home-point・撮/選/安 の3ブロック＋循環図） ============ */}
         <div id="point" className="lp-point">
-          {POINT_BLOCKS.map((b) => (
+          {POINT_BLOCKS.map((b, bi) => (
             <section className={`lp-point__block lp-point__block--${b.tone}`} key={b.id} aria-labelledby={`lp-point-${b.id}`}>
               <div className="lp-point__plate" aria-hidden="true" />
+              <Deco items={[POINT_DECO[bi % POINT_DECO.length]]} />
               <div className="lp-container lp-point__inner">
                 {/* r2 B-1: 見出しは色面の「中」（バッジの右・縦中央）。色面の下に置くと 670px の無地が残るため */}
                 <Reveal className="lp-point__head" variant="up">
@@ -637,6 +702,8 @@ export default function LpPage() {
           <section className="lp-cycle" aria-labelledby="lp-cycle-h">
             <div className="lp-wave lp-wave--top lp-wave--pale" aria-hidden="true" />
             <div className="lp-texture" aria-hidden="true" />
+            <LpRibbon variant="a" className="lp-ribbon--cycle" stars={false} />
+            <Deco items={SECTION_DECO.cycle} />
             <div className="lp-container lp-cycle__inner">
               <Reveal className="lp-band__head" variant="up">
                 <p className="lp-en">three-way satisfaction</p>
@@ -674,6 +741,7 @@ export default function LpPage() {
           <div className="lp-wave lp-wave--top lp-wave--pale" aria-hidden="true" />
           <div className="lp-texture" aria-hidden="true" />
           <LpRibbon variant="b" className="lp-ribbon--daily" stars={false} />
+          <Deco items={SECTION_DECO.daily} />
           <div className="lp-container lp-daily__inner">
             <Reveal className="lp-band__head" variant="up">
               <p className="lp-en">from listing to pickup</p>
@@ -694,7 +762,6 @@ export default function LpPage() {
                     {s.tag ? <span className="lp-daily__tag">{s.tag}</span> : null}
                   </div>
                   <p className="lp-daily__cap">{s.p}</p>
-                  {s.trail ? <span className="lp-trail lp-trail--daily" aria-hidden="true" /> : null}
                 </Reveal>
               ))}
             </ol>
@@ -759,8 +826,10 @@ export default function LpPage() {
 
         {/* ============ 7. CASES（参照 .home-coco・水色 intro/outro ＋ 3件の縦積みカード） ============ */}
         <section id="cases" className="lp-cases">
+          <Deco items={SECTION_DECO.cases} />
           <div className="lp-cases__intro">
             <div className="lp-wave lp-wave--top lp-wave--primary" aria-hidden="true" />
+            <LpRibbon variant="b" className="lp-ribbon--cases" />
             <div className="lp-container">
               {/* r2 B-2: 中身は増やさない（見出し＋その下の極小英字だけ） */}
               <Reveal className="lp-cases__introbody" variant="up">
@@ -859,6 +928,8 @@ export default function LpPage() {
         <section id="biz" className="lp-biz">
           <div className="lp-wave lp-wave--top lp-wave--sky" aria-hidden="true" />
           <div className="lp-texture" aria-hidden="true" />
+          <LpRibbon variant="a" className="lp-ribbon--biz" stars={false} />
+          <Deco items={SECTION_DECO.biz} />
           <div className="lp-container lp-biz__inner">
             <Reveal className="lp-biz__band img-frame img-frame--3x2" variant="up">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -908,6 +979,8 @@ export default function LpPage() {
       {/* ============ 9. FOOTER（参照 l-footer・主色の波形上端＋淡色地＋右端の pagetop） ============ */}
       <footer className="lp-footer">
         <div className="lp-wave lp-wave--top lp-wave--primary" aria-hidden="true" />
+        <LpRibbon variant="b" className="lp-ribbon--footer" />
+        <Deco items={SECTION_DECO.footer} />
         <div className="lp-container lp-footer__inner">
           <div className="lp-footer__brand">
             <KdzLogo size={24} />
