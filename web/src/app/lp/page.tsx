@@ -464,7 +464,6 @@ export default function LpPage() {
                 <br />
                 <span className="hl">動けない</span>あなたへ。
               </h1>
-              <p className="lp-en lp-kv__en">KATAZUKE / BULK PICKUP / BUYER AUCTION</p>
               <p className="lp-kv__sub">
                 家じゅうの不用品を、
                 <strong>
@@ -484,17 +483,19 @@ export default function LpPage() {
         <section className="lp-message" aria-label="運営事務局からのメッセージ">
           <div className="lp-container lp-message__inner">
             <div className="lp-message__figs">
+              {/* 2026-09-18 ユーザー指摘: 60代夫婦の写真がKVの新ペルソナ構成と重複して見えるため、
+                  年代を特定しない一般的な情景写真（手元・部屋の一角）に差し替え */}
               <figure className="lp-message__fig lp-message__fig--a img-frame img-frame--1x1">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/img/v2/top-scene-jikka.webp" alt="" width={800} height={800} loading="lazy" decoding="async" />
+                <img src="/img/lp/message-hands.webp" alt="" width={1024} height={1024} loading="lazy" decoding="async" />
               </figure>
               <figure className="lp-message__fig lp-message__fig--b img-frame img-frame--4x5">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/img/v2/top-hero-couple-60s.webp"
-                  alt="並べた不用品をスマートフォンで撮影する60代の夫婦（イメージ）"
-                  width={900}
-                  height={1350}
+                  src="/img/lp/message-corner.webp"
+                  alt=""
+                  width={1024}
+                  height={1536}
                   loading="lazy"
                   decoding="async"
                 />

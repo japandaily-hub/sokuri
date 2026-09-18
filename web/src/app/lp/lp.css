@@ -229,7 +229,7 @@ html.js-rv .lp-page .rv--up:not(.in) {
   right: 6%;
   bottom: -34px;
   width: 140px;
-  border-top: 1px dashed rgba(255, 255, 255, 0.5);
+  border-top: 1px dashed rgba(var(--primary-rgb), 0.35);
   transform: rotate(16deg);
   pointer-events: none;
 }
@@ -567,10 +567,6 @@ html.js-rv .lp-page .rv--up:not(.in) {
   letter-spacing: 0.05em;
   color: var(--ink);
 }
-.lp-page .lp-kv__en {
-  margin-top: 12px;
-  color: var(--body-soft);
-}
 .lp-page .lp-kv__sub {
   margin-top: 12px;
   font-size: 15px;
@@ -741,10 +737,12 @@ html.js-rv .lp-page .rv--up:not(.in) {
 /* ============================================================
    3. ABOUT（参照 .home-about：主色帯・波形上端・テクスチャ・3 item 交互配置）
    ============================================================ */
+/* 2026-09-18 ユーザー指摘: 主色ベタ（#1447e0）が強すぎるため、帯の地は水色系の
+   薄い面（--sky）に変更。文字色はそれに合わせて白系→ダーク系（--ink/--body）へ反転する。 */
 .lp-page .lp-band {
   position: relative;
-  background: var(--primary);
-  color: #fff;
+  background: var(--sky);
+  color: var(--ink);
   padding: calc(var(--lp-wave-h) + clamp(32px, 6.5vw, 84px)) 0 calc(var(--lp-wave-h) + clamp(32px, 6.5vw, 84px));
   overflow: hidden;
 }
@@ -754,16 +752,12 @@ html.js-rv .lp-page .rv--up:not(.in) {
   text-align: center;
   margin-bottom: clamp(36px, 5vw, 72px);
 }
-/* qa r2 H-1: --lime(#8fb4ff) は --deep 面用の色で、主色帯（#1447e0）上では 3.32:1 しか出ない。
-   11px / 600 は「大きな文字」に該当しないため 4.5:1 必須。白 92%（約 6.1:1）に置換する。 */
-.lp-page .lp-band__head .lp-en {
-  color: rgba(255, 255, 255, 0.92);
-}
+/* 薄い面の上なので .lp-en の既定色（var(--primary)）のまま使う（上書き不要） */
 .lp-page .lp-band__head h2 {
   margin-top: 12px;
   font-size: clamp(22px, 2.9vw, 34px);
   line-height: 1.6;
-  color: #fff;
+  color: var(--ink);
 }
 .lp-page .lp-about__inner,
 .lp-page .lp-daily__inner {
@@ -787,42 +781,35 @@ html.js-rv .lp-page .rv--up:not(.in) {
   direction: ltr;
 }
 .lp-page .lp-about__fig {
-  background: rgba(255, 255, 255, 0.92);
-  border-color: rgba(255, 255, 255, 0.5);
+  background: #fff;
+  border-color: var(--line);
 }
-/* qa r2 M-1: .72 は 4.33:1 で AA 未達。.82 で約 5.2:1（階調差は保てる） */
-.lp-page .lp-about__body .lp-en {
-  color: rgba(255, 255, 255, 0.82);
-}
+/* 薄い面の上なので .lp-en の既定色（var(--primary)）のまま使う（上書き不要） */
 .lp-page .lp-about__body h3 {
   margin-top: 12px;
   font-size: clamp(19px, 2.1vw, 25px);
   line-height: 1.7;
-  color: #fff;
+  color: var(--ink);
 }
-/* r1 B-1: `--lime` は主色帯の上で約 3.6:1 しか出ない。強調は白文字＋白 32% のマーカー下線にする
-   （--gold はカタヅケでは注意色なので使わない）。 */
+/* 強調はサイト共通の .lp-mk と同じ作法（主色文字＋薄い水色マーカー下線）に揃える */
 .lp-page .lp-about__body h3 em {
   font-style: normal;
-  color: #fff;
-  background: linear-gradient(transparent 68%, rgba(255, 255, 255, 0.32) 68%);
+  color: var(--primary);
+  background: linear-gradient(transparent 68%, var(--marker) 68%);
 }
 .lp-page .lp-about__p {
   margin-top: 18px;
   font-size: 15px;
   line-height: 2;
-  color: rgba(255, 255, 255, 0.86);
+  color: var(--body);
 }
-.lp-page .lp-about__p .lp-mk {
-  background: linear-gradient(transparent 66%, rgba(255, 255, 255, 0.3) 66%);
-}
-/* r1 A-7 / legal M4: 打消し表示は強調表示と同程度に認識できる大きさで。本文 15px・白（不透明度 1.0） */
+/* r1 A-7 / legal M4: 打消し表示は強調表示と同程度に認識できる大きさで。本文 15px */
 .lp-page .lp-about__note {
   max-width: 46em;
   margin-inline: auto;
   font-size: 15px;
   line-height: 1.9;
-  color: #fff;
+  color: var(--body);
   text-align: center;
 }
 .lp-page .lp-about__note + .lp-about__note {
@@ -1010,8 +997,8 @@ html.js-rv .lp-page .rv--up:not(.in) {
 .lp-page .lp-cycle {
   --lp-wave-h: clamp(40px, 9vw, 116px);
   position: relative;
-  background: var(--primary);
-  color: #fff;
+  background: var(--sky);
+  color: var(--ink);
   padding: calc(var(--lp-wave-h) + 24px) 0 40px;
   overflow: hidden;
 }
@@ -1069,8 +1056,8 @@ html.js-rv .lp-page .rv--up:not(.in) {
 }
 .lp-page .lp-daily__fig {
   position: relative;
-  background: rgba(255, 255, 255, 0.92);
-  border-color: rgba(255, 255, 255, 0.5);
+  background: #fff;
+  border-color: var(--line);
 }
 /* 番号は白地の正方形（参照の白丸 → 直角 32px） */
 .lp-page .lp-daily__n {
@@ -1106,7 +1093,7 @@ html.js-rv .lp-page .rv--up:not(.in) {
   max-width: 22em;
   font-size: 14px;
   line-height: 1.9;
-  color: #fff;
+  color: var(--ink);
 }
 /* r1 C-3: 写真を 3 段階（大 6/12=50%・中 4/12=33%・小 3/12=25%）に配り、段違いに置く */
 @media (min-width: 860px) {
