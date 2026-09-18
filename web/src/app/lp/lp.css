@@ -2130,3 +2130,28 @@ html.js-rv .lp-page .lp-ribbon__star { transition: opacity 0.8s var(--ease-expo-
   .lp-page .lp-ribbon--footer { right: -22%; bottom: 4%;  width: 118%; }
   .lp-page .lp-band__sub { font-size: 14px; }
 }
+
+/* ============================================================
+   2026-09-18 KV の余白調整: サブコピーを外して見出しが短くなったぶん、写真の上端と veil を上へ詰める
+   （見出し2行の下端 ≒ PC 250px / SP 200px）。veil は文字の直下で切れて写真へ素早くつながるようにする。
+   ============================================================ */
+.lp-page .lp-slider { top: clamp(96px, 12%, 140px); }
+.lp-page .lp-kv__veil {
+  background: linear-gradient(
+    180deg,
+    rgba(244, 247, 252, 0.96) 0 clamp(280px, 34%, 320px),
+    rgba(244, 247, 252, 0) clamp(430px, 52%, 470px)
+  );
+}
+@media (max-width: 859px) {
+  .lp-page .lp-slider { top: 190px; }
+  .lp-page .lp-kv__veil {
+    background: linear-gradient(
+      180deg,
+      rgba(244, 247, 252, 0.96) 0 230px,
+      rgba(244, 247, 252, 0) 340px
+    );
+  }
+  /* 縦長画面で写真が下に沈まないよう、KV の高さは画面の 92% まで */
+  .lp-page .lp-kv { min-height: min(92svh, 760px); }
+}
