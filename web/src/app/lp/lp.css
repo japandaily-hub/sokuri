@@ -2437,3 +2437,42 @@ html.js-rv .lp-page .lp-ribbon__star { transition: opacity 0.8s var(--ease-expo-
 @media (max-width: 859px) {
   .lp-page .lp-intro__ribbon { top: auto; bottom: calc(50% + 64px); }
 }
+
+/* ============================================================
+   2026-09-18 本編の浮遊デコもなめらかに（ユーザー指示。オープニング v3 と同じ作法）
+   参照 LP 由来の steps(1)（コマ送り）をやめ、ease-in-out で「ゆっくり漂う＋ごくわずかに傾く」に置き換える。
+   - 外側 span = translate（漂い）／内側 img = rotate（傾き）。個別変形プロパティで分担し transform を取り合わない。
+   - 同じ区画のアイコンが揃って動かないよう、f1〜f3・s1/s2 で周期を変え、並び順（nth-child）で位相をずらす。
+   - 振れ幅は px 固定（旧: 自身の幅の 10% 前後＝最大 9px 程度）で、本文・写真に近づかない小ささを保つ。
+   - reduced-motion では上の既存ルール（animation:none）を生かすため、no-preference の中だけに書く。
+     オープニング（.lp-intro__deco）は詳細度の高い専用ルールが引き続き優先される。
+   ============================================================ */
+@keyframes lp-drift-a {
+  0%, 100% { translate: -3px 5px; }
+  50%      { translate: 3px -7px; }
+}
+@keyframes lp-drift-b {
+  0%, 100% { translate: 4px 4px; }
+  50%      { translate: -3px -6px; }
+}
+@keyframes lp-tilt-a {
+  0%, 100% { rotate: -3deg; }
+  50%      { rotate: 3deg; }
+}
+@keyframes lp-tilt-b {
+  0%, 100% { rotate: 3.5deg; }
+  50%      { rotate: -3.5deg; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .lp-page .lp-ill--f1 { animation: lp-drift-a 6.2s ease-in-out infinite; will-change: translate; }
+  .lp-page .lp-ill--f2 { animation: lp-drift-b 7.4s ease-in-out -2.1s infinite; will-change: translate; }
+  .lp-page .lp-ill--f3 { animation: lp-drift-a 8.6s ease-in-out -4.3s infinite; will-change: translate; }
+  .lp-page .lp-ill__img--s1 { animation: lp-tilt-a 7s ease-in-out -1.2s infinite; }
+  .lp-page .lp-ill__img--s2 { animation: lp-tilt-b 8.2s ease-in-out -3.4s infinite; }
+  /* 同じ散らし層の中で位相をずらす（同じ f/s の組み合わせが並んでも同期しない） */
+  /* :where() で詳細度を (0,2,0) に抑える。素の :nth-child だと (0,3,x) になり、オープニング専用ルール
+     （.lp-intro__deco …）の animation-delay を上書きして、灯る順番が壊れる */
+  .lp-page .lp-ill:where(:nth-child(3n + 2)) { animation-delay: -3.1s; }
+  .lp-page .lp-ill:where(:nth-child(3n)) { animation-delay: -5.2s; }
+  .lp-page :where(.lp-ill:nth-child(2n)) > [class*="lp-ill__img"] { animation-delay: -4.6s; }
+}
