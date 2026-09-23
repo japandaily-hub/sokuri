@@ -2,7 +2,8 @@
 
 /** メールアドレス確認完了（bareルート / 共通ヘッダー・フッターなし）。
  *  全画面中央寄せカード + confettiアニメ + 3ステップ説明。
- *  メールは URLパラメータ ?email= から取得（デモ表示用）。
+ *  メールは URLパラメータ ?email= から取得（デモ表示用）。バックエンド検証を伴わないため、
+ *  形式チェックを通らない値は表示しない（コンテンツ・スプーフィング対策。layout.tsx で noindex）。
  *  実際の確認処理はバックエンド未配線のため、本ページは「確認完了」表示のみを担う。 */
 
 import "./verify-email.css";
@@ -15,6 +16,17 @@ import { KdzLogo } from "@/components/kdz/Logo";
 
 const CONFETTI_COLORS = ["#1447e0", "#8fb4ff", "#e5a323", "#6f93f2", "#f3981d", "#d7e6ff"];
 
+// login/page.tsx の EMAIL_RE と同一パターン。?email= はバックエンド未検証のクエリ値のため、
+// 形式に一致しない値は表示せず、その欄ごと省略する（コンテンツ・スプーフィング対策）。
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_MAX_LEN = 254;
+
+function sanitizeEmailParam(raw: string | null): string | null {
+  if (!raw) return null;
+  const trimmed = raw.slice(0, EMAIL_MAX_LEN);
+  return EMAIL_RE.test(trimmed) ? trimmed : null;
+}
+
 type ConfettiDot = {
   background: string;
   left: string;
@@ -25,7 +37,7 @@ type ConfettiDot = {
 
 function VerifyEmailContent() {
   const params = useSearchParams();
-  const email = params.get("email") || "example@email.com";
+  const email = sanitizeEmailParam(params.get("email"));
 
   /* confetti は Math.random を使うため、ハイドレーション不一致回避にマウント後に生成 */
   const [dots, setDots] = useState<ConfettiDot[]>([]);
@@ -81,11 +93,11 @@ function VerifyEmailContent() {
           完了しました。
         </h1>
         <p className="confirm-sub">
-          ご登録ありがとうございます。下記のメールアドレスで受け付けました。
+          ご登録ありがとうございます。
           <br />
           さっそく出品を始めましょう。
         </p>
-        <div className="confirm-email">{email}</div>
+        {email ? <div className="confirm-email">{email}</div> : null}
 
         {/* ステップ */}
         <div className="welcome-steps">
