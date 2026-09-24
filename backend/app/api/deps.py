@@ -11,6 +11,7 @@ from datetime import timezone
 import jwt as pyjwt
 from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -83,8 +84,8 @@ def _decode(credentials: HTTPAuthorizationCredentials | None) -> dict:
     return payload
 
 
-def assert_user_not_revoked(user: User, payload: dict) -> None:
-    """退会（論理削除）済み・パスワード変更後の旧トークンを 401 で失効させる。
+def is_user_token_revoked(user: User, payload: dict) -> bool:
+    """退会（論理削除）済み・パスワード変更後の旧トークンなら True を返す（例外を投げない判定本体）。
 
     - 論理削除ゲート: deleted_at が設定済みのアカウントの旧トークンは即時失効させる。
     - パスワード変更失効ゲート: JWT の iat が password_changed_at より古い場合に拒否する。
@@ -93,21 +94,34 @@ def assert_user_not_revoked(user: User, payload: dict) -> None:
       SQLite は tz-naive な datetime を返すため、tzinfo が無ければ UTC を補って比較する
       （tz なしのまま timestamp() するとローカルタイム解釈になりズレるため）。
 
-    ``auth.py`` の ``line_exchange``（Bearer付き連携経路）でも同一ゲートを適用するため
-    モジュール関数として公開する（旧名 ``_assert_user_not_revoked`` から改名・再利用）。
+    必須認証は ``assert_user_not_revoked``（401）、任意認証の ``get_optional_user`` は
+    本関数を直接使う（失効の定義を1か所に保ったまま、共有の ``_CRED_EXC`` を
+    raise→捕捉せずに済ませるため。同一インスタンスの raise を繰り返すとトレースバックが
+    例外インスタンスに蓄積し続ける）。
     """
     if user.deleted_at is not None:
-        raise _CRED_EXC
+        return True
 
     if user.password_changed_at is None:
-        return
+        return False
     iat = payload.get("iat")
     if iat is None:
-        return
+        return False
     changed_at = user.password_changed_at
     if changed_at.tzinfo is None:
         changed_at = changed_at.replace(tzinfo=timezone.utc)
-    if int(iat) < int(changed_at.timestamp()):
+    return int(iat) < int(changed_at.timestamp())
+
+
+def assert_user_not_revoked(user: User, payload: dict) -> None:
+    """退会（論理削除）済み・パスワード変更後の旧トークンを 401 で失効させる。
+
+    判定条件は ``is_user_token_revoked`` に一本化している。
+
+    ``auth.py`` の ``line_exchange``（Bearer付き連携経路）でも同一ゲートを適用するため
+    モジュール関数として公開する（旧名 ``_assert_user_not_revoked`` から改名・再利用）。
+    """
+    if is_user_token_revoked(user, payload):
         raise _CRED_EXC
 
 
@@ -136,6 +150,28 @@ def assert_user_not_suspended(user: User) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail=SUSPENDED_ACCOUNT_DETAIL,
         )
+
+
+def assert_operator_not_revoked(operator: Operator) -> None:
+    """退会（論理削除）済み業者の旧トークンを 401 で失効させる。
+
+    ``assert_user_not_revoked`` の業者側対応。本人退会（``DELETE /operator/me``）・
+    運営による強制削除（``DELETE /admin/operators/{id}``）後の旧トークンを、業者を
+    解決する**全経路**で失効させるための単一の判定点。従来は ``get_current_operator``
+    にだけインラインで書かれており、``get_current_actor`` の operator 分岐と
+    ``auth.py`` の ``line_exchange``（Bearer付き連携経路・operator分岐）が素通しだった。
+    匿名化（``operator_profile._delete_and_anonymize_operator``）は is_suspended /
+    vendor_status を変えないため停止ゲート・閲覧ゲートでも止まらず、削除済み業者が
+    旧トークンで案件・成約（完了取引の依頼者住所・メール）・チャットの閲覧や
+    レビュー投稿を続けられた（security review 指摘対応）。
+
+    停止判定（``assert_operator_not_suspended``）より先に呼ぶこと。退会は停止と違い
+    復帰しないため、403 ``account_suspended``（問い合わせ導線）ではなく 401
+    （再ログイン要求）を返す。依頼者側の iat ゲート（パスワード変更後の旧トークン
+    失効）は業者にパスワード変更経路が無いため持たない（経路を追加する際はここへ足す）。
+    """
+    if operator.deleted_at is not None:
+        raise _CRED_EXC
 
 
 def assert_operator_not_suspended(operator: Operator) -> None:
@@ -183,7 +219,11 @@ def assert_operator_case_access(operator: Operator) -> None:
 
     停止中の判定を先に行い ``account_suspended`` を優先する（停止中の active 業者に
     ``approval_required`` を返すと、web が「承認待ち」という誤った案内を出すため）。
+    さらにその前に退会（論理削除）済みを 401 で止める（多層防御。通常は
+    ``get_current_actor`` が先に弾くが、匿名化は vendor_status を変えないため、
+    別経路で解決した業者がここへ渡されると削除済みでも閲覧が通ってしまう）。
     """
+    assert_operator_not_revoked(operator)
     assert_operator_not_suspended(operator)
     if operator.vendor_status not in OPERATOR_CASE_VIEW_STATUSES:
         raise HTTPException(
@@ -287,8 +327,8 @@ async def get_current_operator(
     # 論理削除ゲート（依頼者側 assert_user_not_revoked と同じ趣旨・r8-M6）:
     # 退会済み業者の旧トークンは即時失効させる。これが無いと、退会直後の
     # 発行済みトークンで最長トークン有効期限ぶん操作を続けられてしまう。
-    if operator.deleted_at is not None:
-        raise _CRED_EXC
+    # 判定は全経路共通の assert_operator_not_revoked に一本化する。
+    assert_operator_not_revoked(operator)
     assert_operator_not_suspended(operator)
     return operator
 
@@ -348,6 +388,10 @@ async def get_current_actor(
         operator = await session.get(Operator, subject_id)
         if operator is None:
             raise _CRED_EXC
+        # user 分岐の assert_user_not_revoked と対称。従来はここに論理削除ゲートが無く、
+        # 退会・強制削除済み業者の旧トークンが Actor 経由の全エンドポイント（案件・
+        # 成約・チャット・レビュー・/auth/me）で通用していた（security review 指摘）。
+        assert_operator_not_revoked(operator)
         assert_operator_not_suspended(operator)
         return Actor(typ="operator", operator=operator)
     raise _CRED_EXC
@@ -400,6 +444,65 @@ async def get_optional_operator(
     except ValueError:
         return None
     operator = await session.get(Operator, operator_id)
+    # 退会・強制削除済みは壊れたトークンと同じく None（トークン無し扱い）に倒す
+    # （上記の「401 化しない」方針。capability URL のため 401 にしてもヘッダを外せば
+    # 同じ画像が取れ、防御上の差は無い）。判定条件は assert_operator_not_revoked と同一だが、
+    # 共有の _CRED_EXC を raise→捕捉するとトレースバックが例外インスタンスに蓄積し
+    # 続けるため、ここでは例外を介さず直接判定する。
     if operator is None or operator.deleted_at is not None:
         return None
     return operator
+
+
+async def get_optional_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    session: AsyncSession = Depends(get_session),
+) -> User | None:
+    """Authorization ヘッダがあれば依頼者を解決する「任意認証」（無ければ None）。
+
+    公開フォーム ``POST /contact`` で、ログイン中の依頼者の送信だけを送信者アカウント
+    （``contact_messages.user_id``）に紐付けるための依存。退会時の問い合わせ記録の
+    匿名化を「メールアドレス一致」ではなく本人の送信分に限定するために使う
+    （signup はメールの所有確認をしないため、メール一致では他人の問い合わせを
+    消せてしまう・security review 指摘対応）。
+
+    トークンが無い・壊れている・期限切れ・用途限定トークン・業者トークン・退会済み・
+    停止中・パスワード変更前の旧トークンは、いずれも ``None``（匿名送信扱い）を返し
+    401/403 にはしない。停止中の依頼者は ``SUSPENDED_ACCOUNT_DETAIL`` の案内で
+    お問い合わせ窓口へ誘導されるため、ここで弾くと唯一の連絡手段が塞がる
+    （web の共通処理も 401/403 を受けるとサインアウトしてしまう）。
+    失効判定は必須認証と同じ ``is_user_token_revoked`` を例外なしで使う。
+    """
+    if credentials is None or not credentials.credentials:
+        return None
+    try:
+        payload = decode_access_token(credentials.credentials)
+    except pyjwt.PyJWTError:
+        return None
+    if payload.get("purpose") is not None or payload.get("typ") != "user":
+        return None
+    subject = payload.get("sub")
+    if not subject:
+        return None
+    try:
+        user_id = uuid.UUID(str(subject))
+    except ValueError:
+        return None
+    try:
+        user = await session.get(User, user_id)
+    except (SQLAlchemyError, OSError) as exc:
+        # 紐付けは付加情報にすぎないため、DB 障害で送信自体を 500 にしない。匿名送信として
+        # 続行し、呼び出し側（contact.py）の「保存に失敗してもメール通知と 202 は維持する」
+        # 経路へ委ねる（ログイン中の問い合わせだけが DB 障害で消える事態を防ぐ）。
+        logger.warning(
+            "get_optional_user: 送信者アカウントの解決に失敗したため匿名扱いで続行 - %s",
+            type(exc).__name__,
+        )
+        try:
+            await session.rollback()
+        except (SQLAlchemyError, OSError):
+            pass
+        return None
+    if user is None or user.is_suspended or is_user_token_revoked(user, payload):
+        return None
+    return user

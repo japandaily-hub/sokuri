@@ -726,12 +726,19 @@ class TestContactDeletionAndWithdrawalAnonymization:
     async def test_withdrawal_anonymizes_matching_contact_messages(
         self, client: AsyncClient, db_session: AsyncSession, monkeypatch
     ):
-        """退会時、同一メールの問い合わせは name/email/message を匿名化する。"""
+        """退会時、本人がログイン中に送った問い合わせは name/email/message を匿名化する。
+
+        照合はメール一致ではなく送信者アカウント（user_id）。メール一致だと他人の
+        問い合わせまで消せたため（security review 指摘。詳細は
+        test_contact_anonymize_ownership.py）。
+        """
         monkeypatch.setattr(get_settings(), "admin_emails_raw", "")
         email = "r10_withdraw_contact@example.com"
         token, user_id = await _signup_user(client, email)
         r = await client.post(
-            "/api/v1/contact", json=_contact_payload(email=email, name="退会予定 花子")
+            "/api/v1/contact",
+            json=_contact_payload(email=email, name="退会予定 花子"),
+            headers=_auth(token),
         )
         assert r.status_code == 202, r.text
 

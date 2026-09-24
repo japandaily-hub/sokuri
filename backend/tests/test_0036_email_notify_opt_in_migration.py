@@ -109,13 +109,17 @@ def test_upgrade_defaults_existing_rows_to_opt_in_true(tmp_path, monkeypatch):
         get_settings.cache_clear()
 
 
-def test_0036_is_the_single_head_chained_from_0035():
-    """0036 が単独の head として 0035 に正しく連鎖していること（分岐の防止）。"""
+def test_0036_is_chained_from_0035_on_a_single_head():
+    """0036 が 0035 に正しく連鎖し、履歴が単一の head に収束していること（分岐の防止）。
+
+    head そのものの検証は最新リビジョンのテスト（test_0037_0038_migrations.py）が持つ
+    （0037 以降の追加で本テストが head 固定のまま壊れないようにする）。
+    """
     from alembic.script import ScriptDirectory
 
     cfg = _alembic_config()
     script = ScriptDirectory.from_config(cfg)
-    assert script.get_heads() == ["0036_email_notify_opt_in"]
+    assert len(script.get_heads()) == 1
     revision = script.get_revision("0036_email_notify_opt_in")
     assert revision.down_revision == "0035_bids_pending_reminder"
     # 過去の alembic_version VARCHAR(32) 全断障害の再発防止ガード。

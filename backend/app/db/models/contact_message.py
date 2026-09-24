@@ -17,6 +17,10 @@ r10 O-M6 対応。従来 ``/contact`` は ADMIN_EMAILS へメールを投げる�
   未対応 = ``handled_at IS NULL``（部分索引ではなく通常索引 + 述語で足りる規模）。
 - 運営アカウントが削除されても対応履歴は残すため ON DELETE SET NULL
   （0031 の ``cancelled_by_admin_id`` と同方針）。
+- ``user_id`` はログイン中の依頼者が送信した場合のみ記録する送信者アカウント
+  （0037）。退会時の匿名化はこの列が一致する行だけを対象にする。``email`` は
+  自己申告で signup もメールの所有確認をしないため、メール一致で匿名化すると
+  他人の問い合わせ（苦情・削除請求など）を消せてしまう（security review 指摘対応）。
 """
 
 from __future__ import annotations
@@ -59,4 +63,10 @@ class ContactMessage(Base, TimestampMixin):
     )
     handled_by_admin_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
+    # 送信者アカウント（deps.get_optional_user で有効な依頼者トークンが解決できた送信のみ）。
+    # 未ログイン・業者・無効なトークンでの送信は NULL。退会時の匿名化の照合キー。
+    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )

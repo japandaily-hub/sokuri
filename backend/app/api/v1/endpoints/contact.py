@@ -45,9 +45,11 @@ from collections import deque
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_optional_user
 from app.api.rate_limit_deps import RateLimitGuard
 from app.config import get_settings
 from app.db.models.contact_message import ContactMessage
+from app.db.models.user import User
 from app.db.session import get_session
 from app.schemas_katadzuke import ContactCreateRequest, ContactCreateResponse
 from app.services import alerts, notify
@@ -161,6 +163,9 @@ async def create_contact(
     # アカウント軸とも10req/3600s）を使う。数値ルールは case_create を流用するが
     # バケット実体は独立する（_scope_spec の "contact" 分岐を参照）。
     _rl: object = Depends(RateLimitGuard("contact")),
+    # ログイン中の依頼者の送信だけを送信者アカウントに紐付ける（退会時の匿名化の照合キー）。
+    # 無効なトークン・業者トークン等は None（匿名送信）になり、401/403 にはならない。
+    sender: User | None = Depends(get_optional_user),
 ) -> ContactCreateResponse:
     # R3再レビュー Medium対応: プロセス内キャップの予約は、IP軸（Depends が本関数
     # 呼び出し前に既に判定・カウント済み）・アカウント軸（hit_account）の両方の
@@ -208,6 +213,7 @@ async def create_contact(
             email=str(body.email),
             category=body.category,
             message=body.message,
+            user_id=sender.id if sender is not None else None,
         )
         session.add(contact_message)
         await session.commit()

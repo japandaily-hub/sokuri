@@ -35,7 +35,8 @@ class Operator(Base, TimestampMixin):
         String(64), unique=True, index=True, nullable=True
     )
     # 退会（論理削除・匿名化）日時。User.deleted_at と同じ意味・同じゲート
-    # （deps.get_current_operator が旧トークンを即時失効させる）。物理削除はしない
+    # （deps.assert_operator_not_revoked が業者を解決する全経路で旧トークンを
+    # 即時失効させる）。物理削除はしない
     # ＝ 完了済み取引・レビュー・キャンセル記録を依頼者側の記録として保持するため。
     deleted_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True, index=True

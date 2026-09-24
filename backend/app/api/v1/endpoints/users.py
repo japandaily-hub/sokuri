@@ -18,6 +18,7 @@ from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user, get_current_user_claims
 from app.api.rate_limit_deps import RateLimitGuard
+from app.config import get_settings
 from app.core.crypto import DecryptionFailedError, decrypt_json, encrypt_json
 from app.core.masking import mask_account_number
 from app.core.security import (
@@ -570,6 +571,39 @@ _DELETE_ACTIVE_TRANSACTION = HTTPException(
     status_code=status.HTTP_409_CONFLICT,
     detail="進行中のお取引があります。お取引の完了またはキャンセル後に、あらためて退会手続きをお願いします。",
 )
+
+
+def _delete_last_admin_conflict() -> HTTPException:
+    """最後の管理者の自己退会を拒否する 409 を都度組み立てる。
+
+    共有インスタンスを使い回すと raise のたびにトレースバックが例外インスタンスへ
+    蓄積するため、contact._contact_cap_exceeded と同じく呼び出しごとに生成する。
+    """
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail="最後の管理者は退会できません。先に別の管理者を追加してから、あらためて退会手続きをお願いします。",
+    )
+
+
+async def _is_last_active_admin(session: AsyncSession, user: User) -> bool:
+    """本人が admin で、本人以外に有効な admin が1人もいなければ True。
+
+    「有効な admin」の定義は auth._admin_role_available（ADMIN_EMAILS による自動付与の
+    可否判定）と同一（role="admin" かつ deleted_at IS NULL）。最後の admin が退会すると
+    自動付与の窓が開き、ADMIN_EMAILS は公開リポジトリの render.yaml に載っていて
+    signup もメールの所有確認をしないため、第三者がそのアドレスで登録するだけで
+    admin になれてしまう（security review 指摘対応の堅牢化）。
+    """
+    if user.role != "admin":
+        return False
+    other_admin_id = await session.scalar(
+        select(User.id)
+        .where(User.role == "admin", User.deleted_at.is_(None), User.id != user.id)
+        .limit(1)
+    )
+    return other_admin_id is None
+
+
 # 取引未成立のまま宙に浮いた案件を退会時にキャンセル化するための非終端ステータス一覧。
 _NON_TERMINAL_CASE_STATUSES = ("draft", "open", "bidding")
 # うち「公開済み＝業者から入札が付きうる」ステータス。cases.cancel_case が
@@ -700,21 +734,39 @@ async def _delete_and_anonymize_user(
         if txn is None or txn.status != "completed":
             case.address_detail = None
 
-    original_email_norm = user.email.strip().lower()
-
     # r10-review M1: privacy:110 の削除請求対応。contact_messages は認証不要の
-    # 公開フォーム由来で本人以外も投稿しうるため物理削除はせず、退会と同じ
-    # 「匿名化」方針（email 一致のみで足りる規模・admin_list_contacts の一覧
-    # 表示に穴を開けない）で name/email/message を置換する。
+    # 公開フォーム由来のため物理削除はせず、退会と同じ「匿名化」方針
+    # （admin_list_contacts の一覧表示に穴を開けない）で name/email/message を置換する。
+    # 照合は送信者アカウント（user_id・ログイン中の送信のみ記録）に限定する。
+    # 以前は email 一致で匿名化していたが、email は自己申告で signup もメールの
+    # 所有確認をしないため、他人のアドレスで登録→退会するだけで、その人が送った
+    # 苦情・削除請求などの記録を消せた（security review 指摘対応）。紐付かない行
+    # （未ログイン送信・0037 以前の行）は自動では変更せず、同一メールの件数だけを
+    # 運営へ知らせ、本人確認のうえ ``DELETE /admin/contacts/{id}`` で対応してもらう
+    # （privacy 第7条「退会時は遅滞なく削除」を、他人の記録を消さずに運用で担保する）。
     await session.execute(
         update(ContactMessage)
-        .where(func.lower(ContactMessage.email) == original_email_norm)
+        .where(ContactMessage.user_id == user.id)
         .values(
             name=f"deleted-{user.id}",
             email=f"deleted-{user.id}@deleted.katazuke.internal",
             message="[削除済み]",
         )
     )
+    original_email = user.email
+    unlinked_contact_count = 0
+    if not notify.is_placeholder_email(original_email):
+        unlinked_contact_count = (
+            await session.scalar(
+                select(func.count())
+                .select_from(ContactMessage)
+                .where(
+                    ContactMessage.user_id.is_(None),
+                    func.lower(ContactMessage.email) == original_email.strip().lower(),
+                )
+            )
+            or 0
+        )
 
     user.email = f"deleted-{user.id}@deleted.katazuke.internal"
     user.name = None
@@ -786,6 +838,25 @@ async def _delete_and_anonymize_user(
             purpose,
         )
 
+    # 紐付かない同一メールの問い合わせがあれば、運営へ本人確認のうえでの削除を依頼する
+    # （上の匿名化コメント参照。commit 後にプリミティブ値で送る規約も同じ）。
+    if unlinked_contact_count:
+        admin_emails = get_settings().admin_emails
+        if not admin_emails:
+            logger.warning(
+                "users/me delete: ADMIN_EMAILS が未設定のため、退会者と同じメールの"
+                "問い合わせ %s 件の確認依頼を送信できません - user_id=%s",
+                unlinked_contact_count,
+                user_id,
+            )
+        for admin_email in admin_emails:
+            background.add_task(
+                notify.send_withdrawn_contact_review_admin_alert,
+                admin_email,
+                original_email,
+                unlinked_contact_count,
+            )
+
 
 @router.delete(
     "/users/me",
@@ -813,6 +884,9 @@ async def delete_my_account(
             ctx.record_failure(account_key)
             raise _DELETE_WRONG_PASSWORD
         ctx.reset_account(account_key)
+
+    if await _is_last_active_admin(session, user):
+        raise _delete_last_admin_conflict()
 
     await _delete_and_anonymize_user(session, background, user)
     return AccountDeleteResponse(detail="退会手続きが完了しました。")

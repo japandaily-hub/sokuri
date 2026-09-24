@@ -565,6 +565,37 @@ async def send_contact_received(
     )
 
 
+async def send_withdrawn_contact_review_admin_alert(
+    to_email: str, original_email: str, unlinked_count: int
+) -> bool:
+    """退会者と同じメールアドレスの「紐付かない」問い合わせの削除確認依頼（admin宛）。
+
+    退会時の問い合わせ匿名化は送信者アカウント（contact_messages.user_id）一致の行に
+    限定している（メール一致で自動削除すると、他人のアドレスで登録→退会するだけで
+    その人の問い合わせを消せてしまうため・security review 指摘対応）。未ログインで
+    送られた同一メールの行はプライバシーポリシー第7条（退会時は遅滞なく削除）の
+    対象になりうるが送信者の同一性を確認できないため、運営に本人確認のうえでの
+    削除を依頼する。宛先は運営のみで、send_contact_received と同じく連絡先メールを
+    載せる（該当行を一覧で特定し、本人確認の連絡を取るために必要）。
+    """
+    settings = get_settings()
+    url = f"{settings.frontend_base_url}/admin/contacts"
+    return await _send(
+        to_email,
+        "【カタヅケ管理】退会者と同じメールアドレスのお問い合わせの確認依頼",
+        _wrap(
+            "<p>依頼者アカウントの退会がありました。退会前のメールアドレス"
+            f"（{html.escape(original_email)}）と同じアドレスで、ログインせずに送られた"
+            f"お問い合わせが {int(unlinked_count)} 件あります。</p>"
+            "<p>送信者がこのアカウントの本人かを確認できないため、自動では削除していません"
+            "（他人のアドレスで登録して退会すると、その人のお問い合わせを消せてしまうため）。"
+            "このアドレス宛に本人確認を行い、本人からの削除のご希望が確認できた場合のみ、"
+            "お問い合わせ一覧から削除してください。</p>"
+            f'<p><a href="{html.escape(url, quote=True)}">お問い合わせ一覧へ</a></p>'
+        ),
+    )
+
+
 async def send_operator_application_rejected(to_email: str, company_name: str, reason: str) -> bool:
     """⑥ 業者事前申込の却下通知（申込者宛）。"""
     return await _send(

@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import (
     Actor,
+    assert_operator_not_revoked,
     assert_operator_not_suspended,
     assert_user_not_revoked,
     assert_user_not_suspended,
@@ -708,6 +709,11 @@ async def line_exchange(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Invalid credentials. Please log in again.",
                 )
+            # 退会・強制削除（論理削除）済み業者の旧トークンは deps.py と同一ゲートで失効させる
+            # （user分岐の assert_user_not_revoked と対称。security review 指摘: 削除で
+            # password_hash=None になるため下の再認証チェックも飛ばされ、匿名化済みの業者行へ
+            # line_user_id を再設定した上で新しいトークンまで発行できていた）。
+            assert_operator_not_revoked(operator)
             # 停止中業者の旧トークンは deps.py と同一ゲートで失効させる（security review指摘）。
             assert_operator_not_suspended(operator)
 
