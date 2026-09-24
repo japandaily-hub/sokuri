@@ -43,6 +43,8 @@
 - [ ] **API の 422 detail 配列を画面で握りつぶしている** — 入札額は事前検証で回避中。
 - [ ] **取り下げ系のレート制限に専用値** — 現在は sensitive_account（5回/15分）の流用。運用で問題が出たら。
 - [ ] **ESLint 警告 4 件** — 未使用変数（signup の `router`、unsubscribe の `submitted`）と不要な eslint-disable 2 件。
+- [ ] **共有 HTTPException のトレースバック蓄積（2026-09-25 実測・別タスク化済み）** — モジュールレベルの例外インスタンス（`_CRED_EXC`・`_FILE_NOT_FOUND` 等 49 か所）を raise するたびにフレームが蓄積し、未認証リクエストでもメモリが単調増加する。呼ぶたびに生成する形へ置換＋回帰テスト。
+- [ ] **2026-09-25 セキュリティレビューの残り（Low）** — ①safe-path の回帰テスト（`web/src/lib/safe-path.test.mts`）が CI で動いていない（ci.yml の Node 20 は型除去非対応・EOL。Node 22/24 へ上げて `node --test` を追加）②PNG/WebP は向き情報（Orientation）を引き継がない ③image_metadata の L-2（ICC 直後の再同期で ICC を落とす判定が付かない・実害なし）/L-3（SOS ヘッダと ICC チャンク境界をまたぐ署名検査・アップロード本人しか作れない）④最後の admin 判定は同時退会の競合を FOR UPDATE で防いでいない ⑤対策前の写真を AI 解析（Gemini）へ送る経路は除去を通らない ⑥`test_katadzuke_api.py:3030` の未使用 import（F401）・`db/models/operator.py` の前方参照 F821（既存）。
 
 ## 04 運用上の注意
 
