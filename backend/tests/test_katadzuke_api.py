@@ -61,6 +61,18 @@ def _auth(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+# 構造として正しい最小の JPEG（1×1 グレー。Pillow で生成し実デコードを確認済み）。
+# 写真の受信・配信はメタデータ除去（services/image_metadata.py）で JPEG の構造を
+# 解釈するため、先頭のマジックバイトだけの偽バイト列は受信で 415・配信で 404 に
+# なる。メタデータを持たないので、除去の前後でバイト列は変わらない。
+_MINIMAL_JPEG = bytes.fromhex(
+    "ffd8ffe000104a46494600010100000100010000ffdb004300080606070605080707070909080a0c140d0c0b0b"
+    "0c1912130f141d1a1f1e1d1a1c1c20242e2720222c231c1c2837292c30313434341f27393d38323c2e333432ff"
+    "c0000b080001000101011100ffc40014000100000000000000000000000000000000ffc4001410010000000000"
+    "0000000000000000000000ffda0008010100003f003fffd9"
+)
+
+
 async def _make_admin(client: AsyncClient, db_session: AsyncSession) -> str:
     admin = User(
         email="admin@katadzuke.jp",
@@ -775,14 +787,14 @@ async def test_upload_roundtrip(client: AsyncClient, tmp_storage):
 
     r = await client.put(
         presign["upload_url"],
-        content=b"\xff\xd8\xff\xe0fakejpegbytes",
+        content=_MINIMAL_JPEG,
         headers={**_auth(token), "Content-Type": "image/jpeg"},
     )
     assert r.status_code == 204
 
     r = await client.get(presign["public_url"])
     assert r.status_code == 200
-    assert r.content == b"\xff\xd8\xff\xe0fakejpegbytes"
+    assert r.content == _MINIMAL_JPEG
     storage_key = presign["storage_key"]
     assert r.headers["ETag"] == f'"{storage_key}"'
     # security review 指摘対応: immutable を含めない（認可の反映を最大7日
@@ -859,17 +871,32 @@ async def test_upload_rejects_duplicate_storage_key(client: AsyncClient, tmp_sto
     presign = r.json()
     r = await client.put(
         presign["upload_url"],
-        content=b"\xff\xd8\xff\xe0fakejpegbytes",
+        content=_MINIMAL_JPEG,
         headers={**_auth(token), "Content-Type": "image/jpeg"},
     )
     assert r.status_code == 204
 
+    # メタデータ除去後も内容が異なる JPEG（量子化テーブルの係数を1つだけ変えた有効な画像）で
+    # 上書きを試みる。COM 等のメタデータだけが違う画像だと、除去後に1回目と同じバイト列に
+    # なり「別内容での上書き」を検証できないため。
+    dqt_first_coeff = _MINIMAL_JPEG.index(b"\xff\xdb\x00\x43\x00") + 5
+    different_jpeg = (
+        _MINIMAL_JPEG[:dqt_first_coeff]
+        + bytes([_MINIMAL_JPEG[dqt_first_coeff] + 1])
+        + _MINIMAL_JPEG[dqt_first_coeff + 1 :]
+    )
+    assert different_jpeg != _MINIMAL_JPEG
     r = await client.put(
         presign["upload_url"],
-        content=b"\xff\xd8\xff\xe0anotherpayload",
+        content=different_jpeg,
         headers={**_auth(token), "Content-Type": "image/jpeg"},
     )
     assert r.status_code == 409
+
+    # 保存済みの実体は1回目のまま（上書きされていない）。
+    r = await client.get(presign["public_url"])
+    assert r.status_code == 200
+    assert r.content == _MINIMAL_JPEG
 
 
 async def test_upload_rejects_content_type_spoofing(client: AsyncClient, tmp_storage):
@@ -920,7 +947,7 @@ async def test_upload_translates_storage_unavailable_to_503(
     ):
         r = await client.put(
             presign["upload_url"],
-            content=b"\xff\xd8\xff\xe0fakejpegbytes",
+            content=_MINIMAL_JPEG,
             headers={**_auth(token), "Content-Type": "image/jpeg"},
         )
     assert r.status_code == 503

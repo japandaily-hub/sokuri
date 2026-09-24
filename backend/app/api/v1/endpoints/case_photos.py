@@ -6,9 +6,18 @@ presign はユーザー認証必須。アップロード本体（PUT）も認証
 （security review 指摘対応: storage_key の推測不能性のみに依存した
 capability URL 方式は、アルバム化でstorage_keyの露出面（案件一覧・
 入札一覧等のレスポンスに含まれる箇所）が増えたことで優先度が上がった）。
+
+security review 確定指摘（MEDIUM）対応: 写真を EXIF 付きのまま保存・配信していた
+ため、承認済み業者が成約前に依頼者の自宅の GPS 座標を取得できた。受信（PUT）で
+メタデータを除去してから保存し、配信（GET）でも同じ除去を通す（対策以前に保存
+済みの写真を、本番データを書き換えずに塞ぐため）。除去は画素を再エンコードしない
+（services/image_metadata.py）。
 """
 
 from __future__ import annotations
+
+import asyncio
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
@@ -19,13 +28,59 @@ from app.api.deps import (
     get_current_user,
     get_optional_operator,
 )
+from app.core.log_throttle import ThrottledLogger
 from app.db.models.operator import Operator
 from app.db.models.user import User
 from app.schemas_katadzuke import PresignRequest, PresignResponse
 from app.services import storage
+from app.services.image_metadata import ImageMetadataError, strip_image_metadata
 from app.services.storage import MAX_UPLOAD_BYTES, StorageKeyConflictError, StorageUnavailableError
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
+
+# メタデータ除去の失敗ログは間引く（壊れた1枚が閲覧・再送のたびにログを埋めないように。
+# 警告の種類ごとに別インスタンス: core/log_throttle.py の方針）。間引いた分もプロセス内
+# 累計件数として次に出る行に含める（deps.py の X-Ops-Token 不一致と同じ流儀）。
+_upload_strip_failure_throttle = ThrottledLogger()
+_serve_strip_failure_throttle = ThrottledLogger()
+_upload_strip_failure_count = 0
+_serve_strip_failure_count = 0
+
+
+def _note_upload_strip_failure(user_id: object, image_ext: str, reason: Exception) -> None:
+    """受信時の除去失敗（415）を数え、間引いて warning を出す（未検証の key は出さない）。"""
+    global _upload_strip_failure_count
+    _upload_strip_failure_count += 1
+    failure_count = _upload_strip_failure_count
+    _upload_strip_failure_throttle.emit(
+        lambda: logger.warning(
+            "case_photos.upload: 画像の構造を解釈できずメタデータを除去できないため拒否 - "
+            "user_id=%s ext=%s reason=%s（プロセス内累計 %s 件）",
+            user_id,
+            image_ext,
+            reason,
+            failure_count,
+        )
+    )
+
+
+def _note_serve_strip_failure(storage_key: str, reason: Exception) -> None:
+    """配信時の除去失敗（404）を数え、間引いて warning を出す（storage_key はマスクする）。"""
+    global _serve_strip_failure_count
+    _serve_strip_failure_count += 1
+    failure_count = _serve_strip_failure_count
+    masked_key = storage.mask_key_for_log(storage_key)
+    _serve_strip_failure_throttle.emit(
+        lambda: logger.warning(
+            "case_photos.serve_file: メタデータを除去できないため配信を拒否（fail closed） - "
+            "key=%s reason=%s（プロセス内累計 %s 件）",
+            masked_key,
+            reason,
+            failure_count,
+        )
+    )
 
 # Content-Lengthヘッダの申告値に対する早期拒否の許容量。ヘッダ自体が無い・
 # 偽装されている場合は後続のストリーミング読み込みでのハード上限で捕捉する
@@ -40,6 +95,8 @@ _TOO_LARGE = HTTPException(
 # （iPhone の HEIC を「すべてのファイル」で選択して accept を回避した場合）に
 # 次の行動が分かる文言にする（r8-H4）。判定は storage.sniff_image_ext の
 # マジックバイト方式（jpeg/png/webp のみ）と1対1で対応させること。
+# シグネチャは正しいが構造が壊れていてメタデータを除去できない画像（途中切れ・
+# 長さ不整合）も同じ 415 にする（除去を保証できない画像は保存しない）。
 _UNSUPPORTED_IMAGE = HTTPException(
     status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
     detail=(
@@ -125,10 +182,21 @@ async def upload(
     # Content-Type ヘッダ・拡張子は詐称可能なため信用せず、実バイト列の先頭
     # シグネチャ（マジックバイト）で画像形式を判定する（security review 指摘対応。
     # operator_license.py の許可証画像アップロードと同じ方式に統一する）。
-    if storage.sniff_image_ext(data) is None:
+    image_ext = storage.sniff_image_ext(data)
+    if image_ext is None:
         raise _UNSUPPORTED_IMAGE
+    # 位置情報（EXIF の GPS 等）を含むメタデータを保存前に除去する（security review
+    # 確定指摘・MEDIUM 対応）。web の「既存案件への写真追加」等は元ファイルをそのまま
+    # 送るため、サーバ側での除去を正本とする。形式は拡張子ではなく上の sniff 結果で
+    # 決める。数 MB の写真で数 ms の CPU 処理のため、イベントループを塞がないよう
+    # スレッドへ逃がす。除去できない画像は元のバイト列を保存せず 415 で拒否する。
     try:
-        await storage.save_bytes(storage_key, data)
+        sanitized_data = await asyncio.to_thread(strip_image_metadata, data, image_ext)
+    except ImageMetadataError as exc:
+        _note_upload_strip_failure(user.id, image_ext, exc)
+        raise _UNSUPPORTED_IMAGE from exc
+    try:
+        await storage.save_bytes(storage_key, sanitized_data)
     except StorageKeyConflictError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except ValueError as exc:
@@ -208,7 +276,21 @@ async def serve_file(
     処理順序: ①業者403多層防御 → ②is_valid_key（不正なら404）→
     ③If-None-Match が一致する場合のみ exists() で実在確認
     （存在しなければ404、存在すれば304）→ ④（③に該当しない場合）
-    read_bytes で本体取得し、None なら404・成功なら200。
+    read_bytes で本体取得し、None なら404 → ⑤メタデータ除去（失敗なら404）→ 200。
+
+    security review 確定指摘（MEDIUM）対応（⑤）: 対策以前に EXIF 付きのまま保存
+    された写真から GPS 座標を取得できないよう、返す直前にも受信時と同じ除去を通す
+    （R2 は上書き不可のため本番データは書き換えない）。形式は storage_key の拡張子
+    ではなく実バイトのシグネチャで決める（web はブラウザが形式を判定できない写真を
+    image/jpeg として presign するため、拡張子 .jpg の実体が PNG/WebP のことがある）。
+    除去できない場合は元のバイト列を返さない（fail closed）。応答は②④と同じ 404 に
+    する: 5xx にすると壊れた1枚が閲覧されるたびに 5xx バースト通知
+    （core/alert_middleware.py）を鳴らし続ける恒常的な誤アラート源になり、専用の
+    文言にすると「実在するが配信できない」を見分けるオラクルになるため。原因の
+    追跡は warning ログ（マスク済み storage_key・累計件数。閲覧のたびにログを埋め
+    ないよう 60 秒に 1 行へ間引く）で行う。libjpeg が警告付きで表示できる程度の
+    JPEG の破損（EOI 欠落等）は除去側で受け付けるため、ここには来ない（QA M1）。
+    304 経路は本体を返さないため除去は不要。
     """
     if operator is not None and (
         operator.is_suspended or operator.vendor_status not in OPERATOR_CASE_VIEW_STATUSES
@@ -249,4 +331,13 @@ async def serve_file(
     if obj is None:
         raise _FILE_NOT_FOUND
 
-    return Response(content=obj.data, media_type=obj.content_type, headers=cache_headers)
+    image_ext = storage.sniff_image_ext(obj.data)
+    try:
+        if image_ext is None:
+            raise ImageMetadataError("JPEG / PNG / WebP のシグネチャではありません")
+        sanitized_data = await asyncio.to_thread(strip_image_metadata, obj.data, image_ext)
+    except ImageMetadataError as exc:
+        _note_serve_strip_failure(storage_key, exc)
+        raise _FILE_NOT_FOUND from exc
+
+    return Response(content=sanitized_data, media_type=obj.content_type, headers=cache_headers)

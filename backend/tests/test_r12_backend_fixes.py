@@ -70,6 +70,18 @@ def _auth(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+# 構造として正しい最小の JPEG（1×1 グレー。Pillow で生成し実デコードを確認済み）。
+# 写真の受信・配信はメタデータ除去（services/image_metadata.py）で JPEG の構造を
+# 解釈するため、先頭のマジックバイトだけの偽バイト列は受信で 415・配信で 404 に
+# なる。メタデータを持たないので、除去の前後でバイト列は変わらない。
+_MINIMAL_JPEG = bytes.fromhex(
+    "ffd8ffe000104a46494600010100000100010000ffdb004300080606070605080707070909080a0c140d0c0b0b"
+    "0c1912130f141d1a1f1e1d1a1c1c20242e2720222c231c1c2837292c30313434341f27393d38323c2e333432ff"
+    "c0000b080001000101011100ffc40014000100000000000000000000000000000000ffc4001410010000000000"
+    "0000000000000000000000ffda0008010100003f003fffd9"
+)
+
+
 async def _make_user(
     db_session: AsyncSession, email: str, *, role: str = "user"
 ) -> tuple[User, str]:
@@ -192,7 +204,9 @@ async def test_case_photo_delivery_blocks_unapproved_operator_token(
     storage_key = f"{uuid.uuid4().hex}.jpg"
     db_session.add(CasePhoto(case_id=case.id, storage_key=storage_key, sort_order=0))
     await db_session.commit()
-    (tmp_path / storage_key).write_bytes(b"dummy-jpeg-bytes")
+    # 画像でないバイト列は配信時のメタデータ除去で fail closed（404）になるため、
+    # 実在する形式の最小 JPEG を置く。
+    (tmp_path / storage_key).write_bytes(_MINIMAL_JPEG)
 
     _, pending_token = await _make_operator(
         db_session, "photo_pending@example.com", vendor_status="pending"
