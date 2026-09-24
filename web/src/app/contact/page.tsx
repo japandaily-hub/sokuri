@@ -7,6 +7,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { Ic } from "@/components/kdz/Icons";
 import { Reveal } from "@/components/kdz/interactions";
 import { ILLUSTRATIONS, ILL_POSITIONS, illSrc, type IllName } from "@/lib/illustrations";
@@ -46,6 +47,11 @@ function buildContactPayload(selectedCategory: string, message: string) {
 }
 
 export default function ContactPage() {
+  /* ログイン中なら送信に backend のアクセストークンを添える（backend が依頼者アカウントに
+     問い合わせを紐付け、退会時の匿名化を本人の送信分だけに限定するため）。未ログイン・
+     セッション読込中（status === "loading" で data が未確定）は session が無く、従来どおり
+     トークン無しの匿名送信になる。画面の文言・入力・バリデーションには使わない。 */
+  const { data: session } = useSession();
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -117,7 +123,7 @@ export default function ContactPage() {
     setSending(true);
     setSubmitError(null);
     try {
-      await submitContactMessage({ name, email, category, message });
+      await submitContactMessage({ name, email, category, message }, session?.accessToken);
       setSent(true);
       if (typeof window !== "undefined") {
         window.scrollTo({ top: 0, behavior: "smooth" });

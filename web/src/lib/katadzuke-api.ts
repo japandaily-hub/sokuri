@@ -1369,15 +1369,21 @@ export interface ContactMessagePayload {
 }
 
 /**
- * お問い合わせフォームの送信。未ログイン訪問者も送信できるため token なし。
+ * お問い合わせフォームの送信。未ログイン訪問者も送信できるため token は省略可能。
+ * ログイン中は session.accessToken を渡すと Authorization: Bearer を付けて送り、
+ * backend は依頼者トークンなら送信者アカウント（contact_messages.user_id）を記録する
+ * （退会時の問い合わせ記録の匿名化を「メールアドレス一致」ではなく本人の送信分だけに
+ * 限定するため・セキュリティレビュー是正）。トークンが無効でも backend は従来どおり
+ * 匿名送信として受け付ける。省略時（未ログイン・セッション読込中）はヘッダを付けない。
  * 成功: 202 { ok: true }。422（入力不正）/429（送信過多）/5xx はいずれも
  * 呼び出し側で日本語の案内へ変換して表示し、偽の完了表示は出さないこと
  * （運営導線監査 r3-operator.md H1 是正）。
  */
 export function submitContactMessage(
   payload: ContactMessagePayload,
+  token?: string,
 ): Promise<{ ok: boolean }> {
-  return request("/contact", { method: "POST", body: JSON.stringify(payload) });
+  return request("/contact", { method: "POST", body: JSON.stringify(payload), token });
 }
 
 // ---------------------------------------------------------------------------
