@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_operator
 from app.api.rate_limit_deps import RateLimitGuard
+from app.core.http_errors import http_exception_factory
 from app.core.security import (
     REAUTH_TOKEN_EXPIRE_MINUTES,
     create_reauth_token,
@@ -285,11 +286,11 @@ async def list_vendors(
 # 従来は operator 側にこれらの手段が一切無く、LINE連携後に本人が解除できない
 # ・auth/line/exchange のoperator分岐に再認証要求も無かった）。
 
-_OPERATOR_REAUTH_LINE_ONLY = HTTPException(
+_OPERATOR_REAUTH_LINE_ONLY = http_exception_factory(
     status_code=status.HTTP_409_CONFLICT,
     detail="このアカウントはパスワード未設定のため、この操作はご利用いただけません。",
 )
-_OPERATOR_REAUTH_WRONG_PASSWORD = HTTPException(
+_OPERATOR_REAUTH_WRONG_PASSWORD = http_exception_factory(
     status_code=status.HTTP_400_BAD_REQUEST,
     detail="現在のパスワードが正しくありません。",
 )
@@ -313,10 +314,10 @@ async def issue_operator_reauth_token(
     # operator は operator_signup で必ず password_hash を持つため、実際には
     # 到達しない想定だが、user側と対称の構造を保つため念のため判定する。
     if operator.password_hash is None:
-        raise _OPERATOR_REAUTH_LINE_ONLY
+        raise _OPERATOR_REAUTH_LINE_ONLY()
     if not verify_password(body.current_password, operator.password_hash):
         ctx.record_failure(account_key)
-        raise _OPERATOR_REAUTH_WRONG_PASSWORD
+        raise _OPERATOR_REAUTH_WRONG_PASSWORD()
     ctx.reset_account(account_key)
 
     token = create_reauth_token(operator.id, "operator")
@@ -325,11 +326,11 @@ async def issue_operator_reauth_token(
     )
 
 
-_OPERATOR_LINE_UNLINK_NO_PASSWORD = HTTPException(
+_OPERATOR_LINE_UNLINK_NO_PASSWORD = http_exception_factory(
     status_code=status.HTTP_409_CONFLICT,
     detail="パスワード未設定のためLINE連携を解除できません（ログイン手段が失われるため）。",
 )
-_OPERATOR_LINE_UNLINK_WRONG_PASSWORD = HTTPException(
+_OPERATOR_LINE_UNLINK_WRONG_PASSWORD = http_exception_factory(
     status_code=status.HTTP_400_BAD_REQUEST,
     detail="現在のパスワードが正しくありません。",
 )
@@ -354,10 +355,10 @@ async def unlink_operator_line(
     # パスワード未設定（実際には到達しない想定だが念のため。user側と対称）の
     # うちは、解除するとログイン手段が完全に消滅するため解除自体を許可しない。
     if operator.password_hash is None:
-        raise _OPERATOR_LINE_UNLINK_NO_PASSWORD
+        raise _OPERATOR_LINE_UNLINK_NO_PASSWORD()
     if not verify_password(body.current_password, operator.password_hash):
         ctx.record_failure(account_key)
-        raise _OPERATOR_LINE_UNLINK_WRONG_PASSWORD
+        raise _OPERATOR_LINE_UNLINK_WRONG_PASSWORD()
     ctx.reset_account(account_key)
 
     operator.line_user_id = None
@@ -368,11 +369,11 @@ async def unlink_operator_line(
 # 依頼者側（users.py の DELETE /users/me）と同じ方針。物理削除はしない
 # （完了済み取引・レビュー・キャンセル記録は依頼者側の記録として保持する）。
 
-_OPERATOR_DELETE_ACTIVE_TRANSACTION = HTTPException(
+_OPERATOR_DELETE_ACTIVE_TRANSACTION = http_exception_factory(
     status_code=status.HTTP_409_CONFLICT,
     detail="進行中の取引があるため退会できません。取引の完了またはキャンセル後に再度お試しください。",
 )
-_OPERATOR_DELETE_WRONG_PASSWORD = HTTPException(
+_OPERATOR_DELETE_WRONG_PASSWORD = http_exception_factory(
     status_code=status.HTTP_403_FORBIDDEN,
     detail="パスワードが正しくありません。",
 )
@@ -440,7 +441,7 @@ async def delete_my_operator_account(
     if operator.password_hash is not None:
         if not verify_password(body.password, operator.password_hash):
             ctx.record_failure(account_key)
-            raise _OPERATOR_DELETE_WRONG_PASSWORD
+            raise _OPERATOR_DELETE_WRONG_PASSWORD()
         ctx.reset_account(account_key)
 
     await _delete_and_anonymize_operator(session, operator)
@@ -482,7 +483,7 @@ async def _delete_and_anonymize_operator(session: AsyncSession, operator: Operat
     )
     if active_txn_count:
         await session.rollback()
-        raise _OPERATOR_DELETE_ACTIVE_TRANSACTION
+        raise _OPERATOR_DELETE_ACTIVE_TRANSACTION()
 
     profile = await session.get(OperatorProfile, operator.id)
     if profile is not None:

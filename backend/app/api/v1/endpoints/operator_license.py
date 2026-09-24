@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.datastructures import UploadFile as StarletteUploadFile
 
 from app.api.deps import get_current_admin, get_current_operator
+from app.core.http_errors import http_exception_factory
 from app.db.models.operator import Operator
 from app.db.models.user import User
 from app.db.session import get_session
@@ -39,19 +40,19 @@ _MAX_DECLARED_CONTENT_LENGTH = MAX_UPLOAD_BYTES + _MULTIPART_OVERHEAD_ALLOWANCE
 # ストリーミング読み込みのチャンクサイズ。
 _READ_CHUNK_BYTES = 1024 * 1024
 
-_UNSUPPORTED_FORMAT = HTTPException(
+_UNSUPPORTED_FORMAT = http_exception_factory(
     status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
     detail="対応していないファイル形式です（jpeg / png / webp のみアップロードできます）。",
 )
-_TOO_LARGE = HTTPException(
+_TOO_LARGE = http_exception_factory(
     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
     detail="ファイルサイズが上限（10MB）を超えています。",
 )
-_NO_FILE = HTTPException(
+_NO_FILE = http_exception_factory(
     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
     detail="ファイルが指定されていません。",
 )
-_NOT_FOUND = HTTPException(
+_NOT_FOUND = http_exception_factory(
     status_code=status.HTTP_404_NOT_FOUND,
     detail="許可証画像が登録されていません。",
 )
@@ -88,7 +89,7 @@ async def upload_license_image(
         except ValueError:
             declared_length = None
         if declared_length is not None and declared_length > _MAX_DECLARED_CONTENT_LENGTH:
-            raise _TOO_LARGE
+            raise _TOO_LARGE()
 
     # max_part_size: Starlette の request.form() が受け付けるキーワード引数
     # （このバージョンでは対応済み。inspect.signature で確認済み）。
@@ -113,7 +114,7 @@ async def upload_license_image(
     # request.form()（Starlette実装）が生成するファイルフィールドは
     # starlette.datastructures.UploadFile（fastapi.UploadFile はそのサブクラス）。
     if upload is None or not isinstance(upload, StarletteUploadFile):
-        raise _NO_FILE
+        raise _NO_FILE()
 
     chunks: list[bytes] = []
     total_bytes = 0
@@ -123,17 +124,17 @@ async def upload_license_image(
             break
         total_bytes += len(chunk)
         if total_bytes > MAX_UPLOAD_BYTES:
-            raise _TOO_LARGE
+            raise _TOO_LARGE()
         chunks.append(chunk)
     await upload.close()
     data = b"".join(chunks)
 
     if not data:
-        raise _NO_FILE
+        raise _NO_FILE()
 
     ext = sniff_image_ext(data)
     if ext is None:
-        raise _UNSUPPORTED_FORMAT
+        raise _UNSUPPORTED_FORMAT()
 
     now = datetime.now(timezone.utc)
     operator.license_image_data = data
@@ -183,7 +184,7 @@ async def _load_license_image(
         )
     ).first()
     if row is None or row[0] is None:
-        raise _NOT_FOUND
+        raise _NOT_FOUND()
     data, content_type = row
     return data, content_type or "application/octet-stream"
 

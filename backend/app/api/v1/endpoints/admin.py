@@ -21,6 +21,7 @@ from app.api.v1.endpoints.operator_profile import _delete_and_anonymize_operator
 from app.api.v1.endpoints.users import _delete_and_anonymize_user
 from app.config import get_settings
 from app.core.crypto import decrypt_json
+from app.core.http_errors import http_exception_factory
 from app.db.models.bid import Bid
 from app.core.masking import mask_account_number
 from app.db.models.case import Case
@@ -1491,13 +1492,13 @@ async def reject_operator_application(
 
 # ──────────────────────────── 依頼者の本人確認書類（審査） ────────────────────────────
 
-_IDENTITY_DOCUMENT_NOT_FOUND = HTTPException(
+_IDENTITY_DOCUMENT_NOT_FOUND = http_exception_factory(
     status_code=status.HTTP_404_NOT_FOUND, detail="本人確認書類が見つかりません。"
 )
-_IDENTITY_DOCUMENT_ALREADY_REVIEWED = HTTPException(
+_IDENTITY_DOCUMENT_ALREADY_REVIEWED = http_exception_factory(
     status_code=status.HTTP_409_CONFLICT, detail="この本人確認書類は既に審査済みです。"
 )
-_IDENTITY_DOCUMENT_ERASED = HTTPException(
+_IDENTITY_DOCUMENT_ERASED = http_exception_factory(
     status_code=status.HTTP_410_GONE, detail="この書類は退会により削除されています。"
 )
 
@@ -1507,7 +1508,7 @@ async def _get_identity_document_or_404(
 ) -> UserIdentityDocument:
     document = await session.get(UserIdentityDocument, document_id)
     if document is None:
-        raise _IDENTITY_DOCUMENT_NOT_FOUND
+        raise _IDENTITY_DOCUMENT_NOT_FOUND()
     return document
 
 
@@ -1668,7 +1669,7 @@ async def get_identity_document_file_admin(
         await session.execute(select(*columns).where(UserIdentityDocument.id == document_id))
     ).first()
     if row is None or row[0] is None:
-        raise _IDENTITY_DOCUMENT_NOT_FOUND
+        raise _IDENTITY_DOCUMENT_NOT_FOUND()
     data, content_type = row
     logger.info(
         "admin: 本人確認書類を閲覧しました - document_id=%s side=%s admin_id=%s admin_email=%s",
@@ -1706,9 +1707,9 @@ async def approve_identity_document(
         )
     ).first()
     if row is None:
-        raise _IDENTITY_DOCUMENT_NOT_FOUND
+        raise _IDENTITY_DOCUMENT_NOT_FOUND()
     if not row[0]:
-        raise _IDENTITY_DOCUMENT_ERASED
+        raise _IDENTITY_DOCUMENT_ERASED()
 
     # TOCTOU対策（security review M-2）: SELECTで確認してからORMで更新すると、
     # 管理画面の多重クリックや複数管理者の同時操作で2回承認処理が走りうる。
@@ -1724,7 +1725,7 @@ async def approve_identity_document(
         .values(status=DOCUMENT_STATUS_APPROVED, reviewed_by=admin.id, reviewed_at=now)
     )
     if result.rowcount == 0:
-        raise _IDENTITY_DOCUMENT_ALREADY_REVIEWED
+        raise _IDENTITY_DOCUMENT_ALREADY_REVIEWED()
 
     document = await _get_identity_document_or_404(session, document_id)
     user = await session.get(User, document.user_id)
@@ -1791,9 +1792,9 @@ async def reject_identity_document(
         )
     ).first()
     if row is None:
-        raise _IDENTITY_DOCUMENT_NOT_FOUND
+        raise _IDENTITY_DOCUMENT_NOT_FOUND()
     if not row[0]:
-        raise _IDENTITY_DOCUMENT_ERASED
+        raise _IDENTITY_DOCUMENT_ERASED()
 
     # TOCTOU対策（security review M-2。approve_identity_document と同じ理由）。
     now = datetime.now(timezone.utc)
@@ -1811,7 +1812,7 @@ async def reject_identity_document(
         )
     )
     if result.rowcount == 0:
-        raise _IDENTITY_DOCUMENT_ALREADY_REVIEWED
+        raise _IDENTITY_DOCUMENT_ALREADY_REVIEWED()
 
     document = await _get_identity_document_or_404(session, document_id)
     user = await session.get(User, document.user_id)
@@ -1857,7 +1858,7 @@ async def reject_identity_document(
 
 # ──────────────────────────── お問い合わせ（受信台帳） ────────────────────────────
 
-_CONTACT_NOT_FOUND = HTTPException(
+_CONTACT_NOT_FOUND = http_exception_factory(
     status_code=status.HTTP_404_NOT_FOUND, detail="お問い合わせが見つかりません。"
 )
 
@@ -1939,7 +1940,7 @@ async def admin_handle_contact(
     """
     contact = await session.get(ContactMessage, contact_id)
     if contact is None:
-        raise _CONTACT_NOT_FOUND
+        raise _CONTACT_NOT_FOUND()
     if contact.handled_at is None:
         contact.handled_at = datetime.now(timezone.utc)
         contact.handled_by_admin_id = admin.id
@@ -1968,7 +1969,7 @@ async def admin_delete_contact(
     """
     contact = await session.get(ContactMessage, contact_id)
     if contact is None:
-        raise _CONTACT_NOT_FOUND
+        raise _CONTACT_NOT_FOUND()
     await session.delete(contact)
     await session.commit()
     logger.info(

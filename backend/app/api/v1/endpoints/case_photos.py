@@ -28,6 +28,7 @@ from app.api.deps import (
     get_current_user,
     get_optional_operator,
 )
+from app.core.http_errors import http_exception_factory
 from app.core.log_throttle import ThrottledLogger
 from app.db.models.operator import Operator
 from app.db.models.user import User
@@ -87,7 +88,7 @@ def _note_serve_strip_failure(storage_key: str, reason: Exception) -> None:
 # （operator_license.pyの許可証画像アップロードと同じ多重防御パターン）。
 _MAX_DECLARED_CONTENT_LENGTH = MAX_UPLOAD_BYTES + 64 * 1024
 _READ_CHUNK_BYTES = 1024 * 1024
-_TOO_LARGE = HTTPException(
+_TOO_LARGE = http_exception_factory(
     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
     detail="ファイルサイズが上限（10MB）を超えています。写真を縮小するか、別の写真をお試しください。",
 )
@@ -97,7 +98,7 @@ _TOO_LARGE = HTTPException(
 # マジックバイト方式（jpeg/png/webp のみ）と1対1で対応させること。
 # シグネチャは正しいが構造が壊れていてメタデータを除去できない画像（途中切れ・
 # 長さ不整合）も同じ 415 にする（除去を保証できない画像は保存しない）。
-_UNSUPPORTED_IMAGE = HTTPException(
+_UNSUPPORTED_IMAGE = http_exception_factory(
     status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
     detail=(
         "この形式の画像には対応していません。"
@@ -106,15 +107,15 @@ _UNSUPPORTED_IMAGE = HTTPException(
         "JPEG として保存できます）。"
     ),
 )
-_UPLOAD_STORAGE_UNAVAILABLE = HTTPException(
+_UPLOAD_STORAGE_UNAVAILABLE = http_exception_factory(
     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
     detail="写真の保存先に接続できませんでした。しばらくしてからもう一度お試しください。",
 )
-_SERVE_STORAGE_UNAVAILABLE = HTTPException(
+_SERVE_STORAGE_UNAVAILABLE = http_exception_factory(
     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
     detail="写真を取得できませんでした。しばらくしてからもう一度お試しください。",
 )
-_FILE_NOT_FOUND = HTTPException(
+_FILE_NOT_FOUND = http_exception_factory(
     status_code=status.HTTP_404_NOT_FOUND, detail="ファイルが見つかりません。"
 )
 
@@ -163,14 +164,14 @@ async def upload(
         except ValueError:
             declared_length = None
         if declared_length is not None and declared_length > _MAX_DECLARED_CONTENT_LENGTH:
-            raise _TOO_LARGE
+            raise _TOO_LARGE()
 
     chunks: list[bytes] = []
     total_bytes = 0
     async for chunk in request.stream():
         total_bytes += len(chunk)
         if total_bytes > MAX_UPLOAD_BYTES:
-            raise _TOO_LARGE
+            raise _TOO_LARGE()
         chunks.append(chunk)
     data = b"".join(chunks)
 
@@ -184,7 +185,7 @@ async def upload(
     # operator_license.py の許可証画像アップロードと同じ方式に統一する）。
     image_ext = storage.sniff_image_ext(data)
     if image_ext is None:
-        raise _UNSUPPORTED_IMAGE
+        raise _UNSUPPORTED_IMAGE()
     # 位置情報（EXIF の GPS 等）を含むメタデータを保存前に除去する（security review
     # 確定指摘・MEDIUM 対応）。web の「既存案件への写真追加」等は元ファイルをそのまま
     # 送るため、サーバ側での除去を正本とする。形式は拡張子ではなく上の sniff 結果で
@@ -194,7 +195,7 @@ async def upload(
         sanitized_data = await asyncio.to_thread(strip_image_metadata, data, image_ext)
     except ImageMetadataError as exc:
         _note_upload_strip_failure(user.id, image_ext, exc)
-        raise _UNSUPPORTED_IMAGE from exc
+        raise _UNSUPPORTED_IMAGE() from exc
     try:
         await storage.save_bytes(storage_key, sanitized_data)
     except StorageKeyConflictError as exc:
@@ -204,7 +205,7 @@ async def upload(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         ) from exc
     except StorageUnavailableError as exc:
-        raise _UPLOAD_STORAGE_UNAVAILABLE from exc
+        raise _UPLOAD_STORAGE_UNAVAILABLE() from exc
 
 
 def _if_none_match_matches(header_value: str, etag: str) -> bool:
@@ -305,7 +306,7 @@ async def serve_file(
         )
 
     if not storage.is_valid_key(storage_key):
-        raise _FILE_NOT_FOUND
+        raise _FILE_NOT_FOUND()
 
     etag = f'"{storage_key}"'
     cache_headers = {
@@ -319,17 +320,17 @@ async def serve_file(
     if if_none_match and _if_none_match_matches(if_none_match, etag):
         try:
             if not await storage.exists(storage_key):
-                raise _FILE_NOT_FOUND
+                raise _FILE_NOT_FOUND()
         except StorageUnavailableError as exc:
-            raise _SERVE_STORAGE_UNAVAILABLE from exc
+            raise _SERVE_STORAGE_UNAVAILABLE() from exc
         return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers=cache_headers)
 
     try:
         obj = await storage.read_bytes(storage_key)
     except StorageUnavailableError as exc:
-        raise _SERVE_STORAGE_UNAVAILABLE from exc
+        raise _SERVE_STORAGE_UNAVAILABLE() from exc
     if obj is None:
-        raise _FILE_NOT_FOUND
+        raise _FILE_NOT_FOUND()
 
     image_ext = storage.sniff_image_ext(obj.data)
     try:
@@ -338,6 +339,6 @@ async def serve_file(
         sanitized_data = await asyncio.to_thread(strip_image_metadata, obj.data, image_ext)
     except ImageMetadataError as exc:
         _note_serve_strip_failure(storage_key, exc)
-        raise _FILE_NOT_FOUND from exc
+        raise _FILE_NOT_FOUND() from exc
 
     return Response(content=sanitized_data, media_type=obj.content_type, headers=cache_headers)

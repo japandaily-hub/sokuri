@@ -28,6 +28,7 @@ from app.api.deps import (
 )
 from app.api.rate_limit_deps import RateLimitGuard
 from app.config import get_settings
+from app.core.http_errors import http_exception_factory
 from app.core.security import (
     REAUTH_PURPOSE_LINE_LINK,
     create_access_token,
@@ -141,7 +142,7 @@ async def _promote_to_admin_if_listed(session: AsyncSession, user: User) -> bool
     return True
 
 
-_LOGIN_FAILED = HTTPException(
+_LOGIN_FAILED = http_exception_factory(
     status_code=status.HTTP_401_UNAUTHORIZED,
     detail="メールアドレスまたはパスワードが正しくありません。",
 )
@@ -151,11 +152,11 @@ _LINE_VERIFY_ENDPOINT = "https://api.line.me/oauth2/v2.1/verify"
 # LINE userId は "U" + 32桁の16進数文字列（LINE Platform API仕様）。
 _LINE_USER_ID_RE = re.compile(r"^U[0-9a-f]{32}$")
 
-_LINE_AUTH_FAILED = HTTPException(
+_LINE_AUTH_FAILED = http_exception_factory(
     status_code=status.HTTP_401_UNAUTHORIZED,
     detail="LINEアカウントの認証に失敗しました。もう一度お試しください。",
 )
-_LINE_NOT_CONFIGURED = HTTPException(
+_LINE_NOT_CONFIGURED = http_exception_factory(
     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
     detail="LINEログイン機能は現在ご利用いただけません。",
 )
@@ -272,7 +273,7 @@ async def user_login(
         or not verify_password(body.password, user.password_hash)
     ):
         ctx.record_failure(rl_account_key)
-        raise _LOGIN_FAILED
+        raise _LOGIN_FAILED()
     ctx.reset_account(rl_account_key)
     # 停止判定はレート制限（総当たり対策）とは別関心のビジネスルールのため、
     # リセット後に判定する（operator_login と同じ順序）。deps.py の
@@ -422,7 +423,7 @@ async def operator_login(
         or not verify_password(body.password, operator.password_hash)
     ):
         ctx.record_failure(rl_account_key)
-        raise _LOGIN_FAILED
+        raise _LOGIN_FAILED()
     # パスワード照合の成功をレート制限上の「成功」境界とする（アカウント軸をリセット）。
     # 停止判定はレート制限（総当たり対策）とは別関心のビジネスルールのため、
     # リセット後に判定する。
@@ -458,7 +459,7 @@ async def _verify_line_access_token(line_access_token: str) -> None:
     settings = get_settings()
     if not settings.line_client_id:
         logger.error("auth/line/exchange: LINE_CLIENT_ID が未設定のため LINE ログインを拒否")
-        raise _LINE_NOT_CONFIGURED
+        raise _LINE_NOT_CONFIGURED()
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -472,7 +473,7 @@ async def _verify_line_access_token(line_access_token: str) -> None:
                 res.status_code,
                 res.text[:500],
             )
-            raise _LINE_AUTH_FAILED
+            raise _LINE_AUTH_FAILED()
         data = res.json()
     except HTTPException:
         raise
@@ -490,12 +491,12 @@ async def _verify_line_access_token(line_access_token: str) -> None:
             "auth/line/exchange: LINEアクセストークンのchannel不一致 - client_id=%s",
             client_id,
         )
-        raise _LINE_AUTH_FAILED
+        raise _LINE_AUTH_FAILED()
     if not isinstance(expires_in, int) or expires_in <= 0:
         logger.error(
             "auth/line/exchange: LINEアクセストークンが期限切れ - expires_in=%s", expires_in
         )
-        raise _LINE_AUTH_FAILED
+        raise _LINE_AUTH_FAILED()
 
 
 async def _fetch_line_user_id(line_access_token: str) -> str:
@@ -538,7 +539,7 @@ async def _fetch_line_user_id(line_access_token: str) -> str:
             "auth/line/exchange: LINE Profile API 応答の userId が不正な書式 - userId=%s",
             line_user_id,
         )
-        raise _LINE_AUTH_FAILED
+        raise _LINE_AUTH_FAILED()
     return str(line_user_id)
 
 
@@ -551,16 +552,16 @@ def _extract_bearer_token(request: Request) -> str | None:
     return token or None
 
 
-_ALREADY_LINKED_TO_OTHER_LINE = HTTPException(
+_ALREADY_LINKED_TO_OTHER_LINE = http_exception_factory(
     status_code=status.HTTP_409_CONFLICT,
     detail="このアカウントは既に別のLINEアカウントと連携済みです。"
     "連携を解除してから再度お試しください。",
 )
-_REAUTH_REQUIRED = HTTPException(
+_REAUTH_REQUIRED = http_exception_factory(
     status_code=status.HTTP_401_UNAUTHORIZED,
     detail="LINE連携には再認証が必要です。現在のパスワードで再認証してください。",
 )
-_REAUTH_INVALID = HTTPException(
+_REAUTH_INVALID = http_exception_factory(
     status_code=status.HTTP_401_UNAUTHORIZED,
     detail="再認証トークンが無効、または有効期限が切れています。",
 )
@@ -583,21 +584,21 @@ def _validate_reauth_token(
     （呼び出し元 line_exchange で password_hash is None の場合はスキップする）。
     """
     if reauth_token is None:
-        raise _REAUTH_REQUIRED
+        raise _REAUTH_REQUIRED()
     try:
         payload = decode_access_token(reauth_token)
     except pyjwt.PyJWTError as exc:
-        raise _REAUTH_INVALID from exc
+        raise _REAUTH_INVALID() from exc
     if payload.get("purpose") != REAUTH_PURPOSE_LINE_LINK:
-        raise _REAUTH_INVALID
+        raise _REAUTH_INVALID()
     if payload.get("typ") != expected_typ:
-        raise _REAUTH_INVALID
+        raise _REAUTH_INVALID()
     try:
         token_subject_id = uuid.UUID(payload["sub"])
     except (KeyError, ValueError) as exc:
-        raise _REAUTH_INVALID from exc
+        raise _REAUTH_INVALID() from exc
     if token_subject_id != expected_subject_id:
-        raise _REAUTH_INVALID
+        raise _REAUTH_INVALID()
 
 
 @router.post(
@@ -658,7 +659,7 @@ async def line_exchange(
             # 既に別のLINEアカウントに連携済みの場合は無条件で拒否する（再バインド禁止。
             # security review 最重要指摘）。同一 line_user_id の再送（冪等な再連携）は許可する。
             if user.line_user_id is not None and user.line_user_id != line_user_id:
-                raise _ALREADY_LINKED_TO_OTHER_LINE
+                raise _ALREADY_LINKED_TO_OTHER_LINE()
 
             if user.line_user_id != line_user_id:
                 # 初回連携（付与）。パスワード設定済みユーザーのみ再認証トークンを要求する
@@ -719,7 +720,7 @@ async def line_exchange(
 
             # 再バインド禁止ガード（user分岐と同様。同一 line_user_id の再送は許可する）。
             if operator.line_user_id is not None and operator.line_user_id != line_user_id:
-                raise _ALREADY_LINKED_TO_OTHER_LINE
+                raise _ALREADY_LINKED_TO_OTHER_LINE()
 
             if operator.line_user_id != line_user_id:
                 # 初回連携（付与）。パスワード設定済み業者のみ再認証トークンを要求する

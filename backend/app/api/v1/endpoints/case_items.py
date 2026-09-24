@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user
+from app.core.http_errors import http_exception_factory
 from app.core.limits import MAX_PHOTOS_PER_CASE, MAX_PHOTOS_PER_ITEM
 from app.db.models.case import Case, CaseItem, CasePhoto
 from app.db.models.user import User
@@ -36,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-_STORAGE_UNAVAILABLE = HTTPException(
+_STORAGE_UNAVAILABLE = http_exception_factory(
     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
     detail="写真の保存先に接続できませんでした。しばらくしてからもう一度お試しください。",
 )
@@ -293,7 +294,7 @@ async def add_case_item_photo(
     try:
         photo_exists = await storage.exists(body.storage_key)
     except StorageUnavailableError as exc:
-        raise _STORAGE_UNAVAILABLE from exc
+        raise _STORAGE_UNAVAILABLE() from exc
     if not photo_exists:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

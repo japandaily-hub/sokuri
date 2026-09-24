@@ -20,6 +20,7 @@ from app.api.deps import get_current_user, get_current_user_claims
 from app.api.rate_limit_deps import RateLimitGuard
 from app.config import get_settings
 from app.core.crypto import DecryptionFailedError, decrypt_json, encrypt_json
+from app.core.http_errors import http_exception_factory
 from app.core.masking import mask_account_number
 from app.core.security import (
     REAUTH_TOKEN_EXPIRE_MINUTES,
@@ -63,7 +64,7 @@ router = APIRouter()
 
 # 「現在のパスワードが正しくありません。」は password/reauth/bank-account/line-link/
 # 退会など複数のエンドポイントで共有する（文言統一のため一箇所にまとめる）。
-_WRONG_CURRENT_PASSWORD = HTTPException(
+_WRONG_CURRENT_PASSWORD = http_exception_factory(
     status_code=status.HTTP_400_BAD_REQUEST,
     detail="現在のパスワードが正しくありません。",
 )
@@ -275,7 +276,7 @@ async def get_my_bank_account(user: User = Depends(get_current_user)) -> UserBan
     return _to_bank_account_masked_out(user)
 
 
-_BANK_ACCOUNT_CURRENT_PASSWORD_REQUIRED = HTTPException(
+_BANK_ACCOUNT_CURRENT_PASSWORD_REQUIRED = http_exception_factory(
     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
     detail="現在のパスワードを入力してください。",
 )
@@ -284,7 +285,7 @@ _BANK_ACCOUNT_CURRENT_PASSWORD_REQUIRED = HTTPException(
 # LINE専用ユーザーの step-up 判定に用いる「直近ログイン」の許容時間（秒）。
 _BANK_ACCOUNT_RECENT_LOGIN_MAX_AGE_SEC = 10 * 60
 
-_BANK_ACCOUNT_RELOGIN_REQUIRED = HTTPException(
+_BANK_ACCOUNT_RELOGIN_REQUIRED = http_exception_factory(
     status_code=status.HTTP_403_FORBIDDEN,
     detail=(
         "振込先口座の変更には本人確認のため再ログインが必要です。"
@@ -312,12 +313,12 @@ def _verify_bank_account_reauth(
             token_iat is None
             or now_ts - float(token_iat) > _BANK_ACCOUNT_RECENT_LOGIN_MAX_AGE_SEC
         ):
-            raise _BANK_ACCOUNT_RELOGIN_REQUIRED
+            raise _BANK_ACCOUNT_RELOGIN_REQUIRED()
         return
     if not current_password:
-        raise _BANK_ACCOUNT_CURRENT_PASSWORD_REQUIRED
+        raise _BANK_ACCOUNT_CURRENT_PASSWORD_REQUIRED()
     if not verify_password(current_password, user.password_hash):
-        raise _WRONG_CURRENT_PASSWORD
+        raise _WRONG_CURRENT_PASSWORD()
 
 
 @router.put(
@@ -430,7 +431,7 @@ async def delete_my_bank_account(
 
 # ──────────────────────────── パスワード変更 ────────────────────────────
 
-_LINE_ONLY_PASSWORD_CHANGE = HTTPException(
+_LINE_ONLY_PASSWORD_CHANGE = http_exception_factory(
     status_code=status.HTTP_409_CONFLICT,
     detail="このアカウントはパスワード未設定（LINEログイン専用）のため、パスワード変更はご利用いただけません。",
 )
@@ -454,10 +455,10 @@ async def change_my_password(
     ctx.check_account(account_key)
 
     if user.password_hash is None:
-        raise _LINE_ONLY_PASSWORD_CHANGE
+        raise _LINE_ONLY_PASSWORD_CHANGE()
     if not verify_password(body.current_password, user.password_hash):
         ctx.record_failure(account_key)
-        raise _WRONG_CURRENT_PASSWORD
+        raise _WRONG_CURRENT_PASSWORD()
     ctx.reset_account(account_key)
 
     user.password_hash = hash_password(body.new_password)
@@ -473,11 +474,11 @@ async def change_my_password(
 
 # ──────────────────────────── LINE連携（再認証トークン・連携解除） ────────────────────────────
 
-_REAUTH_LINE_ONLY = HTTPException(
+_REAUTH_LINE_ONLY = http_exception_factory(
     status_code=status.HTTP_409_CONFLICT,
     detail="このアカウントはパスワード未設定（LINEログイン専用）のため、この操作はご利用いただけません。",
 )
-_REAUTH_WRONG_PASSWORD = HTTPException(
+_REAUTH_WRONG_PASSWORD = http_exception_factory(
     status_code=status.HTTP_400_BAD_REQUEST,
     detail="現在のパスワードが正しくありません。",
 )
@@ -500,10 +501,10 @@ async def issue_reauth_token(
 
     # LINE専用ユーザー（password_hash=None）はパスワードによる再認証手段が無い。
     if user.password_hash is None:
-        raise _REAUTH_LINE_ONLY
+        raise _REAUTH_LINE_ONLY()
     if not verify_password(body.current_password, user.password_hash):
         ctx.record_failure(account_key)
-        raise _REAUTH_WRONG_PASSWORD
+        raise _REAUTH_WRONG_PASSWORD()
     ctx.reset_account(account_key)
 
     token = create_reauth_token(user.id, "user")
@@ -512,11 +513,11 @@ async def issue_reauth_token(
     )
 
 
-_LINE_UNLINK_NO_PASSWORD = HTTPException(
+_LINE_UNLINK_NO_PASSWORD = http_exception_factory(
     status_code=status.HTTP_409_CONFLICT,
     detail="パスワード未設定のためLINE連携を解除できません（ログイン手段が失われるため）。",
 )
-_LINE_UNLINK_WRONG_PASSWORD = HTTPException(
+_LINE_UNLINK_WRONG_PASSWORD = http_exception_factory(
     status_code=status.HTTP_400_BAD_REQUEST,
     detail="現在のパスワードが正しくありません。",
 )
@@ -541,10 +542,10 @@ async def unlink_line(
     # LINE専用ユーザー（password_hash=None）が解除するとログイン手段が完全に
     # 消滅するため、パスワード未設定のうちは解除自体を許可しない。
     if user.password_hash is None:
-        raise _LINE_UNLINK_NO_PASSWORD
+        raise _LINE_UNLINK_NO_PASSWORD()
     if not verify_password(body.current_password, user.password_hash):
         ctx.record_failure(account_key)
-        raise _LINE_UNLINK_WRONG_PASSWORD
+        raise _LINE_UNLINK_WRONG_PASSWORD()
     ctx.reset_account(account_key)
 
     user.line_user_id = None
@@ -553,7 +554,7 @@ async def unlink_line(
 
 # ──────────────────────────── アカウント削除（退会） ────────────────────────────
 
-_DELETE_CONFIRM_REQUIRED = HTTPException(
+_DELETE_CONFIRM_REQUIRED = http_exception_factory(
     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
     detail="削除の確認が必要です。",
 )
@@ -563,11 +564,11 @@ _DELETE_CONFIRM_REQUIRED = HTTPException(
 # パスワード変更・reauth-token・bank-account・line-link の再認証失敗は従来どおり
 # 400（_WRONG_CURRENT_PASSWORD 系）— こちらは user 側・operator 側で既に対称であり、
 # 退会だけを 403 に分離することで「不可逆操作か否か」を status で区別できる。
-_DELETE_WRONG_PASSWORD = HTTPException(
+_DELETE_WRONG_PASSWORD = http_exception_factory(
     status_code=status.HTTP_403_FORBIDDEN,
     detail="パスワードが正しくありません。",
 )
-_DELETE_ACTIVE_TRANSACTION = HTTPException(
+_DELETE_ACTIVE_TRANSACTION = http_exception_factory(
     status_code=status.HTTP_409_CONFLICT,
     detail="進行中のお取引があります。お取引の完了またはキャンセル後に、あらためて退会手続きをお願いします。",
 )
@@ -706,7 +707,7 @@ async def _delete_and_anonymize_user(
         .where(Case.user_id == user.id, Transaction.status.in_(("pending", "visiting")))
     )
     if active_txn_count:
-        raise _DELETE_ACTIVE_TRANSACTION
+        raise _DELETE_ACTIVE_TRANSACTION()
 
     cases = (
         await session.scalars(
@@ -876,13 +877,13 @@ async def delete_my_account(
     ctx.check_account(account_key)
 
     if not body.confirm:
-        raise _DELETE_CONFIRM_REQUIRED
+        raise _DELETE_CONFIRM_REQUIRED()
 
     # LINE専用ユーザー（password_hash=None）はパスワード確認不要。
     if user.password_hash is not None:
         if not body.password or not verify_password(body.password, user.password_hash):
             ctx.record_failure(account_key)
-            raise _DELETE_WRONG_PASSWORD
+            raise _DELETE_WRONG_PASSWORD()
         ctx.reset_account(account_key)
 
     if await _is_last_active_admin(session, user):

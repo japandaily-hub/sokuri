@@ -33,6 +33,7 @@ from starlette.datastructures import UploadFile as StarletteUploadFile
 from app.api.deps import get_current_user
 from app.api.rate_limit_deps import RateLimitGuard
 from app.config import get_settings
+from app.core.http_errors import http_exception_factory
 from app.db.models.user import (
     IDENTITY_STATUS_APPROVED,
     IDENTITY_STATUS_PENDING,
@@ -65,43 +66,43 @@ _MAX_DECLARED_CONTENT_LENGTH = MAX_UPLOAD_BYTES + _MULTIPART_OVERHEAD_ALLOWANCE
 _READ_CHUNK_BYTES = 1024 * 1024
 _MIN_AGE_YEARS = 18
 
-_UNSUPPORTED_FORMAT = HTTPException(
+_UNSUPPORTED_FORMAT = http_exception_factory(
     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
     detail="対応していないファイル形式です（jpeg / png / webp のみアップロードできます）。",
 )
-_TOO_LARGE = HTTPException(
+_TOO_LARGE = http_exception_factory(
     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
     detail="ファイルサイズが上限（10MB）を超えています。",
 )
-_NO_FRONT_FILE = HTTPException(
+_NO_FRONT_FILE = http_exception_factory(
     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
     detail="表面の画像ファイルが指定されていません。",
 )
-_INVALID_DOC_TYPE = HTTPException(
+_INVALID_DOC_TYPE = http_exception_factory(
     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
     detail="書類の種類の指定が正しくありません。",
 )
-_BACK_REQUIRED = HTTPException(
+_BACK_REQUIRED = http_exception_factory(
     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
     detail="この書類の種類は裏面の画像も必要です。",
 )
-_BIRTH_DATE_REQUIRED = HTTPException(
+_BIRTH_DATE_REQUIRED = http_exception_factory(
     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
     detail="先に生年月日を登録してください。",
 )
-_UNDER_AGE = HTTPException(
+_UNDER_AGE = http_exception_factory(
     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
     detail="本人確認は18歳以上の方のみご利用いただけます。",
 )
-_PENDING_EXISTS = HTTPException(
+_PENDING_EXISTS = http_exception_factory(
     status_code=status.HTTP_409_CONFLICT,
     detail="本人確認書類は審査中です。審査結果をお待ちください。",
 )
-_ALREADY_APPROVED = HTTPException(
+_ALREADY_APPROVED = http_exception_factory(
     status_code=status.HTTP_409_CONFLICT,
     detail="本人確認は承認済みです。",
 )
-_NOT_FOUND = HTTPException(
+_NOT_FOUND = http_exception_factory(
     status_code=status.HTTP_404_NOT_FOUND,
     detail="本人確認書類が見つかりません。",
 )
@@ -125,7 +126,7 @@ async def _read_upload(upload: StarletteUploadFile) -> bytes:
             break
         total_bytes += len(chunk)
         if total_bytes > MAX_UPLOAD_BYTES:
-            raise _TOO_LARGE
+            raise _TOO_LARGE()
         chunks.append(chunk)
     await upload.close()
     return b"".join(chunks)
@@ -194,30 +195,30 @@ async def submit_identity_document(
         except ValueError:
             declared_length = None
         if declared_length is not None and declared_length > _MAX_DECLARED_CONTENT_LENGTH:
-            raise _TOO_LARGE
+            raise _TOO_LARGE()
 
     form = await request.form(max_part_size=MAX_UPLOAD_BYTES)
 
     doc_type = form.get("doc_type")
     if not isinstance(doc_type, str) or doc_type not in DOC_TYPES:
-        raise _INVALID_DOC_TYPE
+        raise _INVALID_DOC_TYPE()
 
     front = form.get("front")
     if front is None or not isinstance(front, StarletteUploadFile):
-        raise _NO_FRONT_FILE
+        raise _NO_FRONT_FILE()
     back = form.get("back")
     back_upload = back if isinstance(back, StarletteUploadFile) else None
 
     requires_back = doc_type in DOC_TYPES_REQUIRING_BACK
     discards_back = doc_type in DOC_TYPES_DISCARDING_BACK
     if requires_back and back_upload is None:
-        raise _BACK_REQUIRED
+        raise _BACK_REQUIRED()
 
     # ── 業務前提の検証（重い画像読み込みの前に済ませる） ──────────────
     if user.birth_date is None:
-        raise _BIRTH_DATE_REQUIRED
+        raise _BIRTH_DATE_REQUIRED()
     if not _is_adult(user.birth_date, today=datetime.now(_JST).date()):
-        raise _UNDER_AGE
+        raise _UNDER_AGE()
 
     existing_status = (
         await session.scalar(
@@ -228,9 +229,9 @@ async def submit_identity_document(
         )
     )
     if existing_status == DOCUMENT_STATUS_PENDING:
-        raise _PENDING_EXISTS
+        raise _PENDING_EXISTS()
     if user.identity_status == IDENTITY_STATUS_APPROVED:
-        raise _ALREADY_APPROVED
+        raise _ALREADY_APPROVED()
 
     # ── 表面画像 ────────────────────────────────────────────────
     # 画像の読み込み（I/O待ち）に時間がかかるため、TOCTOU対策の行ロックは
@@ -238,10 +239,10 @@ async def submit_identity_document(
     # （ロック保持時間を最小化し、他リクエストの待ち行列を作らないため）。
     front_data = await _read_upload(front)
     if not front_data:
-        raise _NO_FRONT_FILE
+        raise _NO_FRONT_FILE()
     front_ext = sniff_image_ext(front_data)
     if front_ext is None:
-        raise _UNSUPPORTED_FORMAT
+        raise _UNSUPPORTED_FORMAT()
     front_content_type = _CONTENT_TYPE_BY_EXT[front_ext]
 
     # ── 裏面画像 ────────────────────────────────────────────────
@@ -256,11 +257,11 @@ async def submit_identity_document(
         elif raw_back:
             back_ext = sniff_image_ext(raw_back)
             if back_ext is None:
-                raise _UNSUPPORTED_FORMAT
+                raise _UNSUPPORTED_FORMAT()
             back_data = raw_back
             back_content_type = _CONTENT_TYPE_BY_EXT[back_ext]
         elif requires_back:
-            raise _BACK_REQUIRED
+            raise _BACK_REQUIRED()
 
     # ── TOCTOU対策（security review M-2） ─────────────────────────
     # 上のpending/approved判定から画像読み込みの間に、別リクエスト（多重送信・
@@ -281,9 +282,9 @@ async def submit_identity_document(
         )
     )
     if existing_status == DOCUMENT_STATUS_PENDING:
-        raise _PENDING_EXISTS
+        raise _PENDING_EXISTS()
     if locked_user.identity_status == IDENTITY_STATUS_APPROVED:
-        raise _ALREADY_APPROVED
+        raise _ALREADY_APPROVED()
 
     now = datetime.now(timezone.utc)
     document = UserIdentityDocument(
@@ -372,7 +373,7 @@ async def get_my_identity_document_file(
     ).first()
     # 他人の document_id は「存在しない」と同一の404にする（IDOR経由の在不在オラクル防止）。
     if row is None or row[0] != user.id or row[1] is None:
-        raise _NOT_FOUND
+        raise _NOT_FOUND()
     _, data, content_type = row
     return Response(
         content=data,

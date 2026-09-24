@@ -15,6 +15,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
+from app.core.http_errors import http_exception_factory
 from app.core.log_throttle import ThrottledLogger
 from app.core.security import decode_access_token
 from app.db.models.operator import Operator
@@ -59,7 +60,7 @@ def _note_ops_token_mismatch() -> None:
             )
         )
 
-_CRED_EXC = HTTPException(
+_CRED_EXC = http_exception_factory(
     status_code=status.HTTP_401_UNAUTHORIZED,
     detail="Invalid credentials. Please log in again.",
     headers={"WWW-Authenticate": "Bearer"},
@@ -68,11 +69,11 @@ _CRED_EXC = HTTPException(
 
 def _decode(credentials: HTTPAuthorizationCredentials | None) -> dict:
     if credentials is None or not credentials.credentials:
-        raise _CRED_EXC
+        raise _CRED_EXC()
     try:
         payload = decode_access_token(credentials.credentials)
     except pyjwt.PyJWTError as exc:
-        raise _CRED_EXC from exc
+        raise _CRED_EXC() from exc
     # reauth_token（LINE連携付与用の短命step-upトークン）等の用途限定トークンは
     # "purpose" クレームを持つ。通常のaccess_tokenにはこのクレームが無いため、
     # ここで弾かないと発行から5分間、通常の認証必須エンドポイント全てで
@@ -80,7 +81,7 @@ def _decode(credentials: HTTPAuthorizationCredentials | None) -> dict:
     # core/security.py の create_reauth_token のコメントは元々この分離を前提に
     # 書かれていたが、実際にはここでの検証が抜けていた）。
     if payload.get("purpose") is not None:
-        raise _CRED_EXC
+        raise _CRED_EXC()
     return payload
 
 
@@ -95,9 +96,8 @@ def is_user_token_revoked(user: User, payload: dict) -> bool:
       （tz なしのまま timestamp() するとローカルタイム解釈になりズレるため）。
 
     必須認証は ``assert_user_not_revoked``（401）、任意認証の ``get_optional_user`` は
-    本関数を直接使う（失効の定義を1か所に保ったまま、共有の ``_CRED_EXC`` を
-    raise→捕捉せずに済ませるため。同一インスタンスの raise を繰り返すとトレースバックが
-    例外インスタンスに蓄積し続ける）。
+    本関数を直接使う（失効の定義を1か所に保ったまま、401 を raise→捕捉する遠回りを
+    避けるため）。
     """
     if user.deleted_at is not None:
         return True
@@ -122,7 +122,7 @@ def assert_user_not_revoked(user: User, payload: dict) -> None:
     モジュール関数として公開する（旧名 ``_assert_user_not_revoked`` から改名・再利用）。
     """
     if is_user_token_revoked(user, payload):
-        raise _CRED_EXC
+        raise _CRED_EXC()
 
 
 # 依頼者停止時の 403 detail（security review L-2対応）。従来は文言のみの文字列
@@ -171,7 +171,7 @@ def assert_operator_not_revoked(operator: Operator) -> None:
     失効）は業者にパスワード変更経路が無いため持たない（経路を追加する際はここへ足す）。
     """
     if operator.deleted_at is not None:
-        raise _CRED_EXC
+        raise _CRED_EXC()
 
 
 def assert_operator_not_suspended(operator: Operator) -> None:
@@ -243,7 +243,7 @@ def get_current_user_claims(
     """
     payload = _decode(credentials)
     if payload.get("typ") != "user":
-        raise _CRED_EXC
+        raise _CRED_EXC()
     return payload
 
 
@@ -253,10 +253,10 @@ async def get_current_user(
 ) -> User:
     payload = _decode(credentials)
     if payload.get("typ") != "user":
-        raise _CRED_EXC
+        raise _CRED_EXC()
     user = await session.get(User, uuid.UUID(payload["sub"]))
     if user is None:
-        raise _CRED_EXC
+        raise _CRED_EXC()
     assert_user_not_revoked(user, payload)
     assert_user_not_suspended(user)
     return user
@@ -320,10 +320,10 @@ async def get_current_operator(
 ) -> Operator:
     payload = _decode(credentials)
     if payload.get("typ") != "operator":
-        raise _CRED_EXC
+        raise _CRED_EXC()
     operator = await session.get(Operator, uuid.UUID(payload["sub"]))
     if operator is None:
-        raise _CRED_EXC
+        raise _CRED_EXC()
     # 論理削除ゲート（依頼者側 assert_user_not_revoked と同じ趣旨・r8-M6）:
     # 退会済み業者の旧トークンは即時失効させる。これが無いと、退会直後の
     # 発行済みトークンで最長トークン有効期限ぶん操作を続けられてしまう。
@@ -380,21 +380,21 @@ async def get_current_actor(
     if typ == "user":
         user = await session.get(User, subject_id)
         if user is None:
-            raise _CRED_EXC
+            raise _CRED_EXC()
         assert_user_not_revoked(user, payload)
         assert_user_not_suspended(user)
         return Actor(typ="user", user=user)
     if typ == "operator":
         operator = await session.get(Operator, subject_id)
         if operator is None:
-            raise _CRED_EXC
+            raise _CRED_EXC()
         # user 分岐の assert_user_not_revoked と対称。従来はここに論理削除ゲートが無く、
         # 退会・強制削除済み業者の旧トークンが Actor 経由の全エンドポイント（案件・
         # 成約・チャット・レビュー・/auth/me）で通用していた（security review 指摘）。
         assert_operator_not_revoked(operator)
         assert_operator_not_suspended(operator)
         return Actor(typ="operator", operator=operator)
-    raise _CRED_EXC
+    raise _CRED_EXC()
 
 
 async def get_case_viewer_actor(
@@ -447,8 +447,7 @@ async def get_optional_operator(
     # 退会・強制削除済みは壊れたトークンと同じく None（トークン無し扱い）に倒す
     # （上記の「401 化しない」方針。capability URL のため 401 にしてもヘッダを外せば
     # 同じ画像が取れ、防御上の差は無い）。判定条件は assert_operator_not_revoked と同一だが、
-    # 共有の _CRED_EXC を raise→捕捉するとトレースバックが例外インスタンスに蓄積し
-    # 続けるため、ここでは例外を介さず直接判定する。
+    # None に倒すだけなので例外を介さず直接判定する。
     if operator is None or operator.deleted_at is not None:
         return None
     return operator

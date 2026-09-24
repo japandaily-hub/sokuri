@@ -29,6 +29,7 @@ from app.core.client_ip import (
     scan_client_ip_for_diagnostics,
     truncate_ip_for_log,
 )
+from app.core.http_errors import http_exception_factory
 from app.core.log_throttle import ThrottledLogger
 from app.core.rate_limit import (
     RateLimitConfig,
@@ -53,7 +54,7 @@ _special_address_skip_throttle = ThrottledLogger()
 _cf_range_at_trust_position_throttle = ThrottledLogger()
 _scan_drift_throttle = ThrottledLogger()
 
-_INVALID_REQUEST_HEADERS = HTTPException(
+_INVALID_REQUEST_HEADERS = http_exception_factory(
     status_code=status.HTTP_400_BAD_REQUEST,
     detail="リクエストの形式が正しくありません。時間をおいて再度お試しください。",
 )
@@ -470,7 +471,7 @@ class RateLimitContext:
         ctx.check_account(account_key)      # 超過なら 429 を raise
         ... 認証判定 ...
         ctx.record_failure(account_key)     # IP軸・アカウント軸の両方をカウント
-        raise _LOGIN_FAILED                 # 失敗パス
+        raise _LOGIN_FAILED()               # 失敗パス
         ctx.reset_account(account_key)      # 成功パス（アカウント軸のみリセット）
     """
 
@@ -664,7 +665,7 @@ class RateLimitGuard:
                     # ここで黙って IP軸をスキップすると signup 等（IP軸しか
                     # 持たないスコープ）が完全に無防備になるため拒否する。
                     _warn_unresolvable_xff(self._scope)
-                    raise _INVALID_REQUEST_HEADERS
+                    raise _INVALID_REQUEST_HEADERS()
                 # "no_xff": XFF ヘッダ自体が無い、または request.client も
                 # 無い（インフラ構成としてありうる正常系）。
                 _warn_ip_axis_skipped(self._scope)
