@@ -29,6 +29,11 @@ MAX_REDUCTION_REQUESTS_PER_TRANSACTION = 2
 # 無害化（_sanitize_free_text）の両方がここを参照する（2026-09-25 に 1000 → 300。alembic 0042 の段B）。
 REVIEW_COMMENT_MAX_LENGTH = 300
 
+# 運営が口コミを削除（非表示）にするときの理由の上限文字数（reviews.hidden_reason の列長 200 と同じ）。
+# schemas_katadzuke.ReviewHideRequest の Field と無害化の両方がここを参照する。web の削除ダイアログの
+# 入力上限（200 字）と同じ値にする（2026-09-25 運営の口コミ管理）。
+REVIEW_HIDE_REASON_MAX_LENGTH = 200
+
 # 自社入札の引き上げ（PATCH /cases/{case_id}/bids/me）に必要な最小引き上げ幅（円）。
 # web 側の入力刻みと一致させる。1円単位の無意味な引き上げ連打（通知の増幅・
 # bid_amount_history の膨張）を防ぐ（security review 指摘対応）。
