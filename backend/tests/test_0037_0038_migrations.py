@@ -7,7 +7,8 @@ test_0036_email_notify_opt_in_migration.py と同じ理由（alembic の env.py 
   NULL のまま（紐付けの根拠が無いため遡って推定しない）。downgrade で列が消える。
 - 0038: 論理削除済みの業者行に残った line_user_id だけを NULL に戻す（冪等）。
   有効な業者の連携には触れない。
-- head が 0038 の単独チェーンで、リビジョン ID が 32 文字以内。
+- 0038 → 0037 → 0036 の単独チェーンで、リビジョン ID が 32 文字以内（head そのものの
+  検証は最新リビジョンのテスト（test_0039_sessions_revoked_at_migration.py）が持つ）。
 """
 
 from __future__ import annotations
@@ -174,13 +175,17 @@ def test_0037_adds_nullable_user_id_and_0038_clears_only_deleted_operators(
         get_settings.cache_clear()
 
 
-def test_0038_is_the_single_head_chained_from_0037_and_0036():
-    """0038 が単独の head として 0037 → 0036 に正しく連鎖していること（分岐の防止）。"""
+def test_0038_is_chained_from_0037_and_0036_on_a_single_head():
+    """0038 が 0037 → 0036 に正しく連鎖し、履歴が単一の head に収束していること（分岐の防止）。
+
+    head そのものの検証は最新リビジョンのテスト（test_0039_sessions_revoked_at_migration.py）
+    が持つ（0039 以降の追加で本テストが head 固定のまま壊れないようにする）。
+    """
     from alembic.script import ScriptDirectory
 
     cfg = _alembic_config()
     script = ScriptDirectory.from_config(cfg)
-    assert script.get_heads() == ["0038_clear_deleted_op_line_ids"]
+    assert len(script.get_heads()) == 1
     rev_0038 = script.get_revision("0038_clear_deleted_op_line_ids")
     assert rev_0038.down_revision == "0037_contact_messages_user_id"
     rev_0037 = script.get_revision("0037_contact_messages_user_id")
