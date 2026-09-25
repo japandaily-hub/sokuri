@@ -47,6 +47,7 @@ export interface TransactionSummary {
 
 export interface TransactionDetail extends TransactionSummary {
   reductions: { id: string; status: string; requested_amount: number }[];
+  reviews: { id: string; reviewer_type: "user" | "operator"; verdict: "good" | "improve"; comment: string | null }[];
 }
 
 /** 業者ログインのレスポンス。 */

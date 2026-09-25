@@ -1,0 +1,212 @@
+/* ============================================================
+   評価入力フォーム（ReviewComposer）固有スタイル
+   共通クラス（.btn .btn-primary .btn-block .btn-lg .spinning）は再定義しない。
+   全クラスを .kdz-review-composer 配下に限定し、既存ページへ影響しないようにする。
+   意匠は review.css の .tag-chip を踏襲（角丸0・CSS変数・色の直書きなし）。
+   ============================================================ */
+
+.kdz-review-composer__fieldset {
+  border: none;
+  margin: 0 0 20px;
+  padding: 0;
+}
+
+.kdz-review-composer__legend {
+  font-family: var(--head);
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--ink);
+  margin-bottom: 10px;
+  padding: 0;
+}
+
+.kdz-review-composer__options {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* 評価の選択肢（ラベル全体がタップ領域・高さ44px以上）。
+   選択状態は :has() で枠線・背景を切り替える（未対応ブラウザでは内側の
+   チェック図形と枠色の変化だけになるが、色以外の手がかりは保たれる）。 */
+.kdz-review-composer__option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 160px;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1.5px solid var(--line);
+  border-radius: 0;
+  background: var(--white);
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+}
+.kdz-review-composer__option:has(:checked) {
+  border-color: var(--blue);
+  background: var(--pale);
+}
+
+/* native radio は選択肢の枠全体に透明で重ねる（どこを押しても radio 自身が押される）。
+   1px の視覚的非表示にすると、枠内のチェック図形が radio の位置を覆い、radio 自体を
+   押す操作（支援技術のクリック・E2E の check()）が図形に遮られるため。 */
+.kdz-review-composer__option-input {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.kdz-review-composer__option-input:focus-visible + .kdz-review-composer__option-box {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+/* 選択は枠線とチェック図形で示す（色だけに頼らない）。 */
+.kdz-review-composer__option-box {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: 1.5px solid var(--line);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--white);
+  color: var(--white);
+  transition: border-color .2s, background .2s;
+}
+.kdz-review-composer__option-box svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+  transition: opacity .15s;
+}
+.kdz-review-composer__option-input:checked + .kdz-review-composer__option-box {
+  border-color: var(--blue);
+  background: var(--blue);
+}
+.kdz-review-composer__option-input:checked + .kdz-review-composer__option-box svg {
+  opacity: 1;
+}
+
+.kdz-review-composer__option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.kdz-review-composer__option-label {
+  font-family: var(--head);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--navy);
+}
+.kdz-review-composer__option-hint {
+  font-size: 11.5px;
+  color: var(--body-soft);
+}
+
+.kdz-review-composer__guidance {
+  font-size: 12.5px;
+  color: var(--body-soft);
+  line-height: 1.7;
+  margin: 0 0 20px;
+}
+
+.kdz-review-composer__chips {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin: 0 0 20px;
+}
+.kdz-review-composer__chip {
+  padding: 8px 14px;
+  border-radius: 0;
+  border: 1.5px solid var(--line);
+  background: var(--white);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--body-soft);
+  cursor: pointer;
+  transition: .2s;
+  user-select: none;
+}
+.kdz-review-composer__chip.is-selected {
+  border-color: var(--blue);
+  background: var(--pale);
+  color: var(--blue);
+}
+.kdz-review-composer__chip:hover:not([aria-disabled="true"]) { border-color: var(--blue); }
+.kdz-review-composer__chip[aria-disabled="true"] {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.kdz-review-composer__comment-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--ink);
+  margin-bottom: 10px;
+}
+
+.kdz-review-composer__textarea {
+  width: 100%;
+  font-family: var(--ui);
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--pale-2);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-s);
+  padding: 14px;
+  resize: vertical;
+  min-height: 110px;
+  line-height: 1.75;
+  transition: border-color .2s, box-shadow .2s;
+}
+.kdz-review-composer__textarea::placeholder { color: #bcc3d4; }
+.kdz-review-composer__textarea:focus {
+  border-color: var(--blue);
+  background: var(--white);
+  outline: none;
+}
+
+.kdz-review-composer__count {
+  font-size: 11.5px;
+  color: var(--body-soft);
+  text-align: right;
+  margin: 5px 0 0;
+}
+
+.kdz-review-composer__disclosure {
+  font-size: 12px;
+  color: var(--body-soft);
+  line-height: 1.7;
+  margin: 10px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.kdz-review-composer__submit-area { margin-top: 20px; }
+.kdz-review-composer__submit-hint {
+  font-size: 12px;
+  color: var(--body-soft);
+  margin: 0 0 10px;
+  text-align: center;
+}
+
+@media (max-width: 480px) {
+  .kdz-review-composer__option { flex: 1 1 100%; }
+  .kdz-review-composer__chip { padding: 7px 11px; font-size: 12px; }
+}

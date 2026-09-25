@@ -55,47 +55,8 @@
 .review-page .rate-card-title { font-family: var(--head); font-size: 16px; font-weight: 400; color: var(--navy); margin-bottom: 4px; }
 .review-page .rate-card-sub { font-size: 13px; color: var(--body-soft); margin-bottom: 22px; line-height: 1.7; }
 
-/* スター選択 */
-.review-page .star-selector {
-  display: flex; gap: 8px; justify-content: center; margin-bottom: 22px;
-}
-.review-page .star-btn {
-  font-size: 40px; cursor: pointer; transition: transform .15s, color .15s; line-height: 1;
-  color: var(--line); filter: none; background: none; border: none; padding: 2px;
-}
-.review-page .star-btn.active { color: #f0a030; transform: scale(1.15); }
-.review-page .star-btn.hover-active { color: #f0d080; }
-.review-page .star-btn:hover { transform: scale(1.1); }
-.review-page .star-label {
-  text-align: center; font-family: var(--head); font-size: 15px; font-weight: 400;
-  color: var(--navy); margin-bottom: 20px; min-height: 22px; transition: .2s;
-}
-
-/* 評価タグ */
-.review-page .tag-title { font-size: 13px; font-weight: 400; color: var(--ink); margin-bottom: 10px; }
-.review-page .tag-grid { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 20px; }
-.review-page .tag-chip {
-  padding: 8px 14px; border-radius: 0;
-  border: 1.5px solid var(--line); background: #fff;
-  font-size: 13px; font-weight: 600; color: var(--body-soft);
-  cursor: pointer; transition: .2s; user-select: none;
-}
-.review-page .tag-chip.selected { border-color: var(--blue); background: var(--pale); color: var(--blue); }
-.review-page .tag-chip:hover { border-color: var(--blue); }
-
-/* テキストエリア */
-.review-page .review-textarea {
-  width: 100%; font-family: var(--ui); font-size: 14px; color: var(--ink);
-  background: var(--pale-2); border: 1.5px solid var(--line); border-radius: var(--radius-s);
-  padding: 14px; resize: vertical; min-height: 110px; line-height: 1.75;
-  transition: border-color .2s, box-shadow .2s;
-}
-.review-page .review-textarea::placeholder { color: #bcc3d4; }
-.review-page .review-textarea:focus {
-  border-color: var(--blue); background: #fff;
-  box-shadow: none;
-}
-.review-page .textarea-count { font-size: 11.5px; color: var(--body-soft); text-align: right; margin-top: 5px; }
+/* 評価フォーム（評価選択・候補文チップ・コメント欄）は共通部品 ReviewComposer
+   （components/kdz/review-composer.css）に統一したため、ここでの個別定義は削除した。 */
 
 /* 公開設定 */
 .review-page .publish-row {
@@ -117,9 +78,6 @@
 .review-page .publish-toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
 .review-page .publish-label { font-size: 13px; color: var(--body); line-height: 1.6; }
 .review-page .publish-label .publish-note { font-size: 11.5px; color: var(--body-soft); }
-
-/* 完了ボタン */
-.review-page .submit-area { padding-top: 6px; }
 
 /* 次のアクション */
 .review-page .next-card {
@@ -158,23 +116,11 @@
 .review-page .submitted-screen h2 { font-family: var(--head); font-size: 22px; color: var(--navy); margin-bottom: 10px; }
 .review-page .submitted-screen p { font-size: 14px; color: var(--body-soft); line-height: 1.82; margin-bottom: 28px; }
 
-@keyframes review-star-pop { 0% { transform: scale(1) } 50% { transform: scale(1.4) } 100% { transform: scale(1) } }
-.review-page .star-pop { animation: review-star-pop .2s ease; }
-
 @media (max-width: 480px) {
   .review-page .review-wrap { padding: 18px 14px 80px; }
   .review-page .rate-card { padding: 18px 14px; }
   .review-page .txn-card { padding: 14px; }
   .review-page .done-banner { padding: 18px 14px; }
-  .review-page .star-btn { font-size: 32px; }
-  .review-page .tag-grid { gap: 6px; }
-  .review-page .tag-chip { padding: 7px 11px; font-size: 12px; }
   .review-page .next-action-btn { padding: 12px 14px; }
-  .review-page .submit-area .btn { font-size: 15px; }
   .review-page .txn-amount { font-size: 22px; }
-}
-@media (max-width: 360px) {
-  .review-page .star-selector { gap: 4px; }
-  .review-page .star-btn { font-size: 28px; }
-  .review-page .tag-chip { padding: 6px 9px; font-size: 11.5px; }
 }

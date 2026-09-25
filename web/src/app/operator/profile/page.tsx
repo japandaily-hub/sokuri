@@ -37,6 +37,7 @@ import {
   uploadOperatorLicenseImage,
   type OperatorProfile,
 } from "@/lib/katadzuke-api";
+import { formatVerdictCounts } from "@/lib/review-verdict";
 
 /* ---- 許可証画像アップロード（クライアント側事前検証。バックエンドの受理条件と一致させる） ---- */
 const LICENSE_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
@@ -97,12 +98,6 @@ const EMPTY_STATE: ProfileState = {
     acceptUnsellable: false,
   },
 };
-
-/** 星文字列（塗り★ + 空☆）。デザインレビュー M-4 対応: /vendors/[id] と同じロジックを共有。 */
-function starString(rating: number): string {
-  const filled = Math.round(rating);
-  return "★".repeat(filled) + "☆".repeat(Math.max(0, 5 - filled));
-}
 
 /** バックエンドの OperatorProfile → 編集フォーム状態へ変換。 */
 function toFormState(p: OperatorProfile): ProfileState {
@@ -651,10 +646,11 @@ export default function OperatorProfilePage() {
                 <span className="head-sub">ユーザーからの評価</span>
               </div>
               <div className="prof-card-body">
-                {profile.rating != null ? (
+                {profile.review_count > 0 ? (
                   <div className="rating-summary">
-                    <div className="rating-summary-stars">{starString(profile.rating)}</div>
-                    <div className="rating-summary-num">{profile.rating.toFixed(1)}</div>
+                    <div className="rating-summary-num">
+                      {formatVerdictCounts(profile.good_count, profile.improve_count)}
+                    </div>
                   </div>
                 ) : (
                   <p className="preview-empty">まだ評価がありません。取引が完了すると表示されます。</p>

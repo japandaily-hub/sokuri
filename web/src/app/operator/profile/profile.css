@@ -554,17 +554,15 @@
   gap: 10px;
   margin-bottom: 12px;
 }
-.op-profile .rating-summary-stars {
-  color: var(--gold);
-  font-size: 18px;
-  letter-spacing: -1px;
-}
 .op-profile .rating-summary-num {
   font-family: var(--ui);
   font-variant-numeric: tabular-nums;
-  font-size: 22px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--navy);
+  /* 「よかった 3・伸びしろ 1」が単語の途中で折り返さないようにする（CJK は既定で
+     文字間どこでも折り返せるため）。サイドバー幅が極端に狭い場合ははみ出しを許容する。 */
+  white-space: nowrap;
 }
 .op-profile .rating-summary-link {
   display: inline-flex;

@@ -16,32 +16,19 @@ import {
   formatYen,
   getTransaction,
   toDisplayMessage,
+  type ReviewVerdict,
   type TransactionDetail,
 } from "@/lib/katadzuke-api";
+import { REVIEW_VERDICT_LABEL } from "@/lib/review-verdict";
+import { ReviewComposer } from "@/components/kdz/ReviewComposer";
 
 /* ============================================================
    取引完了・評価ページ（カタヅケ）
    デザイン正典: docs/design_handoff_katazuke/取引完了・評価.html
-   ?transaction_id= 駆動で getTransaction を取得し、★評価+コメントを
-   createReview で送信する（2026-07-03 実配線）。
-   タグ選択UIは維持しつつ、送信は rating + comment のみ（選択タグは
-   comment 末尾に「良かった点: …」として付与する）。
+   ?transaction_id= 駆動で getTransaction を取得し、評価（よかった／伸びしろ）+
+   コメントを createReview で送信する（2026-07-03 実配線、2026-09-25 評価を
+   2択化＋ワンタップ入力に刷新。共通部品 ReviewComposer に委譲する）。
    ============================================================ */
-
-/** スター数 → ラベル。index 0 は未選択時のプレースホルダ用。 */
-const STAR_LABELS = ["", "がっかりした", "もう少し…", "普通", "良かった", "最高でした"];
-
-/** 良かった点タグ（複数選択可）。 */
-const TAGS: { id: string; label: string }[] = [
-  { id: "price", label: "査定額が高い" },
-  { id: "speed", label: "対応が速い" },
-  { id: "kind", label: "スタッフが親切" },
-  { id: "explain", label: "説明が丁寧" },
-  { id: "carry", label: "搬出が丁寧" },
-  { id: "cancel", label: "キャンセル対応" },
-];
-
-const MAX_COMMENT = 300;
 
 /**
  * "YYYY-MM-DD" 形式の date 文字列を日本語表記に整形する。
@@ -58,16 +45,15 @@ function ReviewPageInner() {
   const [txn, setTxn] = useState<TransactionDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  /* ---- 評価フォーム状態 ---- */
-  const [star, setStar] = useState(0);
-  const [hoverStar, setHoverStar] = useState(0);
-  const [popStar, setPopStar] = useState<number | null>(null);
-  const [tags, setTags] = useState<string[]>([]);
-  const [comment, setComment] = useState("");
-
   /* ---- 送信フロー ---- */
   const [busy, setBusy] = useState(false);
   const [justSubmitted, setJustSubmitted] = useState(false);
+  /**
+   * 送信直後、reload() が完了して txn.reviews に反映されるまでの間（reload 失敗時はそのまま）
+   * myReview がまだ undefined のため、送信した verdict をここに保持し表示のフォールバックにする
+   * （QAレビュー Medium 対応: 「評価投稿済み（）」と空の括弧が出ていた）。
+   */
+  const [submittedVerdict, setSubmittedVerdict] = useState<ReviewVerdict | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
@@ -83,37 +69,21 @@ function ReviewPageInner() {
     void reload();
   }, [reload]);
 
-  function toggleTag(id: string) {
-    setTags((prev) => (prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]));
-  }
-
-  function selectStar(v: number) {
-    setStar(v);
-    setPopStar(v);
-    window.setTimeout(() => setPopStar(null), 200);
-  }
-
   function showToast(msg: string) {
     setToast(msg);
     window.setTimeout(() => setToast(null), 2400);
   }
 
-  async function submitReview() {
-    if (busy || !token || !txn || star === 0) return;
+  async function submitReview(value: { verdict: ReviewVerdict; comment?: string }) {
+    if (busy || !token || !txn) return;
     setBusy(true);
     setError(null);
     try {
-      const tagLabels = TAGS.filter((t) => tags.includes(t.id)).map((t) => t.label);
-      const commentBody = [
-        comment.trim(),
-        tagLabels.length > 0 ? `良かった点: ${tagLabels.join("、")}` : "",
-      ]
-        .filter(Boolean)
-        .join("\n");
       await createReview(
-        { transaction_id: txn.id, rating: star, comment: commentBody || undefined },
+        { transaction_id: txn.id, verdict: value.verdict, comment: value.comment },
         token,
       );
+      setSubmittedVerdict(value.verdict);
       setJustSubmitted(true);
       await reload();
       showToast("評価を送信しました");
@@ -123,8 +93,6 @@ function ReviewPageInner() {
       setBusy(false);
     }
   }
-
-  const displayStar = hoverStar || star;
 
   if (loading || (!txn && !error && transactionId)) {
     return (
@@ -159,7 +127,11 @@ function ReviewPageInner() {
 
   if (!txn) return null;
 
-  const alreadyReviewed = txn.reviews.some((r) => r.reviewer_type === "user");
+  const myReview = txn.reviews.find((r) => r.reviewer_type === "user");
+  // reload 完了前（または失敗時）は myReview がまだ無いため、送信直後に保持した
+  // submittedVerdict をフォールバックに使う（空括弧「評価投稿済み（）」を防ぐ）。
+  const displayVerdict = myReview?.verdict ?? submittedVerdict;
+  const alreadyReviewed = myReview != null;
   const isCompleted = txn.status === "completed";
   const isCancelled = txn.status === "cancelled";
   // completed のみ評価フォームを活性化する（cases/[id] の既存インラインレビューと同じ条件）。
@@ -249,71 +221,12 @@ function ReviewPageInner() {
                 評価はほかのユーザーの業者選びに役立ちます。ぜひご協力ください。
               </div>
 
-              {/* スター選択 */}
-              <div className="star-selector" onMouseLeave={() => setHoverStar(0)}>
-                {[1, 2, 3, 4, 5].map((v) => (
-                  <button
-                    key={v}
-                    type="button"
-                    className={`star-btn${v <= star ? " active" : ""}${popStar === v ? " star-pop" : ""}`}
-                    style={v <= displayStar ? { color: "#f0a030" } : undefined}
-                    aria-label={`${v}つ星`}
-                    aria-pressed={v <= star}
-                    onMouseEnter={() => setHoverStar(v)}
-                    onClick={() => selectStar(v)}
-                  >
-                    ★
-                  </button>
-                ))}
-              </div>
-              <div className="star-label">{STAR_LABELS[star] || "タップして評価する"}</div>
-
-              {/* 評価タグ */}
-              <div className="tag-title">良かった点（複数選択可）</div>
-              <div className="tag-grid">
-                {TAGS.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    className={`tag-chip${tags.includes(t.id) ? " selected" : ""}`}
-                    aria-pressed={tags.includes(t.id)}
-                    onClick={() => toggleTag(t.id)}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* コメント */}
-              <div className="tag-title">コメント（任意）</div>
-              <textarea
-                className="review-textarea"
-                placeholder="業者の対応の感想（任意）"
-                maxLength={MAX_COMMENT}
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
+              <ReviewComposer
+                direction="to_operator"
+                submitLabel="評価を送信する"
+                busy={busy}
+                onSubmit={submitReview}
               />
-              <div className="textarea-count">
-                {comment.length}/{MAX_COMMENT}文字
-              </div>
-
-              {/* アクション */}
-              <div className="submit-area">
-                <button
-                  type="button"
-                  className="btn btn-primary btn-block btn-lg"
-                  disabled={busy || star === 0}
-                  onClick={submitReview}
-                >
-                  {busy ? (
-                    <>
-                      <span className="spinning">↻</span> 送信中…
-                    </>
-                  ) : (
-                    "評価を送信する"
-                  )}
-                </button>
-              </div>
             </div>
           ) : (
             <div className="submitted-screen">
@@ -324,9 +237,9 @@ function ReviewPageInner() {
               </div>
               <h2>評価を送信しました。</h2>
               <p>
-                ご協力ありがとうございました。
+                評価投稿済み（{displayVerdict ? REVIEW_VERDICT_LABEL[displayVerdict] : ""}）
                 <br />
-                評価は投稿済みです。
+                ご協力ありがとうございました。
               </p>
             </div>
           )}
@@ -377,6 +290,20 @@ function ReviewPageInner() {
   );
 }
 
+/**
+ * transaction_id が変わるたびに ReviewPageInner を key で作り直す（QAレビュー予防対応）。
+ * ReviewPageInner は内部に busy/justSubmitted/submittedVerdict 等の状態を持つため、
+ * 同一ページ内で transaction_id だけがクライアント側遷移で変わった場合、key が無いと
+ * インスタンスが使い回され、前の取引の送信済み状態が新しい取引に残ってしまう。
+ * ReviewPageInner 自身も useSearchParams を呼ぶため、ここでの呼び出しは
+ * key を得るためだけの重複呼び出しになるが副作用は無い（Suspense 構造は維持）。
+ */
+function ReviewPageKeyed() {
+  const search = useSearchParams();
+  const transactionId = search.get("transaction_id");
+  return <ReviewPageInner key={transactionId ?? ""} />;
+}
+
 export default function ReviewPage() {
   return (
     <Suspense
@@ -389,7 +316,7 @@ export default function ReviewPage() {
         </div>
       }
     >
-      <ReviewPageInner />
+      <ReviewPageKeyed />
     </Suspense>
   );
 }

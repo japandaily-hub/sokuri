@@ -16,6 +16,8 @@ export type CaseStatus = "draft" | "open" | "bidding" | "closed" | "cancelled";
 export type BidStatus = "pending" | "selected" | "rejected" | "withdrawn";
 export type TransactionStatus = "pending" | "visiting" | "completed" | "cancelled";
 export type ReductionStatus = "pending" | "approved" | "rejected";
+/** 評価（メルカリ型の2択）。good=よかった／improve=伸びしろ。 */
+export type ReviewVerdict = "good" | "improve";
 
 export interface UserOut {
   id: string;
@@ -31,7 +33,6 @@ export interface OperatorOut {
   license_number: string | null;
   verified_at: string | null;
   vendor_status: string;
-  rating: number | null;
   is_suspended: boolean;
   created_at: string;
   /** 古物商許可証画像を提出済みか（admin一覧のバッジ表示・確認ボタン活性化に使用）。 */
@@ -46,9 +47,12 @@ export interface OperatorOut {
 export interface OperatorPublic {
   id: string;
   company_name: string;
-  rating: number | null;
   verified_at: string | null;
-  /** 顧客→業者レビューの件数（口コミは常時公開）。 */
+  /** 「よかった」評価の件数。 */
+  good_count: number;
+  /** 「伸びしろ」評価の件数。 */
+  improve_count: number;
+  /** 顧客→業者レビューの件数（口コミは常時公開）。good_count + improve_count と一致する。 */
   review_count: number;
   /** 最新の口コミ本文の抜粋（無ければ null）。 */
   latest_review_comment: string | null;
@@ -287,7 +291,7 @@ export interface ReviewOut {
   id: string;
   transaction_id: string;
   reviewer_type: "user" | "operator";
-  rating: number;
+  verdict: ReviewVerdict;
   comment: string | null;
   created_at: string;
 }
@@ -440,7 +444,6 @@ export interface OperatorProfile {
   license_number: string | null;
   verified_at: string | null;
   vendor_status: string;
-  rating: number | null;
   areas: string[];
   categories: string[];
   strong_categories: string[];
@@ -449,7 +452,11 @@ export interface OperatorProfile {
   intro_message: string | null;
   show_message: boolean;
   accept_unsellable: boolean;
-  /** 顧客→業者レビューの件数。評価・口コミは常時公開。 */
+  /** 「よかった」評価の件数。 */
+  good_count: number;
+  /** 「伸びしろ」評価の件数。 */
+  improve_count: number;
+  /** 顧客→業者レビューの件数。評価・口コミは常時公開。good_count + improve_count と一致する。 */
   review_count: number;
   /** 許可証画像の最終アップロード日時。未提出の場合 null。 */
   license_image_uploaded_at: string | null;
@@ -531,7 +538,7 @@ export async function uploadOperatorLicenseImage(
 /** 公開プロフィールのレビュー（バックエンド PublicReviewOut。内部IDは含まれない）。 */
 export interface PublicReview {
   id: string;
-  rating: number;
+  verdict: ReviewVerdict;
   comment: string | null;
   created_at: string;
 }
@@ -549,7 +556,10 @@ export interface OperatorPublicProfile {
   business_hours: string | null;
   intro_message: string | null;
   accept_unsellable: boolean;
-  rating: number | null;
+  /** 「よかった」評価の件数。 */
+  good_count: number;
+  /** 「伸びしろ」評価の件数。 */
+  improve_count: number;
   review_count: number;
   reviews: PublicReview[];
 }
@@ -566,7 +576,10 @@ export interface VendorListItem {
   areas: string[];
   strong_categories: string[];
   accept_unsellable: boolean;
-  rating: number | null;
+  /** 「よかった」評価の件数。 */
+  good_count: number;
+  /** 「伸びしろ」評価の件数。 */
+  improve_count: number;
   review_count: number;
   latest_review_comment: string | null;
 }
@@ -1897,7 +1910,7 @@ export function decideReduction(
 // ---------------------------------------------------------------------------
 
 export function createReview(
-  payload: { transaction_id: string; rating: number; comment?: string },
+  payload: { transaction_id: string; verdict: ReviewVerdict; comment?: string },
   token: string,
 ): Promise<ReviewOut> {
   return request("/reviews", { method: "POST", body: JSON.stringify(payload), token });

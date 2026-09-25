@@ -12,6 +12,7 @@ import { Reveal, RevealLines } from "@/components/kdz/interactions";
 import { Spinner } from "@/components/Icon";
 import { vendorCategoryName } from "@/lib/categories";
 import { getVendors, toDisplayMessage, type VendorListItem } from "@/lib/katadzuke-api";
+import { formatVerdictCounts } from "@/lib/review-verdict";
 
 /* ============================================================
    登録業者一覧（/vendors）
@@ -21,12 +22,6 @@ import { getVendors, toDisplayMessage, type VendorListItem } from "@/lib/katadzu
    として useEffect の外に置き、読込中・エラー・空を視覚的に区別する。業者行には画像を
    付けない（実在業者に生成画像を添えないため）。
    ============================================================ */
-
-/** 星文字列（塗り★ + 空☆）。rating が小数の場合は四捨五入して塗る。 */
-function starString(rating: number): string {
-  const filled = Math.round(rating);
-  return "★".repeat(filled) + "☆".repeat(Math.max(0, 5 - filled));
-}
 
 /** 取得状態に依存しない静的ブロック（R4 r4 #1/#9/#16）。
  *  取得失敗時と「取得成功で0件」の両方で描く。ここに書く3点は /business の登録要件・
@@ -70,7 +65,7 @@ function VendorStaticInfo({ showSample }: { showSample: boolean }) {
               <b>取扱カテゴリ</b>（得意な品目）
             </li>
             <li>
-              <b>評価</b>（成約したユーザーの5段階評価と口コミ件数）
+              <b>評価</b>（成約したユーザーの「よかった／伸びしろ」の件数と口コミ）
             </li>
           </ul>
           {/* r5 #33: 掲載0件の説明を読み終えた業者の次の一手を、ページ末尾の小さな
@@ -295,13 +290,13 @@ export default function VendorListPage() {
                       ) : null}
                     </div>
                     <div className="vendor-row-rating">
-                      {v.rating != null ? (
-                        <>
-                          <span className="vendor-stars" aria-hidden="true">{starString(v.rating)}</span>
-                          <span className="vd-sr">5段階中 {v.rating.toFixed(1)}</span>
-                          <span className="vendor-rating-num" aria-hidden="true">{v.rating.toFixed(1)}</span>
-                          <span className="vendor-rating-count">（口コミ{v.review_count}件）</span>
-                        </>
+                      {v.review_count > 0 ? (
+                        <span className="vendor-rating-count">
+                          <span className="vendor-rating-value">
+                            {formatVerdictCounts(v.good_count, v.improve_count)}
+                          </span>
+                          （口コミ{v.review_count}件）
+                        </span>
                       ) : (
                         <span className="vendor-rating-count">口コミはまだありません</span>
                       )}

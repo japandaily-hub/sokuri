@@ -9,7 +9,7 @@ import { test, expect } from "@playwright/test";
 import { Api, OperatorSession, loginAll } from "./helpers/api";
 import { ACCOUNTS } from "./helpers/env";
 import { ensureUnscheduledTransaction } from "./helpers/fixtures";
-import { confirmModal, loginAsUser } from "./helpers/ui";
+import { confirmModal, loginAsOperator, loginAsUser } from "./helpers/ui";
 
 let api: Api;
 let sellerToken: string;
@@ -26,7 +26,7 @@ test.afterAll(async () => {
   await api.dispose();
 });
 
-test("日程確定 → 減額承認 → 完了確定 → 評価投稿まで通る", async ({ page }) => {
+test("日程確定 → 減額承認 → 完了確定 → 評価投稿まで通る", async ({ page, browser }) => {
   const txn = await ensureUnscheduledTransaction(api, sellerToken, vendor);
 
   await loginAsUser(page, ACCOUNTS.seller, `/schedule?transaction_id=${txn.id}`);
@@ -67,10 +67,44 @@ test("日程確定 → 減額承認 → 完了確定 → 評価投稿まで通�
     .poll(async () => (await api.getTransaction(txn.id, sellerToken)).status, { timeout: 30_000 })
     .toBe("completed");
 
-  // ---- 評価投稿 ----
+  // ---- 案件詳細のインライン評価フォーム: 評価を選ぶまで送信不可であることを確認 ----
+  // (別画面の /review へ実際に投稿する前に、cases/[id] 側のフォームだけを軽く確認する。
+  //  ここでは投稿しない＝取引を追加消費しない。)
+  await page.goto(`/cases/${txn.case_id}`);
+  const inlineSubmitButton = page.getByRole("button", { name: "評価を投稿する" });
+  await expect(inlineSubmitButton).toBeVisible({ timeout: 30_000 });
+  await expect(inlineSubmitButton).toBeDisabled();
+
+  // ---- 評価投稿（依頼者→業者。既存どおり /review で行う） ----
   await page.goto(`/review?transaction_id=${txn.id}`);
   await expect(page.getByText("業者を評価してください")).toBeVisible({ timeout: 30_000 });
-  await page.getByRole("button", { name: "5つ星" }).click();
-  await page.getByRole("button", { name: "評価を送信する" }).click();
+  const submitReviewButton = page.getByRole("button", { name: "評価を送信する" });
+  await expect(submitReviewButton).toBeDisabled();
+  await page.getByRole("radio", { name: "よかった" }).check();
+  await page.getByRole("button", { name: "安心して取引できました！" }).click();
+  await submitReviewButton.click();
   await expect(page.getByText("評価を送信しました。")).toBeVisible({ timeout: 30_000 });
+
+  const reviewedByUser = await api.getTransaction(txn.id, sellerToken);
+  expect(reviewedByUser.reviews.find((r) => r.reviewer_type === "user")?.verdict).toBe("good");
+
+  // ---- 評価投稿（業者→依頼者。別 browser context で業者としてログインし
+  //      /operator/transactions/[id] から投稿する） ----
+  const operatorContext = await browser.newContext();
+  try {
+    const operatorPage = await operatorContext.newPage();
+    await loginAsOperator(operatorPage, ACCOUNTS.vendor, `/operator/transactions/${txn.id}`);
+    await expect(operatorPage.getByText("ユーザーを評価する")).toBeVisible({ timeout: 30_000 });
+    await operatorPage.getByRole("radio", { name: "よかった" }).check();
+    await operatorPage
+      .getByRole("button", { name: "事前の写真と説明が正確で助かりました！" })
+      .click();
+    await operatorPage.getByRole("button", { name: "レビューを投稿" }).click();
+    await expect(operatorPage.getByText("評価投稿済み（よかった）")).toBeVisible({ timeout: 30_000 });
+  } finally {
+    await operatorContext.close();
+  }
+
+  const reviewedByOperator = await api.getTransaction(txn.id, sellerToken);
+  expect(reviewedByOperator.reviews.find((r) => r.reviewer_type === "operator")?.verdict).toBe("good");
 });

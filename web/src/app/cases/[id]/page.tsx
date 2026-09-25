@@ -55,6 +55,8 @@ import {
   type CaseOut,
   type TransactionDetail,
 } from "@/lib/katadzuke-api";
+import { ReviewComposer } from "@/components/kdz/ReviewComposer";
+import { REVIEW_VERDICT_LABEL, formatVerdictCounts } from "@/lib/review-verdict";
 
 /** 編集/削除UIを許可する案件ステータス（それ以外は409になるためバックエンドと同条件でUIも隠す）。 */
 const EDITABLE_CASE_STATUSES = new Set(["draft", "open"]);
@@ -89,8 +91,6 @@ export default function UserCaseDetailPage() {
   const [busy, setBusy] = useState(false);
   /** AI解析ポーリングが打ち切り時間（backend の遅延回収窓=10分）に達したかどうか。 */
   const [aiPollTimedOut, setAiPollTimedOut] = useState(false);
-  const [rating, setRating] = useState(5);
-  const [comment, setComment] = useState("");
   const [confirmState, setConfirmState] = useState<ConfirmState>(null);
   /** 成約後チャットをこの画面内にインライン展開しているか（既定で開く=別ページ遷移なしで
    *  「業者を選ぶ→そのままチャットで会話開始」を完結させる。r-chat-inline 対応）。 */
@@ -686,9 +686,11 @@ export default function UserCaseDetailPage() {
                   <div>
                     <p className="font-normal text-slate-900">
                       {b.operator?.company_name ?? "業者"}
-                      {b.operator?.rating != null ? (
-                        <span className="ml-2 text-xs font-semibold text-amber-600">
-                          ★ {b.operator.rating.toFixed(1)}
+                      {b.operator != null && b.operator.review_count > 0 ? (
+                        <span className="ml-2 text-xs font-semibold text-slate-600">
+                          <span className="inline-block whitespace-nowrap">
+                            {formatVerdictCounts(b.operator.good_count, b.operator.improve_count)}
+                          </span>
                           <span className="ml-1 font-normal text-slate-500">
                             （口コミ{b.operator.review_count}件）
                           </span>
@@ -1042,7 +1044,7 @@ export default function UserCaseDetailPage() {
             (myReview ? (
               <div>
                 <Notice tone="success">
-                  評価投稿済み（★{myReview.rating}）ありがとうございました。
+                  評価投稿済み（{REVIEW_VERDICT_LABEL[myReview.verdict]}）ありがとうございました。
                 </Notice>
                 {/* r10-M7 是正: 評価投稿後の導線が「← マイ案件一覧へ」1本しか無く行き止まりだったため、
                     /review と同型の「マイページへ」「また出品する」を並べる。 */}
@@ -1058,51 +1060,23 @@ export default function UserCaseDetailPage() {
             ) : (
               <div className="mt-4 rounded-none border border-slate-200 p-4">
                 <p className="font-normal text-slate-900">業者を評価する</p>
-                <div className="mt-2 flex gap-1">
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <button
-                      key={n}
-                      type="button"
-                      onClick={() => setRating(n)}
-                      aria-label={`星${n}`}
-                      className={`text-2xl ${n <= rating ? "text-amber-400" : "text-slate-300"}`}
-                    >
-                      ★
-                    </button>
-                  ))}
-                </div>
-                <textarea
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  className={`${inputBase} mt-3`}
-                  rows={3}
-                  placeholder="業者の対応の感想（任意）"
-                />
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() =>
+                <ReviewComposer
+                  direction="to_operator"
+                  submitLabel="評価を投稿する"
+                  busy={busy}
+                  onSubmit={(value) =>
                     act(() =>
                       createReview(
                         {
                           transaction_id: txn.id,
-                          rating,
-                          comment: comment.trim() || undefined,
+                          verdict: value.verdict,
+                          comment: value.comment,
                         },
                         token!,
                       ),
                     )
                   }
-                  className={`${btnPrimary} mt-3`}
-                >
-                  評価を投稿する
-                </button>
-                <Link
-                  href={`/review?transaction_id=${txn.id}`}
-                  className="mt-2 inline-block text-sm font-semibold text-brand-700 hover:underline"
-                >
-                  詳しく評価する →
-                </Link>
+                />
               </div>
             ))}
         </Card>

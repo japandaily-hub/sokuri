@@ -14,6 +14,7 @@ import {
   toDisplayMessage,
   type OperatorPublicProfile,
 } from "@/lib/katadzuke-api";
+import { REVIEW_VERDICT_LABEL, formatVerdictCounts } from "@/lib/review-verdict";
 
 /* ============================================================
    業者詳細ページ（カタヅケ）
@@ -22,12 +23,6 @@ import {
    「あなたへの最高額入札」ブロック・PROMISES・決定/質問CTA）は削除し、
    案件文脈が無いページのため「入札の選択は案件詳細から行えます」の案内に置換した。
    ============================================================ */
-
-/** 星文字列（塗り★ + 空☆）を生成。rating が小数の場合は四捨五入して塗る。 */
-function starString(rating: number): string {
-  const filled = Math.round(rating);
-  return "★".repeat(filled) + "☆".repeat(Math.max(0, 5 - filled));
-}
 
 export default function VendorDetailPage() {
   const params = useParams<{ id: string }>();
@@ -121,11 +116,10 @@ export default function VendorDetailPage() {
               </div>
             </div>
 
-            {/* 評価（無い場合は非表示） */}
-            {profile.rating != null ? (
+            {/* 評価（口コミが無い場合は非表示） */}
+            {profile.review_count > 0 ? (
               <div className="biz-rating-row">
-                <div className="stars-big">{starString(profile.rating)}</div>
-                <div className="rating-num">{profile.rating.toFixed(1)}</div>
+                <div className="rating-num">{formatVerdictCounts(profile.good_count, profile.improve_count)}</div>
                 <div className="rating-count">（口コミ{profile.review_count}件）</div>
               </div>
             ) : null}
@@ -183,7 +177,9 @@ export default function VendorDetailPage() {
                     </div>
                     <div className="reviewer-info">
                       <div className="review-meta">
-                        <span className="review-stars">{starString(rv.rating)}</span>
+                        <span className="review-verdict" data-verdict={rv.verdict}>
+                          {REVIEW_VERDICT_LABEL[rv.verdict]}
+                        </span>
                         {"　"}
                         {new Date(rv.created_at).toLocaleDateString("ja-JP")}
                       </div>

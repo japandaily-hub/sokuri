@@ -38,6 +38,8 @@ import {
   toDisplayMessage,
   type TransactionDetail,
 } from "@/lib/katadzuke-api";
+import { ReviewComposer } from "@/components/kdz/ReviewComposer";
+import { REVIEW_VERDICT_LABEL } from "@/lib/review-verdict";
 
 type ModalState = { kind: "reduction"; amount: number; reason: string } | { kind: "cancel" } | null;
 
@@ -51,8 +53,6 @@ export default function OperatorTransactionPage() {
   const [busy, setBusy] = useState(false);
   const [requestedAmount, setRequestedAmount] = useState("");
   const [reason, setReason] = useState("");
-  const [rating, setRating] = useState(5);
-  const [comment, setComment] = useState("");
   const [modal, setModal] = useState<ModalState>(null);
   const [cancelReason, setCancelReason] = useState("");
 
@@ -392,35 +392,23 @@ export default function OperatorTransactionPage() {
             <div className="review-card">
               <h4>ユーザーを評価する</h4>
               {myReview ? (
-                <p style={{ marginTop: 10 }}>レビュー投稿済み（★{myReview.rating}）ありがとうございました。</p>
+                <p style={{ marginTop: 10 }}>評価投稿済み（{REVIEW_VERDICT_LABEL[myReview.verdict]}）ありがとうございました。</p>
               ) : (
-                <>
-                  <div className="review-stars-input" style={{ marginTop: 10 }}>
-                    {[1, 2, 3, 4, 5].map((n) => (
-                      <button key={n} type="button" onClick={() => setRating(n)} aria-label={`星${n}`} className={n <= rating ? "on" : ""}>
-                        ★
-                      </button>
-                    ))}
-                  </div>
-                  <textarea
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                    className="modal-textarea"
-                    style={{ marginTop: 12 }}
-                    rows={3}
-                    placeholder="取引の感想（任意）"
-                  />
-                  <button
-                    type="button"
-                    disabled={busy}
-                    className="btn btn-primary"
-                    onClick={() =>
-                      act(() => createReview({ transaction_id: txn.id, rating, comment: comment.trim() || undefined }, token!))
+                <div style={{ marginTop: 10 }}>
+                  <ReviewComposer
+                    direction="to_user"
+                    submitLabel="レビューを投稿"
+                    busy={busy}
+                    onSubmit={(value) =>
+                      act(() =>
+                        createReview(
+                          { transaction_id: txn.id, verdict: value.verdict, comment: value.comment },
+                          token!,
+                        ),
+                      )
                     }
-                  >
-                    レビューを投稿
-                  </button>
-                </>
+                  />
+                </div>
               )}
             </div>
           )}
