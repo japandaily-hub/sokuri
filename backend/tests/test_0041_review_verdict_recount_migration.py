@@ -14,8 +14,8 @@ test_0040_review_verdict_migration.py と同じ理由（alembic の env.py が�
 - downgrade は no-op（データ是正のため戻さない）。
 - 0040 → 0041 を1回の upgrade で続けて流すと、0041 は補完 0 件・再計算 0 件で 0040 の結果を
   変えない（P1 と P2 を同時にデプロイした場合・空の DB を最新まで上げる場合の経路）。
-- head が 0041 の単独チェーンで、リビジョン ID が 32 文字以内（head の固定は最新リビジョンの
-  テストである本ファイルが持つ）。
+- 0041 が 0040 に連鎖し単一の head に収束していて、リビジョン ID が 32 文字以内（head そのものの
+  固定は最新リビジョンのテストへ移設。現在は test_0042_review_verdict_contract_migration.py）。
 """
 
 from __future__ import annotations
@@ -370,13 +370,18 @@ def test_0040_then_0041_in_one_upgrade_leaves_0040_results_unchanged(
         get_settings.cache_clear()
 
 
-def test_0041_is_the_single_head_chained_from_0040():
-    """0041 が単独の head として 0040 に正しく連鎖していること（分岐の防止）。"""
+def test_0041_is_chained_from_0040_on_a_single_head():
+    """0041 が 0040 に正しく連鎖し、履歴が単一の head に収束していること（分岐の防止）。
+
+    head そのものの固定は最新リビジョンのテスト（現在は test_0042_review_verdict_contract_migration.py）
+    が持つ（0042 以降の追加で本テストが head 固定のまま壊れないようにする。test_0037_0038 /
+    test_0039 と同じ流儀）。
+    """
     from alembic.script import ScriptDirectory
 
     cfg = _alembic_config()
     script = ScriptDirectory.from_config(cfg)
-    assert script.get_heads() == ["0041_review_verdict_recount"]
+    assert len(script.get_heads()) == 1
     rev_0041 = script.get_revision("0041_review_verdict_recount")
     assert rev_0041.down_revision == "0040_review_verdict"
     # 過去の alembic_version VARCHAR(32) 全断障害の再発防止ガード。

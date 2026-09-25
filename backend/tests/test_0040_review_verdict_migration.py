@@ -282,7 +282,7 @@ def test_0040_converts_ratings_recalculates_counts_and_round_trips(
 def test_0040_is_chained_from_0039_sessions_revoked_at():
     """0040 が 0039_sessions_revoked_at に正しく連鎖していること。
 
-    head そのものの固定は最新リビジョンのテスト（現在は test_0041_review_verdict_recount_migration.py）、
+    head そのものの固定は最新リビジョンのテスト（現在は test_0042_review_verdict_contract_migration.py）、
     分岐の防止は test_0036 の ``len(script.get_heads()) == 1`` が持つ（0041 以降の追加で本テストが
     壊れないようにする）。
     """
