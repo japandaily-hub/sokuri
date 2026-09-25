@@ -2668,7 +2668,8 @@ async def test_review_comment_rejects_contact_info_and_profile_lists_reject_urls
 
 
 # ──────────────────────────── 評価の2択化（よかった／伸びしろ・2026-09-25） ────────────────────────────
-# ★（rating）は alembic 0042 で撤去済み（入力・応答・集計に無い。DB 列は残置し書き込まない）。
+# ★（rating）は撤去済み（入力・応答・集計に無い。alembic 0042 で書き込みを止め、モデルのマップも
+# 撤去。DB 列は 0044 で削除）。
 
 _REVIEWS_LOGGER = "app.api.v1.endpoints.reviews"
 
@@ -2710,8 +2711,10 @@ def _review_logs(caplog, prefix: str) -> list[str]:
 async def test_review_verdict_saves_without_rating_and_counts_on_every_operator_output(
     client: AsyncClient, db_session: AsyncSession
 ):
-    """T1: verdict で投稿 → 201・ReviewOut.verdict。★（rating）は保存しない（NULL）。
+    """T1: verdict で投稿 → 201・ReviewOut.verdict。★（rating）はモデルにマップしない（書けない）。
     業者の件数は公開プロフィール・自社プロフィール・業者一覧・入札一覧に同じ値で載る。"""
+    # マップしないこと自体を固定する（0044 の列削除の前後どちらの DB でも同じコードで動く前提）。
+    assert "rating" not in Review.__table__.c and "rating" not in Operator.__table__.c
     admin_token = await _make_admin(client, db_session)
     user_token = await _signup_user(client, "verdict_t1_user@example.com")
     op_token, op_id = await _verified_operator(
@@ -2721,12 +2724,10 @@ async def test_review_verdict_saves_without_rating_and_counts_on_every_operator_
         txn_id = await _completed_transaction(client, user_token, op_token)
         body = await _post_review(client, user_token, {"transaction_id": txn_id, "verdict": verdict})
         assert body["verdict"] == verdict and "rating" not in body
-        stored = (
-            await db_session.execute(
-                select(Review.verdict, Review.rating).where(Review.id == uuid.UUID(body["id"]))
-            )
-        ).one()
-        assert tuple(stored) == (verdict, None)
+        stored_verdict = await db_session.scalar(
+            select(Review.verdict).where(Review.id == uuid.UUID(body["id"]))
+        )
+        assert stored_verdict == verdict
 
     assert await _public_verdict_counts(client, op_id) == (1, 1, 2)
     r = await client.get("/api/v1/operator/profile", headers=_auth(op_token))
@@ -2790,10 +2791,12 @@ async def test_review_invalid_verdict_is_rejected_and_stray_rating_is_ignored(
         client, user_token, {"transaction_id": txn_id, "verdict": "improve", "rating": 5}
     )
     assert body["verdict"] == "improve" and "rating" not in body
-    stored_rating = await db_session.scalar(
-        select(Review.rating).where(Review.id == uuid.UUID(body["id"]))
+    # 保存されたのは verdict だけ（rating はモデルに無く、送られても行に届かない）。
+    stored_verdict = await db_session.scalar(
+        select(Review.verdict).where(Review.id == uuid.UUID(body["id"]))
     )
-    assert stored_rating is None
+    assert stored_verdict == "improve"
+    assert "rating" not in Review.__table__.c
 
 
 async def test_review_comment_limit_is_300_characters(

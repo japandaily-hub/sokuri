@@ -1,6 +1,6 @@
 """業者の口コミ集計（operators.good_count / improve_count / review_count /
-latest_review_comment）の再計算。★平均（operators.rating）は alembic 0042 で撤去済みのため
-更新しない。
+latest_review_comment）の再計算。★平均（operators.rating）は撤去済み（alembic 0042 で更新を
+止め、モデルのマップも撤去。DB 列は 0044 で削除）。
 
 reviews.py（投稿時）と admin.py（運営の非表示／再表示時）の両方から呼ぶ単一の正本。
 集計対象は「顧客→業者（reviewer_type="user"）かつ非表示でない」レビューのみ
