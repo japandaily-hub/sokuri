@@ -7,8 +7,8 @@ test_0042 と同じ理由（alembic の env.py が内部で ``asyncio.run()`` �
   業者だけを数えて INFO に出す（pending・許可証提出済み・削除済みは数えない）。
 - 値を一切変更しない（upgrade 前後で operators の全行が同じ。UPDATE/INSERT/DELETE・DDL を
   発行しない）。0 件でもログを出す。downgrade は no-op で、往復しても値は変わらない。
-- head が 0043 の単独チェーンで、リビジョン ID が 32 文字以内（head の固定は最新リビジョンの
-  テストである本ファイルが持つ）。
+- 0043 が 0042 に連鎖し単一の head に収束していて、リビジョン ID が 32 文字以内（head そのものの
+  固定は最新リビジョンのテストへ移設。現在は test_0045_review_hidden_by_admin_migration.py）。
 """
 
 from __future__ import annotations
@@ -180,13 +180,17 @@ def test_0043_logs_zero_when_no_active_operator_lacks_license(tmp_path, monkeypa
         get_settings.cache_clear()
 
 
-def test_0043_is_the_single_head_chained_from_0042():
-    """0043 が単独の head として 0042 に正しく連鎖していること（分岐の防止）。"""
+def test_0043_is_chained_from_0042_on_a_single_head():
+    """0043 が 0042 に正しく連鎖し、履歴が単一の head に収束していること（分岐の防止）。
+
+    head そのものの固定は最新リビジョンのテスト（現在は test_0045_review_hidden_by_admin_migration.py）
+    が持つ（0044 以降の追加で本テストが head 固定のまま壊れないようにする。test_0042 と同じ作法）。
+    """
     from alembic.script import ScriptDirectory
 
     cfg = _alembic_config()
     script = ScriptDirectory.from_config(cfg)
-    assert script.get_heads() == ["0043_audit_active_no_license"]
+    assert len(script.get_heads()) == 1
     rev_0043 = script.get_revision("0043_audit_active_no_license")
     assert rev_0043.down_revision == "0042_review_verdict_contract"
     # 過去の alembic_version VARCHAR(32) 全断障害の再発防止ガード。
