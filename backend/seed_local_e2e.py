@@ -114,14 +114,16 @@ def main() -> None:
             return must(c.post(f"{BASE}/admin/invites", json={}, headers=auth(admin_tok)), 201)["code"]
 
         vendor_tok, vendor_id = signup_or_login_operator(c, *ACCOUNTS["vendor"], "テスト買取センター株式会社", invite())
-        rival_tok, _ = signup_or_login_operator(c, *ACCOUNTS["rival"], "ライバル片付けサービス", invite())
+        rival_tok, rival_id = signup_or_login_operator(c, *ACCOUNTS["rival"], "ライバル片付けサービス", invite())
         pending_tok, _ = signup_or_login_operator(c, *ACCOUNTS["pending"], "審査中リサイクル商店", None)
 
-        # 業者Aは許可証を提出済みにする
-        must(
-            c.post(f"{BASE}/operator/license-image", files={"file": ("license.jpg", PHOTO.read_bytes(), "image/jpeg")}, headers=auth(vendor_tok)),
-            200,
-        )
+        # 業者A・Bは許可証を提出し、運営が承認する（招待コード経由でも signup 直後は pending のため。2026-09-25）
+        for tok, op_id in ((vendor_tok, vendor_id), (rival_tok, rival_id)):
+            must(
+                c.post(f"{BASE}/operator/license-image", files={"file": ("license.jpg", PHOTO.read_bytes(), "image/jpeg")}, headers=auth(tok)),
+                200,
+            )
+            must(c.patch(f"{BASE}/admin/operators/{op_id}/verify", json={"verified": True}, headers=auth(admin_tok)), 200)
 
         # 案件1: A 30,000 → B 45,000（Aは順位外）
         must(c.post(f"{BASE}/cases/{case1['id']}/bids", json={"amount": 30000, "message": "まとめて引き取ります。"}, headers=auth(vendor_tok)), 201)

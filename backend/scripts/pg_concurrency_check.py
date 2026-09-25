@@ -130,7 +130,11 @@ async def new_invite(c: httpx.AsyncClient, admin_token: str) -> str:
 
 
 async def new_operator(c: httpx.AsyncClient, admin_token: str, label: str) -> tuple[str, str]:
-    """招待コード付き（＝ vendor_status="active"）の業者を新規作成して (token, id) を返す。"""
+    """入札できる（vendor_status="active"）業者を新規作成して (token, id) を返す。
+
+    招待コード経由でも signup 直後は pending のため（2026-09-25）、許可証画像の提出と
+    運営の承認（許可証未提出だと 409）まで通す。
+    """
     body = {
         "company_name": f"同時実行検証業者 {label}",
         "email": f"pgop-{RUN_ID}-{label}@example.com",
@@ -140,7 +144,18 @@ async def new_operator(c: httpx.AsyncClient, admin_token: str, label: str) -> tu
         "invite_code": await new_invite(c, admin_token),
     }
     d = must(await c.post(f"{V1}/auth/operator/signup", json=body), 201)
-    return d["access_token"], d["operator"]["id"]
+    token, op_id = d["access_token"], d["operator"]["id"]
+    license_png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 256
+    must(
+        await c.post(
+            f"{V1}/operator/license-image",
+            files={"file": ("license.png", license_png, "image/png")},
+            headers=auth(token),
+        ),
+        200,
+    )
+    must(await c.patch(f"{V1}/admin/operators/{op_id}/verify", json={"verified": True}, headers=auth(admin_token)), 200)
+    return token, op_id
 
 
 async def new_case(c: httpx.AsyncClient, user_token: str) -> str:
