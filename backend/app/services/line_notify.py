@@ -322,12 +322,17 @@ async def push_operator_verified(line_user_id: str, active: bool) -> bool:
 async def push_account_unsuspended(
     line_user_id: str, party: Literal["user", "operator"]
 ) -> bool:
-    """アカウント停止の解除通知（本人宛・r6 H1）。"""
+    """アカウント停止の解除通知（本人宛・r6 H1）。
+
+    停止前のログインは解除後も無効のまま（deps の sessions_revoked_at）のため、
+    再ログインが必要なことを明記する（notify.send_account_unsuspended と同じ趣旨）。
+    """
     settings = get_settings()
     path = "/operator" if party == "operator" else "/mypage"
     return await _push(
         line_user_id,
-        "【カタヅケ】アカウントの利用制限を解除しました。これまでどおりご利用いただけます。\n"
+        "【カタヅケ】アカウントの利用制限を解除しました。"
+        "お手数ですが、あらためてログインしてからご利用ください。\n"
         f"{settings.frontend_base_url}{path}",
     )
 

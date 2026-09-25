@@ -6,7 +6,7 @@ import logging
 import secrets
 import uuid
 from dataclasses import dataclass
-from datetime import timezone
+from datetime import datetime, timezone
 
 import jwt as pyjwt
 from fastapi import Depends, Header, HTTPException, status
@@ -85,15 +85,73 @@ def _decode(credentials: HTTPAuthorizationCredentials | None) -> dict:
     return payload
 
 
+def _epoch_seconds(moment: datetime) -> int:
+    """DB から読んだ時刻を、JWT の iat と同じ「UTC の epoch 秒（秒未満切り捨て）」に揃える。
+
+    PyJWT は datetime の iat を ``timegm(utctimetuple())``（秒未満切り捨て）で int に
+    エンコードするため、比較する側も int 切り捨てで揃える。SQLite は tz-naive な
+    datetime を返すため、tzinfo が無ければ UTC を補ってから変換する（tz なしのまま
+    timestamp() するとローカルタイム解釈になりズレるため）。
+    """
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return int(moment.timestamp())
+
+
+def _is_session_revoked_by_suspension(account: User | Operator, payload: dict) -> bool:
+    """運営の停止に伴うセッション失効（``sessions_revoked_at``）に該当すれば True を返す。
+
+    依頼者・業者共通の判定本体（``is_user_token_revoked`` / ``is_operator_token_revoked``
+    からのみ呼ぶ）。admin.py の停止操作が停止時刻を ``sessions_revoked_at`` に記録し、
+    実際の解除（停止→解除）では解除時刻へ進める（NULL には戻さない）。これにより、停止前に
+    発行されたトークン（有効期限 7 日）が停止解除後に再び使えるようになるのを防ぎ、利用者に
+    再ログインを求める。停止中はログインできず新しいトークンが無いため、解除時に境界を
+    進めても失効するのは停止前と停止に競合したログインのトークンだけで、旧コードで停止され
+    境界が無いアカウントも解除時に塞がる。
+
+    - 停止中（``is_suspended``）は判定しない（False）。停止中の応答は
+      ``assert_user_not_suspended`` / ``assert_operator_not_suspended`` の 403
+      ``account_suspended`` に任せ、web の停止案内（``/login?reason=suspended``）を
+      従来どおり出すため（ここで 401 にすると web は停止案内ではなく「セッション切れ」を
+      出す）。したがって呼び出し側は必ず停止判定と併用すること（必須認証の各依存と
+      auth.line_exchange は失効判定の直後に停止判定を行い、任意認証は
+      ``get_optional_user`` が停止中を None にし、``get_optional_operator`` の結果は
+      配信側 ``case_photos.serve_file`` が停止中を 403 にする）。
+    - 境界が NULL（一度も停止されていない）なら失効しない。
+    - iat を持たないトークンは発行時刻を示せないため失効扱いにする（fail closed。
+      ``create_access_token`` は常に iat を付けるため、正規のトークンには影響しない）。
+    - 比較は秒単位で「境界と同一秒も失効」とする（パスワード変更ゲートより 1 秒厳しい）。
+      iat は秒精度のため同一秒内の前後は区別できないが、停止中はログイン・LINE 連携・
+      パスワード変更のいずれも 403 で新しいトークンが発行されないため、同一秒の
+      トークンは「停止前」または「停止と競合したログイン」で発行されたものとみなし、
+      失効側に倒す。パスワード変更ゲートが同一秒を許すのは、変更直後に同じ
+      リクエスト内で新トークンを発行するためで、本ゲートにはその事情が無い
+      （代償は「解除と同じ秒に再ログインした」場合に再ログインをもう一度求めるだけ）。
+    """
+    if account.is_suspended:
+        return False
+    revoked_at = account.sessions_revoked_at
+    if revoked_at is None:
+        return False
+    iat = payload.get("iat")
+    if iat is None:
+        return True
+    return int(iat) <= _epoch_seconds(revoked_at)
+
+
 def is_user_token_revoked(user: User, payload: dict) -> bool:
-    """退会（論理削除）済み・パスワード変更後の旧トークンなら True を返す（例外を投げない判定本体）。
+    """退会（論理削除）済み・停止に伴うセッション失効・パスワード変更後の旧トークンなら True を返す
+    （例外を投げない判定本体）。
 
     - 論理削除ゲート: deleted_at が設定済みのアカウントの旧トークンは即時失効させる。
+    - 停止に伴うセッション失効ゲート: 運営が停止した時刻（sessions_revoked_at）以前に
+      発行されたトークンを、停止解除後も拒否する。停止中は判定せず
+      ``assert_user_not_suspended`` の 403 に任せる（詳細は
+      ``_is_session_revoked_by_suspension``）。
     - パスワード変更失効ゲート: JWT の iat が password_changed_at より古い場合に拒否する。
       iat は PyJWT により epoch 秒の int にエンコードされるため、比較も int 切り捨てで行い
-      同一秒内に発行された新トークンを誤って弾かないようにする。
-      SQLite は tz-naive な datetime を返すため、tzinfo が無ければ UTC を補って比較する
-      （tz なしのまま timestamp() するとローカルタイム解釈になりズレるため）。
+      同一秒内に発行された新トークンを誤って弾かないようにする（tz-naive 値の扱いは
+      ``_epoch_seconds``）。
 
     必須認証は ``assert_user_not_revoked``（401）、任意認証の ``get_optional_user`` は
     本関数を直接使う（失効の定義を1か所に保ったまま、401 を raise→捕捉する遠回りを
@@ -101,22 +159,22 @@ def is_user_token_revoked(user: User, payload: dict) -> bool:
     """
     if user.deleted_at is not None:
         return True
+    if _is_session_revoked_by_suspension(user, payload):
+        return True
 
     if user.password_changed_at is None:
         return False
     iat = payload.get("iat")
     if iat is None:
         return False
-    changed_at = user.password_changed_at
-    if changed_at.tzinfo is None:
-        changed_at = changed_at.replace(tzinfo=timezone.utc)
-    return int(iat) < int(changed_at.timestamp())
+    return int(iat) < _epoch_seconds(user.password_changed_at)
 
 
 def assert_user_not_revoked(user: User, payload: dict) -> None:
-    """退会（論理削除）済み・パスワード変更後の旧トークンを 401 で失効させる。
+    """退会（論理削除）済み・停止に伴うセッション失効・パスワード変更後の旧トークンを 401 で失効させる。
 
-    判定条件は ``is_user_token_revoked`` に一本化している。
+    判定条件は ``is_user_token_revoked`` に一本化している。停止中の応答（403）は
+    直後に呼ぶ ``assert_user_not_suspended`` が担う。
 
     ``auth.py`` の ``line_exchange``（Bearer付き連携経路）でも同一ゲートを適用するため
     モジュール関数として公開する（旧名 ``_assert_user_not_revoked`` から改名・再利用）。
@@ -152,8 +210,23 @@ def assert_user_not_suspended(user: User) -> None:
         )
 
 
-def assert_operator_not_revoked(operator: Operator) -> None:
-    """退会（論理削除）済み業者の旧トークンを 401 で失効させる。
+def is_operator_token_revoked(operator: Operator, payload: dict) -> bool:
+    """退会（論理削除）済み・停止に伴うセッション失効の旧トークンなら True を返す（例外を投げない判定本体）。
+
+    ``is_user_token_revoked`` の業者側対応。必須認証は ``assert_operator_not_revoked``（401）、
+    任意認証の ``get_optional_operator`` は本関数を直接使う（失効の定義を1か所に保つ）。
+    停止に伴うセッション失効の判定は依頼者側と共通の ``_is_session_revoked_by_suspension``
+    （停止中は判定せず ``assert_operator_not_suspended`` の 403 に任せる）。依頼者側の
+    パスワード変更ゲートは、業者にパスワード変更経路が無いため持たない（経路を追加する
+    際はここへ足す）。
+    """
+    if operator.deleted_at is not None:
+        return True
+    return _is_session_revoked_by_suspension(operator, payload)
+
+
+def assert_operator_not_revoked(operator: Operator, payload: dict) -> None:
+    """退会（論理削除）済み・停止に伴うセッション失効の業者の旧トークンを 401 で失効させる。
 
     ``assert_user_not_revoked`` の業者側対応。本人退会（``DELETE /operator/me``）・
     運営による強制削除（``DELETE /admin/operators/{id}``）後の旧トークンを、業者を
@@ -164,13 +237,14 @@ def assert_operator_not_revoked(operator: Operator) -> None:
     vendor_status を変えないため停止ゲート・閲覧ゲートでも止まらず、削除済み業者が
     旧トークンで案件・成約（完了取引の依頼者住所・メール）・チャットの閲覧や
     レビュー投稿を続けられた（security review 指摘対応）。
+    停止解除後の「停止前に発行されたトークン」も同じ判定点で失効させる（トークンの
+    iat を見るため、検証済みのペイロードを必ず渡す）。
 
     停止判定（``assert_operator_not_suspended``）より先に呼ぶこと。退会は停止と違い
     復帰しないため、403 ``account_suspended``（問い合わせ導線）ではなく 401
-    （再ログイン要求）を返す。依頼者側の iat ゲート（パスワード変更後の旧トークン
-    失効）は業者にパスワード変更経路が無いため持たない（経路を追加する際はここへ足す）。
+    （再ログイン要求）を返す。判定条件は ``is_operator_token_revoked`` に一本化している。
     """
-    if operator.deleted_at is not None:
+    if is_operator_token_revoked(operator, payload):
         raise _CRED_EXC()
 
 
@@ -222,8 +296,13 @@ def assert_operator_case_access(operator: Operator) -> None:
     さらにその前に退会（論理削除）済みを 401 で止める（多層防御。通常は
     ``get_current_actor`` が先に弾くが、匿名化は vendor_status を変えないため、
     別経路で解決した業者がここへ渡されると削除済みでも閲覧が通ってしまう）。
+    本ゲートはトークンを受け取らないため、停止に伴うセッション失効（iat の判定）は
+    見ない。それはトークンから業者を解決する側（``get_current_actor`` 等の
+    ``assert_operator_not_revoked``）の責務（空のペイロードで判定すると、一度でも
+    停止された業者が解除後の新しいトークンでも弾かれてしまうため流用しない）。
     """
-    assert_operator_not_revoked(operator)
+    if operator.deleted_at is not None:
+        raise _CRED_EXC()
     assert_operator_not_suspended(operator)
     if operator.vendor_status not in OPERATOR_CASE_VIEW_STATUSES:
         raise HTTPException(
@@ -327,8 +406,9 @@ async def get_current_operator(
     # 論理削除ゲート（依頼者側 assert_user_not_revoked と同じ趣旨・r8-M6）:
     # 退会済み業者の旧トークンは即時失効させる。これが無いと、退会直後の
     # 発行済みトークンで最長トークン有効期限ぶん操作を続けられてしまう。
+    # 停止解除後の停止前トークン（sessions_revoked_at）も同じ判定で失効させる。
     # 判定は全経路共通の assert_operator_not_revoked に一本化する。
-    assert_operator_not_revoked(operator)
+    assert_operator_not_revoked(operator, payload)
     assert_operator_not_suspended(operator)
     return operator
 
@@ -391,7 +471,7 @@ async def get_current_actor(
         # user 分岐の assert_user_not_revoked と対称。従来はここに論理削除ゲートが無く、
         # 退会・強制削除済み業者の旧トークンが Actor 経由の全エンドポイント（案件・
         # 成約・チャット・レビュー・/auth/me）で通用していた（security review 指摘）。
-        assert_operator_not_revoked(operator)
+        assert_operator_not_revoked(operator, payload)
         assert_operator_not_suspended(operator)
         return Actor(typ="operator", operator=operator)
     raise _CRED_EXC()
@@ -444,11 +524,12 @@ async def get_optional_operator(
     except ValueError:
         return None
     operator = await session.get(Operator, operator_id)
-    # 退会・強制削除済みは壊れたトークンと同じく None（トークン無し扱い）に倒す
-    # （上記の「401 化しない」方針。capability URL のため 401 にしてもヘッダを外せば
-    # 同じ画像が取れ、防御上の差は無い）。判定条件は assert_operator_not_revoked と同一だが、
-    # None に倒すだけなので例外を介さず直接判定する。
-    if operator is None or operator.deleted_at is not None:
+    # 退会・強制削除済み、および停止解除後の停止前トークンは、壊れたトークンと同じく
+    # None（トークン無し扱い）に倒す（上記の「401 化しない」方針。capability URL のため
+    # 401 にしてもヘッダを外せば同じ画像が取れ、防御上の差は無い）。判定条件は
+    # assert_operator_not_revoked と同一の is_operator_token_revoked を例外なしで使う
+    # （停止中はここでは None にせず業者を返し、配信側の停止ゲートで 403 にする）。
+    if operator is None or is_operator_token_revoked(operator, payload):
         return None
     return operator
 
@@ -466,10 +547,11 @@ async def get_optional_user(
     消せてしまう・security review 指摘対応）。
 
     トークンが無い・壊れている・期限切れ・用途限定トークン・業者トークン・退会済み・
-    停止中・パスワード変更前の旧トークンは、いずれも ``None``（匿名送信扱い）を返し
-    401/403 にはしない。停止中の依頼者は ``SUSPENDED_ACCOUNT_DETAIL`` の案内で
-    お問い合わせ窓口へ誘導されるため、ここで弾くと唯一の連絡手段が塞がる
-    （web の共通処理も 401/403 を受けるとサインアウトしてしまう）。
+    停止中・停止解除後の停止前トークン・パスワード変更前の旧トークンは、いずれも
+    ``None``（匿名送信扱い）を返し 401/403 にはしない。停止中の依頼者は
+    ``SUSPENDED_ACCOUNT_DETAIL`` の案内でお問い合わせ窓口へ誘導されるため、ここで
+    弾くと唯一の連絡手段が塞がる（web の共通処理も 401/403 を受けるとサインアウト
+    してしまう）。
     失効判定は必須認証と同じ ``is_user_token_revoked`` を例外なしで使う。
     """
     if credentials is None or not credentials.credentials:

@@ -3027,7 +3027,6 @@ async def test_signup_admin_grant_fires_critical_alert(
     （severity=critical）でも通知される（検知漏れ防止）。"""
     import asyncio
 
-    from app.api.v1.endpoints import auth as auth_endpoint
     from app.config import get_settings
 
     email = "alert-signup-admin@example.com"

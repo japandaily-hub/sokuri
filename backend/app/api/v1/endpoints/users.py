@@ -594,15 +594,29 @@ async def _is_last_active_admin(session: AsyncSession, user: User) -> bool:
     自動付与の窓が開き、ADMIN_EMAILS は公開リポジトリの render.yaml に載っていて
     signup もメールの所有確認をしないため、第三者がそのアドレスで登録するだけで
     admin になれてしまう（security review 指摘対応の堅牢化）。
+
+    有効な admin 全員の行を行ロックで確保してから数える（本人の行も含む）。admin が
+    2 人同時に自己退会すると、ロック無しでは双方が「相手が残る」と判定して 0 人になり得る。
+    行ロックにより後続の退会は先行の commit まで待ち、再評価時には先行の行が
+    deleted_at 済みとして条件から外れるため 409 になる。ロックは退会処理の commit まで
+    保持される（admin は数人規模のため待ちは無視できる）。
+    ロックは FOR NO KEY UPDATE（``key_share=True``）にする。FOR UPDATE だと外部キー検査の
+    FOR KEY SHARE と衝突し、退会中に他の admin が行う問い合わせの対応済み処理・審査
+    （handled_by_admin_id 等で users を参照する更新）まで待たせてしまう（security review Low）。
+    同時退会どうしは NO KEY UPDATE 同士で衝突するため直列化は保たれる。SQLite では無視される。
     """
     if user.role != "admin":
         return False
-    other_admin_id = await session.scalar(
-        select(User.id)
-        .where(User.role == "admin", User.deleted_at.is_(None), User.id != user.id)
-        .limit(1)
-    )
-    return other_admin_id is None
+    active_admin_ids = (
+        await session.scalars(
+            select(User.id)
+            .where(User.role == "admin", User.deleted_at.is_(None))
+            # 降格側（admin._has_other_active_admin）と同じ id 順でロックを取り、デッドロックを避ける。
+            .order_by(User.id)
+            .with_for_update(key_share=True)
+        )
+    ).all()
+    return not any(admin_id != user.id for admin_id in active_admin_ids)
 
 
 # 取引未成立のまま宙に浮いた案件を退会時にキャンセル化するための非終端ステータス一覧。

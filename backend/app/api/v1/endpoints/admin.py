@@ -453,6 +453,12 @@ async def suspend_operator(
     停止中は ``assert_operator_not_suspended``（deps.py）により既存トークンでの
     全操作が 403 になり、ログインも拒否される。解除すると即時に元の
     vendor_status のまま復帰する（承認状態は変更しない）。
+    停止時に ``sessions_revoked_at`` を現在時刻にするため、停止前に発行された
+    トークンは解除後も 401 のままで、業者には再ログインを求める（deps.py の
+    ``assert_operator_not_revoked``）。実際に停止→解除へ変わった時も解除時刻へ進める
+    （停止中はログインできず新しいトークンが無いため、失効するのは停止前と停止に競合した
+    ログインのトークンだけ。デプロイ切替中に旧コードで停止され境界が無いアカウントもここで
+    塞がる・security review Low）。停止していない業者への解除要求では変更しない。
     """
     operator = await session.get(Operator, operator_id)
     if operator is None:
@@ -464,6 +470,13 @@ async def suspend_operator(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="退会済みの業者です。")
     prev_suspended = operator.is_suspended
     operator.is_suspended = body.suspended
+    if body.suspended or prev_suspended:
+        # 停止前に発行されたトークン（有効期限 7 日）が停止解除後に復活しないよう、
+        # 停止時刻を失効境界として記録する。停止中の再送（停止→停止）と、実際の解除
+        # （停止→解除）でも現在時刻へ進める（停止中は新しいトークンが発行されないため、
+        # 境界を進めても失効するのは停止前・停止と競合したログインのトークンだけ）。
+        # NULL へ戻すことはしない（戻すと停止前のトークンが復活するため）。
+        operator.sessions_revoked_at = datetime.now(timezone.utc)
     await session.commit()
     await session.refresh(operator)
     if prev_suspended and not body.suspended:
@@ -478,7 +491,11 @@ async def suspend_operator(
             "operator",
         )
     logger.info(
-        "admin_operator_suspend admin=%s operator=%s suspended=%s", admin.id, operator.id, body.suspended
+        "admin_operator_suspend admin=%s operator=%s suspended=%s sessions_revoked_at=%s",
+        admin.id,
+        operator.id,
+        body.suspended,
+        operator.sessions_revoked_at,
     )
     return OperatorOut.model_validate(operator)
 
@@ -1035,6 +1052,11 @@ async def suspend_user(
 
     停止中は ``assert_user_not_suspended``（deps.py）により既存トークンでの全操作が
     403 になり、ログインも拒否される（auth.py の ``user_login`` / ``line_exchange``）。
+    停止時に ``sessions_revoked_at`` を ``suspended_at`` と同じ時刻にするため、停止前に
+    発行されたトークンは解除後も 401 のままで、依頼者には再ログインを求める（deps.py の
+    ``assert_user_not_revoked``）。解除時は ``suspended_at`` を NULL に戻し、
+    実際に停止→解除へ変わった場合は ``sessions_revoked_at`` を解除時刻へ進める
+    （``suspend_operator`` と同じ理由。NULL へ戻すことはしない）。
     admin 自身、および role="admin" のユーザーは対象外（409）とし、運営操作の
     誤ロックアウトを防ぐ（``suspend_operator`` には無い制約だが、admin は user
     テーブルを共用するため依頼者側にのみ必要な安全策）。
@@ -1053,9 +1075,15 @@ async def suspend_user(
             detail="管理者アカウントは停止できません。",
         )
     prev_suspended = target.is_suspended
+    now = datetime.now(timezone.utc)
     target.is_suspended = body.suspended
-    target.suspended_at = datetime.now(timezone.utc) if body.suspended else None
+    target.suspended_at = now if body.suspended else None
     target.suspended_reason = body.reason if body.suspended else None
+    if body.suspended or prev_suspended:
+        # 停止前に発行されたトークンが停止解除後に復活しないよう、停止時刻を失効境界として
+        # 記録する（suspend_operator と同じ方針。停止中の再送と実際の解除でも現在時刻へ
+        # 進め、NULL へ戻すことはしない）。
+        target.sessions_revoked_at = now
     await session.commit()
     await session.refresh(target)
     if prev_suspended and not body.suspended:
@@ -1083,11 +1111,12 @@ async def suspend_user(
     )
 
     logger.info(
-        "admin_user_suspend admin=%s user=%s suspended=%s open_case_count=%d",
+        "admin_user_suspend admin=%s user=%s suspended=%s open_case_count=%d sessions_revoked_at=%s",
         admin.id,
         target.id,
         body.suspended,
         open_case_count,
+        target.sessions_revoked_at,
     )
     return UserSuspendResponse(
         id=target.id,
@@ -1100,15 +1129,21 @@ async def suspend_user(
 async def _has_other_active_admin(session: AsyncSession, exclude_user_id: uuid.UUID) -> bool:
     """``exclude_user_id`` 以外に有効な（``deleted_at IS NULL``）admin が
     1人でも存在すれば True を返す（demote で「最後の1人」判定に使う）。
+
+    有効な admin 全員の行を FOR NO KEY UPDATE で確保してから数える（users.py の
+    ``_is_last_active_admin`` と同じロック・同じ id 順）。ロック無しでは「2人が互いを降格」
+    「本人の退会と相手の降格が同時」で双方が「相手が残る」と判定し、admin が 0 人になり得る
+    （QA 指摘）。ロックは降格の commit まで保持される。SQLite では無視される。
     """
-    other_admin = await session.scalar(
-        select(User.id).where(
-            User.role == "admin",
-            User.deleted_at.is_(None),
-            User.id != exclude_user_id,
-        ).limit(1)
-    )
-    return other_admin is not None
+    active_admin_ids = (
+        await session.scalars(
+            select(User.id)
+            .where(User.role == "admin", User.deleted_at.is_(None))
+            .order_by(User.id)
+            .with_for_update(key_share=True)
+        )
+    ).all()
+    return any(admin_id != exclude_user_id for admin_id in active_admin_ids)
 
 
 @router.post("/admin/users/{user_id}/promote", response_model=AdminUserRoleResponse)

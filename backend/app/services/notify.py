@@ -645,6 +645,8 @@ async def send_account_unsuspended(to_email: str, party: str) -> bool:
 
     停止（suspend）時は理由開示の是非が運用ポリシー判断のため通知しない。解除は
     「復帰したことを本人が知る手段がゼロ」になるため必ず通知する。
+    停止前に発行されたログインは解除後も無効のまま（deps の sessions_revoked_at）のため、
+    再ログインが必要なことを明記する（「使えない」という問い合わせを防ぐ）。
     """
     settings = get_settings()
     url = (
@@ -656,7 +658,9 @@ async def send_account_unsuspended(to_email: str, party: str) -> bool:
         to_email,
         "【カタヅケ】アカウントのご利用を再開いただけます",
         _wrap(
-            "<p>アカウントの利用制限を解除しました。これまでどおりご利用いただけます。</p>"
+            "<p>アカウントの利用制限を解除しました。</p>"
+            "<p>安全のため、利用制限の前のログイン状態は解除しています。お手数ですが、"
+            "あらためてログインしてからご利用ください。</p>"
             "<p>ご不便をおかけし申し訳ありませんでした。</p>"
             f'<p><a href="{url}">マイページを開く</a></p>'
         ),

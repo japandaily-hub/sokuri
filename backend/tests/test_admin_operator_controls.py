@@ -2,7 +2,8 @@
 
 - 承認: pending かつ許可証未提出 → 409 / 許可証提出後 → 200 active /
         招待コード登録で既に active の業者は許可証なしでも verified_at 付与可（状態遷移なし）
-- 停止: suspended=true で業者の既存トークンが 403・ログイン拒否 / suspended=false で復帰 /
+- 停止: suspended=true で業者の既存トークンが 403・ログイン拒否 / suspended=false で復帰
+        （停止前のトークンは解除後も 401 のまま・再ログインで復帰） /
         非 admin は 401/403 / 存在しない業者は 404 / 型不正は 422
 """
 
@@ -209,7 +210,7 @@ async def test_suspend_and_unsuspend_operator(client: AsyncClient, db_session: A
     )
     assert r.status_code in (401, 403), r.text
 
-    # 停止解除で復帰
+    # 停止解除で復帰（再ログインが必要）
     r = await client.patch(
         f"/api/v1/admin/operators/{op_id}/suspend",
         json={"suspended": False},
@@ -217,7 +218,17 @@ async def test_suspend_and_unsuspend_operator(client: AsyncClient, db_session: A
     )
     assert r.status_code == 200, r.text
     assert r.json()["is_suspended"] is False
+    # 停止前に発行されたトークンは解除後も復活しない（sessions_revoked_at による失効。
+    # 再ログイン後の流れは tests/test_suspension_session_revocation.py で固定）。
     r = await client.get("/api/v1/operator/profile", headers=_auth(op_token))
+    assert r.status_code == 401, r.text
+    # 失効ゲートの 401（再ログイン要求）であること（停止の 403 や別の 401 と区別する）。
+    assert r.json()["detail"] == "Invalid credentials. Please log in again.", r.text
+    assert r.headers.get("www-authenticate") == "Bearer"
+    r = await client.post(
+        "/api/v1/auth/operator/login",
+        json={"email": "ctl_suspend1@example.com", "password": _OP_PASSWORD},
+    )
     assert r.status_code == 200, r.text
 
     # 一覧にも反映される

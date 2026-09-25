@@ -2,12 +2,16 @@
 
 import uuid
 from datetime import datetime
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 from sqlalchemy import Boolean, DateTime, Float, Integer, LargeBinary, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
+
+if TYPE_CHECKING:  # 型注釈の前方参照（"Bid" / "ReductionRequest"）の解決用。実行時は循環 import を避けて読まない。
+    from app.db.models.bid import Bid
+    from app.db.models.transaction import ReductionRequest
 
 
 class Operator(Base, TimestampMixin):
@@ -40,6 +44,14 @@ class Operator(Base, TimestampMixin):
     # ＝ 完了済み取引・レビュー・キャンセル記録を依頼者側の記録として保持するため。
     deleted_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True, index=True
+    )
+    # 停止に伴うセッション失効の境界（User.sessions_revoked_at と同じ意味・alembic 0039）。
+    # 運営が停止した時刻を入れ、iat がこの時刻以前のトークンを
+    # deps.assert_operator_not_revoked が業者を解決する全経路で 401 にする。停止中は
+    # assert_operator_not_suspended の 403 が優先される。実際の解除時は解除時刻へ進め、NULL には
+    # 戻さない（戻すと停止前のトークンが解除後に復活するため）。NULL＝一度も停止されていない。
+    sessions_revoked_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
 
     # ── 古物商許可証画像（審査書類。認証必須の専用エンドポイントでのみ配信） ──

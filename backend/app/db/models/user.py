@@ -94,6 +94,15 @@ class User(Base, TimestampMixin):
     is_suspended: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
     suspended_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     suspended_reason: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    # 停止に伴うセッション失効の境界（alembic 0039）。運営が停止した時刻を入れ、iat が
+    # この時刻以前（秒単位・同一秒を含む）のアクセストークンを deps.py の失効ゲートで
+    # 401 にする。停止中は assert_user_not_suspended の 403 が優先される。実際の解除時は
+    # 解除時刻へ進め、NULL には戻さない（suspended_at と違い NULL に戻すと、停止前の
+    # トークンが解除後に復活するため）。
+    # NULL＝一度も停止されていない（失効境界なし）。
+    sessions_revoked_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     # お知らせメール（入札受信・入札額更新・入札なし/未決定リマインドの4種のみが
     # 対象。取引上必須の連絡には影響しない）の受け取り可否。既定 True＝従来どおり

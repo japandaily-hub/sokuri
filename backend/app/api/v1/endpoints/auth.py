@@ -652,6 +652,7 @@ async def line_exchange(
                 )
             # 退会（論理削除）済み・パスワード変更後の旧トークンは deps.py と同一ゲートで失効させる
             # （security review 指摘: line_exchange のBearer経路はこのゲートを経由していなかった）。
+            # 停止解除後の停止前トークンも同じゲートで失効させる（新トークン発行による迂回防止）。
             assert_user_not_revoked(user, payload)
             # 停止中依頼者の旧トークンも deps.py と同一ゲートで失効させる（r3-verify-operator ADD-2）。
             assert_user_not_suspended(user)
@@ -714,7 +715,9 @@ async def line_exchange(
             # （user分岐の assert_user_not_revoked と対称。security review 指摘: 削除で
             # password_hash=None になるため下の再認証チェックも飛ばされ、匿名化済みの業者行へ
             # line_user_id を再設定した上で新しいトークンまで発行できていた）。
-            assert_operator_not_revoked(operator)
+            # 停止解除後の停止前トークンも同じゲートで失効させる（ここで通すと、失効した
+            # トークンから新しいトークンを発行できてしまい、再ログイン要求が迂回される）。
+            assert_operator_not_revoked(operator, payload)
             # 停止中業者の旧トークンは deps.py と同一ゲートで失効させる（security review指摘）。
             assert_operator_not_suspended(operator)
 
