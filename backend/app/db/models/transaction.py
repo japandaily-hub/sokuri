@@ -180,6 +180,14 @@ class Review(Base, TimestampMixin):
     # 運営による論理削除（公開・集計から除外。物理削除はせず証跡を残す）。
     hidden_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     hidden_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # 今この口コミを削除（非表示）にしている運営アカウント（alembic 0045）。元に戻すと NULL に戻し、
+    # 誰がいつ消して戻したかの履歴は操作ログ（admin_review_hide）にだけ残す。API は運営向けの一覧
+    # （AdminReviewListItem）にだけ出し、ReviewOut・PublicReviewOut には含めない（当事者に運営個人を
+    # 開示しない。cancellations.cancelled_by_admin_id と同方針）。運営アカウントが削除されても
+    # 口コミの行は残す（SET NULL）。
+    hidden_by_admin_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     # relations
     transaction: Mapped[Transaction] = relationship(back_populates="reviews")
