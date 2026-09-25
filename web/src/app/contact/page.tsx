@@ -5,13 +5,15 @@
  *  POST /contact（katadzuke-api.ts submitContactMessage）へ配線済み。422/429/5xx は日本語の
  *  案内に変換して表示し、失敗時に偽の完了表示は出さない（運営導線監査 r3-operator.md H1 是正）。 */
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { Suspense, useEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Ic } from "@/components/kdz/Icons";
 import { Reveal } from "@/components/kdz/interactions";
 import { ILLUSTRATIONS, ILL_POSITIONS, illSrc, type IllName } from "@/lib/illustrations";
 import { KdzApiError, submitContactMessage, toDisplayMessage } from "@/lib/katadzuke-api";
+import { parseReviewReportSubject, withReviewReportPrefix } from "@/lib/review-report";
 import "./contact.css";
 
 /** 循環イラスト帯（ビジュアル刷新 Phase 3・architect指示）。フォーム主体の軽いページのため、
@@ -39,19 +41,24 @@ const DISCLOSURE_PREFIX = "【事業者情報の開示請求】";
  * disclosure が追加されたら、この関数ごと外して value をそのまま送る。
  * （page.tsx は Next の page エントリなので named export を増やさない。検証は実 POST の傍受で行う）
  */
-function buildContactPayload(selectedCategory: string, message: string) {
+function buildContactPayload(selectedCategory: string, message: string, reportedReviewId: string | null) {
+  const withReviewPrefix = reportedReviewId ? withReviewReportPrefix(reportedReviewId, message) : message;
   if (selectedCategory !== DISCLOSURE_CATEGORY) {
-    return { category: selectedCategory, message };
+    return { category: selectedCategory, message: withReviewPrefix };
   }
-  return { category: "other", message: `${DISCLOSURE_PREFIX}\n${message}` };
+  return { category: "other", message: `${DISCLOSURE_PREFIX}\n${withReviewPrefix}` };
 }
 
-export default function ContactPage() {
+function ContactPageContent() {
   /* ログイン中なら送信に backend のアクセストークンを添える（backend が依頼者アカウントに
      問い合わせを紐付け、退会時の匿名化を本人の送信分だけに限定するため）。未ログイン・
      セッション読込中（status === "loading" で data が未確定）は session が無く、従来どおり
      トークン無しの匿名送信になる。画面の文言・入力・バリデーションには使わない。 */
   const { data: session } = useSession();
+  /* vendors/[id] の「この口コミを報告する」リンクから来た場合、subject（厳密一致のときだけ）
+     から口コミ ID を読み取る。無関係な subject（開示請求等）は無視する。 */
+  const searchParams = useSearchParams();
+  const reportedReviewId = parseReviewReportSubject(searchParams.get("subject"));
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -117,7 +124,8 @@ export default function ContactPage() {
     const selectedCategory = (form.elements.namedItem("category") as HTMLSelectElement).value;
     const { category, message } = buildContactPayload(
       selectedCategory,
-      (form.elements.namedItem("message") as HTMLTextAreaElement).value.trim()
+      (form.elements.namedItem("message") as HTMLTextAreaElement).value.trim(),
+      reportedReviewId,
     );
 
     setSending(true);
@@ -279,6 +287,12 @@ export default function ContactPage() {
                   担当：カタヅケ運営事務局（メールでの対応を原則としています）
                 </p>
 
+                {reportedReviewId ? (
+                  <p className="field-hint" style={{ marginBottom: 20 }}>
+                    報告する口コミ: {reportedReviewId}
+                  </p>
+                ) : null}
+
                 {submitError && (
                   <div className="auth-error" role="alert" style={{ marginBottom: 16 }}>
                     <svg
@@ -381,7 +395,7 @@ export default function ContactPage() {
                       <select
                         id="category"
                         name="category"
-                        defaultValue=""
+                        defaultValue={reportedReviewId ? "other" : ""}
                         className={errors.category ? "has-error" : undefined}
                         onChange={() => clearError("category")}
                       >
@@ -492,5 +506,14 @@ export default function ContactPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+/** useSearchParams（?subject=）を使うため Suspense 境界で包む（本番ビルドの静的プリレンダー要件。他ページと同型）。 */
+export default function ContactPage() {
+  return (
+    <Suspense fallback={null}>
+      <ContactPageContent />
+    </Suspense>
   );
 }

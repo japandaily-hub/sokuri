@@ -519,6 +519,10 @@ export default function AdminPage() {
                 <span className="ml-1.5 text-xs font-normal text-kdz-danger">件数取得失敗</span>
               ) : null}
             </Link>
+            {/* ユーザー指示: 運営が口コミの削除ができるようにする導線。 */}
+            <Link href="/admin/reviews" className={btnSecondary}>
+              口コミの管理
+            </Link>
           </div>
         }
       >

@@ -2340,6 +2340,90 @@ export function adminDeleteUser(
 }
 
 // ---------------------------------------------------------------------------
+// 管理: 口コミ（一覧・削除／元に戻す。ユーザー指示「運営が口コミの削除ができるように」対応）
+// ---------------------------------------------------------------------------
+
+/** 口コミ一覧の状態絞り込み。既定は backend も all（絞り込みなし）。 */
+export type AdminReviewVisibility = "visible" | "hidden" | "all";
+
+/** 運営一覧の口コミ1件。当事者向け ReviewOut と異なり hidden_* を含む（運営のみが見る）。 */
+export interface AdminReviewListItem {
+  id: string;
+  transaction_id: string;
+  reviewer_type: "user" | "operator";
+  verdict: ReviewVerdict;
+  /** 本文（全文）。第三者の自由入力のため、描画時は必ずテキストノードにする
+   *  （dangerouslySetInnerHTML は使わない）。 */
+  comment: string | null;
+  created_at: string;
+  /** 非表示（削除）にした日時。非null なら削除済み。 */
+  hidden_at: string | null;
+  hidden_reason: string | null;
+  /** 今非表示にしている運営（admin）の user.id。履歴ではなく現在値のみ。 */
+  hidden_by_admin_id: string | null;
+  /** 業者が退会・匿名化済みの場合は null（行自体は出る）。 */
+  operator_id: string | null;
+  company_name: string | null;
+}
+
+export interface AdminReviewListResponse {
+  items: AdminReviewListItem[];
+  /** 絞り込み後の件数。 */
+  total: number;
+  /** 絞り込み（reviewer_type・verdict・operator_id・q）に関わらない全件の内訳。
+   *  StatusFilterBar の件数表示に使う（operators 一覧の counts と同じ契約）。 */
+  counts: { all: number; visible: number; hidden: number };
+}
+
+export interface AdminReviewListParams {
+  visibility?: AdminReviewVisibility;
+  reviewerType?: "user" | "operator";
+  verdict?: ReviewVerdict;
+  operatorId?: string;
+  /** 口コミID・取引IDの完全一致（UUID として解釈できる場合）、それ以外は業者名の部分一致。100字以内。 */
+  q?: string;
+  limit?: number;
+  offset?: number;
+}
+
+function buildAdminReviewListQuery(params: AdminReviewListParams): string {
+  const sp = new URLSearchParams();
+  if (params.visibility && params.visibility !== "all") sp.set("visibility", params.visibility);
+  if (params.reviewerType) sp.set("reviewer_type", params.reviewerType);
+  if (params.verdict) sp.set("verdict", params.verdict);
+  if (params.operatorId) sp.set("operator_id", params.operatorId);
+  if (params.q && params.q.trim()) sp.set("q", params.q.trim());
+  sp.set("limit", String(params.limit ?? ADMIN_LIST_DEFAULT_LIMIT));
+  sp.set("offset", String(params.offset ?? 0));
+  return sp.toString();
+}
+
+export function adminListReviews(
+  params: AdminReviewListParams,
+  token: string,
+): Promise<AdminReviewListResponse> {
+  return request(`/admin/reviews?${buildAdminReviewListQuery(params)}`, { token });
+}
+
+/**
+ * 運営が口コミを公開画面から削除する（hidden: true・reason 必須 1〜200字）／
+ * 元に戻す（hidden: false・reason は無視される）。
+ * 応答は ReviewOut（当事者向けと同じ形。hidden_reason・hidden_by_admin_id は含まれない）。
+ * 冪等: 既に同じ状態なら何も変えず 200 が返る（最初に消した人・時刻・理由を保持する）。
+ */
+export function adminSetReviewHidden(
+  reviewId: string,
+  payload: { hidden: boolean; reason?: string },
+  token: string,
+): Promise<ReviewOut> {
+  return request(`/admin/reviews/${encodeURIComponent(reviewId)}/hide`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+    token,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // 表示ユーティリティ
 // ---------------------------------------------------------------------------
 

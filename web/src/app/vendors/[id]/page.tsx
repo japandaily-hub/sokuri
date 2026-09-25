@@ -14,6 +14,7 @@ import {
   toDisplayMessage,
   type OperatorPublicProfile,
 } from "@/lib/katadzuke-api";
+import { buildReviewReportSubject } from "@/lib/review-report";
 import { REVIEW_VERDICT_LABEL, formatVerdictCounts } from "@/lib/review-verdict";
 
 /* ============================================================
@@ -187,7 +188,7 @@ export default function VendorDetailPage() {
                   </div>
                   {rv.comment ? <div className="review-text">{rv.comment}</div> : null}
                   <Link
-                    href={`/contact?subject=${encodeURIComponent(`口コミの報告（${rv.id}）`)}`}
+                    href={`/contact?subject=${encodeURIComponent(buildReviewReportSubject(rv.id))}`}
                     className="review-report"
                   >
                     この口コミを報告する

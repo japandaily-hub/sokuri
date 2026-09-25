@@ -127,6 +127,7 @@ test("運営", async ({ page }) => {
     ["admin-transactions", "/admin/transactions"],
     ["admin-users", "/admin/users"],
     ["admin-contacts", "/admin/contacts"],
+    ["admin-reviews", "/admin/reviews"],
     ["admin-applications", "/admin/operator-applications"],
     ["admin-identity", "/admin/identity-documents"],
   ] as const) {
