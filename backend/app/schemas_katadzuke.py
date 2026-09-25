@@ -158,10 +158,14 @@ class OperatorPublicOut(BaseModel):
 
     id: uuid.UUID
     company_name: str
+    # 非推奨（★平均。評価の2択化後は旧 web 互換のためだけに返す。0042 で削除）。
     rating: float | None
     verified_at: datetime | None
-    # 口コミは常時公開（2026-09-04 決定）。入札一覧で「★平均 (件数)」と抜粋を出す。
+    # 口コミは常時公開（2026-09-04 決定）。入札一覧で評価の件数と抜粋を出す。
     review_count: int = 0
+    # 評価の内訳（よかった／伸びしろ。常に review_count = good_count + improve_count）。
+    good_count: int = 0
+    improve_count: int = 0
     latest_review_comment: str | None = None
 
 
@@ -992,10 +996,24 @@ class ReductionOut(BaseModel):
 
 # ──────────────────────────── レビュー ────────────────────────────
 
+# 評価（"good"＝よかった／"improve"＝伸びしろ。2026-09-25〜）。★との対応表の正本は
+# app/db/models/transaction.py（LEGACY_GOOD_MIN_RATING / COMPAT_RATING_BY_VERDICT）。
+ReviewVerdict = Literal["good", "improve"]
+
 
 class ReviewCreateRequest(BaseModel):
+    """レビュー投稿。評価は verdict（よかった／伸びしろ）で受ける。
+
+    rating（★1〜5）は旧 web との互換のためだけに残す任意項目（0042 で削除）:
+    - verdict も rating も無い → 422
+    - 両方ある → verdict を採用し rating は無視する（保存する rating は互換値）
+    - rating のみ（旧形式）→ 値をそのまま保存し、verdict は★から導く（★4以上＝よかった）
+    """
+
     transaction_id: uuid.UUID
-    rating: int = Field(ge=1, le=5)
+    verdict: ReviewVerdict | None = None
+    # 非推奨（旧形式）。範囲外の値は verdict の有無に関わらず 422 のまま。
+    rating: int | None = Field(default=None, ge=1, le=5)
     # 口コミ本文は無認証の公開プロフィール・業者一覧にそのまま掲載されるため、
     # 他の自由入力（品目名・入札メッセージ・自己紹介文）と同じ無害化を必須にする
     # （NFKC 正規化・制御文字除去・連絡先/URL 拒否。security review H-1 対応）。
@@ -1006,6 +1024,12 @@ class ReviewCreateRequest(BaseModel):
     def _sanitize_comment(cls, v: str | None) -> str | None:
         return _sanitize_free_text(v, max_length=1000, field_label="口コミ")
 
+    @model_validator(mode="after")
+    def _require_verdict_or_rating(self) -> ReviewCreateRequest:
+        if self.verdict is None and self.rating is None:
+            raise ValueError("評価（よかった／伸びしろ）を選んでください。")
+        return self
+
 
 class ReviewOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -1013,6 +1037,9 @@ class ReviewOut(BaseModel):
     id: uuid.UUID
     transaction_id: uuid.UUID
     reviewer_type: str
+    # Review.verdict（ハイブリッド）を読むため、旧コードが書いた verdict 列 NULL の行も非 NULL。
+    verdict: ReviewVerdict
+    # 非推奨（旧形式の★または互換値。0042 で削除）。
     rating: int
     comment: str | None
     created_at: datetime
@@ -1034,6 +1061,8 @@ class PublicReviewOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    verdict: ReviewVerdict
+    # 非推奨（0042 で削除）。
     rating: int
     comment: str | None
     created_at: datetime
@@ -1366,6 +1395,9 @@ class OperatorProfileOut(BaseModel):
     show_message: bool = True
     accept_unsellable: bool = False
     review_count: int = 0
+    # 評価の内訳（よかった／伸びしろ）。rating は非推奨（0042 で削除）。
+    good_count: int = 0
+    improve_count: int = 0
     # 許可証画像のアップロード有無・時刻（BLOB本体は含めない）。
     license_image_uploaded_at: datetime | None = None
 
@@ -1416,8 +1448,11 @@ class OperatorPublicProfileOut(BaseModel):
     business_hours: str | None = None
     intro_message: str | None = None
     accept_unsellable: bool = False
+    # 非推奨（0042 で削除）。
     rating: float | None = None
     review_count: int = 0
+    good_count: int = 0
+    improve_count: int = 0
     reviews: list[PublicReviewOut] = []
 
 
@@ -1430,8 +1465,11 @@ class OperatorPublicListItemOut(BaseModel):
     areas: list[str] = []
     strong_categories: list[str] = []
     accept_unsellable: bool = False
+    # 非推奨（0042 で削除）。
     rating: float | None = None
     review_count: int = 0
+    good_count: int = 0
+    improve_count: int = 0
     latest_review_comment: str | None = None
 
 

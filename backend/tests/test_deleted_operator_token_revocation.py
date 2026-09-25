@@ -294,7 +294,7 @@ async def test_deleted_operator_old_token_is_revoked_on_every_path(
     # 書き込み経路: レビュー投稿も 401 で止まり、行は作られない。
     r = await client.post(
         "/api/v1/reviews",
-        json={"transaction_id": txn_id, "rating": 5},
+        json={"transaction_id": txn_id, "verdict": "good"},
         headers=_auth(op_token),
     )
     _assert_revoked(r, "POST /api/v1/reviews")
@@ -341,7 +341,7 @@ async def test_active_operator_token_keeps_working_on_every_path(
 
     r = await client.post(
         "/api/v1/reviews",
-        json={"transaction_id": txn_id, "rating": 5},
+        json={"transaction_id": txn_id, "verdict": "good"},
         headers=_auth(op_token),
     )
     assert r.status_code == 201, r.text

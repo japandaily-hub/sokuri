@@ -557,7 +557,8 @@ async def hide_review(
 
     口コミは常時公開のため、誹謗中傷・第三者の個人情報・送信防止措置の申出への
     対応経路として用意する（security review H-2）。物理削除はせず hidden_at で
-    論理削除し、公開プロフィール・一覧・集計（rating / review_count / 抜粋）から除外する。
+    論理削除し、公開プロフィール・一覧・集計（good_count / improve_count / review_count・
+    互換の rating / 抜粋）から除外する（再表示で戻す。再計算は services/review_stats.py）。
     """
     review = await session.get(Review, review_id)
     if review is None:

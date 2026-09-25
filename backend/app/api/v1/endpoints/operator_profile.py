@@ -107,6 +107,8 @@ def _to_profile_out(operator: Operator, profile: OperatorProfile) -> OperatorPro
         show_message=profile.show_message,
         accept_unsellable=profile.accept_unsellable,
         review_count=operator.review_count,
+        good_count=operator.good_count,
+        improve_count=operator.improve_count,
         license_image_uploaded_at=operator.license_image_uploaded_at,
     )
 
@@ -224,6 +226,8 @@ async def get_vendor_public_profile(
         accept_unsellable=profile.accept_unsellable,
         rating=operator.rating,
         review_count=operator.review_count,
+        good_count=operator.good_count,
+        improve_count=operator.improve_count,
         reviews=reviews_out,
     )
 
@@ -231,7 +235,10 @@ async def get_vendor_public_profile(
 @router.get(
     "/vendors",
     response_model=list[OperatorPublicListItemOut],
-    summary="業者一覧（承認済み・停止中でない業者。評価の高い順・件数順）",
+    summary=(
+        "業者一覧（承認済み・停止中でない業者。『よかった』の多い順"
+        "（同数なら『伸びしろ』の少ない順、次に登録の古い順））"
+    ),
 )
 async def list_vendors(
     session: AsyncSession = Depends(get_session),
@@ -240,7 +247,10 @@ async def list_vendors(
     _rl: object = Depends(RateLimitGuard("public_read")),
 ) -> list[OperatorPublicListItemOut]:
     """業者一覧。個人情報（連絡先・許可番号）は含めない。
-    並び順は「評価あり→評価の高い順→件数の多い順→登録の古い順」。
+    並び順は「『よかった』の多い順（同数なら『伸びしろ』の少ない順、次に登録の古い順）」
+    （2026-09-25 評価の2択化で★平均順から変更）。最後の id はページ送りの順序を決定的に
+    するための同順位の決着。対象は稼働中の業者のみで件数が小さいため、並び替え用の索引は
+    張らない（絞り込みは vendor_status / is_suspended の既存索引）。
 
     API は無認証（画面側 /vendors は middleware でユーザーログイン必須）。公開情報のみを
     返す前提で、IP 軸のレート制限（public_read）と offset 上限で走査コストを抑える。"""
@@ -255,10 +265,10 @@ async def list_vendors(
                 Operator.deleted_at.is_(None),
             )
             .order_by(
-                Operator.rating.is_(None),
-                Operator.rating.desc(),
-                Operator.review_count.desc(),
+                Operator.good_count.desc(),
+                Operator.improve_count.asc(),
                 Operator.created_at.asc(),
+                Operator.id.asc(),
             )
             .limit(limit)
             .offset(offset)
@@ -274,6 +284,8 @@ async def list_vendors(
             accept_unsellable=bool(profile.accept_unsellable) if profile is not None else False,
             rating=operator.rating,
             review_count=operator.review_count,
+            good_count=operator.good_count,
+            improve_count=operator.improve_count,
             latest_review_comment=operator.latest_review_comment,
         )
         for operator, profile in rows

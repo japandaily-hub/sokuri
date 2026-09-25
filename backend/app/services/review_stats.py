@@ -1,7 +1,9 @@
-"""業者の口コミ集計（operators.rating / review_count / latest_review_comment）の再計算。
+"""業者の口コミ集計（operators.good_count / improve_count / review_count / rating /
+latest_review_comment）の再計算。
 
 reviews.py（投稿時）と admin.py（運営の非表示／再表示時）の両方から呼ぶ単一の正本。
-集計対象は「顧客→業者（reviewer_type="user"）かつ非表示でない」レビューのみ。
+集計対象は「顧客→業者（reviewer_type="user"）かつ非表示でない」レビューのみ
+（alembic 0040 の全業者再計算・0041 の補正も同じ母集団）。不変条件 review_count = good_count + improve_count。
 呼び出し側は対象 operators 行を ``with_for_update`` でロック済みであること
 （同一業者への同時投稿で lost update が起きないようにする。security review M-4）。
 """
@@ -39,11 +41,21 @@ async def recalc_operator_review_stats(session: AsyncSession, operator_id: uuid.
             Review.hidden_at.is_(None),
         )
     )
-    # サブクエリの列を明示的に参照する（Review.rating を外側で参照すると reviews
-    # テーブルが再結合され、非表示・業者→顧客レビューまで平均に混ざる）。
-    visible = base.subquery()
-    avg_rating = await session.scalar(select(func.avg(visible.c.rating)))
-    review_count = await session.scalar(select(func.count()).select_from(visible))
+    # 件数と★平均を1回のクエリで取る。maintain_column_froms=True で元の FROM（reviews）を
+    # 保ったまま列だけ差し替える（base の JOIN・WHERE がそのまま効き、reviews が再結合されて
+    # 非表示・業者→顧客レビューまで混ざることはない）。Review.verdict はハイブリッドの SQL 式
+    # （verdict 列が NULL の旧コード行は★から導く）で数える。
+    good_count, improve_count, avg_rating = (
+        await session.execute(
+            base.with_only_columns(
+                func.count().filter(Review.verdict == "good"),
+                func.count().filter(Review.verdict == "improve"),
+                # 旧 web（P2〜P3 の間）の★表示とロールバック用。rating 撤去の 0042 で止める。
+                func.avg(Review.rating),
+                maintain_column_froms=True,
+            )
+        )
+    ).one()
     latest_comment = await session.scalar(
         base.with_only_columns(Review.comment)
         .where(Review.comment.is_not(None), func.trim(Review.comment) != "")
@@ -51,8 +63,11 @@ async def recalc_operator_review_stats(session: AsyncSession, operator_id: uuid.
         .limit(1)
     )
 
+    operator.good_count = int(good_count or 0)
+    operator.improve_count = int(improve_count or 0)
+    # verdict は good / improve のどちらかに必ず決まるため、合計が公開中の件数そのもの。
+    operator.review_count = operator.good_count + operator.improve_count
     operator.rating = round(float(avg_rating), 2) if avg_rating is not None else None
-    operator.review_count = int(review_count or 0)
     # DB 側の trim は半角スペースのみのため、Python 側で改行・タブも含めて整えて空なら None。
     operator.latest_review_comment = (
         (latest_comment.strip()[:LATEST_COMMENT_MAX_LEN] or None) if latest_comment else None
