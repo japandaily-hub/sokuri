@@ -56,6 +56,7 @@
   /health commit=ab37163、/readyz alembic_version=0020_bid_withdrawal_fk_restrict=expected_head。3環境（Vercel / sokuuri / Render）とも ab37163 で success。
 
 ## 現行ハッシュ
+- **2026-09-25 最新: origin/main = e00e21c（本番反映済み・/readyz 0043・CI 全ジョブ success）。** 下の行は過去の記録。
 - origin/main = 552500f（r4〜r10 push 済み・本番反映済み・/readyz 0032）。
 - main = r6 コミット（f5ffdc5 以降・本ファイル更新のコミットを含む）→ origin より 8 コミット以上先行（**push はユーザー判断＝本番デプロイ。alembic 0026〜0029 を含む**）。
 - **注意: 別 Claude セッションが同じ作業ツリーで「業者の入札取り下げ」を廃止し「依頼者の出品取り下げ（cancel_case）」へ置換中（未コミット）。** 対象: backend bids.py/cases.py/case_lock.py/test_case_cancel.py、web cases/[id]/page.tsx・operator/cases/[id]/page.tsx・operator-shared.css・katadzuke-api.ts。これらは触らないこと。
@@ -108,6 +109,7 @@
 ## 決定ログ
 | 日時 | 何を | なぜ | 結果 |
 | :-- | :-- | :-- | :-- |
+| 2026-09-25 | 招待コード経由の業者も許可証提出＋運営承認まで pending／代金の流れは断定しない（特商法表記含む）／0043 監査 | ユーザー決定（選択式） | 0d6005d・96371e9・e00e21c 本番反映。0043 ログ: 許可証なし active 業者 1 社。PG チェックと E2E シードも承認経由に追従 |
 | 2026-09-03 | 書体を next/font/google で自己ホスト | セキュリティ High（CSP不在で外部CSS読込／訪問者IPの第三者送信） | 外部リクエスト0を実機確認 |
 | 2026-09-03 | 主色を苔色からブルー #1447e0 へ | ユーザー指示 | 成功色 --green は別系統緑で独立。LINE緑は据え置き |
 | 2026-09-03 | Codex 実装の withdraw 機能を Claude 側でレビュー・補強して [claude] コミット | Codex セッションが未コミットのまま終了。AGENTS.md 3 に従い意味単位でコミット | 一意制約・IntegrityError変換・テスト1件追加 |
