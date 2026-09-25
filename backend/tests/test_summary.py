@@ -205,7 +205,9 @@ async def test_photo_url_for_ai_returns_none_when_no_local_file_and_no_raw_url(
 async def test_photo_url_for_ai_encodes_stored_object_as_data_url(monkeypatch):
     """保存済みオブジェクトが取得できた場合、bytes を base64 データURL化して返す。"""
     stored = summary_module.storage.StoredObject(
-        data=b"\xff\xd8\xff\xe0fakejpegbytes", content_type="image/jpeg"
+        # 構造として正しい最小の JPEG（Gemini へ送る前にメタデータ除去を通すため）。
+        data=bytes.fromhex("ffd8ffc0000b080010001001011100ffda0008010100003f0000ffd9"),
+        content_type="image/jpeg",
     )
     monkeypatch.setattr(
         summary_module.storage, "read_bytes", AsyncMock(return_value=stored)

@@ -132,7 +132,11 @@ def _photo(sort_order: int = 0) -> dict:
 def _photo_with_file(tmp_storage, sort_order: int = 0) -> dict:
     """AI解析経路（photo_url_for_ai）が None を返さないよう、実ファイルを書き込む。"""
     key = f"{uuid.uuid4().hex}.jpg"
-    (tmp_storage / key).write_bytes(b"\xff\xd8\xff\xe0fakejpegbytes")
+    # 構造として正しい最小の JPEG。AI 解析へ送る前にメタデータ除去（image_metadata）を通すため、
+    # 先頭のマジックバイトだけの偽データでは解析対象から外れてしまう。
+    (tmp_storage / key).write_bytes(
+        bytes.fromhex("ffd8ffc0000b080010001001011100ffda0008010100003f0000ffd9")
+    )
     return {"storage_key": key, "sort_order": sort_order}
 
 

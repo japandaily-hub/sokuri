@@ -10,10 +10,14 @@ security review 確定指摘（MEDIUM）: 案件写真を EXIF 付きのまま�
 - JPEG の軽微な破損（QA 指摘 M1）: libjpeg（ブラウザ）が警告付きで表示できる EOI の欠落・
   セグメント間の余分なバイト・0xFF00・APPn の長さの過少申告は受け付け、読み飛ばした
   バイトは出力に残らない。SOS より前の途切れ・再同期の上限超過は引き続き例外。
-- 長さを偽ったセグメントが後続の Exif を飲み込んでも、出力へ複製されない。
-- PNG: tEXt / iTXt / zTXt / eXIf / tIME（と許可リスト外の補助チャンク）が消え、他は
-  そのまま、IEND 以降が消える。
-- WebP: EXIF / XMP（と未知のチャンク）が消え、VP8X のフラグが落ち、RIFF サイズが正しい。
+- 長さを偽ったセグメントが後続の Exif を飲み込んでも、出力へ複製されない。ICC・サムネイル
+  付き JFIF の疑いは、捨てるセグメントを挟んでも次に残すセグメントまで持ち越す（L-2）。
+- Exif / XMP の目印は SOS ヘッダの中身と、通し番号順につないだ ICC プロファイル全体でも
+  探す（L-3。チャンク・ヘッダの境目をまたぐものも見逃さない）。
+- PNG: tEXt / iTXt / zTXt / tIME（と許可リスト外の補助チャンク）が消え、他はそのまま、
+  IEND 以降が消える。eXIf は向き（2〜8）だけの最小形として同じ位置に残る（CRC 正）。
+- WebP: XMP（と未知のチャンク）が消え、VP8X のフラグが落ち、RIFF サイズが正しい。EXIF は
+  先頭が VP8X のときだけ向き（2〜8）だけの最小形で残り、EXIF フラグが立ち直る。
 - 細工入力で ImageMetadataError 以外の例外が漏れず、出力は冪等。
 - エンドポイント: アップロード時・配信時（対策以前に保存済みの写真）の両方で除去される。
 
@@ -148,25 +152,31 @@ def _exif_tiff(endian: str, *, orientation: int | None, with_gps: bool = True) -
     return tiff
 
 
-def _minimal_exif(endian: str, orientation: int) -> bytes:
-    """除去後に残るべき最小 Exif APP1。実装を呼ばず、仕様どおりのバイト列を手で組む。"""
+def _minimal_tiff(endian: str, orientation: int) -> bytes:
+    """除去後に残るべき最小 Exif の TIFF 本体（PNG の eXIf・WebP の EXIF のデータそのもの）。
+
+    実装を呼ばず、仕様どおりのバイト列を手で組む。
+    """
     if endian == "<":
-        tiff = (
+        return (
             b"II\x2a\x00\x08\x00\x00\x00"  # バイト順・42・IFD0 オフセット 8
             + b"\x01\x00"  # エントリ数 1
             + b"\x12\x01\x03\x00\x01\x00\x00\x00"  # Orientation・SHORT・個数 1
             + bytes((orientation, 0, 0, 0))  # 値（左詰め）
             + b"\x00\x00\x00\x00"  # 次 IFD なし
         )
-    else:
-        tiff = (
-            b"MM\x00\x2a\x00\x00\x00\x08"
-            + b"\x00\x01"
-            + b"\x01\x12\x00\x03\x00\x00\x00\x01"
-            + bytes((0, orientation, 0, 0))
-            + b"\x00\x00\x00\x00"
-        )
-    return b"\xff\xe1\x00\x22" + b"Exif\x00\x00" + tiff
+    return (
+        b"MM\x00\x2a\x00\x00\x00\x08"
+        + b"\x00\x01"
+        + b"\x01\x12\x00\x03\x00\x00\x00\x01"
+        + bytes((0, orientation, 0, 0))
+        + b"\x00\x00\x00\x00"
+    )
+
+
+def _minimal_exif(endian: str, orientation: int) -> bytes:
+    """除去後に残るべき最小 Exif APP1（JPEG）。"""
+    return b"\xff\xe1\x00\x22" + b"Exif\x00\x00" + _minimal_tiff(endian, orientation)
 
 
 # ──────────────────────────── 合成画像の部品（JPEG） ────────────────────────────
@@ -325,7 +335,10 @@ _CLEAN_PNG = _PNG_SIGNATURE + _IHDR + _IDAT_1 + _IDAT_2 + _IEND
 
 
 def _png_with_metadata(*, trailer: bool = True) -> tuple[bytes, bytes]:
-    """（入力, 期待する出力）の組を返す。"""
+    """（入力, 期待する出力）の組を返す。
+
+    eXIf（Orientation=6・GPS 付き）は、同じ位置の「向きだけの最小 eXIf」に置き直される。
+    """
     srgb, gama, iccp, phys, trns = _PNG_KEPT_ANCILLARY
     original = (
         _PNG_SIGNATURE
@@ -348,8 +361,32 @@ def _png_with_metadata(*, trailer: bool = True) -> tuple[bytes, bytes]:
     )
     if trailer:
         original += b"SENTINEL-PNG-TRAILER" + _png_chunk(b"eXIf", _exif_tiff("<", orientation=1))
-    expected = _PNG_SIGNATURE + _IHDR + srgb + gama + iccp + phys + trns + _IDAT_1 + _IDAT_2 + _IEND
+    expected = (
+        _PNG_SIGNATURE
+        + _IHDR
+        + srgb
+        + gama
+        + iccp
+        + phys
+        + _png_chunk(b"eXIf", _minimal_tiff("<", 6))
+        + trns
+        + _IDAT_1
+        + _IDAT_2
+        + _IEND
+    )
     return original, expected
+
+
+def _png_chunks(data: bytes) -> list[tuple[bytes, bytes, int]]:
+    """PNG を（種別, データ, CRC）の列に分解する（実装を使わないテスト側の読み取り）。"""
+    assert data.startswith(_PNG_SIGNATURE)
+    chunks, pos = [], len(_PNG_SIGNATURE)
+    while pos < len(data):
+        (length,) = struct.unpack_from(">I", data, pos)
+        (crc,) = struct.unpack_from(">I", data, pos + 8 + length)
+        chunks.append((data[pos + 4 : pos + 8], data[pos + 8 : pos + 8 + length], crc))
+        pos += 12 + length
+    return chunks
 
 
 def _webp_chunk(fourcc: bytes, payload: bytes) -> bytes:
@@ -375,7 +412,10 @@ _CLEAN_WEBP = _riff_webp(_WEBP_VP8)
 
 
 def _webp_with_metadata(*, trailer: bool = True) -> tuple[bytes, bytes]:
-    """（入力, 期待する出力）の組を返す。"""
+    """（入力, 期待する出力）の組を返す。
+
+    EXIF（Orientation=6・GPS 付き）は、同じ位置の「向きだけの最小 EXIF」に置き直される。
+    """
     all_flags = _WEBP_FLAG_ICC | _WEBP_FLAG_ALPHA | _WEBP_FLAG_EXIF | _WEBP_FLAG_XMP
     original = _riff_webp(
         _vp8x(all_flags)
@@ -389,7 +429,11 @@ def _webp_with_metadata(*, trailer: bool = True) -> tuple[bytes, bytes]:
     if trailer:
         original += b"SENTINEL-WEBP-TRAILER"
     expected = _riff_webp(
-        _vp8x(_WEBP_FLAG_ICC | _WEBP_FLAG_ALPHA) + _WEBP_ICCP + _WEBP_ALPH + _WEBP_VP8
+        _vp8x(_WEBP_FLAG_ICC | _WEBP_FLAG_ALPHA | _WEBP_FLAG_EXIF)
+        + _WEBP_ICCP
+        + _WEBP_ALPH
+        + _WEBP_VP8
+        + _webp_chunk(b"EXIF", _minimal_tiff("<", 6))
     )
     return original, expected
 
@@ -745,6 +789,60 @@ def test_jpeg_jfif_thumbnail_followed_by_resync_is_dropped():
 
 
 @pytest.mark.parametrize(
+    ("dropped", "rebuilt"),
+    [
+        (_COM, b""),
+        (_APP13_IPTC, b""),
+        (_APP2_MPF, b""),  # ICC でない APP2
+        (b"\xff\x01", b""),  # TEM
+        (b"\xff\xd3", b""),  # RST
+        (b"\xff\xfe\x00\x00", b""),  # 長さ 0 の COM（中身なしとして読み飛ばす）
+        (_seg(0xDC, b"\x00\x10\x00"), b""),  # 長さの違う DNL
+        # 向きだけ作り直した最小の Exif は、元の APP1 を残したものではない。
+        (_EXIF_II_6, _minimal_exif("<", 6)),
+    ],
+    ids=["com", "app13", "app2-mpf", "tem", "rst", "com-length-0", "dnl-bad-length", "exif"],
+)
+def test_jpeg_icc_then_dropped_segment_then_resync_is_dropped(dropped: bytes, rebuilt: bytes):
+    """L-2: ICC の後に捨てるセグメントを挟んでから再同期が起きても、ICC を全部落とす
+    （疑いは次に残すセグメントを処理するまで持ち越す）。"""
+    original = _SOI + _APP2_ICC + dropped + _JUNK + _JPEG_BODY
+    assert strip_image_metadata(original, "jpeg") == _SOI + rebuilt + _JPEG_BODY
+
+
+def test_jpeg_jfif_thumbnail_then_dropped_segment_then_resync_is_trimmed():
+    """L-2: サムネイル付き JFIF の後に捨てるセグメントを挟んだ再同期でも、サムネイルを落とす。"""
+    original = _SOI + _JFIF_WITH_THUMBNAIL + _COM + b"\xff\xd0" + _JUNK + _JPEG_BODY
+    expected = _SOI + _seg(0xE0, _JFIF_WITH_THUMBNAIL[4:18]) + _JPEG_BODY
+    assert strip_image_metadata(original, "jpeg") == expected
+
+
+def test_jpeg_icc_swallowing_bytes_that_look_like_com_is_dropped():
+    """L-2 の実例: 中身が削られた ICC が直後の IPTC の見出し（マーカー・長さ・識別子）を
+    飲み込み、飲み込んだ残りが偶然 COM の形をしていると、再同期はその COM の後ろで起きる。
+    それでも ICC ごと落とし、飲み込んだ IPTC の見出しを出力へ複製しない。"""
+    iptc_identifier = b"Photoshop 3.0\x00"
+    iptc = _seg(0xED, iptc_identifier + b"\xff\xfe\x00\x04zz" + b"8BIM\x04\x04SENTINEL-IPTC")
+    swallowed_size = 4 + len(iptc_identifier)  # IPTC のマーカー・長さ・識別子
+    original = _SOI + _delete_inside(_APP2_ICC, 60, swallowed_size) + iptc + _JPEG_BODY
+
+    stripped = strip_image_metadata(original, "jpeg")
+
+    assert stripped == _SOI + _JPEG_BODY
+    assert b"Photoshop" not in stripped
+    assert b"SENTINEL" not in stripped
+
+
+@pytest.mark.parametrize(
+    "kept_next", [_APP14_ADOBE, _APP0_JFIF, _DQT], ids=["adobe", "jfif", "dqt"]
+)
+def test_jpeg_resync_after_next_kept_segment_keeps_icc(kept_next: bytes):
+    """ICC の疑いは次に残すセグメントで解消し、その後ろの再同期では ICC を落とさない。"""
+    original = _SOI + _APP2_ICC + _COM + kept_next + _JUNK + _JPEG_BODY
+    assert strip_image_metadata(original, "jpeg") == _SOI + _APP2_ICC + kept_next + _JPEG_BODY
+
+
+@pytest.mark.parametrize(
     "broken",
     [
         _SOI + _delete_inside(_JFIF_WITH_THUMBNAIL, 14, 20) + _EXIF_II_6 + _JPEG_BODY,
@@ -776,6 +874,26 @@ def test_jpeg_metadata_absorbed_into_scan_data_raises(broken: bytes):
     （QA の前提「エントロピーデータにメタデータは入り得ない」は壊れたファイルでは崩れる）。"""
     with pytest.raises(ImageMetadataError):
         strip_image_metadata(broken, "jpeg")
+
+
+# 4 成分の SOS ヘッダ（成分数 1・成分指定 8・Ss/Se/AhAl 3 の 12 バイト）は長さの検証を通る。
+@pytest.mark.parametrize(
+    "scan",
+    [
+        _seg(0xDA, b"\x04" + b"II*\x00\x08\x00\x00\x00" + b"\x00\x3f\x00") + _ENTROPY_2,
+        _seg(0xDA, b"\x04" + b"MM\x00*\x00\x00\x00\x08" + b"\x00\x3f\x00") + _ENTROPY_2,
+        # SOS ヘッダの末尾からスキャンデータの先頭へまたがる目印。
+        _seg(0xDA, b"\x04" + b"\x01\x00\x02\x00\x03\x00II" + b"*\x00\x08")
+        + b"\x00\x00\x00"
+        + _ENTROPY_2,
+        _seg(0xDA, b"\x04" + b"http://ns.a") + b"dobe.com/" + _ENTROPY_2,
+    ],
+    ids=["tiff-le-in-header", "tiff-be-in-header", "tiff-across-header", "xmp-across-header"],
+)
+def test_jpeg_metadata_signature_in_scan_header_raises(scan: bytes):
+    """L-3: SOS ヘッダの中身（とスキャンデータとの境目）にある Exif / XMP の目印も例外。"""
+    with pytest.raises(ImageMetadataError, match="画像データの中に"):
+        strip_image_metadata(_SOI + _DQT + _SOF0 + scan + _EOI, "jpeg")
 
 
 @pytest.mark.parametrize(
@@ -826,6 +944,51 @@ def test_jpeg_inconsistent_icc_is_dropped(icc_segments: list[bytes]):
     """整合しない ICC は（ブラウザも使わないため）全チャンクを落とし、画像自体は受け付ける。"""
     original = _SOI + b"".join(icc_segments) + _JPEG_BODY
     assert strip_image_metadata(original, "jpeg") == _SOI + _JPEG_BODY
+
+
+def _icc_profile_with(fragment: bytes, offset: int) -> bytes:
+    """申告長 300 の ICC 本体の ``offset`` バイト目から ``fragment`` を書き込んだもの。"""
+    profile = bytearray(_ICC_PROFILE_300)
+    profile[offset : offset + len(fragment)] = fragment
+    return bytes(profile)
+
+
+_SIGNATURE_FRAGMENTS = pytest.mark.parametrize(
+    "fragment",
+    [b"II*\x00\x08\x00\x00\x00", b"MM\x00*\x00\x00\x00\x08", b"http://ns.adobe.com/"],
+    ids=["tiff-le", "tiff-be", "xmp"],
+)
+
+
+@_SIGNATURE_FRAGMENTS
+@pytest.mark.parametrize("file_order", ["in-order", "reversed"])
+def test_jpeg_icc_signature_across_chunk_boundary_drops_icc(fragment: bytes, file_order: str):
+    """L-3: 分割チャンクの境目をまたぐ Exif / XMP の目印も、デコーダと同じく通し番号順に
+    つないだプロファイル全体で見つけて ICC を全部落とす（ICC の既存方針どおり、写真自体は
+    受け付けて色が sRGB 扱いになるだけ）。ファイル上の並びが逆でも同じ。"""
+    split_at = 200
+    straddling_profile = _icc_profile_with(fragment, split_at - len(fragment) // 2)
+    chunks = _icc_chunks(straddling_profile, [split_at, 100])
+    clean_chunks = _icc_chunks(_ICC_PROFILE_300, [split_at, 100])
+    # 各チャンク単体には目印の全体が入っていない（境目をまたいでいる）。
+    assert all(fragment not in chunk for chunk in chunks)
+    if file_order == "reversed":
+        chunks, clean_chunks = chunks[::-1], clean_chunks[::-1]
+
+    stripped = strip_image_metadata(_SOI + b"".join(chunks) + _JPEG_BODY, "jpeg")
+
+    assert stripped == _SOI + _JPEG_BODY
+    # 目印が無ければ同じ並びのまま残る（落としたのは目印のため）。
+    clean = _SOI + b"".join(clean_chunks) + _JPEG_BODY
+    assert strip_image_metadata(clean, "jpeg") == clean
+
+
+@_SIGNATURE_FRAGMENTS
+def test_jpeg_icc_signature_inside_one_chunk_drops_icc(fragment: bytes):
+    """チャンク 1 個の中に収まる目印も同じく ICC を全部落とす（従来の挙動を固定）。"""
+    chunks = _icc_chunks(_icc_profile_with(fragment, 250), [200, 100])
+    stripped = strip_image_metadata(_SOI + b"".join(chunks) + _JPEG_BODY, "jpeg")
+    assert stripped == _SOI + _JPEG_BODY
 
 
 # ──────────────────────────── JPEG: fail closed ────────────────────────────
@@ -899,8 +1062,11 @@ def test_png_strips_text_exif_time_and_trailer_keeping_other_chunks():
     stripped = strip_image_metadata(original, "png")
 
     assert stripped == expected
-    for chunk_type in (b"tEXt", b"zTXt", b"iTXt", b"eXIf", b"tIME", b"caBX", b"exIf"):
+    for chunk_type in (b"tEXt", b"zTXt", b"iTXt", b"tIME", b"caBX", b"exIf"):
         assert chunk_type not in stripped
+    # eXIf は向き（Orientation=6）だけを持つ最小形 1 個になり、GPS・Make は残らない。
+    exif_chunks = [chunk for chunk in _png_chunks(stripped) if chunk[0] == b"eXIf"]
+    assert [payload for _, payload, _ in exif_chunks] == [_minimal_tiff("<", 6)]
     assert b"SENTINEL" not in stripped
     assert _gps_bytes("<") not in stripped
     assert stripped.endswith(_IEND)
@@ -908,6 +1074,78 @@ def test_png_strips_text_exif_time_and_trailer_keeping_other_chunks():
 
 def test_png_without_metadata_passes_through_unchanged():
     assert strip_image_metadata(_CLEAN_PNG, "png") == _CLEAN_PNG
+
+
+def _png_with_exif(*exif_chunks: bytes) -> bytes:
+    """IHDR の直後に ``exif_chunks`` を置いた PNG（何も渡さなければ _CLEAN_PNG と同じ）。"""
+    return _PNG_SIGNATURE + _IHDR + b"".join(exif_chunks) + _IDAT_1 + _IDAT_2 + _IEND
+
+
+@_ENDIANS
+@pytest.mark.parametrize("orientation", [2, 3, 4, 5, 6, 7, 8])
+def test_png_keeps_rotated_orientation_as_minimal_exif(endian: str, orientation: int):
+    """eXIf の向き（2〜8）は、同じ位置に Orientation だけの最小の eXIf（CRC 正）として残る。"""
+    original = _png_with_exif(_png_chunk(b"eXIf", _exif_tiff(endian, orientation=orientation)))
+    stripped = strip_image_metadata(original, "png")
+
+    assert stripped == _png_with_exif(_png_chunk(b"eXIf", _minimal_tiff(endian, orientation)))
+    exif_chunks = [chunk for chunk in _png_chunks(stripped) if chunk[0] == b"eXIf"]
+    assert len(exif_chunks) == 1
+    _, payload, crc = exif_chunks[0]
+    assert payload == _minimal_tiff(endian, orientation)
+    assert crc == zlib.crc32(b"eXIf" + payload)
+    assert _gps_bytes(endian) not in stripped
+    assert b"SENTINEL" not in stripped
+
+
+@_ENDIANS
+@pytest.mark.parametrize("orientation", [None, 0, 1, 9, 0xFFFF])
+def test_png_drops_exif_entirely_when_orientation_is_upright_or_invalid(
+    endian: str, orientation: int | None
+):
+    original = _png_with_exif(_png_chunk(b"eXIf", _exif_tiff(endian, orientation=orientation)))
+    stripped = strip_image_metadata(original, "png")
+    assert stripped == _CLEAN_PNG
+    assert b"eXIf" not in stripped
+
+
+@pytest.mark.parametrize(
+    "exif_data",
+    [
+        b"",
+        b"II\x2a\x00\x08\x00",  # TIFF ヘッダの途中で切れ
+        b"Exif\x00\x00" + _minimal_tiff("<", 6),  # JPEG の APP1 形式（PNG の eXIf には付けない）
+        b"XX" + _minimal_tiff("<", 6)[2:],  # バイト順が不正
+        _minimal_tiff("<", 6)[:-10],  # エントリの途中で切れ
+    ],
+    ids=["empty", "short-header", "jpeg-style-prefix", "bad-byte-order", "truncated-ifd"],
+)
+def test_png_drops_unreadable_exif_without_error(exif_data: bytes):
+    """読めない eXIf は丸ごと捨てて成功する（向きは正立扱い）。"""
+    original = _png_with_exif(_png_chunk(b"eXIf", exif_data))
+    assert strip_image_metadata(original, "png") == _CLEAN_PNG
+
+
+def test_png_orientation_comes_from_first_exif_only():
+    """eXIf は仕様上 1 個まで（libpng も 2 個目以降を無視する）。2 個目以降は向きがあっても
+    読まずに落とし、最小の eXIf は 1 個目の位置に置く。"""
+    upright_first = _png_with_exif(
+        _png_chunk(b"eXIf", _exif_tiff("<", orientation=None)),
+        _png_chunk(b"eXIf", _exif_tiff("<", orientation=6)),
+    )
+    assert strip_image_metadata(upright_first, "png") == _CLEAN_PNG
+
+    rotated_twice = _png_with_exif(
+        _png_chunk(b"eXIf", _exif_tiff(">", orientation=3)),
+        _png_chunk(b"eXIf", _exif_tiff("<", orientation=6)),
+    )
+    expected = _png_with_exif(_png_chunk(b"eXIf", _minimal_tiff(">", 3)))
+    assert strip_image_metadata(rotated_twice, "png") == expected
+
+    # IDAT の後ろにある eXIf も、その位置のまま置き直す（表示側の扱いを変えない）。
+    after_idat = _CLEAN_PNG[: -len(_IEND)] + _png_chunk(b"eXIf", _exif_tiff("<", orientation=8))
+    expected_after_idat = _CLEAN_PNG[: -len(_IEND)] + _png_chunk(b"eXIf", _minimal_tiff("<", 8))
+    assert strip_image_metadata(after_idat + _IEND, "png") == expected_after_idat + _IEND
 
 
 @pytest.mark.parametrize(
@@ -972,17 +1210,96 @@ def test_webp_strips_exif_xmp_unknown_chunks_and_fixes_header():
     stripped = strip_image_metadata(original, "webp")
 
     assert stripped == expected
-    assert b"EXIF" not in stripped and b"XMP " not in stripped and b"C2PA" not in stripped
+    assert b"XMP " not in stripped and b"C2PA" not in stripped
+    # EXIF は向き（Orientation=6）だけを持つ最小形 1 個になり、GPS・Make は残らない。
+    assert stripped.count(b"EXIF") == 1
+    assert stripped.endswith(_webp_chunk(b"EXIF", _minimal_tiff("<", 6)))
     assert b"SENTINEL" not in stripped
     assert _gps_bytes("<") not in stripped
     (riff_size,) = struct.unpack_from("<I", stripped, 4)
     assert riff_size == len(stripped) - 8
     vp8x_flags = stripped[20]  # RIFF ヘッダ 12 + VP8X チャンクヘッダ 8
-    assert vp8x_flags == _WEBP_FLAG_ICC | _WEBP_FLAG_ALPHA
+    assert vp8x_flags == _WEBP_FLAG_ICC | _WEBP_FLAG_ALPHA | _WEBP_FLAG_EXIF
 
 
 def test_webp_without_metadata_passes_through_unchanged():
     assert strip_image_metadata(_CLEAN_WEBP, "webp") == _CLEAN_WEBP
+
+
+def _webp_exif(endian: str, orientation: int | None) -> bytes:
+    """GPS 付きの EXIF チャンク（データは TIFF ヘッダから始まる）。"""
+    return _webp_chunk(b"EXIF", _exif_tiff(endian, orientation=orientation))
+
+
+@_ENDIANS
+@pytest.mark.parametrize("orientation", [2, 3, 4, 5, 6, 7, 8])
+def test_webp_keeps_rotated_orientation_as_minimal_exif(endian: str, orientation: int):
+    """先頭が VP8X の WebP は、EXIF の向き（2〜8）を同じ位置の最小の EXIF として残し、
+    VP8X の EXIF フラグ（0x08）を立て直す（XMP フラグは落としたまま）。"""
+    xmp = _webp_chunk(b"XMP ", b"<x:xmpmeta>SENTINEL-WEBP-XMP</x:xmpmeta>")
+    original = _riff_webp(
+        _vp8x(_WEBP_FLAG_ALPHA | _WEBP_FLAG_EXIF | _WEBP_FLAG_XMP)
+        + _WEBP_ALPH
+        + _WEBP_VP8
+        + _webp_exif(endian, orientation)
+        + xmp
+    )
+    stripped = strip_image_metadata(original, "webp")
+
+    minimal_exif = _webp_chunk(b"EXIF", _minimal_tiff(endian, orientation))
+    assert len(minimal_exif) == 8 + 26  # 偶数長（パディング不要）
+    assert stripped == _riff_webp(
+        _vp8x(_WEBP_FLAG_ALPHA | _WEBP_FLAG_EXIF) + _WEBP_ALPH + _WEBP_VP8 + minimal_exif
+    )
+    (riff_size,) = struct.unpack_from("<I", stripped, 4)
+    assert riff_size == len(stripped) - 8
+    assert stripped[20] & _WEBP_FLAG_EXIF
+    assert _gps_bytes(endian) not in stripped
+    assert b"SENTINEL" not in stripped
+
+
+@_ENDIANS
+@pytest.mark.parametrize("orientation", [None, 0, 1, 9, 0xFFFF])
+def test_webp_drops_exif_entirely_when_orientation_is_upright_or_invalid(
+    endian: str, orientation: int | None
+):
+    original = _riff_webp(_vp8x(_WEBP_FLAG_EXIF) + _WEBP_VP8 + _webp_exif(endian, orientation))
+    stripped = strip_image_metadata(original, "webp")
+    assert stripped == _riff_webp(_vp8x(0) + _WEBP_VP8)
+    assert b"EXIF" not in stripped
+
+
+@pytest.mark.parametrize(
+    ("body", "expected_body"),
+    [
+        # 単純形式（VP8X なし）: デコーダはメタデータのチャンクを読まない。
+        (_WEBP_VP8 + _webp_exif("<", 6), _WEBP_VP8),
+        # VP8X が先頭にない（拡張形式として扱われない）。
+        (_WEBP_VP8 + _vp8x(_WEBP_FLAG_EXIF) + _webp_exif(">", 6), _WEBP_VP8 + _vp8x(0)),
+    ],
+    ids=["no-vp8x", "vp8x-not-first"],
+)
+def test_webp_without_leading_vp8x_drops_orientation(body: bytes, expected_body: bytes):
+    stripped = strip_image_metadata(_riff_webp(body), "webp")
+    assert stripped == _riff_webp(expected_body)
+    assert b"EXIF" not in stripped
+    (riff_size,) = struct.unpack_from("<I", stripped, 4)
+    assert riff_size == len(stripped) - 8
+
+
+@pytest.mark.parametrize(
+    "exif_chunks",
+    [
+        # EXIF は 1 個まで（コンテナ仕様: 読み手は 2 個目以降を無視してよい）。
+        _webp_exif("<", None) + _webp_exif("<", 6),
+        # JPEG の APP1 形式（"Exif\0\0" 付き）は TIFF として読めないため捨てる。
+        _webp_chunk(b"EXIF", b"Exif\x00\x00" + _minimal_tiff("<", 6)),
+    ],
+    ids=["second-exif-ignored", "jpeg-style-prefix"],
+)
+def test_webp_drops_exif_without_readable_orientation_in_first_chunk(exif_chunks: bytes):
+    original = _riff_webp(_vp8x(_WEBP_FLAG_EXIF) + _WEBP_VP8 + exif_chunks)
+    assert strip_image_metadata(original, "webp") == _riff_webp(_vp8x(0) + _WEBP_VP8)
 
 
 def test_webp_accepts_missing_final_padding_and_normalizes_it():
@@ -1075,6 +1392,24 @@ def test_mutated_inputs_only_raise_image_metadata_error(ext: str):
             assert stripped.endswith(_EOI)
             assert b"SENTINEL" not in stripped
             assert _gps_bytes("<") not in stripped
+
+
+@pytest.mark.parametrize(
+    "swallowed",
+    [
+        # IFD0 のオフセットが 8 以外の Exif（TIFF ヘッダの目印には一致しない）。
+        b"Exif\x00\x00II*\x00\x10\x00\x00\x00" + bytes(8) + b"GPS-FRAGMENT",
+        # 市区町村名などを持つ IPTC（APP13）。
+        b"Photoshop 3.0\x008BIM\x04\x04\x00\x00\x00\x00\x00\x12CITY-FRAGMENT",
+    ],
+    ids=["exif_ifd0_offset_16", "photoshop_iptc"],
+)
+def test_signature_check_detects_swallowed_exif_and_iptc_identifiers(swallowed: bytes):
+    """壊れたファイルでスキャンデータに吸収された Exif（IFD0 オフセットを問わない）・IPTC の
+    識別子も目印として検出し、除去を保証できないものとして拒否する（security review Low）。"""
+    data = _SOI + _APP0_JFIF + _DQT + _SOF0 + _SOS_1 + b"\x12\x34" + swallowed + _EOI
+    with pytest.raises(ImageMetadataError):
+        strip_image_metadata(data, "jpeg")
 
 
 def test_orientation_probe_is_bounded_for_many_huge_exif_segments(monkeypatch):

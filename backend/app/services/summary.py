@@ -15,6 +15,7 @@ from dataclasses import dataclass
 
 from app.db.models.enums import ItemCondition
 from app.services import storage
+from app.services.image_metadata import ImageMetadataError, strip_image_metadata
 from app.services.storage import StorageUnavailableError
 from app.services.text_sanitize import normalize_and_strip_control_chars
 from app.services.vision import analyze_image
@@ -155,8 +156,8 @@ async def generate_case_summary(
 def _encode_data_url(data: bytes, content_type: str) -> str:
     """bytes を base64 データ URL 文字列へ組み立てる（同期・CPUバウンド）。
 
-    ``photo_url_for_ai`` から ``asyncio.to_thread`` 経由でのみ呼び出すこと
-    （イベントループを塞がないため）。
+    ``_sanitized_data_url``（``photo_url_for_ai`` から ``asyncio.to_thread`` 経由）
+    からのみ呼び出すこと（イベントループを塞がないため）。
     """
     import base64
 
@@ -164,8 +165,37 @@ def _encode_data_url(data: bytes, content_type: str) -> str:
     return f"data:{content_type};base64,{encoded}"
 
 
+def _sanitized_data_url(data: bytes, content_type: str) -> str:
+    """位置情報等のメタデータを除いた画像を base64 データ URL にする（同期・CPUバウンド）。
+
+    受信時の除去（case_photos.upload）より前に保存された写真は Exif の GPS 等を
+    含みうるため、Gemini（外部の AI サービス）へ送る直前にも配信時
+    （case_photos.serve_file）と同じ除去を通す。形式は storage_key の拡張子や
+    content_type ではなく実バイトのシグネチャで決める（serve_file と同じ）。
+    ``photo_url_for_ai`` から ``asyncio.to_thread`` 経由でのみ呼び出すこと（除去と
+    base64 化を 1 回のスレッド移譲でまとめて行い、イベントループを塞がない）。
+
+    データ URL の MIME も実バイトから判定した形式で決める。web は形式を判定できない写真を
+    image/jpeg として presign するため、保存時の content_type は実体（PNG / WebP）と
+    食い違うことがある（security review Low。判定できない形式が来た場合だけ保存時の値を使う）。
+
+    Raises:
+        ImageMetadataError: JPEG / PNG / WebP として解釈できず、除去を保証できない
+            （呼び出し元は元のバイト列へフォールバックせず、当該写真を解析対象から外す）。
+    """
+    image_ext = storage.sniff_image_ext(data)
+    if image_ext is None:
+        raise ImageMetadataError("JPEG / PNG / WebP のシグネチャではありません")
+    mime_type = _IMAGE_MIME_BY_EXT.get(image_ext, content_type)
+    return _encode_data_url(strip_image_metadata(data, image_ext), mime_type)
+
+
+# sniff_image_ext の戻り値 → データ URL の MIME。
+_IMAGE_MIME_BY_EXT = {"jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp"}
+
+
 async def photo_url_for_ai(storage_key: str, raw_url: str | None) -> str | None:
-    """AI に渡す画像参照を決める。保存済み写真は base64 データ URL 化する。
+    """AI に渡す画像参照を決める。保存済み写真はメタデータを除いて base64 データ URL 化する。
 
     R2 移行後も data URL 経由のまま（変更なし）。R2/ローカルいずれの
     バックエンドでも、取得した bytes を base64 化して Gemini に渡す方式は
@@ -177,6 +207,12 @@ async def photo_url_for_ai(storage_key: str, raw_url: str | None) -> str | None:
     スレッドへ逃がし、イベントループをブロックしない（security review 指摘
     対応。呼び出し元は「実際に解析対象となる写真のみ」このタイミングで遅延
     呼び出しすること。全写真を先行してbase64化しない）。
+
+    位置情報（EXIF の GPS 等）を含むメタデータは、base64 化と同じスレッド上で
+    ``strip_image_metadata`` により除去してから送る（2026-09-25 セキュリティ
+    レビューの残り: 対策前に保存された写真が GPS 付きのまま Gemini へ送られて
+    いた）。除去できない写真（壊れた画像・画像でないもの）は元のバイト列を送らず、
+    当該写真だけを AI 解析から除外する（warning ログ。案件作成は継続）。
     """
     try:
         obj = await storage.read_bytes(storage_key)
@@ -190,7 +226,19 @@ async def photo_url_for_ai(storage_key: str, raw_url: str | None) -> str | None:
         )
         obj = None
     if obj is not None:
-        return await asyncio.to_thread(_encode_data_url, obj.data, obj.content_type)
+        try:
+            return await asyncio.to_thread(_sanitized_data_url, obj.data, obj.content_type)
+        except ImageMetadataError as exc:
+            # 例外のメッセージは構造上の理由だけで、画像のバイト列は含まない
+            # （image_metadata.ImageMetadataError の契約）。
+            logger.warning(
+                "photo_url_for_ai: storage_key=%s の画像からメタデータ（位置情報等）を"
+                "除去できないため、当該写真をAI解析から除外します - %s: %s",
+                storage.mask_key_for_log(storage_key),
+                type(exc).__name__,
+                str(exc)[:200],
+            )
+            return None
     if raw_url and raw_url.startswith("https://"):
         # R3再レビュー Medium対応: vision.analyze_image は security review N-7
         # 対応（SSRF対策）により https:// URL の受け付けを全面撤廃済みのため、
