@@ -22,11 +22,11 @@ class Operator(Base, TimestampMixin):
     license_number: Mapped[Optional[str]] = mapped_column(String(128))
     contact_email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-    # ★平均（旧形式）。評価の2択化（alembic 0040）後は旧 web 互換とロールバック用にだけ
-    # 更新し続ける（0042 の contract で撤去予定）。
+    # ★平均（旧形式）。撤去済み（alembic 0042・評価の2択化の完了）: DB 列は残置し、アプリは
+    # 読まず更新しない（operator_profiles の is_public 等と同じ流儀）。
     rating: Mapped[Optional[float]] = mapped_column(Float)
-    # 顧客→業者レビューの集計（reviews.py で投稿時に再計算する非正規化列）。
-    # rating と同じ扱いで、入札一覧・業者一覧の表示用。
+    # 顧客→業者レビューの件数（reviews.py・admin.py が投稿・非表示の時に再計算する非正規化列）。
+    # 入札一覧・業者一覧の表示用。
     review_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     # 評価の内訳（よかった／伸びしろ。alembic 0040）。review_count と同じ母集団
     # （顧客→業者・非表示を除く）で、常に review_count = good_count + improve_count。

@@ -24,6 +24,11 @@ MAX_PHOTOS_PER_CASE = 150
 # 上限を変えた瞬間に画面と API が食い違う）。r10 V-M4 対応。
 MAX_REDUCTION_REQUESTS_PER_TRANSACTION = 2
 
+# 口コミ（レビューのコメント）の上限文字数。web の入力欄（web/src/lib/review-verdict.ts の
+# REVIEW_COMMENT_MAX）と同じ値にする。schemas_katadzuke.ReviewCreateRequest の Field と
+# 無害化（_sanitize_free_text）の両方がここを参照する（2026-09-25 に 1000 → 300。alembic 0042 の段B）。
+REVIEW_COMMENT_MAX_LENGTH = 300
+
 # 自社入札の引き上げ（PATCH /cases/{case_id}/bids/me）に必要な最小引き上げ幅（円）。
 # web 側の入力刻みと一致させる。1円単位の無意味な引き上げ連打（通知の増幅・
 # bid_amount_history の膨張）を防ぐ（security review 指摘対応）。

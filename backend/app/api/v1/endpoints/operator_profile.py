@@ -1,6 +1,6 @@
 """業者プロフィール — 自社編集（/operator/profile）と公開参照（/vendors/{operator_id}）。
 
-審査確定項目（company_name, license_number, verified_at, vendor_status, rating等）は
+審査確定項目（company_name, license_number, verified_at, vendor_status 等）は
 Operator 本体でのみ管理し、本エンドポイントの PUT では更新できない。
 編集可能項目（areas, categories, strong_categories, staff_count, business_hours,
 intro_message, show_message, accept_unsellable）
@@ -97,7 +97,6 @@ def _to_profile_out(operator: Operator, profile: OperatorProfile) -> OperatorPro
         license_number=operator.license_number,
         verified_at=operator.verified_at,
         vendor_status=operator.vendor_status,
-        rating=operator.rating,
         areas=profile.areas or [],
         categories=profile.categories or [],
         strong_categories=profile.strong_categories or [],
@@ -224,7 +223,6 @@ async def get_vendor_public_profile(
         business_hours=profile.business_hours,
         intro_message=profile.intro_message if profile.show_message else None,
         accept_unsellable=profile.accept_unsellable,
-        rating=operator.rating,
         review_count=operator.review_count,
         good_count=operator.good_count,
         improve_count=operator.improve_count,
@@ -282,7 +280,6 @@ async def list_vendors(
             areas=(profile.areas if profile is not None else None) or [],
             strong_categories=(profile.strong_categories if profile is not None else None) or [],
             accept_unsellable=bool(profile.accept_unsellable) if profile is not None else False,
-            rating=operator.rating,
             review_count=operator.review_count,
             good_count=operator.good_count,
             improve_count=operator.improve_count,

@@ -1,13 +1,14 @@
 """レビューエンドポイント — 成約完了後の双方向評価。
 
 reviewer_type はトークン種別から導出する（クライアント指定を信用しない）。
-評価は verdict（よかった／伸びしろ）。旧形式（rating のみ）も 0042 までは受け付ける
-（入力規則は schemas_katadzuke.ReviewCreateRequest）。
+評価は verdict（よかった／伸びしろ）のみ（旧形式の★は alembic 0042 で撤去済みで、rating は
+保存しない。入力規則は schemas_katadzuke.ReviewCreateRequest）。
 ユーザー → 業者のレビュー投稿時は operators の集計列（good_count / improve_count /
 review_count ほか）を再計算する。
 当事者性と状態はロック前にロック無しで確かめ（第三者は行ロックを取れない）、同じ取引への
 同時投稿は Case → Transaction の行ロックで直列化する。それでも一意制約に当たった場合
-（ロックを取らない旧コードとの重なり等）は 409 にする。
+（ロックを取らない旧コードとの重なり等）は 409 にし、それ以外の整合性違反（NOT NULL・CHECK 等）は
+障害として 500 にする。
 """
 
 from __future__ import annotations
@@ -24,12 +25,7 @@ from sqlalchemy.orm import selectinload
 from app.api.deps import Actor, get_current_actor
 from app.db.models.bid import Bid
 from app.db.models.case import Case
-from app.db.models.transaction import (
-    COMPAT_RATING_BY_VERDICT,
-    Review,
-    Transaction,
-    verdict_from_rating,
-)
+from app.db.models.transaction import Review, Transaction
 from app.db.session import get_session
 from app.schemas_katadzuke import ReviewCreateRequest, ReviewOut
 from app.services.case_lock import lock_transaction_rows
@@ -38,6 +34,37 @@ from app.services.review_stats import recalc_operator_review_stats
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+# 同一取引・同一投稿者は1件（uq_reviews_transaction_reviewer）。この一意制約の違反だけを 409 にする。
+_DUPLICATE_REVIEW_CONSTRAINT = "uq_reviews_transaction_reviewer"
+_PG_UNIQUE_VIOLATION = "23505"
+# SQLite（テスト）は sqlstate も制約名も返さないため、一意制約の列の組を含む文言で判別する。
+_SQLITE_DUPLICATE_REVIEW_MESSAGE = (
+    "UNIQUE constraint failed: reviews.transaction_id, reviews.reviewer_type"
+)
+
+
+def _classify_integrity_error(exc: IntegrityError) -> tuple[bool, str | None, str | None]:
+    """IntegrityError を (uq_reviews_transaction_reviewer の違反か, sqlstate, 制約名) に分類する。
+
+    PostgreSQL（asyncpg）: SQLAlchemy の asyncpg アダプタ（sqlalchemy/dialects/postgresql/asyncpg.py の
+    AsyncAdapt_asyncpg_connection._handle_exception）は、元の asyncpg 例外を ``raise … from error`` で
+    __cause__ に付け、その sqlstate を orig の pgcode / sqlstate に写す。制約名は元の例外の
+    constraint_name（asyncpg がサーバの 'n' フィールドを入れる）。一意制約違反は sqlstate 23505。
+    SQLite: sqlstate が無いため、エラー文言（sqlite3 の例外は SQL・パラメータを含まない）で判別する。
+    例外の文字列全体（SQLAlchemy の例外は SQL とパラメータ＝口コミ本文を含む）はログに出さないこと。
+    """
+    orig = exc.orig
+    sqlstate = getattr(orig, "sqlstate", None) or getattr(orig, "pgcode", None)
+    constraint = getattr(getattr(orig, "__cause__", None), "constraint_name", None)
+    if sqlstate is not None:
+        is_duplicate = (
+            sqlstate == _PG_UNIQUE_VIOLATION and constraint == _DUPLICATE_REVIEW_CONSTRAINT
+        )
+    else:
+        is_duplicate = _SQLITE_DUPLICATE_REVIEW_MESSAGE in str(orig)
+    return is_duplicate, sqlstate, constraint
 
 
 def _reviewer_type_if_allowed(
@@ -148,63 +175,58 @@ async def create_review(
             status_code=status.HTTP_409_CONFLICT, detail="既にレビュー投稿済みです。"
         )
 
-    # 入力規則: verdict を優先し、保存する rating は互換値（good=5／improve=2）。
-    # rating のみの旧形式は値をそのまま保存し、verdict は★から導く（★4以上＝よかった）。
-    if body.verdict is not None:
-        verdict = body.verdict
-        rating = COMPAT_RATING_BY_VERDICT[verdict]
-    elif body.rating is not None:
-        rating = body.rating
-        verdict = verdict_from_rating(rating)
-        # 旧 web からの投稿がまだ届いているかの証跡。0042（rating の削除）の実施時期は、
-        # このログが出なくなったことを Render のログで確かめてから決める。
-        logger.info(
-            "review_legacy_rating_payload transaction=%s reviewer_type=%s rating=%s",
-            txn.id,
-            reviewer_type,
-            rating,
-        )
-    else:
-        # ReviewCreateRequest の model_validator が先に 422 を返すため通常は到達しない。
-        # assert は python -O で消えるため、検証が外れても素通りさせない明示の分岐にする。
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="評価（よかった／伸びしろ）を選んでください。",
-        )
-
+    # rating（旧形式の★）は alembic 0042 で撤去済みのため書かない（列は NULL のまま）。
     review = Review(
         transaction_id=txn.id,
         reviewer_type=reviewer_type,
-        verdict=verdict,
-        rating=rating,
+        verdict=body.verdict,
         comment=body.comment,
     )
     session.add(review)
-    # flush・集計・commit のどこで一意制約違反が出ても 409 にする。ロックを取らない書き手
-    # （デプロイ切替中の旧コード等）と重なった後発は INSERT＝flush の時点で
-    # uq_reviews_transaction_reviewer に当たる（従来は try が commit だけを囲み 500 だった）。
+    # flush・集計・commit のどこで起きた IntegrityError も下の except で捕まえ、一意制約
+    # uq_reviews_transaction_reviewer の違反だけを 409 にする。ロックを取らない書き手（デプロイ切替中の
+    # 旧コード等）と重なった後発は INSERT＝flush の時点でこの制約に当たる（従来は try が commit だけを
+    # 囲み 500 だった）。
     try:
         await session.flush()
         # ユーザー → 業者評価なら operators の集計列（good_count / improve_count / review_count /
-        # 互換の rating / latest_review_comment）を再計算する（正本は services/review_stats.py。
+        # latest_review_comment）を再計算する（正本は services/review_stats.py。
         # 対象 operators 行を排他ロックしてから集計するため同時投稿でもずれない）。
         if reviewer_type == "user":
             await recalc_operator_review_stats(session, txn.bid.operator_id)
         await session.commit()
     except IntegrityError as exc:
-        # uq_reviews_transaction_reviewer（同一取引・同一投稿者は1件）。アプリ層の
-        # 重複チェックをすり抜けた二重送信は 500 ではなく 409 にする（security review L-3）。
         await session.rollback()
-        # rollback 後は ORM 属性が失効するため、リクエスト値とローカル変数だけを記録する。
-        # 例外本文は SQL のパラメータ（口コミ本文）を含みうるため出さず、ドライバの例外名に留める。
-        logger.warning(
-            "review_create_conflict transaction=%s reviewer_type=%s error=%s",
+        # rollback 後は ORM 属性が失効するため、リクエスト値とローカル変数だけを記録する。例外の
+        # 文字列は SQL のパラメータ（口コミ本文）を含むため出さず、型名・sqlstate・制約名に留める。
+        is_duplicate, sqlstate, constraint = _classify_integrity_error(exc)
+        if is_duplicate:
+            # uq_reviews_transaction_reviewer（同一取引・同一投稿者は1件）。アプリ層の重複チェックを
+            # すり抜けた二重送信は 500 ではなく 409 にする（security review L-3）。
+            logger.warning(
+                "review_create_conflict transaction=%s reviewer_type=%s error=%s",
+                body.transaction_id,
+                reviewer_type,
+                type(exc.orig).__name__,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="既にレビュー投稿済みです。"
+            ) from None
+        # それ以外（NOT NULL・CHECK 違反等。例: 段B のコードが 0041 のスキーマで動いた）は障害なので
+        # 409 に偽装せず 500 にし、5xx 監視（alert_middleware の 5xx 集計）に載せる（0042 review M-1）。
+        # 例外を送出し直さないのは、未処理例外のアラート本文が str(exc)（SQL とパラメータ）を含むため。
+        logger.error(
+            "review_create_integrity_error transaction=%s reviewer_type=%s error=%s"
+            " sqlstate=%s constraint=%s",
             body.transaction_id,
             reviewer_type,
             type(exc.orig).__name__,
+            sqlstate,
+            constraint,
         )
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="既にレビュー投稿済みです。"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="評価の保存に失敗しました。時間をおいて再度お試しください。",
         ) from None
     await session.refresh(review)
     return ReviewOut.model_validate(review)

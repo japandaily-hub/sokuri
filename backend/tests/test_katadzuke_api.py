@@ -569,9 +569,9 @@ async def test_full_flow_bid_select_reduction_complete_review(
     )
     assert r.status_code == 201
 
-    r = await client.get("/api/v1/admin/operators", headers=_auth(admin_token))
-    op1 = next(o for o in r.json()["items"] if o["id"] == op1_id)
-    assert op1["rating"] == 5.0
+    # 依頼者→業者の評価だけが業者の件数に入る（業者→依頼者の評価は数えない）。
+    r = await client.get(f"/api/v1/vendors/{op1_id}")
+    assert (r.json()["good_count"], r.json()["improve_count"], r.json()["review_count"]) == (1, 0, 1)
 
 
 # ──────────────────────────── 入札メッセージ: 連絡先/URLガード ────────────────────────────
@@ -2507,8 +2507,6 @@ async def test_review_updates_operator_review_stats_and_bid_summary(
     r = await client.get(f"/api/v1/vendors/{op_id}")
     assert r.status_code == 200
     data = r.json()
-    # rating は非推奨の互換値（good=5）の平均（0042 で削除）。件数の内訳は good / improve。
-    assert data["rating"] == 5.0
     assert (data["good_count"], data["improve_count"], data["review_count"]) == (1, 0, 1)
     assert len(data["reviews"]) == 1
 
@@ -2545,14 +2543,12 @@ async def test_review_updates_operator_review_stats_and_bid_summary(
     r = await client.get(f"/api/v1/vendors/{op_id}")
     assert r.json()["reviews"] == []
     assert (r.json()["good_count"], r.json()["improve_count"], r.json()["review_count"]) == (0, 0, 0)
-    assert r.json()["rating"] is None
     r = await client.patch(
         f"/api/v1/admin/reviews/{review_id}/hide", json={"hidden": False}, headers=_auth(admin_token)
     )
     assert r.status_code == 200
     r = await client.get(f"/api/v1/vendors/{op_id}")
     assert (r.json()["good_count"], r.json()["improve_count"], r.json()["review_count"]) == (1, 0, 1)
-    assert r.json()["rating"] == 5.0
     # 一般ユーザーは非表示操作できない
     r = await client.patch(
         f"/api/v1/admin/reviews/{review_id}/hide", json={"hidden": True}, headers=_auth(user_token)
@@ -2593,6 +2589,7 @@ async def test_review_comment_rejects_contact_info_and_profile_lists_reject_urls
 
 
 # ──────────────────────────── 評価の2択化（よかった／伸びしろ・2026-09-25） ────────────────────────────
+# ★（rating）は alembic 0042 で撤去済み（入力・応答・集計に無い。DB 列は残置し書き込まない）。
 
 _REVIEWS_LOGGER = "app.api.v1.endpoints.reviews"
 
@@ -2623,7 +2620,7 @@ async def _post_review(client: AsyncClient, token: str, payload: dict) -> dict:
 
 
 def _review_logs(caplog, prefix: str) -> list[str]:
-    """reviews.py のログのうち、指定の接頭辞で始まるもの（旧形式の証跡・競合の記録）。"""
+    """reviews.py のログのうち、指定の接頭辞で始まるもの（競合の記録など）。"""
     return [
         r.getMessage()
         for r in caplog.records
@@ -2631,26 +2628,26 @@ def _review_logs(caplog, prefix: str) -> list[str]:
     ]
 
 
-async def test_review_verdict_saves_compat_rating_and_counts_on_every_operator_output(
+async def test_review_verdict_saves_without_rating_and_counts_on_every_operator_output(
     client: AsyncClient, db_session: AsyncSession
 ):
-    """T1: verdict で投稿 → 201・ReviewOut.verdict・保存する rating は互換値（good=5／improve=2）。
+    """T1: verdict で投稿 → 201・ReviewOut.verdict。★（rating）は保存しない（NULL）。
     業者の件数は公開プロフィール・自社プロフィール・業者一覧・入札一覧に同じ値で載る。"""
     admin_token = await _make_admin(client, db_session)
     user_token = await _signup_user(client, "verdict_t1_user@example.com")
     op_token, op_id = await _verified_operator(
         client, db_session, admin_token, "verdict_t1_op@example.com", "評価株式会社"
     )
-    for verdict, compat_rating in (("good", 5), ("improve", 2)):
+    for verdict in ("good", "improve"):
         txn_id = await _completed_transaction(client, user_token, op_token)
         body = await _post_review(client, user_token, {"transaction_id": txn_id, "verdict": verdict})
-        assert (body["verdict"], body["rating"]) == (verdict, compat_rating)
+        assert body["verdict"] == verdict and "rating" not in body
         stored = (
             await db_session.execute(
-                select(Review._verdict, Review.rating).where(Review.id == uuid.UUID(body["id"]))
+                select(Review.verdict, Review.rating).where(Review.id == uuid.UUID(body["id"]))
             )
         ).one()
-        assert tuple(stored) == (verdict, compat_rating)
+        assert tuple(stored) == (verdict, None)
 
     assert await _public_verdict_counts(client, op_id) == (1, 1, 2)
     r = await client.get("/api/v1/operator/profile", headers=_auth(op_token))
@@ -2666,43 +2663,34 @@ async def test_review_verdict_saves_compat_rating_and_counts_on_every_operator_o
     assert _verdict_counts(r.json()[0]["operator"]) == (1, 1, 2)
 
 
-@pytest.mark.parametrize(
-    ("legacy_rating", "expected_verdict", "expected_counts"),
-    [(4, "good", (1, 0, 1)), (3, "improve", (0, 1, 1)), (1, "improve", (0, 1, 1))],
-)
-async def test_review_legacy_rating_only_payload_derives_verdict(
-    client: AsyncClient,
-    db_session: AsyncSession,
-    caplog,
-    legacy_rating: int,
-    expected_verdict: str,
-    expected_counts: tuple[int, int, int],
+@pytest.mark.parametrize("reviewer", ["user", "operator"])
+async def test_review_rating_only_payload_is_rejected_because_verdict_is_required(
+    client: AsyncClient, db_session: AsyncSession, reviewer: str
 ):
-    """T2: 旧形式（rating のみ）は 0042 まで受け付ける（P2 デプロイ後も開いたままの旧 web から
-    届く）。★4以上→good、★3以下→improve。rating は受け取った値のまま保存する。
-    0042 の実施時期を決める証跡として review_legacy_rating_payload の INFO が1件出る。"""
-    caplog.set_level(logging.INFO, logger=_REVIEWS_LOGGER)
+    """T2: 旧形式（★の rating だけ）の投稿は、★の撤去（alembic 0042）後は verdict が無いため 422。
+    依頼者・業者のどちらからでも同じで、行は作られず、その後の verdict での投稿は通る。"""
     admin_token = await _make_admin(client, db_session)
     user_token = await _signup_user(client, "verdict_t2_user@example.com")
-    op_token, op_id = await _verified_operator(
+    op_token, _ = await _verified_operator(
         client, db_session, admin_token, "verdict_t2_op@example.com"
     )
     txn_id = await _completed_transaction(client, user_token, op_token)
-    body = await _post_review(client, user_token, {"transaction_id": txn_id, "rating": legacy_rating})
-    assert (body["verdict"], body["rating"]) == (expected_verdict, legacy_rating)
-    assert _review_logs(caplog, "review_legacy_rating_payload") == [
-        f"review_legacy_rating_payload transaction={txn_id} reviewer_type=user rating={legacy_rating}"
-    ]
-    assert await _public_verdict_counts(client, op_id) == expected_counts
+    token = user_token if reviewer == "user" else op_token
+
+    r = await client.post(
+        "/api/v1/reviews", json={"transaction_id": txn_id, "rating": 5}, headers=_auth(token)
+    )
+    assert r.status_code == 422, r.text
+    assert any(err["loc"][-1] == "verdict" for err in r.json()["detail"])
+    body = await _post_review(client, token, {"transaction_id": txn_id, "verdict": "good"})
+    assert body["reviewer_type"] == reviewer
 
 
-async def test_review_verdict_precedence_and_invalid_payloads(
-    client: AsyncClient, db_session: AsyncSession, caplog
+async def test_review_invalid_verdict_is_rejected_and_stray_rating_is_ignored(
+    client: AsyncClient, db_session: AsyncSession
 ):
-    """T3: verdict と rating の両方 → verdict を採用し、rating は送られた★ではなく互換値で保存する。
-    どちらも無い・未知の verdict・範囲外の rating（verdict があっても黙って捨てない）は 422 で、
-    行は作られない（後続の正常投稿が 409 にならない）。verdict のある投稿は旧形式の証跡に数えない。"""
-    caplog.set_level(logging.INFO, logger=_REVIEWS_LOGGER)
+    """T3: verdict が無い・未知の値は 422 で、行は作られない（後続の正常投稿が 409 にならない）。
+    rating を併せて送られても保存しない（★は撤去済み。入力モデルに無い項目として無視する）。"""
     admin_token = await _make_admin(client, db_session)
     user_token = await _signup_user(client, "verdict_t3_user@example.com")
     op_token, _ = await _verified_operator(
@@ -2710,14 +2698,11 @@ async def test_review_verdict_precedence_and_invalid_payloads(
     )
     txn_id = await _completed_transaction(client, user_token, op_token)
 
-    r = await client.post("/api/v1/reviews", json={"transaction_id": txn_id}, headers=_auth(user_token))
-    assert r.status_code == 422, r.text
-    assert any("評価（よかった／伸びしろ）を選んでください。" in err["msg"] for err in r.json()["detail"])
     for bad_payload in (
+        {"transaction_id": txn_id},
         {"transaction_id": txn_id, "verdict": "bad"},
         {"transaction_id": txn_id, "verdict": "GOOD"},
         {"transaction_id": txn_id, "verdict": None},
-        {"transaction_id": txn_id, "verdict": "good", "rating": 9},
     ):
         r = await client.post("/api/v1/reviews", json=bad_payload, headers=_auth(user_token))
         assert r.status_code == 422, (bad_payload, r.text)
@@ -2725,44 +2710,38 @@ async def test_review_verdict_precedence_and_invalid_payloads(
     body = await _post_review(
         client, user_token, {"transaction_id": txn_id, "verdict": "improve", "rating": 5}
     )
-    assert (body["verdict"], body["rating"]) == ("improve", 2)
-    assert _review_logs(caplog, "review_legacy_rating_payload") == []
+    assert body["verdict"] == "improve" and "rating" not in body
+    stored_rating = await db_session.scalar(
+        select(Review.rating).where(Review.id == uuid.UUID(body["id"]))
+    )
+    assert stored_rating is None
 
 
-async def test_create_review_rejects_payload_bypassing_validator_with_explicit_422(
+async def test_review_comment_limit_is_300_characters(
     client: AsyncClient, db_session: AsyncSession
 ):
-    """ReviewCreateRequest の model_validator を迂回した入力（verdict も rating も無い）でも、
-    create_review は素通りせず明示の 422 を返し、行を作らない（assert は python -O で消えるため
-    設けた防御分岐の固定）。model_construct は検証を実行しない。"""
-    from fastapi import HTTPException
-    from sqlalchemy import func
+    """口コミの上限は 300 字（web の REVIEW_COMMENT_MAX と同じ値。app/core/limits.py が唯一の定義）。
+    ちょうど 300 字は通り、301 字は 422。"""
+    from app.core.limits import REVIEW_COMMENT_MAX_LENGTH
 
-    from app.api.deps import Actor
-    from app.api.v1.endpoints.reviews import create_review
-    from app.schemas_katadzuke import ReviewCreateRequest
-
+    assert REVIEW_COMMENT_MAX_LENGTH == 300
     admin_token = await _make_admin(client, db_session)
-    user_token = await _signup_user(client, "verdict_guard_user@example.com")
+    user_token = await _signup_user(client, "verdict_limit_user@example.com")
     op_token, _ = await _verified_operator(
-        client, db_session, admin_token, "verdict_guard_op@example.com"
+        client, db_session, admin_token, "verdict_limit_op@example.com"
     )
     txn_id = await _completed_transaction(client, user_token, op_token)
-    user = await db_session.scalar(
-        select(User).where(User.email == "verdict_guard_user@example.com")
-    )
-    body = ReviewCreateRequest.model_construct(
-        transaction_id=uuid.UUID(txn_id), verdict=None, rating=None, comment=None
-    )
 
-    with pytest.raises(HTTPException) as exc_info:
-        await create_review(body=body, actor=Actor(typ="user", user=user), session=db_session)
-    assert exc_info.value.status_code == 422
-    assert exc_info.value.detail == "評価（よかった／伸びしろ）を選んでください。"
-    remaining = await db_session.scalar(
-        select(func.count()).select_from(Review).where(Review.transaction_id == uuid.UUID(txn_id))
+    r = await client.post(
+        "/api/v1/reviews",
+        json={"transaction_id": txn_id, "verdict": "good", "comment": "あ" * 301},
+        headers=_auth(user_token),
     )
-    assert remaining == 0
+    assert r.status_code == 422, r.text
+    body = await _post_review(
+        client, user_token, {"transaction_id": txn_id, "verdict": "good", "comment": "あ" * 300}
+    )
+    assert body["comment"] == "あ" * 300
 
 
 async def test_review_non_party_and_invalid_state_return_before_taking_the_lock(
@@ -2830,32 +2809,8 @@ async def test_operator_to_user_verdict_is_excluded_from_operator_counts(
     txn_id = await _completed_transaction(client, user_token, op_token)
     await _post_review(client, user_token, {"transaction_id": txn_id, "verdict": "good"})
     body = await _post_review(client, op_token, {"transaction_id": txn_id, "verdict": "improve"})
-    assert (body["reviewer_type"], body["verdict"], body["rating"]) == ("operator", "improve", 2)
+    assert (body["reviewer_type"], body["verdict"]) == ("operator", "improve")
     assert await _public_verdict_counts(client, op_id) == (1, 0, 1)
-
-
-async def test_operator_to_user_legacy_rating_only_payload(
-    client: AsyncClient, db_session: AsyncSession, caplog
-):
-    """業者→依頼者の旧形式（rating のみ）も受け付け、★から verdict を導いて rating はそのまま保存する。
-    業者の集計には入らず、旧形式の証跡ログは reviewer_type=operator で出る。"""
-    caplog.set_level(logging.INFO, logger=_REVIEWS_LOGGER)
-    admin_token = await _make_admin(client, db_session)
-    user_token = await _signup_user(client, "verdict_legacy_op_user@example.com")
-    op_token, op_id = await _verified_operator(
-        client, db_session, admin_token, "verdict_legacy_op@example.com"
-    )
-    txn_id = await _completed_transaction(client, user_token, op_token)
-    body = await _post_review(client, op_token, {"transaction_id": txn_id, "rating": 3})
-    assert (body["reviewer_type"], body["verdict"], body["rating"]) == ("operator", "improve", 3)
-    assert _review_logs(caplog, "review_legacy_rating_payload") == [
-        f"review_legacy_rating_payload transaction={txn_id} reviewer_type=operator rating=3"
-    ]
-    assert await _public_verdict_counts(client, op_id) == (0, 0, 0)
-    r = await client.get(f"/api/v1/transactions/{txn_id}", headers=_auth(user_token))
-    assert [(rv["reviewer_type"], rv["verdict"]) for rv in r.json()["reviews"]] == [
-        ("operator", "improve")
-    ]
 
 
 async def test_admin_hide_and_unhide_move_verdict_counts_consistently(
@@ -2893,54 +2848,6 @@ async def test_admin_hide_and_unhide_move_verdict_counts_consistently(
     assert await _public_verdict_counts(client, op_id) == (1, 1, 2)
 
 
-async def test_legacy_rows_without_verdict_are_read_and_counted_from_rating(
-    client: AsyncClient, db_session: AsyncSession
-):
-    """T6: 0040 適用後・新コード切替前に旧コードが書いた行（verdict 列 NULL）は、★4 は good、
-    ★3 は improve として取引詳細・公開プロフィールで読まれ、集計（SQL 側のハイブリッド式。
-    ★3 は CASE の else 分岐）でも同じ区分で数える。"""
-    from app.services.review_stats import recalc_operator_review_stats
-
-    admin_token = await _make_admin(client, db_session)
-    user_token = await _signup_user(client, "verdict_t6_user@example.com")
-    op_token, op_id = await _verified_operator(
-        client, db_session, admin_token, "verdict_t6_op@example.com"
-    )
-    legacy_rows: dict[int, tuple[uuid.UUID, str]] = {}
-    for rating in (4, 3):
-        txn_id = await _completed_transaction(client, user_token, op_token)
-        # 旧コードの INSERT を再現（verdict を知らないため列は NULL のまま入る）。
-        legacy = Review(
-            transaction_id=uuid.UUID(txn_id),
-            reviewer_type="user",
-            rating=rating,
-            comment=f"旧コードの行★{rating}",
-        )
-        db_session.add(legacy)
-        await db_session.flush()
-        legacy_rows[rating] = (legacy.id, txn_id)
-    await recalc_operator_review_stats(db_session, uuid.UUID(op_id))
-    await db_session.commit()
-
-    # 列は NULL のまま（読み出し時にだけ★から導く）。SQL 側の式は★4 を good、★3 を improve に。
-    stored = (
-        await db_session.execute(
-            select(Review.rating, Review._verdict, Review.verdict)
-            .where(Review.id.in_([review_id for review_id, _ in legacy_rows.values()]))
-            .order_by(Review.rating)
-        )
-    ).all()
-    assert [tuple(row) for row in stored] == [(3, None, "improve"), (4, None, "good")]
-
-    for rating, expected in ((4, "good"), (3, "improve")):
-        r = await client.get(f"/api/v1/transactions/{legacy_rows[rating][1]}", headers=_auth(user_token))
-        assert r.status_code == 200, r.text
-        assert [(rv["verdict"], rv["rating"]) for rv in r.json()["reviews"]] == [(expected, rating)]
-    r = await client.get(f"/api/v1/vendors/{op_id}")
-    assert sorted(rv["verdict"] for rv in r.json()["reviews"]) == ["good", "improve"]
-    assert _verdict_counts(r.json()) == (1, 1, 2)
-
-
 async def test_review_unique_violation_at_flush_returns_409_and_leaves_nothing(
     client: AsyncClient, db_session: AsyncSession, caplog
 ):
@@ -2970,7 +2877,6 @@ async def test_review_unique_violation_at_flush_returns_409_and_leaves_nothing(
             duplicate = Review(
                 transaction_id=uuid.UUID(txn_id),
                 reviewer_type=pending[0].reviewer_type,
-                rating=5,
                 verdict="good",
             )
             injected.append(duplicate)
@@ -2999,6 +2905,107 @@ async def test_review_unique_violation_at_flush_returns_409_and_leaves_nothing(
 
     await _post_review(client, user_token, {"transaction_id": txn_id, "verdict": "improve"})
     assert await _public_verdict_counts(client, op_id) == (0, 1, 1)
+
+
+async def test_review_non_unique_integrity_error_returns_500_without_leaking_the_comment(
+    client: AsyncClient, db_session: AsyncSession, caplog
+):
+    """一意制約（uq_reviews_transaction_reviewer）以外の IntegrityError は 409 に偽装せず 500 にする
+    （例: 段B のコードが 0041 のスキーマで動き rating の NOT NULL に当たる。5xx 監視に載せる）。
+    ログは取引・投稿者種別・例外の型・sqlstate・制約名だけで、口コミ本文を出さない。
+    再現: flush の直前に評価の verdict を NULL にし、本物の NOT NULL 違反を起こす。"""
+    from sqlalchemy import event, func
+
+    caplog.set_level(logging.INFO, logger=_REVIEWS_LOGGER)
+    admin_token = await _make_admin(client, db_session)
+    user_token = await _signup_user(client, "verdict_500_user@example.com")
+    op_token, op_id = await _verified_operator(
+        client, db_session, admin_token, "verdict_500_op@example.com"
+    )
+    txn_id = await _completed_transaction(client, user_token, op_token)
+    secret_comment = "口コミ本文はログに出さない"
+
+    def _break_not_null(session, flush_context, instances) -> None:
+        for obj in session.new:
+            if isinstance(obj, Review) and obj.transaction_id == uuid.UUID(txn_id):
+                obj.verdict = None
+
+    event.listen(db_session.sync_session, "before_flush", _break_not_null)
+    try:
+        r = await client.post(
+            "/api/v1/reviews",
+            json={"transaction_id": txn_id, "verdict": "good", "comment": secret_comment},
+            headers=_auth(user_token),
+        )
+    finally:
+        event.remove(db_session.sync_session, "before_flush", _break_not_null)
+    assert r.status_code == 500, r.text
+    assert r.json()["detail"] == "評価の保存に失敗しました。時間をおいて再度お試しください。"
+    assert _review_logs(caplog, "review_create_integrity_error") == [
+        f"review_create_integrity_error transaction={txn_id} reviewer_type=user"
+        " error=IntegrityError sqlstate=None constraint=None"
+    ]
+    assert _review_logs(caplog, "review_create_conflict") == []
+    assert all(secret_comment not in record.getMessage() for record in caplog.records)
+    remaining = await db_session.scalar(
+        select(func.count()).select_from(Review).where(Review.transaction_id == uuid.UUID(txn_id))
+    )
+    assert remaining == 0
+    assert await _public_verdict_counts(client, op_id) == (0, 0, 0)
+
+
+def test_classify_integrity_error_by_asyncpg_sqlstate_and_constraint_name():
+    """409 にするのは uq_reviews_transaction_reviewer の違反だけ（PostgreSQL は sqlstate 23505 かつ
+    制約名、SQLite は文言）。PostgreSQL の形は SQLAlchemy の asyncpg アダプタ
+    （sqlalchemy/dialects/postgresql/asyncpg.py の AsyncAdapt_asyncpg_connection._handle_exception）と
+    同じく、実クラスで組み立てる: 元の asyncpg 例外を __cause__ に付け、sqlstate を orig の
+    pgcode / sqlstate に写す。制約名は asyncpg 例外の constraint_name（サーバの 'n' フィールド）。"""
+    import sqlite3
+
+    from asyncpg.exceptions import PostgresError
+    from sqlalchemy.dialects.postgresql.asyncpg import AsyncAdapt_asyncpg_dbapi
+    from sqlalchemy.exc import IntegrityError
+
+    from app.api.v1.endpoints.reviews import _classify_integrity_error
+
+    def asyncpg_shaped(fields: dict) -> IntegrityError:
+        asyncpg_error = PostgresError.new(fields)  # sqlstate（'C'）から具体的な例外クラスが選ばれる
+        translated = AsyncAdapt_asyncpg_dbapi.IntegrityError(f"{type(asyncpg_error)}: {asyncpg_error}")
+        translated.pgcode = translated.sqlstate = asyncpg_error.sqlstate
+        translated.__cause__ = asyncpg_error  # アダプタは raise translated_error from error で送出する
+        return IntegrityError("INSERT INTO reviews ...", {"comment": "本文"}, translated)
+
+    unique_ours = asyncpg_shaped(
+        {"C": "23505", "M": "duplicate key value", "n": "uq_reviews_transaction_reviewer"}
+    )
+    assert type(unique_ours.orig.__cause__).__name__ == "UniqueViolationError"
+    assert _classify_integrity_error(unique_ours) == (True, "23505", "uq_reviews_transaction_reviewer")
+    assert _classify_integrity_error(
+        asyncpg_shaped({"C": "23505", "M": "duplicate key value", "n": "pk_reviews"})
+    ) == (False, "23505", "pk_reviews")
+    assert _classify_integrity_error(
+        asyncpg_shaped({"C": "23502", "M": "null value in column", "c": "rating", "t": "reviews"})
+    ) == (False, "23502", None)
+    assert _classify_integrity_error(
+        asyncpg_shaped({"C": "23514", "M": "violates check constraint", "n": "ck_reviews_verdict"})
+    ) == (False, "23514", "ck_reviews_verdict")
+
+    def sqlite_shaped(message: str) -> IntegrityError:
+        return IntegrityError("INSERT INTO reviews ...", {}, sqlite3.IntegrityError(message))
+
+    assert _classify_integrity_error(
+        sqlite_shaped("UNIQUE constraint failed: reviews.transaction_id, reviews.reviewer_type")
+    ) == (True, None, None)
+    assert _classify_integrity_error(sqlite_shaped("UNIQUE constraint failed: reviews.id")) == (
+        False,
+        None,
+        None,
+    )
+    assert _classify_integrity_error(sqlite_shaped("NOT NULL constraint failed: reviews.rating")) == (
+        False,
+        None,
+        None,
+    )
 
 
 async def test_vendor_list_orders_by_good_then_fewer_improve_then_oldest(
@@ -3042,15 +3049,13 @@ async def test_vendor_list_orders_by_good_then_fewer_improve_then_oldest(
     assert names == ["G5I5", "G3I0-old", "G3I0-new", "G3I2", "G0I0", *same_rank]
 
 
-async def test_review_responses_keep_deprecated_rating_until_0042(
+async def test_review_responses_no_longer_include_rating(
     client: AsyncClient, db_session: AsyncSession
 ):
-    """T8: P1〜P3 の互換期間中は各応答に rating（非推奨）を残し、verdict と件数を併記する。
-
-    rating を応答から消すのは 0042（contract・別チケット）で意図的に行う。P2 デプロイ後も
-    P3（web）が出るまでは旧 web が rating を読むため、それより前に消すと旧画面が壊れる。
-    0042 の実施時に本テストを「rating が無いこと」の確認へ反転させる。
-    OperatorOut（admin・業者本人。web 未使用）には件数を足さない（設計判断の固定）。
+    """T8: ★（rating）は alembic 0042 で撤去済み。評価・業者情報を返す全ての応答に rating が無く、
+    verdict と件数（good_count / improve_count / review_count）を返す（0040〜0041 の互換期間中に
+    「rating が残ること」を固定していたテストを反転）。OperatorOut（admin 一覧・業者本人）にも
+    rating は無く、件数も足さない（設計判断の固定）。
     """
     admin_token = await _make_admin(client, db_session)
     user_token = await _signup_user(client, "verdict_t8_user@example.com")
@@ -3059,18 +3064,20 @@ async def test_review_responses_keep_deprecated_rating_until_0042(
     )
     txn_id = await _completed_transaction(client, user_token, op_token)
     body = await _post_review(client, user_token, {"transaction_id": txn_id, "verdict": "good"})
-    assert {"verdict", "rating"} <= body.keys()
+    assert "verdict" in body and "rating" not in body
+    counts = {"good_count", "improve_count", "review_count"}
 
     r = await client.get(f"/api/v1/transactions/{txn_id}", headers=_auth(user_token))
-    assert {"verdict", "rating"} <= r.json()["reviews"][0].keys()
-    assert {"rating", "good_count", "improve_count", "review_count"} <= r.json()["operator"].keys()
+    review_keys, operator_keys = r.json()["reviews"][0].keys(), r.json()["operator"].keys()
+    assert "verdict" in review_keys and "rating" not in review_keys
+    assert counts <= operator_keys and "rating" not in operator_keys
     r = await client.get(f"/api/v1/vendors/{op_id}")
-    assert r.json()["rating"] == 5.0
-    assert {"verdict", "rating"} <= r.json()["reviews"][0].keys()
+    assert counts <= r.json().keys() and "rating" not in r.json()
+    assert "verdict" in r.json()["reviews"][0] and "rating" not in r.json()["reviews"][0]
     r = await client.get("/api/v1/vendors")
-    assert {"rating", "good_count", "improve_count"} <= r.json()[0].keys()
+    assert counts <= r.json()[0].keys() and "rating" not in r.json()[0]
     r = await client.get("/api/v1/operator/profile", headers=_auth(op_token))
-    assert {"rating", "good_count", "improve_count"} <= r.json().keys()
+    assert counts <= r.json().keys() and "rating" not in r.json()
 
     case = await _create_case(client, user_token)
     r = await client.post(
@@ -3078,16 +3085,19 @@ async def test_review_responses_keep_deprecated_rating_until_0042(
     )
     assert r.status_code == 201, r.text
     r = await client.get(f"/api/v1/cases/{case['id']}/bids", headers=_auth(user_token))
-    assert {"rating", "good_count", "improve_count"} <= r.json()[0]["operator"].keys()
+    assert counts <= r.json()[0]["operator"].keys() and "rating" not in r.json()[0]["operator"]
 
     r = await client.patch(
         f"/api/v1/admin/reviews/{body['id']}/hide", json={"hidden": False}, headers=_auth(admin_token)
     )
     assert r.status_code == 200, r.text
-    assert {"verdict", "rating"} <= r.json().keys()
+    assert "verdict" in r.json() and "rating" not in r.json()
     r = await client.get("/api/v1/admin/operators", headers=_auth(admin_token))
     admin_item = next(o for o in r.json()["items"] if o["id"] == op_id)
-    assert "rating" in admin_item and "good_count" not in admin_item
+    assert "rating" not in admin_item and "good_count" not in admin_item
+    r = await client.get("/api/v1/auth/me", headers=_auth(op_token))
+    assert r.status_code == 200, r.text
+    assert "rating" not in r.json()["operator"]
 
 
 async def test_review_comment_of_joined_phrases_passes_sanitizer_and_is_normalized(

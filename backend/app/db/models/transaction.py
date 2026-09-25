@@ -11,7 +11,6 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     CheckConstraint,
-    ColumnElement,
     Date,
     DateTime,
     ForeignKey,
@@ -21,11 +20,8 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     Uuid,
-    case,
-    func,
     text,
 )
-from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.naming import conv
 
@@ -146,28 +142,12 @@ class ReductionRequest(Base, TimestampMixin):
     operator: Mapped[Operator] = relationship(back_populates="reduction_requests")
 
 
-# ── 評価（よかった／伸びしろ）と旧形式の★の対応表（唯一の正本） ──
-# 2026-09-25 に★1〜5 から「よかった（good）／伸びしろ（improve）」の2択へ移行した
-# （alembic 0040・expand 段階）。rating 列は NOT NULL のまま残し、応答から消すのは 0042（contract）。
-# ★この値以上を「よかった」とみなす。alembic 0040 の既存行の変換・0041 の補完も同じ閾値
-# （マイグレーションは app を import しないため値を複製している）。
-LEGACY_GOOD_MIN_RATING = 4
-# 新形式（verdict）で投稿された評価に書く互換の★（旧 /review の「5 最高でした」「2 もう少し…」）。
-# P2〜P3 の間に残る旧 web の★平均表示と、ロールバック時の旧コードのためだけに使う。
-COMPAT_RATING_BY_VERDICT: dict[str, int] = {"good": 5, "improve": 2}
-
-
-def verdict_from_rating(rating: int) -> str:
-    """旧形式の★から評価を導く（★4・5 → "good"／★1〜3 → "improve"）。"""
-    return "good" if rating >= LEGACY_GOOD_MIN_RATING else "improve"
-
-
 class Review(Base, TimestampMixin):
     """成約後の双方向評価。reviewer_type ごとに 1 件のみ（ユニーク制約）。
 
-    評価の正本は ``verdict``（"good"＝よかった／"improve"＝伸びしろ）。列は NULL 可で、
-    NULL の行（0040 適用後・新コード切替前に旧コードが書いた行）は rating から導く
-    （ハイブリッドプロパティ。Python 側でも SQL 側でも同じ規則）。
+    評価は ``verdict``（"good"＝よかった／"improve"＝伸びしろ）。2026-09-25 に★1〜5 から2択へ
+    移行した（alembic 0040 で列追加と既存評価の変換 → 0041 でずれの補正 → 0042 で verdict を
+    NOT NULL・rating を NULL 可にして完了）。
     """
 
     __tablename__ = "reviews"
@@ -182,10 +162,10 @@ class Review(Base, TimestampMixin):
         UniqueConstraint(
             "transaction_id", "reviewer_type", name=conv("uq_reviews_transaction_reviewer")
         ),
+        # rating は撤去済みだが DB 列と制約は残置しているため宣言も残す（NULL は CHECK を通る）。
         CheckConstraint(
             "rating >= 1 AND rating <= 5", name=conv("ck_reviews_ck_reviews_rating")
         ),
-        # NULL は通す（expand 期間の旧コードの INSERT 用。NOT NULL 化は 0042）。
         CheckConstraint("verdict IN ('good','improve')", name=conv("ck_reviews_verdict")),
     )
 
@@ -197,10 +177,11 @@ class Review(Base, TimestampMixin):
         index=True,
     )
     reviewer_type: Mapped[str] = mapped_column(String(32), nullable=False)  # 'user' | 'operator'
-    # 1–5。旧形式の★、または verdict の互換値（COMPAT_RATING_BY_VERDICT）。0042 で撤去予定。
-    rating: Mapped[int] = mapped_column(Integer, nullable=False)
-    # 評価の列そのもの。読み書きは下の verdict ハイブリッド経由で行う（直接参照しない）。
-    _verdict: Mapped[str | None] = mapped_column("verdict", String(16), nullable=True)
+    # 評価: 'good'（よかった）| 'improve'（伸びしろ）。alembic 0042 で NOT NULL。
+    verdict: Mapped[str] = mapped_column(String(16), nullable=False)
+    # 旧形式の★（1–5）。撤去済み（alembic 0042）: DB 列は残置し、アプリは読まず書き込まない
+    # （0042 以降の新しい評価は NULL。operator_profiles の is_public 等と同じ流儀）。
+    rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
     comment: Mapped[str | None] = mapped_column(Text)
     # 運営による論理削除（公開・集計から除外。物理削除はせず証跡を残す）。
     hidden_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -208,27 +189,6 @@ class Review(Base, TimestampMixin):
 
     # relations
     transaction: Mapped[Transaction] = relationship(back_populates="reviews")
-
-    @hybrid_property
-    def verdict(self) -> str:
-        """評価（"good" / "improve"）。列が NULL の行は rating から導く。
-
-        ReviewOut / PublicReviewOut は from_attributes でこの値を読む（呼び出し側の変更不要）。
-        """
-        return self._verdict or verdict_from_rating(self.rating)
-
-    @verdict.inplace.setter
-    def _verdict_setter(self, value: str) -> None:
-        self._verdict = value
-
-    @verdict.inplace.expression
-    @classmethod
-    def _verdict_expression(cls) -> ColumnElement[str]:
-        # 集計（services/review_stats.py の count FILTER）用。Python 側と同じ規則を SQL で表す。
-        return func.coalesce(
-            cls._verdict,
-            case((cls.rating >= LEGACY_GOOD_MIN_RATING, "good"), else_="improve"),
-        )
 
 
 class Cancellation(Base, TimestampMixin):
