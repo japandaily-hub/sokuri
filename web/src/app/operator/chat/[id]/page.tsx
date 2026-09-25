@@ -424,7 +424,9 @@ export default function OperatorChatPage() {
 
               {/* メッセージ */}
               <div className="messages-area" ref={messagesRef}>
-                {messages.length === 0 ? (
+                {/* 空状態の案内は進行中の取引だけに出す。終了済みでは日程提案ができず
+                    上部の終了案内とも重なるため、空状態ごと出さない（2026-09-25 モバイル監査）。 */}
+                {messages.length === 0 && !isClosed ? (
                   <div className="ch-empty">
                     まだメッセージはありません。
                     <br />
