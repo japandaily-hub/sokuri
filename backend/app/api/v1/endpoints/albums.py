@@ -20,14 +20,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# email-validator パッケージ依存を避けるため EmailStr を使わず、
-# 軽量な正規表現で簡易検証する（送信前にフロントでも検証済み）。
-_EMAIL_PATTERN = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
-
 from app.db.models.album import Album, AlbumItem
 from app.db.models.assessment import Assessment
 from app.db.models.enums import AlbumStatus
 from app.db.session import get_session
+
+# email-validator パッケージ依存を避けるため EmailStr を使わず、
+# 軽量な正規表現で簡易検証する（送信前にフロントでも検証済み）。
+_EMAIL_PATTERN = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
 
 router = APIRouter()
 

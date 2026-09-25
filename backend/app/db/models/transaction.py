@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 from datetime import date, datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     BigInteger,
-    Boolean,
     CheckConstraint,
     Date,
     DateTime,

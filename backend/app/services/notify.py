@@ -435,6 +435,8 @@ async def send_operator_application_approved(to_email: str, company_name: str, i
         _wrap(
             f"<p><strong>{html.escape(company_name)}</strong> 様</p>"
             "<p>業者登録の審査が完了し、承認されました。以下の招待コードで本登録を完了してください。</p>"
+            "<p>本登録の後、プロフィール画面から古物商許可証の画像を提出してください。"
+            "運営が確認して承認すると入札できるようになります。</p>"
             f'<p style="font-size:20px;font-weight:bold;letter-spacing:1px;">{html.escape(invite_code)}</p>'
             f'<p><a href="{url}">本登録ページへ進む</a></p>'
         ),

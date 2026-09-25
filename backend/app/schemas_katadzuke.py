@@ -55,7 +55,7 @@ CURRENT_OPERATOR_TERMS_VERSION = "2026-09-04"
 
 
 class OperatorSignupRequest(BaseModel):
-    invite_code: str | None = Field(default=None, max_length=64, description="招待コード（任意。あればactive、なければpending登録＝要admin承認）")
+    invite_code: str | None = Field(default=None, max_length=64, description="招待コード（任意。有無に関わらず pending 登録＝許可証提出＋admin承認で active）")
     company_name: str = Field(min_length=1, max_length=255)
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
@@ -1421,7 +1421,7 @@ class OperatorPublicProfileOut(BaseModel):
     company_name: str
     verified_at: datetime | None
     # 運営承認済み（vendor_status == "active"）。公開画面の「古物商許可済」バッジはこれを根拠にする
-    # （verified_at は招待コード登録だと付かない古い手動承認フィールドのため）。
+    # （verified_at は古い手動承認フィールドで、過去の招待コード即 active 登録の業者には付いていないため）。
     is_approved: bool = False
     areas: list[str] = []
     categories: list[str] = []

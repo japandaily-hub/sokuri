@@ -11,8 +11,8 @@ test_0040 / test_0041 と同じ理由（alembic の env.py が内部で ``asynci
 - PostgreSQL だけで発行する lock_timeout と表ロックは、SQLite では発行しない。
 - downgrade で rating が NULL の行（段B 以降に書かれた行）が互換値（good=5／improve=2）で埋まり、
   rating NOT NULL・verdict NULL 可に戻る。再 upgrade（往復・2回目）は補完 0 件・再計算 0 件。
-- head が 0042 の単独チェーンで、リビジョン ID が 32 文字以内（head の固定は最新リビジョンの
-  テストである本ファイルが持つ）。
+- 0042 が 0041 に連鎖し単一の head に収束していて、リビジョン ID が 32 文字以内（head そのものの
+  固定は最新リビジョンのテストへ移設。現在は test_0043_audit_active_no_license_migration.py）。
 """
 
 from __future__ import annotations
@@ -348,13 +348,17 @@ def test_0042_waits_for_the_reviews_lock_at_most_3s_only_on_postgresql(monkeypat
         assert executed == expected, dialect
 
 
-def test_0042_is_the_single_head_chained_from_0041():
-    """0042 が単独の head として 0041 に正しく連鎖していること（分岐の防止）。"""
+def test_0042_is_chained_from_0041_on_a_single_head():
+    """0042 が 0041 に正しく連鎖し、履歴が単一の head に収束していること（分岐の防止）。
+
+    head そのものの固定は最新リビジョンのテスト（現在は test_0043_audit_active_no_license_migration.py）
+    が持つ（0043 以降の追加で本テストが head 固定のまま壊れないようにする。test_0041 と同じ作法）。
+    """
     from alembic.script import ScriptDirectory
 
     cfg = _alembic_config()
     script = ScriptDirectory.from_config(cfg)
-    assert script.get_heads() == ["0042_review_verdict_contract"]
+    assert len(script.get_heads()) == 1
     rev_0042 = script.get_revision("0042_review_verdict_contract")
     assert rev_0042.down_revision == "0041_review_verdict_recount"
     # 過去の alembic_version VARCHAR(32) 全断障害の再発防止ガード。

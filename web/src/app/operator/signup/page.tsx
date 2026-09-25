@@ -1,9 +1,10 @@
 "use client";
 
 /**
- * 業者新規登録（/operator/signup）。招待コード任意 → 自動ログイン → 案件一覧へ。
- * 招待コードあり → vendor_status=active（即フル稼働）
- * 招待コードなし → vendor_status=limited（即暫定稼働、住所開示は admin 承認後）
+ * 業者新規登録（/operator/signup）。招待コード任意 → 自動ログイン → 案件一覧へ
+ * （承認前は案件一覧が ApprovalPendingNotice＝承認待ちの案内に差し替わる）。
+ * 招待コードの有無にかかわらず、案件の閲覧と入札は古物商許可証の提出と
+ * 運営（admin）の承認後に開放される（backend 仕様変更に合わせ、招待コードでの即時入札は廃止）。
  *
  * デザインレビュー B-3 対応: 旧 slate 系 AuthCard（components/AuthCard.tsx）を廃し、
  * ユーザー側 /signup と同じ視覚言語（AuthBar/auth-card/Field、katazuke-pages.css）に統一。
@@ -144,7 +145,7 @@ export default function OperatorSignupPage() {
 
             {/* 承認前にできること／できないこと。アコーディオンの開閉に関わらず常時表示（日数は書かない） */}
             <p className="op-gate-note">
-              登録後すぐに案件の閲覧ができます。入札は運営の承認後に開放されます。
+              案件の閲覧と入札は、古物商許可証をご提出いただき、運営が承認した後にご利用いただけます。
             </p>
 
             {error ? (
@@ -174,7 +175,7 @@ export default function OperatorSignupPage() {
                         placeholder="KDZ-XXXXXXXX"
                       />
                     </Field>
-                    <p className="invite-hint">招待コードがあると登録直後からフル機能で入札できます。</p>
+                    <p className="invite-hint">招待コードをお使いの場合も、入札には古物商許可証の提出と運営の承認が必要です。</p>
                   </div>
                 ) : (
                   // 淡青の面ではなく、折りたたみラベル行に添える補足テキスト（operator-auth.css .invite-note）

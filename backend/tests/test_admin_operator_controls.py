@@ -1,7 +1,8 @@
 """admin の業者制御（承認時の許可証ゲート／停止・停止解除）の統合テスト。
 
 - 承認: pending かつ許可証未提出 → 409 / 許可証提出後 → 200 active /
-        招待コード登録で既に active の業者は許可証なしでも verified_at 付与可（状態遷移なし）
+        既に active の業者（2026-09-25 以前の招待コード即 active 登録の残存）は許可証なしでも
+        verified_at 付与可（状態遷移なし）。2026-09-25 以降は招待コード登録も pending で始まる
 - 停止: suspended=true で業者の既存トークンが 403・ログイン拒否 / suspended=false で復帰
         （停止前のトークンは解除後も 401 のまま・再ログインで復帰） /
         非 admin は 401/403 / 存在しない業者は 404 / 型不正は 422
@@ -87,7 +88,11 @@ async def _signup_pending_operator(client: AsyncClient, email: str) -> tuple[str
 
 
 async def _signup_invited_operator(client: AsyncClient, admin_token: str, email: str) -> tuple[str, str]:
-    """招待コードありの業者登録（vendor_status=active・verified_at は None）。"""
+    """招待コードありの業者登録 → 許可証画像の提出 → 運営承認まで済ませた active 業者。
+
+    2026-09-25 ユーザー決定で、招待コード経由でも signup 直後は pending（許可証提出＋運営承認で
+    active）。(token, operator_id) を返す。
+    """
     r = await client.post("/api/v1/admin/invites", json={}, headers=_auth(admin_token))
     assert r.status_code == 201, r.text
     code = r.json()["code"]
@@ -104,8 +109,36 @@ async def _signup_invited_operator(client: AsyncClient, admin_token: str, email:
     )
     assert r.status_code == 201, r.text
     data = r.json()
-    assert data["operator"]["vendor_status"] == "active"
-    return data["access_token"], data["operator"]["id"]
+    assert data["operator"]["vendor_status"] == "pending"
+    op_token, op_id = data["access_token"], data["operator"]["id"]
+    await _upload_license(client, op_token)
+    r = await client.patch(
+        f"/api/v1/admin/operators/{op_id}/verify",
+        json={"verified": True},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["vendor_status"] == "active"
+    return op_token, op_id
+
+
+async def _legacy_active_operator_without_license(db_session: AsyncSession, email: str) -> str:
+    """2026-09-25 以前に招待コードで即 active 登録された業者（許可証未提出・verified_at なし）。
+
+    仕様変更後は API からは作れないが、本番には残存し得る（0043 で件数を監査）ため DB へ直接作る。
+    operator_id を返す。
+    """
+    operator = Operator(
+        company_name="旧招待登録業者",
+        contact_email=email,
+        password_hash=hash_password(_OP_PASSWORD),
+        license_number="第123456789012号",
+        vendor_status="active",
+        verified_at=None,
+    )
+    db_session.add(operator)
+    await db_session.commit()
+    return str(operator.id)
 
 
 async def _upload_license(client: AsyncClient, op_token: str) -> None:
@@ -154,9 +187,10 @@ async def test_verify_pending_with_license_succeeds(client: AsyncClient, db_sess
 
 
 async def test_verify_already_active_without_license_is_allowed(client: AsyncClient, db_session: AsyncSession):
-    """招待コード登録は既に active（状態遷移なし）なので、許可証なしでも verified_at を付与できる。"""
+    """既に active の業者（旧仕様の招待コード即 active 登録の残存）は状態遷移なしなので、
+    許可証なしでも verified_at を付与できる（既存の業者は変更しない方針。2026-09-25 ユーザー決定）。"""
     admin_token = await _make_admin(client, db_session)
-    _, op_id = await _signup_invited_operator(client, admin_token, "ctl_invited1@example.com")
+    op_id = await _legacy_active_operator_without_license(db_session, "ctl_invited1@example.com")
 
     r = await client.patch(
         f"/api/v1/admin/operators/{op_id}/verify",
@@ -170,7 +204,8 @@ async def test_verify_already_active_without_license_is_allowed(client: AsyncCli
 
 async def test_unverify_never_requires_license(client: AsyncClient, db_session: AsyncSession):
     admin_token = await _make_admin(client, db_session)
-    _, op_id = await _signup_invited_operator(client, admin_token, "ctl_invited2@example.com")
+    # 許可証未提出の active 業者でも承認取消（→ pending）は許可証を要求しない。
+    op_id = await _legacy_active_operator_without_license(db_session, "ctl_invited2@example.com")
 
     r = await client.patch(
         f"/api/v1/admin/operators/{op_id}/verify",
@@ -286,6 +321,7 @@ async def test_public_profile_is_approved_follows_vendor_status(client: AsyncCli
     admin_token = await _make_admin(client, db_session)
     _, pending_id = await _signup_pending_operator(client, "ctl_public_pending@example.com")
     _, active_id = await _signup_invited_operator(client, admin_token, "ctl_public_active@example.com")
+    legacy_id = await _legacy_active_operator_without_license(db_session, "ctl_public_legacy@example.com")
 
     r = await client.get(f"/api/v1/vendors/{pending_id}")
     assert r.status_code == 200, r.text
@@ -294,7 +330,12 @@ async def test_public_profile_is_approved_follows_vendor_status(client: AsyncCli
     r = await client.get(f"/api/v1/vendors/{active_id}")
     assert r.status_code == 200, r.text
     assert r.json()["is_approved"] is True
-    # 招待コード登録は verified_at が付かないが、承認済みバッジの根拠は vendor_status
+    assert r.json()["verified_at"] is not None
+
+    # 旧仕様の招待コード即 active 登録は verified_at が付かないが、承認済みバッジの根拠は vendor_status
+    r = await client.get(f"/api/v1/vendors/{legacy_id}")
+    assert r.status_code == 200, r.text
+    assert r.json()["is_approved"] is True
     assert r.json()["verified_at"] is None
 
 

@@ -108,6 +108,14 @@ async def _verified_operator(
     assert r.status_code == 201, r.text
     data = r.json()
     token, op_id = data["access_token"], data["operator"]["id"]
+    # 招待コード経由でも signup 直後は pending（2026-09-25 ユーザー決定）。
+    # 許可証画像の提出 → 運営承認を経て active にする（承認は許可証未提出だと 409）。
+    r = await client.post(
+        "/api/v1/operator/license-image",
+        files={"file": ("license.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 256, "image/png")},
+        headers=_auth(token),
+    )
+    assert r.status_code == 200, r.text
     r = await client.patch(
         f"/api/v1/admin/operators/{op_id}/verify",
         json={"verified": True},

@@ -127,12 +127,32 @@ async def _signup_operator(
     return data["access_token"], data["operator"]["id"]
 
 
+# 許可証画像として受理される最小の PNG（マジックバイトで判定される。test_admin_operator_controls と同じ）。
+_LICENSE_PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 256
+
+
+async def _upload_license(client: AsyncClient, op_token: str) -> None:
+    """業者本人として古物商許可証画像を提出する（承認 pending→active の前提条件）。"""
+    r = await client.post(
+        "/api/v1/operator/license-image",
+        files={"file": ("license.png", _LICENSE_PNG_BYTES, "image/png")},
+        headers=_auth(op_token),
+    )
+    assert r.status_code == 200, r.text
+
+
 async def _verified_operator(
     client: AsyncClient, db_session: AsyncSession, admin_token: str, email: str,
     company: str = "テスト片付け株式会社",
 ) -> tuple[str, str]:
+    """招待コードで登録 → 許可証画像を提出 → 運営が承認、を経た active 業者を作る。
+
+    2026-09-25 以降は招待コード経由でも signup 直後は pending のため、本番と同じ
+    承認フローを通す。
+    """
     code = await _invite_code(client, admin_token)
     token, op_id = await _signup_operator(client, code, email, company)
+    await _upload_license(client, token)
     r = await client.patch(
         f"/api/v1/admin/operators/{op_id}/verify",
         json={"verified": True},
@@ -1057,8 +1077,16 @@ async def test_open_operator_registration(client: AsyncClient, db_session: Async
     assert r.status_code == 403
 
 
-async def test_invited_operator_gets_active(client: AsyncClient, db_session: AsyncSession):
-    """招待コードありで登録 → vendor_status=active。"""
+async def test_invited_operator_stays_pending_until_license_and_approval(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """招待コードありでも登録直後は pending（2026-09-25 ユーザー決定）。
+
+    招待コードは消込まれるが、案件の閲覧・入札はできない。許可証未提出のままの承認は 409 で、
+    許可証画像の提出 → 運営の承認を経てはじめて active になり、案件を閲覧できる。
+    """
+    from app.db.models.invite import Invite
+
     admin_token = await _make_admin(client, db_session)
     code = await _invite_code(client, admin_token)
 
@@ -1075,7 +1103,55 @@ async def test_invited_operator_gets_active(client: AsyncClient, db_session: Asy
     )
     assert r.status_code == 201
     data = r.json()
-    assert data["operator"]["vendor_status"] == "active"
+    assert data["operator"]["vendor_status"] == "pending"
+    assert data["operator"]["has_license_image"] is False
+    op_token, op_id = data["access_token"], data["operator"]["id"]
+
+    # 招待コードの検証・消込は従来通り行われる（使用済み・業者と紐付け）。
+    invite = await db_session.scalar(select(Invite).where(Invite.code == code))
+    assert invite is not None
+    await db_session.refresh(invite)
+    assert invite.used_at is not None
+    assert invite.operator_id == uuid.UUID(op_id)
+
+    # pending の間は案件の閲覧も入札もできない。
+    user_token = await _signup_user(client, "invited_pending_user@example.com")
+    case = await _create_case(client, user_token)
+    r = await client.get("/api/v1/cases", headers=_auth(op_token))
+    assert r.status_code == 403
+    assert r.json()["detail"]["code"] == "approval_required"
+    r = await client.post(
+        f"/api/v1/cases/{case['id']}/bids", json={"amount": 30000}, headers=_auth(op_token)
+    )
+    assert r.status_code == 403
+
+    # 許可証画像が未提出のままでは、招待コード経由でも運営は承認できない。
+    r = await client.patch(
+        f"/api/v1/admin/operators/{op_id}/verify",
+        json={"verified": True},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 409
+    operator = await db_session.get(Operator, uuid.UUID(op_id))
+    await db_session.refresh(operator)
+    assert operator.vendor_status == "pending"
+
+    # 許可証画像の提出 → 運営の承認で active になり、案件を閲覧・入札できる。
+    await _upload_license(client, op_token)
+    r = await client.patch(
+        f"/api/v1/admin/operators/{op_id}/verify",
+        json={"verified": True},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["vendor_status"] == "active"
+    assert r.json()["verified_at"] is not None
+    r = await client.get("/api/v1/cases", headers=_auth(op_token))
+    assert r.status_code == 200
+    r = await client.post(
+        f"/api/v1/cases/{case['id']}/bids", json={"amount": 30000}, headers=_auth(op_token)
+    )
+    assert r.status_code == 201, r.text
 
 
 async def test_pending_operator_cannot_bid(client: AsyncClient, db_session: AsyncSession):
@@ -1123,7 +1199,7 @@ async def test_deapproved_operator_address_hidden(
     """
     admin_token = await _make_admin(client, db_session)
 
-    # 1. 招待コードで登録 → active（審査済み前提）
+    # 1. 招待コードで登録 → 許可証提出 → 運営承認で active
     op_token, op_id = await _verified_operator(
         client, db_session, admin_token, "deapprove_op@example.com", "取消テスト業者"
     )
@@ -1453,7 +1529,8 @@ async def test_admin_approve_operator_application_issues_invite(
         },
     )
     assert r.status_code == 201
-    assert r.json()["operator"]["vendor_status"] == "active"
+    # 申込が承認済みでも、登録直後は pending（許可証提出＋運営承認で active。2026-09-25 ユーザー決定）。
+    assert r.json()["operator"]["vendor_status"] == "pending"
 
     # 承認済み申込を再承認しようとすると409
     r = await client.patch(
@@ -1468,8 +1545,9 @@ async def test_operator_signup_invite_email_mismatch_403(
 ):
     """承認発行された招待コード（emailに紐付け済み）を別emailで使おうとすると403になる。
 
-    招待コード漏洩時に第三者が無審査でactive業者アカウントを作成できてしまう
-    バイパスを防ぐための照合（security review High指摘対応）。
+    招待コード漏洩時に第三者が招待コードを横取りして業者アカウントを作成できてしまう
+    バイパスを防ぐための照合（security review High指摘対応。当時は招待コード登録が即 active
+    だった。2026-09-25 以降は pending 登録だが、横取り防止のため維持している）。
     """
     admin_token = await _make_admin(client, db_session)
 
@@ -1529,7 +1607,8 @@ async def test_operator_signup_invite_without_email_allows_any_email(
         },
     )
     assert r.status_code == 201
-    assert r.json()["operator"]["vendor_status"] == "active"
+    # 招待コード経由でも登録直後は pending（2026-09-25 ユーザー決定）。
+    assert r.json()["operator"]["vendor_status"] == "pending"
 
 
 async def test_admin_reject_operator_application(

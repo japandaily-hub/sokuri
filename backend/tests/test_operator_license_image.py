@@ -81,12 +81,18 @@ async def _invite_code(client: AsyncClient, admin_token: str) -> str:
     return r.json()["code"]
 
 
-async def _verified_operator(
+async def _signed_up_operator(
     client: AsyncClient,
     admin_token: str,
     email: str,
     company: str = "テスト片付け株式会社",
 ) -> tuple[str, str]:
+    """招待コードで登録しただけの業者（pending・許可証画像は未提出）。
+
+    2026-09-25 ユーザー決定で、招待コード経由でも signup 直後は pending で、許可証画像の提出は
+    承認（pending→active）の前提条件になった。よって本ファイルが検証する提出・取得 API は
+    承認前の業者が使えなければならず、承認は経由させない（未提出状態の 404 も検証するため）。
+    """
     code = await _invite_code(client, admin_token)
     r = await client.post(
         "/api/v1/auth/operator/signup",
@@ -102,12 +108,8 @@ async def _verified_operator(
     assert r.status_code == 201, r.text
     data = r.json()
     token, op_id = data["access_token"], data["operator"]["id"]
-    r = await client.patch(
-        f"/api/v1/admin/operators/{op_id}/verify",
-        json={"verified": True},
-        headers=_auth(admin_token),
-    )
-    assert r.status_code == 200
+    assert data["operator"]["vendor_status"] == "pending"
+    assert data["operator"]["has_license_image"] is False
     return token, op_id
 
 
@@ -122,7 +124,7 @@ _NOT_IMAGE_BYTES = b"this is definitely not an image file" * 10
 class TestUploadLicenseImage:
     async def test_upload_success(self, client: AsyncClient, db_session: AsyncSession):
         admin_token = await _make_admin(client, db_session)
-        op_token, op_id = await _verified_operator(client, admin_token, "license_op1@example.com")
+        op_token, op_id = await _signed_up_operator(client, admin_token, "license_op1@example.com")
 
         r = await client.post(
             "/api/v1/operator/license-image",
@@ -145,7 +147,7 @@ class TestUploadLicenseImage:
 
     async def test_upload_non_image_415(self, client: AsyncClient, db_session: AsyncSession):
         admin_token = await _make_admin(client, db_session)
-        op_token, _ = await _verified_operator(client, admin_token, "license_op2@example.com")
+        op_token, _ = await _signed_up_operator(client, admin_token, "license_op2@example.com")
 
         r = await client.post(
             "/api/v1/operator/license-image",
@@ -156,7 +158,7 @@ class TestUploadLicenseImage:
 
     async def test_upload_too_large_422(self, client: AsyncClient, db_session: AsyncSession):
         admin_token = await _make_admin(client, db_session)
-        op_token, _ = await _verified_operator(client, admin_token, "license_op3@example.com")
+        op_token, _ = await _signed_up_operator(client, admin_token, "license_op3@example.com")
 
         oversized = b"\x89PNG\r\n\x1a\n" + b"\x00" * (MAX_UPLOAD_BYTES + 1)
         r = await client.post(
@@ -168,7 +170,7 @@ class TestUploadLicenseImage:
 
     async def test_upload_replaces_existing(self, client: AsyncClient, db_session: AsyncSession):
         admin_token = await _make_admin(client, db_session)
-        op_token, _ = await _verified_operator(client, admin_token, "license_op4@example.com")
+        op_token, _ = await _signed_up_operator(client, admin_token, "license_op4@example.com")
 
         r1 = await client.post(
             "/api/v1/operator/license-image",
@@ -197,7 +199,7 @@ class TestUploadLicenseImage:
 class TestGetLicenseImage:
     async def test_get_own_image_success(self, client: AsyncClient, db_session: AsyncSession):
         admin_token = await _make_admin(client, db_session)
-        op_token, _ = await _verified_operator(client, admin_token, "license_get1@example.com")
+        op_token, _ = await _signed_up_operator(client, admin_token, "license_get1@example.com")
         await client.post(
             "/api/v1/operator/license-image",
             files={"file": ("license.png", _PNG_BYTES, "image/png")},
@@ -211,7 +213,7 @@ class TestGetLicenseImage:
 
     async def test_get_not_uploaded_404(self, client: AsyncClient, db_session: AsyncSession):
         admin_token = await _make_admin(client, db_session)
-        op_token, _ = await _verified_operator(client, admin_token, "license_get2@example.com")
+        op_token, _ = await _signed_up_operator(client, admin_token, "license_get2@example.com")
 
         r = await client.get("/api/v1/operator/license-image", headers=_auth(op_token))
         assert r.status_code == 404
@@ -225,7 +227,7 @@ class TestGetLicenseImage:
         self, client: AsyncClient, db_session: AsyncSession
     ):
         admin_token = await _make_admin(client, db_session)
-        op_token, op_id = await _verified_operator(client, admin_token, "license_get3@example.com")
+        op_token, op_id = await _signed_up_operator(client, admin_token, "license_get3@example.com")
         await client.post(
             "/api/v1/operator/license-image",
             files={"file": ("license.png", _PNG_BYTES, "image/png")},
@@ -242,8 +244,8 @@ class TestGetLicenseImage:
         self, client: AsyncClient, db_session: AsyncSession
     ):
         admin_token = await _make_admin(client, db_session)
-        op_token, op_id = await _verified_operator(client, admin_token, "license_get4@example.com")
-        other_op_token, _ = await _verified_operator(
+        op_token, op_id = await _signed_up_operator(client, admin_token, "license_get4@example.com")
+        other_op_token, _ = await _signed_up_operator(
             client, admin_token, "license_get5@example.com"
         )
 
@@ -254,7 +256,7 @@ class TestGetLicenseImage:
 
     async def test_admin_get_not_uploaded_404(self, client: AsyncClient, db_session: AsyncSession):
         admin_token = await _make_admin(client, db_session)
-        _, op_id = await _verified_operator(client, admin_token, "license_get6@example.com")
+        _, op_id = await _signed_up_operator(client, admin_token, "license_get6@example.com")
 
         r = await client.get(
             f"/api/v1/admin/operators/{op_id}/license-image", headers=_auth(admin_token)

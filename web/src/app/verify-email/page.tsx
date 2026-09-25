@@ -107,7 +107,7 @@ function VerifyEmailContent() {
             <div className="ws-num">3</div>
             <div className="ws-body">
               <strong>業者を選んで引き取り</strong>
-              <span>気に入った業者を選べばOK。支払方法や日程は業者ごとに異なるため、チャットでご確認ください。</span>
+              <span>気に入った業者を選べばOK。お支払い方法は、成約後に業者からご案内します。日程はチャットでご相談ください。</span>
             </div>
           </div>
         </div>

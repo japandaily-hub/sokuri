@@ -307,7 +307,7 @@ async def user_login(
     "/auth/operator/signup",
     response_model=AuthTokenResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="業者登録（招待コード任意: あれば審査済み前提でactive、なければpending＝要admin承認）",
+    summary="業者登録（招待コード任意。有無に関わらず pending で登録し、許可証提出＋admin承認で active）",
 )
 async def operator_signup(
     body: OperatorSignupRequest,
@@ -339,8 +339,10 @@ async def operator_signup(
             )
         # 招待コードが特定emailに紐付けて発行されている場合（admin承認フロー等）は、
         # signup時のemailと一致することを必須にする。不一致だと招待コード漏洩時に
-        # 全く別人が任意emailで無審査のまま active 業者アカウントを作成できてしまうため
-        # （security review High指摘対応）。
+        # 全く別人が任意emailで招待コードを横取り（消込）し、事前申込に紐付いた業者
+        # アカウントを作成できてしまうため（security review High指摘対応。当時は招待
+        # コード登録が即 active だった。2026-09-25 以降は pending 登録＋許可証審査だが、
+        # 横取り防止のため維持する）。
         # email無し（None）で発行された招待コード（admin/invites, admin/invites/bulk 等）は
         # 従来通り誰でも使用可能な運用を維持する。
         if invite.email is not None and invite.email.lower() != email:
@@ -354,9 +356,12 @@ async def operator_signup(
             status_code=status.HTTP_409_CONFLICT,
             detail="このメールアドレスは既に登録されています。",
         )
-    # 招待コードあり=admin事前審査済み前提でactive（即フル稼働）。
-    # 招待コードなし（オープン登録）=pending（案件閲覧は可・入札は admin 承認まで不可）。
-    vendor_status = "active" if invite else "pending"
+    # 招待コードの有無に関わらず pending で登録する（2026-09-25 ユーザー決定）。
+    # 招待コード経由でも古物商許可証画像の提出（POST /operator/license-image）と
+    # admin 承認（PATCH /admin/operators/{id}/verify。許可証未提出だと 409）を経て
+    # はじめて active（入札可）になる。pending の間は案件の閲覧・入札とも不可（403 approval_required）。
+    # 招待コードは事前申込との対応付け（下の消込・operator_id 書き戻し）に使う。
+    vendor_status = "pending"
     operator = Operator(
         company_name=body.company_name,
         contact_email=email,

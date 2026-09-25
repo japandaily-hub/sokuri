@@ -2,8 +2,9 @@
 
 /**
  * 振込口座（/mypage/bank-account）。
- * カタヅケは買取代金の送金を行わない（当事者間精算）。ここに保存するのは、お振込みでの
- * 受け取りを希望する場合に業者へ伝えるための口座情報であり、業者へ自動開示はしない。
+ * 買取代金のお受け取りに使う口座を登録しておく画面。代金の流れ（誰がどう送金するか）は
+ * 決済方針の確定（法務確認後）まで断定しない。受け取り方法は成約後に案内する旨だけを書く。
+ * 保存した口座情報は業者へ自動開示はしない。
  *
  * デザインは既存の /mypage/profile（人の森整合テーマ）を踏襲する。form-card /
  * edit-section-title はページ間でクラスを共有しない既存の慣習に合わせ、
@@ -412,7 +413,7 @@ export default function BankAccountPage() {
 
           <div className="id-notice-box">
             <ul>
-              <li>買取代金の受け取り方法（現金・お振込み）は、成約後に業者とチャットで調整します。お振込みを希望する場合に業者へお伝えする口座情報を、あらかじめここに保存できます。</li>
+              <li>買取代金のお受け取りに使う口座を登録できます（受け取り方法は成約後にご案内します）。</li>
               <li>保存した口座情報は暗号化して保管し、業者へ自動で開示することはありません。</li>
               <li>支店名の欄に、ゆうちょ銀行の振込用店名（例：〇一八店）を入力してください。</li>
             </ul>
@@ -496,7 +497,7 @@ export default function BankAccountPage() {
           {!editing && !account.has_bank_account ? (
             <div className="form-card">
               <p style={{ fontSize: 13, color: "var(--body-soft)", lineHeight: 1.75, margin: 0 }}>
-                まだ振込口座が登録されていません。お振込みでの受け取りを希望する場合に備えて、口座情報を保存しておくことができます（登録は任意です）。
+                まだ振込口座が登録されていません。買取代金のお受け取りに使う口座を、あらかじめ登録しておくことができます（登録は任意です）。
               </p>
               <button type="button" className="btn btn-primary" style={{ marginTop: 14 }} onClick={startEdit}>
                 口座を登録する

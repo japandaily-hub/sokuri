@@ -174,7 +174,7 @@ async def _signup_user(client: AsyncClient, email: str) -> tuple[str, uuid.UUID]
 async def _verified_operator(
     client: AsyncClient, admin_token: str, email: str
 ) -> tuple[str, uuid.UUID]:
-    """招待コード登録（active）→ 運営承認まで済ませた業者の (token, operator_id)。"""
+    """招待コード登録（pending）→ 許可証提出 → 運営承認まで済ませた業者の (token, operator_id)。"""
     r = await client.post("/api/v1/admin/invites", json={}, headers=_auth(admin_token))
     assert r.status_code == 201, r.text
     r = await client.post(
@@ -190,6 +190,14 @@ async def _verified_operator(
     )
     assert r.status_code == 201, r.text
     data = r.json()
+    # 招待コード経由でも signup 直後は pending（2026-09-25 ユーザー決定）。
+    # 許可証画像の提出 → 運営承認を経て active にする（承認は許可証未提出だと 409）。
+    r = await client.post(
+        "/api/v1/operator/license-image",
+        files={"file": ("license.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 256, "image/png")},
+        headers=_auth(data["access_token"]),
+    )
+    assert r.status_code == 200, r.text
     r = await client.patch(
         f"/api/v1/admin/operators/{data['operator']['id']}/verify",
         json={"verified": True},

@@ -407,8 +407,9 @@ async def verify_operator(
         # 退会（匿名化・ログイン不能化）と状態遷移の意味が矛盾する。
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="退会済みの業者です。")
     # 承認（pending/limited → active）は古物商許可証画像の提出を必須にする。
-    # 招待コード登録で既に active の業者に対する verified_at の付与は対象外
-    # （状態遷移を伴わないため）。フロント（/admin）の disabled 制御と同じ規則。
+    # 既に active の業者（2026-09-25 以前に招待コードで即 active 登録された業者を含む）
+    # に対する verified_at の付与は対象外（状態遷移を伴わないため）。
+    # フロント（/admin）の disabled 制御と同じ規則。
     if body.verified and operator.vendor_status != "active" and not operator.has_license_image:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -1477,10 +1478,11 @@ async def approve_operator_application(
         invite.code,
     )
     logger.info(
-        "admin: 業者申込を承認しました - application_id=%s admin_id=%s invite_code=%s",
+        # 招待コードそのものはログに残さない（ログ閲覧者による横取り防止）。末尾4文字のみ。
+        "admin: 業者申込を承認しました - application_id=%s admin_id=%s invite_code_tail=%s",
         application.id,
         admin.id,
-        invite.code,
+        invite.code[-4:],
     )
     return OperatorApplicationApproveResponse(
         application=_to_application_out(application), invite_code=invite.code

@@ -17,7 +17,6 @@ from sqlalchemy.orm import selectinload
 from app.api.deps import get_current_operator, get_current_user
 from app.core.limits import MAX_REDUCTION_REQUESTS_PER_TRANSACTION
 from app.db.models.bid import Bid
-from app.db.models.case import Case
 from app.db.models.operator import Operator
 from app.db.models.transaction import ReductionRequest, Transaction
 from app.db.models.user import User

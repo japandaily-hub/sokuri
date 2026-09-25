@@ -200,15 +200,15 @@ export default function OperatorTransactionPage() {
             <DisclosureNotice viewer="operator" disclosed={disclosed} awaitingApproval={txn.awaiting_approval} />
           </div>
 
-          {/* r10 H2・H3 是正: 依頼者側には「代金は業者とチャットで調整」「完了確定は依頼者が行う」と
-              案内されているのに、業者側には精算方法も完了確定の主体もどこにも書かれていなかった。
+          {/* r10 H2・H3 是正: 業者側には支払いの案内も完了確定の主体もどこにも書かれていなかった。
+              代金の流れ（当事者間か・カタヅケ経由か）は決済方針の確定（法務確認後）まで断定しない。
               成約直後に必ず目に入る位置（開示カード直下）へ置く。キャンセル済みでは出さない。 */}
           {txn.status !== "cancelled" ? (
             <div className="op-card">
               <h2>成約後の進め方</h2>
               <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.85, marginTop: 8 }}>
-                <strong style={{ color: "var(--navy)" }}>買取代金はユーザーと直接精算します</strong>
-                （現金またはお振込み。方法はチャットで調整。カタヅケは送金を仲介しません）。
+                <strong style={{ color: "var(--navy)" }}>買取代金のお支払い方法は、成約後にご案内します。</strong>
+                ご不明な点は運営へお問い合わせください。
               </p>
               <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.85, marginTop: 8 }}>
                 <strong style={{ color: "var(--navy)" }}>作業完了はユーザーが確定します。</strong>
