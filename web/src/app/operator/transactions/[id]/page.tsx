@@ -187,8 +187,10 @@ export default function OperatorTransactionPage() {
                   ? ` → 確定額 ${formatYen(txn.final_amount)}`
                   : ""}
               </div>
+              {/* 日程提案を勧めるのは進行中の取引だけ。終了済みではサーバーが提案を 409 で拒否し、
+                  業者チャットでも提案できないため「未確定」だけにする（2026-09-25 モバイル監査）。 */}
               <div className="listing-meta">
-                訪問日時 {visitSchedule ? visitSchedule : "未確定（チャットで日程を提案してください）"}
+                訪問日時 {visitSchedule ? visitSchedule : active ? "未確定（チャットで日程を提案してください）" : "未確定"}
               </div>
             </div>
             <div className={`listing-status-badge ${txn.status === "completed" ? "badge-active" : txn.status === "cancelled" ? "badge-done" : "badge-waiting"}`}>
