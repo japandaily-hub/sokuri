@@ -41,6 +41,10 @@ jobs:
         run: pip install -e ".[dev]"
 
       - name: Run pytest
+        # ランナーの既定は UTC のため、tz なしの日時をローカル時刻として解釈してしまう退行
+        # （SQLite が返す tz なしの値の扱い）を検出できない。本番利用者と同じ日本時間で流す。
+        env:
+          TZ: Asia/Tokyo
         run: pytest -q
 
   # 実 PostgreSQL 16 での同時実行チェック（行ロック・部分一意索引・冪等キー）。
@@ -123,10 +127,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node 20
+      # Node 20 は 2026-04 にサポート終了。24 は TypeScript の型除去が既定で有効なため、
+      # web の単体テスト（*.test.mts）を依存追加なしの node --test で実行できる（ローカルと同じ版）。
+      - name: Set up Node 24
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: "npm"
           cache-dependency-path: web/package-lock.json
 
@@ -138,6 +144,9 @@ jobs:
 
       - name: Lint (errors only fail; warnings allowed)
         run: npx eslint src
+
+      - name: Unit tests (node --test)
+        run: node --test --disable-warning=MODULE_TYPELESS_PACKAGE_JSON "src/**/*.test.mts"
 
       - name: Build
         run: npx next build
