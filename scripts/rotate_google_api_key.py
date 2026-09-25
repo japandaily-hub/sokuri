@@ -2,7 +2,9 @@
 """GOOGLE_API_KEY（Gemini）を1コマンドで差し替える。人がやるのは「新キーをコピー」と「旧キーの削除」だけ。
 
 使い方（リポジトリ直下で）:
-    1. https://aistudio.google.com/app/apikey で「API キーを作成」→ 表示されたキーをコピー
+    1. https://aistudio.google.com/apikey で「API キーを作成」→ 表示されたキーをコピー
+       （AI Studio で作れない場合は Cloud コンソールの「認証情報」で、現行キーと同じプロジェクトに
+       Gemini API に制限したキーを作る。サービスアカウントへのバインドが必須で "AQ." 形式になる）
     2. python scripts/rotate_google_api_key.py            （--dry-run で書き込みなしの予行）
     3. 画面の指示どおり AI Studio で旧キーを削除して Enter → 失効を自動確認して完了
 
@@ -42,8 +44,13 @@ LOCAL_BACKEND_ENV = os.path.join("backend", ".env")
 BACKEND_URL = os.environ.get("KDZ_BACKEND_URL", "https://sokuri-backend.onrender.com")
 RENDER_API = "https://api.render.com/v1"
 GEMINI_MODELS_URL = "https://generativelanguage.googleapis.com/v1beta/models"
-AI_STUDIO_URL = "https://aistudio.google.com/app/apikey"
-KEY_PATTERN = re.compile(r"^AIza[0-9A-Za-z_\-]{35}$")
+# 旧 URL（/app/apikey）は 2026-09 時点で「Page not found」になるため現行の URL を案内する。
+AI_STUDIO_URL = "https://aistudio.google.com/apikey"
+# 旧形式（"AIza" で始まる 39 文字）と、サービスアカウントにバインドされた新形式（"AQ." で始まる）の
+# 両方を受け付ける。2026-09 時点で Cloud コンソールから Gemini API に制限したキーを作ると、
+# サービスアカウントへのバインドが必須になり新形式で発行される（実測 53 文字）。長さは将来の
+# 変更に備えて幅を持たせ、最終判定は Gemini API への疎通確認（gemini_status）で行う。
+KEY_PATTERN = re.compile(r"^(?:AIza[0-9A-Za-z_\-]{35}|AQ\.[0-9A-Za-z_\-.]{30,200})$")
 # 同名の実行ファイルをカレントから拾わないよう絶対パスで呼ぶ
 POWERSHELL = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
 ABORT_HINT = "旧キーはまだ削除せず、原因を解消してから同じコマンドを再実行してください"
@@ -245,7 +252,7 @@ def main() -> int:
 
 def rotate(render_key: str, new_key: str, dry_run: bool) -> int:
     if not KEY_PATTERN.match(new_key):
-        fail("新キーの形式が不正です（AIza で始まる 39 文字のはず）")
+        fail("新キーの形式が不正です（AIza で始まる 39 文字、または AQ. で始まる新形式のはず）")
         return 2
     st = gemini_status(new_key)
     if st != 200:
