@@ -6,11 +6,10 @@
  * 6-2 は審査中業者アカウント（pending@example.com）を使う。ロックしても他テストの
  * 前提に影響しないアカウントを選ぶこと（seller/vendor を使うと後続が全部落ちる）。
  */
-import { test, expect } from "@playwright/test";
-
 import { Api, OperatorSession, loginAll } from "./helpers/api";
 import { ACCOUNTS, API_URL } from "./helpers/env";
 import { ensureLiveTransaction } from "./helpers/fixtures";
+import { test, expect } from "./helpers/test";
 import { loginAsUser } from "./helpers/ui";
 
 let api: Api;

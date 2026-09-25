@@ -3,11 +3,12 @@
  *
  * 未読カウントは r6 で入れた導線なので、依頼者→業者の向きで実際に増えることを見る。
  */
-import { test, expect, BrowserContext, Page } from "@playwright/test";
+import { BrowserContext, Page } from "@playwright/test";
 
 import { Api, OperatorSession, loginAll } from "./helpers/api";
 import { ACCOUNTS, API_URL } from "./helpers/env";
 import { ensureLiveTransaction } from "./helpers/fixtures";
+import { test, expect, newE2EContext } from "./helpers/test";
 import { loginAsOperator, loginAsUser } from "./helpers/ui";
 
 let api: Api;
@@ -40,7 +41,9 @@ test("依頼者の送信が業者側で未読になり、業者が返信と候�
   await expect(page.getByText(body)).toBeVisible({ timeout: 30_000 });
 
   // ---- 業者: 別 context で未読を確認 ----
-  const vendorContext: BrowserContext = await browser.newContext();
+  // browser.newContext() ではなく newE2EContext()。375px 幅では左下の next dev 用
+  // インジケーターが入力欄左端の「日程を提案」に重なるため、それを消したコンテキストで開く。
+  const vendorContext: BrowserContext = await newE2EContext(browser);
   const vendorPage: Page = await vendorContext.newPage();
   try {
     await loginAsOperator(vendorPage, ACCOUNTS.vendor, "/operator/transactions");

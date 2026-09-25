@@ -4,11 +4,10 @@
  * 成約後の主要導線を1本で通す。減額申請だけは業者 UI ではなく API で作る
  * （業者側の申請フォームは別テストの範囲。ここでは依頼者側の受け取りと承認を見る）。
  */
-import { test, expect } from "@playwright/test";
-
 import { Api, OperatorSession, loginAll } from "./helpers/api";
 import { ACCOUNTS } from "./helpers/env";
 import { ensureUnscheduledTransaction } from "./helpers/fixtures";
+import { test, expect, newE2EContext } from "./helpers/test";
 import { confirmModal, loginAsOperator, loginAsUser } from "./helpers/ui";
 
 let api: Api;
@@ -90,7 +89,8 @@ test("日程確定 → 減額承認 → 完了確定 → 評価投稿まで通�
 
   // ---- 評価投稿（業者→依頼者。別 browser context で業者としてログインし
   //      /operator/transactions/[id] から投稿する） ----
-  const operatorContext = await browser.newContext();
+  // browser.newContext() ではなく newE2EContext()（next dev の開発用オーバーレイを消す。helpers/test.ts）。
+  const operatorContext = await newE2EContext(browser);
   try {
     const operatorPage = await operatorContext.newPage();
     await loginAsOperator(operatorPage, ACCOUNTS.vendor, `/operator/transactions/${txn.id}`);

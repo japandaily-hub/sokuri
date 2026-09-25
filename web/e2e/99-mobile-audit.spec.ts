@@ -4,11 +4,10 @@
  *   375px 幅でフルページ撮影し、改行・折返し・余白のバランス確認に使う。
  *   実行例: E2E_AUDIT_DIR=C:/tmp/shots npx playwright test e2e/99-mobile-audit.spec.ts --project=mobile
  */
-import { test } from "@playwright/test";
-
 import { Api, loginAll, OperatorSession } from "./helpers/api";
 import { ACCOUNTS } from "./helpers/env";
 import { ensureOpenCaseWithBid } from "./helpers/fixtures";
+import { test } from "./helpers/test";
 import { loginAsOperator, loginAsUser } from "./helpers/ui";
 
 const DIR = process.env.E2E_AUDIT_DIR;

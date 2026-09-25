@@ -4,11 +4,10 @@
  * 選定の確認は window.confirm ではなく共通 ConfirmModal（role="dialog"）である点が
  * 回帰しやすいので、ダイアログの出現・確定・成約パネル表示までを通しで見る。
  */
-import { test, expect } from "@playwright/test";
-
 import { Api, OperatorSession, loginAll } from "./helpers/api";
 import { ACCOUNTS } from "./helpers/env";
 import { ensureOpenCaseWithBid } from "./helpers/fixtures";
+import { test, expect } from "./helpers/test";
 import { confirmModal, loginAsUser } from "./helpers/ui";
 
 let api: Api;
@@ -53,8 +52,13 @@ test("依頼者が入札を選定すると成約パネルが出る", async ({ pa
   await confirmModal(page, /この業者に決定しますか？/, "決定する");
 
   // 成約パネル（成約: 〇〇）と、チャット・日程調整の導線が出る。
+  // チャットは別ページへのリンクではなく、この画面内に開いた状態で埋め込まれる
+  // （r-chat-inline・d9b4c06 以降）。開閉ボタンは開いている間「チャットを閉じる」
+  // （未読があると「（未読N）」が続くため前方一致）で、入力欄まで描画されることを見る。
   await expect(page.getByRole("heading", { name: /^成約: / })).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole("link", { name: /業者とチャット/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^チャットを閉じる/, expanded: true })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "メッセージを入力", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "訪問日程を調整する" })).toBeVisible();
 
   // API 側でも「どの入札が選ばれたか」が確定し、取引が生成されている
   // （画面表示だけの偽陽性を防ぐ）。案件に複数入札があり得るため、押下したのが

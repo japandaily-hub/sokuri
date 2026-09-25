@@ -4,8 +4,7 @@
  * 200 で返ること・横スクロールが出ないこと・console error が出ないことの3点だけを
  * 見る。文言の細部は各導線のテストで担保する。
  */
-import { test, expect } from "@playwright/test";
-
+import { test, expect } from "./helpers/test";
 import { collectConsoleErrors, expectNoHorizontalScroll } from "./helpers/ui";
 
 /** 未ログインで開ける代表ページ（middleware の保護対象外）。 */

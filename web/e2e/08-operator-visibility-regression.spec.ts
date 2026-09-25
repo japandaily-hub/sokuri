@@ -7,11 +7,10 @@
  *   8-3 業者は自社の入札額を引き上げられる（引き上げのみ・現在額+1,000 円以上）。下回る金額は
  *       サーバーが 409 で拒否し、画面にその理由が出る。
  */
-import { test, expect } from "@playwright/test";
-
 import { Api, CaseDetail, OperatorSession, loginAll } from "./helpers/api";
 import { ACCOUNTS, API_URL } from "./helpers/env";
 import { ensureOpenCaseWithBid } from "./helpers/fixtures";
+import { test, expect } from "./helpers/test";
 import { loginAsOperator } from "./helpers/ui";
 
 let api: Api;

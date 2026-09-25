@@ -5,9 +5,8 @@
  * 差し戻す無限ループの起点になっていた（r3 再レビュー3回目で是正）。行き止まりを作らず
  * サインアウト導線が出ることを守る。
  */
-import { test, expect } from "@playwright/test";
-
 import { ACCOUNTS } from "./helpers/env";
+import { test, expect } from "./helpers/test";
 import { loginAsOperator } from "./helpers/ui";
 
 test("業者セッションで /login を開くとサインアウト導線が出る", async ({ page }) => {

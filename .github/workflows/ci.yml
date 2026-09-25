@@ -143,7 +143,9 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Lint (errors only fail; warnings allowed)
-        run: npx eslint src
+        # e2e も対象にする: spec が next dev の開発用オーバーレイを消す fixture（e2e/helpers/test.ts）を
+        # 迂回していないかを eslint.config.mjs のルールで検査している（docs/ops/e2e.md の設計方針）。
+        run: npx eslint src e2e
 
       - name: Unit tests (node --test)
         run: node --test --disable-warning=MODULE_TYPELESS_PACKAGE_JSON "src/**/*.test.mts"

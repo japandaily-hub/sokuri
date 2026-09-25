@@ -68,7 +68,7 @@ $env:RL_CASE_CREATE_IP_MAX="200"; $env:RL_CASE_CREATE_ACCOUNT_MAX="200"
 | ファイル | 内容 |
 | --- | --- |
 | `e2e/01-public-pages.spec.ts` | 公開ページ 8 本が 200・横スクロールなし・console error なし |
-| `e2e/02-seller-select-bid.spec.ts` | 依頼者ログイン → マイページ → 案件詳細で入札を選定（ConfirmModal）→ 成約表示 |
+| `e2e/02-seller-select-bid.spec.ts` | 依頼者ログイン → マイページ → 案件詳細で入札を選定（ConfirmModal）→ 成約表示（チャットは画面内に開いた状態で出る） |
 | `e2e/03-chat-unread.spec.ts` | 依頼者チャット送信 → 業者（別 context）で未読 → 返信 → 候補日提案 |
 | `e2e/04-schedule-reduction-complete.spec.ts` | 日程確定 → 減額申請（業者 API）→ 依頼者が承認 → 完了確定 → 評価投稿 |
 | `e2e/05-admin-operations.spec.ts` | 運営: /admin のバッジ → 事前申込を承認して招待コード表示 → お問い合わせを対応済み |
@@ -77,6 +77,11 @@ $env:RL_CASE_CREATE_IP_MAX="200"; $env:RL_CASE_CREATE_ACCOUNT_MAX="200"
 
 `e2e/helpers/` は共通部品。
 
+- `test.ts` … 全 spec が使う `test` / `expect`（`@playwright/test` の拡張）。next dev の開発用オーバーレイ
+  （`<nextjs-portal>`）を全ページで非表示にする。**spec は `@playwright/test` ではなくここから import し、
+  別コンテキストは `browser.newContext()` ではなく `newE2EContext(browser)` で作ること**（`web/eslint.config.mjs`
+  で強制。`browser.newContext` / `browser.newPage` の直接呼び出しは helpers も含めて禁止。違反すると
+  `npm run lint` と CI の lint（`npx eslint src e2e`）が落ちる）。
 - `env.ts` … 接続先とテスト口座。**`backend/seed_local_e2e.py` の `ACCOUNTS` と 1:1 で同期させること。**
 - `api.ts` … 前提データ作成・ID 引き当て用の API クライアント（`web/src/lib/katadzuke-api.ts` は
   `"use client"` 依存を持つため import せず、必要な型だけ再定義している）。
@@ -93,6 +98,11 @@ $env:RL_CASE_CREATE_IP_MAX="200"; $env:RL_CASE_CREATE_ACCOUNT_MAX="200"
 - **`retries: 0`。** 落ちたら実挙動の問題として扱う。リトライで隠さない。
 - **前提は API・確認は UI。** シードの ID は決め打ちせず、ログイン後に API から引く。
 - 2 プロジェクト（`desktop` 1280px / `mobile` 375px）で同じシナリオを流す。chromium のみ。
+- **next dev の開発用オーバーレイはテストのブラウザ内だけで消す。** 左下の「N」インジケーターは本番に
+  存在せず、375px 幅では画面下端に固定された入力欄左端のボタン（業者チャットの「日程を提案」）に重なって
+  クリックを横取りする（チャット画面は 100vh 固定なのでスクロールでは避けられない）。next.config の
+  `devIndicators` は next dev の起動設定で E2E だけに限定できず、DevTools の「Hide Dev Tools」は
+  dev サーバー側に保存されて開発者のブラウザにも効くため、どちらも使わない（`helpers/test.ts`）。
 
 ## PG 同時実行チェックの手順
 

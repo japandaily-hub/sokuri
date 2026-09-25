@@ -5,10 +5,9 @@
  * 前提の申込・お問い合わせは API で作る（/business・/contact のフォーム送信そのものは
  * 公開ページのスモークで担保する範囲外なので、ここでは運営側の処理だけを見る）。
  */
-import { test, expect } from "@playwright/test";
-
 import { Api } from "./helpers/api";
 import { ACCOUNTS, uniqueSuffix } from "./helpers/env";
+import { test, expect } from "./helpers/test";
 import { loginAsUser } from "./helpers/ui";
 
 let api: Api;
