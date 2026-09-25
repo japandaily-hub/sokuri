@@ -112,7 +112,7 @@ def test_upgrade_defaults_existing_rows_to_opt_in_true(tmp_path, monkeypatch):
 def test_0036_is_chained_from_0035_on_a_single_head():
     """0036 が 0035 に正しく連鎖し、履歴が単一の head に収束していること（分岐の防止）。
 
-    head そのものの検証は最新リビジョンのテスト（test_0037_0038_migrations.py）が持つ
+    head そのものの検証は最新リビジョンのテスト（tests/test_00NN_*.py の最新番号）が持つ
     （0037 以降の追加で本テストが head 固定のまま壊れないようにする）。
     """
     from alembic.script import ScriptDirectory

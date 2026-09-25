@@ -159,7 +159,9 @@ def test_0039_is_the_single_head_chained_from_0038():
 
     cfg = _alembic_config()
     script = ScriptDirectory.from_config(cfg)
-    assert script.get_heads() == [_REVISION]
+    # head そのものの固定は最新リビジョンのテストへ移設（0040_review_verdict 以降の追加で本テストが
+    # 壊れないようにする。test_0037_0038_migrations.py と同じ流儀）。ここでは分岐が無いことだけを見る。
+    assert len(script.get_heads()) == 1
     revision = script.get_revision(_REVISION)
     assert revision.down_revision == _DOWN_REVISION
     # 過去の alembic_version VARCHAR(32) 全断障害の再発防止ガード。
