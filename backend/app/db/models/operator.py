@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional
 
-from sqlalchemy import Boolean, DateTime, Float, Integer, LargeBinary, String, Uuid
+from sqlalchemy import Boolean, DateTime, Integer, LargeBinary, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
@@ -22,9 +22,9 @@ class Operator(Base, TimestampMixin):
     license_number: Mapped[Optional[str]] = mapped_column(String(128))
     contact_email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-    # ★平均（旧形式）。撤去済み（alembic 0042・評価の2択化の完了）: DB 列は残置し、アプリは
-    # 読まず更新しない（operator_profiles の is_public 等と同じ流儀）。
-    rating: Mapped[Optional[float]] = mapped_column(Float)
+    # ★平均（旧形式の rating）は撤去済み: alembic 0042 でアプリの読み書きを止め、モデルのマップも
+    # 外した（DB 列の削除は alembic 0044_drop_rating_columns）。マップしないので INSERT・SELECT に
+    # 現れず、列がある DB（0044 適用前）でも無い DB（適用後）でも同じコードで動く。
     # 顧客→業者レビューの件数（reviews.py・admin.py が投稿・非表示の時に再計算する非正規化列）。
     # 入札一覧・業者一覧の表示用。
     review_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")

@@ -1,14 +1,16 @@
 """Review モデルの制約名が、alembic が本番に作った実名と一致することの回帰テスト。
 
 モデルの ``__table_args__`` は、テストの create_all でも本番と同じ制約（二重投稿の一意制約・
-★の範囲・評価の値）を効かせるためにある。Base.metadata の命名規約
+評価の値）を効かせるためにある。Base.metadata の命名規約
 ``"ck_%(table_name)s_%(constraint_name)s"`` は明示名にも前置されるため、書き方を誤ると
 名前が本番と食い違う（0040 の実装時に "ck_reviews_ck_reviews_verdict" が実際に出た）。
 
-- 0004 由来（一意制約・★の範囲）: 0004 は create_table に "ck_reviews_rating" と書いたが、
-  alembic の op にも命名規約が掛かるため、実際に出る DDL の名前は
-  "ck_reviews_ck_reviews_rating"。ファイルに書かれた文字列ではなく、0004 をオフライン
+- 0004 由来（一意制約）: ファイルに書かれた文字列ではなく、0004 をオフライン
   （--sql・PostgreSQL 方言。DB には接続しない）で DDL に変換した結果を正とする。
+- 0004 由来（★の範囲）: ★の撤去でモデルの宣言から外した（DB の CHECK と列は 0044 で削除）。
+  0004 は create_table に "ck_reviews_rating" と書いたが、alembic の op にも命名規約が掛かるため
+  実名は "ck_reviews_ck_reviews_rating"。0044 の upgrade は名前を推測せず DB から読むが、
+  downgrade はこの実名で作り直すので、実名そのものはここで引き続き固定する。
 - 0040 由来（評価の値）: op.f() による確定名 "ck_reviews_verdict"（SQLite での実 DDL は
   test_0040_review_verdict_migration.py が確認している）。
 """
@@ -65,9 +67,10 @@ def test_review_model_constraint_names_match_alembic_ddl(monkeypatch):
         "CONSTRAINT uq_reviews_transaction_reviewer UNIQUE (transaction_id, reviewer_type)"
         in reviews_ddl
     )
-    # ★の範囲: モデルの名前と条件が、0004 が実際に作る制約と完全に一致すること。
-    rating_name = check_names["rating >= 1 AND rating <= 5"]
-    assert f"CONSTRAINT {rating_name} CHECK (rating >= 1 AND rating <= 5)" in reviews_ddl
-    assert rating_name == "ck_reviews_ck_reviews_rating"
+    # ★の範囲: モデルは宣言しない（撤去済み）。0004 が実際に作った実名は 0044 の downgrade が
+    # 作り直す名前として固定する。
+    assert not any("rating" in sqltext for sqltext in check_names)
+    assert "rating" not in Review.__table__.c
+    assert "CONSTRAINT ck_reviews_ck_reviews_rating CHECK (rating >= 1 AND rating <= 5)" in reviews_ddl
     # 評価の値: 0040 が op.f() で確定させた名前（命名規約で二重化していないこと）。
-    assert check_names["verdict IN ('good','improve')"] == "ck_reviews_verdict"
+    assert check_names == {"verdict IN ('good','improve')": "ck_reviews_verdict"}
