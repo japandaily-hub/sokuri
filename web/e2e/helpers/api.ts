@@ -50,6 +50,27 @@ export interface TransactionDetail extends TransactionSummary {
   reviews: { id: string; reviewer_type: "user" | "operator"; verdict: "good" | "improve"; comment: string | null }[];
 }
 
+/** 運営の口コミ一覧（GET /admin/reviews）の1行。09-admin-reviews.spec.ts の状態確認用。 */
+export interface AdminReviewListItem {
+  id: string;
+  transaction_id: string;
+  reviewer_type: "user" | "operator";
+  verdict: "good" | "improve";
+  comment: string | null;
+  created_at: string;
+  hidden_at: string | null;
+  hidden_reason: string | null;
+  hidden_by_admin_id: string | null;
+  operator_id: string | null;
+  company_name: string | null;
+}
+
+export interface AdminReviewListResponse {
+  items: AdminReviewListItem[];
+  total: number;
+  counts: { all: number; visible: number; hidden: number };
+}
+
 /** 業者ログインのレスポンス。 */
 export interface OperatorSession {
   token: string;
@@ -256,6 +277,22 @@ export class Api {
       data: { reason },
     });
     await expectJson(res, 200);
+  }
+
+  /** 運営の口コミ一覧（09-admin-reviews.spec.ts の状態確認用）。UI 操作の裏付けに使う。 */
+  async adminListReviews(
+    params: { visibility?: string; q?: string; limit?: number; offset?: number },
+    adminToken: string,
+  ): Promise<AdminReviewListResponse> {
+    const sp = new URLSearchParams();
+    if (params.visibility) sp.set("visibility", params.visibility);
+    if (params.q) sp.set("q", params.q);
+    if (params.limit != null) sp.set("limit", String(params.limit));
+    if (params.offset != null) sp.set("offset", String(params.offset));
+    const res = await this.ctx.get(`${API_URL}/admin/reviews?${sp.toString()}`, {
+      headers: this.headers(adminToken),
+    });
+    return expectJson<AdminReviewListResponse>(res, 200);
   }
 
   // ---- 公開フォーム -------------------------------------------------------

@@ -29,6 +29,7 @@ import {
   type AdminContactListResponse,
   type AdminContactMessage,
 } from "@/lib/katadzuke-api";
+import { extractReviewIdFromMessage } from "@/lib/review-report";
 
 /** 絞り込みの値。API の handled（true/false/未指定）へ 1:1 で対応させる。 */
 type HandledFilter = "unhandled" | "handled" | "all";
@@ -149,45 +150,61 @@ export default function AdminContactsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {data?.items.map((m) => (
-                  <tr key={m.id} className="align-top">
-                    <td className="py-2 pr-4 whitespace-nowrap text-slate-500">
-                      {new Date(m.created_at).toLocaleString("ja-JP")}
-                    </td>
-                    <td className="py-2 pr-4 break-words text-slate-700">{m.name}</td>
-                    <td className="py-2 pr-4 break-all text-slate-700">{m.email}</td>
-                    <td className="py-2 pr-4 break-words text-slate-700">{m.category}</td>
-                    <td className="py-2 pr-4 max-w-md whitespace-pre-wrap break-words text-slate-700">
-                      {m.message}
-                    </td>
-                    <td className="py-2 pr-4">
-                      {m.handled_at ? (
-                        <StatusBadge value="completed" label="対応済み" />
-                      ) : (
-                        <StatusBadge value="pending" label="未対応" />
-                      )}
-                    </td>
-                    <td className="py-2 text-right">
-                      {m.handled_at ? (
-                        <p className="whitespace-nowrap text-xs text-slate-500">
-                          {new Date(m.handled_at).toLocaleString("ja-JP")}
-                        </p>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setHandleModalError(null);
-                            setHandleTarget(m);
-                          }}
-                          disabled={busy}
-                          className={`${btnPrimary} whitespace-nowrap`}
-                        >
-                          対応済みにする
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {data?.items.map((m) => {
+                  // r-review-verdict 対応: 口コミの報告（vendors/[id] → /contact）は本文の先頭行に
+                  // 口コミ ID が入る（review-report.ts）。取れた行だけ /admin/reviews への
+                  // 直行リンクを出す（無関係なお問い合わせでは何も出さない）。
+                  const reportedReviewId = extractReviewIdFromMessage(m.message);
+                  return (
+                    <tr key={m.id} className="align-top">
+                      <td className="py-2 pr-4 whitespace-nowrap text-slate-500">
+                        {new Date(m.created_at).toLocaleString("ja-JP")}
+                      </td>
+                      <td className="py-2 pr-4 break-words text-slate-700">{m.name}</td>
+                      <td className="py-2 pr-4 break-all text-slate-700">{m.email}</td>
+                      <td className="py-2 pr-4 break-words text-slate-700">{m.category}</td>
+                      <td className="py-2 pr-4 max-w-md whitespace-pre-wrap break-words text-slate-700">
+                        {m.message}
+                      </td>
+                      <td className="py-2 pr-4">
+                        {m.handled_at ? (
+                          <StatusBadge value="completed" label="対応済み" />
+                        ) : (
+                          <StatusBadge value="pending" label="未対応" />
+                        )}
+                      </td>
+                      <td className="py-2 text-right">
+                        <div className="flex flex-col items-end gap-1.5">
+                          {m.handled_at ? (
+                            <p className="whitespace-nowrap text-xs text-slate-500">
+                              {new Date(m.handled_at).toLocaleString("ja-JP")}
+                            </p>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setHandleModalError(null);
+                                setHandleTarget(m);
+                              }}
+                              disabled={busy}
+                              className={`${btnPrimary} whitespace-nowrap`}
+                            >
+                              対応済みにする
+                            </button>
+                          )}
+                          {reportedReviewId ? (
+                            <Link
+                              href={`/admin/reviews?q=${encodeURIComponent(reportedReviewId)}&visibility=all`}
+                              className="whitespace-nowrap text-xs text-brand-600 underline"
+                            >
+                              該当の口コミを開く
+                            </Link>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
             {data && data.items.length === 0 ? (
