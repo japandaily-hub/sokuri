@@ -35,6 +35,7 @@ import sys
 import uuid
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import urlsplit
 
 import asyncpg
 import httpx
@@ -432,8 +433,119 @@ async def s6_admin_cancel_vs_complete(
             sc.check(n_cxl == 0, f"r{i}: 完了成功なのに cancellations={n_cxl}（期待 0）")
 
 
+async def s7_last_admin_race(
+    c: httpx.AsyncClient, pg: asyncpg.Connection, admin_token: str, sc: Scenario
+) -> None:
+    """(7) 有効な管理者が2人だけのときの同時操作 → 管理者が0人にならない。
+
+    users._is_last_active_admin（本人の退会）と admin._has_other_active_admin（降格）は、
+    有効な admin の行を FOR NO KEY UPDATE（id 順）で確保してから「最後の1人か」を数える。
+    ロックが効いていなければ双方が「相手が残る」と判定して 0 人になり得る3通りを撃つ:
+      - withdraw_both: A と B が同時に自己退会
+      - demote_each_other: A が B を、B が A を同時に降格
+      - withdraw_vs_demote: A が自己退会しながら、同時に B を降格
+    いずれも成功はちょうど1件で、A・B のうち有効な admin が1人以上残ること。
+    「最後の2人」を作るため、A・B 以外の有効な admin はラウンド中だけ SQL で一般ユーザーへ
+    外し、終了後に必ず戻す（本スクリプトの運営アカウントを含む）。
+    """
+    kinds = ("withdraw_both", "demote_each_other", "withdraw_vs_demote")
+    for i in range(ROUNDS):
+        for kind in kinds:
+            a_token, a_user = await signup_user(c, f"pgadm-a-{RUN_ID}-{i}-{kind}@example.com", "管理 A")
+            b_token, b_user = await signup_user(c, f"pgadm-b-{RUN_ID}-{i}-{kind}@example.com", "管理 B")
+            a_id, b_id = a_user["id"], b_user["id"]
+            for uid in (a_id, b_id):
+                must(await c.post(f"{V1}/admin/users/{uid}/promote", headers=auth(admin_token)), 200)
+            pair = [uuid.UUID(a_id), uuid.UUID(b_id)]
+            # 外す対象を先に確定してから try の中で外す（UPDATE 中の中断でも finally で必ず戻す）。
+            other_ids = [
+                row["id"]
+                for row in await pg.fetch(
+                    "SELECT id FROM users WHERE role = 'admin' AND deleted_at IS NULL "
+                    "AND id <> ALL($1::uuid[])",
+                    pair,
+                )
+            ]
+            try:
+                await pg.execute(
+                    "UPDATE users SET role = 'user' WHERE id = ANY($1::uuid[])", other_ids
+                )
+
+                def withdraw(token: str) -> Any:
+                    async def _do(cc: httpx.AsyncClient) -> httpx.Response:
+                        return await cc.request(
+                            "DELETE",
+                            f"{V1}/users/me",
+                            json={"password": PASSWORD, "confirm": True},
+                            headers=auth(token),
+                        )
+
+                    return _do
+
+                def demote(token: str, target_id: str) -> Any:
+                    async def _do(cc: httpx.AsyncClient) -> httpx.Response:
+                        return await cc.post(
+                            f"{V1}/admin/users/{target_id}/demote", headers=auth(token)
+                        )
+
+                    return _do
+
+                if kind == "withdraw_both":
+                    rs = await volley(withdraw(a_token), withdraw(b_token))
+                elif kind == "demote_each_other":
+                    rs = await volley(demote(a_token, b_id), demote(b_token, a_id))
+                else:
+                    rs = await volley(withdraw(a_token), demote(a_token, b_id))
+                statuses = [r.status_code for r in rs]
+                active = await pg.fetchval(
+                    "SELECT count(*) FROM users WHERE role = 'admin' AND deleted_at IS NULL "
+                    "AND id = ANY($1::uuid[])",
+                    pair,
+                )
+                sc.codes.append(f"r{i} {kind}: {statuses}")
+                sc.facts.append(f"r{i} {kind}: A・B のうち有効な admin={active}")
+                # 成功がちょうど1件なら、残る管理者は必ず1人（0 人なら直列化の破綻、2 人なら
+                # 成功したはずの退会・降格が反映されていない）。
+                sc.check(active == 1, f"r{i} {kind}: 残った管理者が {active} 人（{statuses}）")
+                sc.check(
+                    statuses.count(200) == 1,
+                    f"r{i} {kind}: 成功がちょうど1件ではない（{statuses}）",
+                )
+                sc.check(
+                    all(s in (200, 401, 403, 409) for s in statuses),
+                    f"r{i} {kind}: 想定外の応答（{statuses}）",
+                )
+            finally:
+                # 先に外した admin を戻してから、生き残った A・B を一般ユーザーへ戻す（常に admin が
+                # 1人以上いる順序。検証用の固定パスワードの admin を DB に残さない）。
+                if other_ids:
+                    await pg.execute(
+                        "UPDATE users SET role = 'admin' WHERE id = ANY($1::uuid[])", other_ids
+                    )
+                await pg.execute(
+                    "UPDATE users SET role = 'user' WHERE id = ANY($1::uuid[]) "
+                    "AND deleted_at IS NULL",
+                    pair,
+                )
+
+
 # ──────────────────────────── エントリポイント ────────────────────────────
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+
+
 async def run() -> int:
+    # S7 は接続先 DB の admin を一時的に一般ユーザーへ外すため、使い捨ての検証 DB（ローカル・
+    # CI のサービスコンテナ）以外では動かさない（本番や共有 DB の運営者の権限を外さない）。
+    api_host = urlsplit(API_BASE).hostname
+    pg_host = urlsplit(PG_DSN).hostname
+    if api_host not in _LOOPBACK_HOSTS or pg_host not in _LOOPBACK_HOSTS:
+        print(
+            f"[env] 接続先がローカルではありません（API={api_host} / PG={pg_host}）。"
+            "本スクリプトは使い捨ての検証 DB 専用です。",
+            file=sys.stderr,
+        )
+        return 2
+
     try:
         async with httpx.AsyncClient(timeout=10) as probe:
             health = await probe.get(f"{API_BASE}/health")
@@ -449,6 +561,13 @@ async def run() -> int:
     except Exception as exc:  # noqa: BLE001  接続失敗の例外型はドライバ依存で広い
         print(f"[env] PostgreSQL へ接続できません（{PG_DSN}）: {exc}", file=sys.stderr)
         return 2
+    # 前回の実行が S7 の途中で強制終了され、運営アカウントが admin から外れたまま残っていても
+    # 再実行できるよう戻しておく（未作成なら何もしない。初回は signup 時の自動付与で admin になる）。
+    await pg.execute(
+        "UPDATE users SET role = 'admin' WHERE lower(email) = lower($1) "
+        "AND deleted_at IS NULL AND role <> 'admin'",
+        ADMIN_EMAIL,
+    )
 
     scenarios = [
         Scenario("S1", "同一案件への同時 select_bid（2業者）"),
@@ -457,6 +576,7 @@ async def run() -> int:
         Scenario("S4", "取引キャンセルの同時2連投"),
         Scenario("S5", "同一 idempotency_key の POST /cases 同時2連投"),
         Scenario("S6", "運営の強制終了と依頼者 complete の同時実行"),
+        Scenario("S7", "最後の管理者2人の同時退会・相互降格・退会と降格の同時実行"),
     ]
     try:
         async with httpx.AsyncClient(timeout=60) as c:
@@ -476,6 +596,8 @@ async def run() -> int:
             await s4_cancel_double(c, pg, admin_token, user_token, scenarios[3])
             await s5_idempotent_case(c, pg, user_id, user_token, scenarios[4])
             await s6_admin_cancel_vs_complete(c, pg, admin_token, user_token, scenarios[5])
+            # S7 は運営アカウントを一時的に admin から外すため、必ず最後に流す。
+            await s7_last_admin_race(c, pg, admin_token, scenarios[6])
     except ApiError as exc:
         print(f"[env] セットアップに失敗しました: {exc}", file=sys.stderr)
         return 2

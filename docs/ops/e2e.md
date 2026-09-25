@@ -133,10 +133,14 @@ docker rm -f kdz-pg
 | S4 | 取引キャンセル × 2 | `[200, 409]` | `cancellations`=1 行 |
 | S5 | 同一 `idempotency_key` の `POST /cases` × 2 | `[200, 201]` | 案件=1 件 |
 | S6 | 運営の強制終了と依頼者の `complete` | 片方のみ成功 | status と `cancellations` が矛盾しない |
+| S7 | 有効な管理者が2人だけのときの①同時自己退会 ②相互降格 ③退会と降格の同時実行 | 成功はちょうど1件（他は 401 / 403 / 409） | 残る管理者はちょうど1人（0 人にならない） |
 
 **このチェックで落ちたら実バグとして扱う**（実際 r12 で `create_case` の 500 を検出した。
 `.agent-state/audit/r12-pg-concurrency.md` 参照）。反復回数は `KDZ_ROUNDS`、接続先は
 `KDZ_API_BASE` / `KDZ_PG_DSN` で変えられる。アカウントは実行ごとに新規作成するため再実行可能。
+S7 はラウンド中だけ接続先 DB の他の admin を一般ユーザーへ外す（終了時に戻す）ため、接続先が
+ローカル（127.0.0.1 / localhost / ::1）でなければ実行を拒否する。前回の実行が途中で止まって
+運営アカウントが admin から外れたまま残っていても、起動時に自動で戻す。
 
 > Docker Desktop が `initializing Inference manager` / `Secrets Engine` のソケットエラーで
 > 起動しない場合は、`%LOCALAPPDATA%\Docker\run` と `%LOCALAPPDATA%\docker-secrets-engine` を

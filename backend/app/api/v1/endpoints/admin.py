@@ -11,7 +11,7 @@ from typing import Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from fastapi.responses import Response
-from sqlalchemy import case, func, or_, select, text, update
+from sqlalchemy import case, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -691,18 +691,20 @@ async def admin_list_cases(
         users_by_id = {u.id: u for u in rows}
 
     items: list[AdminCaseListItem] = []
-    for case in cases:
-        selected_bid = next((b for b in case.bids if b.status == "selected"), None)
+    # ループ変数を case にすると sqlalchemy の case() と同名になり、同じ関数内で case() を
+    # 使った途端に UnboundLocalError になるため別名にする（ruff F402）。
+    for case_row in cases:
+        selected_bid = next((b for b in case_row.bids if b.status == "selected"), None)
         txn = selected_bid.transaction if selected_bid is not None else None
-        owner = users_by_id.get(case.user_id) if case.user_id is not None else None
+        owner = users_by_id.get(case_row.user_id) if case_row.user_id is not None else None
         items.append(
             AdminCaseListItem(
-                id=case.id,
-                status=case.status,
-                created_at=case.created_at,
-                purpose=case.purpose,
-                prefecture=case.prefecture,
-                city=case.city,
+                id=case_row.id,
+                status=case_row.status,
+                created_at=case_row.created_at,
+                purpose=case_row.purpose,
+                prefecture=case_row.prefecture,
+                city=case_row.city,
                 user_email=owner.email if owner is not None else None,
                 company_name=selected_bid.operator.company_name if selected_bid is not None else None,
                 amount=(txn.final_amount if txn is not None and txn.final_amount is not None else (
