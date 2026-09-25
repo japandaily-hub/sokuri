@@ -15,7 +15,11 @@ from dataclasses import dataclass
 
 from app.db.models.enums import ItemCondition
 from app.services import storage
-from app.services.image_metadata import ImageMetadataError, strip_image_metadata
+from app.services.image_metadata import (
+    IMAGE_MIME_TYPES,
+    ImageMetadataError,
+    strip_image_metadata,
+)
 from app.services.storage import StorageUnavailableError
 from app.services.text_sanitize import normalize_and_strip_control_chars
 from app.services.vision import analyze_image
@@ -186,12 +190,8 @@ def _sanitized_data_url(data: bytes, content_type: str) -> str:
     image_ext = storage.sniff_image_ext(data)
     if image_ext is None:
         raise ImageMetadataError("JPEG / PNG / WebP のシグネチャではありません")
-    mime_type = _IMAGE_MIME_BY_EXT.get(image_ext, content_type)
+    mime_type = IMAGE_MIME_TYPES.get(image_ext, content_type)
     return _encode_data_url(strip_image_metadata(data, image_ext), mime_type)
-
-
-# sniff_image_ext の戻り値 → データ URL の MIME。
-_IMAGE_MIME_BY_EXT = {"jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp"}
 
 
 async def photo_url_for_ai(storage_key: str, raw_url: str | None) -> str | None:

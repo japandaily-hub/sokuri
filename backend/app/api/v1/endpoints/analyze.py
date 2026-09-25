@@ -27,7 +27,7 @@ from app.db.models.item import Item
 from app.db.models.user import User
 from app.db.session import get_session
 from app.schemas import AnalyzeRequest, AnalyzeResponse
-from app.services.vision import analyze_image
+from app.services.vision import ImageInputError, analyze_image
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,7 @@ router = APIRouter()
 # security review M-4対応: Gemini の生例外メッセージ（内部エンドポイント情報等を
 # 含みうる）をそのままクライアントへ返さない。詳細はサーバーログにのみ残す。
 _AI_SERVICE_UNAVAILABLE_DETAIL = "AI サービスが一時的に利用できません。時間をおいて再度お試しください。"
+_ANALYZE_FAILED_DETAIL = "画像を解析できませんでした。別の写真でお試しください。"
 
 
 @router.post(
@@ -80,10 +81,25 @@ async def analyze(
     # 1. AI Vision で製品情報を抽出
     try:
         vision_result = await analyze_image(body.base_image)
-    except ValueError as exc:
+    except ImageInputError as exc:
+        # 利用者が送った画像に起因するもの（固定文言）だけ、メッセージをそのまま返す。
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(exc),
+        ) from exc
+    except ValueError as exc:
+        # Gemini 応答の解析失敗など、入力に起因しない ValueError（pydantic の ValidationError を
+        # 含む）。生のメッセージには内部の実装や応答の断片が含まれうるため固定文言で返し、
+        # 詳細はログにだけ残す（security review Low。応答コードは従来どおり 422）。
+        logger.warning(
+            "analyze: 画像の解析結果を処理できませんでした - user_id=%s %s: %s",
+            user.id,
+            type(exc).__name__,
+            str(exc)[:200],
+        )
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=_ANALYZE_FAILED_DETAIL,
         ) from exc
     except GenAIAPIError as exc:
         # Gemini 側のレート制限・タイムアウト・5xx は 503 にマップ。生例外のメッセージは

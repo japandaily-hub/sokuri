@@ -15,7 +15,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.db.models.enums import CategoryTier, ChannelType, ItemCondition, RoutingMethod
 
@@ -70,12 +70,19 @@ CONDITION_CONFIG: dict[ItemCondition, ConditionConfig] = {
 # POST /api/v1/analyze
 # ---------------------------------------------------------------------------
 
+_ANALYZE_BASE_IMAGE_MAX_CHARS = 10 * 1024 * 1024 * 4 // 3 + 256
+
+
 class AnalyzeRequest(BaseModel):
     """写真投稿による製品スペック特定リクエスト。"""
 
     base_image: str = Field(
         description="撮影画像。base64 エンコード文字列（data: URL）のみ受け付ける（外部URLは不可）。",
         examples=["data:image/jpeg;base64,/9j/4AAQ..."],
+        # 復号後 10MB（写真アップロードと同じ上限・storage.MAX_UPLOAD_BYTES）を base64 にした長さ
+        # ＋ data URL の接頭辞の余裕。上限が無いと巨大な JSON でワーカーのメモリが跳ねる
+        # （security / QA review。復号後のサイズは vision._decode_image_for_ai でも検査する）。
+        max_length=_ANALYZE_BASE_IMAGE_MAX_CHARS,
     )
 
     @field_validator("base_image")

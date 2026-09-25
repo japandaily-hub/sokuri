@@ -39,7 +39,11 @@ import struct
 import zlib
 from dataclasses import dataclass
 
-__all__ = ["ImageMetadataError", "strip_image_metadata"]
+__all__ = ["IMAGE_MIME_TYPES", "ImageMetadataError", "strip_image_metadata"]
+
+# ``storage.sniff_image_ext`` の戻り値（実バイトから判定した形式）→ MIME。AI 解析（Gemini）へ
+# 送るデータ URL の型は、保存時の content_type や利用者の申告ではなくこれで決める。
+IMAGE_MIME_TYPES: dict[str, str] = {"jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp"}
 
 
 class ImageMetadataError(Exception):

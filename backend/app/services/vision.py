@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import binascii
 import json
 import logging
 import random
@@ -26,6 +27,12 @@ from pydantic import BaseModel, Field
 
 from app.config import get_settings
 from app.db.models.enums import CategoryTier, ItemCondition
+from app.services.image_metadata import (
+    IMAGE_MIME_TYPES,
+    ImageMetadataError,
+    strip_image_metadata,
+)
+from app.services.storage import MAX_UPLOAD_BYTES, sniff_image_ext
 
 logger = logging.getLogger(__name__)
 
@@ -247,6 +254,44 @@ async def _generate_content_with_retry(
             await asyncio.sleep(wait_sec)
 
 
+class ImageInputError(ValueError):
+    """利用者が送った画像に起因するエラー（メッセージは固定文言で、そのまま 422 で返してよい）。
+
+    ``ValueError`` の派生のため既存の呼び出し元の扱いは変わらない。/analyze はこの型だけ
+    メッセージを利用者へ返し、それ以外の ValueError（Gemini 応答の解析失敗など。内部の実装や
+    応答の断片を含みうる）は固定文言にしてログへ回す（security review Low）。
+    """
+
+
+def _decode_image_for_ai(b64data: str) -> tuple[bytes, str]:
+    """data URL の base64 本体を復号し、メタデータを除いた (バイト列, 実バイトから判定した MIME) を返す。
+
+    ``analyze_image`` から ``asyncio.to_thread`` 経由でのみ呼ぶ（復号・除去とも CPU バウンドのため
+    イベントループ上で行わない）。元のバイト列へフォールバックはしない（除去を保証できない画像は
+    送らない）。サイズの上限は写真アップロードと同じ ``MAX_UPLOAD_BYTES``（除去処理はこの上限を前提に
+    計算量を見積もっている）。
+
+    Raises:
+        ImageInputError: base64 でない・空・大きすぎる・JPEG / PNG / WebP でない・構造を解釈できず
+            除去を保証できない（/analyze は 422 に翻訳する）。
+    """
+    try:
+        image_bytes = base64.b64decode(b64data, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ImageInputError("画像データ（base64）を読み取れませんでした。") from exc
+    if not image_bytes:
+        raise ImageInputError("画像データが空です。")
+    if len(image_bytes) > MAX_UPLOAD_BYTES:
+        raise ImageInputError("画像が大きすぎます（10MB まで）。")
+    image_ext = sniff_image_ext(image_bytes)
+    if image_ext is None:
+        raise ImageInputError("対応していない画像形式です（JPEG・PNG・WebP のみ）。")
+    try:
+        return strip_image_metadata(image_bytes, image_ext), IMAGE_MIME_TYPES[image_ext]
+    except ImageMetadataError as exc:
+        raise ImageInputError("画像の構造を解釈できませんでした。別の写真でお試しください。") from exc
+
+
 async def analyze_image(base_image: str) -> VisionResult:
     """画像を Gemini Vision で解析し :class:`VisionResult` を返す。
 
@@ -266,10 +311,15 @@ async def analyze_image(base_image: str) -> VisionResult:
 
     # --- 入力画像を genai Part に変換 ---
     if base_image.startswith("data:image/"):
-        # "data:image/jpeg;base64,/9j/..." → mime_type + bytes
-        header, b64data = base_image.split(",", 1)
-        mime_type = header.split(":")[1].split(";")[0]  # e.g. "image/jpeg"
-        image_bytes = base64.b64decode(b64data)
+        # "data:image/jpeg;base64,/9j/..." → bytes（形式と MIME は申告ではなく実バイトで決める）
+        _, separator, b64data = base_image.partition(",")
+        if not separator:
+            raise ImageInputError("画像データの形式が正しくありません（data URL）。")
+        # Gemini（外部の AI サービス）へ送る前に、位置情報（Exif の GPS 等）を含むメタデータを
+        # 除く。案件フロー（summary.photo_url_for_ai）は送る前に除去済みだが、/analyze は
+        # 利用者が送った画像をそのまま渡していたため、ここを全ての Gemini 送信の単一の関門にする
+        # （security review Low。除去済みの画像を再度通しても結果は変わらない＝冪等）。
+        image_bytes, mime_type = await asyncio.to_thread(_decode_image_for_ai, b64data)
         image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
     else:
         # security review N-7対応（SSRFシンク）: 従来は任意の https:// URL を
@@ -289,7 +339,7 @@ async def analyze_image(base_image: str) -> VisionResult:
         # 追記: 案件写真ストレージを Cloudflare R2 へ移行した後も、この経路は
         # 変更なし（summary.photo_url_for_ai は storage.read_bytes で取得した
         # bytes を引き続き base64 データURL化して渡す。https 直渡しには対応しない）。
-        raise ValueError(
+        raise ImageInputError(
             "base_image は 'data:image/...' の base64 文字列である必要があります。"
         )
 
