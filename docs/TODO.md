@@ -37,14 +37,15 @@
 - [ ] **r4 レビューの意図的未対応（Low）** — 口座全桁開示・停止・昇格の監査ログが標準出力のみ／web の自動テスト 0 件／`alerts.fire_and_forget` の Task 参照（alerts.py）／送信成功直後のブラウザバックで空の /create に着地。
 - [ ] **r3 レビューの意図的未対応（Medium 以下）** — ①管理者操作（停止/昇格）の監査は logger のみ→追記専用テーブル化 ②`/contact` のプロセス内キャップ（300/h）は全IP共有で枯渇時に全断 503（IP別化・DBキュー化） ③全 admin が退会すると ADMIN_EMAILS の自動付与が再び有効になる窓 ④`alerts.fire_and_forget` が Task 参照を保持しない（GC で通知消失の可能性・alerts.py） ⑤停止した依頼者の進行中案件は open のまま業者に見える（停止時の案件処理は運営判断・`open_case_count` を返すのみ） ⑥LINE ログイン成功で着地先に直行する場合、401 ループ検知キーの削除が走らない ⑦`Transaction.fee_amount` が常に 0（β後の請求に向けた 8% 計算の実装） ⑧web の自動テスト 0 件。
 - [ ] **口コミ機能の残課題（2026-09-04 レビュー指摘・Medium 以下）** — ①公開プロフィールの口コミは最新 50 件まで（ページング未実装。見出しで「N件中 最新M件」と明示済み）。②運営の非表示操作は API のみ（PATCH /admin/reviews/{id}/hide）で管理画面 UI 未実装。③/vendors/[id] は審査中・却下業者の URL 直打ちで表示される（既存挙動踏襲）。④PG 専用のバックフィル SQL を CI で検証できない（SQLite テスト）。
-- [ ] **停止解除で旧トークンが再有効化する** — トークン世代カウンタの導入（セキュリティ Medium）。
+- [x] **停止解除で旧トークンが再有効化する（2026-09-25 修正・alembic 0039）** — users / operators に `sessions_revoked_at` を追加し、停止時と実際の解除時に現在時刻を記録。iat がそれ以前のトークンは依頼者・業者の全認証経路で 401（停止中は従来どおり 403 優先）。解除通知に再ログインの案内を追記。回帰テスト `tests/test_suspension_session_revocation.py`。
 - [ ] **ユーザー側 `/cases/[id]` が window.confirm のまま** — 業者側と同じブランドモーダルへ。
 - [ ] **業者の案件一覧にエリア絞り込みがない** — 案内文は実態に合わせ修正済み。
 - [ ] **API の 422 detail 配列を画面で握りつぶしている** — 入札額は事前検証で回避中。
 - [ ] **取り下げ系のレート制限に専用値** — 現在は sensitive_account（5回/15分）の流用。運用で問題が出たら。
 - [ ] **ESLint 警告 4 件** — 未使用変数（signup の `router`、unsubscribe の `submitted`）と不要な eslint-disable 2 件。
 - [x] **共有 HTTPException のトレースバック蓄積（2026-09-25 実測 → 同日修正・859bc00）** — モジュールレベルの例外インスタンス（`_CRED_EXC`・`_FILE_NOT_FOUND` 等 49 か所）を raise するたびにフレームが蓄積し、未認証リクエストでもメモリが単調増加していた。`app/core/http_errors.http_exception_factory`（呼ぶたびに新規生成）へ置換し `raise _XXX()` に。回帰ガード `tests/test_http_exception_not_shared.py`（関数外の例外生成・モジュールレベルの名前の raise を静的に禁止＋401/404/任意認証/内部捕捉の実経路でフレームが増えないこと）。例外を返す関数に `lru_cache` を付けると再発するので注意。
-- [ ] **2026-09-25 セキュリティレビューの残り（Low）** — ①safe-path の回帰テスト（`web/src/lib/safe-path.test.mts`）が CI で動いていない（ci.yml の Node 20 は型除去非対応・EOL。Node 22/24 へ上げて `node --test` を追加）②PNG/WebP は向き情報（Orientation）を引き継がない ③image_metadata の L-2（ICC 直後の再同期で ICC を落とす判定が付かない・実害なし）/L-3（SOS ヘッダと ICC チャンク境界をまたぐ署名検査・アップロード本人しか作れない）④最後の admin 判定は同時退会の競合を FOR UPDATE で防いでいない ⑤対策前の写真を AI 解析（Gemini）へ送る経路は除去を通らない ⑥`test_katadzuke_api.py:3030` の未使用 import（F401）・`db/models/operator.py` の前方参照 F821（既存）。
+- [x] **2026-09-25 セキュリティレビューの残り（Low）→ 同日対応** — ①CI を Node 24 にし `node --test "src/**/*.test.mts"` を追加（backend の pytest は TZ=Asia/Tokyo で実行）②PNG の eXIf・WebP の EXIF も Orientation だけを最小 Exif で引き継ぐ ③image_metadata の L-2/L-3（ICC 直後の再同期・SOS ヘッダと ICC 全体の署名検査）と目印の追加（Exif・Photoshop の識別子）④最後の admin 判定（退会・降格の両方）を FOR NO KEY UPDATE の行ロックで直列化 ⑤AI 解析（Gemini）へ送る写真にも除去を通し、MIME は実バイトから判定 ⑥F401・F821 を解消。
+- [ ] **2026-09-25 レビューで見つかった残り（Low・未対応）** — ①`POST /api/v1/analyze` は利用者が送った画像を除去なしで Gemini へ送る（web の `analyzeImage` はどこからも呼ばれていない＝未使用。除去を通すか廃止する）②Vercel のビルドの Node バージョンがリポジトリで固定されていない（`web/package.json` の `engines.node` で揃えられるが、本番ビルドの Node が変わるため要確認のうえで）③`admin.py` の既存の Lint（未使用の `sqlalchemy.text`・ループ変数 `case` の import 名との重複）④最後の admin の行ロックは実 PostgreSQL での同時実行シナリオ未検証（`scripts/pg_concurrency_check.py` に追加する）。
 
 ## 04 運用上の注意
 
