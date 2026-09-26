@@ -435,7 +435,7 @@ function AdminReviewsContent() {
       {restoreTarget ? (
         <ConfirmModal
           title="この口コミを元に戻します"
-          message="公開プロフィールと件数に再び反映されます。削除の理由と実施者の記録は消え、操作ログにだけ残ります。"
+          message="公開プロフィールと件数に再び反映されます。この画面からは削除の理由と実施者の記録が消えます（元に戻した操作は、実施した運営と日時が操作ログに残ります）。"
           confirmLabel="元に戻す"
           error={restoreModalError}
           busy={busy}
