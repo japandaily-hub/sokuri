@@ -251,8 +251,9 @@ def test_0045_adds_hidden_by_admin_id_with_set_null_fk_and_index_and_rolls_back_
             conn.close()
         assert _review_rows(db_path) == rows_before
 
-        # 往復: head へ上げ直すと元どおり（ci.yml の pg-concurrency が実 PG で同じ往復を通す）。
-        command.upgrade(cfg, "head")
+        # 往復: 0045 へ上げ直すと元どおり（ci.yml の pg-concurrency が実 PG で同じ往復を通す）。
+        # "head" ではなく 0045 を明示する（後続のマイグレーションが本テストの最小スキーマに無い表を触るため）。
+        command.upgrade(cfg, "0045_review_hidden_by_admin")
         conn = _connect(db_path)
         try:
             columns = _columns(conn, "reviews")
@@ -294,12 +295,16 @@ def test_0045_waits_for_locks_at_most_3s_only_on_postgresql(monkeypatch):
         assert executed == expected, dialect
 
 
-def test_0045_is_the_single_head_chained_from_0044():
-    """0045 が単独の head として 0044 → 0043 → 0042 に正しく連鎖していること（分岐の防止）。"""
+def test_0045_is_chained_from_0044_on_a_single_head():
+    """0045 が 0044 → 0043 → 0042 に正しく連鎖し、履歴が単一の head に収束していること（分岐の防止）。
+
+    head そのものの固定は最新リビジョンのテスト（現在は test_0046_messages_kind_length_migration.py）
+    が持つ（test_0041・test_0042 と同じ作法）。
+    """
     from alembic.script import ScriptDirectory
 
     script = ScriptDirectory.from_config(_alembic_config())
-    assert script.get_heads() == ["0045_review_hidden_by_admin"]
+    assert len(script.get_heads()) == 1
     rev_0045 = script.get_revision("0045_review_hidden_by_admin")
     assert rev_0045.down_revision == "0044_drop_rating_columns"
     assert script.get_revision("0044_drop_rating_columns").down_revision == (

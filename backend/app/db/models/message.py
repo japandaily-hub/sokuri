@@ -27,6 +27,9 @@ class Message(Base, TimestampMixin):
       "text"               ユーザー・業者の通常発言
       "schedule_proposal"  業者からの日程候補提示（meta.slots に候補一覧）
       "schedule_confirmed" ユーザーによる日程確定（システムメッセージ）
+      "complete_request"   業者からの完了確定の依頼（sender_type="operator"）
+      "completed"          完了確定（システムメッセージ。meta.final_amount・
+                           meta.completed_by="user"|"admin"）
       "system"             その他システム通知
     """
 
@@ -43,8 +46,11 @@ class Message(Base, TimestampMixin):
     sender_type: Mapped[str] = mapped_column(String(16), nullable=False)
     sender_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid, nullable=True)
     body: Mapped[str] = mapped_column(Text, nullable=False)
-    # "text" | "schedule_proposal" | "schedule_confirmed" | "system"
-    kind: Mapped[str] = mapped_column(String(16), nullable=False, default="text")
+    # "text" | "schedule_proposal" | "schedule_confirmed" | "complete_request" |
+    # "completed" | "system"
+    # 32文字: 0046 で 16 → 32 に拡幅（schedule_proposal=17字・schedule_confirmed=18字が
+    # 旧列長を超えており、PostgreSQL では INSERT が失敗しうる潜在不具合だった）。
+    kind: Mapped[str] = mapped_column(String(32), nullable=False, default="text")
     meta: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
     # relations

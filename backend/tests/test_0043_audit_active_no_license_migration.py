@@ -8,7 +8,7 @@ test_0042 と同じ理由（alembic の env.py が内部で ``asyncio.run()`` �
 - 値を一切変更しない（upgrade 前後で operators の全行が同じ。UPDATE/INSERT/DELETE・DDL を
   発行しない）。0 件でもログを出す。downgrade は no-op で、往復しても値は変わらない。
 - 0043 が 0042 に連鎖し単一の head に収束していて、リビジョン ID が 32 文字以内（head そのものの
-  固定は最新リビジョンのテストへ移設。現在は test_0045_review_hidden_by_admin_migration.py）。
+  固定は最新リビジョンのテストへ移設。現在は test_0046_messages_kind_length_migration.py）。
 """
 
 from __future__ import annotations
@@ -183,7 +183,7 @@ def test_0043_logs_zero_when_no_active_operator_lacks_license(tmp_path, monkeypa
 def test_0043_is_chained_from_0042_on_a_single_head():
     """0043 が 0042 に正しく連鎖し、履歴が単一の head に収束していること（分岐の防止）。
 
-    head そのものの固定は最新リビジョンのテスト（現在は test_0045_review_hidden_by_admin_migration.py）
+    head そのものの固定は最新リビジョンのテスト（現在は test_0046_messages_kind_length_migration.py）
     が持つ（0044 以降の追加で本テストが head 固定のまま壊れないようにする。test_0042 と同じ作法）。
     """
     from alembic.script import ScriptDirectory
