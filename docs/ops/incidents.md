@@ -1,6 +1,6 @@
 # 障害台帳と再発防止の仕組み（学習する運用）
 
-更新: 2026-09-07。**障害対応は「直った」では終わらない。この台帳に1行足し、教訓をガード（自動検査）に変えて初めて完了。**
+更新: 2026-09-27。**障害対応は「直った」では終わらない。この台帳に1行足し、教訓をガード（自動検査）に変えて初めて完了。**
 Claude / Codex はセッション開始時に本ファイルの「原則」と「未収束の教訓」を読む（`AGENTS.md` 参照）。
 
 ## 原則（すべての障害対応の完了条件）
@@ -35,11 +35,14 @@ Claude / Codex はセッション開始時に本ファイルの「原則」と�
 | アラート宛先の照合 | 運営アラート（[CRITICAL]/[RECOVERED]）の宛先に管理者が入っているか。失敗と復旧が別の受信箱に散ると未解決に見える | `ops_jobs.check_alert_recipients` + `backend/tests/test_ops_cron_cadence.py` | 日次 / pytest |
 | Ops cron 欠測検知 | スケジュール実行の成功が24時間で下限未満（＝止まっている）。過去の失敗回数は積まない＝自己増殖ループにしない | `ops_jobs.py` daily ⑤ + `backend/tests/test_ops_cron_cadence.py` | 日次 / pytest |
 | 外形監視の HEAD 対応 | `/health` `/readyz` が HEAD を受ける（UptimeRobot は HEAD で叩く。GET 専用だと 405＝Down 誤判定） | `backend/tests/test_main.py` | pytest（CI） |
+| CI build の外部取得の一時失敗 | next/font の Google Fonts 取得の一時失敗で main を赤くしない（それ以外の build 失敗は即失敗のまま） | `ci.yml` web ジョブの Build（`An error occurred in next/font` のときだけ 15 秒後に 1 回再試行） | push (main)・PR ごと |
 
 ## 台帳
 
 | ID | 日付 | 通知元 / 症状 | 根本原因 | 対処 | 再発防止ガード | 状態 |
 |---|---|---|---|---|---|---|
+| INC-2026-09-25-1 | 2026-09-25 | GitHub「Run failed: CI」＋ LINE／メール [FAILED]（CI #215・7fc842e・15:07 JST）。web ジョブの Build（next build）が `An error occurred in next/font`（`TypeError: Cannot read properties of null (reading '1')`・`@next/font/dist/google/loader.js:122`） | next/font が build 時に取得する Google Fonts の CSS の一時的な取得失敗（外部要因）。7fc842e の変更（E2E・eslint 設定・CI の lint 対象）とは無関係で、同じ構成の次の実行（#217・ccd1e49）は success。直近 100 回の CI で next/font 起因はこの 1 回だけ | 自動で [RECOVERED]（#217）。コードの修正は不要 | CI の Build を「next/font の失敗に限り 15 秒後に 1 回だけ再試行」に（他の失敗は即失敗のまま）。Vercel 本番の build が同じ理由で落ちても直前のデプロイが配信を続けるので、Deployments API の state で確かめて再デプロイする | open（ガードの本番確認待ち） |
+| INC-2026-09-25-2 | 2026-09-25 | GitHub「Run failed: CI」＋ [FAILED]（CI #219・0d6005d と 96371e9 をまとめた push で head は 96371e9・16:19 JST）。pg-concurrency の前処理で `POST /cases/{id}/bids -> 403 アカウントは承認待ちです` | 0d6005d で招待コード経由の業者も signup 直後は pending（許可証提出＋運営承認まで入札不可）にしたが、`scripts/pg_concurrency_check.py` の業者作成が旧フロー（招待コードで即 active）のままだった。検査が仕様変更を検出したもので、本番の不具合ではない | e00e21c で検査スクリプトと `backend/seed_local_e2e.py` の業者を許可証提出＋運営承認まで通す。#221 で success・自動で [RECOVERED] | 既存の pg-concurrency ジョブが検出した（ガードは機能）。業者の状態遷移を変えるときは、検査スクリプトと E2E シードの業者作成も同じ変更で直す | closed |
 | INC-2026-09-11-3 | 2026-09-04〜09-11 | 「失敗の通知は来るのに復旧が来ない」状態が続く（運営の体感） | 通知先の不一致。GitHub の「Run failed」と UptimeRobot は運営のメイン受信箱 `ko.13.hei@gmail.com` に届くが、こちらの `notify()`（[CRITICAL] / [RECOVERED] / 日次ジョブの要対応）は `ALERT_EMAILS` = `katazuke.support@gmail.com` にしか届いていなかった。LINE には両方届くのでメールだけ片側が欠けていた | `ALERT_EMAILS` に `ko.13.hei@gmail.com` を追加（GitHub Secrets と `.env.alerts` の両方）。テスト送信で両アドレスへの delivered を Brevo で実測 | 日次ジョブ ①-2 で「管理者アドレスが ALERT_EMAILS に含まれるか」を照合（`ops_jobs.check_alert_recipients`・`test_ops_cron_cadence.py` 4 件） | closed |
 | INC-2026-09-11-1 | 2026-09-08〜09-11 | GitHub「Run failed: Ops cron」が 3 晩連続（9/8 21:02・9/9 20:51・9/10 20:45 UTC）＋ LINE／メールに「日次ジョブで要対応の項目」 | **自己増殖ループ。** `_check_hourly_runs` が「直近24時間に Ops cron の失敗が n 回」を要対応に積んでいたため、前日の失敗そのものが翌日の daily を失敗させ、その失敗をさらに翌日が検知する。起点は 9/7 の Brevo 差出人拒否（INC-2026-09-08-1・9/8 に解消済み）で、真因が消えたあとも 3 晩通知が届き続けた。9/9・9/10 の要対応項目は「失敗が 1 回」の 1 行のみ | 失敗回数を要対応から外し、ログ表示だけに変更（個々の失敗は発生時に fail()・notify-failure・GitHub メールが通知済みで重複）。欠測検知（成功回数が下限未満）は維持 | `backend/tests/test_ops_cron_cadence.py`（過去の失敗だけでは要対応にしない／スケジュール停止は検知する） | closed（9/11 16:20 JST 修正後の判定を実 GitHub 履歴＝同じ入力に対して実行し「要対応なし」を確認。16:38 JST の手動実行 #41 で `daily: all clear`・`recovered: notified=['email','line']`） |
 | INC-2026-09-11-2 | 2026-09-08〜09-11 | UptimeRobot「Monitor is DOWN: カタヅケ API (backend)」（9/8 13:23 JST）。以後 3 日間 UP 通知が来ない | UptimeRobot は HEAD で監視するが、`/health` `/readyz` が GET 専用で 405 を返していた。修正は 9/8 にコミット済み（a88756d）だったが **push されず本番に反映されていなかった**。台帳で INC-2026-09-08-2 を closed にした時点で本番反映を確認していなかったのが判断ミス | a88756d を本番へ反映（`@app.api_route(methods=["GET","HEAD"])`）。UptimeRobot が UP に復帰 | `backend/tests/test_main.py::test_health_and_readyz_accept_head_for_external_monitors`／運用面は原則 5（下記）を追加 | closed（9/11 16:40 JST 本番 8e98f7e 反映後に HEAD `/health` `/readyz` とも 200 を実測、本番ログで UptimeRobot の HEAD 検査が 200 を受領、16:50 JST に「Monitor is UP」メールを確認） |

@@ -106,6 +106,9 @@ $env:RL_CASE_CREATE_IP_MAX="200"; $env:RL_CASE_CREATE_ACCOUNT_MAX="200"
   クリックを横取りする（チャット画面は 100vh 固定なのでスクロールでは避けられない）。next.config の
   `devIndicators` は next dev の起動設定で E2E だけに限定できず、DevTools の「Hide Dev Tools」は
   dev サーバー側に保存されて開発者のブラウザにも効くため、どちらも使わない（`helpers/test.ts`）。
+- **CI は E2E を実行しないが、型と lint は守る。** web ジョブで `npx tsc -p e2e/tsconfig.json`（ルートの
+  tsconfig は `e2e` を除外しているため別に回す）と `npx eslint src e2e` を通す。spec や helpers を変えたら
+  push 前にローカルでも同じ2つを流す。
 
 ## PG 同時実行チェックの手順
 

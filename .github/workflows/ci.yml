@@ -2,7 +2,7 @@ name: CI
 
 # push (main) / pull_request 時に自動実行する統合チェック。
 # - backend: pytest（SQLite・秘密情報不要）
-# - web: tsc --noEmit → eslint（警告は許容・エラーのみ失敗）→ next build
+# - web: tsc --noEmit（src）→ tsc（e2e）→ eslint（src・e2e。警告は許容・エラーのみ失敗）→ node --test → next build
 #   next build に必要な環境変数はダミー値を使用（本番の秘密情報は使わない）。
 # 直近、tsc/eslint は通るのに next build だけ落ちる不備（useSearchParams の
 # Suspense 欠落）が本番直前に発覚したため、push/PR ゲートとして next build まで通す。
@@ -142,6 +142,11 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      - name: Type check (E2E)
+        # e2e/ はルートの tsconfig.json で exclude しているため、上の tsc では検査されない。
+        # E2E の実行自体はローカルスタック前提で CI では行わない（docs/ops/e2e.md）。型だけはここで守る。
+        run: npx tsc -p e2e/tsconfig.json
+
       - name: Lint (errors only fail; warnings allowed)
         # e2e も対象にする: spec が next dev の開発用オーバーレイを消す fixture（e2e/helpers/test.ts）を
         # 迂回していないかを eslint.config.mjs のルールで検査している（docs/ops/e2e.md の設計方針）。
@@ -151,7 +156,23 @@ jobs:
         run: node --test --disable-warning=MODULE_TYPELESS_PACKAGE_JSON "src/**/*.test.mts"
 
       - name: Build
-        run: npx next build
+        # next/font は build 時に Google Fonts の CSS を取得する。その一時的な失敗で
+        # 「An error occurred in `next/font`」となり main が赤くなった（INC-2026-09-25-1・直近 100 回中 1 回）。
+        # この文言の失敗に限って 15 秒待って 1 回だけやり直す（next build は開始時に .next を消すので前回の残骸は効かない）。
+        # 文言は next/font の未知のエラー全般で出るため設定の不具合でも再試行するが、その場合は 2 回目も落ちて赤になる。
+        # それ以外の失敗（型・構文・Suspense 欠落等）は再試行せず即失敗のまま。
+        run: |
+          set -o pipefail
+          if npx next build 2>&1 | tee "$RUNNER_TEMP/next-build.log"; then
+            exit 0
+          fi
+          if grep -qF 'An error occurred in `next/font`' "$RUNNER_TEMP/next-build.log"; then
+            echo "::warning::next/font の取得に失敗したため next build を 1 回だけやり直します（INC-2026-09-25-1）"
+            sleep 15
+            npx next build
+          else
+            exit 1
+          fi
 
   # 失敗 → 復旧を運営へ通知する。GitHub は失敗メールしか送らないため、LINE／メールへ
   # 「[FAILED]」と「[RECOVERED]」を同じ経路で届ける（正常時は通知しない）。
