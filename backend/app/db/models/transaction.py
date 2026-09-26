@@ -13,7 +13,6 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
-    Integer,
     String,
     Text,
     UniqueConstraint,
@@ -145,7 +144,8 @@ class Review(Base, TimestampMixin):
 
     評価は ``verdict``（"good"＝よかった／"improve"＝伸びしろ）。2026-09-25 に★1〜5 から2択へ
     移行した（alembic 0040 で列追加と既存評価の変換 → 0041 でずれの補正 → 0042 で verdict を
-    NOT NULL・rating を NULL 可にして完了）。
+    NOT NULL・rating を NULL 可にしてアプリから撤去 → モデルのマップと rating CHECK の宣言も撤去し、
+    DB 列と CHECK は 0044_drop_rating_columns で削除）。
     """
 
     __tablename__ = "reviews"
@@ -153,16 +153,12 @@ class Review(Base, TimestampMixin):
         # 本番の制約と同じ名前・条件をモデルにも宣言する（テストの create_all でも効かせ、
         # 二重投稿の IntegrityError → 409 経路を SQLite でも検証できるようにする）。
         # 名前は conv() で確定名として渡す: 命名規約 "ck_%(table_name)s_%(constraint_name)s" は
-        # 明示名にも前置される。0004 は create_table に "ck_reviews_rating" を渡したが alembic 経由で
-        # 命名規約が掛かり、実名は "ck_reviews_ck_reviews_rating"（0004 のオフライン DDL で確認）。
-        # 0040 の CHECK は op.f() で "ck_reviews_verdict" に確定させた。実名との一致は
-        # tests/test_review_model_constraints.py で固定している。
+        # 明示名にも前置される（0004 の★の CHECK は "ck_reviews_rating" と書かれたが実名は
+        # "ck_reviews_ck_reviews_rating" になった。その CHECK は★の撤去でモデルの宣言から外し、
+        # 0044 は名前を推測せず DB から読んで削除する）。0040 の CHECK は op.f() で
+        # "ck_reviews_verdict" に確定させた。実名との一致は tests/test_review_model_constraints.py で固定している。
         UniqueConstraint(
             "transaction_id", "reviewer_type", name=conv("uq_reviews_transaction_reviewer")
-        ),
-        # rating は撤去済みだが DB 列と制約は残置しているため宣言も残す（NULL は CHECK を通る）。
-        CheckConstraint(
-            "rating >= 1 AND rating <= 5", name=conv("ck_reviews_ck_reviews_rating")
         ),
         CheckConstraint("verdict IN ('good','improve')", name=conv("ck_reviews_verdict")),
     )
@@ -177,13 +173,21 @@ class Review(Base, TimestampMixin):
     reviewer_type: Mapped[str] = mapped_column(String(32), nullable=False)  # 'user' | 'operator'
     # 評価: 'good'（よかった）| 'improve'（伸びしろ）。alembic 0042 で NOT NULL。
     verdict: Mapped[str] = mapped_column(String(16), nullable=False)
-    # 旧形式の★（1–5）。撤去済み（alembic 0042）: DB 列は残置し、アプリは読まず書き込まない
-    # （0042 以降の新しい評価は NULL。operator_profiles の is_public 等と同じ流儀）。
-    rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # 旧形式の★（rating 1–5）は撤去済み: alembic 0042 で NULL 可にしてアプリの読み書きを止め、
+    # モデルのマップも外した（DB 列の削除は 0044_drop_rating_columns）。INSERT が列を省くので、
+    # 0044 適用前の DB では NULL が入り（NULL は旧 CHECK を通る）、適用後は列そのものが無い。
     comment: Mapped[str | None] = mapped_column(Text)
     # 運営による論理削除（公開・集計から除外。物理削除はせず証跡を残す）。
     hidden_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     hidden_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # 今この口コミを削除（非表示）にしている運営アカウント（alembic 0045）。元に戻すと NULL に戻し、
+    # 誰がいつ消して戻したかの履歴は操作ログ（admin_review_hide）にだけ残す。API は運営向けの一覧
+    # （AdminReviewListItem）にだけ出し、ReviewOut・PublicReviewOut には含めない（当事者に運営個人を
+    # 開示しない。cancellations.cancelled_by_admin_id と同方針）。運営アカウントが削除されても
+    # 口コミの行は残す（SET NULL）。
+    hidden_by_admin_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     # relations
     transaction: Mapped[Transaction] = relationship(back_populates="reviews")

@@ -2,7 +2,7 @@
 
 reviewer_type はトークン種別から導出する（クライアント指定を信用しない）。
 評価は verdict（よかった／伸びしろ）のみ（旧形式の★は alembic 0042 で撤去済みで、rating は
-保存しない。入力規則は schemas_katadzuke.ReviewCreateRequest）。
+モデルにも無い＝DB 列は 0044 で削除。入力規則は schemas_katadzuke.ReviewCreateRequest）。
 ユーザー → 業者のレビュー投稿時は operators の集計列（good_count / improve_count /
 review_count ほか）を再計算する。
 当事者性と状態はロック前にロック無しで確かめ（第三者は行ロックを取れない）、同じ取引への
@@ -175,7 +175,7 @@ async def create_review(
             status_code=status.HTTP_409_CONFLICT, detail="既にレビュー投稿済みです。"
         )
 
-    # rating（旧形式の★）は alembic 0042 で撤去済みのため書かない（列は NULL のまま）。
+    # rating（旧形式の★）は撤去済みでモデルにマップしていない（0044 適用前の DB では NULL が入る）。
     review = Review(
         transaction_id=txn.id,
         reviewer_type=reviewer_type,

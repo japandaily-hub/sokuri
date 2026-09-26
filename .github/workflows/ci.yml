@@ -97,6 +97,15 @@ jobs:
           python scripts/pg_alembic_upgrade.py upgrade head || echo "::notice::1回目の upgrade が失敗（新規 DB では 0008 で想定内）。2回目で head 到達を判定します"
           python scripts/pg_alembic_upgrade.py upgrade head
 
+      # 0044（★列の削除）・0045（口コミを削除した運営の記録）の downgrade を実 PostgreSQL で通す往復。
+      # SQLite の移行テストは batch（表の作り直し）の経路なので、PG の ALTER・LOCK の経路はここでしか
+      # 通らない。0043 まで戻して（0045 の列・FK・索引が消え、★列が NULL で戻る）から head へ上げ直し、
+      # 続く同時実行シナリオは上げ直した後のスキーマで走らせる。
+      - name: Round-trip the latest migrations (downgrade 0043 then upgrade head)
+        run: |
+          python scripts/pg_alembic_upgrade.py downgrade 0043_audit_active_no_license
+          python scripts/pg_alembic_upgrade.py upgrade head
+
       - name: Start API on PostgreSQL (:8001)
         run: |
           nohup python scripts/run_pg_e2e.py > /tmp/pg_api.log 2>&1 &

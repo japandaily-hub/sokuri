@@ -11,7 +11,7 @@ from typing import Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from fastapi.responses import Response
-from sqlalchemy import case, func, or_, select, update
+from sqlalchemy import Select, case, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -50,6 +50,9 @@ from app.schemas_katadzuke import (
     AdminContactHandleResponse,
     AdminContactListItem,
     AdminContactListResponse,
+    AdminReviewListCounts,
+    AdminReviewListItem,
+    AdminReviewListResponse,
     AdminTransactionCancelRequest,
     AdminTransactionCancelResponse,
     AdminTransactionListItem,
@@ -547,6 +550,157 @@ async def delete_operator(
     return AdminOperatorDeleteResponse(id=operator_id_value, detail="アカウントを削除しました。")
 
 
+# ──────────────────────────── 口コミの管理 ────────────────────────────
+
+# GET /admin/reviews の q の上限（口コミ ID・取引 ID・業者名。UUID は 36 字）。
+_ADMIN_REVIEW_Q_MAX_LENGTH = 100
+
+_REVIEW_NOT_FOUND = http_exception_factory(
+    status_code=status.HTTP_404_NOT_FOUND, detail="Review not found."
+)
+
+
+def _join_review_operator(stmt: Select) -> Select:
+    """口コミ一覧の FROM（Review→Transaction は内部結合、Bid・Operator は外部結合）。
+
+    業者が退会（匿名化）しても口コミの行を出すため Bid・Operator は外部結合にする。件数（total）と
+    一覧（items）で同じ結合を使い、業者 ID・業者名の絞込が両方に同じく効くようにする。
+    """
+    return (
+        stmt.select_from(Review)
+        .join(Transaction, Review.transaction_id == Transaction.id)
+        .outerjoin(Bid, Transaction.bid_id == Bid.id)
+        .outerjoin(Operator, Bid.operator_id == Operator.id)
+    )
+
+
+@router.get(
+    "/admin/reviews",
+    response_model=AdminReviewListResponse,
+    summary="口コミ一覧（運営の口コミ管理・表示中/削除済み・向き・評価・業者で絞込・新しい順）",
+)
+async def admin_list_reviews(
+    visibility: Literal["visible", "hidden", "all"] = Query(
+        default="all",
+        description="visible=表示中 / hidden=削除済み（非表示）/ all=すべて。省略時 all。",
+    ),
+    reviewer_type: Literal["user", "operator"] | None = Query(
+        default=None, description="user=依頼者→業者 / operator=業者→依頼者。省略時は両方。"
+    ),
+    verdict: Literal["good", "improve"] | None = Query(
+        default=None, description="good=よかった / improve=伸びしろ。省略時は両方。"
+    ),
+    operator_id: uuid.UUID | None = Query(default=None, description="業者 ID の完全一致。"),
+    q: str | None = Query(
+        default=None,
+        max_length=_ADMIN_REVIEW_Q_MAX_LENGTH,
+        description="口コミ ID・取引 ID の完全一致（UUID） または 業者名の部分一致",
+    ),
+    limit: int = Query(default=_ADMIN_CASE_TXN_DEFAULT_LIMIT, ge=1, le=_ADMIN_CASE_TXN_MAX_LIMIT),
+    offset: int = Query(default=0, ge=0),
+    admin: User = Depends(get_current_admin),
+    session: AsyncSession = Depends(get_session),
+) -> AdminReviewListResponse:
+    """運営が口コミを確認・削除するための一覧（2026-09-25 運営の口コミ管理）。
+
+    - ``total`` は絞込後の件数、``counts``（all / visible / hidden）は絞込に関わらない全件の内訳
+      （list_operators と同じ契約。状態バッジの件数表示用）。
+    - q は前後の空白を除いて UUID として読めれば口コミ ID・取引 ID の完全一致（部分 UUID の前方一致は
+      しない）、読めなければ業者名の部分一致（security review M-3 と同方針で ilike はエスケープ付き）。
+    - 一覧は1クエリ（業者 ID・業者名は外部結合で同時に取る＝行ごとの追加 SELECT をしない）。
+      並びは created_at 降順・同時刻は id 降順（ページ跨ぎで重複・欠落しない）。
+    - 依頼者のメール等は返さない。ログには絞込の種類・件数だけを書き、本文・理由・q の中身は書かない。
+    """
+    conditions: list = []
+    if visibility == "visible":
+        conditions.append(Review.hidden_at.is_(None))
+    elif visibility == "hidden":
+        conditions.append(Review.hidden_at.isnot(None))
+    if reviewer_type is not None:
+        conditions.append(Review.reviewer_type == reviewer_type)
+    if verdict is not None:
+        conditions.append(Review.verdict == verdict)
+    if operator_id is not None:
+        conditions.append(Bid.operator_id == operator_id)
+    q_norm = (q or "").strip()
+    if q_norm:
+        parsed_id = _try_parse_uuid(q_norm)
+        if parsed_id is not None:
+            # 貼り付けられた ID が口コミ ID か取引 ID かは画面側で区別できないため両方に当てる
+            # （admin_list_transactions と同じ流儀）。
+            conditions.append(or_(Review.id == parsed_id, Review.transaction_id == parsed_id))
+        else:
+            conditions.append(
+                Operator.company_name.ilike(f"%{_escape_ilike_value(q_norm)}%", escape="\\")
+            )
+
+    total = await session.scalar(
+        _join_review_operator(select(func.count())).where(*conditions)
+    )
+    # 状態バッジ用の内訳は絞込に関わらず全件で数える（count().filter() の1クエリ）。
+    # reviews.transaction_id は NOT NULL の FK（ON DELETE CASCADE）なので、結合せずに数えても
+    # 一覧の母集団（Transaction との内部結合）と一致する。
+    all_count, visible_count, hidden_count = (
+        await session.execute(
+            select(
+                func.count(),
+                func.count().filter(Review.hidden_at.is_(None)),
+                func.count().filter(Review.hidden_at.isnot(None)),
+            ).select_from(Review)
+        )
+    ).one()
+    rows = (
+        await session.execute(
+            _join_review_operator(select(Review, Bid.operator_id, Operator.company_name))
+            .where(*conditions)
+            # created_at 単独だと同時刻の行がページング境界で重複・欠落しうる
+            # （admin_list_contacts と同型の tie-breaker）。
+            .order_by(Review.created_at.desc(), Review.id.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+    ).all()
+    items = [
+        AdminReviewListItem(
+            id=review.id,
+            transaction_id=review.transaction_id,
+            reviewer_type=review.reviewer_type,
+            verdict=review.verdict,
+            comment=review.comment,
+            created_at=review.created_at,
+            hidden_at=review.hidden_at,
+            hidden_reason=review.hidden_reason,
+            hidden_by_admin_id=review.hidden_by_admin_id,
+            operator_id=row_operator_id,
+            company_name=company_name,
+        )
+        for review, row_operator_id, company_name in rows
+    ]
+
+    # 本文・削除の理由・q の中身は第三者の個人情報を含みうるためログに書かない（絞込の種類と件数のみ）。
+    logger.info(
+        "admin: 口コミ一覧を取得しました - visibility=%s reviewer_type=%s verdict=%s"
+        " operator_filter=%s has_q=%s count=%d total=%d admin_id=%s",
+        visibility,
+        reviewer_type,
+        verdict,
+        operator_id is not None,
+        bool(q_norm),
+        len(items),
+        total or 0,
+        admin.id,
+    )
+    return AdminReviewListResponse(
+        items=items,
+        total=int(total or 0),
+        counts=AdminReviewListCounts(
+            all=int(all_count or 0),
+            visible=int(visible_count or 0),
+            hidden=int(hidden_count or 0),
+        ),
+    )
+
+
 @router.patch("/admin/reviews/{review_id}/hide", response_model=ReviewOut)
 async def hide_review(
     review_id: uuid.UUID,
@@ -554,27 +708,58 @@ async def hide_review(
     admin: User = Depends(get_current_admin),
     session: AsyncSession = Depends(get_session),
 ) -> ReviewOut:
-    """口コミを運営が非表示（hidden=true）／再表示（false）にする。
+    """口コミを運営が削除（hidden=true・非表示）／元に戻す（false）。
 
     口コミは常時公開のため、誹謗中傷・第三者の個人情報・送信防止措置の申出への
     対応経路として用意する（security review H-2）。物理削除はせず hidden_at で
     論理削除し、公開プロフィール・一覧・集計（good_count / improve_count / review_count /
-    抜粋）から除外する（再表示で戻す。再計算は services/review_stats.py）。
+    抜粋）から除外する（元に戻すで再表示。再計算は services/review_stats.py）。
+
+    2026-09-25 運営の口コミ管理で強化（パスと応答 ReviewOut は不変）:
+    - 削除は理由必須（ReviewHideRequest が 422 で弾く）。今削除している運営を hidden_by_admin_id に
+      残す。元に戻すと hidden_at・hidden_reason・hidden_by_admin_id の3列とも NULL（履歴は操作ログ）。
+    - reviews の行ロック → （再計算で）operators の行ロックの順に取り、同時操作を直列化する
+      （投稿の経路は既存の reviews の行を掴まないため、順序の循環は生じない）。
+    - 冪等: 既に要求と同じ状態なら何も書かず再計算もせず 200（最初に削除した人・時刻・理由を保持。
+      admin_handle_contact と同じ流儀＝二度押し・同時押しで記録が後勝ちで消えないようにする）。
     """
-    review = await session.get(Review, review_id)
+    # populate_existing: セッションに古い状態が載っていても、ロックを取った最新の行で判定する。
+    review = await session.get(Review, review_id, with_for_update=True, populate_existing=True)
     if review is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review not found.")
-    review.hidden_at = datetime.now(timezone.utc) if body.hidden else None
-    review.hidden_reason = (body.reason or None) if body.hidden else None
-    await session.flush()
-    txn = await session.get(Transaction, review.transaction_id)
-    bid = await session.get(Bid, txn.bid_id) if txn is not None else None
-    if review.reviewer_type == "user" and bid is not None:
-        await recalc_operator_review_stats(session, bid.operator_id)
+        raise _REVIEW_NOT_FOUND()
+    # 取引→入札から業者を引く（1クエリ・ロックなし。集計の再計算と操作ログ用）。
+    operator_id = await session.scalar(
+        select(Bid.operator_id)
+        .join(Transaction, Transaction.bid_id == Bid.id)
+        .where(Transaction.id == review.transaction_id)
+    )
+    changed = (review.hidden_at is not None) != body.hidden
+    if changed:
+        if body.hidden:
+            review.hidden_at = datetime.now(timezone.utc)
+            review.hidden_reason = body.reason
+            review.hidden_by_admin_id = admin.id
+        else:
+            review.hidden_at = None
+            review.hidden_reason = None
+            review.hidden_by_admin_id = None
+        # autoflush=False のため、再計算の集計クエリが今回の変更を読むよう明示的に flush する。
+        await session.flush()
+        # 集計の母集団は依頼者→業者だけ（業者→依頼者の口コミは業者の件数・最新口コミに影響しない）。
+        if review.reviewer_type == "user" and operator_id is not None:
+            await recalc_operator_review_stats(session, operator_id)
+    # 変更が無い場合も commit で行ロックを解放する（書き込むものは無い）。
     await session.commit()
-    await session.refresh(review)
+    if changed:
+        await session.refresh(review)
+    # 削除の理由は第三者の個人情報を含みうるためログに書かない（誰が・どれを・どちらへ・変えたか）。
     logger.info(
-        "admin_review_hide admin=%s review=%s hidden=%s", admin.id, review.id, body.hidden
+        "admin_review_hide admin=%s review=%s operator=%s hidden=%s changed=%s",
+        admin.id,
+        review.id,
+        operator_id,
+        body.hidden,
+        changed,
     )
     return ReviewOut.model_validate(review)
 

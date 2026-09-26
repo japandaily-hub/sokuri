@@ -24,6 +24,7 @@ from app.core.limits import (
     MAX_PHOTOS_PER_ITEM,
     MAX_REDUCTION_REQUESTS_PER_TRANSACTION,
     REVIEW_COMMENT_MAX_LENGTH,
+    REVIEW_HIDE_REASON_MAX_LENGTH,
 )
 from app.db.models.enums import ItemCondition
 from app.services.message_guard import contains_contact_info
@@ -1029,14 +1030,43 @@ class ReviewOut(BaseModel):
     comment: str | None
     created_at: datetime
     # 運営が非表示にした日時（公開プロフィール・集計から除外される）。
+    # 削除の理由（hidden_reason）と実施者（hidden_by_admin_id）は意図して含めない（当事者に運営の
+    # 判断内容・運営個人を開示しない。運営向けは AdminReviewListItem）。
     hidden_at: datetime | None = None
 
 
 class ReviewHideRequest(BaseModel):
-    """運営による口コミの非表示／再表示（admin 専用）。物理削除はせず論理削除で証跡を残す。"""
+    """運営による口コミの削除（hidden=true・非表示）／元に戻す（false）（admin 専用）。
+
+    物理削除はせず論理削除で証跡を残す（送信防止措置・発信者情報開示の申出に応じるため、また
+    誤操作を戻せるようにするため）。削除（hidden=true）は理由が必須: 前後の空白を除いて 1〜200 字で、
+    他の自由入力と同じ無害化（NFKC 正規化・制御文字除去・連絡先/URL 拒否）を掛ける。欠落・空白だけ
+    は 422。元に戻す（hidden=false）の reason は無視する（保存しない）。
+    """
 
     hidden: bool
-    reason: str | None = Field(default=None, max_length=200)
+    # 上限は前後の空白を除いてから数える（下の検証）。Field の max_length にしないのは、元に戻す
+    # （hidden=false）では中身を見ずに捨てるためと、前後の空白で 200 字を超えただけの入力を弾かないため。
+    reason: str | None = None
+
+    @model_validator(mode="after")
+    def _require_reason_when_hiding(self) -> "ReviewHideRequest":
+        if not self.hidden:
+            self.reason = None
+            return self
+        stripped = (self.reason or "").strip()
+        # 無害化（NFKC 正規化）より前に長さで弾く（巨大な入力を正規化しない）。
+        if len(stripped) > REVIEW_HIDE_REASON_MAX_LENGTH:
+            raise ValueError(
+                f"削除の理由は{REVIEW_HIDE_REASON_MAX_LENGTH}字以内で入力してください。"
+            )
+        reason = _sanitize_free_text(
+            stripped, max_length=REVIEW_HIDE_REASON_MAX_LENGTH, field_label="削除の理由"
+        )
+        if reason is None:
+            raise ValueError("口コミを削除する理由を入力してください。")
+        self.reason = reason
+        return self
 
 
 class PublicReviewOut(BaseModel):
@@ -1547,6 +1577,46 @@ class AdminContactHandleResponse(BaseModel):
 
     id: uuid.UUID
     handled_at: datetime
+
+
+class AdminReviewListItem(BaseModel):
+    """GET /admin/reviews の1件（運営の口コミ管理・2026-09-25）。
+
+    本文は全文（公開画面の抜粋ではなく運営の判断材料）。依頼者のメール等の個人情報は含めない。
+    ``hidden_by_admin_id`` は「今削除（非表示）にしている運営」だけ（元に戻すと NULL。履歴は操作ログ）。
+    hidden_reason・hidden_by_admin_id は admin 認証済みのこの応答にだけ載せ、ReviewOut・
+    PublicReviewOut（当事者・公開向け）には出さない（運営個人を当事者に開示しない）。
+    業者は Bid・Operator の外部結合で引くため、業者が退会（匿名化）しても行は出る
+    （operator_id・company_name は型の上では NULL 可）。
+    """
+
+    id: uuid.UUID
+    transaction_id: uuid.UUID
+    reviewer_type: str  # 'user'（依頼者→業者）| 'operator'（業者→依頼者）
+    verdict: ReviewVerdict
+    comment: str | None
+    created_at: datetime
+    hidden_at: datetime | None
+    hidden_reason: str | None
+    hidden_by_admin_id: uuid.UUID | None
+    operator_id: uuid.UUID | None
+    company_name: str | None
+
+
+class AdminReviewListCounts(BaseModel):
+    """GET /admin/reviews の ``counts``（絞込に関わらない全件の内訳。OperatorListCounts と同じ契約）。"""
+
+    all: int
+    visible: int
+    hidden: int
+
+
+class AdminReviewListResponse(BaseModel):
+    """GET /admin/reviews の一覧応答（items + 絞込後の total + 全件内訳の counts）。"""
+
+    items: list[AdminReviewListItem]
+    total: int
+    counts: AdminReviewListCounts
 
 
 # 前方参照の解決
