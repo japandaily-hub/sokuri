@@ -13,6 +13,11 @@ import { ensureUnscheduledTransaction } from "./helpers/fixtures";
 import { test, expect, newE2EContext } from "./helpers/test";
 import { confirmModal, loginAsUser } from "./helpers/ui";
 
+// サーバーは自由入力を NFKC 正規化して保存する（全角の記号は半角になる）ため、
+// 保存後の比較は正規化後の値で行う
+const HIDE_REASON = "誹謗中傷・名誉毀損のおそれ：E2E検証";
+const SAVED_HIDE_REASON = HIDE_REASON.normalize("NFKC");
+
 let api: Api;
 let sellerToken: string;
 let adminToken: string;
@@ -101,14 +106,14 @@ test("運営が口コミを削除・元に戻せる。報告→問い合わせ�
     await reviewRows.getByRole("button", { name: "削除する" }).click();
     const hideDialog = adminPage.getByRole("dialog").filter({ hasText: "この口コミを公開画面から削除します" });
     await expect(hideDialog).toBeVisible();
-    await hideDialog.getByLabel(/削除理由/).fill("誹謗中傷・名誉毀損のおそれ：E2E検証");
+    await hideDialog.getByLabel(/削除理由/).fill(HIDE_REASON);
     await hideDialog.getByRole("button", { name: "削除する" }).click();
     await expect(hideDialog).toBeHidden({ timeout: 30_000 });
 
     // ---- backend の契約も直接確認する（UI だけでなく API 応答の hidden_reason を検証） ----
     const hiddenCheck = await api.adminListReviews({ visibility: "hidden", q: review.id }, adminToken);
     expect(hiddenCheck.items).toHaveLength(1);
-    expect(hiddenCheck.items[0]?.hidden_reason).toBe("誹謗中傷・名誉毀損のおそれ：E2E検証");
+    expect(hiddenCheck.items[0]?.hidden_reason).toBe(SAVED_HIDE_REASON);
     expect(hiddenCheck.items[0]?.hidden_at).toBeTruthy();
 
     // ---- 公開画面から消え、件数が1件減っていること ----
@@ -122,7 +127,7 @@ test("運営が口コミを削除・元に戻せる。報告→問い合わせ�
     await adminPage.getByRole("button", { name: "削除済み" }).click();
     const hiddenRow = adminPage.getByRole("row").filter({ hasText: reportComment });
     await expect(hiddenRow).toBeVisible({ timeout: 30_000 });
-    await expect(hiddenRow).toContainText("誹謗中傷・名誉毀損のおそれ：E2E検証");
+    await expect(hiddenRow).toContainText(SAVED_HIDE_REASON);
 
     // ---- 元に戻す ----
     await hiddenRow.getByRole("button", { name: "元に戻す" }).click();
