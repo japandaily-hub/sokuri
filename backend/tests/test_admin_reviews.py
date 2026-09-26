@@ -5,7 +5,8 @@
 - 認可: 未ログインは 401、一般ユーザーは 403（一覧・削除とも）。
 - 一覧: 状態（表示中／削除済み／すべて）・向き・評価・業者 ID の絞込とその組み合わせ。total は絞込後、
   counts は絞込に関わらない全件。q は UUID として読めれば口コミ ID・取引 ID の完全一致（部分 UUID は
-  一致しない）、読めなければ業者名の部分一致（% と _ はエスケープ）。limit は 1〜200・q は 100 字以内。
+  一致しない）、読めなければ業者名の部分一致（% と _ はエスケープ）。業者 ID と業者名の q を同時に
+  指定すると AND。limit は 1〜200・q は 100 字以内。
   同時刻の行もページを跨いで重複・欠落しない。業者が退会（匿名化）しても行は出る。依頼者のメールは出さない。
   SQL の本数は行数によらず一定（N+1 なし）。
 - 削除: 理由必須（欠落・空白・201 字・連絡先入りは 422 で何も書かない）。hidden_by_admin_id を記録し、
@@ -321,6 +322,39 @@ async def test_admin_reviews_q_matches_ids_exactly_and_escapes_company_name(
     assert (await _list(client, token, q="あ" * 100))["total"] == 0
     r = await client.get("/api/v1/admin/reviews", params={"q": "あ" * 101}, headers=_auth(token))
     assert r.status_code == 422
+
+
+async def test_admin_reviews_operator_id_and_company_name_q_are_combined_with_and(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """operator_id と q（業者名の部分一致）を同時に指定すると AND で絞り込む（業者名のリンクで業者を
+    絞った画面から検索欄を使う組み合わせ）。どちらか一方にだけ当たる口コミは出さない。"""
+    s = await _scenario(client, db_session)
+    token = s["admin_token"]
+    op_a_reviews = {s["r1_user"], s["r1_op"], s["r2_user"]}
+
+    cases = [
+        # 「片付け」は業者 A・B の両方の名前に含まれる → operator_id の業者の口コミだけ。
+        ({"operator_id": s["op_b"], "q": "片付け"}, {s["r3_user"]}),
+        ({"operator_id": s["op_a"], "q": "片付け"}, op_a_reviews),
+        # 業者名が operator_id と別の業者にだけ一致する → 0 件（OR なら両方の業者の口コミが出る）。
+        ({"operator_id": s["op_b"], "q": "口コミ管理"}, set()),
+        ({"operator_id": s["op_a"], "q": "別の片付け"}, set()),
+        # 状態・向きの絞込を重ねても AND のまま。
+        (
+            {"operator_id": s["op_a"], "q": "口コミ管理", "visibility": "hidden"},
+            {s["r2_user"]},
+        ),
+        (
+            {"operator_id": s["op_a"], "q": "口コミ管理", "reviewer_type": "operator"},
+            {s["r1_op"]},
+        ),
+    ]
+    for params, expected in cases:
+        body = await _list(client, token, **params)
+        assert set(_ids(body)) == expected, params
+        assert body["total"] == len(expected), params
+        assert body["counts"] == {"all": 4, "visible": 3, "hidden": 1}, params
 
 
 async def test_admin_reviews_paging_is_stable_for_same_timestamp_and_limit_is_bounded(
