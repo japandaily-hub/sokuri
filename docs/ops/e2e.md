@@ -98,8 +98,8 @@ $env:RL_CASE_CREATE_IP_MAX="200"; $env:RL_CASE_CREATE_ACCOUNT_MAX="200"
 | --- | --- |
 | `e2e/01-public-pages.spec.ts` | 公開ページ 8 本が 200・横スクロールなし・console error なし |
 | `e2e/02-seller-select-bid.spec.ts` | 依頼者ログイン → マイページ → 案件詳細で入札を選定（ConfirmModal）→ 成約表示（チャットは画面内に開いた状態で出る） |
-| `e2e/03-chat-unread.spec.ts` | 依頼者チャット送信 → 業者（別 context）で未読 → 返信 → 候補日提案 |
-| `e2e/04-schedule-reduction-complete.spec.ts` | 日程確定 → 減額申請（業者 API）→ 依頼者が承認 → 完了確定 → 評価投稿 |
+| `e2e/03-chat-unread.spec.ts` | 依頼者チャット送信 → 業者（別 context）で未読 → 返信 → 候補日提案（日付入力＋時間帯ボタン。業者側・依頼者側とも件数 +1 で確認） |
+| `e2e/04-schedule-reduction-complete.spec.ts` | 日程確定（当月の今日）→ 減額申請（業者 API）→ 依頼者が承認 → 業者が完了確定を依頼（依頼後はボタンが無効＋注記）→ 完了確定 → 評価投稿 |
 | `e2e/05-admin-operations.spec.ts` | 運営: /admin のバッジ → 事前申込を承認して招待コード表示 → お問い合わせを対応済み |
 | `e2e/06-abnormal-cases.spec.ts` | 運営の強制終了でチャットが閉じる（UI 文言 + API 409）／誤パスワード 6 回で 429 文言 |
 | `e2e/07-session-crossover.spec.ts` | 業者セッションで `/login` を開くとサインアウト導線が出る（ループ再発防止） |
