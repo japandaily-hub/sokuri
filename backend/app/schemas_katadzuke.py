@@ -1371,16 +1371,86 @@ class MessageOut(BaseModel):
 
 # ──────────────────────────── 日程調整 ────────────────────────────
 
+# transactions.visit_time_slot 列が String(32) のため、確定できる文字列の上限は32文字。
+# 従来は候補提示（slots）を64文字・確定（visit_time_slot）を32文字と別上限にしており、
+# 33〜64文字の候補は業者が提示できても、依頼者が確定しようとすると
+# ScheduleConfirmRequest.visit_time_slot の上限（32字）を超えて422になる
+# 不整合があった（DB自体に書き込みが届くわけではなく、この Pydantic 側の
+# max_length で弾かれる）。候補提示の上限もこの値に揃える
+# （2026-09-25 セキュリティレビュー Low 対応）。
+VISIT_TIME_SLOT_MAX_LENGTH = 32
+
+# 業者からの提示が無い取引でも依頼者が確定できる固定5択（日程調整ページ）。
+# web/src/lib/visit-slots.ts の VISIT_TIME_SLOTS の value と1文字違わず一致させること
+# （日程調整ページと業者の候補日提示フォームが共有する唯一の定義）。
+# ここがずれると、日程調整ページ（固定5択）からの確定が
+# transactions.py の _assert_offered_time_slot で 422 になる。
+SCHEDULE_FIXED_TIME_SLOTS: frozenset[str] = frozenset(
+    {
+        "9:00〜12:00",
+        "12:00〜15:00",
+        "15:00〜18:00",
+        "18:00〜21:00",
+        "時間指定なし",
+    }
+)
+
+#: 拒否する Unicode 双方向クラス（日程検証レビュー SEC-L2）。R（右から左に書く文字。
+#: ヘブライ文字等）/ AL（アラビア文字）/ AN（アラビア・インド数字）。
+#: Cf の双方向制御文字（U+202E RLO 等）を拒否しても、これらの文字自体が持つ
+#: 双方向性だけで見た目の桁順を変えられる。例えば「1」と「2月3日」の間に
+#: U+05F3（ヘブライ文字の区切り記号。双方向クラス R）を挟んだ「1{U+05F3}2月3日」は、
+#: 論理順（実際に格納・照合される文字順）では「1」→U+05F3→「2月3日」だが、
+#: 双方向レンダリング規則により画面上は桁が入れ替わって見えることがある。
+#: _slot_month_days は論理順の文字列に対して正規表現で「2月3日」を拾うため、
+#: 業者・依頼者の画面に見えている見た目の日付と、実際に照合・確定される日付が
+#: ずれかねない。候補日・確定時間帯（ScheduleProposeRequest.slots /
+#: ScheduleConfirmRequest.visit_time_slot）にのみ適用し、右から左の文字を書く
+#: 正当な用途がありうる note・お問い合わせ本文等の自由記述欄には適用しない。
+_REJECTED_BIDI_CLASSES = {"R", "AL", "AN"}
+
+
+def _reject_rtl_chars(value: str, *, field_label: str) -> str:
+    """双方向クラスが右から左（_REJECTED_BIDI_CLASSES = R/AL/AN）の文字を拒否する。
+
+    日程検証レビュー SEC-L2（2026-09-26）対応。詳細は
+    ``_REJECTED_BIDI_CLASSES`` のコメント参照。
+    """
+    for ch in value:
+        if unicodedata.bidirectional(ch) in _REJECTED_BIDI_CLASSES:
+            raise ValueError(
+                f"{field_label}に右から左に書く文字（アラビア文字・ヘブライ文字等）は使えません。"
+            )
+    return value
+
 
 class ScheduleProposeRequest(BaseModel):
-    slots: list[Annotated[str, StringConstraints(min_length=1, max_length=64)]] = Field(
-        min_length=1, max_length=10
-    )
+    slots: list[
+        Annotated[str, StringConstraints(min_length=1, max_length=VISIT_TIME_SLOT_MAX_LENGTH)]
+    ] = Field(min_length=1, max_length=10)
+
+    @field_validator("slots")
+    @classmethod
+    def _validate_slots(cls, v: list[str]) -> list[str]:
+        """候補日ラベルは空白のみの値を禁止し、制御文字・右から左の文字を拒否する。
+
+        2026-09-25 セキュリティレビュー（Low）対応: 双方向制御文字（U+202E 等）や
+        ゼロ幅文字を候補ラベルに混ぜられると、依頼者のチャット・日程調整画面上で
+        候補の見た目（表示順や文字列そのもの）を偽装できてしまう。
+        右から左に書く文字（R/AL/AN）についても同様の見た目のずれが起こりうる
+        ため拒否する（日程検証レビュー SEC-L2、詳細は _REJECTED_BIDI_CLASSES 参照）。
+        """
+        for item in v:
+            if not item.strip():
+                raise ValueError("候補日に空白のみの値は指定できません。")
+            _reject_control_chars(item, field_label="候補日")
+            _reject_rtl_chars(item, field_label="候補日")
+        return v
 
 
 class ScheduleConfirmRequest(BaseModel):
     visit_date: date
-    visit_time_slot: str = Field(min_length=1, max_length=32)
+    visit_time_slot: str = Field(min_length=1, max_length=VISIT_TIME_SLOT_MAX_LENGTH)
     note: str | None = Field(default=None, max_length=500)
 
     @field_validator("visit_date")
@@ -1392,6 +1462,31 @@ class ScheduleConfirmRequest(BaseModel):
         if v > today + timedelta(days=365):
             raise ValueError("訪問日が遠すぎます。")
         return v
+
+    @field_validator("visit_time_slot")
+    @classmethod
+    def _validate_visit_time_slot(cls, v: str) -> str:
+        """双方向制御文字・右から左に書く文字等で任意の見た目を業者画面に作らせない。
+
+        2026-09-25 セキュリティレビュー（Low）対応。時間帯は1行表示のため
+        改行も拒否する（_reject_non_newline_control_chars と異なり
+        allow_newline=False のまま呼ぶ）。右から左の文字（R/AL/AN）も
+        見た目の桁順を変えうるため拒否する（日程検証レビュー SEC-L2、詳細は
+        _REJECTED_BIDI_CLASSES 参照）。
+        """
+        v = _reject_control_chars(v, field_label="訪問時間帯")
+        return _reject_rtl_chars(v, field_label="訪問時間帯")
+
+    @field_validator("note")
+    @classmethod
+    def _validate_note(cls, v: str | None) -> str | None:
+        """/schedule の textarea 由来のため改行のみ許可する。
+
+        2026-09-25 セキュリティレビュー（Low）対応。
+        """
+        if v is None:
+            return v
+        return _reject_non_newline_control_chars(v, field_label="業者へのひとこと")
 
 
 # ──────────────────────────── 業者プロフィール ────────────────────────────
@@ -1512,6 +1607,40 @@ ContactCategory = Literal[
 #: 実害を持たない。
 _REJECTED_CONTROL_CATEGORIES = {"Cc", "Cf", "Co", "Cs"}
 
+#: 改行を許可しないフィールドで追加拒否する Unicode カテゴリ（日程検証レビュー SEC-L3）。
+#: Zl（U+2028 LINE SEPARATOR）/ Zp（U+2029 PARAGRAPH SEPARATOR）はどちらも
+#: レンダリング上「改行」と同じ行送り効果を持つ書式文字でない空白文字だが、
+#: Unicode カテゴリは Cc/Cf のどちらでもないため _REJECTED_CONTROL_CATEGORIES
+#: だけでは拾えていなかった。改行そのもの（"\n"）を許可するフィールド
+#: （note・お問い合わせ本文等）ではこれらの要否は本対応の対象外のため、
+#: allow_newline=False の場合にのみ追加で拒否する。
+_REJECTED_LINE_BREAK_CATEGORIES = {"Zl", "Zp"}
+
+
+def _reject_control_chars(
+    value: str, *, field_label: str, allow_newline: bool = False
+) -> str:
+    """制御文字・Unicode双方向制御文字・ゼロ幅文字を拒否する（改行の可否は呼び出し元が選ぶ）。
+
+    security review M-1対応の判定基準（_REJECTED_CONTROL_CATEGORIES）を、改行を
+    許可しないフィールド（日程調整の候補日・訪問時間帯等。2026-09-25 セキュリティ
+    レビュー Low 対応）にも共有するための共通実装。``_reject_non_newline_control_chars``
+    （複数行の問い合わせ本文向け）は本関数の薄いラッパーとして維持する。
+    改行を許可しない場合（allow_newline=False）は、Unicode の行区切り・段落区切り
+    （_REJECTED_LINE_BREAK_CATEGORIES = Zl/Zp。U+2028・U+2029）も同じ文言で
+    拒否する（日程検証レビュー SEC-L3: 改行を許さない項目のはずが、これらの
+    文字で見た目上の改行を作れてしまっていた）。
+    """
+    for ch in value:
+        if allow_newline and ch == "\n":
+            continue
+        category = unicodedata.category(ch)
+        if category in _REJECTED_CONTROL_CATEGORIES:
+            raise ValueError(f"{field_label}に制御文字を含めることはできません。")
+        if not allow_newline and category in _REJECTED_LINE_BREAK_CATEGORIES:
+            raise ValueError(f"{field_label}に制御文字を含めることはできません。")
+    return value
+
 
 def _reject_non_newline_control_chars(value: str, *, field_label: str) -> str:
     """改行（``\\n``）以外の制御文字・Unicode双方向制御文字・ゼロ幅文字を拒否する。
@@ -1525,12 +1654,7 @@ def _reject_non_newline_control_chars(value: str, *, field_label: str) -> str:
     N-9対応: Cn（未割り当て）は誤検知源のため対象外にする（詳細は
     ``_REJECTED_CONTROL_CATEGORIES`` のコメント参照）。
     """
-    for ch in value:
-        if ch == "\n":
-            continue
-        if unicodedata.category(ch) in _REJECTED_CONTROL_CATEGORIES:
-            raise ValueError(f"{field_label}に制御文字を含めることはできません。")
-    return value
+    return _reject_control_chars(value, field_label=field_label, allow_newline=True)
 
 
 class ContactCreateRequest(BaseModel):

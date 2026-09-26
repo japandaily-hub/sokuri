@@ -141,3 +141,57 @@ describe("parseSlotDate", () => {
     }
   });
 });
+
+describe("parseSlotDate（日程検証 98ec5f6 の読み取りと年の境目。旧 categories.ts の slotVisitDate から移設）", () => {
+  // 合字・タイ数字はソースに生の文字として埋め込まず String.fromCharCode で組み立てる
+  // （categories.test.mts と同じ方針）。
+  /** 月の合字（IDEOGRAPHIC TELEGRAPH SYMBOL FOR MONTH、例: 10月なら U+32C9）。 */
+  const monthLigature = (month: number): string => String.fromCharCode(0x32c0 + month - 1);
+  /** 日の合字（IDEOGRAPHIC TELEGRAPH SYMBOL FOR DAY、例: 1日なら U+33E0）。 */
+  const dayLigature = (day: number): string => String.fromCharCode(0x33e0 + day - 1);
+  /** タイ数字1桁（NFKC で ASCII 数字には変換されない）。 */
+  const thaiDigit = (n: number): string => String.fromCharCode(0x0e50 + n);
+
+  it("平年 2027-03-10 に年なし「2月29日」→ 翌年のうるう年 2028-02-29 を採用する", () => {
+    assert.equal(parseSlotDate("2月29日", new Date(2027, 2, 10)), "2028-02-29");
+  });
+  it("平年 2027-02-10 に年なし「2月29日」→ 今年は実在しないので翌年のうるう年 2028-02-29 を採用する", () => {
+    assert.equal(parseSlotDate("2月29日", new Date(2027, 1, 10)), "2028-02-29");
+  });
+  it("うるう年 2028-03-01 に年なし「2月29日」→ null（今年の2/29は過去、2029年は平年で実在しない）", () => {
+    assert.equal(parseSlotDate("2月29日", new Date(2028, 2, 1)), null);
+  });
+  it("2027-12-20 に年なし「1月5日」→ 年をまたいで 2028-01-05 を採用する", () => {
+    assert.equal(parseSlotDate("1月5日", new Date(2027, 11, 20)), "2028-01-05");
+  });
+  it("当日 2027-10-01 に年なし「10月1日」→ 当日の 2027-10-01 を採用する", () => {
+    assert.equal(parseSlotDate("10月1日", new Date(2027, 9, 1)), "2027-10-01");
+  });
+  it("実在しない年なし「2月30日」→ どちらの年でも実在せず null", () => {
+    assert.equal(parseSlotDate("2月30日", new Date(2027, 2, 10)), null);
+  });
+  it("日付を含まない固定時間帯 → null", () => {
+    assert.equal(parseSlotDate("9:00〜12:00", new Date(2027, 2, 10)), null);
+  });
+
+  const jan1 = new Date(2027, 0, 1); // 2027-01-01
+  it("全角数字「１０月１日」も読む（NFKC 正規化）", () => {
+    assert.equal(parseSlotDate("１０月１日", jan1), "2027-10-01");
+  });
+  it("月・日の合字（10月・1日）も読む（NFKC 正規化）", () => {
+    assert.equal(parseSlotDate(`${monthLigature(10)}${dayLigature(1)}（金）9:00〜12:00`, jan1), "2027-10-01");
+  });
+  it("数字と「月」「日」の間の空白を許容する", () => {
+    assert.equal(parseSlotDate("10月 1日（金）", jan1), "2027-10-01");
+    assert.equal(parseSlotDate("10 月 1 日", jan1), "2027-10-01");
+  });
+  it("全角の年「２０２８年」もその年として使う", () => {
+    assert.equal(parseSlotDate("２０２８年２月２９日（火）9:00〜12:00", jan1), "2028-02-29");
+  });
+  it("年と月の間の空白を許容する", () => {
+    assert.equal(parseSlotDate("2027 年 10月1日", jan1), "2027-10-01");
+  });
+  it("タイ数字は NFKC で ASCII 数字にならないため読まない（backend の照合と同じ）", () => {
+    assert.equal(parseSlotDate(`${thaiDigit(1)}${thaiDigit(0)}月${thaiDigit(1)}日`, jan1), null);
+  });
+});

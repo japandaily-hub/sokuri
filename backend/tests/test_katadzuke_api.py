@@ -2224,26 +2224,38 @@ async def test_schedule_confirm_user_only_and_status_transition(
 
     r = await client.post(
         f"/api/v1/transactions/{txn_id}/schedule/confirm",
-        json={"visit_date": visit_date, "visit_time_slot": "午前"},
+        json={"visit_date": visit_date, "visit_time_slot": "9:00〜12:00"},
         headers=_auth(op_token),
     )
     assert r.status_code == 403
 
     r = await client.post(
         f"/api/v1/transactions/{txn_id}/schedule/confirm",
-        json={"visit_date": visit_date, "visit_time_slot": "午前", "note": "在宅確認済み"},
+        json={"visit_date": visit_date, "visit_time_slot": "9:00〜12:00", "note": "在宅確認済み"},
         headers=_auth(user_token),
     )
     assert r.status_code == 200
     data = r.json()
     assert data["status"] == "visiting"
     assert data["visit_date"] == visit_date
-    assert data["visit_time_slot"] == "午前"
+    assert data["visit_time_slot"] == "9:00〜12:00"
 
     r = await client.get(f"/api/v1/transactions/{txn_id}/messages", headers=_auth(user_token))
     assert r.status_code == 200
-    kinds = [m["kind"] for m in r.json()]
+    messages = r.json()
+    kinds = [m["kind"] for m in messages]
     assert "schedule_confirmed" in kinds
+    # note（業者へのひとこと）は運営名義のシステムメッセージ本文に連結せず、
+    # 依頼者本人（user）の発言として別メッセージに分離される
+    # （2026-09-25 セキュリティレビュー Low 対応: 運営のお知らせを装う文面を
+    # 作れてしまう不備の是正）。
+    confirmed_index = next(i for i, m in enumerate(messages) if m["kind"] == "schedule_confirmed")
+    confirmed = messages[confirmed_index]
+    assert "在宅確認済み" not in confirmed["body"]
+    note_message = messages[confirmed_index + 1]
+    assert note_message["kind"] == "text"
+    assert note_message["sender_type"] == "user"
+    assert note_message["body"] == "在宅確認済み"
 
 
 # ── 完了確定の依頼 ──
@@ -2278,7 +2290,7 @@ async def _advance_to_visiting(
     future_date = (date.today() + timedelta(days=7)).isoformat()
     r = await client.post(
         f"/api/v1/transactions/{txn_id}/schedule/confirm",
-        json={"visit_date": future_date, "visit_time_slot": "午前"},
+        json={"visit_date": future_date, "visit_time_slot": "9:00〜12:00"},
         headers=_auth(user_token),
     )
     assert r.status_code == 200, r.text
@@ -2818,7 +2830,7 @@ async def test_propose_schedule_rejects_when_visiting(
     future_date = (date.today() + td(days=7)).isoformat()
     r = await client.post(
         f"/api/v1/transactions/{txn_id}/schedule/confirm",
-        json={"visit_date": future_date, "visit_time_slot": "午前"},
+        json={"visit_date": future_date, "visit_time_slot": "9:00〜12:00"},
         headers=_auth(user_token),
     )
     assert r.status_code == 200, r.text

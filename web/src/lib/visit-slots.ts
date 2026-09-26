@@ -11,7 +11,12 @@
  * 単体テスト: src/lib/visit-slots.test.mts（review-verdict.test.mts と同じ node --test 流儀）。
  */
 
-/** 希望時間帯（訪問日程調整ページ・業者の候補日提案フォームで共有する唯一の情報源）。 */
+/**
+ * 希望時間帯（訪問日程調整ページ・業者の候補日提案フォームで共有する唯一の情報源）。
+ * value は backend/app/schemas_katadzuke.py の SCHEDULE_FIXED_TIME_SLOTS と 1文字違わず
+ * 一致させること（不一致だと日程調整ページからの日程確定が 422 になる。backend の
+ * tests/test_schedule_input_validation.py がこのファイルを読んで両者の一致を検査する）。
+ */
 export const VISIT_TIME_SLOTS: { value: string; label: string }[] = [
   { value: "9:00〜12:00", label: "午前" },
   { value: "12:00〜15:00", label: "昼" },
@@ -30,8 +35,20 @@ const DOW_LABELS = ["日", "月", "火", "水", "木", "金", "土"] as const;
  */
 export const VISIT_TIME_SLOT_MAX_LENGTH = 32;
 
-/** ISO日付（"YYYY-MM-DD"）とその月日を抽出する正規表現。年は任意（無ければ繰り上げ推定）。 */
-const SLOT_DATE_PATTERN = /(?:(\d{4})年)?(\d{1,2})月(\d{1,2})日/;
+/**
+ * 候補日ラベルから「(YYYY年)M月D日」を抽出する正規表現。年は任意（無ければ繰り上げ推定）。
+ * NFKC 正規化した文字列に当て、ASCII の [0-9] のみを数字とみなし、数字と「年」「月」「日」の
+ * 間の空白を許容する（backend の transactions._SLOT_DATE_PATTERN と同じ形。backend が
+ * 照合に使う月日・年と、ここで読み取って送る visit_date が食い違わないようにする。
+ * 日程検証レビュー SEC-I1/SEC-I4/QA-M4）。
+ */
+const SLOT_DATE_PATTERN = /(?:([0-9]{4})\s*年\s*)?([0-9]+)\s*月\s*([0-9]+)\s*日/;
+
+/** year 年 month 月 day 日が暦の上で実在するか（2月30日・平年の2月29日等は false）。 */
+function existsOnCalendar(year: number, month: number, day: number): boolean {
+  const d = new Date(year, month - 1, day);
+  return d.getFullYear() === year && d.getMonth() === month - 1 && d.getDate() === day;
+}
 
 /**
  * Date（ローカルタイムの年月日）を "YYYY-MM-DD" に整形する。
@@ -66,18 +83,21 @@ export function formatSlotLabel(isoDate: string, timeValue: string): string {
 /**
  * 業者が提示・入力した候補日ラベル（新形式 "2026年10月15日（木）9:00〜12:00"、
  * 旧形式 "10月15日（木）9:00〜12:00" のいずれも対象）から ISO日付（"YYYY-MM-DD"）を抽出する。
- * 「月」「日」の数字パターンのみに依存し、抽出できない場合は null を返す
- * （呼び出し側でエラー表示にフォールバックする）。
+ * ラベルを NFKC 正規化してから SLOT_DATE_PATTERN の最初の一致を使うため、全角数字
+ * 「１０月１日」や合字「㋉」「㏠」、「10月 1日」のような空白入りも読める。
+ * 抽出できない場合は null を返す（呼び出し側でエラー表示にフォールバックする）。
  *
  * - 年が明記されている場合: その年を使い、実在する日付か検証する（2月30日等は null）。
  *   過去日でも解析自体は成功する（過去日かどうかの判定は呼び出し側の責務）。
- * - 年が無い場合（旧形式）: today 以降で直近に来る年を採用する
- *   （月が today の月より前なら来年扱いにする、旧仕様との後方互換のための繰り上げ推定）。
+ * - 年が無い場合（旧形式）: today の年→翌年の順に、その年で実在し、かつ today 以降になる
+ *   最初の年を採用する（どちらでも満たさなければ null）。年を先に1つに決めてから実在を
+ *   確かめると、2月29日の候補で平年/うるう年の境目をまたいだときに解析失敗・存在しない
+ *   日付の送信が起きるため、年ごとに実在を確かめ直す（日程検証レビュー SEC-N3 / QA-R-M1）。
  *
  * today は年月日の比較にのみ使う（時刻は無視する）。
  */
 export function parseSlotDate(label: string, today: Date): string | null {
-  const m = SLOT_DATE_PATTERN.exec(label);
+  const m = SLOT_DATE_PATTERN.exec(label.normalize("NFKC"));
   if (!m) return null;
   const month = Number(m[2]);
   const day = Number(m[3]);
@@ -87,21 +107,15 @@ export function parseSlotDate(label: string, today: Date): string | null {
 
   if (m[1]) {
     const year = Number(m[1]);
-    const d = new Date(year, month - 1, day);
-    if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
-    return toIsoDateString(d);
+    return existsOnCalendar(year, month, day) ? toIsoDateString(new Date(year, month - 1, day)) : null;
   }
 
-  let year = today.getFullYear();
-  const candidateThisYear = new Date(year, month - 1, day);
   const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  if (candidateThisYear < todayMidnight) year += 1;
-  const candidate = new Date(year, month - 1, day);
-  // 4月31日・平年の2月29日等、繰り上げ推定で決めた年に実在しない月日は null を返す
-  // （年ありの分岐と同じ実在チェックを行う。年の決定を先に済ませてから判定することで、
-  // 「今年は平年だが繰り上げ先の来年はうるう年」のようなケースも正しく扱える）。
-  if (candidate.getFullYear() !== year || candidate.getMonth() !== month - 1 || candidate.getDate() !== day) {
-    return null;
+  for (const year of [today.getFullYear(), today.getFullYear() + 1]) {
+    if (!existsOnCalendar(year, month, day)) continue;
+    const candidate = new Date(year, month - 1, day);
+    if (candidate < todayMidnight) continue;
+    return toIsoDateString(candidate);
   }
-  return toIsoDateString(candidate);
+  return null;
 }

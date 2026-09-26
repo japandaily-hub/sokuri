@@ -225,7 +225,9 @@ export interface TransactionListItem {
   final_amount: number | null;
   visit_date: string | null;
   /**
-   * confirmSchedule で設定される訪問時間帯（例: "10:00-12:00"）。未確定時は null。
+   * confirmSchedule で設定される訪問時間帯（例: 固定時間帯なら "9:00〜12:00"、
+   * 業者が提示した候補由来なら "2026年10月1日（木）9:00〜12:00"〔日付＋時間帯の選択式〕や
+   * 自由入力だった頃の "10月1日（木）10:00〜12:00" 等）。未確定時は null。
    * [推測] backend の TransactionListItem に本フィールドが追加されるまでは undefined
    * のまま届く想定（r10 対応）。formatVisitSchedule(visit_date, visit_time_slot) に
    * そのまま渡せば、未対応期間中も visit_date のみの表示にフォールバックする。
@@ -271,7 +273,7 @@ export interface TransactionOut {
   fee_amount: number;
   /** "YYYY-MM-DD" 形式（date型）。ISO日時ではないため new Date() でのUTC解釈は不可（JST日付がズレる）。 */
   visit_date: string | null;
-  /** 例: "10:00-12:00"。confirmSchedule で設定される訪問時間帯。未確定時は null。 */
+  /** 例: 固定時間帯なら "9:00〜12:00"、業者提示の候補由来なら "2026年10月1日（木）9:00〜12:00" 等。confirmSchedule で設定される訪問時間帯。未確定時は null。 */
   visit_time_slot: string | null;
   status: TransactionStatus;
   created_at: string;

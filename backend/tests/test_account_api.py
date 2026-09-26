@@ -938,7 +938,7 @@ async def test_delete_account_blocked_by_visiting_transaction(
     visit_date = (date.today() + timedelta(days=7)).isoformat()
     r = await client.post(
         f"/api/v1/transactions/{txn_id}/schedule/confirm",
-        json={"visit_date": visit_date, "visit_time_slot": "10:00-12:00"},
+        json={"visit_date": visit_date, "visit_time_slot": "9:00〜12:00"},
         headers=_auth(user_token),
     )
     assert r.status_code == 200, r.text

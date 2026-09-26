@@ -22,6 +22,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Ic } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
 import { useToken } from "@/components/kdz/Ui";
+import { stripControlChars, stripControlCharsKeepNewlines } from "@/lib/categories";
 import {
   CANCELLED_BY_LABEL,
   TXN_STATUS_LABEL,
@@ -490,13 +491,18 @@ export default function OperatorChatPage() {
                         <div className="msg-avatar">{m.mine ? "自" : m.sender_type === "system" ? "運" : peerInitial}</div>
                         <div>
                           <div className="msg-time">{formatTime(m.created_at)}</div>
-                          <div className="bubble">{m.body}</div>
+                          {/* 日程検証レビュー SEC-L5: 本対応前に保存された運営名義（system）メッセージへの
+                              二重の防御として表示直前に制御文字（改行以外）を除去する。依頼者・
+                              業者の通常メッセージは絵文字の結合（ZWJ）等を壊さないよう変えない。 */}
+                          <div className="bubble">
+                            {m.sender_type === "system" ? stripControlCharsKeepNewlines(m.body) : m.body}
+                          </div>
                           {m.kind === "schedule_proposal" && Array.isArray(m.meta?.slots) ? (
                             <ul className="msg-slots" aria-label="提示した候補日">
                               {(m.meta?.slots as unknown[])
                                 .filter((s): s is string => typeof s === "string")
                                 .map((slot, si) => (
-                                  <li key={`${si}-${slot}`}>{slot}</li>
+                                  <li key={`${si}-${slot}`}>{stripControlChars(slot)}</li>
                                 ))}
                             </ul>
                           ) : null}

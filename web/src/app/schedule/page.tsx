@@ -9,6 +9,7 @@ import { Ic } from "@/components/kdz/Icons";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import { useToken } from "@/components/kdz/Ui";
 import { Notice } from "@/components/kdz/Notice";
+import { stripControlCharsKeepNewlines } from "@/lib/categories";
 import {
   confirmSchedule,
   getTransaction,
@@ -114,7 +115,11 @@ function SchedulePageInner() {
         /* 候補日の補助表示に過ぎないため、取得失敗しても致命的ではない */
       }
       const latestProposal = [...messages].reverse().find((m) => m.kind === "schedule_proposal");
-      const slots = Array.isArray(latestProposal?.meta?.slots) ? (latestProposal?.meta?.slots as string[]) : [];
+      // 日程検証レビュー SEC-I6: 壊れた meta（文字列以外の要素）が混じっていても後段の処理が
+      // 落ちないよう、文字列だけに絞る。
+      const slots = Array.isArray(latestProposal?.meta?.slots)
+        ? (latestProposal?.meta?.slots as unknown[]).filter((s): s is string => typeof s === "string")
+        : [];
       setProposedSlots(slots);
     } catch (e) {
       setLoadError(toDisplayMessage(e, "成約情報の取得に失敗しました"));
@@ -232,7 +237,10 @@ function SchedulePageInner() {
         {
           visit_date: `${selectedDate.year}-${mm}-${dd}`,
           visit_time_slot: selectedTime,
-          note: note.trim() || undefined,
+          // 日程検証レビュー SEC-I9: 絵文字の結合文字（ZWJ）・旗の国コード用タグ文字・表計算からの
+          // 貼り付けで混じるタブ等が残っていると backend の 422（画面では理由の出ない
+          // 汎用エラー）になるため、複数行は許しつつ送信前に落とす。
+          note: stripControlCharsKeepNewlines(note).trim() || undefined,
         },
         token,
       );

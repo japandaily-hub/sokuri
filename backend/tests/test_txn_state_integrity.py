@@ -403,7 +403,7 @@ async def _confirm_schedule(client: AsyncClient, user_token: str, txn_id: str) -
     visit_date = (date.today() + timedelta(days=7)).isoformat()
     r = await client.post(
         f"/api/v1/transactions/{txn_id}/schedule/confirm",
-        json={"visit_date": visit_date, "visit_time_slot": "10:00-12:00"},
+        json={"visit_date": visit_date, "visit_time_slot": "9:00〜12:00"},
         headers=_auth(user_token),
     )
     assert r.status_code == 200, r.text

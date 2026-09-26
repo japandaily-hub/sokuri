@@ -569,7 +569,7 @@ class TestTransactionListVisitTimeSlot:
         visit_date = (date.today() + timedelta(days=7)).isoformat()
         r = await client.post(
             f"/api/v1/transactions/{txn_id}/schedule/confirm",
-            json={"visit_date": visit_date, "visit_time_slot": "10:00-12:00"},
+            json={"visit_date": visit_date, "visit_time_slot": "9:00〜12:00"},
             headers=_auth(user_token),
         )
         assert r.status_code == 200, r.text
@@ -578,7 +578,7 @@ class TestTransactionListVisitTimeSlot:
             r = await client.get("/api/v1/transactions", headers=_auth(token))
             assert r.status_code == 200, r.text
             item = next(t for t in r.json() if t["id"] == txn_id)
-            assert item["visit_time_slot"] == "10:00-12:00"
+            assert item["visit_time_slot"] == "9:00〜12:00"
 
 
 # ──────────────── O-M6: お問い合わせの受信台帳 ────────────────

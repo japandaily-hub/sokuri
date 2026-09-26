@@ -20,6 +20,7 @@ import "@/app/chat/[id]/chat.css";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useToken } from "@/components/kdz/Ui";
+import { stripControlChars, stripControlCharsKeepNewlines } from "@/lib/categories";
 import {
   CANCELLED_BY_LABEL,
   confirmSchedule as apiConfirmSchedule,
@@ -221,6 +222,9 @@ export function ChatPanel({
   async function handleConfirmSchedule(msg: MessageOut, slots: string[]) {
     if (!token || !transactionId || confirmingMsgId) return;
     const idx = schedulePickByMsg[msg.id] ?? 0;
+    // stripControlChars を通さず生の slotLabel のまま送る。backend はこの取引で業者が
+    // 提示した候補（保存済みの文字列）と完全一致するかで照合するため、ここで整形すると
+    // 一致せず 422 になる（表示用の整形は下記 JSX 側の stripControlChars で別途行う）。
     const slotLabel = slots[idx];
     if (!slotLabel) return;
     // 確定 API（ScheduleConfirmRequest.visit_time_slot）は32字までしか受け付けない（超えると 422）。
@@ -370,8 +374,16 @@ export function ChatPanel({
           <div className="messages-area" ref={messagesRef} role="log" aria-live="polite" aria-relevant="additions">
             {messages.map((m, i) => {
               const showDateSep = i === 0 || formatDateSep(m.created_at) !== formatDateSep(messages[i - 1].created_at);
+              // 日程検証レビュー SEC-L5: 本対応前に保存された運営名義（system）メッセージへの二重の防御として
+              // 表示直前に制御文字（改行以外）を除去する。依頼者・業者の通常メッセージは絵文字の
+              // 結合（ZWJ）等を壊さないよう、ここでは一切変更しない。
+              const bodyText = m.sender_type === "system" ? stripControlCharsKeepNewlines(m.body) : m.body;
               if (m.kind === "schedule_proposal") {
-                const slots = Array.isArray(m.meta?.slots) ? (m.meta?.slots as string[]) : [];
+                // 日程検証レビュー SEC-I6: 壊れた meta（文字列以外の要素）が混じっていても
+                // stripControlChars に非文字列を渡して落ちないよう、文字列だけに絞る。
+                const slots = Array.isArray(m.meta?.slots)
+                  ? (m.meta?.slots as unknown[]).filter((s): s is string => typeof s === "string")
+                  : [];
                 const pick = schedulePickByMsg[m.id] ?? 0;
                 return (
                   <div key={m.id}>
@@ -380,7 +392,7 @@ export function ChatPanel({
                       <div className="msg-avatar">{bizInitial}</div>
                       <div>
                         <div className="msg-time">{formatTime(m.created_at)}</div>
-                        <div className="bubble">{m.body}</div>
+                        <div className="bubble">{bodyText}</div>
                       </div>
                     </div>
                     <div className="schedule-card" id={`schedule-card-${m.id}`}>
@@ -400,7 +412,7 @@ export function ChatPanel({
                                 setSchedulePickByMsg((prev) => ({ ...prev, [m.id]: si }))
                               }
                             />
-                            <label htmlFor={`s-${m.id}-${si}`}>{opt}</label>
+                            <label htmlFor={`s-${m.id}-${si}`}>{stripControlChars(opt)}</label>
                           </div>
                         ))}
                       </div>
@@ -418,7 +430,7 @@ export function ChatPanel({
                               ? "日程確定済み"
                               : confirmingMsgId === m.id
                                 ? "確定中…"
-                                : `${slots[pick] ?? ""} を選ぶ`}
+                                : `${stripControlChars(slots[pick] ?? "")} を選ぶ`}
                       </button>
                     </div>
                   </div>
@@ -431,7 +443,7 @@ export function ChatPanel({
                     <div className="msg-avatar">{m.mine ? "自" : m.sender_type === "system" ? "運" : bizInitial}</div>
                     <div>
                       <div className="msg-time">{formatTime(m.created_at)}</div>
-                      <div className="bubble">{m.body}</div>
+                      <div className="bubble">{bodyText}</div>
                     </div>
                   </div>
                 </div>

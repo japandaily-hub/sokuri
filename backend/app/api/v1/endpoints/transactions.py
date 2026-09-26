@@ -10,6 +10,7 @@ import math
 import re
 
 import logging
+import unicodedata
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
@@ -39,6 +40,7 @@ from app.schemas_katadzuke import (
     OperatorPublicOut,
     ReductionOut,
     ReviewOut,
+    SCHEDULE_FIXED_TIME_SLOTS,
     ScheduleConfirmRequest,
     ScheduleProposeRequest,
     TransactionAddressOut,
@@ -912,6 +914,119 @@ def _is_within_schedule_proposal_notify_interval(last_proposed_at: datetime | No
     return datetime.now(timezone.utc) - last_proposed_at < _SCHEDULE_PROPOSAL_NOTIFY_INTERVAL
 
 
+# 候補日ラベル（例「2026年10月1日（木）9:00〜12:00」「9月7日（日）10:00〜12:00」）に
+# 含まれる「(YYYY年)◯月◯日」を抽出する。年は任意（業者の候補日提示が日付＋時間帯の
+# 選択式になってからのラベルは年入り、自由入力だった頃のラベルは年なし）。
+# ASCII の [0-9] のみを数字とみなす（Python の \d は Unicode の Nd 全体
+# 〔タイ数字等〕にも一致するが、NFKC 正規化はそれらを ASCII 数字へ変換しない
+# ため、\d のままだと web 側の判定と食い違う。日程検証レビュー SEC-I1/SEC-I4）。
+# 「10月 1日」のような数字と年・月・日の間の空白も許容する。
+_SLOT_DATE_PATTERN = re.compile(r"(?:([0-9]{4})\s*年\s*)?([0-9]+)\s*月\s*([0-9]+)\s*日")
+
+
+def _slot_dates(label: str) -> set[tuple[int | None, int, int]]:
+    """候補日ラベルに含まれる日付をすべて (年, 月, 日) の集合として返す（年の無い表記は年=None）。
+
+    NFKC 正規化してから、ASCII の [0-9] のみを数字とみなして照合する
+    （全角数字「１０月１日」や「㋈」「㏠」のような合字は NFKC 正規化で
+    半角数字・「月」「日」に分解されるため拾えるが、タイ数字のように
+    NFKC で ASCII化されない non-ASCII の数字文字は拾わない＝空集合になる。
+    日程検証レビュー SEC-I1/SEC-I4）。
+    web 側は web/src/lib/visit-slots.ts の parseSlotDate（チャットでの確定前の日付の
+    読み取り・日程調整ページの候補日の強調表示）が同じ正規表現で最初の1件を読み、
+    web/src/lib/categories.ts の slotMonthDays（表示用の formatVisitSchedule）が
+    同じ「◯月◯日」の部分で判定する。
+    """
+    normalized = unicodedata.normalize("NFKC", label)
+    return {
+        (int(year) if year else None, int(month), int(day))
+        for year, month, day in _SLOT_DATE_PATTERN.findall(normalized)
+    }
+
+
+def _slot_month_days(label: str) -> set[tuple[int, int]]:
+    """候補日ラベルに含まれる「◯月◯日」をすべて (月, 日) の集合として返す（年は見ない）。"""
+    return {(month, day) for _, month, day in _slot_dates(label)}
+
+
+def _slot_years(label: str) -> set[int]:
+    """候補日ラベルに明記された年の集合を返す（年の無いラベルは空集合）。"""
+    return {year for year, _, _ in _slot_dates(label) if year is not None}
+
+
+async def _assert_offered_time_slot(
+    session: AsyncSession, txn_id: uuid.UUID, visit_time_slot: str
+) -> None:
+    """visit_time_slot が固定時間帯か、業者提示済みの候補のいずれかであることを検証する。
+
+    2026-09-25 セキュリティレビュー（Low）対応: 確定前は文字数しか検証しておらず、
+    依頼者が API を直接呼べば任意の文字列（双方向制御文字を含む）を
+    「業者へ確定表示される時間帯」として送り込めた。日程調整ページ
+    （web/src/app/schedule/page.tsx）は固定5種のいずれかしか送らず、チャット
+    （web/src/components/kdz/ChatPanel.tsx）は業者の schedule_proposal の
+    meta.slots に載っている文字列をそのまま送る契約のため、どちらでもない値は
+    不正入力として拒否する。ChatPanel は直近だけでなく過去の提示カードからも
+    確定できる UI のため、直近1件ではなく当該取引の全 schedule_proposal
+    メッセージを対象にする（過去の提示からの正当な確定を誤って弾かないため）。
+    """
+    if visit_time_slot in SCHEDULE_FIXED_TIME_SLOTS:
+        return
+    rows = (
+        await session.scalars(
+            select(Message.meta).where(
+                Message.transaction_id == txn_id, Message.kind == "schedule_proposal"
+            )
+        )
+    ).all()
+    for meta in rows:
+        # meta は本来 {"slots": [...]} 形式の JSON 列だが、想定外に壊れた行
+        # （dict でない・slots が list でない）があっても 500 にせず無視する。
+        if not isinstance(meta, dict):
+            continue
+        slots = meta.get("slots")
+        if not isinstance(slots, list):
+            continue
+        if visit_time_slot in slots:
+            return
+    raise HTTPException(
+        # Starlette 1.2.1 では status.HTTP_422_UNPROCESSABLE_ENTITY が非推奨
+        # （改名後の HTTP_422_UNPROCESSABLE_CONTENT は pyproject の許容範囲に含む
+        # 旧 Starlette には無い）ため、どの版でも動く数値で書く
+        # （main.py の RequestValidationError ハンドラと同じ方針）。
+        status_code=422,
+        detail="候補にない時間帯は指定できません。業者が提示した候補日か、日程調整ページの時間帯から選んでください。",
+    )
+
+
+def _assert_slot_date_matches(visit_time_slot: str, visit_date: date) -> None:
+    """候補日ラベルに含まれる日付が visit_date と一致することを検証する。
+
+    2026-09-25 セキュリティレビュー（Low）対応: 例えば visit_date=10/1 のまま
+    visit_time_slot="9月28日 10:00" を送ると、業者画面には日付入りラベルが
+    そのまま表示される一方、通知・訪問日超過リマインド（services/reminders.py）は
+    visit_date を基準に動くため、業者に見える予定日と実際の基準日がずれる。
+    ラベルに日付が含まれない場合（固定5種の時間帯等）は対象外。
+    集合の等価比較で判定するため、ラベルに異なる日付が複数含まれる場合は
+    （要素数2以上の集合が要素数1の集合と等しくなることはないので）
+    常に不一致＝422になる。propose_schedule は本対応以降に作成される新規の
+    候補提示についてこの形を拒否するが、本対応より前に保存済みの提示
+    （旧データ）にこの関数が適用された場合も、同じ集合比較でそのまま422になる。
+    ラベルに年が明記されている場合（業者の候補日提示が日付＋時間帯の選択式になって
+    からの「2026年10月1日（木）…」）は年も visit_date と照合する。月日だけの照合だと
+    「2026年10月1日」の候補を visit_date=2027-10-01 で確定でき、同じずれが年の単位で
+    起きるため（web の parseSlotDate は明記された年をそのまま visit_date にする）。
+    """
+    month_days = _slot_month_days(visit_time_slot)
+    years = _slot_years(visit_time_slot)
+    if (month_days and month_days != {(visit_date.month, visit_date.day)}) or (
+        years and years != {visit_date.year}
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="候補日の日付と訪問日が一致しません。候補日をもう一度選び直してください。",
+        )
+
+
 @router.post(
     "/transactions/{transaction_id}/schedule/propose",
     response_model=MessageOut,
@@ -948,6 +1063,32 @@ async def propose_schedule(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail=SCHEDULE_ALREADY_CONFIRMED_DETAIL
         )
+
+    # 1つの候補に複数の異なる日付が混在すると、確定時に _assert_slot_date_matches の
+    # 集合比較が必ず不一致（422）になり、有効な候補として確定できなくなる
+    # （提示できても確定できない候補を事前に弾く）。同じ日付の重複表記
+    # （例「10月1日 10:00〜10月1日 12:00」）は1種類として扱うため許可する
+    # （2026-09-25 セキュリティレビュー Low 対応）。明記された年が2種類以上ある候補も、
+    # 確定時の年の照合が必ず不一致になるため同じく弾く。
+    for slot in body.slots:
+        if len(_slot_month_days(slot)) > 1 or len(_slot_years(slot)) > 1:
+            raise HTTPException(
+                status_code=422,
+                detail="1つの候補日に複数の日付は入れられません。候補を分けて入力してください。",
+            )
+        # 「2月30日」「13月1日」「2027年2月29日」のような実在しない日付を弾く（日程検証
+        # レビュー SEC-I5）。年が明記されていればその年、無ければ 2000年（うるう年）を
+        # 仮の基準に使い、年なしの2月29日を不当に弾かないようにする。month/day が
+        # 巨大な整数だと date() コンストラクタが OverflowError を送出しうるため
+        # 合わせて捕捉する（年 0000 は ValueError）。
+        for year, month, day in _slot_dates(slot):
+            try:
+                date(year if year is not None else 2000, month, day)
+            except (ValueError, OverflowError):
+                raise HTTPException(
+                    status_code=422,
+                    detail="存在しない日付が含まれています。日付を確認してください。",
+                )
 
     # Message 追加前に判定する（追加後だと今回分が常に1件以上ヒットし、通知が
     # 永久に抑止されてしまう）。
@@ -1023,27 +1164,67 @@ async def confirm_schedule(
             detail="日程確定できる状態ではありません。",
         )
 
+    # 提示候補・固定候補以外の任意文字列を「確定した時間帯」として業者に見せない、
+    # かつ業者に見える日付と通知・訪問日超過リマインドの基準日（visit_date）が
+    # ずれないようにする（2026-09-25 セキュリティレビュー Low 対応）。
+    await _assert_offered_time_slot(session, txn.id, body.visit_time_slot)
+    _assert_slot_date_matches(body.visit_time_slot, body.visit_date)
+
     txn.visit_date = body.visit_date
     txn.visit_time_slot = body.visit_time_slot
     txn.status = "visiting"
 
     # 候補日ラベル（例「9月7日（日）10:00〜12:00」）に日付が含まれる場合は ISO 日付を重ねて出さない
-    if re.search(r"\d+月\d+日", body.visit_time_slot):
+    if _slot_month_days(body.visit_time_slot):
         confirm_body = f"訪問日程が {body.visit_time_slot} に確定しました。"
     else:
         confirm_body = f"訪問日程が {body.visit_date} {body.visit_time_slot} に確定しました。"
-    if body.note:
-        confirm_body += f" ({body.note})"
-    session.add(
-        Message(
-            transaction_id=txn.id,
-            sender_type="system",
-            sender_id=None,
-            body=confirm_body,
-            kind="schedule_confirmed",
-            meta={"visit_date": body.visit_date.isoformat(), "visit_time_slot": body.visit_time_slot},
-        )
+    confirmed_message = Message(
+        transaction_id=txn.id,
+        sender_type="system",
+        sender_id=None,
+        body=confirm_body,
+        kind="schedule_confirmed",
+        meta={"visit_date": body.visit_date.isoformat(), "visit_time_slot": body.visit_time_slot},
     )
+    session.add(confirmed_message)
+
+    # note（業者へのひとこと）は運営名義のシステムメッセージ本文に連結しない。
+    # schedule_confirmed はチャット上で運営名義（アバター表示「運」・
+    # white-space: pre-wrap）として表示されるため、依頼者の自由記述をそのまま
+    # 連結すると運営のお知らせを装った文面を作れてしまう
+    # （2026-09-25 セキュリティレビュー Low 対応）。依頼者本人の発言として
+    # 別メッセージに分離する。
+    note_text = body.note.strip() if body.note is not None else ""
+    if note_text:
+        # created_at は TimestampMixin の server_default=func.now()（PostgreSQL では
+        # トランザクション開始時刻・テストの SQLite は秒精度）で決まるため、同一
+        # トランザクション内で追加した2件は同時刻になり、list_messages の
+        # created_at 昇順では並び順が定まらない。confirmed_message を先に flush して
+        # DB が払い出した created_at を読み取り、note メッセージにはその
+        # 1マイクロ秒後を明示することで「確定→ひとこと」の順を固定する
+        # （アプリ側の時計 datetime.now() は使わない。DB時計とのずれで
+        # list_messages の after= 差分ポーリングから漏れ得るため）。
+        await session.flush()
+        await session.refresh(confirmed_message, attribute_names=["created_at"])
+        session.add(
+            Message(
+                transaction_id=txn.id,
+                sender_type="user",
+                sender_id=actor.id,
+                body=note_text,
+                kind="text",
+                created_at=confirmed_message.created_at + timedelta(microseconds=1),
+            )
+        )
+        # LINE・メールの日程確定通知（dispatch_schedule_confirmed）は訪問日と
+        # 取引URLだけを送り、note は含まない（services/line_notify.py の
+        # push_schedule_confirmed・services/notify.py の send_schedule_confirmed
+        # 参照）。業者はその通知から開くチャットで note を読む（本対応前も note は
+        # schedule_confirmed の確定メッセージ内にあり、同じくチャットで読む経路
+        # だった点は変わらない）。そのため新着メッセージ通知
+        # （dispatch_message_received）は重ねて送らない。
+
     operator_email = txn.bid.operator.contact_email
     operator_line_user_id = txn.bid.operator.line_user_id
     await session.commit()
