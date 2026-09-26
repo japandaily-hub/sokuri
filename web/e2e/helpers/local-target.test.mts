@@ -12,6 +12,7 @@
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { inspect } from "node:util";
 import type { E2ETarget } from "./local-target.ts";
 import {
   ALLOW_REMOTE_ENV,
@@ -88,6 +89,21 @@ describe("assertLocalTarget", () => {
       assert.ok(error instanceof Error);
       assert.ok(!error.message.includes(url));
       assert.ok(error.message.includes("URL として解釈できません"));
+      return true;
+    });
+  });
+
+  it("解釈できない値の元の例外を cause に付けない（表示に生の値が出ない）", () => {
+    // Playwright は設定読み込みの例外を console.error(e) で出し、Node の表示は cause の TypeError と
+    // その input（生の値）まで出力する。{ cause } を付けると認証情報が端末に出るため、付けないことを固定する。
+    const url = "https://user:tok3n@host.invalid:443443/api?key=s3cr3t"; // ポートが範囲外で解釈できない
+    assert.throws(() => assertLocalTarget({ label: "対象", url }), (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.equal(error.cause, undefined);
+      const shown = inspect(error);
+      for (const secret of ["tok3n", "s3cr3t", "443443"]) {
+        assert.ok(!shown.includes(secret), `表示に ${secret} が含まれる: ${shown}`);
+      }
       return true;
     });
   });

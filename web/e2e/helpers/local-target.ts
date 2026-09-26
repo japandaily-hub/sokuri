@@ -15,9 +15,10 @@
  * ワーカーを起動する前に止めるので hook は一切走らず、④は API クライアントを作るその場で
  * 検査するので fixture のキャッシュや hook の実行順に依存しない。
  * ③は page / context を使うテストでしか走らない（request fixture だけのテストでは作られない）。
- * そのため spec での test.use({ baseURL }) と @playwright/test からの request の import は
- * web/eslint.config.mjs で禁止し、baseURL の出どころを①②が検査する playwright.config.ts だけに、
- * API の呼び出しを④の Api だけにしている。
+ * そのため spec で baseURL を書くこと（test.use・test.extend・newE2EContext の options など、
+ * オブジェクトの baseURL キー全般）と @playwright/test からの request・default の import は
+ * web/eslint.config.mjs で禁止し、baseURL の出どころを①②が検査する playwright.config.ts だけにしている
+ * （組み込みの request fixture も baseURL はこの設定値になる）。
  *
  * 判定は拒否リストではなく許可リスト（{@link LOCAL_HOSTNAMES}）。本番・プレビュー等の
  * ホスト名は将来増えうるため拒否リストでは検査漏れが起きる。本番のホスト名はこのファイルにも

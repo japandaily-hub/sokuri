@@ -16,9 +16,12 @@ npx playwright install chromium
 複製して `AUTH_SECRET` を任意の乱数文字列にし、`NEXT_PUBLIC_API_URL` は
 `http://localhost:8000/api/v1` にする（worktree では本体の `web/.env.local` を複製してもよい。その場合も
 `NEXT_PUBLIC_API_URL` と、あれば `API_URL` の行がローカルを向いていることを確かめる。`API_URL` は
-サーバー側で `NEXT_PUBLIC_API_URL` より優先される）。Next は環境変数を「OS の環境変数（ユーザー・システム
-どちらも）→ `.env.development.local` → `.env.local` → `.env.development` → `.env`」の順に採るので、
-OS の環境変数や `.env.development.local` に `API_URL` / `NEXT_PUBLIC_API_URL` が残っていないことも確かめる。
+サーバー側で `NEXT_PUBLIC_API_URL` より優先される）。Next は環境変数を「プロセスの環境変数（シェルで
+設定した値（PowerShell の `$env:API_URL=…` 等）と、OS のユーザー・システム環境変数）→
+`.env.development.local` → `.env.local` → `.env.development` → `.env`」の順に採るので、それらに
+`API_URL` / `NEXT_PUBLIC_API_URL` が残っていないことも確かめる。
+シード（`backend/seed_local_e2e.py`）と E2E は、リポジトリ直下の `test-room.jpg`（任意の室内写真）を読む。
+`.gitignore` 済みで新しい worktree には無いので、各自で置く（コミットしない。実写なら EXIF の位置情報を除く）。
 **接続先が未設定のまま `next dev` を起動しても本番 API へは落ちない**（未設定時に本番 API を使うのは
 本番ビルドだけ）。ログインは画面上「サーバーに接続できませんでした」になり、`next dev` のターミナルに
 `[backend-api-base] バックエンド API の接続先（API_URL / NEXT_PUBLIC_API_URL）が未設定です…` が出る。
@@ -60,9 +63,10 @@ npx playwright show-trace test-results\<失敗したテスト>\trace.zip # 失�
 4段の検査で実行前に失敗する: ①`playwright.config.ts` の読み込み時（主防御。ワーカーを1つも
 起動しない） ②`helpers/test.ts` の worker fixture（`localTargetGuard`） ③ブラウザのコンテキストを
 作るときの実効 `baseURL`（`context` fixture・`newE2EContext`） ④`Api.create()`（API クライアントを
-作るたび）。③は page / context を使うテストでしか走らないため、spec での `test.use({ baseURL })` と
-`@playwright/test` からの `request` の import は `web/eslint.config.mjs` で禁止している（baseURL は
-`playwright.config.ts` だけで決め、API は `helpers/api.ts` の `Api` から呼ぶ）。検査の本体は
+作るたび）。③は page / context を使うテストでしか走らないため、spec では baseURL を書くこと
+（`test.use` / `test.extend` / `newE2EContext` の options など、オブジェクトの `baseURL` キー全般）と
+`@playwright/test` からの `request`・default の import を `web/eslint.config.mjs` で禁止している
+（baseURL は `playwright.config.ts` だけで決める）。検査の本体は
 `helpers/local-target.ts`。`E2E_ALLOW_REMOTE=1` を付けると検査を外すが、外した接続先（origin）を
 警告として表示する。ただし `next dev` 自身が使う接続先（サーバー側の NextAuth の `authorize()` 等と、
 画面が使う `NEXT_PUBLIC_API_URL` の両方）は4段では検査しないため、`web/.env.local` の接続先そのものを
@@ -107,8 +111,8 @@ $env:RL_CASE_CREATE_IP_MAX="200"; $env:RL_CASE_CREATE_ACCOUNT_MAX="200"
   別コンテキストは `browser.newContext()` ではなく `newE2EContext(browser)` で作ること**（`web/eslint.config.mjs`
   で強制。`browser.newContext` / `browser.newPage` の直接呼び出しは helpers も含めて禁止。違反すると
   `npm run lint` と CI の lint（`npx eslint src e2e`）が落ちる）。接続先の検査のうち worker fixture
-  （`localTargetGuard`）と、テストごとの実効 `baseURL` を見る `context` fixture / `newE2EContext` の
-  2段を持つ。
+  （`localTargetGuard`）と、コンテキスト作成時の実効 `baseURL` を見る `context` fixture / `newE2EContext`
+  の2段を持つ。
 - `local-target.ts` … 接続先がローカルスタックかどうかを検査する純関数（検査の本体）。上記4段の
   検査はすべてここから import する。
 - `local-target.test.mts` … 上記の回帰テスト（`node --test`。`playwright.config.ts` の
@@ -128,8 +132,8 @@ $env:RL_CASE_CREATE_IP_MAX="200"; $env:RL_CASE_CREATE_ACCOUNT_MAX="200"
 - **ローカル以外には向けない。** 接続先は許可リスト（localhost / 127.0.0.1 / ::1）で検査し、
   本番のホスト名はテストコードに書かない。検査は4段（`playwright.config.ts` の読み込み時が
   主防御 → `helpers/test.ts` の worker fixture → コンテキスト作成時の `baseURL` → `Api.create()`）で
-  重ねている（検査の本体は `helpers/local-target.ts`）。spec では `test.use({ baseURL })` と
-  `@playwright/test` の `request` を使わない（eslint で禁止）。
+  重ねている（検査の本体は `helpers/local-target.ts`）。spec では baseURL を書かず、`@playwright/test` の
+  `request`・default を import しない（eslint で禁止）。
 - **`data-testid` を足さない。** セレクタは `getByRole` と表示文言で書く。文言変更で壊れやすい
   ところは正規表現で緩める。UI 側にテスト専用属性を増やさないための制約。
 - **直列実行（`workers: 1` / `fullyParallel: false`）。** シナリオが同じ DB の取引を消費するため、
