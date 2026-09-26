@@ -244,14 +244,16 @@ export default function OperatorTransactionPage() {
             </div>
           ) : null}
 
-          {/* ユーザーとのやり取り導線（チャット・日程調整はチャット画面から行う） */}
+          {/* ユーザーとのやり取り導線（チャット・日程調整はチャット画面から行う）。
+              「日程調整」を添えるのは進行中の取引だけ。完了済みではサーバーが日程提案を 409 で拒否し、
+              業者チャットでも提案できないため、過去のやり取りを見返す入口として「ユーザーとチャット」だけにする。 */}
           {txn.status !== "cancelled" ? (
             <Link
               href={`/operator/chat/${txn.id}`}
               className="btn btn-primary"
               style={{ display: "inline-flex" }}
             >
-              ユーザーとチャット（日程調整）
+              {active ? "ユーザーとチャット（日程調整）" : "ユーザーとチャット"}
             </Link>
           ) : null}
 
