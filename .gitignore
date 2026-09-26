@@ -100,6 +100,9 @@ out/
 playwright-report/
 blob-report/
 **/playwright/.cache/
+# E2E とシード（backend/seed_local_e2e.py）が読むリポジトリ直下の写真。各自で置き、コミットしない
+# （公開リポジトリなので、素の git add で入り込まないようにする）。
+/test-room.jpg
 
 # Lock files (keep package-lock.json / yarn.lock / pnpm-lock.yaml — remove only if monorepo policy differs)
 # Uncomment the line below only if you intentionally ignore lock files:
