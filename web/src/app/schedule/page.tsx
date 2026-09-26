@@ -19,6 +19,7 @@ import {
   type MessageOut,
   type TransactionDetail,
 } from "@/lib/katadzuke-api";
+import { VISIT_TIME_SLOTS as TIME_SLOTS, parseSlotDate } from "@/lib/visit-slots";
 
 /* ============================================================
    訪問日程調整ページ（カタヅケ）
@@ -37,33 +38,12 @@ const PROGRESS_STEPS = [
   { state: "todo" as const, label: "訪問・完了" },
 ];
 
-/** 希望時間帯。 */
-const TIME_SLOTS: { value: string; label: string }[] = [
-  { value: "9:00〜12:00", label: "午前" },
-  { value: "12:00〜15:00", label: "昼" },
-  { value: "15:00〜18:00", label: "午後" },
-  { value: "18:00〜21:00", label: "夜" },
-  { value: "時間指定なし", label: "業者に一任" },
-];
-
 const DOW_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
 
 type SelectedDate = { key: string; label: string; year: number; month: number; day: number };
 
 /** 数値を `1,234` 形式に整形（円表示用）。 */
 const yen = (n: number) => n.toLocaleString();
-
-/** 業者が propose_schedule で提示した候補日文字列から日付を抽出（例: "7月5日（土）10:00〜12:00"）。 */
-function parseSlotDate(slot: string): { month: number; day: number } | null {
-  const m = slot.match(/(\d{1,2})月(\d{1,2})日/);
-  if (!m) return null;
-  const month = Number(m[1]);
-  const day = Number(m[2]);
-  if (!Number.isInteger(month) || !Number.isInteger(day) || month < 1 || month > 12 || day < 1 || day > 31) {
-    return null;
-  }
-  return { month, day };
-}
 
 export default function SchedulePage() {
   return (
@@ -155,16 +135,14 @@ function SchedulePageInner() {
   const [viewYear, setViewYear] = useState(() => today.getFullYear());
   const [viewMonth, setViewMonth] = useState(() => today.getMonth());
 
-  /* ---- 業者提示候補日のハイライト用セット ---- */
+  /* ---- 業者提示候補日のハイライト用セット（ISO形式をこのページのキー形式へ変換） ---- */
   const proposedDayKeys = useMemo(() => {
     const set = new Set<string>();
     for (const slot of proposedSlots) {
-      const parsed = parseSlotDate(slot);
-      if (!parsed) continue;
-      let year = today.getFullYear();
-      const candidate = new Date(year, parsed.month - 1, parsed.day);
-      if (candidate < today) year += 1;
-      set.add(`${year}-${parsed.month}-${parsed.day}`);
+      const iso = parseSlotDate(slot, today);
+      if (!iso) continue;
+      const [year, month, day] = iso.split("-").map(Number);
+      set.add(`${year}-${month}-${day}`);
     }
     return set;
   }, [proposedSlots, today]);

@@ -441,6 +441,13 @@
 .btn.btn-danger-ghost:hover { background: var(--danger-bg-soft); }
 .btn.btn-danger-ghost:disabled { opacity: .6; cursor: not-allowed; }
 
+/* 取引詳細のチャット導線（「ユーザーとチャット（日程調整）」）。.btn の左右 40px・字間 .1em のままだと
+   375px 幅でカードの内側（335px）から約 9px はみ出していた（2026-09-26 実測）。
+   狭い画面だけ余白と字間を詰めて 1 行に収める（デスクトップの見た目は変えない）。 */
+@media (max-width: 480px) {
+  .btn.op-chat-link { padding-left: 20px; padding-right: 20px; letter-spacing: .05em; max-width: 100%; }
+}
+
 /* 案件一覧の絞り込み行（/operator/cases） */
 .lot-filters {
   display: flex;

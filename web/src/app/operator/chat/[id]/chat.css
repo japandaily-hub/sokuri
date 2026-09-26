@@ -320,13 +320,20 @@
   gap: 6px;
 }
 .opchat-page .sp-head .ic { width: 16px; height: 16px; color: var(--blue); }
-.opchat-page .sp-options { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
-.opchat-page .sp-opt-row { display: flex; gap: 8px; align-items: center; }
+.opchat-page .sp-options { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
+/* 2026-09-26 ボタン化: 1行 = 日付input+削除ボタン（.sp-opt-head）+ 時間帯ボタン5つ（.sp-time-slots）+
+   生成ラベルのプレビュー（.sp-slot-preview）の縦積みに変更（旧: 自由入力テキスト1本の横並び）。
+   複数候補日を視覚的に分けるため、最後の行以外に下線を引く。 */
+.opchat-page .sp-opt-row { display: flex; flex-direction: column; gap: 8px; }
+.opchat-page .sp-opt-row:not(:last-child) { padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.opchat-page .sp-opt-head { display: flex; gap: 8px; align-items: center; }
 .opchat-page .sp-date-input {
   flex: 1;
   min-width: 0;
   font-family: var(--sans);
-  font-size: 13px;
+  /* iOS は 16px 未満の入力欄をフォーカス時に自動拡大する。type="date" のネイティブUIが
+     ズームインしたまま戻らない不具合を避けるため 16px にする（2026-09-26 ボタン化）。 */
+  font-size: 16px;
   color: var(--ink);
   background: #fff;
   border: 1.5px solid var(--line);
@@ -349,6 +356,44 @@
   flex-shrink: 0;
 }
 .opchat-page .sp-remove .ic { width: 14px; height: 14px; }
+/* 時間帯ボタン5つ。375px幅（.schedule-propose の実質内側は約254px）でも横に
+   はみ出さないよう、固定列数を決めずに flex-wrap で折り返す（1行に収まる分だけ並ぶ）。 */
+.opchat-page .sp-time-slots { display: flex; flex-wrap: wrap; gap: 6px; }
+.opchat-page .sp-time-btn {
+  flex: 1 1 auto;
+  min-width: 72px;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  background: #fff;
+  border: 1.5px solid var(--line);
+  border-radius: 0;
+  padding: 6px 8px;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color .15s, background .15s, color .15s;
+}
+.opchat-page .sp-time-btn .sp-time-sub {
+  display: block;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--body-soft);
+  margin-top: 2px;
+}
+.opchat-page .sp-time-btn.selected { border-color: var(--blue); background: var(--pale); color: var(--blue); }
+.opchat-page .sp-time-btn.selected .sp-time-sub { color: var(--blue); }
+/* 生成ラベルのプレビュー（送信前に確認できる、実際に相手へ届く文言そのもの）。 */
+.opchat-page .sp-slot-preview {
+  font-size: 11.5px;
+  color: var(--body-soft);
+  background: #fff;
+  border: 1px dashed var(--line);
+  padding: 4px 8px;
+  word-break: break-word;
+}
+/* 日付・時間帯が未選択の行の控えめな案内（2026-09-26 ボタン化）。 */
+.opchat-page .sp-slot-preview-empty { font-style: italic; opacity: .75; }
 .opchat-page .btn-add-slot {
   font-size: 12.5px;
   font-weight: 600;
@@ -361,6 +406,7 @@
   align-items: center;
   gap: 4px;
 }
+.opchat-page .btn-add-slot:disabled { color: var(--body-soft); cursor: not-allowed; }
 .opchat-page .btn-send-schedule {
   width: 100%;
   padding: 11px;
@@ -403,6 +449,7 @@
   flex-shrink: 0;
 }
 .opchat-page .tool-btn:hover { background: var(--pale); }
+.opchat-page .tool-btn:disabled { color: var(--body-soft); cursor: not-allowed; opacity: .6; }
 .opchat-page .tool-btn .ic { width: 18px; height: 18px; }
 .opchat-page .msg-input {
   flex: 1;
@@ -536,6 +583,7 @@
   gap: 6px;
 }
 .opchat-page .btn-propose:hover { background: var(--blue-d); }
+.opchat-page .btn-propose:disabled { opacity: .6; cursor: not-allowed; }
 .opchat-page .btn-propose .ic { width: 16px; height: 16px; }
 
 @media (max-width: 900px) {

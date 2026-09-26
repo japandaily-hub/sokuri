@@ -331,6 +331,20 @@ export interface TransactionDetail extends TransactionOut {
   cancellation: TransactionCancellation | null;
   /** 落札業者が退会済みか（依頼者・業者双方の画面で取引継続不可の判定に使う）。r8-fix-frontend5 対応。 */
   operator_deleted: boolean;
+  /**
+   * 落札業者がこれまでに送信済みの完了確定依頼（requestCompletion）の件数。2026-09-26 ボタン化。
+   * backend 未反映の環境では応答に含まれない場合があるため optional（その場合はボタンを
+   * 押せるままにし、409/429 はボタン直下の表示（operator/transactions/[id]/page.tsx の
+   * completionError state）に委ねる）。
+   */
+  completion_request_count?: number;
+  /** 1取引あたりの完了確定依頼の上限回数（backend 側の固定値）。2026-09-26 ボタン化・同上の理由で optional。 */
+  completion_request_limit?: number;
+  /**
+   * 次に完了確定を依頼できる時刻（24時間のクールダウン）。今すぐ依頼できる場合は null。
+   * 2026-09-26 ボタン化・backend 未反映の環境では応答に含まれない場合があるため optional。
+   */
+  completion_request_available_at?: string | null;
 }
 
 /** reduction_request_limit が backend から未取得の場合に使う既定の上限回数。r10 H2 対応。 */
@@ -359,7 +373,12 @@ export function getReductionQuota(txn: {
 // ---------------------------------------------------------------------------
 
 export type MessageSenderType = "user" | "operator" | "system";
-export type MessageKind = "text" | "schedule_proposal" | "schedule_confirmed" | "system";
+/**
+ * complete_request（業者→ユーザー: 完了確定の依頼。sender_type="operator"）／
+ * completed（system: 完了確定の記録。2026-09-26 ボタン化）を追加。表示側の追加描画は不要
+ * （ChatPanel・業者チャットともに schedule_proposal 以外は汎用の吹き出しとして描画するため）。
+ */
+export type MessageKind = "text" | "schedule_proposal" | "schedule_confirmed" | "system" | "complete_request" | "completed";
 
 export interface MessageOut {
   id: string;
@@ -1845,6 +1864,23 @@ export function completeTransaction(
   token: string,
 ): Promise<TransactionOut> {
   return request(`/transactions/${encodeURIComponent(transactionId)}/complete`, { method: "POST", token });
+}
+
+/**
+ * 完了確定の依頼（落札業者のみ。訪問・引き取り後にユーザーへ「作業完了を確定してください」と
+ * 依頼する。業者名義のメッセージ（kind="complete_request"）がチャットに1件増える）。2026-09-26 ボタン化。
+ * 409（判定順）: 取引終了済み／訪問日程の確定前（pending）／訪問予定日より前／
+ * 依頼者が利用停止中／減額申請の回答待ち／回数上限（1取引3回まで）。
+ * 429: 前回依頼から24時間未満（Retry-After付き）。
+ */
+export function requestCompletion(
+  transactionId: string,
+  token: string,
+): Promise<MessageOut> {
+  return request(`/transactions/${encodeURIComponent(transactionId)}/complete/request`, {
+    method: "POST",
+    token,
+  });
 }
 
 export function cancelTransaction(

@@ -33,6 +33,7 @@ import {
   type MessageOut,
   type TransactionDetail,
 } from "@/lib/katadzuke-api";
+import { parseSlotDate, toIsoDateString, VISIT_TIME_SLOT_MAX_LENGTH } from "@/lib/visit-slots";
 
 const POLL_INTERVAL_MS = 5000;
 
@@ -55,30 +56,6 @@ function CalendarIc({ className }: { className?: string }) {
       <path d="M4 9h16M8 3v4M16 3v4" />
     </svg>
   );
-}
-
-/**
- * 業者が入力する候補日文字列（例: "7月5日（土）10:00〜12:00"）から
- * ISO日付（YYYY-MM-DD）を抽出する。「月」「日」の数字パターンのみに依存し、
- * 抽出できない場合は null を返す（呼び出し側でエラー表示にフォールバックする）。
- * 年は「今日以降で直近に来る年」を採用する（月が現在月より前なら来年扱い）。
- */
-function parseSlotDate(slot: string): string | null {
-  const m = slot.match(/(\d{1,2})月(\d{1,2})日/);
-  if (!m) return null;
-  const month = Number(m[1]);
-  const day = Number(m[2]);
-  if (!Number.isInteger(month) || !Number.isInteger(day) || month < 1 || month > 12 || day < 1 || day > 31) {
-    return null;
-  }
-  const now = new Date();
-  let year = now.getFullYear();
-  const candidate = new Date(year, month - 1, day);
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  if (candidate < today) year += 1;
-  const mm = String(month).padStart(2, "0");
-  const dd = String(day).padStart(2, "0");
-  return `${year}-${mm}-${dd}`;
 }
 
 export interface ChatPanelProps {
@@ -246,9 +223,22 @@ export function ChatPanel({
     const idx = schedulePickByMsg[msg.id] ?? 0;
     const slotLabel = slots[idx];
     if (!slotLabel) return;
-    const visitDate = parseSlotDate(slotLabel);
+    // 確定 API（ScheduleConfirmRequest.visit_time_slot）は32字までしか受け付けない（超えると 422）。
+    // 候補日が自由入力だった頃の長い候補は、送信前に弾いて日程調整ページへ案内する（2026-09-26 ボタン化）。
+    if (slotLabel.length > VISIT_TIME_SLOT_MAX_LENGTH) {
+      showToast("候補日の形式を解析できませんでした。日程調整ページからお選びください。");
+      return;
+    }
+    const now = new Date();
+    const visitDate = parseSlotDate(slotLabel, now);
     if (!visitDate) {
       showToast("候補日の形式を解析できませんでした。日程調整ページからお選びください。");
+      return;
+    }
+    // 年入りラベルは過去日でも解析自体は成功するため、確定前に過去日を弾く
+    // （年なし旧形式は繰り上げ推定で必ず未来日になるため、このガードは年入りのみ発火する）。
+    if (visitDate < toIsoDateString(now)) {
+      showToast("この候補日は過ぎています。日程調整ページからお選びください。");
       return;
     }
     setConfirmingMsgId(msg.id);

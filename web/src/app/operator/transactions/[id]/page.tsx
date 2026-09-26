@@ -35,13 +35,21 @@ import {
   getReductionQuota,
   getTransaction,
   photoSrc,
+  requestCompletion,
   toDisplayMessage,
   type TransactionDetail,
 } from "@/lib/katadzuke-api";
+import { toIsoDateString } from "@/lib/visit-slots";
 import { ReviewComposer } from "@/components/kdz/ReviewComposer";
 import { REVIEW_VERDICT_LABEL } from "@/lib/review-verdict";
 
 type ModalState = { kind: "reduction"; amount: number; reason: string } | { kind: "cancel" } | null;
+
+/** "YYYY-MM-DD" から "M月D日" を作る（訪問日が未到来のときの注記表示用）。 */
+function formatMonthDay(isoDate: string): string {
+  const [, month, day] = isoDate.split("-").map(Number);
+  return `${month}月${day}日`;
+}
 
 export default function OperatorTransactionPage() {
   const params = useParams<{ id: string }>();
@@ -55,6 +63,12 @@ export default function OperatorTransactionPage() {
   const [reason, setReason] = useState("");
   const [modal, setModal] = useState<ModalState>(null);
   const [cancelReason, setCancelReason] = useState("");
+  // 2026-09-26 ボタン化: 完了確定の依頼に成功したことをこの画面滞在中だけ示す（再読込・別取引への
+  // 遷移でリセットされる。サーバー側の永続状態は completion_request_count 等で判定する）。
+  const [completionRequested, setCompletionRequested] = useState(false);
+  // 完了確定の依頼で 409/429 が出た場合、ページ最上部の error とは別に、ボタン直下にも出す
+  // （どのボタンの失敗か分かるように専用の state にする）。
+  const [completionError, setCompletionError] = useState<string | null>(null);
 
   // モーダルを開いたトリガー要素を保持し、閉じた際にフォーカスを戻す（アクセシビリティ対応）。
   const modalTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -117,6 +131,26 @@ export default function OperatorTransactionPage() {
     }
   }
 
+  /**
+   * 完了確定の依頼専用のハンドラ。act() と違い、失敗時（409/429）も reload() を呼んで
+   * 件数・クールダウン時刻をサーバーの最新値に取り直す（失敗直後にもう一度押せる条件を
+   * 正しく反映するため）。エラーはページ最上部の error ではなくボタン直下の
+   * completionError に出す。
+   */
+  async function handleRequestCompletion(transactionId: string) {
+    if (busy || !token) return;
+    setBusy(true);
+    setCompletionError(null);
+    try {
+      await requestCompletion(transactionId, token);
+      setCompletionRequested(true);
+    } catch (e) {
+      setCompletionError(toDisplayMessage(e, "完了確定の依頼に失敗しました"));
+    }
+    await reload();
+    setBusy(false);
+  }
+
   if (loading || (!txn && !error)) {
     return (
       <div className="case-detail-page">
@@ -151,6 +185,46 @@ export default function OperatorTransactionPage() {
   // r10 H2 是正: count/limit が未定義（backend 未反映）だと Math.max(0, NaN) となり
   // フォームごと消えていたため、getReductionQuota() で既定上限・残り不明フォールバックする。
   const { limit: reductionLimit, remaining: reductionRemaining } = getReductionQuota(txn);
+  // 2026-09-26 ボタン化: 完了確定の依頼（業者→ユーザー）が押せない条件と、その注記。
+  // 優先順（恒久的な条件を先、一時的な制限を後）:
+  // 訪問日程の確定前 → 訪問日が未到来 → 依頼者の利用停止 → 減額回答待ち → 回数上限 → クールダウン。
+  // backend も同じ優先順で 409 を返す想定（visiting かつ visit_date <= 今日 でなければ拒否）。
+  // 追加フィールドを返さない旧APIには count/limit/available_at が undefined のまま届き、
+  // その場合は下記の判定をすべてスキップしてボタンを押せる状態のままにする
+  // （409/429 は completionError に出す）。
+  const todayIso = toIsoDateString(new Date());
+  const visitNotYetArrived = txn.status === "visiting" && txn.visit_date != null && txn.visit_date > todayIso;
+  const completionCount = txn.completion_request_count;
+  const completionLimit = txn.completion_request_limit;
+  const completionAvailableAt = txn.completion_request_available_at;
+  const completionLimitReached =
+    completionCount != null && completionLimit != null && completionCount >= completionLimit;
+  const completionCooldownUntil =
+    completionAvailableAt != null && new Date(completionAvailableAt).getTime() > Date.now()
+      ? completionAvailableAt
+      : null;
+  const completionBlockedNote =
+    txn.status !== "visiting"
+      ? "訪問日程の確定後に依頼できます。"
+      : visitNotYetArrived
+        ? `訪問日（${formatMonthDay(txn.visit_date!)}）以降に依頼できます。`
+        : txn.user_suspended
+          ? "ユーザーが利用停止中のため依頼できません。運営へお問い合わせください。"
+          : pendingReduction
+            ? "減額申請への回答後に依頼できます。"
+            : completionLimitReached
+              ? `依頼できる回数（${completionLimit}回）に達しました。運営へお問い合わせください。`
+              : completionCooldownUntil
+                ? `依頼済みです。次に依頼できるのは${new Date(completionCooldownUntil).toLocaleString("ja-JP", { dateStyle: "medium", timeStyle: "short" })}以降です。`
+                : null;
+  const completionDisabled =
+    busy ||
+    txn.status !== "visiting" ||
+    visitNotYetArrived ||
+    txn.user_suspended ||
+    Boolean(pendingReduction) ||
+    completionLimitReached ||
+    completionCooldownUntil !== null;
 
   function openReductionModal(e: React.FormEvent) {
     e.preventDefault();
@@ -212,10 +286,41 @@ export default function OperatorTransactionPage() {
                 <strong style={{ color: "var(--navy)" }}>買取代金のお支払い方法は、成約後にご案内します。</strong>
                 ご不明な点は運営へお問い合わせください。
               </p>
-              <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.85, marginTop: 8 }}>
-                <strong style={{ color: "var(--navy)" }}>作業完了はユーザーが確定します。</strong>
-                訪問・引き取り後、ユーザーにチャットで完了確定を依頼してください。
-              </p>
+              {/* 2026-09-26 ボタン化: 2段落目を状態で分ける。completed では依頼ボタンごと引く。 */}
+              {active ? (
+                <>
+                  <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.85, marginTop: 8 }}>
+                    <strong style={{ color: "var(--navy)" }}>作業完了はユーザーが確定します。</strong>
+                    訪問・引き取りが済んだら、下のボタンでユーザーに完了確定を依頼してください（LINEまたはメールでお知らせします）。
+                  </p>
+                  {/* 2026-09-26 ボタン化: 押せない条件（busy は注記なし・disabled のみ）は completionBlockedNote で示す。
+                      確認モーダルは付けない（24時間のクールダウンで連発されないため）。 */}
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    style={{ marginTop: 10 }}
+                    disabled={completionDisabled}
+                    onClick={() => void handleRequestCompletion(txn.id)}
+                  >
+                    完了確定を依頼する
+                  </button>
+                  {completionBlockedNote ? (
+                    <p style={{ fontSize: 12.5, color: "var(--body-soft)", marginTop: 6 }}>{completionBlockedNote}</p>
+                  ) : null}
+                  {completionError ? (
+                    <div className="op-alert error" style={{ marginTop: 6 }}>{completionError}</div>
+                  ) : null}
+                  {completionRequested ? (
+                    <p role="status" style={{ fontSize: 13, color: "var(--green)", marginTop: 6 }}>
+                      ユーザーに完了確定を依頼しました。
+                    </p>
+                  ) : null}
+                </>
+              ) : txn.status === "completed" ? (
+                <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.85, marginTop: 8 }}>
+                  <strong style={{ color: "var(--navy)" }}>作業完了はユーザーが確定済みです。</strong>
+                </p>
+              ) : null}
             </div>
           ) : null}
 
@@ -245,15 +350,17 @@ export default function OperatorTransactionPage() {
           ) : null}
 
           {/* ユーザーとのやり取り導線（チャット・日程調整はチャット画面から行う）。
-              「日程調整」を添えるのは進行中の取引だけ。完了済みではサーバーが日程提案を 409 で拒否し、
-              業者チャットでも提案できないため、過去のやり取りを見返す入口として「ユーザーとチャット」だけにする。 */}
+              「日程調整」を添えるのは pending（訪問日程が未確定）のときだけ。visiting では
+              業者チャット側が「訪問日程は確定済みです。変更が必要な場合はメッセージでご相談ください。」
+              と出し新しい候補日も提示できないため、日程調整を促す文言は矛盾する。完了済みも同様に
+              過去のやり取りを見返す入口として「ユーザーとチャット」だけにする。 */}
           {txn.status !== "cancelled" ? (
             <Link
               href={`/operator/chat/${txn.id}`}
-              className="btn btn-primary"
+              className="btn btn-primary op-chat-link"
               style={{ display: "inline-flex" }}
             >
-              {active ? "ユーザーとチャット（日程調整）" : "ユーザーとチャット"}
+              {txn.status === "pending" ? "ユーザーとチャット（日程調整）" : "ユーザーとチャット"}
             </Link>
           ) : null}
 
