@@ -86,6 +86,9 @@ $env:RL_CASE_CREATE_IP_MAX="200"; $env:RL_CASE_CREATE_ACCOUNT_MAX="200"
 - `api.ts` … 前提データ作成・ID 引き当て用の API クライアント（`web/src/lib/katadzuke-api.ts` は
   `"use client"` 依存を持つため import せず、必要な型だけ再定義している）。
 - `ui.ts` … ログインフォーム操作、共通 ConfirmModal の確定、横スクロール判定、console error 収集。
+  `loginAsUser` は callbackUrl なしで `/login` を開き、**ログイン直後の着地先（運営は `/admin`・それ以外は
+  `/cases`）を必須で確かめてから**目的のパスへ移る（`/login` を抜けたことだけを見ていた頃は、運営が
+  `/cases` に着地する不具合を見逃していた。2026-09-26）。
 - `fixtures.ts` … シード済み DB から「入札待ちの案件」「進行中の取引」を引き当てる。
   **既存を再利用できる場合は必ず再利用し、案件の新規作成は最後の手段**（上記レート上限のため）。
 

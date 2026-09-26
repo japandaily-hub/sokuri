@@ -6,7 +6,7 @@
  */
 import { Page, expect } from "@playwright/test";
 
-import { Account } from "./env";
+import { ACCOUNTS, Account } from "./env";
 
 /** ログインフォーム（依頼者 /login・業者 /operator/login・運営 /login 共通の作り）。 */
 async function submitLoginForm(page: Page, account: Account): Promise<void> {
@@ -15,16 +15,22 @@ async function submitLoginForm(page: Page, account: Account): Promise<void> {
   await page.locator('button[type="submit"]').click();
 }
 
-/** 依頼者（および運営）としてログインし、遷移完了まで待つ。 */
+/**
+ * 依頼者（および運営）としてログインし、遷移完了まで待つ。
+ *
+ * callbackUrl なしで /login を開くので、着地先は役割だけで決まる（運営は /admin・それ以外は
+ * /cases。web/src/lib/post-login-path.ts）。着地先そのものを確かめてから目的のパスへ移る。
+ * 以前は「/login を抜けたこと」だけを見て目的のパスへ goto していたため、運営が /admin ではなく
+ * /cases に着地する不具合（2026-09-26 是正）を見逃していた。
+ */
 export async function loginAsUser(page: Page, account: Account, expectPath = "/cases"): Promise<void> {
   await page.goto("/login");
   await submitLoginForm(page, account);
   await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 30_000 });
-  if (expectPath) {
-    // 遷移先が callbackUrl 依存で揺れるため、ログイン画面を抜けたことだけを必須とし
-    // 目的のパスへは明示遷移する。
-    await page.goto(expectPath);
-  }
+  const landingPath = account.email === ACCOUNTS.admin.email ? "/admin" : "/cases";
+  await expect(page, `ログイン直後の着地先が ${landingPath} ではない`).toHaveURL((url) => url.pathname === landingPath);
+  // 着地先がそのまま目的のパスなら読み込み直さない。
+  if (expectPath && expectPath !== landingPath) await page.goto(expectPath);
 }
 
 /** 業者としてログインする。 */

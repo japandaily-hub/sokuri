@@ -3,60 +3,119 @@
 /** ユーザーログイン（新デザイン）。admin も同じフォーム（role で /admin へ誘導）。
  *  認証は既存の NextAuth Credentials（user-credentials → backend JWT）を維持。 */
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { getSession, signIn, signOut, useSession } from "next-auth/react";
 import { AuthBar, Field, PasswordField, LineAuthButton, TrustRow } from "@/components/kdz/auth";
 import { Reveal } from "@/components/kdz/interactions";
 import { safeInternalPath } from "@/lib/safe-path";
+import { USER_HOME_PATH, resolvePostLoginPath } from "@/lib/post-login-path";
 import { clearRedirectLoopStorage } from "@/lib/katadzuke-api";
 import "./login.css";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/**
+ * 遷移の出口での多層防御。destination は safeInternalPath を通した値か定数だけのはずだが、
+ * 将来の呼び出し誤り（生の callbackUrl や signIn の応答 URL を渡す等）で外部サイトや javascript: へ
+ * 遷移しないよう、現在地（location.href。<base> 要素の影響を受けない）を基準に解決し、
+ * 同一 origin であることを確かめる。満たさない値は依頼者の既定（/cases）へ置き換える。
+ * @returns 同一 origin の絶対 URL
+ */
+function toSameOriginHref(destination: string): string {
+  const here = window.location.href;
+  try {
+    const target = new URL(destination, here);
+    if (target.origin === window.location.origin) return target.href;
+  } catch {
+    // URL として解釈できない値も下の既定へ置き換える
+  }
+  console.error("[login] 同一 origin でない遷移先を拒否しました。既定の遷移先へ進みます。");
+  return new URL(USER_HOME_PATH, here).href;
+}
+
+/**
+ * ログイン後の画面遷移（この画面がログイン後に出す唯一の遷移）。ページ全体を読み込み直して遷移する。
+ * ルーターの遷移（router.replace / push）を使わない理由は LoginForm の遷移処理のコメント参照。
+ * @param destination resolvePostLoginPath が返したサイト内パス
+ */
+function leaveLoginPage(destination: string): void {
+  // ログインに成功した（LINE 等の経路を含む）ので、ループ検知の発火履歴をリセットする（r3 再レビュー N-8）。
+  clearRedirectLoopStorage();
+  window.location.replace(toSameOriginHref(destination));
+}
+
+/**
+ * ログイン API は成功したのに、画面側のセッションが依頼者のものになっていない場合の後始末
+ * （直後の取得の通信断、または送信前に始まった取得の古い応答＝未ログイン・業者のセッションが
+ * 後から届いて上書きした場合）。role を確かめるため 1 回だけ取り直し（broadcast しない＝この画面の
+ * 再取得を起こさない）、遷移する。確かめられなければ依頼者の既定へ進む（遷移先のページが読み直す）。
+ * ここで止めると「ログイン中…」のまま画面が動かなくなるため、失敗しても必ず遷移する。
+ * @param requestedPath safeInternalPath で検証済みの callbackUrl（指定なしは null）
+ */
+async function recheckSessionAndLeave(requestedPath: string | null): Promise<void> {
+  let role: string | undefined;
+  try {
+    const fresh = await getSession({ broadcast: false });
+    if (fresh?.accountType === "user") role = fresh.role;
+  } catch (error) {
+    console.error("[login] ログイン後のセッションの取り直しに失敗しました", error);
+  }
+  if (role === undefined) {
+    console.error("[login] ログイン後に依頼者のセッションを確認できませんでした。既定の遷移先へ進みます。");
+  }
+  leaveLoginPage(resolvePostLoginPath(requestedPath, role));
+}
+
 function LoginForm() {
-  const router = useRouter();
   const params = useSearchParams();
-  // オープンリダイレクト対策: サイト内パスのみ許可
-  // 運営ログイン是正: callbackUrl が明示されていない直入店（/login を直接開いた場合）は
-  // 既定で /cases（依頼者のマイ案件）へ送っていたため、role=admin でログインしても
-  // 管理画面(/admin)ではなく一般ユーザー画面に着地していた。callbackUrl が省略された
-  // ケースかどうかを区別し、role 判明後に admin だけ /admin へ振り分ける（下記参照）。
-  const hasExplicitCallbackUrl = params.get("callbackUrl") != null;
-  const callbackUrl = safeInternalPath(params.get("callbackUrl"), "/cases");
+  // オープンリダイレクト対策: サイト内パスのみ許可（safeInternalPath）。検証に通らない値は
+  // 「指定なし」と同じ扱いにする（fallback を空文字にして区別する。検証済みの値は必ず "/" で始まる）。
+  const requestedPath = safeInternalPath(params.get("callbackUrl"), "") || null;
+  // 画面の文言切替と LINE ログインの戻り先。ログイン前は役割が分からないため既定は依頼者の /cases。
+  const callbackUrl = requestedPath ?? USER_HOME_PATH;
   const toCreate = callbackUrl.startsWith("/create");
   // r3 セキュリティレビュー L-2 是正: backend が停止アカウントを 403
   // { code: "account_suspended" } で返した際、共通処理（katadzuke-api.ts）が
   // signOut 後にここへ ?reason=suspended 付きで遷移させる。
   const suspended = params.get("reason") === "suspended";
   const { data: session, status } = useSession();
-  // ログイン済みなら（LINEではじめる 等から来た場合）そのまま目的地へ。
-  // r3 セキュリティレビュー H-2 是正: callbackUrl が自分の役割で到達できないパス
-  // （/operator配下、admin以外なのに/admin配下）を指す場合はそこへ送らず、
-  // 既定の遷移先（/cases）へフォールバックする。
-  // r3 再レビュー N-3 是正: 業者アカウントで /login に迷い込んだ場合（このページは
-  // accountType==="user" のセッションのみを想定）に callbackUrl（/cases 等）へ
-  // 自動 replace してしまうと、その後 middleware が accountType 不一致で /login に
-  // 送り返す無限ループになりうる。accountType==="user" を必須条件に加える。
-  // r3 再レビュー3回目 是正: 業者セッションの場合はそもそも replace せず（=行き先が無く
-  // ループの起点になっていた）、下の「サインアウトして依頼者ログインへ」バナーに委ねる。
+  const accountType = session?.accountType;
+  const role = session?.role;
+  // ログイン後の画面遷移は、ここで 1 回だけ行う（送信直後も、LINE 等でログイン済みのまま /login を
+  // 開いた場合も）。遷移先は resolvePostLoginPath（callbackUrl 指定なし → 運営 /admin・それ以外 /cases。
+  // 指定あり → 遷移先として許可できればそこ、できなければ既定。r3 セキュリティレビュー H-2 の到達性ガードを含む）。
+  // r3 再レビュー N-3 / 3回目 是正: このページは accountType==="user" のセッションだけを想定する。
+  // 業者セッションでは遷移せず（行き先が無くループの起点になっていた）、下のバナーに委ねる。
+  //
+  // 2026-09-26 是正（運営ログインが /login のまま止まる・/cases に着地する）: 以前は送信処理
+  // （getSession() → router.push → router.refresh）とこの effect（router.replace）の双方が遷移を出し、
+  // getSession() の BroadcastChannel 通知によるセッション再取得で effect も再発火していた。
+  // Next 15.5.18 のルーターは、保留中の遷移を後発の遷移で破棄するときに待ち行列の末尾
+  // （app-router-instance.js の actionQueue.last）を更新しない。そのため後から積まれた refresh
+  // （next dev では HMR の refresh も）が破棄済みの枝につながって永久に解決せず、URL が /login の
+  // まま止まることがあった。止まらない場合も最後に効くのは effect の "/cases" で、運営が /admin
+  // ではなく /cases に着地していた。遷移元をここ 1 か所に絞り、さらにルーターの待ち行列を通らない
+  // ページ全体の読み込み（leaveLoginPage）で遷移する。読み込み直すので router.refresh() は要らない
+  // （ルートレイアウトはサーバー側でセッションを読んでいない）。
+  const navigatedRef = useRef(false);
+  // ログイン API の成功（送信処理が立てる）。直後のセッションが依頼者のものでなかった場合の後始末に使う。
+  const [signedIn, setSignedIn] = useState(false);
   useEffect(() => {
-    if (status !== "authenticated") return;
-    if (session?.accountType !== "user") return;
-    const role = session?.role;
-    const reachable =
-      !callbackUrl.startsWith("/operator") &&
-      (!callbackUrl.startsWith("/admin") || role === "admin");
-    // 運営ログイン是正: callbackUrl 省略時の既定 "/cases" は依頼者向けで、
-    // role=admin にとっては行き止まり（マイ案件に案件が無いだけの画面）になる。
-    // 明示的な callbackUrl が無い場合に限り、admin は /admin へ送る。
-    const fallback = !hasExplicitCallbackUrl && role === "admin" ? "/admin" : "/cases";
-    // ログイン済み（LINE等の経路含む）でここへ到達した成功ケースなので、
-    // ループ検知の発火履歴をリセットする（N-8と同趣旨）。
-    clearRedirectLoopStorage();
-    router.replace(reachable ? callbackUrl : fallback);
-  }, [status, session, callbackUrl, hasExplicitCallbackUrl, router]);
+    if (navigatedRef.current) return;
+    if (status === "authenticated" && accountType === "user") {
+      navigatedRef.current = true;
+      leaveLoginPage(resolvePostLoginPath(requestedPath, role));
+      return;
+    }
+    // ログイン API は成功したのに、画面側のセッションが依頼者のものになっていない（未ログインのまま、
+    // または業者のセッションのまま）。取り直して遷移する（recheckSessionAndLeave）。
+    if (signedIn && status !== "loading") {
+      navigatedRef.current = true;
+      void recheckSessionAndLeave(requestedPath);
+    }
+  }, [status, accountType, role, requestedPath, signedIn]);
 
   // r3 再レビュー3回目 是正: 業者アカウントでログイン中に /login を開いた場合、
   // フォームは表示したまま上部に案内バナー＋サインアウト導線を出す（行き止まり解消）。
@@ -100,7 +159,19 @@ function LoginForm() {
     if (!ok) return;
 
     setBusy(true);
-    const res = await signIn("user-credentials", { email, password, redirect: false });
+    const res = await signIn("user-credentials", { email, password, redirect: false }).catch((error: unknown) => {
+      // 通信断等で要求自体が失敗した場合は、下の「サーバーに接続できませんでした」に寄せる
+      // （以前は例外が未処理のまま残り、ボタンが「ログイン中…」で止まっていた）。
+      console.error("[login] ログインの要求に失敗しました", error);
+      return null;
+    });
+    if (res?.ok && !res.error) {
+      // 画面遷移は上の effect が 1 回だけ行う（ここから router.push 等を出すと遷移が競合する）。
+      // ループ検知のリセット（r3 再レビュー N-8）も遷移の直前にそちらで行う。
+      // 遷移が始まるまで再送信させないよう、ボタンは「ログイン中…」のまま残す。
+      setSignedIn(true);
+      return;
+    }
     setBusy(false);
     if (res?.code === "account_suspended") {
       setSuspendedNow(true);
@@ -110,25 +181,13 @@ function LoginForm() {
       setRateLimited(true);
       return;
     }
-    if (res?.code === "server_error") {
+    // 要求自体の失敗（null）・応答なし（signIn がエラー画面へ遷移した場合の undefined）・
+    // エラー無しの失敗応答も、パスワード違いと誤診させない。
+    if (!res || res.code === "server_error" || !res.error) {
       setServerError(true);
       return;
     }
-    if (res?.error) {
-      setAuthErr("メールアドレスまたはパスワードが正しくありません。");
-      return;
-    }
-    // r3 再レビュー N-8 是正: ログイン成功時にループ検知の発火履歴をリセットする。
-    clearRedirectLoopStorage();
-    // 運営ログイン是正: callbackUrl 省略時（/login 直入店）の既定 "/cases" は依頼者向け。
-    // role=admin の場合だけ /admin へ送る（callbackUrl が明示されている場合は従来どおり尊重）。
-    let destination = callbackUrl;
-    if (!hasExplicitCallbackUrl) {
-      const freshSession = await getSession();
-      if (freshSession?.role === "admin") destination = "/admin";
-    }
-    router.push(destination);
-    router.refresh();
+    setAuthErr("メールアドレスまたはパスワードが正しくありません。");
   }
 
   return (
