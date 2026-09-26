@@ -94,6 +94,13 @@ out/
 # TypeScript
 *.tsbuildinfo
 
+# Playwright（web/e2e）。test-results/ は上の pytest 節で無視している。
+# 失敗時のトレース・HTML レポートには Bearer トークン・Cookie・画面キャプチャが入る。
+# リポジトリは公開なので決してコミットしない（CI=1 で実行すると web/playwright-report/ に出る）。
+playwright-report/
+blob-report/
+**/playwright/.cache/
+
 # Lock files (keep package-lock.json / yarn.lock / pnpm-lock.yaml — remove only if monorepo policy differs)
 # Uncomment the line below only if you intentionally ignore lock files:
 # package-lock.json
