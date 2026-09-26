@@ -12,6 +12,17 @@ npm install
 npx playwright install chromium
 ```
 
+`web/.env.local` も必要（`.gitignore` 済みで新しい worktree には無い）。`web/.env.example` を
+複製して `AUTH_SECRET` を任意の乱数文字列にし、`NEXT_PUBLIC_API_URL` は
+`http://localhost:8000/api/v1` にする（worktree では本体の `web/.env.local` を複製してもよい。その場合も
+接続先がローカルを向いていることを確かめる）。シェルやユーザー環境変数に `API_URL` /
+`NEXT_PUBLIC_API_URL` が残っていると `.env.local` より優先される（`API_URL` はサーバー側で最優先）ので、
+それらも残さない。
+**接続先が未設定のまま `next dev` を起動しても本番 API へは落ちない**（未設定時に本番 API を使うのは
+本番ビルドだけ）。ログインは画面上「サーバーに接続できませんでした」になり、`next dev` のターミナルに
+`[backend-api-base] バックエンド API の接続先（API_URL / NEXT_PUBLIC_API_URL）が未設定です…` が出る。
+`AUTH_SECRET` も無い場合は、それより手前で NextAuth が `MissingSecret` で止まる。
+
 ## 実行（3 コマンド）
 
 ターミナルを 3 枚使う。1・2 は起動しっぱなしにする。
@@ -42,6 +53,16 @@ npx playwright show-trace test-results\<失敗したテスト>\trace.zip # 失�
 | --- | --- | --- |
 | `E2E_BASE_URL` | `http://localhost:3100` | フロントの起点 |
 | `E2E_API_URL` | `http://localhost:8000/api/v1` | バックエンド API の起点 |
+| `E2E_ALLOW_REMOTE` | 未設定 | `1` のときだけ localhost / 127.0.0.1 / ::1 以外への実行を許す |
+
+`E2E_BASE_URL` / `E2E_API_URL` / `playwright.config.ts` の `baseURL` のホストがローカル以外だと、
+4段の検査で実行前に失敗する: ①`playwright.config.ts` の読み込み時（主防御。ワーカーを1つも
+起動しない） ②`helpers/test.ts` の worker fixture（`localTargetGuard`） ③テストごとの実効
+`baseURL`（`context` fixture・`newE2EContext`。`test.use` の上書きも見る） ④`Api.create()`
+（API クライアントを作るたび）。検査の本体は `helpers/local-target.ts`。`E2E_ALLOW_REMOTE=1` を
+付けると検査を外すが、外した接続先（origin）を警告として表示する。ただし `next dev` の
+サーバー側（NextAuth の `authorize()` 等）が出す通信は E2E からは止められないため、
+`web/.env.local` の接続先そのものをローカルにしておくこと。
 
 ## クリーンな状態から流す
 
@@ -81,7 +102,13 @@ $env:RL_CASE_CREATE_IP_MAX="200"; $env:RL_CASE_CREATE_ACCOUNT_MAX="200"
   （`<nextjs-portal>`）を全ページで非表示にする。**spec は `@playwright/test` ではなくここから import し、
   別コンテキストは `browser.newContext()` ではなく `newE2EContext(browser)` で作ること**（`web/eslint.config.mjs`
   で強制。`browser.newContext` / `browser.newPage` の直接呼び出しは helpers も含めて禁止。違反すると
-  `npm run lint` と CI の lint（`npx eslint src e2e`）が落ちる）。
+  `npm run lint` と CI の lint（`npx eslint src e2e`）が落ちる）。接続先の検査のうち worker fixture
+  （`localTargetGuard`）と、テストごとの実効 `baseURL` を見る `context` fixture / `newE2EContext` の
+  2段を持つ。
+- `local-target.ts` … 接続先がローカルスタックかどうかを検査する純関数（検査の本体）。上記4段の
+  検査はすべてここから import する。
+- `local-target.test.mts` … 上記の回帰テスト（`node --test`。`playwright.config.ts` の
+  `testMatch` を `**/*.spec.ts` に絞っているため Playwright の収集対象にもならない）。
 - `env.ts` … 接続先とテスト口座。**`backend/seed_local_e2e.py` の `ACCOUNTS` と 1:1 で同期させること。**
 - `api.ts` … 前提データ作成・ID 引き当て用の API クライアント（`web/src/lib/katadzuke-api.ts` は
   `"use client"` 依存を持つため import せず、必要な型だけ再定義している）。
@@ -94,6 +121,10 @@ $env:RL_CASE_CREATE_IP_MAX="200"; $env:RL_CASE_CREATE_ACCOUNT_MAX="200"
 
 ## 設計方針（変更するときの約束）
 
+- **ローカル以外には向けない。** 接続先は許可リスト（localhost / 127.0.0.1 / ::1）で検査し、
+  本番のホスト名はテストコードに書かない。検査は4段（`playwright.config.ts` の読み込み時が
+  主防御 → `helpers/test.ts` の worker fixture → テストごとの `baseURL` → `Api.create()`）で
+  重ねている（検査の本体は `helpers/local-target.ts`）。
 - **`data-testid` を足さない。** セレクタは `getByRole` と表示文言で書く。文言変更で壊れやすい
   ところは正規表現で緩める。UI 側にテスト専用属性を増やさないための制約。
 - **直列実行（`workers: 1` / `fullyParallel: false`）。** シナリオが同じ DB の取引を消費するため、

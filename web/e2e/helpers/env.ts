@@ -5,10 +5,18 @@
  * （片方だけ変えるとシード済み DB に対して全テストが落ちる）。
  */
 
-/** フロントの起点。playwright.config.ts の baseURL と同一値。 */
+/**
+ * フロントの起点。playwright.config.ts の baseURL と同一値。
+ * ローカル（localhost / 127.0.0.1 / ::1）以外は helpers/test.ts のガードで実行前に失敗する
+ * （E2E_ALLOW_REMOTE=1 で解除）。
+ */
 export const BASE_URL = process.env.E2E_BASE_URL ?? "http://localhost:3100";
 
-/** バックエンド API の起点（末尾スラッシュなし）。 */
+/**
+ * バックエンド API の起点（末尾スラッシュなし）。
+ * ローカル（localhost / 127.0.0.1 / ::1）以外は helpers/test.ts のガードで実行前に失敗する
+ * （E2E_ALLOW_REMOTE=1 で解除）。
+ */
 export const API_URL = (process.env.E2E_API_URL ?? "http://localhost:8000/api/v1").replace(/\/+$/, "");
 
 /** バックエンドのオリジン（presign が返す相対 upload_url の解決に使う）。 */

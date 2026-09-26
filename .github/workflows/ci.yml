@@ -162,7 +162,7 @@ jobs:
         run: npx eslint src e2e
 
       - name: Unit tests (node --test)
-        run: node --test --disable-warning=MODULE_TYPELESS_PACKAGE_JSON "src/**/*.test.mts"
+        run: node --test --disable-warning=MODULE_TYPELESS_PACKAGE_JSON "src/**/*.test.mts" "e2e/**/*.test.mts"
 
       - name: Build
         # next/font は build 時に Google Fonts の CSS を取得する。その一時的な失敗で

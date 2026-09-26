@@ -10,6 +10,7 @@ import path from "node:path";
 import { APIRequestContext, APIResponse, request as playwrightRequest } from "@playwright/test";
 
 import { ACCOUNTS, API_ORIGIN, API_URL, Account, SUPPORTED_PREFECTURE } from "./env";
+import { assertLocalTargets } from "./local-target";
 
 export type CaseStatus = "draft" | "open" | "bidding" | "closed" | "cancelled";
 export type TransactionStatus = "pending" | "visiting" | "completed" | "cancelled";
@@ -96,6 +97,8 @@ export class Api {
   private constructor(private readonly ctx: APIRequestContext) {}
 
   static async create(): Promise<Api> {
+    // API クライアントを作るたびに検査する＝fixture のキャッシュや hook の順序に依存しない。
+    assertLocalTargets([{ label: "E2E_API_URL", url: API_URL }]);
     return new Api(await playwrightRequest.newContext({ timeout: 60_000 }));
   }
 
