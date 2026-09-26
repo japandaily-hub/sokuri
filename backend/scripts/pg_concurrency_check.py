@@ -34,6 +34,7 @@ import os
 import sys
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -193,6 +194,68 @@ async def new_transaction(
         await c.post(f"{V1}/cases/{case_id}/bids/{bid_id}/select", headers=auth(user_token)), 201
     )
     return txn["id"], op_token
+
+
+async def new_completed_transaction(c: httpx.AsyncClient, user_token: str, op_token: str) -> str:
+    """指定の業者で成約を1件作り、依頼者の完了確定まで進めて transaction_id を返す（口コミを投稿できる状態）。
+
+    完了確定は日程の確定を要しない（tests の _completed_transaction と同じ経路）。同じ業者の取引を
+    複数作るため、呼ぶたびに業者を新規作成する new_transaction とは別に置く。
+    """
+    case_id = await new_case(c, user_token)
+    bid_id = await new_bid(c, op_token, case_id, 20000)
+    txn = must(
+        await c.post(f"{V1}/cases/{case_id}/bids/{bid_id}/select", headers=auth(user_token)), 201
+    )
+    must(await c.post(f"{V1}/transactions/{txn['id']}/complete", headers=auth(user_token)), 200)
+    return txn["id"]
+
+
+async def new_review(
+    c: httpx.AsyncClient, token: str, txn_id: str, verdict: str, comment: str
+) -> str:
+    body = {"transaction_id": txn_id, "verdict": verdict, "comment": comment}
+    return must(await c.post(f"{V1}/reviews", json=body, headers=auth(token)), 201)["id"]
+
+
+# ──────────────────────────── DB ヘルパ ────────────────────────────
+def parse_ts(value: str | None) -> datetime | None:
+    """API 応答の ISO 8601 の日時（末尾 Z を含む）を aware な datetime にする（asyncpg の値と比べる用）。"""
+    return datetime.fromisoformat(value.replace("Z", "+00:00")) if value else None
+
+
+async def review_hidden_columns(
+    pg: asyncpg.Connection, review_id: str
+) -> tuple[datetime | None, str | None, str | None]:
+    """口コミの (hidden_at, hidden_reason, hidden_by_admin_id)。実施者 ID は API の表記（文字列）に揃える。"""
+    row = await pg.fetchrow(
+        "SELECT hidden_at, hidden_reason, hidden_by_admin_id FROM reviews WHERE id = $1",
+        uuid.UUID(review_id),
+    )
+    by_admin = row["hidden_by_admin_id"]
+    return row["hidden_at"], row["hidden_reason"], (str(by_admin) if by_admin is not None else None)
+
+
+async def operator_review_counts(
+    pg: asyncpg.Connection, op_id: str
+) -> tuple[tuple[int, ...], tuple[int, ...]]:
+    """業者の (good_count, improve_count, review_count) の（保存値, 数え直し）。
+
+    数え直しの母集団は services/review_stats.py と同じ「依頼者→業者かつ非表示でない」口コミ。
+    """
+    stored = await pg.fetchrow(
+        "SELECT good_count, improve_count, review_count FROM operators WHERE id = $1",
+        uuid.UUID(op_id),
+    )
+    recount = await pg.fetchrow(
+        "SELECT count(*) FILTER (WHERE r.verdict = 'good') AS good,"
+        " count(*) FILTER (WHERE r.verdict = 'improve') AS improve, count(*) AS total"
+        " FROM reviews r JOIN transactions t ON t.id = r.transaction_id"
+        " JOIN bids b ON b.id = t.bid_id"
+        " WHERE b.operator_id = $1 AND r.reviewer_type = 'user' AND r.hidden_at IS NULL",
+        uuid.UUID(op_id),
+    )
+    return tuple(stored), tuple(recount)
 
 
 # ──────────────────────────── シナリオ本体 ────────────────────────────
@@ -544,6 +607,203 @@ async def s7_last_admin_race(
                 )
 
 
+async def s8_review_hide_race(
+    c: httpx.AsyncClient,
+    pg: asyncpg.Connection,
+    admin_token: str,
+    admin_id: str,
+    user_token: str,
+    sc: Scenario,
+) -> None:
+    """(8) 運営の口コミ削除（PATCH /admin/reviews/{id}/hide）の同時実行 → 状態の変化は1回だけで
+    中途半端な状態が残らず、業者の件数（good_count / improve_count / review_count）が数え直しと一致する。
+
+    hide_review は reviews の行を FOR UPDATE で確保してから「既に同じ状態か」を判定し（冪等）、依頼者→
+    業者の口コミなら recalc_operator_review_stats が operators の行を FOR UPDATE で確保してから数え直す。
+    SQLite（pytest）ではどちらも no-op のため、同じ業者に「終始表示中の伸びしろ（基準）」と「削除対象の
+    よかった」を置き、次の4通りを撃つ:
+      - hide_both: 削除対象を運営 A・B が別の理由で同時に削除 → 両方 200・3列が片方の運営の組（理由と
+        実施者）で揃い、両方の応答の hidden_at が DB と一致（後発が上書きしていない）・件数は1回だけ減る
+      - restore_both: 削除済みの口コミの「元に戻す」を A・B が同時に → 両方 200・3列とも NULL・件数が戻る
+      - hide_vs_restore: A の削除と B の元に戻すを同時に（奇数ラウンドは B が削除済みの状態から）→ 両方
+        200・最終状態は「3列とも A の組」か「3列とも NULL」のどちらか・件数は最終状態の数え直しと一致
+      - post_vs_hide: 同じ業者の別取引への口コミ投稿（POST /reviews）と削除対象の削除を同時に → 201 と
+        200・件数は両方を反映した値（業者の行ロックが無いと、片方の数え直しが他方の結果を上書きする）
+    件数は数え直し（services/review_stats.py と同じ母集団）と期待値の両方で確かめる。運営 B はこの
+    シナリオの間だけ admin にし、終了時に一般ユーザーへ戻す（S7 と同じく検証用の固定パスワードの admin を
+    DB に残さない）。
+    """
+    # 理由は NFKC 正規化（_sanitize_free_text）で変わらない文字だけにする（DB の値と文字列で比べるため）。
+    reason_a = "同時実行検証による運営Aの削除"
+    reason_b = "同時実行検証による運営Bの削除"
+    # 期待する件数 (good_count, improve_count, review_count)。
+    shown = (1, 1, 2)  # 基準の伸びしろ＋削除対象のよかった
+    hidden_only = (0, 1, 1)  # 基準の伸びしろだけ（削除対象は削除済み）
+    posted = (0, 2, 2)  # 基準の伸びしろ＋同時投稿の伸びしろ（削除対象は削除済み）
+    admin_b_token, admin_b = await signup_user(c, f"pgrv-admin-b-{RUN_ID}@example.com", "運営 次郎")
+    admin_b_id = admin_b["id"]
+
+    def state(cols: tuple[datetime | None, str | None, str | None]) -> str:
+        """hidden_at・hidden_reason・hidden_by_admin_id の状態。揃って NULL＝visible、揃って設定＝
+        hidden(A|B)（理由と実施者がどちらの運営の組か。別々の要求から来ていれば 混在）、それ以外＝partial。
+        """
+        filled = [value is not None for value in cols]
+        if not any(filled):
+            return "visible"
+        if not all(filled):
+            return "partial"
+        pairs = {(reason_a, admin_id): "A", (reason_b, admin_b_id): "B"}
+        return f"hidden({pairs.get((cols[1], cols[2]), '混在')})"
+
+    def hide(token: str, review_id: str, hidden: bool, reason: str | None = None) -> Any:
+        async def _call(cc: httpx.AsyncClient) -> httpx.Response:
+            body: dict[str, Any] = {"hidden": hidden}
+            if reason is not None:
+                body["reason"] = reason
+            return await cc.patch(
+                f"{V1}/admin/reviews/{review_id}/hide", json=body, headers=auth(token)
+            )
+
+        return _call
+
+    try:
+        must(await c.post(f"{V1}/admin/users/{admin_b_id}/promote", headers=auth(admin_token)), 200)
+        for i in range(ROUNDS):
+            op_token, op_id = await new_operator(c, admin_token, f"s8{i}")
+            base_txn = await new_completed_transaction(c, user_token, op_token)
+            target_txn = await new_completed_transaction(c, user_token, op_token)
+            post_txn = await new_completed_transaction(c, user_token, op_token)
+            await new_review(c, user_token, base_txn, "improve", "同時実行検証の基準の口コミです。")
+            target = await new_review(
+                c, user_token, target_txn, "good", "同時実行検証の削除対象の口コミです。"
+            )
+            stored, recount = await operator_review_counts(pg, op_id)
+            sc.check(
+                stored == recount == shown,
+                f"r{i} 準備: 件数 {stored}・数え直し {recount}（期待 {shown}）",
+            )
+
+            # ── hide_both: 同じ口コミの削除を A・B が別の理由で同時に ──
+            rs = await volley(
+                hide(admin_token, target, True, reason_a),
+                hide(admin_b_token, target, True, reason_b),
+            )
+            cols = await review_hidden_columns(pg, target)
+            stored, recount = await operator_review_counts(pg, op_id)
+            reported = {parse_ts(r.json().get("hidden_at")) for r in rs if r.status_code == 200}
+            sc.codes.append(f"r{i} hide_both: {codes(rs)}")
+            sc.facts.append(f"r{i} hide_both: 状態={state(cols)} 件数={stored} 数え直し={recount}")
+            sc.check(codes(rs) == [200, 200], f"r{i} hide_both: 応答が [200,200] でない: {codes(rs)}")
+            sc.check(
+                state(cols) in ("hidden(A)", "hidden(B)"),
+                f"r{i} hide_both: 3列が片方の運営の組で揃っていない: {state(cols)}",
+            )
+            # 後発は先発のコミットを待ってから「削除済み」を読み、何も書かずに先発の hidden_at を返す。
+            # 両方が書いていれば（行ロックが効いていない）応答の hidden_at が食い違うか DB と一致しない。
+            # hidden_at はサーバの時計の値のため、時計が粗い環境（ローカルの Windows で約 1ms を実測）では
+            # 2回の書き込みが同じ値になり見逃しうる。検出力の前提はマイクロ秒単位の CI（Linux）。
+            sc.check(
+                reported == {cols[0]},
+                f"r{i} hide_both: 応答の hidden_at {sorted(map(str, reported))} が DB の {cols[0]}"
+                " と一致しない（状態の変化が2回）",
+            )
+            sc.check(
+                stored == recount == hidden_only,
+                f"r{i} hide_both: 件数 {stored}・数え直し {recount}（期待 {hidden_only}）",
+            )
+
+            # ── restore_both: 削除済みの口コミの「元に戻す」を A・B が同時に ──
+            rs = await volley(hide(admin_token, target, False), hide(admin_b_token, target, False))
+            cols = await review_hidden_columns(pg, target)
+            stored, recount = await operator_review_counts(pg, op_id)
+            sc.codes.append(f"r{i} restore_both: {codes(rs)}")
+            sc.facts.append(f"r{i} restore_both: 状態={state(cols)} 件数={stored} 数え直し={recount}")
+            sc.check(
+                codes(rs) == [200, 200], f"r{i} restore_both: 応答が [200,200] でない: {codes(rs)}"
+            )
+            sc.check(state(cols) == "visible", f"r{i} restore_both: 3列とも NULL でない: {state(cols)}")
+            sc.check(
+                stored == recount == shown,
+                f"r{i} restore_both: 件数 {stored}・数え直し {recount}（期待 {shown}）",
+            )
+
+            # ── hide_vs_restore: A の削除と B の元に戻すを同時に ──
+            # 奇数ラウンドは B が削除済みの状態から始め、「元に戻す→削除」の順に変わる経路も通す。
+            start = "visible"
+            if i % 2:
+                must(await hide(admin_b_token, target, True, reason_b)(c), 200)
+                start = "hidden(B)"
+            rs = await volley(
+                hide(admin_token, target, True, reason_a), hide(admin_b_token, target, False)
+            )
+            hide_code, restore_code = rs[0].status_code, rs[1].status_code
+            cols = await review_hidden_columns(pg, target)
+            stored, recount = await operator_review_counts(pg, op_id)
+            # 件数の母集団は hidden_at だけで決まる（数え直しと同じ基準）。
+            expected = shown if cols[0] is None else hidden_only
+            sc.codes.append(
+                f"r{i} hide_vs_restore({start}から): hide={hide_code} restore={restore_code}"
+            )
+            sc.facts.append(
+                f"r{i} hide_vs_restore({start}から): 状態={state(cols)} 件数={stored}"
+                f" 数え直し={recount}"
+            )
+            sc.check(
+                hide_code == 200 and restore_code == 200,
+                f"r{i} hide_vs_restore: 応答が両方 200 でない: hide={hide_code} restore={restore_code}",
+            )
+            # 直列化されていれば後に処理された側の要求どおりに終わる: 削除が後なら3列とも A の組、元に戻す
+            # が後なら3列とも NULL（B の削除済みから始めても B の元に戻すが必ず効くため、B の組は残らない）。
+            sc.check(
+                state(cols) in ("hidden(A)", "visible"),
+                f"r{i} hide_vs_restore: 最終状態が「A の組で3列とも設定」「3列とも NULL」のどちらでも"
+                f"ない: {state(cols)}",
+            )
+            sc.check(
+                stored == recount == expected,
+                f"r{i} hide_vs_restore: 件数 {stored}・数え直し {recount}（期待 {expected}）",
+            )
+
+            # ── post_vs_hide: 同じ業者の別取引への口コミ投稿と、削除対象の削除を同時に ──
+            must(await hide(admin_token, target, False)(c), 200)  # 表示中に揃える（冪等）
+
+            async def do_post(cc: httpx.AsyncClient) -> httpx.Response:
+                return await cc.post(
+                    f"{V1}/reviews",
+                    json={
+                        "transaction_id": post_txn,
+                        "verdict": "improve",
+                        "comment": "同時実行検証の同時投稿の口コミです。",
+                    },
+                    headers=auth(user_token),
+                )
+
+            rs = await volley(do_post, hide(admin_token, target, True, reason_a))
+            post_code, hide_code = rs[0].status_code, rs[1].status_code
+            cols = await review_hidden_columns(pg, target)
+            stored, recount = await operator_review_counts(pg, op_id)
+            sc.codes.append(f"r{i} post_vs_hide: post={post_code} hide={hide_code}")
+            sc.facts.append(f"r{i} post_vs_hide: 状態={state(cols)} 件数={stored} 数え直し={recount}")
+            sc.check(
+                post_code == 201 and hide_code == 200,
+                f"r{i} post_vs_hide: 応答が post=201・hide=200 でない: post={post_code} hide={hide_code}",
+            )
+            sc.check(
+                state(cols) == "hidden(A)",
+                f"r{i} post_vs_hide: 削除が A の組で3列揃っていない: {state(cols)}",
+            )
+            # 業者の行ロックが無いと、投稿側（削除前の状態で数える）と削除側（投稿前の状態で数える）の
+            # どちらかの数え直しが後勝ちで残り、(1, 2, 3) か (0, 1, 1) になる。
+            sc.check(
+                stored == recount == posted,
+                f"r{i} post_vs_hide: 件数 {stored}・数え直し {recount}（期待 {posted}）",
+            )
+    finally:
+        # 運営 B を一般ユーザーへ戻す（S7 と同じく検証用の固定パスワードの admin を DB に残さない。
+        # 昇格や途中の API が失敗しても必ず戻す）。
+        await pg.execute("UPDATE users SET role = 'user' WHERE id = $1", uuid.UUID(admin_b_id))
+
+
 # ──────────────────────────── エントリポイント ────────────────────────────
 _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
@@ -592,6 +852,7 @@ async def run() -> int:
         Scenario("S5", "同一 idempotency_key の POST /cases 同時2連投"),
         Scenario("S6", "運営の強制終了と依頼者 complete の同時実行"),
         Scenario("S7", "最後の管理者2人の同時退会・相互降格・退会と降格の同時実行"),
+        Scenario("S8", "運営の口コミ削除の同時2連投・元に戻すの同時2連投・削除と元に戻す・投稿と削除の同時実行"),
     ]
     try:
         async with httpx.AsyncClient(timeout=60) as c:
@@ -611,6 +872,11 @@ async def run() -> int:
             await s4_cancel_double(c, pg, admin_token, user_token, scenarios[3])
             await s5_idempotent_case(c, pg, user_id, user_token, scenarios[4])
             await s6_admin_cancel_vs_complete(c, pg, admin_token, user_token, scenarios[5])
+            # S8 は運営アカウントの admin 権限を使う（2人目の運営は S8 の中で昇格・降格する）ため、
+            # S7 より前に流す。
+            await s8_review_hide_race(
+                c, pg, admin_token, admin_user["id"], user_token, scenarios[7]
+            )
             # S7 は運営アカウントを一時的に admin から外すため、必ず最後に流す。
             await s7_last_admin_race(c, pg, admin_token, scenarios[6])
     except ApiError as exc:
