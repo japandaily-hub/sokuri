@@ -172,7 +172,14 @@ export class Api {
       }),
       200,
     );
-    const put = await this.ctx.put(`${API_ORIGIN}${pre.upload_url}`, {
+    // upload_url は API と同じオリジンの相対パスのはず。文字列でつなぐと "@host/..." のような値で
+    // API のホストが userinfo 扱いになり、Bearer 付きのまま別ホストへ送られうるため、解決後の
+    // オリジンが API と一致することを確かめてから送る。
+    const uploadUrl = new URL(pre.upload_url, API_ORIGIN);
+    if (uploadUrl.origin !== API_ORIGIN) {
+      throw new Error(`[e2e] upload_url が API と別のオリジンです（${uploadUrl.origin}）`);
+    }
+    const put = await this.ctx.put(uploadUrl.href, {
       data: fs.readFileSync(PHOTO_PATH),
       headers: { ...this.headers(token), "Content-Type": "image/jpeg" },
     });

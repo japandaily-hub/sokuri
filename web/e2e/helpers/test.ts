@@ -79,9 +79,10 @@ export const test = base.extend<Record<never, never>, LocalTargetGuardFixtures>(
   // 誤認して lint エラーになるため別名にしている（Playwright は引数名に依存しない）。
   context: async ({ context, baseURL }, provide) => {
     if (baseURL !== undefined) {
-      // test.use({ baseURL: ... }) によるテストごとの上書きを含む実効値を検査する
-      // （worker fixture の localTargetGuard は project 既定値までしか見えない）。
-      assertLocalTargets([{ label: "このテストの baseURL（test.use の上書きを含む）", url: baseURL }]);
+      // コンテキストを作るテストで、実効する baseURL を検査する（worker fixture の localTargetGuard は
+      // project の既定値までしか見えない）。spec での test.use({ baseURL }) は eslint で禁止している
+      // ため、ここは helpers や別の設定ファイルから上書きされた場合の保険。
+      assertLocalTargets([{ label: "このテストの baseURL", url: baseURL }]);
     }
     await hideNextDevOverlay(context);
     await provide(context);

@@ -15,9 +15,10 @@ npx playwright install chromium
 `web/.env.local` も必要（`.gitignore` 済みで新しい worktree には無い）。`web/.env.example` を
 複製して `AUTH_SECRET` を任意の乱数文字列にし、`NEXT_PUBLIC_API_URL` は
 `http://localhost:8000/api/v1` にする（worktree では本体の `web/.env.local` を複製してもよい。その場合も
-接続先がローカルを向いていることを確かめる）。シェルやユーザー環境変数に `API_URL` /
-`NEXT_PUBLIC_API_URL` が残っていると `.env.local` より優先される（`API_URL` はサーバー側で最優先）ので、
-それらも残さない。
+`NEXT_PUBLIC_API_URL` と、あれば `API_URL` の行がローカルを向いていることを確かめる。`API_URL` は
+サーバー側で `NEXT_PUBLIC_API_URL` より優先される）。Next は環境変数を「OS の環境変数（ユーザー・システム
+どちらも）→ `.env.development.local` → `.env.local` → `.env.development` → `.env`」の順に採るので、
+OS の環境変数や `.env.development.local` に `API_URL` / `NEXT_PUBLIC_API_URL` が残っていないことも確かめる。
 **接続先が未設定のまま `next dev` を起動しても本番 API へは落ちない**（未設定時に本番 API を使うのは
 本番ビルドだけ）。ログインは画面上「サーバーに接続できませんでした」になり、`next dev` のターミナルに
 `[backend-api-base] バックエンド API の接続先（API_URL / NEXT_PUBLIC_API_URL）が未設定です…` が出る。
@@ -57,12 +58,15 @@ npx playwright show-trace test-results\<失敗したテスト>\trace.zip # 失�
 
 `E2E_BASE_URL` / `E2E_API_URL` / `playwright.config.ts` の `baseURL` のホストがローカル以外だと、
 4段の検査で実行前に失敗する: ①`playwright.config.ts` の読み込み時（主防御。ワーカーを1つも
-起動しない） ②`helpers/test.ts` の worker fixture（`localTargetGuard`） ③テストごとの実効
-`baseURL`（`context` fixture・`newE2EContext`。`test.use` の上書きも見る） ④`Api.create()`
-（API クライアントを作るたび）。検査の本体は `helpers/local-target.ts`。`E2E_ALLOW_REMOTE=1` を
-付けると検査を外すが、外した接続先（origin）を警告として表示する。ただし `next dev` の
-サーバー側（NextAuth の `authorize()` 等）が出す通信は E2E からは止められないため、
-`web/.env.local` の接続先そのものをローカルにしておくこと。
+起動しない） ②`helpers/test.ts` の worker fixture（`localTargetGuard`） ③ブラウザのコンテキストを
+作るときの実効 `baseURL`（`context` fixture・`newE2EContext`） ④`Api.create()`（API クライアントを
+作るたび）。③は page / context を使うテストでしか走らないため、spec での `test.use({ baseURL })` と
+`@playwright/test` からの `request` の import は `web/eslint.config.mjs` で禁止している（baseURL は
+`playwright.config.ts` だけで決め、API は `helpers/api.ts` の `Api` から呼ぶ）。検査の本体は
+`helpers/local-target.ts`。`E2E_ALLOW_REMOTE=1` を付けると検査を外すが、外した接続先（origin）を
+警告として表示する。ただし `next dev` 自身が使う接続先（サーバー側の NextAuth の `authorize()` 等と、
+画面が使う `NEXT_PUBLIC_API_URL` の両方）は4段では検査しないため、`web/.env.local` の接続先そのものを
+ローカルにしておくこと。
 
 ## クリーンな状態から流す
 
@@ -123,8 +127,9 @@ $env:RL_CASE_CREATE_IP_MAX="200"; $env:RL_CASE_CREATE_ACCOUNT_MAX="200"
 
 - **ローカル以外には向けない。** 接続先は許可リスト（localhost / 127.0.0.1 / ::1）で検査し、
   本番のホスト名はテストコードに書かない。検査は4段（`playwright.config.ts` の読み込み時が
-  主防御 → `helpers/test.ts` の worker fixture → テストごとの `baseURL` → `Api.create()`）で
-  重ねている（検査の本体は `helpers/local-target.ts`）。
+  主防御 → `helpers/test.ts` の worker fixture → コンテキスト作成時の `baseURL` → `Api.create()`）で
+  重ねている（検査の本体は `helpers/local-target.ts`）。spec では `test.use({ baseURL })` と
+  `@playwright/test` の `request` を使わない（eslint で禁止）。
 - **`data-testid` を足さない。** セレクタは `getByRole` と表示文言で書く。文言変更で壊れやすい
   ところは正規表現で緩める。UI 側にテスト専用属性を増やさないための制約。
 - **直列実行（`workers: 1` / `fullyParallel: false`）。** シナリオが同じ DB の取引を消費するため、

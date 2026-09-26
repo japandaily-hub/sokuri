@@ -7,6 +7,8 @@
  * コメントを参照（tsconfig の include に一致させず、型検査の対象から外したまま実行する）。
  * 加えて playwright.config.ts の testMatch を "**\/*.spec.ts" に絞っているため、このファイルは
  * Playwright の収集対象にもならない（既定の testMatch は *.test.* も拾ってしまう）。
+ * node --test 専用なので @playwright/test は import しない（web/eslint.config.mjs の e2e 向けの
+ * 制限は *.ts が対象で .mts には掛からないため、ここは慣習で守る）。
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";

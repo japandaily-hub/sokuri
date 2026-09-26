@@ -6,24 +6,29 @@
  *      1つも起動しない（beforeAll・afterAll も一切走らない）＝主防御。
  *   ② e2e/helpers/test.ts の worker 自動 fixture（localTargetGuard）。①と同じ値を、
  *      各ワーカーの最初のテストより前にもう一度検査する。project ごとの baseURL も見る。
- *   ③ e2e/helpers/test.ts の context fixture と newE2EContext。テストごとに実効する
- *      baseURL（test.use() による個別テストの上書きを含む）を検査する。
+ *   ③ e2e/helpers/test.ts の context fixture と newE2EContext。ブラウザのコンテキストを作るとき
+ *      に、実効する baseURL（newE2EContext に明示した値を含む）を検査する。
  *   ④ e2e/helpers/api.ts の Api.create()。API クライアントを作るたびに検査する。
  * ②（worker fixture）だけに頼らないのは、worker fixture が失敗しても Playwright 1.63 は同じ
  * ファイルの afterAll（失敗した fixture を引数で要求しない hook）を実行するため（実測済み）。
  * 将来 afterAll や2本目の beforeAll に API を叩く後始末を足すと、②では止まらない。①は
  * ワーカーを起動する前に止めるので hook は一切走らず、④は API クライアントを作るその場で
- * 検査するので fixture のキャッシュや hook の実行順に依存しない。③は①②が見ない
- * test.use による上書きを見る。
+ * 検査するので fixture のキャッシュや hook の実行順に依存しない。
+ * ③は page / context を使うテストでしか走らない（request fixture だけのテストでは作られない）。
+ * そのため spec での test.use({ baseURL }) と @playwright/test からの request の import は
+ * web/eslint.config.mjs で禁止し、baseURL の出どころを①②が検査する playwright.config.ts だけに、
+ * API の呼び出しを④の Api だけにしている。
  *
  * 判定は拒否リストではなく許可リスト（{@link LOCAL_HOSTNAMES}）。本番・プレビュー等の
  * ホスト名は将来増えうるため拒否リストでは検査漏れが起きる。本番のホスト名はこのファイルにも
  * テストコードのどこにも書かない。{@link ALLOW_REMOTE_ENV} が "1" のときだけ、意図してローカル
  * 以外に向けるための脱出口として検査を外す。
  *
- * next dev のサーバー側（NextAuth の authorize() 等、ブラウザを介さずサーバープロセスが直接
- * 送る通信）はここでは止められない（E2E のプロセスの外で発生するため）。そちらは
- * web/src/lib/backend-api-base.ts が未設定時に本番へフォールバックしないことで塞いでいる。
+ * next dev 自身が使う接続先はここでは検査しない（E2E のプロセスの外で決まるため）。サーバー側
+ * （NextAuth の authorize() 等）は web/src/lib/backend-api-base.ts が未設定時に本番へ落とさない
+ * ことで塞ぎ、画面が使う NEXT_PUBLIC_API_URL は未設定なら web/src/lib/katadzuke-api.ts が例外に
+ * する。設定された値そのものがローカルかどうかは web/.env.local を用意する人が確かめる
+ * （docs/ops/e2e.md）。
  *
  * local-target.test.mts から node --test で直接 import されるため、このファイルは import を
  * 持たない（依存ゼロ）。Node の型除去（type stripping）で実行できるよう、enum・namespace・
