@@ -25,6 +25,7 @@ import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import LINE from "next-auth/providers/line";
 import type { Provider } from "next-auth/providers";
+import { serverBackendApiBase } from "@/lib/backend-api-base";
 
 export type AccountType = "user" | "operator";
 
@@ -38,14 +39,6 @@ interface BackendAuthResponse {
     contact_email: string;
     verified_at: string | null;
   };
-}
-
-const FALLBACK_PROD_API_URL = "https://sokuri-backend.onrender.com/api/v1";
-
-function apiBase(): string {
-  const url =
-    process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? FALLBACK_PROD_API_URL;
-  return url.replace(/\/$/, "");
 }
 
 /**
@@ -83,7 +76,7 @@ async function backendLogin(
 ): Promise<BackendAuthResponse | null> {
   let res: Response;
   try {
-    res = await fetch(`${apiBase()}${path}`, {
+    res = await fetch(`${serverBackendApiBase()}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -127,7 +120,7 @@ async function backendLineExchange(
   lineAccessToken: string,
 ): Promise<{ ok: true; data: BackendAuthResponse } | { ok: false; code?: string }> {
   try {
-    const res = await fetch(`${apiBase()}/auth/line/exchange`, {
+    const res = await fetch(`${serverBackendApiBase()}/auth/line/exchange`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ line_access_token: lineAccessToken }),

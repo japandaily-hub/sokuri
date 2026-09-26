@@ -3,6 +3,7 @@
  * バックエンド schemas.py に対応した型定義と fetch ラッパーを提供する。
  * 直接 fetch を呼ばず、このモジュール経由で統一すること。
  */
+import { publicBackendApiBase } from "./backend-api-base";
 
 // ---------------------------------------------------------------------------
 // 共通型
@@ -106,32 +107,13 @@ export class ApiError extends Error {
 // 内部ユーティリティ
 // ---------------------------------------------------------------------------
 
-/**
- * 本番フォールバック API URL。
- *
- * Vercel の Environment Variables を Sensitive 扱いにすると ``NEXT_PUBLIC_*`` が
- * クライアントバンドルに inline されない既知制約があり、env var だけに頼ると
- * 本番でフロントが backend に到達できなくなる。確実性のため本番 Render URL を
- * フォールバックとして埋め込む。
- *
- * Railway → Render 移行履歴:
- *   旧: https://backend-production-e4f0d.up.railway.app/api/v1 (deploy 不安定で廃止)
- *   現: https://sokuri-backend.onrender.com/api/v1
- *
- * ローカル開発時は ``.env.local`` の ``NEXT_PUBLIC_API_URL`` が優先される。
- */
-const FALLBACK_PROD_API_URL = "https://sokuri-backend.onrender.com/api/v1";
-
-function getBaseUrl(): string {
-  const url = process.env.NEXT_PUBLIC_API_URL || FALLBACK_PROD_API_URL;
-  return url.replace(/\/$/, "");
-}
+// 接続先（本番フォールバック含む）の決め方は lib/backend-api-base.ts に集約している。
 
 async function request<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
-  const base = getBaseUrl();
+  const base = publicBackendApiBase();
   const res = await fetch(`${base}${path}`, {
     headers: {
       "Content-Type": "application/json",
@@ -210,7 +192,7 @@ export async function uploadDefects(
   assessmentId: string,
   files: File[],
 ): Promise<DefectsResponse> {
-  const base = getBaseUrl();
+  const base = publicBackendApiBase();
   const form = new FormData();
   for (const file of files) {
     form.append("images", file);

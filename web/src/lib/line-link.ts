@@ -8,6 +8,7 @@
  *
  * state・reauth_token は共に短命 httpOnly cookie で受け渡す（CSRF対策 / 誤操作防止）。
  */
+import { serverBackendApiBase } from "./backend-api-base";
 
 const LINE_AUTHORIZE_URL = "https://access.line.me/oauth2/v2.1/authorize";
 const LINE_TOKEN_URL = "https://api.line.me/oauth2/v2.1/token";
@@ -123,14 +124,6 @@ export async function exchangeLineCodeForAccessToken(
   }
 }
 
-/** バックエンド API のベース URL。auth.ts の apiBase() と同じ優先順位（サーバー専用: API_URL優先）。 */
-function backendApiBase(): string {
-  const FALLBACK_PROD_API_URL = "https://sokuri-backend.onrender.com/api/v1";
-  const url =
-    process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? FALLBACK_PROD_API_URL;
-  return url.replace(/\/$/, "");
-}
-
 export type LineExchangeResult =
   | { outcome: "linked" }
   | { outcome: "already_linked" }
@@ -150,7 +143,7 @@ export async function linkLineToCurrentUser(
   reauthToken: string | null,
 ): Promise<LineExchangeResult> {
   try {
-    const res = await fetch(`${backendApiBase()}/auth/line/exchange`, {
+    const res = await fetch(`${serverBackendApiBase()}/auth/line/exchange`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
