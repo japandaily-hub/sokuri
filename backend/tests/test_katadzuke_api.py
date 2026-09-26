@@ -2246,6 +2246,654 @@ async def test_schedule_confirm_user_only_and_status_transition(
     assert "schedule_confirmed" in kinds
 
 
+# ── 完了確定の依頼 ──
+
+
+def test_today_jst_rolls_over_at_utc_15():
+    """UTC 15:00（JST 0:00）で日付が繰り上がる（JST=UTC+9 の境界を固定する）。"""
+    from datetime import date, datetime, timezone
+
+    from app.api.v1.endpoints.transactions import _today_jst
+
+    assert _today_jst(datetime(2026, 9, 26, 14, 59, 59, tzinfo=timezone.utc)) == date(2026, 9, 26)
+    assert _today_jst(datetime(2026, 9, 26, 15, 0, 0, tzinfo=timezone.utc)) == date(2026, 9, 27)
+
+
+async def _advance_to_visiting(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    txn_id: str,
+    user_token: str,
+    visit_date_offset_days: int = 0,
+) -> None:
+    """取引を visiting に進め、visit_date を指定日（既定: 本日）にする。
+
+    ScheduleConfirmRequest は本日以降の日付のみ許可するため、まず近未来日で確定させて
+    から DB で visit_date を直接書き換える（request_completion の訪問日ゲートのテスト用）。
+    """
+    from datetime import date, timedelta
+
+    from app.db.models.transaction import Transaction
+
+    future_date = (date.today() + timedelta(days=7)).isoformat()
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/schedule/confirm",
+        json={"visit_date": future_date, "visit_time_slot": "午前"},
+        headers=_auth(user_token),
+    )
+    assert r.status_code == 200, r.text
+
+    txn = await db_session.get(Transaction, uuid.UUID(txn_id))
+    txn.visit_date = date.today() + timedelta(days=visit_date_offset_days)
+    await db_session.commit()
+
+
+async def test_request_completion_operator_success_and_notifies_owner(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """正常系: 201・kind・sender_type・mine・依頼者unread_count +1・dispatch引数の完全一致。"""
+    admin_token = await _make_admin(client, db_session)
+    user_email = "complete_req_user@example.com"
+    user_token = await _signup_user(client, user_email)
+    op_token, _ = await _verified_operator(
+        client, db_session, admin_token, "complete_req_op@example.com"
+    )
+    case_id, txn_id = await _create_transaction(client, user_token, op_token)
+    await _advance_to_visiting(client, db_session, txn_id, user_token)
+
+    with patch(
+        "app.api.v1.endpoints.transactions.notify_dispatch.dispatch_completion_requested",
+        new_callable=AsyncMock,
+    ) as dispatch_mock:
+        r = await client.post(
+            f"/api/v1/transactions/{txn_id}/complete/request", headers=_auth(op_token)
+        )
+    assert r.status_code == 201, r.text
+    data = r.json()
+    assert data["kind"] == "complete_request"
+    assert data["sender_type"] == "operator"
+    assert data["mine"] is True
+    # 依頼者の line_user_id（未連携なので None）・email・case_id の順で完全一致。
+    dispatch_mock.assert_called_once_with(None, user_email, case_id)
+
+    r = await client.get(f"/api/v1/transactions/{txn_id}", headers=_auth(user_token))
+    assert r.status_code == 200
+    assert r.json()["unread_count"] == 1
+
+
+async def test_request_completion_rejects_user(client: AsyncClient, db_session: AsyncSession):
+    """依頼者は呼べない（403）。"""
+    admin_token = await _make_admin(client, db_session)
+    user_token = await _signup_user(client, "complete_req_user2@example.com")
+    op_token, _ = await _verified_operator(
+        client, db_session, admin_token, "complete_req_op2@example.com"
+    )
+    _, txn_id = await _create_transaction(client, user_token, op_token)
+    await _advance_to_visiting(client, db_session, txn_id, user_token)
+
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/complete/request", headers=_auth(user_token)
+    )
+    assert r.status_code == 403, r.text
+    assert r.json()["detail"] == "完了確定の依頼は落札業者のみ行えます。"
+
+
+async def test_request_completion_rejects_before_visiting(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """訪問日程の確定（visiting）前は409。"""
+    admin_token = await _make_admin(client, db_session)
+    user_token = await _signup_user(client, "complete_req_user_pending@example.com")
+    op_token, _ = await _verified_operator(
+        client, db_session, admin_token, "complete_req_op_pending@example.com"
+    )
+    _, txn_id = await _create_transaction(client, user_token, op_token)
+
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/complete/request", headers=_auth(op_token)
+    )
+    assert r.status_code == 409, r.text
+    assert r.json()["detail"] == "訪問日程の確定後に依頼できます。"
+
+
+async def test_request_completion_visit_date_gate_uses_today_jst(
+    client: AsyncClient, db_session: AsyncSession, monkeypatch
+):
+    """visit_date == 今日 なら201、visit_date == 今日+1日 なら409。
+
+    transactions モジュールの _today_jst を固定日付に monkeypatch し、
+    date.today() に依存させずに日付境界を検証する。
+    """
+    from datetime import date, timedelta
+
+    from app.db.models.message import Message
+    from app.db.models.transaction import Transaction
+
+    fixed_today = date(2026, 6, 15)
+    monkeypatch.setattr(
+        "app.api.v1.endpoints.transactions._today_jst", lambda: fixed_today
+    )
+
+    admin_token = await _make_admin(client, db_session)
+    user_token = await _signup_user(client, "complete_req_user_future@example.com")
+    op_token, _ = await _verified_operator(
+        client, db_session, admin_token, "complete_req_op_future@example.com"
+    )
+    _, txn_id = await _create_transaction(client, user_token, op_token)
+    await _advance_to_visiting(client, db_session, txn_id, user_token)
+
+    txn = await db_session.get(Transaction, uuid.UUID(txn_id))
+    txn.visit_date = fixed_today
+    await db_session.commit()
+
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/complete/request", headers=_auth(op_token)
+    )
+    assert r.status_code == 201, r.text
+
+    # クールダウンを回避して再試行できるよう前回分を巻き戻し、翌日の visit_date にする。
+    row = await db_session.scalar(
+        select(Message).where(
+            Message.transaction_id == uuid.UUID(txn_id), Message.kind == "complete_request"
+        )
+    )
+    row.created_at = row.created_at - timedelta(hours=25)
+    txn.visit_date = fixed_today + timedelta(days=1)
+    await db_session.commit()
+
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/complete/request", headers=_auth(op_token)
+    )
+    assert r.status_code == 409, r.text
+    assert r.json()["detail"] == "訪問日（6月16日）以降に依頼できます。"
+
+
+async def test_request_completion_rejects_when_owner_suspended(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """依頼者（案件所有者）が利用停止中なら409（確定操作ができないため依頼しても無応答）。"""
+    admin_token = await _make_admin(client, db_session)
+    user_email = "complete_req_user_suspended@example.com"
+    user_token = await _signup_user(client, user_email)
+    op_token, _ = await _verified_operator(
+        client, db_session, admin_token, "complete_req_op_suspended@example.com"
+    )
+    _, txn_id = await _create_transaction(client, user_token, op_token)
+    await _advance_to_visiting(client, db_session, txn_id, user_token)
+
+    from app.db.models.user import User
+
+    owner = await db_session.scalar(select(User).where(User.email == user_email))
+    owner.is_suspended = True
+    await db_session.commit()
+
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/complete/request", headers=_auth(op_token)
+    )
+    assert r.status_code == 409, r.text
+    assert r.json()["detail"] == (
+        "ユーザーが利用停止中のため、完了確定を依頼できません。運営へお問い合わせください。"
+    )
+
+
+async def test_request_completion_cooldown_429_then_available_after_24h(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """直後の2回目は429＋Retry-After（メッセージもdispatchも増えない）。
+
+    前回依頼を23時間59分前にすると429のまま、24時間+1秒前にすると201になる
+    （制限値の境界を固定する）。依頼直後の Retry-After は 86300 < x <= 86400 秒。
+    """
+    admin_token = await _make_admin(client, db_session)
+    user_token = await _signup_user(client, "complete_req_user3@example.com")
+    op_token, _ = await _verified_operator(
+        client, db_session, admin_token, "complete_req_op3@example.com"
+    )
+    _, txn_id = await _create_transaction(client, user_token, op_token)
+    await _advance_to_visiting(client, db_session, txn_id, user_token)
+
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/complete/request", headers=_auth(op_token)
+    )
+    assert r.status_code == 201, r.text
+
+    with patch(
+        "app.api.v1.endpoints.transactions.notify_dispatch.dispatch_completion_requested",
+        new_callable=AsyncMock,
+    ) as dispatch_mock:
+        r = await client.post(
+            f"/api/v1/transactions/{txn_id}/complete/request", headers=_auth(op_token)
+        )
+    assert r.status_code == 429, r.text
+    retry_after = int(r.headers["retry-after"])
+    assert 86300 < retry_after <= 86400
+    dispatch_mock.assert_not_called()
+
+    r = await client.get(f"/api/v1/transactions/{txn_id}/messages", headers=_auth(user_token))
+    complete_requests = [m for m in r.json() if m["kind"] == "complete_request"]
+    assert len(complete_requests) == 1, "429の間はメッセージが増えない"
+
+    from datetime import datetime, timezone
+
+    from app.db.models.message import Message
+
+    async def _set_last_request_age(delta: timedelta) -> None:
+        row = await db_session.scalar(
+            select(Message).where(
+                Message.transaction_id == uuid.UUID(txn_id), Message.kind == "complete_request"
+            )
+        )
+        row.created_at = datetime.now(timezone.utc) - delta
+        await db_session.commit()
+
+    # 23時間59分前 → まだクールダウン中で429。
+    await _set_last_request_age(timedelta(hours=23, minutes=59))
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/complete/request", headers=_auth(op_token)
+    )
+    assert r.status_code == 429, r.text
+
+    # 24時間+1秒前 → クールダウンが明けて201。
+    await _set_last_request_age(timedelta(hours=24, seconds=1))
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/complete/request", headers=_auth(op_token)
+    )
+    assert r.status_code == 201, r.text
+
+
+async def test_request_completion_limit_409_after_max_requests(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """古い依頼が上限（3件）残っていると409。"""
+    admin_token = await _make_admin(client, db_session)
+    user_token = await _signup_user(client, "complete_req_user4@example.com")
+    op_token, _ = await _verified_operator(
+        client, db_session, admin_token, "complete_req_op4@example.com"
+    )
+    _, txn_id = await _create_transaction(client, user_token, op_token)
+    await _advance_to_visiting(client, db_session, txn_id, user_token)
+
+    from app.db.models.message import Message
+
+    for _ in range(3):
+        r = await client.post(
+            f"/api/v1/transactions/{txn_id}/complete/request", headers=_auth(op_token)
+        )
+        assert r.status_code == 201, r.text
+        # 次のクールダウン判定に引っかからないよう、都度過去へ巻き戻す。
+        row = await db_session.scalar(
+            select(Message)
+            .where(Message.transaction_id == uuid.UUID(txn_id), Message.kind == "complete_request")
+            .order_by(Message.created_at.desc())
+        )
+        row.created_at = row.created_at - timedelta(hours=25)
+        await db_session.commit()
+
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/complete/request", headers=_auth(op_token)
+    )
+    assert r.status_code == 409, r.text
+    assert "3回まで" in r.json()["detail"]
+
+
+async def test_request_completion_blocked_by_pending_reduction(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """pending の減額申請があると409。"""
+    admin_token = await _make_admin(client, db_session)
+    user_token = await _signup_user(client, "complete_req_user5@example.com")
+    op_token, _ = await _verified_operator(
+        client, db_session, admin_token, "complete_req_op5@example.com"
+    )
+    _, txn_id = await _create_transaction(client, user_token, op_token)
+    await _advance_to_visiting(client, db_session, txn_id, user_token)
+
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/reduction",
+        json={"requested_amount": 1000, "reason": "破損が見つかったため減額を相談したい"},
+        headers=_auth(op_token),
+    )
+    assert r.status_code == 201, r.text
+
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/complete/request", headers=_auth(op_token)
+    )
+    assert r.status_code == 409, r.text
+    assert "減額申請への回答待ち" in r.json()["detail"]
+
+
+async def test_request_completion_detail_counters_before_and_after(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """成約詳細の count・limit・available_at が依頼の前後で正しく変わる。"""
+    admin_token = await _make_admin(client, db_session)
+    user_token = await _signup_user(client, "complete_req_user6@example.com")
+    op_token, _ = await _verified_operator(
+        client, db_session, admin_token, "complete_req_op6@example.com"
+    )
+    _, txn_id = await _create_transaction(client, user_token, op_token)
+    await _advance_to_visiting(client, db_session, txn_id, user_token)
+
+    r = await client.get(f"/api/v1/transactions/{txn_id}", headers=_auth(op_token))
+    assert r.status_code == 200
+    data = r.json()
+    assert data["completion_request_count"] == 0
+    assert data["completion_request_limit"] == 3
+    assert data["completion_request_available_at"] is None
+
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/complete/request", headers=_auth(op_token)
+    )
+    assert r.status_code == 201, r.text
+
+    r = await client.get(f"/api/v1/transactions/{txn_id}", headers=_auth(op_token))
+    assert r.status_code == 200
+    data = r.json()
+    assert data["completion_request_count"] == 1
+    assert data["completion_request_limit"] == 3
+    assert data["completion_request_available_at"] is not None
+
+
+# ── 完了確定の記録と業者への通知 ──
+
+
+async def test_complete_transaction_adds_system_message_and_notifies_operator(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """完了で kind="completed" のsystemメッセージ（確定額入り）とdispatch引数の完全一致。"""
+    admin_token = await _make_admin(client, db_session)
+    user_token = await _signup_user(client, "complete_c_user@example.com")
+    op_email = "complete_c_op@example.com"
+    op_token, _ = await _verified_operator(client, db_session, admin_token, op_email)
+    _, txn_id = await _create_transaction(client, user_token, op_token, amount=45000)
+
+    with patch(
+        "app.api.v1.endpoints.transactions.notify_dispatch.dispatch_transaction_completed",
+        new_callable=AsyncMock,
+    ) as dispatch_mock:
+        r = await client.post(
+            f"/api/v1/transactions/{txn_id}/complete", headers=_auth(user_token)
+        )
+    assert r.status_code == 200, r.text
+    # 業者の line_user_id（未連携なので None）・contact_email・txn_id・確定額の順で完全一致。
+    dispatch_mock.assert_called_once_with(None, op_email, txn_id, 45000)
+
+    r = await client.get(f"/api/v1/transactions/{txn_id}/messages", headers=_auth(op_token))
+    assert r.status_code == 200
+    completed_messages = [m for m in r.json() if m["kind"] == "completed"]
+    assert len(completed_messages) == 1
+    assert completed_messages[0]["sender_type"] == "system"
+    assert completed_messages[0]["meta"]["final_amount"] == 45000
+    assert completed_messages[0]["meta"]["completed_by"] == "user"
+    assert "45,000" in completed_messages[0]["body"]
+
+
+async def test_complete_transaction_by_admin_records_completed_by_admin(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """案件所有者本人ではない管理者が完了確定すると meta.completed_by == "admin"。
+
+    管理者による完了そのものを禁止・別経路化するのは対象外（現状どおり通す）。
+    """
+    admin_token = await _make_admin(client, db_session)
+    user_token = await _signup_user(client, "complete_c_user_admin@example.com")
+    op_token, _ = await _verified_operator(
+        client, db_session, admin_token, "complete_c_op_admin@example.com"
+    )
+    _, txn_id = await _create_transaction(client, user_token, op_token, amount=30000)
+
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/complete", headers=_auth(admin_token)
+    )
+    assert r.status_code == 200, r.text
+
+    r = await client.get(f"/api/v1/transactions/{txn_id}/messages", headers=_auth(op_token))
+    assert r.status_code == 200
+    completed_messages = [m for m in r.json() if m["kind"] == "completed"]
+    assert len(completed_messages) == 1
+    assert completed_messages[0]["meta"]["completed_by"] == "admin"
+
+
+async def test_complete_transaction_403_409_do_not_add_message_or_dispatch(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """403/409 経路では何も追加しない。"""
+    admin_token = await _make_admin(client, db_session)
+    user_token = await _signup_user(client, "complete_c_user2@example.com")
+    op_token, _ = await _verified_operator(
+        client, db_session, admin_token, "complete_c_op2@example.com"
+    )
+    _, txn_id = await _create_transaction(client, user_token, op_token)
+
+    with patch(
+        "app.api.v1.endpoints.transactions.notify_dispatch.dispatch_transaction_completed",
+        new_callable=AsyncMock,
+    ) as dispatch_mock:
+        r = await client.post(
+            f"/api/v1/transactions/{txn_id}/complete", headers=_auth(op_token)
+        )
+        assert r.status_code == 403, r.text
+
+        r = await client.post(
+            f"/api/v1/transactions/{txn_id}/cancel",
+            json={"reason": "テスト都合"},
+            headers=_auth(user_token),
+        )
+        assert r.status_code == 200, r.text
+
+        r = await client.post(
+            f"/api/v1/transactions/{txn_id}/complete", headers=_auth(user_token)
+        )
+        assert r.status_code == 409, r.text
+    dispatch_mock.assert_not_called()
+
+    r = await client.get(f"/api/v1/transactions/{txn_id}/messages", headers=_auth(user_token))
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+# ── 候補提示の通知と抑止 ──
+
+
+async def test_propose_schedule_notify_debounced_within_5_minutes(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """初回propose で通知1回（dispatch引数完全一致）、5分以内の2回目は0回、
+    6分前に更新すると再び1回。"""
+    admin_token = await _make_admin(client, db_session)
+    user_email = "propose_d_user@example.com"
+    user_token = await _signup_user(client, user_email)
+    op_token, _ = await _verified_operator(
+        client, db_session, admin_token, "propose_d_op@example.com"
+    )
+    _, txn_id = await _create_transaction(client, user_token, op_token)
+
+    with patch(
+        "app.api.v1.endpoints.transactions.notify_dispatch.dispatch_schedule_proposed",
+        new_callable=AsyncMock,
+    ) as dispatch_mock:
+        r = await client.post(
+            f"/api/v1/transactions/{txn_id}/schedule/propose",
+            json={"slots": ["2026-07-10 午前"]},
+            headers=_auth(op_token),
+        )
+        assert r.status_code == 201, r.text
+    # 依頼者の line_user_id（未連携なので None）・email・txn_id の順で完全一致。
+    dispatch_mock.assert_called_once_with(None, user_email, txn_id)
+
+    with patch(
+        "app.api.v1.endpoints.transactions.notify_dispatch.dispatch_schedule_proposed",
+        new_callable=AsyncMock,
+    ) as dispatch_mock2:
+        r = await client.post(
+            f"/api/v1/transactions/{txn_id}/schedule/propose",
+            json={"slots": ["2026-07-11 午後"]},
+            headers=_auth(op_token),
+        )
+        assert r.status_code == 201, r.text
+    dispatch_mock2.assert_not_called()
+
+    from app.db.models.message import Message
+
+    rows = (
+        await db_session.scalars(
+            select(Message).where(
+                Message.transaction_id == uuid.UUID(txn_id),
+                Message.kind == "schedule_proposal",
+            )
+        )
+    ).all()
+    for row in rows:
+        row.created_at = row.created_at - timedelta(minutes=6)
+    await db_session.commit()
+
+    with patch(
+        "app.api.v1.endpoints.transactions.notify_dispatch.dispatch_schedule_proposed",
+        new_callable=AsyncMock,
+    ) as dispatch_mock3:
+        r = await client.post(
+            f"/api/v1/transactions/{txn_id}/schedule/propose",
+            json={"slots": ["2026-07-12 午前"]},
+            headers=_auth(op_token),
+        )
+        assert r.status_code == 201, r.text
+    dispatch_mock3.assert_called_once()
+
+
+async def test_propose_schedule_no_notify_when_owner_missing(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """case.user_id が None（依頼者を特定できない）なら201のまま通知しない。"""
+    admin_token = await _make_admin(client, db_session)
+    user_token = await _signup_user(client, "propose_d_user2@example.com")
+    op_token, _ = await _verified_operator(
+        client, db_session, admin_token, "propose_d_op2@example.com"
+    )
+    case_id, txn_id = await _create_transaction(client, user_token, op_token)
+
+    from app.db.models.case import Case
+
+    case = await db_session.get(Case, uuid.UUID(case_id))
+    case.user_id = None
+    await db_session.commit()
+
+    with patch(
+        "app.api.v1.endpoints.transactions.notify_dispatch.dispatch_schedule_proposed",
+        new_callable=AsyncMock,
+    ) as dispatch_mock:
+        r = await client.post(
+            f"/api/v1/transactions/{txn_id}/schedule/propose",
+            json={"slots": ["2026-07-10 午前"]},
+            headers=_auth(op_token),
+        )
+        assert r.status_code == 201, r.text
+    dispatch_mock.assert_not_called()
+
+
+async def test_propose_schedule_rejects_when_visiting(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """visiting（日程確定済み）への再提示は409（メッセージも通知も増えない）。
+
+    confirm_schedule は status=="pending" のときのみ確定を許可するため、
+    visiting のまま候補を提示し続けても依頼者は確定できない。
+    """
+    admin_token = await _make_admin(client, db_session)
+    user_token = await _signup_user(client, "propose_d_user3@example.com")
+    op_token, _ = await _verified_operator(
+        client, db_session, admin_token, "propose_d_op3@example.com"
+    )
+    _, txn_id = await _create_transaction(client, user_token, op_token)
+
+    from datetime import date, timedelta as td
+
+    # 確定前に1件提示しておき、確定後の再提示でメッセージが「増えない」ことを検証できるようにする。
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/schedule/propose",
+        json={"slots": ["2026-07-13 午前"]},
+        headers=_auth(op_token),
+    )
+    assert r.status_code == 201, r.text
+
+    future_date = (date.today() + td(days=7)).isoformat()
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/schedule/confirm",
+        json={"visit_date": future_date, "visit_time_slot": "午前"},
+        headers=_auth(user_token),
+    )
+    assert r.status_code == 200, r.text
+
+    with patch(
+        "app.api.v1.endpoints.transactions.notify_dispatch.dispatch_schedule_proposed",
+        new_callable=AsyncMock,
+    ) as dispatch_mock:
+        r = await client.post(
+            f"/api/v1/transactions/{txn_id}/schedule/propose",
+            json={"slots": ["2026-07-20 午前"]},
+            headers=_auth(op_token),
+        )
+    assert r.status_code == 409, r.text
+    assert r.json()["detail"] == {
+        "code": "schedule_already_confirmed",
+        "message": "訪問日程は確定済みです。変更が必要な場合はメッセージでご相談ください。",
+    }
+    dispatch_mock.assert_not_called()
+
+    r = await client.get(f"/api/v1/transactions/{txn_id}/messages", headers=_auth(user_token))
+    proposals = [m for m in r.json() if m["kind"] == "schedule_proposal"]
+    assert len(proposals) == 1, "409 になった再提示はメッセージを増やさない"
+
+
+async def test_propose_schedule_notify_up_to_3_then_stops_at_4th(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """抑止間隔（5分）を空けた1・2・3件目の提示はそれぞれ通知が1回ずつ出て、
+    4件目は出ない（提示自体は拒否しない。下限・上限の境界を1本で確認する）。"""
+    admin_token = await _make_admin(client, db_session)
+    user_token = await _signup_user(client, "propose_d_user4@example.com")
+    op_token, _ = await _verified_operator(
+        client, db_session, admin_token, "propose_d_op4@example.com"
+    )
+    _, txn_id = await _create_transaction(client, user_token, op_token)
+
+    from app.db.models.message import Message
+
+    async def _propose_and_count_dispatch(slot: str) -> int:
+        with patch(
+            "app.api.v1.endpoints.transactions.notify_dispatch.dispatch_schedule_proposed",
+            new_callable=AsyncMock,
+        ) as dispatch_mock:
+            r = await client.post(
+                f"/api/v1/transactions/{txn_id}/schedule/propose",
+                json={"slots": [slot]},
+                headers=_auth(op_token),
+            )
+            assert r.status_code == 201, r.text
+        return dispatch_mock.call_count
+
+    async def _clear_debounce_window() -> None:
+        # 5分抑止に引っかからないよう、直近提示を都度過去へ巻き戻す。
+        rows = (
+            await db_session.scalars(
+                select(Message).where(
+                    Message.transaction_id == uuid.UUID(txn_id),
+                    Message.kind == "schedule_proposal",
+                )
+            )
+        ).all()
+        for row in rows:
+            row.created_at = row.created_at - timedelta(minutes=6)
+        await db_session.commit()
+
+    for i in range(3):
+        call_count = await _propose_and_count_dispatch(f"2026-07-{10 + i} 午前")
+        assert call_count == 1, f"{i + 1}件目は通知が1回出るはず"
+        await _clear_debounce_window()
+
+    call_count = await _propose_and_count_dispatch("2026-07-20 午前")
+    assert call_count == 0, "4件目は通知が出ないはず"
+
+
 # ── 開示ゲート回帰（既存フローが壊れていないこと） ──
 
 

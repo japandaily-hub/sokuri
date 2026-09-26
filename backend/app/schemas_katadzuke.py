@@ -19,6 +19,7 @@ from pydantic import (
 )
 
 from app.core.limits import (
+    MAX_COMPLETION_REQUESTS_PER_TRANSACTION,
     MAX_ITEMS_PER_CASE,
     MAX_PHOTOS_PER_CASE,
     MAX_PHOTOS_PER_ITEM,
@@ -918,6 +919,13 @@ class TransactionDetailOut(TransactionOut):
     # サーバー側の確定値として明示的に返す。
     reduction_request_count: int = 0
     reduction_request_limit: int = MAX_REDUCTION_REQUESTS_PER_TRANSACTION
+    # 完了確定の依頼（POST /transactions/{id}/complete/request）の消費回数・上限・
+    # 次に依頼できる時刻。旧クライアント（未対応の web）は
+    # これらのフィールドを無視するだけで後方互換を保つ。available_at は24時間クールダウンが
+    # 明けていれば None（今すぐ依頼できる）。
+    completion_request_count: int = 0
+    completion_request_limit: int = MAX_COMPLETION_REQUESTS_PER_TRANSACTION
+    completion_request_available_at: datetime | None = None
     # 落札業者が利用停止中か（依頼者側にのみ意味がある。業者側は 403 の
     # detail.code=account_suspended で自身の停止を知れるため）。r6-flow H-2 対応。
     operator_suspended: bool = False

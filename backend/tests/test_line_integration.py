@@ -337,6 +337,269 @@ class TestNotifyDispatch:
         push_mock.assert_called_once_with("U123", "txn1", "2026-08-01")
         email_mock.assert_not_called()
 
+    # ── 完了確定の依頼（依頼者宛） ──
+
+    async def test_dispatch_completion_requested_prefers_line(self, monkeypatch):
+        push_mock = AsyncMock(return_value=True)
+        email_mock = AsyncMock(return_value=True)
+        monkeypatch.setattr("app.services.line_notify.push_completion_requested", push_mock)
+        monkeypatch.setattr("app.services.notify.send_completion_requested", email_mock)
+
+        await notify_dispatch.dispatch_completion_requested("U123", "user@example.com", "case1")
+
+        push_mock.assert_called_once_with("U123", "case1")
+        email_mock.assert_not_called()
+
+    async def test_dispatch_completion_requested_falls_back_to_email_when_line_fails(
+        self, monkeypatch
+    ):
+        push_mock = AsyncMock(return_value=False)
+        email_mock = AsyncMock(return_value=True)
+        monkeypatch.setattr("app.services.line_notify.push_completion_requested", push_mock)
+        monkeypatch.setattr("app.services.notify.send_completion_requested", email_mock)
+
+        await notify_dispatch.dispatch_completion_requested("U123", "user@example.com", "case1")
+
+        push_mock.assert_called_once()
+        email_mock.assert_called_once_with("user@example.com", "case1")
+
+    async def test_dispatch_completion_requested_skips_when_unlinked_and_placeholder_email(
+        self, monkeypatch
+    ):
+        push_mock = AsyncMock(return_value=False)
+        email_mock = AsyncMock(return_value=True)
+        monkeypatch.setattr("app.services.line_notify.push_completion_requested", push_mock)
+        monkeypatch.setattr("app.services.notify.send_completion_requested", email_mock)
+
+        await notify_dispatch.dispatch_completion_requested(
+            None, "line-Uabc@line.katazuke.internal", "case1"
+        )
+
+        push_mock.assert_not_called()
+        email_mock.assert_not_called()
+
+    # ── 完了確定（業者宛） ──
+
+    async def test_dispatch_transaction_completed_prefers_line(self, monkeypatch):
+        push_mock = AsyncMock(return_value=True)
+        email_mock = AsyncMock(return_value=True)
+        monkeypatch.setattr("app.services.line_notify.push_transaction_completed", push_mock)
+        monkeypatch.setattr("app.services.notify.send_transaction_completed", email_mock)
+
+        await notify_dispatch.dispatch_transaction_completed(
+            "U123", "op@example.com", "txn1", 40000
+        )
+
+        push_mock.assert_called_once_with("U123", "txn1", 40000)
+        email_mock.assert_not_called()
+
+    async def test_dispatch_transaction_completed_falls_back_to_email_when_line_fails(
+        self, monkeypatch
+    ):
+        push_mock = AsyncMock(return_value=False)
+        email_mock = AsyncMock(return_value=True)
+        monkeypatch.setattr("app.services.line_notify.push_transaction_completed", push_mock)
+        monkeypatch.setattr("app.services.notify.send_transaction_completed", email_mock)
+
+        await notify_dispatch.dispatch_transaction_completed(
+            "U123", "op@example.com", "txn1", 40000
+        )
+
+        push_mock.assert_called_once()
+        email_mock.assert_called_once_with("op@example.com", "txn1", 40000)
+
+    async def test_dispatch_transaction_completed_skips_when_unlinked_and_placeholder_email(
+        self, monkeypatch
+    ):
+        push_mock = AsyncMock(return_value=False)
+        email_mock = AsyncMock(return_value=True)
+        monkeypatch.setattr("app.services.line_notify.push_transaction_completed", push_mock)
+        monkeypatch.setattr("app.services.notify.send_transaction_completed", email_mock)
+
+        await notify_dispatch.dispatch_transaction_completed(
+            None, "line-Uabc@line.katazuke.internal", "txn1", 40000
+        )
+
+        push_mock.assert_not_called()
+        email_mock.assert_not_called()
+
+    # ── 候補日の提示（依頼者宛） ──
+
+    async def test_dispatch_schedule_proposed_prefers_line(self, monkeypatch):
+        push_mock = AsyncMock(return_value=True)
+        email_mock = AsyncMock(return_value=True)
+        monkeypatch.setattr("app.services.line_notify.push_schedule_proposed", push_mock)
+        monkeypatch.setattr("app.services.notify.send_schedule_proposed", email_mock)
+
+        await notify_dispatch.dispatch_schedule_proposed("U123", "user@example.com", "txn1")
+
+        push_mock.assert_called_once_with("U123", "txn1")
+        email_mock.assert_not_called()
+
+    async def test_dispatch_schedule_proposed_falls_back_to_email_when_line_fails(
+        self, monkeypatch
+    ):
+        push_mock = AsyncMock(return_value=False)
+        email_mock = AsyncMock(return_value=True)
+        monkeypatch.setattr("app.services.line_notify.push_schedule_proposed", push_mock)
+        monkeypatch.setattr("app.services.notify.send_schedule_proposed", email_mock)
+
+        await notify_dispatch.dispatch_schedule_proposed("U123", "user@example.com", "txn1")
+
+        push_mock.assert_called_once()
+        email_mock.assert_called_once_with("user@example.com", "txn1")
+
+    async def test_dispatch_schedule_proposed_skips_when_unlinked_and_placeholder_email(
+        self, monkeypatch
+    ):
+        push_mock = AsyncMock(return_value=False)
+        email_mock = AsyncMock(return_value=True)
+        monkeypatch.setattr("app.services.line_notify.push_schedule_proposed", push_mock)
+        monkeypatch.setattr("app.services.notify.send_schedule_proposed", email_mock)
+
+        await notify_dispatch.dispatch_schedule_proposed(
+            None, "line-Uabc@line.katazuke.internal", "txn1"
+        )
+
+        push_mock.assert_not_called()
+        email_mock.assert_not_called()
+
+
+class TestCompletionAndScheduleProposedLinks:
+    """完了確定の依頼・完了確定・候補提示の push_* が正しい遷移先URLを本文に含めること
+    （実装の URL 組み立てを直接検証）。"""
+
+    async def _push_and_capture_text(self, monkeypatch, coro) -> str:
+        settings = get_settings()
+        monkeypatch.setattr(settings, "line_channel_access_token", "dummy-token")
+        mock_response = httpx.Response(
+            200, json={}, request=httpx.Request("POST", line_notify._LINE_PUSH_ENDPOINT)
+        )
+        with patch.object(
+            httpx.AsyncClient, "post", new=AsyncMock(return_value=mock_response)
+        ) as mock_post:
+            await coro
+        return mock_post.call_args.kwargs["json"]["messages"][0]["text"]
+
+    async def _send_and_capture_html(self, monkeypatch, coro) -> str:
+        settings = get_settings()
+        monkeypatch.setattr(settings, "brevo_api_key", "dummy-key")
+        mock_response = httpx.Response(
+            200,
+            json={"messageId": "abc"},
+            request=httpx.Request("POST", notify._BREVO_ENDPOINT),
+        )
+        with patch.object(
+            httpx.AsyncClient, "post", new=AsyncMock(return_value=mock_response)
+        ) as mock_post:
+            await coro
+        return mock_post.call_args.kwargs["json"]["htmlContent"]
+
+    async def test_push_completion_requested_links_to_cases(self, monkeypatch):
+        settings = get_settings()
+        text = await self._push_and_capture_text(
+            monkeypatch, line_notify.push_completion_requested("U123", "case1")
+        )
+        assert f"{settings.frontend_base_url}/cases/case1" in text
+
+    async def test_push_transaction_completed_wording_is_neutral_on_who_completed(
+        self, monkeypatch
+    ):
+        """確定は依頼者本人だけでなく運営（admin）の代行でも起きるため、文面は
+        「誰が確定したか」に依存しない（「依頼者が」を含まない）。"""
+        settings = get_settings()
+        text = await self._push_and_capture_text(
+            monkeypatch, line_notify.push_transaction_completed("U123", "txn1", 40000)
+        )
+        assert text == (
+            "【カタヅケ】作業完了が確定しました（確定額 40,000 円）。"
+            "取引の評価をお願いします。\n"
+            f"{settings.frontend_base_url}/operator/transactions/txn1"
+        )
+        assert "依頼者が" not in text
+
+    async def test_send_transaction_completed_wording_is_neutral_on_who_completed(
+        self, monkeypatch
+    ):
+        """メール本文の1段落目も「誰が確定したか」に依存しない（件名は既に中立のため不変）。"""
+        html = await self._send_and_capture_html(
+            monkeypatch, notify.send_transaction_completed("op@example.com", "txn1", 40000)
+        )
+        assert "<p>作業完了が確定しました（確定額 <strong>40,000 円</strong>）。</p>" in html
+        assert "依頼者が" not in html
+
+    async def test_push_schedule_proposed_links_to_chat(self, monkeypatch):
+        settings = get_settings()
+        text = await self._push_and_capture_text(
+            monkeypatch, line_notify.push_schedule_proposed("U123", "txn1")
+        )
+        assert f"{settings.frontend_base_url}/chat/txn1" in text
+
+
+class TestVisitOverdueOperatorWording:
+    """業者宛の訪問予定日超過リマインドの新文面（完了確定を依頼するボタンに合わせた案内）を
+    LINE・メールの両方で検証する。依頼者宛の文面・リンク先は対象外（変更していない）。"""
+
+    async def test_push_visit_overdue_operator_wording(self, monkeypatch):
+        settings = get_settings()
+        monkeypatch.setattr(settings, "line_channel_access_token", "dummy-token")
+        mock_response = httpx.Response(
+            200, json={}, request=httpx.Request("POST", line_notify._LINE_PUSH_ENDPOINT)
+        )
+        with patch.object(
+            httpx.AsyncClient, "post", new=AsyncMock(return_value=mock_response)
+        ) as mock_post:
+            await line_notify.push_visit_overdue("U123", "txn1", "operator")
+        text = mock_post.call_args.kwargs["json"]["messages"][0]["text"]
+        assert "取引詳細の「完了確定を依頼する」から依頼者に依頼できます。" in text
+        assert f"{settings.frontend_base_url}/operator/transactions/txn1" in text
+
+    async def test_push_visit_overdue_user_wording_unchanged(self, monkeypatch):
+        """依頼者宛は今回変更していないことの回帰確認。"""
+        settings = get_settings()
+        monkeypatch.setattr(settings, "line_channel_access_token", "dummy-token")
+        mock_response = httpx.Response(
+            200, json={}, request=httpx.Request("POST", line_notify._LINE_PUSH_ENDPOINT)
+        )
+        with patch.object(
+            httpx.AsyncClient, "post", new=AsyncMock(return_value=mock_response)
+        ) as mock_post:
+            await line_notify.push_visit_overdue("U123", "txn1", "user")
+        text = mock_post.call_args.kwargs["json"]["messages"][0]["text"]
+        assert "作業が終わっていれば完了確定を、まだなら業者とチャットで日程を確認してください。" in text
+        assert f"{settings.frontend_base_url}/chat/txn1" in text
+
+    async def test_send_visit_overdue_operator_wording(self, monkeypatch):
+        settings = get_settings()
+        monkeypatch.setattr(settings, "brevo_api_key", "dummy-key")
+        mock_response = httpx.Response(
+            200,
+            json={"messageId": "abc"},
+            request=httpx.Request("POST", notify._BREVO_ENDPOINT),
+        )
+        with patch.object(
+            httpx.AsyncClient, "post", new=AsyncMock(return_value=mock_response)
+        ) as mock_post:
+            await notify.send_visit_overdue("op@example.com", "txn1", "operator")
+        html = mock_post.call_args.kwargs["json"]["htmlContent"]
+        assert "取引詳細の「完了確定を依頼する」から依頼者に依頼できます。" in html
+
+    async def test_send_visit_overdue_user_wording_unchanged(self, monkeypatch):
+        """依頼者宛は今回変更していないことの回帰確認。"""
+        settings = get_settings()
+        monkeypatch.setattr(settings, "brevo_api_key", "dummy-key")
+        mock_response = httpx.Response(
+            200,
+            json={"messageId": "abc"},
+            request=httpx.Request("POST", notify._BREVO_ENDPOINT),
+        )
+        with patch.object(
+            httpx.AsyncClient, "post", new=AsyncMock(return_value=mock_response)
+        ) as mock_post:
+            await notify.send_visit_overdue("user@example.com", "txn1", "user")
+        html = mock_post.call_args.kwargs["json"]["htmlContent"]
+        assert "作業が終わっていれば完了確定を、まだなら業者とチャットで日程を確認してください。" in html
+
 
 # ──────────────────────────── /auth/line/exchange ────────────────────────────
 

@@ -6,11 +6,12 @@
 
 from __future__ import annotations
 
+import math
 import re
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_, select, update
@@ -19,7 +20,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import Actor, get_current_actor
-from app.core.limits import MAX_REDUCTION_REQUESTS_PER_TRANSACTION
+from app.core.limits import (
+    COMPLETION_REQUEST_COOLDOWN_HOURS,
+    MAX_COMPLETION_REQUESTS_PER_TRANSACTION,
+    MAX_REDUCTION_REQUESTS_PER_TRANSACTION,
+)
 from app.db.models.bid import Bid
 from app.db.models.case import Case, CaseItem
 from app.db.models.message import Message
@@ -27,6 +32,7 @@ from app.db.models.operator import Operator
 from app.db.models.transaction import Cancellation, Transaction
 from app.db.models.user import User
 from app.db.session import get_session
+from app.services.reminders import JST
 from app.schemas_katadzuke import (
     MessageCreateRequest,
     MessageOut,
@@ -57,6 +63,14 @@ router = APIRouter()
 TRANSACTION_CLOSED_DETAIL: dict[str, str] = {
     "code": "transaction_closed",
     "message": "この取引は終了しています。",
+}
+# 日程確定済み（visiting）の取引への日程候補の再提示を拒否する 409。confirm_schedule は
+# status=="pending" のときのみ日程確定を許可するため、visiting のまま候補を提示し続けても
+# 依頼者は確定できない（提示そのものを止める）。TRANSACTION_CLOSED_DETAIL と同じ dict
+# detail 方式。
+SCHEDULE_ALREADY_CONFIRMED_DETAIL: dict[str, str] = {
+    "code": "schedule_already_confirmed",
+    "message": "訪問日程は確定済みです。変更が必要な場合はメッセージでご相談ください。",
 }
 # 書き込みを許可する取引ステータス。既読ポインタ更新（mark_messages_read）は
 # 「過去ログを読んだ」記録に過ぎず終了後も正当なため、意図的に対象外とする。
@@ -326,6 +340,15 @@ async def get_transaction(
     # 同じ定数（core/limits.py）を返し、web が自前のリテラルを持たないようにする。
     out.reduction_request_count = len(txn.reduction_requests)
     out.reduction_request_limit = MAX_REDUCTION_REQUESTS_PER_TRANSACTION
+    # 完了確定の依頼の消費回数・上限・次に依頼できる時刻（r10 V-M4 と同じ考え方）。
+    completion_request_count, last_completion_requested_at = await _completion_request_stats(
+        session, txn.id
+    )
+    out.completion_request_count = completion_request_count
+    out.completion_request_limit = MAX_COMPLETION_REQUESTS_PER_TRANSACTION
+    out.completion_request_available_at = _completion_request_available_at(
+        last_completion_requested_at
+    )
     out.reviews = [ReviewOut.model_validate(r) for r in txn.reviews]
 
     if txn.status != "cancelled":
@@ -404,6 +427,54 @@ async def _count_unread(session: AsyncSession, txn: Transaction, party: str) -> 
     return int(count or 0)
 
 
+async def _completion_request_stats(
+    session: AsyncSession, txn_id: uuid.UUID
+) -> tuple[int, datetime | None]:
+    """指定取引の完了確定依頼（kind="complete_request"）の件数と最終送信時刻を1クエリで集計する。
+
+    request_completion の 409/429 判定と TransactionDetailOut の3フィールドの
+    単一の出所にする（DB（messages）に残るため再起動・複数インスタンスでもすり抜けない）。
+    """
+    row = (
+        await session.execute(
+            select(func.count(), func.max(Message.created_at)).where(
+                Message.transaction_id == txn_id,
+                Message.kind == "complete_request",
+            )
+        )
+    ).one()
+    count, last_created_at = row
+    return int(count), last_created_at
+
+
+def _completion_request_available_at(last_requested_at: datetime | None) -> datetime | None:
+    """直近の完了確定依頼から COMPLETION_REQUEST_COOLDOWN_HOURS 経過後に依頼可能になる時刻。
+
+    まだクールダウン中なら次に依頼できる時刻を、依頼履歴が無い・経過済みなら None
+    （今すぐ依頼できる）を返す。created_at が naive な場合は UTC とみなす
+    （SQLite はタイムゾーン情報を保持しないため。cases.py:93 と同じ規約）。
+    """
+    if last_requested_at is None:
+        return None
+    if last_requested_at.tzinfo is None:
+        last_requested_at = last_requested_at.replace(tzinfo=timezone.utc)
+    available_at = last_requested_at + timedelta(hours=COMPLETION_REQUEST_COOLDOWN_HOURS)
+    return available_at if available_at > datetime.now(timezone.utc) else None
+
+
+def _today_jst(now_utc: datetime | None = None) -> date:
+    """日本時間での「今日」の日付。visit_date（訪問予定日）はJSTの暦で判定する
+    （reminders.py の訪問日超過リマインドと同じ理由・同じ JST 定義）。
+
+    now_utc を省略すると現在時刻を使うが、テストから固定時刻を注入できるように
+    引数化している（monkeypatch で本関数自体を差し替えれば date.today() に依存せず
+    日付境界を固定できる）。
+    """
+    if now_utc is None:
+        now_utc = datetime.now(timezone.utc)
+    return now_utc.astimezone(JST).date()
+
+
 @router.post(
     "/transactions/{transaction_id}/complete",
     response_model=TransactionOut,
@@ -411,6 +482,7 @@ async def _count_unread(session: AsyncSession, txn: Transaction, party: str) -> 
 )
 async def complete_transaction(
     transaction_id: uuid.UUID,
+    background: BackgroundTasks,
     actor: Actor = Depends(get_current_actor),
     session: AsyncSession = Depends(get_session),
 ) -> TransactionOut:
@@ -441,9 +513,154 @@ async def complete_transaction(
     if txn.final_amount is None:
         txn.final_amount = txn.initial_amount
     txn.status = "completed"
+    final_amount = txn.final_amount
+    # _assert_party は「本人」または「admin」を "user" として通す。案件所有者本人
+    # ではない管理者が代行確定した場合を監査できるよう meta に記録する（通知文面は
+    # どちらでも同一のまま。「誰が確定したか」に依存させない）。
+    assert actor.user is not None
+    completed_by = (
+        "admin" if actor.user.role == "admin" and txn.case.user_id != actor.user.id else "user"
+    )
+    # 完了確定を両当事者のチャットに記録として残す（confirm_schedule の
+    # schedule_confirmed と同じ「状態遷移の記録は system 名義」の方針）。
+    session.add(
+        Message(
+            transaction_id=txn.id,
+            sender_type="system",
+            sender_id=None,
+            body=f"作業完了が確定しました（確定額 {final_amount:,} 円）。",
+            kind="completed",
+            meta={"final_amount": final_amount, "completed_by": completed_by},
+        )
+    )
+    # commit 前にプリミティブ値へ取り出す（detached インスタンスの遅延ロードによる
+    # MissingGreenlet を避ける。confirm_schedule と同じ規約）。
+    operator_line_user_id = txn.bid.operator.line_user_id
+    operator_email = txn.bid.operator.contact_email
+    txn_id_str = str(txn.id)
     await session.commit()
     await session.refresh(txn)
+
+    background.add_task(
+        notify_dispatch.dispatch_transaction_completed,
+        operator_line_user_id,
+        operator_email,
+        txn_id_str,
+        final_amount,
+    )
     return TransactionOut.model_validate(txn)
+
+
+@router.post(
+    "/transactions/{transaction_id}/complete/request",
+    response_model=MessageOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="完了確定の依頼（落札業者のみ・24時間に1回・1取引3回まで）",
+)
+async def request_completion(
+    transaction_id: uuid.UUID,
+    background: BackgroundTasks,
+    actor: Actor = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+) -> MessageOut:
+    # 認可（当事者性）はロック取得より前に確認する（r6-verify-fix M1 と同じパターン）。
+    await _assert_party_before_lock(session, transaction_id, actor)
+    # 判定と Message 追加を原子的にするため、他の状態遷移（complete/cancel/
+    # confirm_schedule）と同じ行ロックへ参加してから読み直す（連打の直列化）。
+    await _lock_txn_rows(session, transaction_id)
+    txn = await _get_txn(session, transaction_id)
+    party = _assert_party(txn, actor)
+    if party != "operator":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="完了確定の依頼は落札業者のみ行えます。",
+        )
+    # 終了済み取引への依頼を拒否する（r8-H3 と同じ方針。_assert_txn_open を再利用）。
+    _assert_txn_open(txn)
+    # 訪問日程の確定（visiting）前は依頼できない。pending のまま依頼を許すと、
+    # 依頼者が訪問日も知らないまま「完了確定を」と言われる状態になる。
+    if txn.status != "visiting":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="訪問日程の確定後に依頼できます。",
+        )
+    # 訪問予定日より前の依頼は「まだ訪問していないのに完了確定を求める」ことになる。
+    if txn.visit_date is not None and txn.visit_date > _today_jst():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"訪問日（{txn.visit_date.month}月{txn.visit_date.day}日）以降に依頼できます。",
+        )
+    # 依頼者（案件所有者）が利用停止中だと完了確定操作ができず、依頼しても
+    # ユーザーから永久に応答されない（r8-M4 と同じ「相手が無応答の理由」対応）。
+    # owner はここで取得し、以降の通知（dispatch_completion_requested）でも使い回す。
+    owner = await _owner(session, txn)
+    if owner is not None and owner.is_suspended:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="ユーザーが利用停止中のため、完了確定を依頼できません。運営へお問い合わせください。",
+        )
+    # 未回答の減額申請を残したまま依頼すると、ユーザーが完了確定した直後に
+    # decide_reduction が通って確定額が事後に書き換わる穴になる（complete_transaction
+    # の pending 減額ガードと同じ理由）。
+    if any(r.status == "pending" for r in txn.reduction_requests):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="減額申請への回答待ちのため、完了確定を依頼できません。ユーザーの回答後にお試しください。",
+        )
+
+    request_count, last_requested_at = await _completion_request_stats(session, txn.id)
+    if request_count >= MAX_COMPLETION_REQUESTS_PER_TRANSACTION:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"完了確定の依頼は1取引につき{MAX_COMPLETION_REQUESTS_PER_TRANSACTION}回までです。"
+                "ユーザーから確定がない場合は運営へお問い合わせください。"
+            ),
+        )
+    available_at = _completion_request_available_at(last_requested_at)
+    if available_at is not None:
+        retry_after_seconds = max(
+            math.ceil((available_at - datetime.now(timezone.utc)).total_seconds()), 1
+        )
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                f"完了確定の依頼は{COMPLETION_REQUEST_COOLDOWN_HOURS}時間に1回までです。"
+                "時間をおいて再度お試しください。"
+            ),
+            headers={"Retry-After": str(retry_after_seconds)},
+        )
+
+    # 業者名義（押した業者本人）で送る。依頼者の未読数（_count_unread は相手側
+    # sender_type のみ数える）に乗るため「業者とチャット（未読1）」でも気づける。
+    # 相手に行動を求める要求は行為者名義（schedule_proposal と同じ）、状態遷移の記録は system 名義。
+    message = Message(
+        transaction_id=txn.id,
+        sender_type="operator",
+        sender_id=actor.id,
+        body=(
+            "作業完了の確定をお願いします。引き取りが済んでいれば、"
+            "マイ案件の「作業完了を確定する」から確定してください。"
+        ),
+        kind="complete_request",
+        meta=None,
+    )
+    session.add(message)
+
+    owner_line_user_id = owner.line_user_id if owner is not None else None
+    owner_email = owner.email if owner is not None else None
+    case_id_str = str(txn.case_id)
+
+    await session.commit()
+    await session.refresh(message)
+
+    background.add_task(
+        notify_dispatch.dispatch_completion_requested,
+        owner_line_user_id,
+        owner_email,
+        case_id_str,
+    )
+    return _to_message_out(message, party)
 
 
 @router.post(
@@ -653,6 +870,47 @@ async def mark_messages_read(
 
 # ──────────────────────────── 日程調整 ────────────────────────────
 
+# 同一取引への候補提示の通知間隔。業者が短時間に何度も提示し直すたびに
+# 依頼者へ通知が飛ぶと迷惑になるため、直近にこの間隔内の提示が無いときだけ通知する
+# （DB基準・判定は propose_schedule 内で行う）。
+_SCHEDULE_PROPOSAL_NOTIFY_INTERVAL = timedelta(minutes=5)
+# 同一取引への候補提示の通知回数上限。これ以上は「またか」の通知疲れになるため、
+# 提示そのものは拒否せず通知だけ止める（既存 API の挙動は変えない）。
+_SCHEDULE_PROPOSAL_NOTIFY_MAX = 3
+
+
+async def _schedule_proposal_stats(
+    session: AsyncSession, txn_id: uuid.UUID
+) -> tuple[int, datetime | None]:
+    """指定取引の日程候補提示（kind="schedule_proposal"）の件数と最終提示時刻を1クエリで集計する。
+
+    _completion_request_stats と同じ形（1回の集計クエリで件数・上限判定・間隔判定の
+    両方に使う値を取る）。
+    """
+    row = (
+        await session.execute(
+            select(func.count(), func.max(Message.created_at)).where(
+                Message.transaction_id == txn_id,
+                Message.kind == "schedule_proposal",
+            )
+        )
+    ).one()
+    count, last_created_at = row
+    return int(count), last_created_at
+
+
+def _is_within_schedule_proposal_notify_interval(last_proposed_at: datetime | None) -> bool:
+    """直近の候補提示が通知の抑止間隔内（既定5分）に収まっているか。
+
+    created_at が naive な場合は UTC とみなす（SQLite 対策。
+    _completion_request_available_at と同じ規約）。
+    """
+    if last_proposed_at is None:
+        return False
+    if last_proposed_at.tzinfo is None:
+        last_proposed_at = last_proposed_at.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) - last_proposed_at < _SCHEDULE_PROPOSAL_NOTIFY_INTERVAL
+
 
 @router.post(
     "/transactions/{transaction_id}/schedule/propose",
@@ -663,9 +921,14 @@ async def mark_messages_read(
 async def propose_schedule(
     transaction_id: uuid.UUID,
     body: ScheduleProposeRequest,
+    background: BackgroundTasks,
     actor: Actor = Depends(get_current_actor),
     session: AsyncSession = Depends(get_session),
 ) -> MessageOut:
+    # 認可（当事者性）はロック取得より前に確認する（r6-verify-fix M1 と同じパターン）。
+    await _assert_party_before_lock(session, transaction_id, actor)
+    # 通知件数・間隔の判定を他の同時提示と直列化する（request_completion と同じ順序）。
+    await _lock_txn_rows(session, transaction_id)
     txn = await _get_txn(session, transaction_id)
     party = _assert_party(txn, actor)
     if party != "operator":
@@ -676,6 +939,25 @@ async def propose_schedule(
     # 終了済み取引への候補提示を拒否する（r8-H3）。confirm_schedule 側は既に
     # status=="pending" のみ許可しているため、往路（提示）だけが穴になっていた。
     _assert_txn_open(txn)
+    # 日程確定済み（visiting）への再提示も拒否する。confirm_schedule は
+    # status=="pending" のときのみ確定を許可するため、visiting のまま候補を
+    # 提示し続けても依頼者は確定できず「選ぶと日程が確定します」が事実と違う。
+    # これにより以降は必ず pending のみ到達するため、通知条件に status を含める
+    # 必要はない。
+    if txn.status != "pending":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=SCHEDULE_ALREADY_CONFIRMED_DETAIL
+        )
+
+    # Message 追加前に判定する（追加後だと今回分が常に1件以上ヒットし、通知が
+    # 永久に抑止されてしまう）。
+    proposal_count, last_proposed_at = await _schedule_proposal_stats(session, txn.id)
+    should_notify = (
+        # 既に上限件数以上を提示済みなら、これ以上の通知は疲れさせるだけ。
+        proposal_count < _SCHEDULE_PROPOSAL_NOTIFY_MAX
+        # 直近の抑止間隔内の提示があれば送らない（既存の5分抑止）。
+        and not _is_within_schedule_proposal_notify_interval(last_proposed_at)
+    )
 
     message = Message(
         transaction_id=txn.id,
@@ -686,8 +968,28 @@ async def propose_schedule(
         meta={"slots": body.slots},
     )
     session.add(message)
+
+    owner_line_user_id: str | None = None
+    owner_email: str | None = None
+    should_dispatch = False
+    if should_notify:
+        owner = await _owner(session, txn)
+        if owner is not None:
+            owner_line_user_id = owner.line_user_id
+            owner_email = owner.email
+            should_dispatch = True
+    txn_id_str = str(txn.id)
+
     await session.commit()
     await session.refresh(message)
+
+    if should_dispatch:
+        background.add_task(
+            notify_dispatch.dispatch_schedule_proposed,
+            owner_line_user_id,
+            owner_email,
+            txn_id_str,
+        )
     return _to_message_out(message, party)
 
 

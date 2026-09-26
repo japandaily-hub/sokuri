@@ -219,6 +219,13 @@ async def test_message_and_schedule_blocked_on_closed_transaction(
     assert r.status_code == 409, r.text
     assert r.json()["detail"]["code"] == "transaction_closed"
 
+    # 完了確定の依頼も終了済み取引では拒否する（同じ H3 方針）。
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/complete/request", headers=_auth(op_token)
+    )
+    assert r.status_code == 409, r.text
+    assert r.json()["detail"]["code"] == "transaction_closed"
+
     # 既読更新は終了後も許容（契約）。
     r = await client.post(
         f"/api/v1/transactions/{txn_id}/messages/read", headers=_auth(user_token)

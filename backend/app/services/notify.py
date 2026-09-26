@@ -326,7 +326,9 @@ async def send_visit_overdue(
         )
     else:
         url = f"{settings.frontend_base_url}/operator/transactions/{transaction_id}"
-        body = "<p>依頼者に完了確定を依頼してください。</p>"
+        # 完了確定の依頼が取引詳細のボタンになったため、文面をそれに合わせる
+        # （2026-09-26。依頼者宛の文面・リンク先は変えない）。
+        body = "<p>取引詳細の「完了確定を依頼する」から依頼者に依頼できます。</p>"
     return await _send(
         to_email,
         "【カタヅケ】訪問予定日を過ぎています",
@@ -697,5 +699,56 @@ async def send_identity_document_reviewed(
             f"{reason_html}"
             "<p>お手数ですが、内容をご確認のうえ再度ご提出ください。</p>"
             f'<p><a href="{url}">本人確認書類を再提出する</a></p>'
+        ),
+    )
+
+
+async def send_completion_requested(to_email: str, case_id: str) -> bool:
+    """完了確定のお願い通知（依頼者宛）。"""
+    settings = get_settings()
+    url = f"{settings.frontend_base_url}/cases/{case_id}"
+    return await _send(
+        to_email,
+        "【カタヅケ】作業完了の確定をお願いします",
+        _wrap(
+            "<p>落札業者から作業完了の確定のお願いが届いています。</p>"
+            "<p>引き取りが済んでいれば確定してください。"
+            "まだの場合は、業者とチャットでご確認ください。</p>"
+            f'<p><a href="{url}">内容を確認して確定する</a></p>'
+        ),
+    )
+
+
+async def send_transaction_completed(to_email: str, transaction_id: str, amount: int) -> bool:
+    """作業完了の確定通知（業者宛）。
+
+    確定は依頼者本人だけでなく運営（admin）が代行する経路もあるため、文面は
+    「誰が確定したか」に依存しない表現にする（確定者の記録は Message.meta.completed_by）。
+    """
+    settings = get_settings()
+    url = f"{settings.frontend_base_url}/operator/transactions/{transaction_id}"
+    return await _send(
+        to_email,
+        "【カタヅケ】作業完了が確定しました",
+        _wrap(
+            f"<p>作業完了が確定しました（確定額 <strong>{amount:,} 円</strong>）。</p>"
+            "<p>取引の評価をお願いします。</p>"
+            f'<p><a href="{url}">成約詳細を確認する</a></p>'
+        ),
+    )
+
+
+async def send_schedule_proposed(to_email: str, transaction_id: str) -> bool:
+    """訪問日程の候補提示通知（依頼者宛）。候補の文字列は信頼できない差し込み値のため
+    本文には載せない（push_schedule_proposed と同じ理由）。"""
+    settings = get_settings()
+    url = f"{settings.frontend_base_url}/chat/{transaction_id}"
+    return await _send(
+        to_email,
+        "【カタヅケ】訪問日程の候補が届きました",
+        _wrap(
+            "<p>落札業者から訪問日程の候補が届きました。</p>"
+            "<p>ご都合のよい候補を選ぶと日程が確定します。</p>"
+            f'<p><a href="{url}">候補日を確認する</a></p>'
         ),
     )

@@ -206,7 +206,9 @@ async def push_visit_overdue(
         body = "作業が終わっていれば完了確定を、まだなら業者とチャットで日程を確認してください。"
     else:
         url = f"{settings.frontend_base_url}/operator/transactions/{transaction_id}"
-        body = "依頼者に完了確定を依頼してください。"
+        # 完了確定の依頼が取引詳細のボタンになったため、文面をそれに合わせる
+        # （2026-09-26。依頼者宛の文面・リンク先は変えない）。
+        body = "取引詳細の「完了確定を依頼する」から依頼者に依頼できます。"
     return await _push(
         line_user_id,
         f"【カタヅケ】訪問予定日を過ぎています。\n{body}\n{url}",
@@ -355,4 +357,47 @@ async def push_identity_document_reviewed(
         line_user_id,
         "【カタヅケ】ご提出いただいた本人確認書類を受理できませんでした。\n"
         f"{reason_line}お手数ですが再度ご提出ください。\n{url}",
+    )
+
+
+async def push_completion_requested(line_user_id: str, case_id: str) -> bool:
+    """完了確定のお願い通知（依頼者宛）。push_reduction_requested と同じ作り。"""
+    settings = get_settings()
+    url = f"{settings.frontend_base_url}/cases/{case_id}"
+    return await _push(
+        line_user_id,
+        "【カタヅケ】落札業者から作業完了の確定のお願いが届いています。"
+        "引き取りが済んでいれば「作業完了を確定する」を押してください。\n"
+        f"{url}",
+    )
+
+
+async def push_transaction_completed(line_user_id: str, transaction_id: str, amount: int) -> bool:
+    """作業完了の確定通知（業者宛）。
+
+    確定は依頼者本人だけでなく運営（admin）が代行する経路もあるため、文面は
+    「誰が確定したか」に依存しない表現にする（確定者の記録は Message.meta.completed_by）。
+    """
+    settings = get_settings()
+    url = f"{settings.frontend_base_url}/operator/transactions/{transaction_id}"
+    return await _push(
+        line_user_id,
+        f"【カタヅケ】作業完了が確定しました（確定額 {amount:,} 円）。"
+        f"取引の評価をお願いします。\n{url}",
+    )
+
+
+async def push_schedule_proposed(line_user_id: str, transaction_id: str) -> bool:
+    """訪問日程の候補提示通知（依頼者宛）。
+
+    候補の文字列は本文に載せない（API は自由文も受けるため信頼できない差し込み値。
+    候補カードから1タップで確定できる /chat/{id} へ誘導する。r10 O-H-1）。
+    """
+    settings = get_settings()
+    url = f"{settings.frontend_base_url}/chat/{transaction_id}"
+    return await _push(
+        line_user_id,
+        "【カタヅケ】落札業者から訪問日程の候補が届きました。"
+        "ご都合のよい候補を選ぶと日程が確定します。\n"
+        f"{url}",
     )

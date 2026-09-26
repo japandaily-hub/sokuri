@@ -43,3 +43,15 @@ BID_RAISE_MIN_STEP = 1000
 # （dispatch_bid_updated）の連打と bid_amount_history の無制限な行数増加を
 # 招くため、DoS・通知疲れ対策として上限を設ける（security review 指摘対応）。
 MAX_BID_REVISIONS = 20
+
+# 完了確定の依頼（POST /transactions/{id}/complete/request）の1取引あたり上限回数。
+# 無制限だと業者が依頼者を通知で連打できてしまうため、減額申請の上限
+# （MAX_REDUCTION_REQUESTS_PER_TRANSACTION）と同じ考え方で上限を設ける。
+# transactions.py の 409 判定と TransactionDetailOut.completion_request_limit の
+# 単一の出所にする。
+MAX_COMPLETION_REQUESTS_PER_TRANSACTION = 3
+
+# 完了確定の依頼の再送クールダウン（時間）。前回の依頼からこの時間が経つまでは
+# 429 で拒否する（通知の連打防止）。transactions.py の 429 判定と
+# TransactionDetailOut.completion_request_available_at の単一の出所にする。
+COMPLETION_REQUEST_COOLDOWN_HOURS = 24

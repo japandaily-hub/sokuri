@@ -452,3 +452,45 @@ async def dispatch_message_received(
     if not ok:
         # 送れていない以上、5分間の抑止を効かせる理由がない（次のメッセージで再挑戦させる）。
         _MESSAGE_PUSH_LAST_SENT.pop(key, None)
+
+
+@_best_effort
+async def dispatch_completion_requested(
+    line_user_id: str | None, email: str | None, case_id: str
+) -> None:
+    """完了確定のお願い通知（依頼者宛）。LINE優先・失敗/未連携時はメールにフォールバック。"""
+    if line_user_id:
+        ok = await line_notify.push_completion_requested(line_user_id, case_id)
+        if ok:
+            return
+    if not email or notify.is_placeholder_email(email):
+        return
+    await notify.send_completion_requested(email, case_id)
+
+
+@_best_effort
+async def dispatch_transaction_completed(
+    line_user_id: str | None, email: str, transaction_id: str, amount: int
+) -> None:
+    """作業完了の確定通知（業者宛）。LINE優先・失敗/未連携時はメールにフォールバック。"""
+    if line_user_id:
+        ok = await line_notify.push_transaction_completed(line_user_id, transaction_id, amount)
+        if ok:
+            return
+    if notify.is_placeholder_email(email):
+        return
+    await notify.send_transaction_completed(email, transaction_id, amount)
+
+
+@_best_effort
+async def dispatch_schedule_proposed(
+    line_user_id: str | None, email: str | None, transaction_id: str
+) -> None:
+    """訪問日程の候補提示通知（依頼者宛）。LINE優先・失敗/未連携時はメールにフォールバック。"""
+    if line_user_id:
+        ok = await line_notify.push_schedule_proposed(line_user_id, transaction_id)
+        if ok:
+            return
+    if not email or notify.is_placeholder_email(email):
+        return
+    await notify.send_schedule_proposed(email, transaction_id)
