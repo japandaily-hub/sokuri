@@ -13,6 +13,9 @@
 
 from __future__ import annotations
 
+import json
+import logging
+import uuid
 from typing import AsyncIterator
 from unittest.mock import AsyncMock, patch
 
@@ -20,6 +23,7 @@ import httpx
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.rate_limit_deps import get_rate_limiter
@@ -34,9 +38,11 @@ from app.core.rate_limit import (
 )
 from app.core.security import create_access_token, hash_password
 from app.db.models.operator import Operator
+from app.db.models.operator_application import OperatorApplication
 from app.db.models.user import User
 from app.db.session import get_session
 from app.main import create_app
+from tests.test_katadzuke_api import _application_payload
 from tests.test_rate_limit import FakeClock
 
 _TEST_LINE_CLIENT_ID = "test-line-channel-id-rl"
@@ -1131,6 +1137,257 @@ class TestContactRateLimit:
             )
         assert r.status_code == 429
         assert r.json() == {"detail": _CONTACT_MSG}
+
+
+# ──────────────────── 業者事前申込（/operator-applications・IP軸） ────────────────────
+
+_OPERATOR_APPLICATION_MSG = "送信回数の上限に達しました。しばらく時間をおいて再度お試しください。"
+
+# 2026-09-26 に本番（TRUSTED_PROXY_HOPS=3）で実測した X-Forwarded-For のうち、
+# 利用者が書けない右側3段（実クライアント, Cloudflare, Render 内部）。左に何を
+# 足しても右から3番目（実クライアント）は変わらない。
+_OA_REAL_CLIENT_IP = "203.0.113.50"
+_OA_PROXY_APPENDED = f"{_OA_REAL_CLIENT_IP}, 172.68.10.20, 10.196.14.1"
+
+
+async def _post_operator_application(
+    client: AsyncClient,
+    email: str,
+    headers: dict[str, str] | list[tuple[str, str]] | None = None,
+) -> httpx.Response:
+    """業者事前申込を送る（既定の XFF は ``_signup_user`` と同じ RFC5737 の公開IP 1段）。"""
+    return await client.post(
+        "/api/v1/operator-applications",
+        json=_application_payload(email=email),
+        headers=headers if headers is not None else _TEST_PUBLIC_IP_HEADERS,
+    )
+
+
+class TestOperatorApplicationIpAxis:
+    """``POST /operator-applications``（無認証・/business の送信先）の IP 軸
+    （同一IPから1時間5件・全リクエストカウント）。
+
+    以前はエンドポイントが X-Forwarded-For の先頭（利用者が自由に書ける値）で
+    DB の件数を数えていたため、リクエストごとに XFF を付け替えるだけで制限を
+    回避でき、記録される client_ip も偽の値になっていた。現在は他のスコープと
+    同じ ``RateLimitGuard``（右から N 番目の正本解決）で判定する。
+    """
+
+    async def test_sixth_from_same_ip_is_429_and_other_ip_is_unaffected(
+        self, client: AsyncClient
+    ):
+        for i in range(5):
+            r = await _post_operator_application(client, f"oa-limit-{i}@example.com")
+            assert r.status_code == 201, r.text
+        r = await _post_operator_application(client, "oa-limit-over@example.com")
+        assert r.status_code == 429
+        assert r.json() == {"detail": _OPERATOR_APPLICATION_MSG}
+        assert int(r.headers["Retry-After"]) >= 1
+
+        r = await _post_operator_application(
+            client,
+            "oa-limit-other-ip@example.com",
+            headers={"X-Forwarded-For": "198.51.100.201"},
+        )
+        assert r.status_code == 201, r.text
+
+    async def test_spoofed_leftmost_xff_is_counted_as_same_ip(
+        self, client: AsyncClient, db_session: AsyncSession, monkeypatch
+    ):
+        """リクエストごとに先頭の偽の値を変えても、右から3番目の実IPで数えて記録する
+        （修正前はこの6件目も 201 で通り、記録も偽の値だった）。"""
+        monkeypatch.setattr(get_settings(), "trusted_proxy_hops", 3)
+        application_ids = []
+        for i in range(5):
+            r = await _post_operator_application(
+                client,
+                f"oa-spoof-{i}@example.com",
+                headers={"X-Forwarded-For": f"198.51.100.{i + 1}, {_OA_PROXY_APPENDED}"},
+            )
+            assert r.status_code == 201, r.text
+            application_ids.append(uuid.UUID(r.json()["application_id"]))
+        r = await _post_operator_application(
+            client,
+            "oa-spoof-over@example.com",
+            headers={"X-Forwarded-For": f"198.51.100.99, {_OA_PROXY_APPENDED}"},
+        )
+        assert r.status_code == 429
+
+        for application_id in application_ids:
+            application = await db_session.get(OperatorApplication, application_id)
+            assert application is not None
+            assert application.client_ip == _OA_REAL_CLIENT_IP
+
+    async def test_spoofed_value_in_separate_xff_header_line_is_counted_as_same_ip(
+        self, client: AsyncClient, monkeypatch
+    ):
+        """偽の値を別の X-Forwarded-For ヘッダ行で送っても同じIPとして数える
+        （headers.get() は先頭行＝偽の値しか返さないため、全行を結合して右から数える）。"""
+        monkeypatch.setattr(get_settings(), "trusted_proxy_hops", 3)
+        for i in range(5):
+            r = await _post_operator_application(
+                client,
+                f"oa-dup-{i}@example.com",
+                headers=[
+                    ("X-Forwarded-For", f"198.51.100.{i + 1}"),
+                    ("X-Forwarded-For", _OA_PROXY_APPENDED),
+                ],
+            )
+            assert r.status_code == 201, r.text
+        r = await _post_operator_application(
+            client,
+            "oa-dup-over@example.com",
+            headers=[
+                ("X-Forwarded-For", "198.51.100.99"),
+                ("X-Forwarded-For", _OA_PROXY_APPENDED),
+            ],
+        )
+        assert r.status_code == 429
+
+    @pytest.mark.parametrize(
+        ("trusted_hops", "xff"),
+        [
+            (1, "not-an-ip"),  # IP として読めない値
+            (3, "198.51.100.7"),  # 信頼する段数より短い（右から3番目が無い）
+        ],
+    )
+    async def test_unresolvable_xff_is_rejected_400_and_not_saved(
+        self,
+        client: AsyncClient,
+        db_session: AsyncSession,
+        monkeypatch,
+        trusted_hops: int,
+        xff: str,
+    ):
+        monkeypatch.setattr(get_settings(), "trusted_proxy_hops", trusted_hops)
+        email = f"oa-bad-xff-{trusted_hops}@example.com"
+        r = await _post_operator_application(client, email, headers={"X-Forwarded-For": xff})
+        assert r.status_code == 400
+        saved = await db_session.scalar(
+            select(func.count())
+            .select_from(OperatorApplication)
+            .where(OperatorApplication.contact_email == email)
+        )
+        assert saved == 0
+
+    async def test_rejected_422_requests_are_also_counted(self, client: AsyncClient):
+        """本文の検証エラーや同意なしで 422 になる送信も数える（ガードは本文の検証より
+        先に動く）。依存の順序が変わって数えなくなったら、ここで気づけるようにする。"""
+        missing_field = _application_payload(email="oa-422-missing@example.com")
+        del missing_field["company_name"]
+        not_agreed = _application_payload(email="oa-422-not-agreed@example.com")
+        not_agreed["agreed"] = False
+        for payload in (missing_field, missing_field, missing_field, not_agreed, not_agreed):
+            r = await client.post(
+                "/api/v1/operator-applications", json=payload, headers=_TEST_PUBLIC_IP_HEADERS
+            )
+            assert r.status_code == 422
+        r = await _post_operator_application(client, "oa-422-valid@example.com")
+        assert r.status_code == 429
+
+    @pytest.mark.parametrize(
+        "content_type",
+        [
+            "text/plain",  # fetch の no-cors で送れる
+            None,  # Content-Type なし（Uint8Array 等の本文）
+            "application/x-www-form-urlencoded",  # <form> で送れる
+            "multipart/form-data",  # <form enctype> で送れる
+            "application/csp-report",  # CSP の違反報告（report-uri）
+            "application/reports+json",  # Reporting API（FastAPI は JSON として読む）
+        ],
+    )
+    async def test_non_json_body_is_rejected_415_before_counting(
+        self, client: AsyncClient, content_type: str | None
+    ):
+        """第三者のページが訪問者のブラウザからプリフライトなしで送れる（または送れうる）
+        本文は、数える前に 415 で止める。通すと本文の検証で 422 になるが、ガードがその前に
+        数えるので訪問者の IP の枠を消費してしまう。受け付けるのは application/json だけ。"""
+        body = json.dumps(_application_payload(email="oa-simple@example.com")).encode("utf-8")
+        headers = dict(_TEST_PUBLIC_IP_HEADERS)
+        if content_type is not None:
+            headers["Content-Type"] = content_type
+        for _ in range(6):
+            r = await client.post("/api/v1/operator-applications", content=body, headers=headers)
+            assert r.status_code == 415
+        # 枠は1件も消費されていない。charset 付きの application/json は通る。
+        r = await _post_operator_application(
+            client,
+            "oa-simple-valid@example.com",
+            headers={**_TEST_PUBLIC_IP_HEADERS, "Content-Type": "application/json; charset=utf-8"},
+        )
+        assert r.status_code == 201, r.text
+
+    @pytest.mark.parametrize(
+        ("trusted_position_ip", "counted"),
+        [
+            ("198.51.100.30", True),  # 公開 IPv4
+            ("2001:db8::30", True),  # 公開 IPv6
+            ("172.68.10.20", True),  # Cloudflare のレンジ（攻撃者が誘発できるので数え続ける）
+            ("10.0.0.5", False),  # プライベート
+            ("100.64.0.5", False),  # RFC 6598（クラウド内部で多用）
+            ("127.0.0.1", False),  # ループバック
+            ("0.0.0.0", False),  # 未指定
+            ("224.0.0.1", False),  # マルチキャスト
+            ("240.0.0.1", False),  # 予約済み
+        ],
+    )
+    async def test_recorded_ip_matches_what_the_guard_counts(
+        self,
+        client: AsyncClient,
+        db_session: AsyncSession,
+        trusted_position_ip: str,
+        counted: bool,
+    ):
+        """ガードが IP 軸で数える値だけを client_ip に記録し、数えずにスキップする値は記録
+        しない。ガード側にスキップ条件を足して記録側が追従しなかった場合（またはその逆）に
+        ここで落ちる（記録側は operator_applications._client_ip_for_record）。"""
+        headers = {"X-Forwarded-For": trusted_position_ip}
+        application_ids = []
+        for i in range(5):
+            r = await _post_operator_application(client, f"oa-eq-{i}@example.com", headers=headers)
+            assert r.status_code == 201, r.text
+            application_ids.append(uuid.UUID(r.json()["application_id"]))
+        r = await _post_operator_application(client, "oa-eq-over@example.com", headers=headers)
+        assert r.status_code == (429 if counted else 201)
+
+        application = await db_session.get(OperatorApplication, application_ids[0])
+        assert application is not None
+        assert application.client_ip == (trusted_position_ip if counted else None)
+
+    async def test_over_limit_log_has_only_truncated_ip(self, client: AsyncClient, caplog):
+        """超過時の WARNING に生の IP を出さない（/24 に丸めた値のみ）。"""
+        raw_ip = "198.51.100.123"
+        xff = {"X-Forwarded-For": raw_ip}
+        for i in range(5):
+            r = await _post_operator_application(client, f"oa-log-{i}@example.com", headers=xff)
+            assert r.status_code == 201, r.text
+        with caplog.at_level(logging.WARNING, logger="app.api.rate_limit_deps"):
+            r = await _post_operator_application(client, "oa-log-over@example.com", headers=xff)
+        assert r.status_code == 429
+        messages = [record.getMessage() for record in caplog.records]
+        assert any(
+            "scope=operator_application" in m and "ip_net=198.51.100.0/24" in m for m in messages
+        )
+        assert not any(raw_ip in m for m in messages)
+
+    async def test_bucket_is_separate_from_signup(self, client: AsyncClient):
+        """業者申込の枠を使い切っても、同じIPからの会員登録（signup）は止まらない
+        （scope が別なのでバケットを共有しない）。"""
+        for i in range(5):
+            r = await _post_operator_application(client, f"oa-separate-{i}@example.com")
+            assert r.status_code == 201, r.text
+        r = await _post_operator_application(client, "oa-separate-over@example.com")
+        assert r.status_code == 429
+
+        r = await _signup_user(client, "oa-separate-signup@example.com")
+        assert r.status_code == 201, r.text
+
+    async def test_killswitch_disables_the_limit(self, client_killswitch: AsyncClient):
+        """緊急停止スイッチ（RATE_LIMIT_ENABLED=false）で他のスコープと同じく止まる
+        （以前の DB 件数方式はスイッチの対象外だった）。"""
+        for i in range(8):
+            r = await _post_operator_application(client_killswitch, f"oa-kill-{i}@example.com")
+            assert r.status_code == 201, r.text
 
 
 # ──────────────────────────── キルスイッチ / 既存テスト非破壊 ────────────────────────────

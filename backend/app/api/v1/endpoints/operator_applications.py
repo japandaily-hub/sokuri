@@ -16,8 +16,13 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request,
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.rate_limit_deps import RateLimitGuard
+from app.core.client_ip import (
+    is_private_or_loopback,
+    is_special_use_address,
+    resolve_client_ip_with_reason,
+)
 from app.core.crypto import encrypt_json
-from app.core.request_ip import get_client_ip
 from app.db.models.operator_application import OperatorApplication
 from app.db.session import get_session
 from app.schemas_katadzuke import (
@@ -35,15 +40,76 @@ router = APIRouter()
 # ── レート制限・スパム対策（security review Critical指摘対応） ──────────────
 # 認証不要の公開エンドポイントのため、DB肥大化・暗号化コスト増幅・
 # 第三者へのメール爆撃（contact_email に任意アドレスを指定して送信させる）を防ぐ。
-# 新規インフラ（Redis等）は導入せず、既存テーブルの created_at のみで判定する。
-
-# 同一IPからの申込は1時間あたりこの件数まで許容する。
-_RATE_LIMIT_MAX_PER_IP_PER_WINDOW = 5
-_RATE_LIMIT_WINDOW = timedelta(hours=1)
+# 同一IPからの申込数は RateLimitGuard("operator_application")（IP軸・全リクエスト
+# カウント・1時間5件）で絞る。以前はここで X-Forwarded-For の先頭（利用者が自由に
+# 書ける値）を使って client_ip の件数を DB で数えていたため、ヘッダを付け替える
+# だけで制限を回避でき、記録される IP も偽の値になっていた。IP の解決は他の
+# レート制限と同じ正本（app.core.client_ip.resolve_client_ip_with_reason）に揃える。
 
 # 同一 contact_email 宛の受付確認メールは、直近この期間内に送信済みなら再送しない
 # （メール爆撃対策。申込自体は保存する＝正規ユーザーの再申込を拒否しない）。
 _EMAIL_NOTIFY_THROTTLE_WINDOW = timedelta(hours=1)
+
+# operator_applications.client_ip の列長（String(64)）。正規化済みの IP は IPv6 でも
+# 39 文字に収まるが、IPv6 のゾーン ID（"%" 以降）は長さに上限なく受理されるため、
+# 列に収まらない値は記録しない（PostgreSQL では超過すると保存そのものが失敗する）。
+_CLIENT_IP_MAX_LENGTH = OperatorApplication.client_ip.type.length
+
+
+def _client_ip_for_record(request: Request) -> str | None:
+    """申込に記録する送信元 IP を、レート制限と同じ正本の解決で求める。
+
+    記録するのは ``RateLimitGuard`` が IP 軸で数えるのと同じ値だけにする。
+    プライベート/ループバック・特殊用途のアドレス（TRUSTED_PROXY_HOPS の誤設定等で
+    内部プロキシの IP を掴んでいる状態。ガードは数えずにスキップする）は、
+    別々の申込者が同じ IP として並び追跡を誤らせるため記録しない。解決できない場合と
+    列に収まらない場合も ``None``（記録なし）。
+
+    判定（不正な X-Forwarded-For の 400・上限超過の 429）はガードの責務で、本関数は
+    記録専用。ガードとは別に解決し直す（1リクエスト2回・文字列処理のみ）のは、
+    緊急停止スイッチ（RATE_LIMIT_ENABLED=false）中はガードが IP を解決しないため。
+    ここで 400 を返さないのも、停止中にガードが素通しになる挙動を記録のために変えないため。
+    """
+    ip = resolve_client_ip_with_reason(request, get_settings().trusted_proxy_hops).ip
+    if (
+        ip is None
+        or is_private_or_loopback(ip)
+        or is_special_use_address(ip)
+        or len(ip) > _CLIENT_IP_MAX_LENGTH
+    ):
+        return None
+    return ip
+
+
+async def _require_json_body(request: Request) -> None:
+    """本文が JSON（Content-Type: application/json）の要求だけを通す。それ以外は 415。
+
+    I/O を持たないため ``async def`` にしている（同期関数の依存は FastAPI が
+    スレッドプールで実行する）。
+
+    全リクエストを数えるガード（``RateLimitGuard``）より前に置くこと。ブラウザは
+    application/json のクロスオリジン POST を CORS のプリフライト（許可オリジン以外は
+    拒否）なしには送れないが、text/plain・フォーム・Content-Type なしの「単純な
+    リクエスト」や、ブラウザ自身が送る報告（CSP の違反報告等）はプリフライトなしで
+    届きうる。これらは本文の検証で 422 になるものの、ガードはその前に数えるため、
+    通すと第三者のページが訪問者のブラウザから送らせるだけで訪問者の IP の枠を
+    使い切れてしまう。
+
+    受け付けるのは application/json ちょうど（charset 等のパラメータと大小文字は無視）。
+    正規の送信元（web の request()・E2E・テスト）はすべてこれを送るため、FastAPI が
+    JSON として読む application/*+json（例: Reporting API の application/reports+json）
+    までは広げない。Content-Type なしも拒否する。現在入る FastAPI 0.136 系は既定の
+    strict_content_type で Content-Type なしの本文を JSON として読まないが、pyproject は
+    fastapi>=0.115 で版を固定しておらず、読む版が入ると訪問者の IP で申込そのものを
+    作らせることもできるため。
+    """
+    media_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+    if media_type == "application/json":
+        return
+    raise HTTPException(
+        status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+        detail="リクエストの形式が正しくありません。",
+    )
 
 
 @router.post(
@@ -57,6 +123,13 @@ async def create_operator_application(
     body: OperatorApplicationCreateRequest,
     background: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
+    # 依存は宣言順に実行される。JSON 以外の本文はカウントより前に 415 で止める
+    # （第三者のページから訪問者の IP の枠を使い切らせないため。_require_json_body 参照）。
+    _json_only: None = Depends(_require_json_body),
+    # 同一IPからの申込数の制限（IP軸・全リクエストカウント・1時間5件）。ハンドラ本体
+    # より前に判定・カウントされ、上限超過なら 429、解決できない X-Forwarded-For
+    # なら 400 で止まる（_scope_spec の "operator_application" 分岐を参照）。
+    _rl: object = Depends(RateLimitGuard("operator_application")),
 ) -> OperatorApplicationCreateResponse:
     if not body.agreed:
         raise HTTPException(
@@ -64,32 +137,8 @@ async def create_operator_application(
             detail="利用規約・プライバシーポリシーへの同意が必要です。",
         )
 
-    client_ip = get_client_ip(request)
+    client_ip = _client_ip_for_record(request)
     now = datetime.now(timezone.utc)
-    window_start = now - _RATE_LIMIT_WINDOW
-
-    # ── レート制限（IPアドレス単位） ────────────────────────────────
-    # client_ip が取得できない（テスト環境等）場合は判定をスキップする
-    # （取得不能を理由に正規リクエストを一律ブロックしない。可用性目的の対策のため）。
-    if client_ip is not None:
-        recent_count_from_ip = await session.scalar(
-            select(func.count())
-            .select_from(OperatorApplication)
-            .where(
-                OperatorApplication.client_ip == client_ip,
-                OperatorApplication.created_at >= window_start,
-            )
-        )
-        if (recent_count_from_ip or 0) >= _RATE_LIMIT_MAX_PER_IP_PER_WINDOW:
-            logger.warning(
-                "operator_applications: レート制限超過 - client_ip=%s count=%s",
-                client_ip,
-                recent_count_from_ip,
-            )
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="送信回数の上限に達しました。しばらく時間をおいて再度お試しください。",
-            )
 
     # 口座情報は保存直前に暗号化する。平文はここで使い切り、以降ログ・変数に残さない。
     bank_account_enc = encrypt_json(body.bank_account.model_dump())

@@ -64,7 +64,8 @@ class OperatorApplication(Base, TimestampMixin):
     # ようにする（M-4対応）。招待コードは1申込につき1つのみ発行されるため一意。
     invite_code: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
 
-    # 送信元IPアドレス（IPv6も許容し余裕を持たせた長さ）。レート制限・不正申込の追跡に使用。
-    # X-Forwarded-For が無い直接接続環境では None にはならないが、プロキシ構成が
-    # 不明な場合に備え nullable にしておく（欠損してもアプリを壊さない）。
+    # 送信元IPアドレス（IPv6も許容し余裕を持たせた長さ）。不正申込の追跡に使用。
+    # 値はレート制限と同じ正本の解決（X-Forwarded-For の右から TRUSTED_PROXY_HOPS 番目）で、
+    # 利用者が自由に書ける先頭の値ではない。件数の制限そのものは RateLimitGuard が行い、
+    # この列は数えない。解決できない場合は None（欠損してもアプリを壊さない）。
     client_ip: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)

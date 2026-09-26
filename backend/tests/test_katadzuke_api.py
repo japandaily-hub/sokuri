@@ -1377,31 +1377,65 @@ async def test_operator_application_not_agreed_422(client: AsyncClient):
     assert r.status_code == 422
 
 
-async def test_operator_application_rate_limit_429(client: AsyncClient):
-    """同一IPから制限件数（5件/時間）を超えて申込むと429になる（security review Critical指摘対応）。"""
-    ip = "203.0.113.10"
-    for i in range(5):
-        r = await client.post(
-            "/api/v1/operator-applications",
-            json=_application_payload(email=f"rate_limit_{i}@example.com"),
-            headers={"X-Forwarded-For": ip},
-        )
-        assert r.status_code == 201
+async def test_operator_application_records_client_ip_from_trusted_position(
+    client: AsyncClient, db_session: AsyncSession, monkeypatch
+):
+    """記録する client_ip は X-Forwarded-For の右から TRUSTED_PROXY_HOPS 番目で、
+    利用者が自由に書ける先頭の値ではない（2026-09-26 に本番で実測した4段の並び
+    「偽の値, 実IP, Cloudflare, Render 内部」を hops=3 で再現）。
 
+    件数の制限（同一IPで5件まで・偽の XFF でも同じIPとして数える）は
+    tests/test_rate_limit_api.py の TestOperatorApplicationIpAxis で検証する
+    （この client は conftest の RATE_LIMIT_ENABLED=false でガードが素通し）。
+    """
+    from app.config import get_settings
+    from app.db.models.operator_application import OperatorApplication
+
+    monkeypatch.setattr(get_settings(), "trusted_proxy_hops", 3)
     r = await client.post(
         "/api/v1/operator-applications",
-        json=_application_payload(email="rate_limit_over@example.com"),
-        headers={"X-Forwarded-For": ip},
-    )
-    assert r.status_code == 429
-
-    # 別IPからは引き続き申込可能であること（IP単位の絞り込みであることの確認）
-    r = await client.post(
-        "/api/v1/operator-applications",
-        json=_application_payload(email="rate_limit_other_ip@example.com"),
-        headers={"X-Forwarded-For": "203.0.113.99"},
+        json=_application_payload(email="trusted_position_ip@example.com"),
+        headers={"X-Forwarded-For": "198.51.100.7, 203.0.113.10, 172.68.10.20, 10.196.14.1"},
     )
     assert r.status_code == 201
+
+    application = await db_session.get(
+        OperatorApplication, uuid.UUID(r.json()["application_id"])
+    )
+    assert application is not None
+    assert application.client_ip == "203.0.113.10"
+
+
+@pytest.mark.parametrize(
+    "xff",
+    [
+        "not-an-ip",  # 解決できない（ガードが有効なら 400）
+        "10.0.0.5",  # プライベート（hops の誤設定で内部プロキシを掴んだ状態。ガードは数えない）
+        "0.0.0.0",  # 特殊用途（未指定アドレス。ガードは数えない）
+        "2001:db8::1%" + "z" * 60,  # ゾーン ID 付きで列長（64）を超える
+        None,  # ヘッダなし＝接続元（ASGITransport では 127.0.0.1 のループバック）
+    ],
+)
+async def test_operator_application_records_no_ip_unless_guard_would_count_it(
+    client: AsyncClient, db_session: AsyncSession, xff: str | None
+):
+    """記録するのはガードが IP 軸で数えるのと同じ値だけで、それ以外は申込を受け付けたうえで
+    client_ip を None にする。この client はガードが素通し（緊急停止スイッチ中と同じ）で、
+    400 で拒否するのはガードの責務のため、記録側は停止中の挙動を変えない。"""
+    from app.db.models.operator_application import OperatorApplication
+
+    r = await client.post(
+        "/api/v1/operator-applications",
+        json=_application_payload(email="no_record_ip@example.com"),
+        headers={"X-Forwarded-For": xff} if xff is not None else None,
+    )
+    assert r.status_code == 201
+
+    application = await db_session.get(
+        OperatorApplication, uuid.UUID(r.json()["application_id"])
+    )
+    assert application is not None
+    assert application.client_ip is None
 
 
 async def test_operator_application_bank_account_not_stored_plaintext(

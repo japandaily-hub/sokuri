@@ -211,6 +211,7 @@ _SCOPE_MESSAGES: dict[str, str] = {
     "public_read": "リクエストが集中しています。しばらく時間をおいて再度お試しください。",
     "analyze": "画像解析のリクエストが集中しています。しばらく時間をおいて再度お試しください。",
     "contact": "お問い合わせが集中しています。時間をおいて再度お送りください。",
+    "operator_application": "送信回数の上限に達しました。しばらく時間をおいて再度お試しください。",
 }
 
 
@@ -453,6 +454,15 @@ def _scope_spec(scope: str, config: RateLimitConfig) -> _ScopeSpec:
         return _ScopeSpec(
             ip_rule=config.case_create_ip, account_rule=config.case_create_account,
             count_all=True,
+        )
+    if scope == "operator_application":
+        # 無認証の業者事前申込（POST /operator-applications・/business の送信先）。
+        # 口座情報の暗号化・DB 保存・運営宛メールを伴うため、成否を問わず全リクエストを
+        # IP 軸でカウントする（signup と同じ方式。scope 名が別なのでバケットは共有しない）。
+        # 以前はエンドポイント側が X-Forwarded-For の先頭（利用者が自由に書ける値）で
+        # DB の件数を数えており、ヘッダを付け替えるだけで回避できた。
+        return _ScopeSpec(
+            ip_rule=config.operator_application_ip, account_rule=None, count_all=True
         )
     raise ValueError(f"未知の rate limit scope です: {scope!r}")
 

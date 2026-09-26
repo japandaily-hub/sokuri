@@ -79,6 +79,10 @@ class RateLimitConfig:
     case_create_account: RateLimitRule = RateLimitRule(10, 3600)
     # 無認証の公開参照（業者一覧・公開プロフィール）。IP軸・全リクエストカウント。
     public_read_ip: RateLimitRule = RateLimitRule(120, 60)
+    # 無認証の業者事前申込（POST /operator-applications）。IP軸・全リクエストカウント。
+    # 値は従来のエンドポイント内のコード定数（同一IPから1時間5件）を引き継ぐ。
+    # 従来どおり環境変数は持たず、get_rate_limiter() でも上書きしない。
+    operator_application_ip: RateLimitRule = RateLimitRule(5, 3600)
 
 
 class RateLimitStore(Protocol):
