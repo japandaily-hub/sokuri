@@ -1031,7 +1031,11 @@ def _relayed_client_ip(scope: str, request: Request) -> str | None:
         return None
 
     try:
-        log_relay_outcome(scope, verification)
+        # keys_configured=bool(keys): verify_request_client_ip_relay に渡したのと
+        # 同じ keys から算出する（鍵が設定されているのに absent＝中継ヘッダが
+        # 来ない要求を検知する material。2回目 security review L-A。
+        # app.core.client_ip_relay.log_relay_outcome docstring 参照）。
+        log_relay_outcome(scope, verification, keys_configured=bool(keys))
     except Exception:  # noqa: BLE001 -- ログ処理の不具合で確定済みの検証結果を握りつぶさない
         _relay_log_outcome_error_throttle.emit(
             lambda: logger.exception(

@@ -166,7 +166,7 @@ async function backendLineExchange(
  * LINEログインの signIn コールバックには元リクエストが渡らないため、next/headers の
  * headers() を使って読み出す。signIn コールバックは Route Handler の中で動くため
  * 通常は読めるが、呼び出し文脈によっては例外を投げうる
- * （client-ip-relay.ts 冒頭 JSDoc「組み込み予定」の注意点を参照）ため try/catch で包み、
+ * （client-ip-relay.ts 冒頭 JSDoc「組み込み状況」の不変条件を参照）ため try/catch で包み、
  * 失敗時は null を返す（clientIpRelayHeaders 側で no_client_ip として扱われ、中継ヘッダ
  * なしで fail-open する）。IP等の値はログに出さない。
  */

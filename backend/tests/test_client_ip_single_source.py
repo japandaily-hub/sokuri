@@ -39,6 +39,17 @@ _IP_HEADER_ALLOWED_FILES: dict[str, frozenset[str]] = {
 # 正本のフォールバックと、診断エンドポイントの peer 表示だけ。
 _CLIENT_HOST_ALLOWED_FILES = frozenset({"core/client_ip.py", "main.py"})
 
+# 署名付き中継IP（I8）の検証関連シンボル → それを import・参照してよいファイル
+# （2回目 security review L-C）。署名検証（verify_client_ip_relay /
+# verify_request_client_ip_relay）を経ずに RELAY_HEADER_NAME で直接ヘッダの値を
+# 読み、検証済みのふりをして利用者IPとして使う実装が紛れ込むことを防ぐ
+# （上記の X-Forwarded-For 版の再発防止と同じ動機）。core/client_ip_relay.py は
+# 検証ロジックの定義元、api/rate_limit_deps.py はその唯一の呼び出し元。
+_RELAY_SYMBOL_ALLOWED_FILES = frozenset({"core/client_ip_relay.py", "api/rate_limit_deps.py"})
+_RELAY_RESTRICTED_SYMBOLS = frozenset(
+    {"RELAY_HEADER_NAME", "verify_client_ip_relay", "verify_request_client_ip_relay"}
+)
+
 
 def _app_sources() -> list[tuple[str, ast.AST]]:
     sources = []
@@ -86,4 +97,39 @@ def test_request_client_host_is_used_only_by_the_canonical_module():
     assert not violations, (
         "request.client.host を直接使っています（プロキシ配下では全員が同じ IP になる）。"
         "resolve_client_ip_with_reason を使ってください: " + ", ".join(violations)
+    )
+
+
+def test_relay_verification_symbols_used_only_by_allowed_files():
+    """署名付き中継IP（I8）の検証関連シンボルを許可ファイル以外で
+    import・参照することを禁止する（2回目 security review L-C）。
+
+    ``ast.alias``（``import``/``from ... import`` の名前）・``ast.Name``
+    （変数参照・関数呼び出し）・``ast.Attribute``（``module.attr`` 形式の
+    参照）の3種を横断して調べる。docstring・コメント・文字列リテラル中の
+    言及は対象にならない（識別子としての参照のみを検出するため、上記
+    ``_IP_HEADER_ALLOWED_FILES`` のような文字列定数の完全一致検査とは
+    別の検査軸になる）。
+    """
+    violations = []
+    for relative, tree in _app_sources():
+        if relative in _RELAY_SYMBOL_ALLOWED_FILES:
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.alias):
+                name = node.name
+            elif isinstance(node, ast.Name):
+                name = node.id
+            elif isinstance(node, ast.Attribute):
+                name = node.attr
+            else:
+                continue
+            if name in _RELAY_RESTRICTED_SYMBOLS:
+                violations.append(f"{relative}:{node.lineno} {name}")
+    assert not violations, (
+        "署名付き中継IPの検証関連シンボル（RELAY_HEADER_NAME・"
+        "verify_client_ip_relay・verify_request_client_ip_relay）を、"
+        "core/client_ip_relay.py・api/rate_limit_deps.py 以外で参照しています"
+        "（署名検証を経ずにヘッダの値を使う実装の混入を防ぐため禁止）: "
+        + ", ".join(violations)
     )

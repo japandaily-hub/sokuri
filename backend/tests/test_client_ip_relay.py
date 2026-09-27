@@ -28,6 +28,7 @@ from app.core.client_ip_relay import (
     log_relay_outcome,
     parse_relay_secrets,
     verify_client_ip_relay,
+    verify_request_client_ip_relay,
 )
 
 _LOGGER_NAME = "app.core.client_ip_relay"
@@ -81,6 +82,22 @@ def _verify(
     )
 
 
+def _clear_relay_secret_caches() -> None:
+    """``parse_relay_secrets`` と ``inspect_relay_secrets`` の ``@lru_cache`` を
+    必ず対で clear する共通ヘルパー（QA L-A）。
+
+    ``parse_relay_secrets`` は内部で ``inspect_relay_secrets(raw).keys`` を
+    返すだけの薄いラッパーであり、それぞれが独立した ``@lru_cache`` を持つ。
+    片方だけを clear すると、もう片方のキャッシュが残ったままヒットして
+    しまい（``inspect_relay_secrets`` はキャッシュヒット時は ERROR ログを
+    出さない）、ログ出力を検証するテストが「同じ raw 文字列を過去に別の
+    テストが使っていたか」という実行順序に依存してしまう
+    （``tests/test_client_ip_relay_api.py`` でも同じヘルパーを import して使う）。
+    """
+    parse_relay_secrets.cache_clear()
+    inspect_relay_secrets.cache_clear()
+
+
 @pytest.fixture(autouse=True)
 def _reset_log_state():
     """各テストの前後でプロセス内ログ状態（初回済みscope集合・スロットラ）を初期化する。"""
@@ -107,7 +124,7 @@ class TestParseRelaySecrets:
         assert result == (_PARSE_VALID_KEY_1.encode("ascii"), _PARSE_VALID_KEY_2.encode("ascii"))
 
     def test_short_key_excluded_with_error_log_without_value_or_length(self, caplog) -> None:
-        parse_relay_secrets.cache_clear()
+        _clear_relay_secret_caches()
         short_key = "a" * 31
         with caplog.at_level(logging.ERROR, logger=_LOGGER_NAME):
             result = parse_relay_secrets(short_key)
@@ -120,7 +137,7 @@ class TestParseRelaySecrets:
             assert "31" not in message
 
     def test_non_ascii_key_excluded_with_error_log(self, caplog) -> None:
-        parse_relay_secrets.cache_clear()
+        _clear_relay_secret_caches()
         non_ascii_key = "あ" * 32
         with caplog.at_level(logging.ERROR, logger=_LOGGER_NAME):
             result = parse_relay_secrets(non_ascii_key)
@@ -130,7 +147,7 @@ class TestParseRelaySecrets:
             assert non_ascii_key not in record.getMessage()
 
     def test_key_with_internal_whitespace_excluded_with_error_log(self, caplog) -> None:
-        parse_relay_secrets.cache_clear()
+        _clear_relay_secret_caches()
         key_with_space = "a" * 20 + " " + "a" * 20
         with caplog.at_level(logging.ERROR, logger=_LOGGER_NAME):
             result = parse_relay_secrets(key_with_space)
@@ -146,7 +163,7 @@ class TestParseRelaySecrets:
         assert result == (_PARSE_VALID_KEY_1.encode("ascii"), _PARSE_VALID_KEY_2.encode("ascii"))
 
     def test_five_keys_capped_to_four_with_error_log(self, caplog) -> None:
-        parse_relay_secrets.cache_clear()
+        _clear_relay_secret_caches()
         keys = [secrets.token_urlsafe(48) for _ in range(5)]
         raw = ",".join(keys)
         with caplog.at_level(logging.ERROR, logger=_LOGGER_NAME):
@@ -157,7 +174,7 @@ class TestParseRelaySecrets:
 
     def test_exactly_four_valid_keys_do_not_trigger_cap_error(self, caplog) -> None:
         """QA L-1: MAX_KEYS ちょうど（4本）では上限超過のERRORが出ない。"""
-        parse_relay_secrets.cache_clear()
+        _clear_relay_secret_caches()
         keys = [secrets.token_urlsafe(48) for _ in range(4)]
         raw = ",".join(keys)
         with caplog.at_level(logging.ERROR, logger=_LOGGER_NAME):
@@ -167,19 +184,19 @@ class TestParseRelaySecrets:
 
     def test_exactly_min_length_key_is_accepted(self) -> None:
         """QA L-1: ちょうど32文字（MIN_SECRET_LENGTH）の鍵は受理される。"""
-        parse_relay_secrets.cache_clear()
+        _clear_relay_secret_caches()
         key = _diverse_key(32)
         assert len(key) == 32
         assert parse_relay_secrets(key) == (key.encode("ascii"),)
 
     def test_secrets_token_urlsafe_48_is_accepted(self) -> None:
         """推奨生成コマンド（``secrets.token_urlsafe(48)``）が実際に受理されることの確認。"""
-        parse_relay_secrets.cache_clear()
+        _clear_relay_secret_caches()
         key = secrets.token_urlsafe(48)
         assert parse_relay_secrets(key) == (key.encode("ascii"),)
 
     def test_all_invalid_returns_empty_with_disable_error_log(self, caplog) -> None:
-        parse_relay_secrets.cache_clear()
+        _clear_relay_secret_caches()
         raw = "short1,short2"
         with caplog.at_level(logging.ERROR, logger=_LOGGER_NAME):
             result = parse_relay_secrets(raw)
@@ -213,7 +230,7 @@ class TestRejectsKnownWeakOrTestKeys:
         ],
     )
     def test_weak_or_known_key_excluded_with_error_log(self, weak_key: str, caplog) -> None:
-        parse_relay_secrets.cache_clear()
+        _clear_relay_secret_caches()
         with caplog.at_level(logging.ERROR, logger=_LOGGER_NAME):
             result = parse_relay_secrets(weak_key)
         assert result == ()
@@ -223,6 +240,32 @@ class TestRejectsKnownWeakOrTestKeys:
             message = record.getMessage()
             assert weak_key not in message
             assert str(len(weak_key)) not in message
+
+
+class TestDistinctCharThresholdBoundary:
+    """QA L-B: 使用文字種数のちょうど閾値（``_MIN_DISTINCT_CHARS`` = 10）の
+    境界。9種類ちょうどは弱い鍵として除外され、10種類ちょうどは受理される
+    ことを固定する（``TestRejectsKnownWeakOrTestKeys`` の4種類の例だけでは
+    閾値そのものの境界が検証されていなかった）。
+    """
+
+    def test_exactly_ten_distinct_chars_is_accepted(self) -> None:
+        _clear_relay_secret_caches()
+        key = "0123456789" * 4  # 長さ40・文字種10（MIN_SECRET_LENGTH=32以上も満たす）
+        assert len(set(key)) == 10
+        assert parse_relay_secrets(key) == (key.encode("ascii"),)
+
+    def test_nine_distinct_chars_is_excluded(self, caplog) -> None:
+        _clear_relay_secret_caches()
+        key = "012345678" * 4  # 長さ36・文字種9
+        assert len(set(key)) == 9
+        with caplog.at_level(logging.ERROR, logger=_LOGGER_NAME):
+            result = parse_relay_secrets(key)
+        assert result == ()
+        messages = [r.getMessage() for r in caplog.records]
+        assert any("偏っている" in m for m in messages)
+        for record in caplog.records:
+            assert key not in record.getMessage()
 
 
 # ──────────────────────────── inspect_relay_secrets（parse_relay_secrets の検証本体） ────────────────────────────
@@ -235,7 +278,7 @@ class TestInspectRelaySecrets:
     def test_rejected_count_excludes_max_keys_truncation_and_duplicates(self) -> None:
         """MAX_KEYS超過による切り捨て・重複の除去は「不正な鍵」として
         数えない（``RelaySecretsInspection`` docstring の契約）。"""
-        inspect_relay_secrets.cache_clear()
+        _clear_relay_secret_caches()
         keys = [secrets.token_urlsafe(48) for _ in range(5)]
         raw = ",".join(keys + [keys[0]])  # 5本の有効鍵 + 先頭の重複を1つ追加
         result = inspect_relay_secrets(raw)
@@ -243,7 +286,7 @@ class TestInspectRelaySecrets:
         assert result.rejected_count == 0
 
     def test_rejected_count_counts_actual_invalid_candidates_only(self) -> None:
-        inspect_relay_secrets.cache_clear()
+        _clear_relay_secret_caches()
         valid_key = secrets.token_urlsafe(48)
         raw = f"{valid_key},too-short,{KEY_A}"
         result = inspect_relay_secrets(raw)
@@ -251,14 +294,13 @@ class TestInspectRelaySecrets:
         assert result.rejected_count == 2
 
     def test_unset_returns_zero_rejected_count(self) -> None:
-        inspect_relay_secrets.cache_clear()
+        _clear_relay_secret_caches()
         result = inspect_relay_secrets("")
         assert result.keys == ()
         assert result.rejected_count == 0
 
     def test_parse_relay_secrets_is_thin_wrapper_over_inspect(self) -> None:
-        parse_relay_secrets.cache_clear()
-        inspect_relay_secrets.cache_clear()
+        _clear_relay_secret_caches()
         valid_key = secrets.token_urlsafe(48)
         assert parse_relay_secrets(valid_key) == inspect_relay_secrets(valid_key).keys
 
@@ -747,4 +789,185 @@ class TestLogRelayOutcome:
         message = caplog.records[0].getMessage()
         assert header_value not in message
         assert KEY_A not in message
-        assert "203.0.113.9" not in message
+
+    def test_ok_first_time_warning_is_per_key_slot_not_just_scope(self, caplog) -> None:
+        """2回目 security review L-B: 初回 WARNING は (scope, key_slot) の組ごと。
+
+        同じ scope でも key_slot が変われば（鍵のローテーションで新しい鍵が
+        使われ始めれば）再度 WARNING に格上げされる。scope だけで管理すると
+        旧鍵で既に「初回」を消費済みのため、新しい鍵の採用が INFO に埋もれて
+        運用者が確認できない（docs/ops/admin-operations.md の入れ替え手順）。
+        """
+        v_slot0 = RelayVerification("203.0.113.9", "ok", key_slot=0, skew_seconds=5)
+        v_slot1 = RelayVerification("203.0.113.9", "ok", key_slot=1, skew_seconds=5)
+        with caplog.at_level(logging.INFO, logger=_LOGGER_NAME):
+            log_relay_outcome("login", v_slot0)  # 初回 WARNING（slot=0）
+            log_relay_outcome("login", v_slot0)  # 2回目 INFO（slot=0）
+            log_relay_outcome("login", v_slot1)  # 新しい key_slot のため再度 WARNING
+        records = caplog.records
+        assert len(records) == 3
+        assert records[0].levelname == "WARNING"
+        assert "key_slot=0" in records[0].getMessage()
+        assert records[1].levelname == "INFO"
+        assert records[2].levelname == "WARNING"
+        assert "key_slot=1" in records[2].getMessage()
+
+    def test_ok_same_key_slot_across_scopes_are_independent(self, caplog) -> None:
+        """key_slot=0 が login で既に初回消費済みでも、line_exchange 側では
+        別の (scope, key_slot) の組として独立に初回 WARNING が出る
+        （scope を組から外していない回帰確認）。"""
+        v = RelayVerification("203.0.113.9", "ok", key_slot=0, skew_seconds=5)
+        with caplog.at_level(logging.INFO, logger=_LOGGER_NAME):
+            log_relay_outcome("login", v)
+            log_relay_outcome("line_exchange", v)
+        records = caplog.records
+        assert len(records) == 2
+        assert records[0].levelname == "WARNING"
+        assert records[1].levelname == "WARNING"
+
+
+# ──────────────────────────── log_relay_outcome: absent + 鍵設定済み（2回目 security review L-A） ────────────────────────────
+
+
+class TestLogRelayOutcomeAbsentWithKeysConfigured:
+    """鍵（CLIENT_IP_RELAY_SECRETS）が設定されているのに中継ヘッダが来ない
+    （absent）要求を、scope ごとに10分に1回のスロットリング付き WARNING で
+    検知する（2回目 security review L-A）。web が中継を付けなくなった
+    構成ドリフト（Vercel の鍵の削除・再デプロイ漏れ等）の早期検知が目的。
+    """
+
+    def test_absent_with_keys_configured_emits_warning(self, caplog) -> None:
+        v = RelayVerification(None, "absent")
+        with caplog.at_level(logging.WARNING, logger=_LOGGER_NAME):
+            log_relay_outcome("login", v, keys_configured=True)
+        assert len(caplog.records) == 1
+        assert caplog.records[0].levelname == "WARNING"
+        message = caplog.records[0].getMessage()
+        assert "鍵" in message
+        assert "scope=login" in message
+
+    def test_absent_with_keys_configured_is_throttled(self, caplog) -> None:
+        """10分以内の再度の absent はスロットリングされ無出力になる。"""
+        v = RelayVerification(None, "absent")
+        with caplog.at_level(logging.WARNING, logger=_LOGGER_NAME):
+            log_relay_outcome("login", v, keys_configured=True)
+            log_relay_outcome("login", v, keys_configured=True)
+            log_relay_outcome("login", v, keys_configured=True)
+        assert len(caplog.records) == 1
+
+    def test_absent_without_keys_configured_emits_nothing(self, caplog) -> None:
+        """鍵が1本も無い（``keys_configured=False``。既定値）場合の absent は
+        従来どおり完全に無音のまま（中継ヘッダを使わない大多数のリクエストで
+        ログを埋め尽くさないため）。"""
+        v = RelayVerification(None, "absent")
+        with caplog.at_level(logging.WARNING, logger=_LOGGER_NAME):
+            log_relay_outcome("login", v, keys_configured=False)
+            log_relay_outcome("login", v)  # 既定値（False）でも無音のまま
+        assert len(caplog.records) == 0
+
+    def test_absent_with_keys_configured_independent_per_scope(self, caplog) -> None:
+        v = RelayVerification(None, "absent")
+        with caplog.at_level(logging.WARNING, logger=_LOGGER_NAME):
+            log_relay_outcome("login", v, keys_configured=True)
+            log_relay_outcome("line_exchange", v, keys_configured=True)
+        assert len(caplog.records) == 2
+
+    def test_absent_with_keys_configured_does_not_affect_unconfigured_reason(
+        self, caplog
+    ) -> None:
+        """absent 用のスロットリングは reason="unconfigured" とは独立している
+        （どちらも「鍵の状態に関する異常」だが、reason 自体が異なるため
+        ``_relay_throttle`` のキー（reason, scope）が別になる）。"""
+        with caplog.at_level(logging.WARNING, logger=_LOGGER_NAME):
+            log_relay_outcome("login", RelayVerification(None, "absent"), keys_configured=True)
+            log_relay_outcome("login", RelayVerification(None, "unconfigured"))
+        assert len(caplog.records) == 2
+
+
+# ──────────────────────────── verify_request_client_ip_relay: scope["path"] を使う（QA L-C） ────────────────────────────
+
+
+class _FakeHeaders:
+    """``Headers.getlist()`` だけを持つ最小の偽ヘッダ（QA L-C 用）。"""
+
+    def __init__(self, values: list[str]) -> None:
+        self._values = values
+
+    def getlist(self, name: str) -> list[str]:
+        return list(self._values)
+
+
+class _FakeUrl:
+    """``URL.path`` だけを持つ最小の偽 URL（QA L-C 用）。"""
+
+    def __init__(self, path: str) -> None:
+        self.path = path
+
+
+class _FakeRequestWithDivergentScopeAndUrlPath:
+    """``request.scope["path"]`` と ``request.url.path`` がわざと食い違う、
+    ``verify_request_client_ip_relay`` が要求する最小限の属性
+    （``method``・``headers.getlist``・``scope``・``url.path``）だけを持つ
+    偽リクエスト（QA L-C）。
+
+    本物の ``starlette.datastructures.URL`` は Host ヘッダから文字列を
+    組み立て直して再パースするため、``scope["path"]`` と ``url.path`` が
+    常に一致するとは限らない（``verify_request_client_ip_relay`` の
+    docstring・``app.core.client_ip_relay`` モジュール docstring
+    「ヘッダ形式」節参照）。ここでは実際に Starlette を経由させず、
+    この食い違いだけを直接再現する。
+    """
+
+    def __init__(self, *, header_value: str, scope_path: str, url_path: str) -> None:
+        self.method = _VALID_METHOD
+        self.headers = _FakeHeaders([header_value])
+        self.scope = {"path": scope_path}
+        self.url = _FakeUrl(url_path)
+
+
+class TestVerifyRequestUsesScopePathNotUrlPath:
+    """``verify_request_client_ip_relay`` が ``request.url.path`` ではなく
+    ``request.scope["path"]`` を使うことの回帰テスト（QA L-C。
+    security review I-1 で確定した設計判断の固定化）。"""
+
+    def test_signed_with_scope_path_is_ok(self) -> None:
+        scope_path = "/api/v1/auth/login"
+        url_path = "/api/v1/auth/operator/login"  # わざと scope_path と食い違わせる
+        sig = compute_relay_signature(
+            _VALID_KEY,
+            method=_VALID_METHOD,
+            path=scope_path,
+            timestamp=str(_VALID_TS),
+            ip=_VALID_IP,
+        )
+        header_value = f"{RELAY_VERSION};{_VALID_TS};{_VALID_IP};{sig}"
+        request = _FakeRequestWithDivergentScopeAndUrlPath(
+            header_value=header_value, scope_path=scope_path, url_path=url_path
+        )
+        result = verify_request_client_ip_relay(
+            request, (_VALID_KEY,), clock=lambda: float(_VALID_TS)
+        )
+        assert result.reason == "ok"
+        assert result.ip == _VALID_IP
+
+    def test_signed_with_url_path_is_bad_signature(self) -> None:
+        """``url.path`` の値で署名しても、検証は ``scope["path"]`` を使う
+        ため一致せず ``bad_signature`` になる（``url.path`` を使う実装への
+        先祖返りを検知する）。"""
+        scope_path = "/api/v1/auth/login"
+        url_path = "/api/v1/auth/operator/login"
+        sig = compute_relay_signature(
+            _VALID_KEY,
+            method=_VALID_METHOD,
+            path=url_path,
+            timestamp=str(_VALID_TS),
+            ip=_VALID_IP,
+        )
+        header_value = f"{RELAY_VERSION};{_VALID_TS};{_VALID_IP};{sig}"
+        request = _FakeRequestWithDivergentScopeAndUrlPath(
+            header_value=header_value, scope_path=scope_path, url_path=url_path
+        )
+        result = verify_request_client_ip_relay(
+            request, (_VALID_KEY,), clock=lambda: float(_VALID_TS)
+        )
+        assert result.reason == "bad_signature"

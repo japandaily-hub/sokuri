@@ -63,6 +63,48 @@ docstring）。IP はヘッダの生文字列の
 記録する仕組みを導入する場合は、v2 でノンスまたはリクエスト本文ハッシュを
 署名対象に加えて1回限りの使用を強制する必要がある（運用手順は
 ``docs/ops/admin-operations.md`` の「署名付き中継IPの鍵」節も参照）。
+
+**運用上の注意点（2回目 security review I-b/I-c/I-d 対応）**:
+
+- **Vercel の Sensitive 属性の意味**: ``CLIENT_IP_RELAY_SECRET`` に設定する
+  Vercel の Sensitive 属性（ダッシュボード上で値をマスクする機能）は、
+  「Vercel の運用者が手元で平文を見られない」ようにするための前提に過ぎず、
+  ビルド・実行時にプロセスへ環境変数として渡ること自体を防ぐものではない。
+  したがって Vercel 以外の環境（自前で Next.js のビルド・実行を行う場合等）
+  で本番と同じ鍵を使い回すと、その環境の運用者からは平文で読める状態になる。
+  Vercel 以外で本番ビルドを動かす必要がある場合は ``CLIENT_IP_RELAY_SECRET``
+  自体を渡さないこと（未設定なら web 側は中継ヘッダを付けず、backend は
+  従来どおり hops 方式にフォールバックするだけで、中継が無効化される
+  以上の実害は無い）。
+- **backend のスピンアップ直後に ``"expired"`` が増えることがある（想定内）**:
+  Render 無料枠等はアイドルでスピンダウンし、コールドスタートに数秒〜
+  数十秒かかることがある。この間に受け付けたリクエストは、web 側が
+  タイムスタンプを付与してから backend が実際に検証するまでの経過時間が
+  伸び、``MAX_CLOCK_SKEW_SECONDS``（60秒）を超えて ``"expired"`` と
+  判定されることがある。これは攻撃でも両サーバー間の時計ずれでもなく、
+  コールドスタートの遅延が原因であり、hops 方式へのフォールバックで
+  正しく機能し続ける（想定内の挙動として扱い、原因調査に時間を使わない
+  こと）。
+- **CF レンジ警告（``log_relay_outcome`` の Cloudflare WARNING）が検知
+  できるのは Cloudflare だけ**: ``is_cloudflare_range`` は Cloudflare が
+  公開する IP レンジのハードコードされた判定であり、他社 CDN・プロキシ
+  （Fastly・Akamai・自前のリバースプロキシ等）が Vercel の前段に挟まる
+  構成変更は検知できない。Vercel の Trusted Proxy 機能を有効にする、
+  または Vercel の前段に別のプロキシを追加する場合、``x-real-ip`` 等の
+  ヘッダの意味（どの層の IP が入るか）が変わりうるため、その都度 I8
+  の前提（web が実際に利用者の実 IP を中継できているか）を見直すこと。
+- **APM・エラートラッキング導入時はヘッダをスクラブすること**: 将来
+  Sentry 等の APM を導入する場合、``RELAY_HEADER_NAME`` の値をリクエスト
+  ヘッダの自動収集対象から必ず除外（スクラブ）すること。この値には
+  利用者の実 IP が平文で含まれ、かつ前述の再送耐性が無い割り切りにより、
+  記録された値がそのまま有効期限内に再送可能な「署名済みトークン」として
+  機能してしまう。
+- **v2 で再送対策をする場合の推奨**: ノンス方式（サーバー側で使用済み
+  ノンスの集合を保持する必要があり、状態を持つ・掃除の運用が要る）よりも、
+  リクエスト本文の SHA-256 ハッシュを署名対象に加える方式を推奨する。
+  本文ハッシュ方式は状態を持たず、かつ内容が同一の正当な重複リクエスト
+  （クライアント側のリトライ等）を誤って拒否しない（本文が変われば署名も
+  変わるため、盗聴された値の使い回しは同一本文の範囲に限定される）。
 """
 
 from __future__ import annotations
@@ -85,7 +127,7 @@ from app.core.client_ip import (
     is_special_use_address,
     truncate_ip_for_log,
 )
-from app.core.log_throttle import ThrottledLogger
+from app.core.log_throttle import DEFAULT_THROTTLE_INTERVAL_SEC, ThrottledLogger
 
 logger = logging.getLogger(__name__)
 
@@ -519,8 +561,8 @@ def verify_request_client_ip_relay(
 
 # ──────────────────────────── ログ出力（プロセス内状態を持つ） ────────────────────────────
 #
-# ok の初回（プロセス起動後、scope ごとに1回）だけ WARNING で出す理由:
-# 本番は app.* のロガーにレベルが明示設定されておらず、デフォルトの
+# ok の初回（プロセス起動後、(scope, key_slot) の組ごとに1回）だけ WARNING で
+# 出す理由: 本番は app.* のロガーにレベルが明示設定されておらず、デフォルトの
 # WARNING 以上しか実際には出力されない（2026-09-27 実測: 本番起動23回分の
 # ログを確認したが、main.py の起動時 seed 処理が出す INFO ログが1件も
 # 見つからなかった）。したがって本番反映後に「実際に署名付き中継IPが
@@ -528,42 +570,75 @@ def verify_request_client_ip_relay(
 # 格上げすることが唯一の確実な確認手段になる。2回目以降は reason・scope
 # ごとに独立した ThrottledLogger で INFO（採用時）/WARNING（不採用時）に
 # 落ち着かせ、ログ量を抑える。
-_relay_first_ok_logged_scopes: set[str] = set()
+#
+# **scope だけでなく key_slot も組にする（2回目 security review L-B）**:
+# scope 単独で管理すると、鍵のローテーション中に新しい鍵（NEW）が実際に
+# 採用され始めたことを確認する手段が無い（旧鍵 OLD で既に「初回」を消費済み
+# のため、NEW 採用時も WARNING に格上げされず INFO に埋もれてしまい、
+# ``docs/ops/admin-operations.md`` の入れ替え手順で「反映確認」ができない）。
+# key_slot を組に含めることで、鍵を入れ替えるたびに「新しい鍵の初回採用」を
+# 再度 WARNING で確認できる。
+_relay_first_ok_logged_scope_slots: set[tuple[str, int]] = set()
 _relay_log_throttles: dict[tuple[str, str], ThrottledLogger] = {}
 
+# 鍵（CLIENT_IP_RELAY_SECRETS）が設定されているのに中継ヘッダが来ない
+# （absent）要求を検知する WARNING の間隔（2回目 security review L-A）。
+# 他の不採用理由（bad_signature 等）と同じ60秒間隔にしないのは、absent は
+# 「web が中継を付けなくなった」という構成ドリフトの検知が主目的であり、
+# 鍵未設定時の unconfigured と違って中継対象外の直接アクセス（運用者の
+# 疎通確認・監視等）でも自然に発生しうるため、60秒間隔だと平常運用でも
+# 鳴り続けてノイズになる。10分に1回で検知目的は十分満たせる。
+_RELAY_ABSENT_WITH_KEYS_THROTTLE_INTERVAL_SECONDS = 600.0
 
-def _relay_throttle(reason: str, scope: str) -> ThrottledLogger:
+
+def _relay_throttle(
+    reason: str, scope: str, *, interval_seconds: float = DEFAULT_THROTTLE_INTERVAL_SEC
+) -> ThrottledLogger:
     """``(reason, scope)`` ごとに独立した ``ThrottledLogger`` を遅延生成して返す。
 
     独立させる理由: 同一インスタンスを複数の reason/scope で共有すると
     互いのスロットリングに干渉する（``ThrottledLogger`` docstring 参照）。
     scope（login/line_exchange）を跨いで共有すると、片方の scope で直近
     発生した WARNING が、もう片方の scope の初回異常検知を隠してしまう。
+
+    ``interval_seconds`` はインスタンスの初回生成時のみ効く（``reason``/
+    ``scope`` の組が既存なら、以後この引数を変えて呼んでも間隔は変わらない）。
+    現状これを既定の60秒から変えるのは ``"absent_with_keys"``（10分間隔。
+    2回目 security review L-A）のみ。
     """
     key = (reason, scope)
     throttle = _relay_log_throttles.get(key)
     if throttle is None:
-        throttle = ThrottledLogger()
+        throttle = ThrottledLogger(interval_seconds=interval_seconds)
         _relay_log_throttles[key] = throttle
     return throttle
 
 
-def log_relay_outcome(scope: str, v: RelayVerification) -> None:
+def log_relay_outcome(scope: str, v: RelayVerification, *, keys_configured: bool = False) -> None:
     """``verify_client_ip_relay`` / ``verify_request_client_ip_relay`` の判定結果をログへ記録する。
 
     **ヘッダ値・署名・鍵・生 IP は絶対に出さない。** ``ip_net`` は常に
     ``truncate_ip_for_log`` で /24（IPv4）・/48（IPv6）に丸めた値のみを使う。
 
+    - ``keys_configured``: 呼び出し時点で backend に有効な鍵
+      （``CLIENT_IP_RELAY_SECRETS``）が1本以上あるか。``verify_client_ip_relay``
+      に渡したのと同じ ``keys`` から呼び出し側が ``bool(keys)`` を渡すこと
+      （``reason=="absent"`` の分岐でのみ使う。2回目 security review L-A）。
     - ``"absent"``: 中継ヘッダを使わない大多数のリクエスト（web 経由以外の
       直接アクセス、または本機能の未反映段階）でログを埋め尽くさないため、
-      何も出力しない。
-    - ``"ok"``: 起動後 scope ごとの初回のみ WARNING（前述の理由）。以後は
-      INFO をスロットリング（60秒に1回）。**加えて、採用した中継IPが
-      Cloudflare の公開レンジ内だった場合は、判定は変えず（採用・カウントは
-      継続）scope ごとにスロットリング付き WARNING を別途出す**
-      （security review M-2。Vercel の前段に Cloudflare 等のプロキシが
-      挟まり、web 側が受け取る「実クライアントIP」が実は利用者ではなく
-      そのプロキシの IP になっている疑いを検知するため。
+      通常は何も出力しない。**ただし ``keys_configured`` が True の場合のみ**、
+      scope ごとに10分に1回のスロットリング付き WARNING を出す（鍵は既に
+      投入済みなのに中継ヘッダが来ない＝web 側が中継を付けていない疑いが
+      あり、無音のままだと I8 以前の状態（Vercel の送信元IPを全利用者で
+      共有）へ気付かず戻っていることになるため。詳細は
+      ``docs/ops/admin-operations.md`` 「署名付き中継IPの鍵」節）。
+    - ``"ok"``: 起動後 (scope, key_slot) の組ごとの初回のみ WARNING（前述の
+      理由）。以後は INFO をスロットリング（60秒に1回）。**加えて、採用した
+      中継IPが Cloudflare の公開レンジ内だった場合は、判定は変えず
+      （採用・カウントは継続）scope ごとにスロットリング付き WARNING を
+      別途出す**（security review M-2。Vercel の前段に Cloudflare 等の
+      プロキシが挟まり、web 側が受け取る「実クライアントIP」が実は利用者
+      ではなくそのプロキシの IP になっている疑いを検知するため。
       ``app.core.client_ip.is_cloudflare_range`` は判定に使ってはならない
       値だが、``RateLimitGuard`` の hops 方式側の同種の WARNING
       （``rate_limit_deps._warn_cf_range_at_trust_position``）と同じ
@@ -574,6 +649,20 @@ def log_relay_outcome(scope: str, v: RelayVerification) -> None:
       補足（生値を含まない）を付ける。
     """
     if v.reason == "absent":
+        if keys_configured:
+            _relay_throttle(
+                "absent_with_keys",
+                scope,
+                interval_seconds=_RELAY_ABSENT_WITH_KEYS_THROTTLE_INTERVAL_SECONDS,
+            ).emit(
+                lambda: logger.warning(
+                    "client_ip_relay: 鍵（CLIENT_IP_RELAY_SECRETS）が設定されているのに"
+                    "中継ヘッダの無い要求を受けました（scope=%s）。web が中継を付けていない"
+                    "（Vercel の鍵の削除・再デプロイ漏れ等）か、backend を直接呼ぶ要求です。"
+                    "前者なら I8 以前の状態（Vercel の送信元を全員で共有）に戻っています。",
+                    scope,
+                )
+            )
         return
 
     if v.reason == "ok":
@@ -596,12 +685,14 @@ def log_relay_outcome(scope: str, v: RelayVerification) -> None:
                     ip_net,
                 )
             )
-        if scope not in _relay_first_ok_logged_scopes:
-            _relay_first_ok_logged_scopes.add(scope)
+        slot_key = (scope, key_slot)
+        if slot_key not in _relay_first_ok_logged_scope_slots:
+            _relay_first_ok_logged_scope_slots.add(slot_key)
             logger.warning(
                 "client_ip_relay: 起動後初めて署名付き中継の利用者IPを採用しました"
                 "（scope=%s ip_net=%s key_slot=%d）。以後の採用は INFO で60秒に1回"
-                "だけ記録します。",
+                "だけ記録します（鍵を入れ替えた場合は新しい key_slot でこの"
+                "WARNING が再度出ます）。",
                 scope,
                 ip_net,
                 key_slot,
@@ -653,6 +744,6 @@ def log_relay_outcome(scope: str, v: RelayVerification) -> None:
 
 
 def _reset_relay_log_state_for_tests() -> None:
-    """テスト専用: プロセス内ログ状態（初回済み scope 集合・スロットラ辞書）を初期化する。"""
-    _relay_first_ok_logged_scopes.clear()
+    """テスト専用: プロセス内ログ状態（初回済み (scope, key_slot) 集合・スロットラ辞書）を初期化する。"""
+    _relay_first_ok_logged_scope_slots.clear()
     _relay_log_throttles.clear()

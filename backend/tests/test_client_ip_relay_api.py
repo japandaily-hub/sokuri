@@ -31,9 +31,8 @@ from app.core.client_ip_relay import (
     _reset_relay_log_state_for_tests,
     build_relay_header_value,
     compute_relay_signature,
-    inspect_relay_secrets,
-    parse_relay_secrets,
 )
+from tests.test_client_ip_relay import _clear_relay_secret_caches
 from tests.test_rate_limit_api import (  # noqa: F401 -- フィクスチャ再エクスポート
     SMALL_LINE_MAX,
     SMALL_LOGIN_IP_MAX,
@@ -77,22 +76,21 @@ def _relay_headers(
 def _reset_relay_module_state():
     """テスト間の相互干渉を防ぐ（QA L-2）。
 
-    - ``parse_relay_secrets`` / ``inspect_relay_secrets`` の ``@lru_cache``:
+    - ``_clear_relay_secret_caches()``（``parse_relay_secrets`` /
+      ``inspect_relay_secrets`` の ``@lru_cache`` を対で clear。QA L-A）:
       引数の生文字列自体をキーにするため、テストごとに異なる鍵文字列を
       使えば本来は不要だが、明示的に毎回クリアすることで「前のテストの
       キャッシュが残っていないか」を気にせず書けるようにする。
     - ``_reset_relay_log_state_for_tests()``: 起動後初回 WARNING 格上げの
-      scope 集合・スロットリング辞書をプロセス内グローバルとして持つため、
-      テストごとに初期化しないと前のテストの状態が漏れる（例えば "login"
-      scope が既に初回消費済みだと、本テストの最初の採用が WARNING ではなく
-      INFO になり、ログ関連のアサーションが崩れる）。
+      (scope, key_slot) 集合・スロットリング辞書をプロセス内グローバルとして
+      持つため、テストごとに初期化しないと前のテストの状態が漏れる（例えば
+      "login" scope・key_slot=0 が既に初回消費済みだと、本テストの最初の
+      採用が WARNING ではなく INFO になり、ログ関連のアサーションが崩れる）。
     """
-    parse_relay_secrets.cache_clear()
-    inspect_relay_secrets.cache_clear()
+    _clear_relay_secret_caches()
     _reset_relay_log_state_for_tests()
     yield
-    parse_relay_secrets.cache_clear()
-    inspect_relay_secrets.cache_clear()
+    _clear_relay_secret_caches()
     _reset_relay_log_state_for_tests()
 
 
@@ -850,3 +848,106 @@ class TestSignedForOneScopeRejectedOnAnother:
                 headers=mismatched_headers_final,
             )
             assert r.status_code == 429
+
+
+# ──────────────────────────── 18. IPv6 の段と中継の結合（security review M-1） ────────────────────────────
+
+
+class TestRelayIpv6TierIntegration:
+    """署名付き中継の利用者IPがIPv6の場合も、hops方式と同じ /64・/56・/48 の
+    3段（``rate_limit_deps._apply_ip_axis`` / ``_ip_axis_buckets``）で数えられる
+    ことの結合テスト（security review M-1）。中継の検証本体
+    （``verify_client_ip_relay``）はIPv6アドレスを正規化して返すのみで、
+    段への分解は ``_apply_ip_axis`` に完全に委ねている（中継専用の別実装を
+    持たない）ため、この委譲が壊れていないことを別途固定する。
+
+    段の上限倍率は /64 が1倍（``_IPV6_TIERS`` 参照）のため、狭い段（/64）の
+    上限は ``login_ip_max`` そのもの（``SMALL_LOGIN_IP_MAX``）で判定できる。
+    """
+
+    async def test_relay_two_different_ipv6_addresses_in_same_slash64_share_bucket(
+        self, client_small_limits: AsyncClient, db_session: AsyncSession, monkeypatch
+    ) -> None:
+        """(a) 中継で来た同じ /64 内の別々の IPv6 アドレス（要求ごとに違う値）
+        でもバケットは共有され、失敗が合算されて login_ip_max（＝/64 の上限）
+        で 429 になる（中継側だけ /64 集約が効かず要求ごとに新しいバケットが
+        生成されるような分岐が紛れ込んでいないことの固定）。"""
+        monkeypatch.setattr(
+            get_settings(), "client_ip_relay_secrets", SecretStr(_RELAY_KEY_A_RAW)
+        )
+        for i in range(SMALL_LOGIN_IP_MAX):
+            email = f"relay-ipv6-64-{i}@example.com"
+            await _create_user(db_session, email)
+            ip = f"2001:db8:1:1::{i + 1:x}"
+            r = await client_small_limits.post(
+                "/api/v1/auth/login",
+                json={"email": email, "password": "wrong-password"},
+                headers=_relay_headers(_RELAY_KEY_A, ip=ip),
+            )
+            assert r.status_code == 401
+        await _create_user(db_session, "relay-ipv6-64-final@example.com")
+        r = await client_small_limits.post(
+            "/api/v1/auth/login",
+            json={
+                "email": "relay-ipv6-64-final@example.com",
+                "password": "wrong-password",
+            },
+            headers=_relay_headers(_RELAY_KEY_A, ip="2001:db8:1:1::ff"),
+        )
+        assert r.status_code == 429
+
+        # 同じ /48 内でも別の /64 からは影響を受けない（IPv4版
+        # TestRelayCoreBehavior の「別IPなら成功」に相当する対照）。
+        await _create_user(
+            db_session, "relay-ipv6-64-other@example.com", password="correct-pass-v6-64"
+        )
+        r = await client_small_limits.post(
+            "/api/v1/auth/login",
+            json={
+                "email": "relay-ipv6-64-other@example.com",
+                "password": "correct-pass-v6-64",
+            },
+            headers=_relay_headers(_RELAY_KEY_A, ip="2001:db8:1:2::1"),
+        )
+        assert r.status_code == 200
+
+    async def test_relay_and_direct_hops_share_bucket_for_same_slash64(
+        self, client_small_limits: AsyncClient, db_session: AsyncSession, monkeypatch
+    ) -> None:
+        """(b) 同じ /64 の IPv6 について、直接アクセス（XFF）と中継で数えた分が
+        1つのバケットに合算される（中継用と hops 用でバケット実体が別に
+        分岐していないことの固定。IPv4 版の
+        ``TestRelaySharesHopsBucketForSameIp`` に対応する）。"""
+        monkeypatch.setattr(
+            get_settings(), "client_ip_relay_secrets", SecretStr(_RELAY_KEY_A_RAW)
+        )
+        direct_count = SMALL_LOGIN_IP_MAX - 1
+        for i in range(direct_count):
+            email = f"relay-ipv6-shared-direct-{i}@example.com"
+            await _create_user(db_session, email)
+            r = await client_small_limits.post(
+                "/api/v1/auth/login",
+                json={"email": email, "password": "wrong-password"},
+                headers={"X-Forwarded-For": f"2001:db8:1:9::{i + 1:x}"},
+            )
+            assert r.status_code == 401
+
+        email_relayed = "relay-ipv6-shared-relayed-0@example.com"
+        await _create_user(db_session, email_relayed)
+        r = await client_small_limits.post(
+            "/api/v1/auth/login",
+            json={"email": email_relayed, "password": "wrong-password"},
+            headers=_relay_headers(_RELAY_KEY_A, ip=f"2001:db8:1:9::{direct_count + 1:x}"),
+        )
+        assert r.status_code == 401
+
+        await _create_user(db_session, "relay-ipv6-shared-final@example.com")
+        r = await client_small_limits.post(
+            "/api/v1/auth/login",
+            json={
+                "email": "relay-ipv6-shared-final@example.com",
+                "password": "wrong-password",
+            },
+            headers=_relay_headers(_RELAY_KEY_A, ip="2001:db8:1:9::ff"),
+        )
+        assert r.status_code == 429

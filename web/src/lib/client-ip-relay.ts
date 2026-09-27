@@ -12,9 +12,11 @@
  * 対策: web が Vercel から渡される x-real-ip（下記参照）を読み取り、HMAC-SHA256 で
  * 署名した1本のヘッダに包んで backend へ中継する。backend は署名が正しい場合のみ
  * ヘッダの値を「利用者IP」として採用し、正しくなければ従来通り接続元IPで数える
- * （fail-safe）。このファイルは中継ヘッダを「作る」側だけを担当する。実際に
- * auth.ts / line-link.ts の各呼び出し箇所へ組み込む作業と、backend 側の検証実装は
- * 別スコープ（後日・別セッションで対応）。
+ * （fail-safe）。このファイルは中継ヘッダを「作る」側（署名の組み立て・環境変数の
+ * 読み取り）を担当する。auth.ts / line-link.ts の各呼び出し箇所への組み込みは完了
+ * 済み（呼び出し箇所の一覧・守るべき不変条件は本ファイル末尾「組み込み状況」を
+ * 参照）。backend 側の検証実装は別ファイル（backend/app/core/client_ip_relay.py・
+ * 実装済み）。
  *
  * x-real-ip を信頼できる根拠:
  * Vercel はエッジ層でリクエストの x-real-ip ヘッダを実際の接続元IPで必ず上書きする
@@ -25,14 +27,30 @@
  * Preview・他ホスティングでは無視し、中継ヘッダを付けない）。
  *
  * VERCEL_ENV も条件に含める理由（VERCEL === "1" だけでは不十分な理由）:
- * `vercel env pull` を実行すると、Production 環境変数を含む .env.local が手元に生成
- * され、そこには VERCEL="1" が含まれる。この .env.local を使って `next dev` を起動し、
- * それを誤って LAN 等へ公開してしまうと、`next dev` は Vercel の x-real-ip 上書きを
- * 経由しない（＝任意の第三者が x-real-ip ヘッダを自由に名乗れる）にもかかわらず、
- * VERCEL === "1" の判定だけを見ていると本番向けの正当な署名済みヘッダを誰でも
- * 作らせられてしまう。`vercel dev` や `vercel env pull` 経由で取得する値では
- * VERCEL_ENV は "development" になるため、VERCEL_ENV === "production" も併せて
- * 要求することでこの穴を塞ぐ。
+ * `vercel env pull` を引数なしで実行すると Development 環境変数を含む .env.local が
+ * 手元に生成され、そこには VERCEL="1" は含まれるが VERCEL_ENV は "development"
+ * になる（明示的に設定されなければ未定義のこともある）。この .env.local を使って
+ * `next dev` を起動し、それを誤って LAN 等へ公開してしまうと、`next dev` は Vercel の
+ * x-real-ip 上書きを経由しない（＝任意の第三者が x-real-ip ヘッダを自由に名乗れる）
+ * にもかかわらず、VERCEL === "1" の判定だけを見ていると本番向けの正当な署名済み
+ * ヘッダを誰でも作らせられてしまう。VERCEL_ENV === "production" も併せて要求する
+ * ことでこの穴を塞ぐ。
+ *
+ * `vercel env pull --environment=production` を指定した場合の扱い（前提が崩れる
+ * ケース）:
+ * このオプション付きで実行すると Production 環境変数が対象になり、プロジェクト設定で
+ * System Environment Variables の自動公開が有効な場合は .env.local に
+ * VERCEL_ENV="production" が書き出されうる（上記の「development になる」という
+ * 前提はこのケースでは成り立たない）。しかしこの場合でも、CLIENT_IP_RELAY_SECRET は
+ * Vercel の Environment Variables に Sensitive 属性で設定する運用のため（下記「鍵の
+ * 置き場所」参照）、Vercel は Sensitive な値を作成後に一切再表示しない仕様であり
+ * `vercel env pull` の応答にも実際の値は含まれない。そのため
+ * `--environment=production` で生成した .env.local を使って `next dev` を起動しても
+ * CLIENT_IP_RELAY_SECRET は手元に存在せず、clientIpRelayHeaders は no_secret として
+ * 中継を拒否する（fail-open。偽装された署名付きヘッダは作れない）。この no_secret は
+ * 「Vercel の本番デプロイ自体で鍵の設定を忘れている」状態と字面上区別できないため、
+ * 後者を見逃さないよう clientIpRelayHeaders は console.error で1回だけ通知する
+ * （詳細は同関数の実装・JSDoc参照）。
  *
  * 鍵（CLIENT_IP_RELAY_SECRET）の置き場所:
  * Vercel の Environment Variables に Production 環境専用で設定する（Environment の
@@ -71,13 +89,21 @@
  * では元の意味を保てない構文は使わない。process.env の参照は分割代入・動的キーを使わず
  * 必ずリテラルで書く。
  *
- * 組み込み予定（このファイル単体では未接続。別セッションで組み込まれる想定）:
- *   - auth.ts の backendLogin（/auth/login, /auth/operator/login）
- *   - auth.ts の backendLineExchange（/auth/line/exchange）
- *   - line-link.ts の linkLineToCurrentUser（/auth/line/exchange、Bearer付き）
+ * 組み込み状況（実装済み。以下3箇所から呼ばれている）:
+ *   - web/src/auth.ts の backendLogin（/auth/login, /auth/operator/login）。
+ *     呼び出し元は Credentials プロバイダの authorize（user-credentials /
+ *     operator-credentials 共通・第2引数 request のヘッダを渡す）。
+ *   - web/src/auth.ts の backendLineExchange（/auth/line/exchange）。
+ *     呼び出し元は LINE プロバイダの signIn コールバック（readIncomingRequestHeaders
+ *     経由で next/headers の headers() を渡す）。
+ *   - web/src/lib/line-link.ts の linkLineToCurrentUser（/auth/line/exchange、
+ *     Bearer付き）。呼び出し元は web/src/app/api/line/link/callback/route.ts
+ *     （NextRequest.headers をそのまま渡す）。
  *
- * 上記いずれの組み込みでも次の3点を守ること（組み込み作業自体は別セッションの
- * スコープだが、実装者が見落とすと中継ヘッダ導入の意図が損なわれるためここに残す）:
+ * 上記いずれの呼び出し箇所でも次の3点を「守るべき不変条件」として維持すること
+ * （どれか1つでも崩れると中継ヘッダ導入の意図が損なわれる。実装を変更する際は
+ * 必ず維持されているか確認する。client-ip-relay-wiring.test.mts がこの一部を
+ * 静的検査で自動検知する）:
  *   - fetch のオプションに redirect: "error" を指定する。既定の "follow" のままだと
  *     backend からの 3xx 応答に暗黙に追従してしまい、署名済み中継ヘッダとログイン用
  *     パスワードがリダイレクト先の任意のオリジンへそのまま送られる経路ができてしまう。
@@ -368,6 +394,15 @@ const loggedAttachedTargets = new Set<string>();
 let loggedInvalidSecretOnce = false;
 
 /**
+ * no_secret（VERCEL="1" かつ VERCEL_ENV="production" なのに CLIENT_IP_RELAY_SECRET が
+ * 未設定）のログをプロセス内で1回だけ出すためのフラグ。invalid_secret と別フラグに
+ * する理由: 原因（鍵が無い／鍵はあるが不正）が異なり、運用者が取るべき対応も異なる
+ * （前者は鍵をまだ設定していない、後者は設定値が壊れている）ため、それぞれ独立に
+ * 1回ずつ通知できるようにする。
+ */
+let loggedNoSecretInProductionOnce = false;
+
+/**
  * (reason, target) の組み合わせごとに直近 console.warn を出した時刻（ミリ秒・
  * Date.now()）を記録する。スロットリング用（backend の ThrottledLogger と同じ
  * 「直近の発火から一定秒数未満は抑制し、それ以降は再び出す」方針。
@@ -398,14 +433,16 @@ function shouldWarnNow(reason: string, target: string): boolean {
 
 /**
  * テスト専用: プロセス内グローバル状態（付与ログ済み target 集合・invalid_secret
- * 済みフラグ・console.warn のスロットリング状態）を初期化する。このモジュールは
- * 複数のテストケースから同一プロセス内で繰り返し呼ばれるため、各テストケースの
- * 実行前に呼ばないと「前のテストケースで既にログ済み」という状態を引きずり、
- * 後続のテストが誤って「ログされなかった」と判定してしまう。
+ * 済みフラグ・no_secret（Vercel本番なのに鍵未設定）済みフラグ・console.warn の
+ * スロットリング状態）を初期化する。このモジュールは複数のテストケースから同一
+ * プロセス内で繰り返し呼ばれるため、各テストケースの実行前に呼ばないと「前の
+ * テストケースで既にログ済み」という状態を引きずり、後続のテストが誤って
+ * 「ログされなかった」と判定してしまう。
  */
 export function _resetClientIpRelayLogStateForTests(): void {
   loggedAttachedTargets.clear();
   loggedInvalidSecretOnce = false;
+  loggedNoSecretInProductionOnce = false;
   warnedAtMsByReasonAndTarget.clear();
 }
 
@@ -432,6 +469,15 @@ function checkVercelProductionEnv(): "ok" | "not_on_vercel" | "not_production" {
  * 戻るだけで、ログイン機能自体は止めない）。
  *
  * 受信ヘッダを丸ごと転送することはせず、組み立てた1本のヘッダだけを返す。
+ *
+ * ログ出力ポリシー（no_secret）: VERCEL="1" かつ VERCEL_ENV="production"
+ * （＝Vercelの本番デプロイ）であるにもかかわらず CLIENT_IP_RELAY_SECRET が未設定
+ * だった場合は、プロセスごとに1回だけ console.error で通知する（鍵の値はそもそも
+ * 読めていないため出しようがなく、IPも出さない）。本番デプロイの全面展開前（まだ
+ * Vercel に鍵を投入していない移行期間）もこの条件に該当し、その間は呼び出しの都度
+ * この分岐を通過する（1回だけログを出した後は無出力）。これは「中継ヘッダが効いて
+ * おらず、backend が Vercel の送信元IPで回数制限している」実態を正しく示しているため
+ * 想定どおりの挙動であり、鍵を投入すれば自然に発生しなくなる。
  *
  * buildClientIpRelayHeaders を呼ぶ前に、このラッパー固有の追加判定を行う
  * （いずれも該当すれば buildClientIpRelayHeaders を呼ばずに確定させる）:
@@ -496,9 +542,24 @@ export async function clientIpRelayHeaders(
     switch (result.reason) {
       case "not_on_vercel":
       case "not_production":
-      case "no_secret":
-        // ローカル開発・Preview・本番以外のVercelデプロイでは未設定/非本番が
+        // ローカル開発・Preview・本番以外のVercelデプロイでは中継しないのが
         // 正常系のため無出力。
+        break;
+      case "no_secret":
+        // no_secretはvercelCheck==="ok"（Vercel本番デプロイ）の分岐でしか発生しない
+        // （直前のif/else-ifを参照。vercelCheckが"ok"以外ならbuildClientIpRelayHeaders
+        // 自体を呼ばずreasonを確定させているため）。本番デプロイなのに鍵が未設定という
+        // 運用上見逃せない状態（全面展開前で鍵をまだ投入していない移行期間を含む）を
+        // 一度だけ通知する。vercelCheckを併せて確認するのは、reasonの値だけに依存せず
+        // 呼び出し元の条件を自己文書化するため（鍵の値はそもそも読めていないため出せない）。
+        if (vercelCheck === "ok" && !loggedNoSecretInProductionOnce) {
+          loggedNoSecretInProductionOnce = true;
+          console.error(
+            "[client-ip-relay] Vercel の本番なのに CLIENT_IP_RELAY_SECRET が未設定です。" +
+              "ログイン・LINE の回数制限が Vercel の送信元 IP で数えられる状態（I8 以前）" +
+              "に戻っています。",
+          );
+        }
         break;
       case "invalid_secret":
         if (!loggedInvalidSecretOnce) {

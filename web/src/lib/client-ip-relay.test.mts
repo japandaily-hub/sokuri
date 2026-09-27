@@ -641,6 +641,89 @@ describe("clientIpRelayHeaders（環境変数ラッパー）", () => {
   });
 });
 
+describe("clientIpRelayHeaders（no_secretの本番通知ログ）", () => {
+  let originalVercel: string | undefined;
+  let originalVercelEnv: string | undefined;
+  let originalSecret: string | undefined;
+
+  beforeEach(() => {
+    originalVercel = process.env.VERCEL;
+    originalVercelEnv = process.env.VERCEL_ENV;
+    originalSecret = process.env.CLIENT_IP_RELAY_SECRET;
+    // no_secret を再現するため、このdescribe内では明示的に鍵を未設定にする。
+    delete process.env.CLIENT_IP_RELAY_SECRET;
+  });
+
+  afterEach(() => {
+    if (originalVercel === undefined) delete process.env.VERCEL;
+    else process.env.VERCEL = originalVercel;
+    if (originalVercelEnv === undefined) delete process.env.VERCEL_ENV;
+    else process.env.VERCEL_ENV = originalVercelEnv;
+    if (originalSecret === undefined) delete process.env.CLIENT_IP_RELAY_SECRET;
+    else process.env.CLIENT_IP_RELAY_SECRET = originalSecret;
+  });
+
+  it("Vercel本番なのに鍵未設定なら1回だけconsole.errorで通知する（IPは出さない）", async (t) => {
+    process.env.VERCEL = "1";
+    process.env.VERCEL_ENV = "production";
+    const errorMock = t.mock.method(console, "error", () => undefined);
+    const first = await clientIpRelayHeaders(
+      "POST",
+      BACKEND_LOGIN_URL,
+      headersOf({ "x-real-ip": "203.0.113.9" }),
+    );
+    const second = await clientIpRelayHeaders(
+      "POST",
+      BACKEND_LOGIN_URL,
+      headersOf({ "x-real-ip": "203.0.113.9" }),
+    );
+    assert.deepEqual(first, {});
+    assert.deepEqual(second, {});
+    assert.equal(errorMock.mock.calls.length, 1);
+    const args = errorMock.mock.calls[0].arguments.map((a) => String(a));
+    assert.ok(args.some((a) => a.includes("CLIENT_IP_RELAY_SECRET")));
+    assert.ok(args.some((a) => a.includes("Vercel")));
+    assert.ok(!args.some((a) => a.includes("203.0.113.9")));
+  });
+
+  it("VERCEL_ENVが本番以外（preview）なら鍵未設定でもconsole.errorを出さない", async (t) => {
+    process.env.VERCEL = "1";
+    process.env.VERCEL_ENV = "preview";
+    const errorMock = t.mock.method(console, "error", () => undefined);
+    const headers = await clientIpRelayHeaders(
+      "POST",
+      BACKEND_LOGIN_URL,
+      headersOf({ "x-real-ip": "203.0.113.9" }),
+    );
+    assert.deepEqual(headers, {});
+    assert.equal(errorMock.mock.calls.length, 0);
+  });
+
+  it("Vercel上ですらない場合は鍵未設定でもconsole.errorを出さない", async (t) => {
+    delete process.env.VERCEL;
+    process.env.VERCEL_ENV = "production";
+    const errorMock = t.mock.method(console, "error", () => undefined);
+    const headers = await clientIpRelayHeaders(
+      "POST",
+      BACKEND_LOGIN_URL,
+      headersOf({ "x-real-ip": "203.0.113.9" }),
+    );
+    assert.deepEqual(headers, {});
+    assert.equal(errorMock.mock.calls.length, 0);
+  });
+
+  it("_resetClientIpRelayLogStateForTestsを呼ぶとフラグが戻り、再度1回だけ通知される", async (t) => {
+    process.env.VERCEL = "1";
+    process.env.VERCEL_ENV = "production";
+    const errorMock = t.mock.method(console, "error", () => undefined);
+    await clientIpRelayHeaders("POST", BACKEND_LOGIN_URL, headersOf({ "x-real-ip": "203.0.113.9" }));
+    assert.equal(errorMock.mock.calls.length, 1);
+    _resetClientIpRelayLogStateForTests();
+    await clientIpRelayHeaders("POST", BACKEND_LOGIN_URL, headersOf({ "x-real-ip": "203.0.113.9" }));
+    assert.equal(errorMock.mock.calls.length, 2);
+  });
+});
+
 describe("clientIpRelayHeaders（console.warnのスロットリング）", () => {
   let originalVercel: string | undefined;
   let originalVercelEnv: string | undefined;
