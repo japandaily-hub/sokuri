@@ -40,6 +40,11 @@ engine = create_async_engine(
     echo=_settings.sql_echo,
     pool_pre_ping=True,
     pool_recycle=300,
+    # 本番では DB 例外の文言に SQL のパラメータ値（メール・氏名・住所・メッセージ本文等）を
+    # 載せない。SQLAlchemy は既定で "[parameters: (...)]" を例外文に含め、それが
+    # logger.error(... %s, exc)・トレースバック・運営アラートの本文を通って Render のログへ残る。
+    # SQL 文と制約名は残るので原因の切り分けはできる。開発時は調査のため従来どおり表示する。
+    hide_parameters=_settings.app_env == "production",
     connect_args=_connect_args,
     **_pool_kwargs,
 )
