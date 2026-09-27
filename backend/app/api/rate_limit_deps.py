@@ -13,10 +13,11 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import ipaddress
 import logging
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import NoReturn
+from typing import NamedTuple, NoReturn
 
 from fastapi import Depends, HTTPException, Request, status
 
@@ -53,6 +54,7 @@ _private_ip_skip_throttle = ThrottledLogger()
 _special_address_skip_throttle = ThrottledLogger()
 _cf_range_at_trust_position_throttle = ThrottledLogger()
 _scan_drift_throttle = ThrottledLogger()
+_unparseable_ip_throttle = ThrottledLogger()
 
 _INVALID_REQUEST_HEADERS = http_exception_factory(
     status_code=status.HTTP_400_BAD_REQUEST,
@@ -91,7 +93,7 @@ def _warn_private_ip_skip(scope: str, ip: str) -> None:
     全世界のログインが429になる」最悪の全体障害に直結する。ここで IP軸を
     スキップすることで、誤構成時でも「レート制限が緩む」だけで済み、
     認証全断は構造的に起こりえなくなる（詳細は RateLimitGuard 参照）。
-    生 IP はログに残さず ``truncate_ip_for_log()`` で丸めた値のみ出す。
+    生 IP はログに残さず ``_ip_net_for_log()`` で丸めた値（ゾーン ID を含まない）のみ出す。
     """
     _private_ip_skip_throttle.emit(
         lambda: logger.warning(
@@ -99,7 +101,7 @@ def _warn_private_ip_skip(scope: str, ip: str) -> None:
             "しました（scope=%s ip_net=%s）。TRUSTED_PROXY_HOPS の誤設定で内部プロキシIPを"
             "掴んでいる疑いがあります。/api/v1/_diag/client-ip で実測して確認してください。",
             scope,
-            truncate_ip_for_log(ip),
+            _ip_net_for_log(ip),
         )
     )
 
@@ -113,8 +115,8 @@ def _warn_special_address_skip(scope: str, ip: str) -> None:
     ここに現れる異常値は攻撃ではなくプロキシ実装・LB構成の変更を意味する。
     ``_warn_private_ip_skip`` と同じ理由でフェイルクローズではなくスキップに
     倒す（誤構成時でも「レート制限が緩む」だけで済み、認証全断は構造的に
-    起こりえなくなる）。生 IP はログに残さず ``truncate_ip_for_log()`` で
-    丸めた値のみ出す。
+    起こりえなくなる）。生 IP はログに残さず ``_ip_net_for_log()`` で
+    丸めた値（ゾーン ID を含まない）のみ出す。
     """
     _special_address_skip_throttle.emit(
         lambda: logger.warning(
@@ -122,7 +124,7 @@ def _warn_special_address_skip(scope: str, ip: str) -> None:
             "IP軸をスキップしました（scope=%s ip_net=%s）。プロキシ/LB構成が変更された"
             "可能性があります。/api/v1/_diag/client-ip で実測して確認してください。",
             scope,
-            truncate_ip_for_log(ip),
+            _ip_net_for_log(ip),
         )
     )
 
@@ -162,7 +164,28 @@ def _warn_cf_range_at_trust_position(scope: str, ip: str) -> None:
             "から誘発可能なバイパスになるため）。/api/v1/_diag/client-ip で実測して"
             "確認してください。",
             scope,
-            truncate_ip_for_log(ip),
+            _ip_net_for_log(ip),
+        )
+    )
+
+
+def _warn_unparseable_ip(scope: str) -> None:
+    """IP軸のバケット計算（``_ip_axis_buckets``）で、resolve 済みのはずの値が
+    ``ipaddress.ip_address()`` で読めなかった際の警告。
+
+    ``resolve_client_ip_with_reason`` は返す前に必ず ``ipaddress.ip_address()``
+    で検証済みのため、ここに到達するのは実装の不具合（正規化ロジックの
+    変更漏れや、検証前の値を渡す新しい経路）のみを意味する。それでも例外には
+    せず、scope ごとに1つだけの固定のバケットで数え続ける（値ごとに別のキーに
+    すると、値を替えるだけで回避でき、キーも増え続けるため）。ログには scope
+    のみを出し、値そのものは出さない。
+    """
+    _unparseable_ip_throttle.emit(
+        lambda: logger.warning(
+            "rate_limit: IP軸のバケット計算で解決済みの値をパースできませんでした"
+            "（scope=%s）。実装の不具合の可能性があります。scope ごとに1つの"
+            "固定のバケット（axis=ip_unparseable）で数えます（値そのものはログしません）。",
+            scope,
         )
     )
 
@@ -297,6 +320,178 @@ def _build_key(scope: str, axis: str, digest: str) -> str:
     scope を含めることでエンドポイント間でバケットが混ざらない。
     """
     return f"{scope}:{axis}:{digest}"
+
+
+# ──────────────── IPv6 の IP軸: /64・/56・/48 の3段で数える（重要な設計判断） ────────────────
+#
+# 従来は解決済みの IP の文字列全体をキーにしていた。IPv6 の利用者は /64（日本の IPoE で
+# ひかり電話ありの HGW なら /56）を払い出されているため、要求ごとに送信元アドレスを
+# 替えるだけで毎回新しいバケットになり、IP軸しか持たないスコープ（signup・
+# operator_application・contact・public_read 等）を含む全スコープの IP軸を回避できた。
+#
+# 採否の理由:
+#   - /64 で数える: SLAAC の最小の割当単位で、通常は 1 回線・1 端末に割り当てられる。
+#     これより細かい単位（アドレス全体）で数えると、アドレスを替えるだけで回避される。
+#   - 広い段（/56・/48）を併用する（採用）: /64 だけだと、/56 の保有者は 256 個、/48 の
+#     保有者は 65,536 個の /64 を使い分けられ、上限の最大 256 倍・65,536 倍まで数えられずに
+#     済む。Hurricane Electric の tunnelbroker は /48 を無料で配っており（1 アカウント
+#     5 本まで）、放置するといつでも使える抜け道が残る。
+#   - 段と倍率（/64 は 1 倍・/56 は 2 倍・/48 は 8 倍）の根拠:
+#       * /56 は住宅向けによく使われる割当単位（日本の IPoE の HGW も /56）。/56 の保有者は
+#         上限の 2 倍までに抑えられる。家庭が同時に使う /64 は 1〜2 個なので、その分は通す。
+#         倍率を 2 以上にするのは、HGW なしのフレッツのように /64 ごとに別の契約者が入る
+#         割当で、/64 を 1 つしか持たない回線だけでは同じ /56 の他人を塞げないようにする
+#         ため。携帯は再接続で別の /64 を得られるので、同じ /56 に /64 が 2 つ以上当たれば
+#         1 人でも塞げる（キャリアの割当の方式による。要確認）。
+#       * /48 は事業所向けや tunnelbroker の割当単位。/48 の保有者は上限の 8 倍までに
+#         抑えられる。倍率を /56 の 4 倍にするのは、/56 を 1 つ持つ世帯だけでは同じ /48 の
+#         他の世帯（最大 255）を塞げないようにするため（塞ぐには /56 が 4 つ要る）。
+#       * 最も重い業者申込（1 時間 5 件・1 件ごとに運営へメール）でも、/56 あたり 10 件・
+#         /48 あたり 40 件に収まる。
+#   - 巻き添えと対処: 同じ /56 に /64 を 2 つ以上持つ利用者は同じ /56 の他人を、同じ /48 の
+#     4 つ以上の /56 に /64 を持つ利用者は同じ /48 の他人を、上限まで使い切れば窓の残り
+#     時間だけ 429 にできる（login はパスワード照合の前に判定するので、正しいパスワード
+#     でも 429）。/56 を 1 つ持つ普通の世帯が塞げるのは自分の /56 だけ。IPv4 でも MAP-E・
+#     DS-Lite・携帯の CGNAT では 1 台で同じ巻き添えが起きる。本番の backend のホスト名には
+#     2026-09-27 時点で AAAA が無く、正規の利用者の IPv6 通信が無いので、今は被害者がいない。
+#     本コードベースの前例（``_warn_cf_range_at_trust_position``）と同じく、いつでも使える
+#     抜け道より、運用で対処できる数えすぎを選ぶ。429 のログは axis（ip6_64・ip6_56・
+#     ip6_48）で区別でき、緊急停止スイッチ（RATE_LIMIT_ENABLED=false）ですぐ止められる。
+#   - 見直しの条件: 正規の IPv6 利用者が来たら見直す（Render が AAAA を有効にした時・
+#     I8 で login の IP を中継する時）。倍率と、段ごとの停止スイッチの要否を検討する。
+#   - IPv4 はアドレス単位のまま変えない。IPv4 を埋め込んだ IPv6（IPv4 射影・6to4・Teredo）
+#     は、埋め込まれた IPv4 の 1 段で数える（``_canonical_address``）。
+_IPV6_56_LIMIT_MULTIPLIER = 2
+_IPV6_48_LIMIT_MULTIPLIER = 8
+
+
+class _Ipv6Tier(NamedTuple):
+    """IPv6 の IP軸の1段（axis 名・プレフィックス長・IP軸の上限に掛ける倍率）。"""
+
+    axis: str
+    prefix_len: int
+    limit_multiplier: int
+
+
+# 狭い段 → 広い段の順に並べる（``_apply_ip_axis`` はこの順を前提に、広い段から peek する）。
+_IPV6_TIERS: tuple[_Ipv6Tier, ...] = (
+    _Ipv6Tier("ip6_64", 64, 1),
+    _Ipv6Tier("ip6_56", 56, _IPV6_56_LIMIT_MULTIPLIER),
+    _Ipv6Tier("ip6_48", 48, _IPV6_48_LIMIT_MULTIPLIER),
+)
+
+# 読めない値を数えるバケット（scope ごとに1つ）の axis 名と、ハッシュの材料。
+_UNPARSEABLE_IP_AXIS = "ip_unparseable"
+_UNPARSEABLE_IP_MATERIAL = "unparseable"
+
+
+@dataclass(frozen=True)
+class _IpBucket:
+    """IP軸の「数える単位」1個分（IPv4 は1個、IPv6 は /64・/56・/48 の3個）。
+
+    ``axis``: ログ・ストアキーに使う軸名（"ip"・"ip6_64"・"ip6_56"・"ip6_48"・
+    読めない値の "ip_unparseable"）。
+    ``store_key``: ``_build_key(scope, axis, digest)`` の結果。
+    ``rule``: この段に適用する上限（広い段は倍率を掛けた値）。
+    ``key_prefix``: digest の先頭12桁（超過時ログ用）。
+    """
+
+    axis: str
+    store_key: str
+    rule: RateLimitRule
+    key_prefix: str
+
+
+def _make_ip_bucket(scope: str, axis: str, material: str, rule: RateLimitRule) -> _IpBucket:
+    """材料（IPv4 アドレス・IPv6 の CIDR 等）をハッシュして ``_IpBucket`` を1つ作る。"""
+    digest = _hash_identity(material)
+    return _IpBucket(
+        axis=axis,
+        store_key=_build_key(scope, axis, digest),
+        rule=rule,
+        key_prefix=digest[:12],
+    )
+
+
+def _canonical_address(ip: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
+    """IP軸で数えるときの正規の形のアドレスを返す（読めない値は ``None``）。
+
+    - IPv4 を埋め込んだ IPv6 は、埋め込まれた IPv4 にする。
+        - IPv4 射影（``::ffff:a.b.c.d``）: ``app.core.client_ip`` が展開済みなので本来は
+          届かないが、IPv6 のまま /64 に丸めると射影アドレスの全員が1つのバケットに潰れる。
+        - 6to4（2002::/16）: /48 が IPv4 1 個に当たるので、IPv6 の段で数えると IPv4 1 個の
+          持ち主が IPv4 の枠とは別に上限の 8 倍まで使える。
+        - Teredo（2001::/32）: /64 が中継サーバー 1 台に当たり、その利用者全員が1つの枠を
+          共有してしまう。クライアントの IPv4 は ``teredo[1]``。
+    - IPv6 のゾーン ID（"%eth0" 等）は落とす（int から作り直す）。ゾーン ID は受信側の
+      インターフェース名で送信元を区別しないうえ、任意の文字列を書ける。残すとゾーン ID
+      ごとに別バケットになり、ログにも任意の文字列が入る。
+    - 文字列以外は読めない値として扱う。``ipaddress.ip_address()`` は int や 4・16 バイトの
+      bytes もアドレスとして受け付けるため、そのまま通すと、値ごとに別のキーになる入口が
+      残る。
+    """
+    if not isinstance(ip, str):
+        return None
+    try:
+        parsed = ipaddress.ip_address(ip)
+    except ValueError:
+        return None
+    if isinstance(parsed, ipaddress.IPv4Address):
+        return parsed
+    embedded_ipv4 = parsed.ipv4_mapped or parsed.sixtofour
+    if embedded_ipv4 is None and parsed.teredo is not None:
+        embedded_ipv4 = parsed.teredo[1]
+    if embedded_ipv4 is not None:
+        return embedded_ipv4
+    return ipaddress.IPv6Address(int(parsed))
+
+
+def _ip_axis_buckets(scope: str, ip: str, rule: RateLimitRule) -> tuple[_IpBucket, ...]:
+    """IP から「数える単位」の並び（狭い段→広い段）を組み立てる（純関数・O(1)）。
+
+    - IPv4（IPv4 を埋め込んだ IPv6 を含む。``_canonical_address``）: 従来どおりアドレス
+      単位の1段（axis="ip"）。hops 方式で解決した値はもともと正規の表記なので、キーは
+      従来の ``_build_key(scope, "ip", _hash_identity(ip))`` と1ビットも変わらない。
+    - IPv6: ``_IPV6_TIERS`` の各段（/64・/56・/48）。材料は int から作る CIDR の文字列
+      （例 "2001:db8:1:2::/64"）で、ゾーン ID を含まない（``ip_network(f"{ip}/64",
+      strict=False)`` はホスト部が 0 のアドレスでゾーン ID を残す。Python 3.11.9 で確認）。
+      段ごとに axis 名を分け、材料にもプレフィックス長を含めるので、ネットワーク
+      アドレスが一致する段どうしでもキーは混ざらない。上限は ``rule`` の
+      ``limit_multiplier`` 倍（窓の長さは同じ）。
+    - 読めない値（resolve 済みの値なので本来は届かない）: 値ごとに別のキーにすると、
+      将来ほかの経路から検証前の値が届いたとき、値を替えるだけで回避でき、キーも増え
+      続ける。そこで scope ごとに1つだけの固定のバケット（axis="ip_unparseable"）で数え、
+      スロットリング付きの WARNING を出す。例外（500）にもスキップ（抜け道）にもしない。
+    """
+    address = _canonical_address(ip)
+    if address is None:
+        _warn_unparseable_ip(scope)
+        return (_make_ip_bucket(scope, _UNPARSEABLE_IP_AXIS, _UNPARSEABLE_IP_MATERIAL, rule),)
+    if isinstance(address, ipaddress.IPv4Address):
+        return (_make_ip_bucket(scope, "ip", str(address), rule),)
+
+    address_int = int(address)
+    return tuple(
+        _make_ip_bucket(
+            scope,
+            tier.axis,
+            str(ipaddress.IPv6Network((address_int, tier.prefix_len), strict=False)),
+            rule
+            if tier.limit_multiplier == 1
+            else RateLimitRule(rule.max_requests * tier.limit_multiplier, rule.window_seconds),
+        )
+        for tier in _IPV6_TIERS
+    )
+
+
+def _ip_net_for_log(ip: str) -> str:
+    """超過ログに出す IP の範囲（IPv4 は /24・IPv6 は /48）を返す。
+
+    ``_canonical_address`` を通すので、ゾーン ID は出さず、IPv4 を埋め込んだ IPv6 は
+    埋め込まれた IPv4 の /24 になる。読めない値は "invalid"。
+    """
+    address = _canonical_address(ip)
+    return "invalid" if address is None else truncate_ip_for_log(str(address))
 
 
 def _raise_429(
@@ -476,11 +671,16 @@ class RateLimitContext:
     email 等が判明した直後にハンドラ側が明示的に呼び出す
     （Depends の実行時点ではリクエストボディが未解析のため）。
 
+    ``ip_buckets`` は IP軸の「数える単位」の並び（``_apply_ip_axis`` が
+    ``_ip_axis_buckets`` で作る。IPv4 は1個、IPv6 は /64・/56・/48 の3個）。
+    空タプルは IP軸スキップ、またはそもそも IP軸を持たないスコープを
+    意味する。``record_failure`` はこの全段を記録する。
+
     呼び出し規約（設計書 §6）:
         ctx = request.state.rate_limit
         ctx.check_account(account_key)      # 超過なら 429 を raise
         ... 認証判定 ...
-        ctx.record_failure(account_key)     # IP軸・アカウント軸の両方をカウント
+        ctx.record_failure(account_key)     # IP軸の全段・アカウント軸をカウント
         raise _LOGIN_FAILED()               # 失敗パス
         ctx.reset_account(account_key)      # 成功パス（アカウント軸のみリセット）
     """
@@ -488,8 +688,7 @@ class RateLimitContext:
     limiter: RateLimiter
     scope: str
     account_rule: RateLimitRule | None
-    ip_key: str | None
-    ip_rule: RateLimitRule | None
+    ip_buckets: tuple[_IpBucket, ...] = ()
 
     def check_account(self, account_raw: str) -> None:
         """アカウント軸の事前チェック（peek）。超過なら 429 を raise する。"""
@@ -509,16 +708,17 @@ class RateLimitContext:
             )
 
     def record_failure(self, account_raw: str) -> None:
-        """失敗を記録する（IP軸・アカウント軸の両方をカウント）。
+        """失敗を記録する（IP軸の全段・アカウント軸をカウント）。
 
-        ここでは 429 を raise しない（呼び出し元がこの後で本来の失敗
-        HTTPException（401等）を raise する契約のため。超過判定は次回リクエスト
-        時の事前チェックで行われる）。IP軸は意図的にリセットしない（設計書 §4:
-        同一IPから「自分のアカウントに成功→他人を攻撃」を繰り返すと IP軸が
-        無意味化するため）。
+        IP軸は ``ip_buckets`` の全段（IPv4なら1段、IPv6なら /64・/56・/48 の3段）を
+        それぞれの ``rule`` で記録する。ここでは 429 を raise しない（呼び出し元が
+        この後で本来の失敗 HTTPException（401等）を raise する契約のため。超過判定は
+        次回リクエスト時の事前チェックで行われる）。IP軸は意図的にリセットしない
+        （設計書 §4: 同一IPから「自分のアカウントに成功→他人を攻撃」を繰り返すと
+        IP軸が無意味化するため）。
         """
-        if self.ip_key is not None and self.ip_rule is not None:
-            self.limiter.record(_build_key(self.scope, "ip", self.ip_key), self.ip_rule)
+        for bucket in self.ip_buckets:
+            self.limiter.record(bucket.store_key, bucket.rule)
         if self.account_rule is not None:
             digest = _hash_identity(account_raw)
             self.limiter.record(_build_key(self.scope, "acct", digest), self.account_rule)
@@ -581,6 +781,72 @@ class NoopRateLimitContext:
 NOOP_RATE_LIMIT_CONTEXT = NoopRateLimitContext()
 
 
+def _apply_ip_axis(
+    scope: str,
+    limiter: RateLimiter,
+    rule: RateLimitRule,
+    *,
+    count_all: bool,
+    ip: str,
+) -> tuple[_IpBucket, ...]:
+    """IP軸のキーを作り、判定する唯一の場所（``RateLimitGuard.__call__`` から
+    呼ぶ）。hops 方式以外の経路で得た IP（例: 将来の署名付き中継）であっても、
+    レート制限に数える前には必ずこの関数を経由すること。戻り値の段は
+    ``RateLimitContext.ip_buckets`` に渡す（失敗のみカウントの login では、
+    ``record_failure`` がこの段に記録する）。
+
+    ``_ip_axis_buckets`` で狭い段→広い段の並びを作り、次の順で評価する
+    （IPv4 は段が1つのため、呼び出しの並びと結果は従来と同一になる）:
+      (a) 広い段（/56・/48）をすべて先に ``limiter.check``（peek。キーを作らない）で
+          判定する。弾かれたら 429（広い段が塞がった後は、新しい /64 から来ても
+          ストアのキーを増やさない）。
+      (b) 狭い段を判定する。``count_all`` なら ``limiter.record``、そうでなければ
+          （login 等）``limiter.check``。弾かれたら 429。
+      (c) ``count_all`` のときだけ、広い段を狭い順に ``limiter.record`` する
+          （狭い段で弾かれた要求は広い段に数えない。1つの /64 の連打で /56・/48 が
+          埋まらないようにするため）。(a)〜(c) の間に await が無いため必ず通るはず
+          だが、ストアが差し替えられた場合に備えて verdict を確かめ、通らなければ
+          429 にする。
+    429 は ``_raise_429`` を使い、axis・rule・key_prefix は弾いた段のものを、ip_net は
+    ``_ip_net_for_log(ip)``（IPv6 は /48。生の IP・/64・ゾーン ID は出さない）を渡す。
+    応答文言はスコープの既存文言のまま（段では変えない）。
+    ``count_all`` と ``ip`` はキーワード専用（真偽値と文字列の取り違えを防ぐ）。
+    """
+    buckets = _ip_axis_buckets(scope, ip, rule)
+    narrow, wider = buckets[0], buckets[1:]
+
+    def reject(bucket: _IpBucket, verdict: RateLimitVerdict) -> NoReturn:
+        _raise_429(
+            scope=scope,
+            axis=bucket.axis,
+            rule=bucket.rule,
+            verdict=verdict,
+            key_prefix=bucket.key_prefix,
+            ip_net=_ip_net_for_log(ip),
+        )
+
+    for bucket in wider:
+        verdict = limiter.check(bucket.store_key, bucket.rule)
+        if not verdict.allowed:
+            reject(bucket, verdict)
+
+    verdict = (
+        limiter.record(narrow.store_key, narrow.rule)
+        if count_all
+        else limiter.check(narrow.store_key, narrow.rule)
+    )
+    if not verdict.allowed:
+        reject(narrow, verdict)
+
+    if count_all:
+        for bucket in wider:
+            verdict = limiter.record(bucket.store_key, bucket.rule)
+            if not verdict.allowed:
+                reject(bucket, verdict)
+
+    return buckets
+
+
 class RateLimitGuard:
     """スコープ別のレート制限ガード（FastAPI の Depends として使用する）。
 
@@ -595,6 +861,14 @@ class RateLimitGuard:
     - 失敗のみカウント方式のスコープ（login）は、ここでは ``peek``
       （非消費の事前判定）のみを行う。実カウントはハンドラ側の
       ``ctx.record_failure()`` で行われる。
+    - **IP軸の段数（IPv6）**: IP軸のキー生成・判定は ``_apply_ip_axis``
+      （内部で ``_ip_axis_buckets`` を使う）に一本化されている。IPv4 は
+      従来どおりアドレス単位の1段。IPv6 は要求ごとに送信元アドレスを
+      替えるだけで単一アドレス単位のバケットを無限に生成できてしまうため、
+      SLAAC の最小割当単位である /64 と、それより広い /56・/48（上限を
+      ``_IPV6_56_LIMIT_MULTIPLIER`` 倍・``_IPV6_48_LIMIT_MULTIPLIER`` 倍に緩めて
+      併用）の3段で数える。採否の理由は同モジュールの ``_IPV6_TIERS`` 定数
+      近くのコメントに詳述する。
     - IP が解決できない場合（``resolve_client_ip_with_reason`` が返す
       ``ClientIpResolution.ip`` が ``None``）の扱いは ``reason`` で分岐する
       （security review 指摘対応。設計書 §2 時点の単純なフェイルオープンから
@@ -654,7 +928,7 @@ class RateLimitGuard:
 
         spec = _scope_spec(self._scope, limiter.config)
 
-        ip_key: str | None = None
+        ip_buckets: tuple[_IpBucket, ...] = ()
         if spec.ip_rule is not None:
             settings = get_settings()
             # IP 解決は resolve_client_ip_with_reason（正本・単一入口）を
@@ -703,29 +977,15 @@ class RateLimitGuard:
                         # （_warn_cf_range_at_trust_position のトレードオフ
                         # docstring 参照）。
                         _warn_cf_range_at_trust_position(self._scope, ip)
-                    ip_key = _hash_identity(ip)
-                    key = _build_key(self._scope, "ip", ip_key)
-                    verdict = (
-                        limiter.record(key, spec.ip_rule)
-                        if spec.count_all
-                        else limiter.check(key, spec.ip_rule)
+                    ip_buckets = _apply_ip_axis(
+                        self._scope, limiter, spec.ip_rule, count_all=spec.count_all, ip=ip
                     )
-                    if not verdict.allowed:
-                        _raise_429(
-                            scope=self._scope,
-                            axis="ip",
-                            rule=spec.ip_rule,
-                            verdict=verdict,
-                            key_prefix=ip_key[:12],
-                            ip_net=truncate_ip_for_log(ip),
-                        )
 
         ctx = RateLimitContext(
             limiter=limiter,
             scope=self._scope,
             account_rule=spec.account_rule,
-            ip_key=ip_key,
-            ip_rule=spec.ip_rule,
+            ip_buckets=ip_buckets,
         )
         request.state.rate_limit = ctx
         return ctx

@@ -876,6 +876,408 @@ class TestTruncateIpForLog:
         assert truncate_ip_for_log("not-an-ip") == "invalid"
 
 
+class TestIpAxisBuckets:
+    """``_ip_axis_buckets``（IPv6 の IP軸を /64・/56・/48 の3段で数える）の単体テスト。
+
+    修正前は解決済み IP の文字列全体をそのままキーにしていたため、IPv6 の利用者は
+    要求ごとに送信元アドレスを替えるだけで毎回新しいバケットになり、IP軸しか持たない
+    スコープを含む全スコープの IP軸を回避できた。各テストの docstring に、その観点で
+    「修正前（または素朴な実装）ならどうなっていたか」を書く。
+    """
+
+    _RULE = RateLimitRule(10, 3600)
+    _TIER_AXES = ["ip6_64", "ip6_56", "ip6_48"]
+
+    @staticmethod
+    def _keys(buckets) -> list[str]:
+        return [bucket.store_key for bucket in buckets]
+
+    def test_ipv4_is_unchanged_single_axis_bucket(self) -> None:
+        """IPv4 はこの修正の対象外。キーが修正前（``_build_key(scope, "ip",
+        _hash_identity(ip))``）と1ビットも変わらないことを固定化する。"""
+        from app.api.rate_limit_deps import _build_key, _hash_identity, _ip_axis_buckets
+
+        ip = "203.0.113.5"
+        buckets = _ip_axis_buckets("login", ip, self._RULE)
+        assert len(buckets) == 1
+        bucket = buckets[0]
+        assert bucket.axis == "ip"
+        assert bucket.store_key == _build_key("login", "ip", _hash_identity(ip))
+        assert bucket.rule == self._RULE
+
+    def test_ipv6_same_slash64_shares_all_tier_keys(self) -> None:
+        """修正前なら2つの別アドレスは2つの別キーとなり、/64 の中でアドレスを
+        使い分けるだけで IP軸を回避できた。"""
+        from app.api.rate_limit_deps import _ip_axis_buckets
+
+        a = _ip_axis_buckets("signup", "2001:db8:1:2::1", self._RULE)
+        b = _ip_axis_buckets("signup", "2001:db8:1:2:ffff:ffff:ffff:ffff", self._RULE)
+        assert [bucket.axis for bucket in a] == self._TIER_AXES
+        assert self._keys(a) == self._keys(b)
+
+    def test_each_tier_shares_keys_only_within_its_prefix(self) -> None:
+        """/64・/56・/48 のそれぞれで、同じ範囲なら同じキー、範囲が違えば別のキーに
+        なることを固定化する（/56 の境界は第4グループの上位8ビット）。/48 の段が無い
+        実装だと、/56 を替えるだけで数えられずに済む。"""
+        from app.api.rate_limit_deps import _ip_axis_buckets
+
+        base = _ip_axis_buckets("signup", "2001:db8:1:1::1", self._RULE)
+        same_56 = _ip_axis_buckets("signup", "2001:db8:1:2::1", self._RULE)
+        same_48 = _ip_axis_buckets("signup", "2001:db8:1:101::1", self._RULE)
+        other_48 = _ip_axis_buckets("signup", "2001:db8:2:1::1", self._RULE)
+
+        def shared(x, y) -> list[bool]:
+            return [p == q for p, q in zip(self._keys(x), self._keys(y))]
+
+        assert shared(base, same_56) == [False, True, True]
+        assert shared(base, same_48) == [False, False, True]
+        assert shared(base, other_48) == [False, False, False]
+
+    def test_network_address_collision_between_tiers_does_not_merge_keys(self) -> None:
+        """段どうしでネットワークアドレスの文字列が一致するアドレス（例 2001:db8:1::5 は
+        /64・/56・/48 のどれでも "2001:db8:1::"）でも、段ごとの axis 名と、材料に含めた
+        プレフィックス長の両方で区別し、段のキーが混ざらないことを固定化する。"""
+        from app.api.rate_limit_deps import _ip_axis_buckets
+
+        buckets = _ip_axis_buckets("signup", "2001:db8:1::5", self._RULE)
+        assert len(set(self._keys(buckets))) == 3
+        # axis 名だけでなく、ハッシュの材料（"/64"・"/56"・"/48" 付き）自体も別であること。
+        assert len({bucket.key_prefix for bucket in buckets}) == 3
+
+    def test_zone_id_is_ignored(self) -> None:
+        """int() を通さない素朴な実装（``ip_network(f"{ip}/64", strict=False)``）だと、
+        ゾーン ID（"%eth0" 等）の違いだけで別バケットになり、同じ /64 の利用者を
+        見逃す抜け道になる。"""
+        from app.api.rate_limit_deps import _ip_axis_buckets
+
+        variants = ["2001:db8::%a", "2001:db8::%b", "2001:db8::1%a", "2001:db8::1"]
+        first, *others = [
+            self._keys(_ip_axis_buckets("login", ip, self._RULE)) for ip in variants
+        ]
+        for other in others:
+            assert other == first
+
+    def test_tier_rules_and_multiplier_invariants(self) -> None:
+        """段の上限は /64 が1倍・/56 が ``_IPV6_56_LIMIT_MULTIPLIER`` 倍・/48 が
+        ``_IPV6_48_LIMIT_MULTIPLIER`` 倍で、窓の長さは同じ。倍率の関係も固定化する:
+        /56 が2倍未満だと /64 を1つ持つだけで同じ /56 の他人を塞げ、/48 が /56 以下だと
+        /56 を1つ持つ世帯だけで同じ /48 の他の世帯を塞げてしまう。"""
+        from app.api.rate_limit_deps import (
+            _IPV6_48_LIMIT_MULTIPLIER,
+            _IPV6_56_LIMIT_MULTIPLIER,
+            _IPV6_TIERS,
+            _ip_axis_buckets,
+        )
+
+        assert _IPV6_56_LIMIT_MULTIPLIER >= 2
+        assert _IPV6_48_LIMIT_MULTIPLIER > _IPV6_56_LIMIT_MULTIPLIER
+        # 狭い段 → 広い段の順（_apply_ip_axis はこの順を前提に広い段から peek する）。
+        prefix_lens = [tier.prefix_len for tier in _IPV6_TIERS]
+        assert prefix_lens == sorted(set(prefix_lens), reverse=True)
+        assert _IPV6_TIERS[0].limit_multiplier == 1
+
+        buckets = _ip_axis_buckets("login", "2001:db8::1", self._RULE)
+        assert [bucket.rule.max_requests for bucket in buckets] == [
+            self._RULE.max_requests,
+            self._RULE.max_requests * _IPV6_56_LIMIT_MULTIPLIER,
+            self._RULE.max_requests * _IPV6_48_LIMIT_MULTIPLIER,
+        ]
+        assert all(bucket.rule.window_seconds == self._RULE.window_seconds for bucket in buckets)
+
+    def test_different_scope_changes_the_key(self) -> None:
+        """scope をキーに含めない実装だと、別スコープ（例: signup と login）の
+        バケットの実体が共有され、無関係なスコープの間で巻き添えが起きる。"""
+        from app.api.rate_limit_deps import _ip_axis_buckets
+
+        login_keys = self._keys(_ip_axis_buckets("login", "2001:db8::1", self._RULE))
+        signup_keys = self._keys(_ip_axis_buckets("signup", "2001:db8::1", self._RULE))
+        assert set(login_keys).isdisjoint(signup_keys)
+
+        ipv4_login = _ip_axis_buckets("login", "203.0.113.5", self._RULE)
+        ipv4_signup = _ip_axis_buckets("signup", "203.0.113.5", self._RULE)
+        assert ipv4_login[0].store_key != ipv4_signup[0].store_key
+
+    @pytest.mark.parametrize(
+        ("ipv6", "embedded_ipv4"),
+        [
+            ("::ffff:203.0.113.5", "203.0.113.5"),  # IPv4 射影（本来は展開済みで届かない）
+            ("2002:cb00:7105::1", "203.0.113.5"),  # 6to4（2002:<IPv4>::/48）
+            ("2002:cb00:7105:ff::2%eth0", "203.0.113.5"),  # 6to4・別の /64・ゾーン ID 付き
+            ("2001:0:4136:e378:8000:63bf:3fff:fdd2", "192.0.2.45"),  # Teredo
+        ],
+    )
+    def test_ipv6_with_embedded_ipv4_is_counted_by_that_ipv4(
+        self, ipv6: str, embedded_ipv4: str
+    ) -> None:
+        """IPv4 を埋め込んだ IPv6 は、埋め込まれた IPv4 と同じ1段で数える。IPv6 のまま
+        段に丸めると、IPv4 射影は全員が1つのバケットに潰れ、6to4 は IPv4 1個の持ち主が
+        IPv4 の枠とは別に上限の8倍まで使え、Teredo は中継サーバーの利用者全員が1つの
+        枠を共有してしまう。"""
+        from app.api.rate_limit_deps import _ip_axis_buckets
+
+        embedded = _ip_axis_buckets("login", ipv6, self._RULE)
+        plain = _ip_axis_buckets("login", embedded_ipv4, self._RULE)
+        assert len(embedded) == 1
+        assert embedded[0].axis == "ip"
+        assert embedded[0].store_key == plain[0].store_key
+
+    # 型ヒントは str だが、検証前の値を渡す経路ができた場合に備え、str 以外（None・int・
+    # bytes）も固定のバケットに落ちることを意図して確かめる。
+    @pytest.mark.parametrize(
+        "bad_value",
+        [
+            "not-an-ip",
+            "2001:db8::1/64",
+            "",
+            None,
+            3232235777,  # ip_address() は int も IPv4 として受け付ける
+            bytes([203, 0, 113, 5]),  # 4 バイトの bytes も同じ
+        ],
+    )
+    def test_unparseable_values_share_one_fixed_bucket_and_warn_without_value(
+        self, caplog, bad_value
+    ) -> None:
+        """resolve 済みの値なので本来は届かないが、届いた場合も例外（500）にもスキップ
+        （抜け道）にもせず、scope ごとに1つだけの固定のバケットで数えることを固定化する。
+        値ごとに別のキーにすると、検証前の値を渡す経路ができたとき、値を替えるだけで
+        回避でき、キーも増え続ける（文字列以外を ``ip_address()`` に通すと、int や bytes が
+        値ごとのアドレスとして読めてしまう）。WARNING に値そのものは出さない。"""
+        import logging
+
+        from app.api import rate_limit_deps
+
+        rate_limit_deps._unparseable_ip_throttle.reset()
+        with caplog.at_level(logging.WARNING, logger="app.api.rate_limit_deps"):
+            buckets = rate_limit_deps._ip_axis_buckets("login", bad_value, self._RULE)
+        other = rate_limit_deps._ip_axis_buckets("login", "also-not-an-ip", self._RULE)
+        assert len(buckets) == 1
+        assert buckets[0].axis == "ip_unparseable"
+        assert buckets[0].store_key == other[0].store_key
+        assert buckets[0].rule == self._RULE
+        messages = [r.getMessage() for r in caplog.records]
+        assert sum("パースできませんでした" in m for m in messages) == 1
+        if isinstance(bad_value, str) and bad_value:
+            assert not any(bad_value in m for m in messages)
+
+
+class TestApplyIpAxis:
+    """``_apply_ip_axis``（IP軸のキー生成・判定を行う唯一の入口）の単体テスト。
+
+    HTTP を経由せず、注入した ``RateLimiter``・``FakeClock`` に対して直接呼び出す。
+    hops 以外の経路（将来の署名付き中継等）から得た IP でも、この関数を通せば同じ
+    判定になることを固定化する。
+    """
+
+    @staticmethod
+    def _limiter() -> tuple[FakeClock, InMemoryRateLimitStore, RateLimiter]:
+        clock = FakeClock()
+        store = InMemoryRateLimitStore(clock=clock)
+        config = RateLimitConfig(
+            enabled=True,
+            login_account=RateLimitRule(5, 900),
+            login_ip=RateLimitRule(20, 900),
+            sensitive_account=RateLimitRule(5, 900),
+            signup_ip=RateLimitRule(10, 3600),
+            line_ip=RateLimitRule(20, 900),
+            max_keys=10000,
+        )
+        return clock, store, RateLimiter(config=config, store=store)
+
+    def test_ipv6_same_slash64_exceeding_limit_raises_429_with_retry_after(self) -> None:
+        """修正前ならアドレスごとに別キーとなり、同じ /64 からの連打は一度も
+        429 にならなかった。"""
+        from fastapi import HTTPException
+
+        from app.api.rate_limit_deps import _apply_ip_axis
+
+        _, _, limiter = self._limiter()
+        rule = RateLimitRule(10, 3600)
+        buckets: tuple = ()
+        for i in range(10):
+            buckets = _apply_ip_axis(
+                "signup", limiter, rule, count_all=True, ip=f"2001:db8:9:9::{i + 1:x}"
+            )
+        assert tuple(bucket.axis for bucket in buckets) == ("ip6_64", "ip6_56", "ip6_48")
+
+        with pytest.raises(HTTPException) as exc_info:
+            _apply_ip_axis("signup", limiter, rule, count_all=True, ip="2001:db8:9:9::ff")
+        assert exc_info.value.status_code == 429
+        assert int(exc_info.value.headers["Retry-After"]) >= 1
+
+    def test_check_only_mode_counts_nothing_until_failures_are_recorded(self) -> None:
+        """失敗のみカウント（login）の呼び方（count_all=False）では、何度通しても数えず、
+        キーも作らない。``record_failure`` で記録して初めて全段が数えられる。
+        record_failure が狭い段しか記録しない実装だと、同じ /56 の別の /64 を使うだけで
+        /56・/48 の段に届かない。"""
+        from fastapi import HTTPException
+
+        from app.api.rate_limit_deps import RateLimitContext, _apply_ip_axis
+
+        _, store, limiter = self._limiter()
+        rule = RateLimitRule(3, 900)  # /64 は 3・/56 は 6・/48 は 24
+
+        def fail_three_times_from(ip: str) -> None:
+            buckets = _apply_ip_axis("login", limiter, rule, count_all=False, ip=ip)
+            ctx = RateLimitContext(
+                limiter=limiter, scope="login", account_rule=None, ip_buckets=buckets
+            )
+            for _ in range(3):
+                ctx.record_failure("user:ipv6-check-only@example.com")
+
+        for _ in range(10):
+            _apply_ip_axis("login", limiter, rule, count_all=False, ip="2001:db8:8:1::1")
+        assert len(store) == 0
+
+        fail_three_times_from("2001:db8:8:1::1")
+        assert len(store) == 3  # /64・/56・/48 の3段に記録された
+        with pytest.raises(HTTPException) as exc_info:
+            _apply_ip_axis("login", limiter, rule, count_all=False, ip="2001:db8:8:1::2")
+        assert exc_info.value.status_code == 429
+
+        # 同じ /56 の別の /64 はまだ通る。そこでも3回失敗すると /56（上限 6）が埋まり、
+        # 同じ /56 の3つ目の /64 は、初めて使うアドレスでも 429 になる。
+        fail_three_times_from("2001:db8:8:2::1")
+        with pytest.raises(HTTPException) as exc_info:
+            _apply_ip_axis("login", limiter, rule, count_all=False, ip="2001:db8:8:3::1")
+        assert exc_info.value.status_code == 429
+        # 別の /56（同じ /48）は、/48（上限 24）に余裕があるので通る。
+        _apply_ip_axis("login", limiter, rule, count_all=False, ip="2001:db8:8:100::1")
+
+    def test_wide_tier_retry_after_and_all_tiers_recover_after_the_window(self, caplog) -> None:
+        """広い段（/56・/48）で弾かれたときの Retry-After はその段の窓の残り時間で、窓が
+        過ぎればすべての段が元に戻ることを固定化する（倍率を窓の長さに掛けてしまう等の
+        誤りを検出する）。"""
+        import logging
+
+        from fastapi import HTTPException
+
+        from app.api.rate_limit_deps import (
+            _IPV6_48_LIMIT_MULTIPLIER,
+            _IPV6_56_LIMIT_MULTIPLIER,
+            _apply_ip_axis,
+        )
+
+        clock, _, limiter = self._limiter()
+        rule = RateLimitRule(1, 60)  # /64 は 1・/56 は K56・/48 は K48
+        assert _IPV6_48_LIMIT_MULTIPLIER % _IPV6_56_LIMIT_MULTIPLIER == 0
+        # 同じ /48 の中の /56 を K48/K56 個、それぞれ /64 を K56 個ずつ使って /48 を埋める
+        # （/56 の境界は第4グループの上位8ビット）。
+        for s in range(_IPV6_48_LIMIT_MULTIPLIER // _IPV6_56_LIMIT_MULTIPLIER):
+            for t in range(_IPV6_56_LIMIT_MULTIPLIER):
+                _apply_ip_axis(
+                    "signup", limiter, rule, count_all=True, ip=f"2001:db8:7:{s * 0x100 + t:x}::1"
+                )
+
+        clock.advance(10)
+        blocked = [
+            ("2001:db8:7:ff::1", "ip6_56"),  # 埋まった /56 の新しい /64
+            ("2001:db8:7:ff00::1", "ip6_48"),  # 同じ /48 の新しい /56
+        ]
+        for ip, axis in blocked:
+            caplog.clear()
+            with caplog.at_level(logging.WARNING, logger="app.api.rate_limit_deps"):
+                with pytest.raises(HTTPException) as exc_info:
+                    _apply_ip_axis("signup", limiter, rule, count_all=True, ip=ip)
+            assert exc_info.value.status_code == 429
+            assert exc_info.value.headers["Retry-After"] == "50"
+            messages = [r.getMessage() for r in caplog.records]
+            assert any(f"axis={axis} " in m for m in messages)
+
+        clock.advance(50)
+        for ip, _axis in blocked:
+            _apply_ip_axis("signup", limiter, rule, count_all=True, ip=ip)
+
+    def test_over_limit_log_has_no_zone_id_and_uses_embedded_ipv4_net(self, caplog) -> None:
+        """超過ログの ip_net は ``_canonical_address`` を通した値の範囲で出す。ゾーン ID
+        （任意の文字列を書ける）はログに出さず、IPv4 を埋め込んだ IPv6 は IPv4 の /24 に
+        なる（素朴に ``truncate_ip_for_log(ip)`` へ渡すと、/48 境界のアドレスでは
+        ゾーン ID がそのまま残る）。"""
+        import logging
+
+        from fastapi import HTTPException
+
+        from app.api.rate_limit_deps import _apply_ip_axis
+
+        _, _, limiter = self._limiter()
+        rule = RateLimitRule(1, 60)
+        cases = [
+            ("2001:db8:5::%evil scope=x", "ip_net=2001:db8:5::/48", "ip6_64"),
+            ("2002:cb00:7105::1", "ip_net=203.0.113.0/24", "ip"),
+        ]
+        for ip, expected_net, expected_axis in cases:
+            _apply_ip_axis("signup", limiter, rule, count_all=True, ip=ip)
+            caplog.clear()
+            with caplog.at_level(logging.WARNING, logger="app.api.rate_limit_deps"):
+                with pytest.raises(HTTPException):
+                    _apply_ip_axis("signup", limiter, rule, count_all=True, ip=ip)
+            messages = [r.getMessage() for r in caplog.records]
+            assert any(expected_net in m and f"axis={expected_axis} " in m for m in messages)
+            assert not any("evil" in m for m in messages)
+
+    def test_unparseable_values_are_limited_together_and_logged_as_invalid(self, caplog) -> None:
+        """読めない値は、値が違っても scope ごとの固定バケットで一緒に数え、上限を超えれば
+        429 になる。超過ログの axis は "ip_unparseable"・ip_net は "invalid" で、値そのもの
+        は出さない（値ごとに別のキーだと、値を替えるだけで 429 にならない）。"""
+        import logging
+
+        from fastapi import HTTPException
+
+        from app.api.rate_limit_deps import _apply_ip_axis
+
+        _, _, limiter = self._limiter()
+        rule = RateLimitRule(1, 60)
+        _apply_ip_axis("signup", limiter, rule, count_all=True, ip="bogus-1")
+        caplog.clear()
+        with caplog.at_level(logging.WARNING, logger="app.api.rate_limit_deps"):
+            with pytest.raises(HTTPException) as exc_info:
+                _apply_ip_axis("signup", limiter, rule, count_all=True, ip="bogus-2")
+        assert exc_info.value.status_code == 429
+        messages = [r.getMessage() for r in caplog.records]
+        assert any("axis=ip_unparseable " in m and "ip_net=invalid" in m for m in messages)
+        assert not any("bogus" in m for m in messages)
+
+
+class TestIpNetForLog:
+    """ログに出す IP の範囲（``_ip_net_for_log``）の単体テスト。"""
+
+    @pytest.mark.parametrize(
+        ("ip", "expected"),
+        [
+            ("203.0.113.9", "203.0.113.0/24"),
+            ("2001:db8:abcd:1234::1", "2001:db8:abcd::/48"),
+            ("2001:db8:abcd::%evil scope=x", "2001:db8:abcd::/48"),  # ゾーン ID は出さない
+            ("2002:cb00:7105::1", "203.0.113.0/24"),  # 6to4 は埋め込まれた IPv4 の /24
+            ("not-an-ip", "invalid"),
+        ],
+    )
+    def test_ip_net_for_log(self, ip: str, expected: str) -> None:
+        from app.api.rate_limit_deps import _ip_net_for_log
+
+        assert _ip_net_for_log(ip) == expected
+
+    def test_skip_warnings_do_not_log_zone_id(self, caplog) -> None:
+        """IP軸をスキップしたときの WARNING も ``_ip_net_for_log`` を通すので、/48 境界の
+        アドレスに付いたゾーン ID（任意の文字列を書ける）はログに出ない。素朴に
+        ``truncate_ip_for_log(ip)`` へ渡すと、そのまま残る。"""
+        import logging
+
+        from app.api import rate_limit_deps
+
+        for throttle in (
+            rate_limit_deps._private_ip_skip_throttle,
+            rate_limit_deps._special_address_skip_throttle,
+            rate_limit_deps._cf_range_at_trust_position_throttle,
+        ):
+            throttle.reset()
+        with caplog.at_level(logging.WARNING, logger="app.api.rate_limit_deps"):
+            rate_limit_deps._warn_private_ip_skip("login", "fe80::%evil scope=x")
+            rate_limit_deps._warn_special_address_skip("login", "ff02::%evil scope=x")
+            rate_limit_deps._warn_cf_range_at_trust_position("login", "2606:4700::%evil scope=x")
+        messages = [r.getMessage() for r in caplog.records]
+        assert len(messages) == 3
+        assert not any("evil" in m for m in messages)
+
+
 class TestTrustedProxyHopsValidator:
     """QA指摘 L-3: TRUSTED_PROXY_HOPS バリデータのテスト（security review M-5 の
     範囲チェックを含む）。

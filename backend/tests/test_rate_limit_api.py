@@ -26,7 +26,11 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.rate_limit_deps import get_rate_limiter
+from app.api.rate_limit_deps import (
+    _IPV6_48_LIMIT_MULTIPLIER,
+    _IPV6_56_LIMIT_MULTIPLIER,
+    get_rate_limiter,
+)
 from app.api.v1.endpoints import auth as auth_endpoint
 from app.api.v1.router import api_router
 from app.config import Settings, get_settings
@@ -939,6 +943,313 @@ class TestPrivateIpAtTrustPositionSkipsIpAxis:
                 headers=loopback_xff,
             )
             assert r.status_code == 401
+
+
+# ──────── IPv6 の IP軸: /64・/56・/48 の3段で数える（新設） ────────
+
+
+class TestIpv6RateLimitTiers:
+    """IPv6 の IP軸を /64・/56・/48 の3段で数えることの統合テスト。
+
+    修正前は解決した IP の文字列全体をキーにしていたため、IPv6 の利用者
+    （自宅回線は通常 /64、日本の IPoE でひかり電話ありの HGW なら /56）は
+    要求ごとに送信元アドレスを替えるだけで毎回新しいバケットになり、IP軸
+    しか持たないスコープを含む全スコープの IP軸を回避できた。アドレスは
+    文書用レンジ 2001:db8::/32（RFC3849）の中で作る。/56 の境界は第4グループの
+    上位8ビット（例 2001:db8:5:1:: と 2001:db8:5:ff:: は同じ /56、2001:db8:5:100:: は
+    別の /56）。
+    """
+
+    async def test_login_ip_axis_blocks_within_same_slash64(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """修正前なら21個の別アドレスは21個の別キーとなり、一度も429に
+        ならなかった。"""
+        for i in range(20):
+            r = await client.post(
+                "/api/v1/auth/login",
+                json={
+                    "email": f"ipv6-64-login-{i}@example.com",
+                    "password": "wrong-password",
+                },
+                headers={"X-Forwarded-For": f"2001:db8:1:1::{i + 1:x}"},
+            )
+            assert r.status_code == 401
+
+        target_email = "ipv6-64-login-target@example.com"
+        await _create_user(db_session, target_email, password="correct-password-v6")
+        r = await client.post(
+            "/api/v1/auth/login",
+            json={"email": target_email, "password": "correct-password-v6"},
+            headers={"X-Forwarded-For": "2001:db8:1:1::15"},
+        )
+        assert r.status_code == 429
+        assert r.json() == {"detail": _LOGIN_MSG}
+
+        # 同じ利用者・同じ/48内の別の/64からは影響を受けない。
+        r = await client.post(
+            "/api/v1/auth/login",
+            json={"email": target_email, "password": "correct-password-v6"},
+            headers={"X-Forwarded-For": "2001:db8:1:2::1"},
+        )
+        assert r.status_code == 200
+
+    async def test_signup_ip_axis_blocks_within_same_slash64(self, client: AsyncClient):
+        """修正前なら10個の別アドレスは10個の別キーとなり、一度も429に
+        ならなかった。"""
+        for i in range(10):
+            r = await _signup_user(
+                client,
+                f"ipv6-64-signup-{i}@example.com",
+                headers={"X-Forwarded-For": f"2001:db8:1:1::{i + 1:x}"},
+            )
+            assert r.status_code == 201, r.text
+        r = await _signup_user(
+            client,
+            "ipv6-64-signup-over@example.com",
+            headers={"X-Forwarded-For": "2001:db8:1:1::b"},
+        )
+        assert r.status_code == 429
+        assert r.json() == {"detail": _SIGNUP_MSG}
+
+        r = await _signup_user(
+            client,
+            "ipv6-64-signup-other64@example.com",
+            headers={"X-Forwarded-For": "2001:db8:1:2::1"},
+        )
+        assert r.status_code == 201, r.text
+
+    async def test_operator_application_counts_same_slash64_at_real_hops_position(
+        self, client: AsyncClient, db_session: AsyncSession, monkeypatch
+    ):
+        """修正前なら本番と同じ段数でも、右から3番目の実アドレスを/64内で
+        替えるだけで業者申込の5件/時間の上限を無限に回避できた。記録される
+        client_ip は丸めない生のIPv6のままであることも確認する。"""
+        monkeypatch.setattr(get_settings(), "trusted_proxy_hops", 3)
+        application_ids = []
+        real_ips = []
+        for i in range(5):
+            real_ip = f"2001:db8:1:1::{i + 1:x}"
+            real_ips.append(real_ip)
+            r = await _post_operator_application(
+                client,
+                f"oa-v6-64-{i}@example.com",
+                headers={
+                    "X-Forwarded-For": (
+                        f"198.51.100.{i + 1}, {real_ip}, 172.68.10.20, 10.196.14.1"
+                    )
+                },
+            )
+            assert r.status_code == 201, r.text
+            application_ids.append(uuid.UUID(r.json()["application_id"]))
+        r = await _post_operator_application(
+            client,
+            "oa-v6-64-over@example.com",
+            headers={
+                "X-Forwarded-For": "198.51.100.99, 2001:db8:1:1::b, 172.68.10.20, 10.196.14.1"
+            },
+        )
+        assert r.status_code == 429
+
+        for application_id, real_ip in zip(application_ids, real_ips):
+            application = await db_session.get(OperatorApplication, application_id)
+            assert application is not None
+            assert application.client_ip == real_ip
+
+    async def test_signup_one_slash56_household_cannot_block_its_slash48_neighbours(
+        self, client: AsyncClient, db_session: AsyncSession, caplog
+    ):
+        """/56 を1つ持つ世帯（日本の IPoE の HGW 等）が /64 を替えながら送っても、上限の
+        K56 倍で止まり（axis=ip6_56）、同じ /48 の別の世帯（別の /56）は影響を受けない。
+        /64 だけで数える実装なら、/64 を替えるたびに枠が戻って止まらなかった。"""
+        existing_email = "ipv6-tier-household-dup@example.com"
+        await _create_user(db_session, existing_email)
+        # 登録済みのメールで送る: 409 はハッシュ計算が走らず速く、全件方式なので数えられる。
+        for t in range(_IPV6_56_LIMIT_MULTIPLIER):
+            for i in range(10):
+                r = await _signup_user(
+                    client,
+                    existing_email,
+                    headers={"X-Forwarded-For": f"2001:db8:4:{t + 1:x}::{i + 1:x}"},
+                )
+                assert r.status_code == 409
+        with caplog.at_level(logging.WARNING, logger="app.api.rate_limit_deps"):
+            r = await _signup_user(
+                client, existing_email, headers={"X-Forwarded-For": "2001:db8:4:ff::1"}
+            )
+        assert r.status_code == 429
+        assert r.json() == {"detail": _SIGNUP_MSG}
+        messages = [record.getMessage() for record in caplog.records]
+        assert any("scope=signup" in m and "axis=ip6_56" in m for m in messages)
+
+        # 同じ /48 の別の /56（別の世帯）は通る。
+        r = await _signup_user(
+            client, existing_email, headers={"X-Forwarded-For": "2001:db8:4:100::1"}
+        )
+        assert r.status_code == 409
+
+    async def test_login_wider_tiers_cap_failures_spread_over_many_slash64(
+        self, client: AsyncClient, caplog
+    ):
+        """/64 を替えながら失敗を積み上げても、同じ /56 では /64 の上限の K56 倍、同じ
+        /48 では K48 倍で止まる。/64 だけで数える実装なら、/64 を替えるたびに枠が戻り、
+        失敗を無制限に積み上げられた（修正前はアドレスを替えるだけで同じだった）。"""
+        slash56_count = _IPV6_48_LIMIT_MULTIPLIER // _IPV6_56_LIMIT_MULTIPLIER
+        attempt = 0
+        # 存在しないメールで失敗させる（パスワード照合が走らないので速い）。
+        for s in range(slash56_count):
+            for t in range(_IPV6_56_LIMIT_MULTIPLIER):
+                for i in range(20):
+                    r = await client.post(
+                        "/api/v1/auth/login",
+                        json={
+                            "email": f"ipv6-tier-login-{attempt}@example.com",
+                            "password": "wrong-password",
+                        },
+                        headers={"X-Forwarded-For": f"2001:db8:2:{s * 0x100 + t + 1:x}::{i + 1:x}"},
+                    )
+                    attempt += 1
+                    assert r.status_code == 401
+
+        blocked = [
+            ("2001:db8:2:ff::1", "ip6_56"),  # 失敗で埋まった /56 の新しい /64
+            ("2001:db8:2:ff00::1", "ip6_48"),  # 同じ /48 の新しい /56
+        ]
+        for xff, axis in blocked:
+            caplog.clear()
+            with caplog.at_level(logging.WARNING, logger="app.api.rate_limit_deps"):
+                r = await client.post(
+                    "/api/v1/auth/login",
+                    json={
+                        "email": f"ipv6-tier-login-{axis}@example.com",
+                        "password": "wrong-password",
+                    },
+                    headers={"X-Forwarded-For": xff},
+                )
+            assert r.status_code == 429
+            assert r.json() == {"detail": _LOGIN_MSG}
+            assert int(r.headers["Retry-After"]) >= 1
+            messages = [record.getMessage() for record in caplog.records]
+            assert any("scope=login" in m and f"axis={axis} " in m for m in messages)
+
+        # 別の /48 は無関係（存在しないメールなので 401 のまま）。
+        r = await client.post(
+            "/api/v1/auth/login",
+            json={"email": "ipv6-tier-login-other48@example.com", "password": "wrong-password"},
+            headers={"X-Forwarded-For": "2001:db8:9:1::1"},
+        )
+        assert r.status_code == 401
+
+    async def test_signup_rejected_requests_are_not_counted_into_wider_tiers(
+        self, client: AsyncClient, db_session: AsyncSession, caplog
+    ):
+        """狭い段で弾かれた要求まで広い段に数える実装だと、1つの /64 の連打で /56・/48 が
+        埋まり、同じ範囲の別の /64・/56（別の利用者）の登録が途中から 429 になる。弾かれた
+        要求を広い段に数えないことを固定化する（修正前は広い段自体が無かった）。"""
+        existing_email = "ipv6-tier-signup-dup@example.com"
+        await _create_user(db_session, existing_email)
+
+        async def signup_from(xff: str) -> int:
+            r = await _signup_user(client, existing_email, headers={"X-Forwarded-For": xff})
+            return r.status_code
+
+        # 最初の /56 の1つ目の /64: 10 回は 409（全件方式なので数える）、続く 5 回は
+        # /64 の上限で 429。
+        for i in range(10):
+            assert await signup_from(f"2001:db8:5:1::{i + 1:x}") == 409
+        for i in range(5):
+            assert await signup_from(f"2001:db8:5:1::{i + 11:x}") == 429
+        # 同じ /56 の残りの /64 も 10 回ずつ 409。/64 で弾かれた 5 回を /56 に数えて
+        # いれば、ここで途中から 429 になる。
+        for t in range(1, _IPV6_56_LIMIT_MULTIPLIER):
+            for i in range(10):
+                assert await signup_from(f"2001:db8:5:{t + 1:x}::{i + 1:x}") == 409
+        # 最初の /56 は埋まった。同じ /56 の新しい /64 は /56 の段で弾かれる（/48 に数えない）。
+        for i in range(5):
+            assert await signup_from(f"2001:db8:5:ff::{i + 1:x}") == 429
+        # 同じ /48 の残りの /56 で /48 を埋める。弾かれた要求を /48 に数えていれば途中から 429。
+        slash56_count = _IPV6_48_LIMIT_MULTIPLIER // _IPV6_56_LIMIT_MULTIPLIER
+        for s in range(1, slash56_count):
+            for t in range(_IPV6_56_LIMIT_MULTIPLIER):
+                for i in range(10):
+                    xff = f"2001:db8:5:{s * 0x100 + t + 1:x}::{i + 1:x}"
+                    assert await signup_from(xff) == 409
+        # /48 は上限に達した。同じ /48 の新しい /56 は /48 の段で 429（axis=ip6_48）。
+        with caplog.at_level(logging.WARNING, logger="app.api.rate_limit_deps"):
+            assert await signup_from("2001:db8:5:ff00::1") == 429
+        messages = [record.getMessage() for record in caplog.records]
+        assert any("scope=signup" in m and "axis=ip6_48" in m for m in messages)
+
+    async def test_bucket_count_does_not_grow_once_wider_tiers_are_saturated(
+        self, db_session: AsyncSession
+    ):
+        """広い段が塞がった後も、新しい /64 から来るたびにストアのキーが増える実装だと、
+        大量の /64 を送りつけるだけでメモリ（RL_MAX_KEYS）を圧迫できる。塞がった後は
+        新しい /64・/56 からの要求も peek で弾かれるだけで、キーを作らないことを固定化する。"""
+        test_app = create_test_app(db_session)
+        store = InMemoryRateLimitStore(clock=FakeClock())
+        limiter = RateLimiter(config=_config(), store=store)
+        test_app.dependency_overrides[get_rate_limiter] = lambda: limiter
+        async with AsyncClient(
+            transport=ASGITransport(app=test_app), base_url="http://test"
+        ) as saturating_client:
+            existing_email = "ipv6-tier-saturate-dup@example.com"
+            await _create_user(db_session, existing_email)
+            slash56_count = _IPV6_48_LIMIT_MULTIPLIER // _IPV6_56_LIMIT_MULTIPLIER
+            for s in range(slash56_count):
+                for t in range(_IPV6_56_LIMIT_MULTIPLIER):
+                    for i in range(10):
+                        r = await _signup_user(
+                            saturating_client,
+                            existing_email,
+                            headers={
+                                "X-Forwarded-For": f"2001:db8:6:{s * 0x100 + t + 1:x}::{i + 1:x}"
+                            },
+                        )
+                        assert r.status_code == 409
+
+            key_count_before = len(store)
+            # 埋まった /56 の新しい /64 と、同じ /48 の新しい /56 から送る。
+            for xff in (
+                "2001:db8:6:ff::1",
+                "2001:db8:6:fe::1",
+                "2001:db8:6:ff00::1",
+                "2001:db8:6:fe00::1",
+                "2001:db8:6:fd00::1",
+            ):
+                r = await _signup_user(
+                    saturating_client, existing_email, headers={"X-Forwarded-For": xff}
+                )
+                assert r.status_code == 429
+            assert len(store) == key_count_before
+
+    async def test_narrow_tier_over_limit_log_shows_ip6_64_axis_and_slash48_ip_net(
+        self, client: AsyncClient, caplog
+    ):
+        """超過ログの ip_net は生のIPv6アドレスでも/64表記でもなく、常に
+        /48に丸めた値であることを固定化する(truncate_ip_for_logの既定仕様)。
+        修正前はキーがアドレス全体だったため、この段(axis=ip6_64)自体が
+        存在しなかった。"""
+        raw_ip = "2001:db8:3:1::b"
+        for i in range(10):
+            r = await _signup_user(
+                client,
+                f"ipv6-64-log-{i}@example.com",
+                headers={"X-Forwarded-For": f"2001:db8:3:1::{i + 1:x}"},
+            )
+            assert r.status_code == 201, r.text
+        with caplog.at_level(logging.WARNING, logger="app.api.rate_limit_deps"):
+            r = await _signup_user(
+                client, "ipv6-64-log-over@example.com", headers={"X-Forwarded-For": raw_ip}
+            )
+        assert r.status_code == 429
+        messages = [record.getMessage() for record in caplog.records]
+        assert any(
+            "scope=signup" in m and "axis=ip6_64" in m and "ip_net=2001:db8:3::/48" in m
+            for m in messages
+        )
+        assert not any(raw_ip in m for m in messages)
+        assert not any("/64" in m for m in messages)
 
 
 # ──────────────────────────── LINEログイン統合（全リクエストカウント） ────────────────────────────
