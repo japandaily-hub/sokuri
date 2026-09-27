@@ -44,6 +44,12 @@
       への安全網）。uvicorn.error が出す未処理例外のトレースバック（"Exception in ASGI
       application"）にも、uvicorn の書式を変えずに同じ処理を掛ける。呼び出し側では引き続き
       ``mask_email`` 等で個別にマスクすること。
+    - DB 例外（PostgreSQL の DETAIL＝一意制約違反のキーの値・CHECK 違反の行全体を文言に抱える）と
+      検証エラー（入力値を抱える）は、メール等のマスクでは氏名・住所・電話番号が残る。トレースバックは
+      :func:`app.core.error_summary.format_exception_for_log` で両者の文言だけを要約（型・SQLSTATE・
+      制約名等）に差し替えて整形し、本文の引数にこれらの例外オブジェクトがそのまま渡されたときも
+      要約に差し替える。呼び出し側では引き続き ``describe_exception(exc)`` を渡すこと（本処理は
+      取りこぼし対策。APP_LOG_LEVEL が無く本ハンドラが付かない開発・テストでは効かない）。
     - 整形に失敗したとき（書式と引数の不一致）、標準の ``Handler.handleError`` は引数の生値を
       マスクを通さず stderr へ書くため、例外の種類と発生箇所だけを1行で出す。
 """
@@ -53,7 +59,13 @@ from __future__ import annotations
 import logging
 import os
 import sys
+from collections.abc import Mapping
 
+from app.core.error_summary import (
+    describe_exception,
+    format_exception_for_log,
+    is_value_bearing_exception,
+)
 from app.core.masking import mask_sensitive_in_text
 
 #: 設定対象のロガー名。``logging.getLogger(__name__)`` を使う app 配下の全モジュールがこの子になる。
@@ -152,6 +164,25 @@ def _render_block(block: str) -> str:
     return "\n".join(_CONTINUATION_PREFIX + line for line in lines)
 
 
+def _summarize_if_value_bearing(value: object) -> object:
+    """DB 例外・検証エラーのオブジェクトなら要約の文字列に、それ以外はそのまま返す。"""
+    return describe_exception(value) if is_value_bearing_exception(value) else value  # type: ignore[arg-type]
+
+
+def _render_message(record: logging.LogRecord) -> str:
+    """``record.getMessage()`` と同じ文字列を作る。本文・引数が DB 例外・検証エラーのオブジェクトなら
+    要約に差し替える（``logger.error("... %s", exc)`` の取りこぼし対策。record 自体は書き換えない）。"""
+    message = str(_summarize_if_value_bearing(record.msg))
+    args = record.args
+    if not args:
+        return message
+    if isinstance(args, Mapping):
+        return message % {key: _summarize_if_value_bearing(value) for key, value in args.items()}
+    if isinstance(args, tuple):
+        return message % tuple(_summarize_if_value_bearing(value) for value in args)
+    return message % args
+
+
 class AppLogFormatter(logging.Formatter):
     """``LEVEL [ロガー名] 本文`` の1行（例外時はその後ろに ``  | `` 付きのトレースバック）へ整形する。
 
@@ -159,17 +190,22 @@ class AppLogFormatter(logging.Formatter):
     同じ並びにそろえる。時刻は Render がログ1行ごとに付けるので含めない。
     """
 
+    def formatException(self, ei) -> str:  # noqa: ANN001 -- logging の exc_info（型・値・トレースバック）
+        """標準と同じトレースバック。DB 例外・検証エラーの文言だけを要約に差し替える（error_summary 参照）。"""
+        return format_exception_for_log(ei[1] if ei else None)
+
     def format(self, record: logging.LogRecord) -> str:
         # マスクは生の文字列に先に掛けてからエスケープする（エスケープ後の "\n" 等は英数字で終わり、
         # storage_key・LINE userId の前の境界判定を崩す）。マスクは制御文字を生まない。
-        message = mask_sensitive_in_text(record.getMessage()).translate(_MESSAGE_ESCAPES)
+        message = mask_sensitive_in_text(_render_message(record)).translate(_MESSAGE_ESCAPES)
         text = f"{record.levelname} [{record.name}] {message}"
-        # トレースバックの文字列は標準の Formatter と同じく record にキャッシュする（他の
-        # ハンドラも同じ文字列を使う）。整形とマスクは戻り値にだけ掛け、record は書き換えない。
-        if record.exc_info and not record.exc_text:
-            record.exc_text = self.formatException(record.exc_info)
-        if record.exc_text:
-            text = f"{text}\n{_render_block(mask_sensitive_in_text(record.exc_text))}"
+        # トレースバックは例外オブジェクト（exc_info）があれば毎回ここで整形し、record のキャッシュ
+        # （exc_text）は読まない・書かない。先に別の書式（標準の Formatter 等）が作った生の
+        # トレースバック（DB 例外の DETAIL を含む）を使い回さず、こちらの要約も他のハンドラへ
+        # 押し付けない。exc_info が無く exc_text だけある record はマスクだけ掛けて出す。
+        exception_text = self.formatException(record.exc_info) if record.exc_info else record.exc_text
+        if exception_text:
+            text = f"{text}\n{_render_block(mask_sensitive_in_text(exception_text))}"
         if record.stack_info:
             stack = self.formatStack(record.stack_info)
             text = f"{text}\n{_render_block(mask_sensitive_in_text(stack))}"
@@ -199,7 +235,8 @@ class _AppLogHandler(logging.StreamHandler):
 
 
 class _UvicornTracebackFilter(logging.Filter):
-    """uvicorn.error の未処理例外のトレースバックに、app.* と同じ処理（継続の印・エスケープ・マスク）を掛ける。
+    """uvicorn.error の未処理例外のトレースバックに、app.* と同じ処理（DB 例外・検証エラーの文言の要約・
+    継続の印・エスケープ・マスク）を掛ける。
 
     uvicorn の Formatter は ``record.exc_text`` のキャッシュをそのまま使うので、先に整えた文字列を
     入れておけば、uvicorn 自身の書式（"ERROR:    Exception in ASGI application"）は変わらない。
@@ -207,7 +244,7 @@ class _UvicornTracebackFilter(logging.Filter):
     ため、整形に失敗しても例外は出さない（トレースバックは例外の種類だけに差し替える＝隠す側に倒す）。
     """
 
-    _traceback_formatter = logging.Formatter()
+    _traceback_formatter = AppLogFormatter()
 
     def filter(self, record: logging.LogRecord) -> bool:
         if record.exc_info and not record.exc_text:

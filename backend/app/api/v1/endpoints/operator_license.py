@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.datastructures import UploadFile as StarletteUploadFile
 
 from app.api.deps import get_current_admin, get_current_operator
+from app.core.error_summary import describe_exception
 from app.core.http_errors import http_exception_factory
 from app.core.masking import mask_email
 from app.db.models.operator import Operator
@@ -155,7 +156,7 @@ async def upload_license_image(
         logger.error(
             "operator_license: 許可証画像の保存に失敗 - operator_id=%s - %s",
             operator_id,
-            exc,
+            describe_exception(exc),
             exc_info=True,
         )
         raise HTTPException(

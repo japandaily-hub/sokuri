@@ -49,6 +49,7 @@ from app.api.deps import get_optional_user
 from app.api.json_body_deps import require_json_body
 from app.api.rate_limit_deps import RateLimitGuard
 from app.config import get_settings
+from app.core.error_summary import describe_exception
 from app.db.models.contact_message import ContactMessage
 from app.db.models.user import User
 from app.db.session import get_session
@@ -224,11 +225,12 @@ async def create_contact(
         contact_id = contact_message.id
     except Exception as exc:  # noqa: BLE001 -- 保存失敗でメール送信を止めない
         await session.rollback()
-        # 本文・氏名・メールは PII のためログに出さない（例外種別と要旨のみ）。
+        # 本文・氏名・メールは PII のためログに出さない（例外種別と要旨のみ）。DB 例外の文言は
+        # DETAIL（重複したキーの値・CHECK 違反の行全体＝氏名・メール・本文）を含むため、
+        # describe_exception で型・SQLSTATE・制約名だけにする（アラート本文も同じ）。
         logger.error(
-            "contact: お問い合わせの保存に失敗しました（メール送信は継続） - %s: %s",
-            type(exc).__name__,
-            str(exc)[:200],
+            "contact: お問い合わせの保存に失敗しました（メール送信は継続） - %s",
+            describe_exception(exc),
             exc_info=True,
         )
         alerts.fire_and_forget(
@@ -236,7 +238,7 @@ async def create_contact(
                 "/contact の DB 保存に失敗しています",
                 "お問い合わせの受信台帳（contact_messages）への保存が失敗しました。"
                 "メール通知は継続していますが、管理画面の一覧には現れません。"
-                f"直近のエラー: {type(exc).__name__}: {str(exc)[:200]}",
+                f"直近のエラー: {describe_exception(exc)}",
                 severity="warning",
                 key="contact-persist-failed",
             )

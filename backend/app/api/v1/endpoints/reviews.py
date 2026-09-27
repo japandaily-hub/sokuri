@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import Actor, get_current_actor
+from app.core.error_summary import db_error_info, is_unique_violation
 from app.db.models.bid import Bid
 from app.db.models.case import Case
 from app.db.models.transaction import Review, Transaction
@@ -37,17 +38,15 @@ router = APIRouter()
 
 
 # 同一取引・同一投稿者は1件（uq_reviews_transaction_reviewer）。この一意制約の違反だけを 409 にする。
-_DUPLICATE_REVIEW_CONSTRAINT = "uq_reviews_transaction_reviewer"
-_PG_UNIQUE_VIOLATION = "23505"
-# SQLite（テスト）は sqlstate も制約名も返さないため、一意制約の列の組を含む文言で判別する。
-_SQLITE_DUPLICATE_REVIEW_MESSAGE = (
-    "UNIQUE constraint failed: reviews.transaction_id, reviews.reviewer_type"
-)
+_DUPLICATE_REVIEW_CONSTRAINTS = frozenset({"uq_reviews_transaction_reviewer"})
+# SQLite（テスト）は sqlstate も制約名も返さないため、一意制約の列の組の文言で判別する。
+_SQLITE_DUPLICATE_REVIEW_COLUMNS = "reviews.transaction_id, reviews.reviewer_type"
 
 
 def _classify_integrity_error(exc: IntegrityError) -> tuple[bool, str | None, str | None]:
     """IntegrityError を (uq_reviews_transaction_reviewer の違反か, sqlstate, 制約名) に分類する。
 
+    判別と取り出しは app/core/error_summary.py（is_unique_violation・db_error_info）に一本化している。
     PostgreSQL（asyncpg）: SQLAlchemy の asyncpg アダプタ（sqlalchemy/dialects/postgresql/asyncpg.py の
     AsyncAdapt_asyncpg_connection._handle_exception）は、元の asyncpg 例外を ``raise … from error`` で
     __cause__ に付け、その sqlstate を orig の pgcode / sqlstate に写す。制約名は元の例外の
@@ -55,16 +54,13 @@ def _classify_integrity_error(exc: IntegrityError) -> tuple[bool, str | None, st
     SQLite: sqlstate が無いため、エラー文言（sqlite3 の例外は SQL・パラメータを含まない）で判別する。
     例外の文字列全体（SQLAlchemy の例外は SQL とパラメータ＝口コミ本文を含む）はログに出さないこと。
     """
-    orig = exc.orig
-    sqlstate = getattr(orig, "sqlstate", None) or getattr(orig, "pgcode", None)
-    constraint = getattr(getattr(orig, "__cause__", None), "constraint_name", None)
-    if sqlstate is not None:
-        is_duplicate = (
-            sqlstate == _PG_UNIQUE_VIOLATION and constraint == _DUPLICATE_REVIEW_CONSTRAINT
-        )
-    else:
-        is_duplicate = _SQLITE_DUPLICATE_REVIEW_MESSAGE in str(orig)
-    return is_duplicate, sqlstate, constraint
+    info = db_error_info(exc)
+    is_duplicate = is_unique_violation(
+        exc, _DUPLICATE_REVIEW_CONSTRAINTS, sqlite_columns=_SQLITE_DUPLICATE_REVIEW_COLUMNS
+    )
+    if info is None:
+        return is_duplicate, None, None
+    return is_duplicate, info.sqlstate, info.constraint
 
 
 def _reviewer_type_if_allowed(

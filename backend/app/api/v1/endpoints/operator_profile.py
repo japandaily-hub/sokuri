@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.cross_site_deps import reject_cross_site_browser_request
 from app.api.deps import get_current_operator
 from app.api.rate_limit_deps import RateLimitGuard
+from app.core.error_summary import describe_exception
 from app.core.http_errors import http_exception_factory
 from app.core.security import (
     REAUTH_TOKEN_EXPIRE_MINUTES,
@@ -80,7 +81,7 @@ async def _get_or_create_profile(session: AsyncSession, operator_id: uuid.UUID) 
             logger.error(
                 "operator_profile: 初回プロフィール自動作成に失敗 - operator_id=%s - %s",
                 operator_id,
-                exc,
+                describe_exception(exc),
                 exc_info=True,
             )
             raise HTTPException(
@@ -525,7 +526,7 @@ async def _delete_and_anonymize_operator(session: AsyncSession, operator: Operat
         logger.error(
             "operator/me delete: 退会処理のコミットに失敗 - operator_id=%s - %s",
             deleted_operator_id,
-            exc,
+            describe_exception(exc),
             exc_info=True,
         )
         raise HTTPException(

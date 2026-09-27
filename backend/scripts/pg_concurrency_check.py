@@ -472,6 +472,55 @@ async def s5_idempotent_case(
         sc.check(len(ids) == 1, f"r{i}: 返却された案件 id が {len(ids)} 種（期待 1）")
 
 
+async def s10_signup_duplicate_email_race(pg: asyncpg.Connection, sc: Scenario) -> None:
+    """(10) 同じメールアドレスでの signup 同時2連投（依頼者・業者）→ [201, 409]・アカウントは1件。
+
+    事前確認（SELECT）は2本ともすり抜けうるため、後発は一意制約（uq_users_email・
+    uq_operators_contact_email）に当たる。2026-09-27 まではここが未処理例外（500）で、例外の DETAIL に
+    メールアドレスが載ってログ・運営アラートへ残った。事前確認と同じ 409・同じ文言になること。
+    """
+    taken = "このメールアドレスは既に登録されています。"
+    for i in range(ROUNDS):
+        user_email = f"pgsignup-{RUN_ID}-{i}@example.com"
+
+        async def do_user_signup(cc: httpx.AsyncClient) -> httpx.Response:
+            return await cc.post(
+                f"{V1}/auth/signup", json={"email": user_email, "password": PASSWORD, "name": "同時 登録"}
+            )
+
+        rs = await volley(do_user_signup, do_user_signup)
+        n_user = await pg.fetchval("SELECT count(*) FROM users WHERE email = $1", user_email)
+        details = [r.json().get("detail") for r in rs if r.status_code == 409]
+        sc.codes.append(f"user r{i}: {codes(rs)}")
+        sc.facts.append(f"user r{i}: users={n_user}")
+        sc.check(codes(rs) == [201, 409], f"user r{i}: 応答が [201,409] でない: {codes(rs)}")
+        sc.check(n_user == 1, f"user r{i}: 依頼者が {n_user} 件（期待 1）")
+        sc.check(details == [taken], f"user r{i}: 409 の文言が事前確認と違う: {details}")
+
+        operator_email = f"pgsignup-op-{RUN_ID}-{i}@example.com"
+        operator_body = {
+            "company_name": f"同時登録検証業者 {i}",
+            "email": operator_email,
+            "password": PASSWORD,
+            "license_number": "第301234567890号",
+            "agreed": True,
+        }
+
+        async def do_operator_signup(cc: httpx.AsyncClient) -> httpx.Response:
+            return await cc.post(f"{V1}/auth/operator/signup", json=operator_body)
+
+        rs = await volley(do_operator_signup, do_operator_signup)
+        n_operator = await pg.fetchval(
+            "SELECT count(*) FROM operators WHERE contact_email = $1", operator_email
+        )
+        details = [r.json().get("detail") for r in rs if r.status_code == 409]
+        sc.codes.append(f"operator r{i}: {codes(rs)}")
+        sc.facts.append(f"operator r{i}: operators={n_operator}")
+        sc.check(codes(rs) == [201, 409], f"operator r{i}: 応答が [201,409] でない: {codes(rs)}")
+        sc.check(n_operator == 1, f"operator r{i}: 業者が {n_operator} 件（期待 1）")
+        sc.check(details == [taken], f"operator r{i}: 409 の文言が事前確認と違う: {details}")
+
+
 async def s6_admin_cancel_vs_complete(
     c: httpx.AsyncClient, pg: asyncpg.Connection, admin_token: str, user_token: str, sc: Scenario
 ) -> None:
@@ -854,6 +903,9 @@ async def run() -> int:
         Scenario("S7", "最後の管理者2人の同時退会・相互降格・退会と降格の同時実行"),
         Scenario("S8", "運営の口コミ削除の同時2連投・元に戻すの同時2連投・削除と元に戻す・投稿と削除の同時実行"),
     ]
+    # S10 は新規アカウントだけを使う独立のシナリオ（添字ではなく変数で渡す）。
+    signup_race = Scenario("S10", "同じメールアドレスでの signup 同時2連投（依頼者・業者）")
+    scenarios.append(signup_race)
     try:
         async with httpx.AsyncClient(timeout=60) as c:
             admin_token, admin_user = await signup_user(c, ADMIN_EMAIL, "運営 太郎")
@@ -872,6 +924,7 @@ async def run() -> int:
             await s4_cancel_double(c, pg, admin_token, user_token, scenarios[3])
             await s5_idempotent_case(c, pg, user_id, user_token, scenarios[4])
             await s6_admin_cancel_vs_complete(c, pg, admin_token, user_token, scenarios[5])
+            await s10_signup_duplicate_email_race(pg, signup_race)
             # S8 は運営アカウントの admin 権限を使う（2人目の運営は S8 の中で昇格・降格する）ため、
             # S7 より前に流す。
             await s8_review_hide_race(

@@ -33,6 +33,7 @@ from starlette.datastructures import UploadFile as StarletteUploadFile
 from app.api.deps import get_current_user
 from app.api.rate_limit_deps import RateLimitGuard
 from app.config import get_settings
+from app.core.error_summary import describe_exception
 from app.core.http_errors import http_exception_factory
 from app.db.models.user import (
     IDENTITY_STATUS_APPROVED,
@@ -313,7 +314,7 @@ async def submit_identity_document(
         logger.error(
             "user_identity: 本人確認書類の保存に失敗 - user_id=%s - %s",
             user_id,
-            exc,
+            describe_exception(exc),
             exc_info=True,
         )
         raise HTTPException(

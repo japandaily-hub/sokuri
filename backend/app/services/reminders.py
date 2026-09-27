@@ -46,6 +46,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.error_summary import describe_exception
 from app.db.models.bid import BID_STATUS_PENDING, BID_STATUS_WITHDRAWN, Bid
 from app.db.models.case import Case
 from app.db.models.operator import Operator
@@ -364,6 +365,8 @@ async def _dispatch_or_warn(
     送信済みマーカーは既に commit 済みのため、ここで例外を伝播させても再送には
     ならず「1周分の残りの通知を巻き添えで落とす」だけになる。よって握り潰し、
     運営が気付けるよう warning のアラートを1本上げる（key でクールダウン）。
+    例外の説明は describe_exception（DB 例外は型・SQLSTATE・制約名だけ。文言の DETAIL に
+    宛先や行の値が入るため）。
     """
     try:
         await dispatch(*args)
@@ -371,14 +374,14 @@ async def _dispatch_or_warn(
         logger.error(
             "reminders: 通知の送信に失敗（マーカー確定済みのため再送しない） - %s - %s",
             context,
-            exc,
+            describe_exception(exc),
             exc_info=True,
         )
         alerts.fire_and_forget(
             alerts.send_alert(
                 "リマインド通知の送信に失敗しました",
                 "掘り起こし通知が1件届いていない可能性があります（再送はされません）。"
-                f"対象: {context} / エラー: {type(exc).__name__}: {str(exc)[:200]}",
+                f"対象: {context} / エラー: {describe_exception(exc)}",
                 severity="warning",
                 key="reminder_dispatch_failed",
             )

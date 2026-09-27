@@ -29,6 +29,7 @@ from app.api.deps import (
 from app.api.json_body_deps import require_json_body
 from app.api.rate_limit_deps import RateLimitGuard
 from app.config import get_settings
+from app.core.error_summary import describe_exception, is_unique_violation
 from app.core.http_errors import http_exception_factory
 from app.core.masking import mask_email
 from app.core.security import (
@@ -163,6 +164,38 @@ _LINE_NOT_CONFIGURED = http_exception_factory(
     detail="LINEログイン機能は現在ご利用いただけません。",
 )
 
+# 登録済みのメールアドレス・使用済みの招待コード。signup の事前確認（SELECT）と、同時登録で事前確認を
+# すり抜けた後発が一意制約に当たった場合とで同じ応答にする（二度押し・並行リクエストで 500 にしない）。
+_EMAIL_ALREADY_REGISTERED = http_exception_factory(
+    status_code=status.HTTP_409_CONFLICT,
+    detail="このメールアドレスは既に登録されています。",
+)
+_INVITE_CODE_UNAVAILABLE = http_exception_factory(
+    status_code=status.HTTP_403_FORBIDDEN,
+    detail="招待コードが無効、または既に使用されています。",
+)
+
+# 事前確認の対象と同じ一意制約（error_summary.is_unique_violation で PostgreSQL は SQLSTATE 23505 と
+# 制約名、SQLite は文言で判別）。users.email は本番（alembic 0005）が UniqueConstraint
+# "uq_users_email"、モデルの create_all（unique=True, index=True）が unique index "ix_users_email"。
+# operators.invite_code は alembic 0006 の部分ユニークインデックスで、本番の PostgreSQL にだけある。
+_USER_EMAIL_UNIQUE_CONSTRAINTS = frozenset({"uq_users_email", "ix_users_email"})
+_OPERATOR_EMAIL_UNIQUE_CONSTRAINTS = frozenset({"uq_operators_contact_email"})
+_OPERATOR_INVITE_CODE_UNIQUE_CONSTRAINTS = frozenset({"uix_operators_invite_code_notnull"})
+
+
+def _operator_signup_conflict(exc: IntegrityError) -> HTTPException | None:
+    """業者登録の一意制約違反を、事前確認と同じ応答に対応付ける（該当しなければ None）。"""
+    if is_unique_violation(
+        exc, _OPERATOR_EMAIL_UNIQUE_CONSTRAINTS, sqlite_columns="operators.contact_email"
+    ):
+        return _EMAIL_ALREADY_REGISTERED()
+    if is_unique_violation(
+        exc, _OPERATOR_INVITE_CODE_UNIQUE_CONSTRAINTS, sqlite_columns="operators.invite_code"
+    ):
+        return _INVITE_CODE_UNAVAILABLE()
+    return None
+
 
 # ──────────────────────────── ユーザー ────────────────────────────
 
@@ -194,10 +227,7 @@ async def user_signup(
         )
     existing = await session.scalar(select(User).where(User.email == email))
     if existing is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="このメールアドレスは既に登録されています。",
-        )
+        raise _EMAIL_ALREADY_REGISTERED()
     # security review L-1対応: email は既に .lower() 済みだが、比較関数側と
     # 判定条件を一本化するため _is_listed_admin_email 経由で比較する。
     # N-1（Critical）対応: signup 時の admin 付与は「DB に有効な role=admin の
@@ -229,7 +259,20 @@ async def user_signup(
         user.email_notify_opt_in = body.email_notify_opt_in
         user.email_notify_updated_at = datetime.now(timezone.utc)
     session.add(user)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        if not is_unique_violation(exc, _USER_EMAIL_UNIQUE_CONSTRAINTS, sqlite_columns="users.email"):
+            raise
+        # 同じメールアドレスの同時登録で、上の事前確認をすり抜けた後発。事前確認と同じ 409 にする
+        # （従来は未処理例外＝500 で、例外の DETAIL にメールアドレスが載ってログ・アラートへ残った）。
+        # レート制限は RateLimitGuard が入口で全リクエストを数え済みで、事前確認の 409 と同じく
+        # ここでの加算・払い戻しはしない。ログは型・SQLSTATE・制約名だけ（値を出さない）。
+        logger.warning(
+            "auth/signup: 同じメールアドレスの同時登録を一意制約で拒否 - %s", describe_exception(exc)
+        )
+        raise _EMAIL_ALREADY_REGISTERED() from None
     await session.refresh(user)
     if role == "admin":
         # security review C-1対応: サインアップ時の admin 付与はアカウント奪取の
@@ -349,10 +392,7 @@ async def operator_signup(
     if body.invite_code:
         invite = await session.scalar(select(Invite).where(Invite.code == body.invite_code))
         if invite is None or invite.used_at is not None:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="招待コードが無効、または既に使用されています。",
-            )
+            raise _INVITE_CODE_UNAVAILABLE()
         # 招待コードが特定emailに紐付けて発行されている場合（admin承認フロー等）は、
         # signup時のemailと一致することを必須にする。不一致だと招待コード漏洩時に
         # 全く別人が任意emailで招待コードを横取り（消込）し、事前申込に紐付いた業者
@@ -368,10 +408,7 @@ async def operator_signup(
             )
     existing = await session.scalar(select(Operator).where(Operator.contact_email == email))
     if existing is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="このメールアドレスは既に登録されています。",
-        )
+        raise _EMAIL_ALREADY_REGISTERED()
     # 招待コードの有無に関わらず pending で登録する（2026-09-25 ユーザー決定）。
     # 招待コード経由でも古物商許可証画像の提出（POST /operator/license-image）と
     # admin 承認（PATCH /admin/operators/{id}/verify。許可証未提出だと 409）を経て
@@ -390,21 +427,36 @@ async def operator_signup(
         agreed_at=datetime.now(timezone.utc),
     )
     session.add(operator)
-    await session.flush()
-    if invite is not None:
-        invite.used_at = datetime.now(timezone.utc)
-        invite.operator_id = operator.id
-        # M-4対応: admin承認フローで発行された招待コードなら、その発行元の
-        # 事前申込（invite_codeで対応付け）に operator_id を書き戻す。
-        # 招待コードとの対応付けは OperatorApplication.invite_code
-        # （承認時に発行コードを控える。app/api/v1/endpoints/admin.py の
-        # approve_operator_application 参照）で引く。
-        application = await session.scalar(
-            select(OperatorApplication).where(OperatorApplication.invite_code == invite.code)
+    # flush・commit のどこで起きた IntegrityError も下の except で受け、事前確認と同じ一意制約の違反
+    # （同じメールアドレス・同じ招待コードの同時登録で、事前確認をすり抜けた後発）だけを事前確認と
+    # 同じ応答にする（メールは 409・招待コードは 403）。それ以外は障害として従来どおり 500。
+    # レート制限は user_signup と同じく入口で数え済み。
+    try:
+        await session.flush()
+        if invite is not None:
+            invite.used_at = datetime.now(timezone.utc)
+            invite.operator_id = operator.id
+            # M-4対応: admin承認フローで発行された招待コードなら、その発行元の
+            # 事前申込（invite_codeで対応付け）に operator_id を書き戻す。
+            # 招待コードとの対応付けは OperatorApplication.invite_code
+            # （承認時に発行コードを控える。app/api/v1/endpoints/admin.py の
+            # approve_operator_application 参照）で引く。
+            application = await session.scalar(
+                select(OperatorApplication).where(OperatorApplication.invite_code == invite.code)
+            )
+            if application is not None:
+                application.operator_id = operator.id
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        conflict = _operator_signup_conflict(exc)
+        if conflict is None:
+            raise
+        # ログは型・SQLSTATE・制約名だけ（例外の DETAIL にはメールアドレス・招待コードが載る）。
+        logger.warning(
+            "auth/operator/signup: 同時登録を一意制約で拒否 - %s", describe_exception(exc)
         )
-        if application is not None:
-            application.operator_id = operator.id
-    await session.commit()
+        raise conflict from None
     await session.refresh(operator)
     token = create_access_token(operator.id, "operator", "operator")
     return AuthTokenResponse(
@@ -861,7 +913,11 @@ async def line_exchange(
         await session.rollback()
         # line_user_id か placeholder_email の重複（レースコンディション）。
         # 通常はここに到達しない想定（事前 SELECT で existing_user None を確認済み）。
-        logger.error("auth/line/exchange: 新規User作成が一意制約違反で失敗 - %s", exc)
+        # 例外の文言は DETAIL（重複したキー＝LINE userId・プレースホルダのメール）を含むため、
+        # 型・SQLSTATE・制約名だけを残す。
+        logger.error(
+            "auth/line/exchange: 新規User作成が一意制約違反で失敗 - %s", describe_exception(exc)
+        )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="このLINEアカウントは既に別のアカウントと連携されています。",

@@ -311,8 +311,9 @@ def test_formatter_keeps_traceback_and_masks_emails_in_it():
     assert all(line.startswith("  | ") for line in rest)
     assert "taro@example.com" not in text
     assert "(t***@example.com)" in text
-    # record 側のキャッシュ（他のハンドラと共有する）は書き換えない。
-    assert "taro@example.com" in (record.exc_text or "")
+    # record 側のキャッシュ（他のハンドラと共有する exc_text）には書き込まない（マスク・要約済みの文字列を
+    # 他のハンドラへ押し付けず、先に別の書式が作った生の文字列も使い回さない。test_db_error_log_privacy.py）。
+    assert record.exc_text is None
 
 
 def test_formatter_keeps_forged_lines_inside_traceback_indented():

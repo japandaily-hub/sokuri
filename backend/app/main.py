@@ -21,6 +21,7 @@ from sqlalchemy import text
 
 from app.core.alert_middleware import ServerErrorAlertMiddleware
 from app.core.app_logging import configure_app_logging_from_env
+from app.core.error_summary import describe_exception
 from app.api.v1.router import api_router
 from app.config import Settings, get_settings
 from app.core.client_ip import (
@@ -64,7 +65,10 @@ async def _run_seed() -> None:
             await seed_channels_and_rules(session)
         logger.info("seed: チャネルシード完了")
     except Exception as exc:
-        logger.error("seed: チャネルシード失敗（サービスは継続） - %s", exc, exc_info=True)
+        # DB 例外の文言は DETAIL（キーの値・行全体）を含むため型・SQLSTATE・制約名だけにする。
+        logger.error(
+            "seed: チャネルシード失敗（サービスは継続） - %s", describe_exception(exc), exc_info=True
+        )
 
 
 async def _run_stale_pending_ai_sweep() -> None:
@@ -87,7 +91,9 @@ async def _run_stale_pending_ai_sweep() -> None:
         logger.info("cases: 起動時 pending スイープ完了 - count=%s", count)
     except Exception as exc:
         logger.error(
-            "cases: 起動時 pending スイープ失敗（サービスは継続） - %s", exc, exc_info=True
+            "cases: 起動時 pending スイープ失敗（サービスは継続） - %s",
+            describe_exception(exc),
+            exc_info=True,
         )
 
 
@@ -118,12 +124,15 @@ async def _run_reminder_loop(settings: Settings) -> None:
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # noqa: BLE001 -- 定期ループを1回の失敗で終わらせない
-            logger.error("reminders: 定期実行に失敗（次周期で再試行） - %s", exc, exc_info=True)
+            # ログ・アラートとも DB 例外は型・SQLSTATE・制約名だけ（describe_exception）。
+            logger.error(
+                "reminders: 定期実行に失敗（次周期で再試行） - %s", describe_exception(exc), exc_info=True
+            )
             alerts.fire_and_forget(
                 alerts.send_alert(
                     "リマインド定期処理が失敗しました",
                     "訪問日超過・入札ゼロ放置・入札未決定のリマインドが1周分スキップされました。"
-                    f"次の周期で自動再試行します。直近のエラー: {type(exc).__name__}: {str(exc)[:200]}",
+                    f"次の周期で自動再試行します。直近のエラー: {describe_exception(exc)}",
                     severity="warning",
                     key="reminders_loop_failed",
                 )

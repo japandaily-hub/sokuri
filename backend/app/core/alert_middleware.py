@@ -5,6 +5,9 @@
 - 5xx バースト: 直近 window 秒間の 5xx 応答（例外由来を含む）が threshold 件以上で 1 回アラート。
   再送はクールダウンに従う。
 - /health・/readyz 自身の 503 は外形監視側で拾うため集計から除外する（監視の自己言及を避ける）。
+- 未処理例外のアラート本文は ``describe_exception``: DB 例外は型・SQLSTATE・制約名だけ（PostgreSQL の
+  DETAIL＝一意制約違反のキーの値・CHECK 違反の行全体を LINE・メールへ送らない）、応答の検証エラーは
+  項目と種類だけ、それ以外は従来どおり「型: 文言」（app/core/error_summary.py）。
 """
 from __future__ import annotations
 
@@ -13,6 +16,7 @@ import time
 from collections import deque
 
 from app.config import get_settings
+from app.core.error_summary import describe_exception
 from app.services import alerts
 
 logger = logging.getLogger(__name__)
@@ -110,7 +114,7 @@ class ServerErrorAlertMiddleware:
                 alerts.fire_and_forget(
                     alerts.send_alert(
                         "未処理の例外が発生しました",
-                        f"{scope.get('method', '')} {path}\n{type(exc).__name__}: {str(exc)[:300]}",
+                        f"{scope.get('method', '')} {path}\n{describe_exception(exc, limit=300)}",
                         severity="critical",
                         key=f"unhandled:{path}",
                     )

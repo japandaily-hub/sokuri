@@ -85,6 +85,14 @@ async def run_migrations_online() -> None:
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
         connect_args=connect_args,
+        # アプリのエンジン（app/db/session.py）と同じく、development 以外では失敗した文の
+        # "[parameters: ...]" を例外文に載せない。失敗の出力は /tmp/alembic-last.log → Render の
+        # ログ・/readyz の migration_log_tail に残り、データ移行（行ごとの UPDATE 等）の引数には
+        # メール・氏名などの値が入りうるため。SQL 文・SQLSTATE・制約名・発生箇所（リビジョンの
+        # ファイルと行）は残るので、どの文が失敗したかは切り分けられる。引数の値が要るときは、
+        # 同じ SQL を DB で直接確かめるか、APP_ENV=development の手元で同じデータを再現する。
+        # 判定は app/db/session.py と同じく隠す側に倒す（綴りゆれ・未知の値でも表示しない）。
+        hide_parameters=get_settings().app_env != "development",
     )
     async with connectable.connect() as connection:
         # alembic_version.version_num はデフォルト VARCHAR(32) だが、本チェーンには

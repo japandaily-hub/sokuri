@@ -20,6 +20,7 @@ from app.api.deps import get_current_user, get_current_user_claims
 from app.api.rate_limit_deps import RateLimitGuard
 from app.config import get_settings
 from app.core.crypto import DecryptionFailedError, decrypt_json, encrypt_json
+from app.core.error_summary import describe_exception
 from app.core.http_errors import http_exception_factory
 from app.core.masking import mask_account_number
 from app.core.security import (
@@ -363,7 +364,7 @@ async def update_my_bank_account(
         logger.error(
             "users/me/bank-account PUT: 保存に失敗 - user_id=%s - %s",
             user_id,
-            exc,
+            describe_exception(exc),
             exc_info=True,
         )
         raise HTTPException(
@@ -415,7 +416,7 @@ async def delete_my_bank_account(
         logger.error(
             "users/me/bank-account DELETE: 削除に失敗 - user_id=%s - %s",
             user_id,
-            exc,
+            describe_exception(exc),
             exc_info=True,
         )
         raise HTTPException(
@@ -832,7 +833,7 @@ async def _delete_and_anonymize_user(
         logger.error(
             "users/me delete: 退会処理のコミットに失敗 - user_id=%s - %s",
             user_id,
-            exc,
+            describe_exception(exc),
             exc_info=True,
         )
         raise HTTPException(
