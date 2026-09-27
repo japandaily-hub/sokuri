@@ -64,9 +64,17 @@ class LocalDiskBackend:
         try:
             path.unlink(missing_ok=True)
         except OSError as exc:
+            # OSError の文言には失敗したファイルの絶対パス（storage_key＝無認証の capability URL を
+            # 含む）が入るため、丸めたキーと例外の種類・errno だけを残す（R2Backend と同じ扱い）。
+            # storage.mask_key_for_log は storage → storage_backends の import と循環するため
+            # ここで読み込む。
+            from app.services.storage import mask_key_for_log
+
             logger.warning(
-                "LocalDiskBackend.delete: ファイル削除に失敗（無視して続行） - error=%s",
-                exc,
+                "LocalDiskBackend.delete: ファイル削除に失敗（無視して続行） - key=%s %s errno=%s",
+                mask_key_for_log(key),
+                type(exc).__name__,
+                exc.errno,
             )
 
     async def put(self, key: str, data: bytes, content_type: str) -> None:
