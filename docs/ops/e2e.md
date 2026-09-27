@@ -191,6 +191,7 @@ docker rm -f kdz-pg
 | S6 | 運営の強制終了と依頼者の `complete` | 片方のみ成功 | status と `cancellations` が矛盾しない |
 | S7 | 有効な管理者が2人だけのときの①同時自己退会 ②相互降格 ③退会と降格の同時実行 | 成功はちょうど1件（他は 401 / 403 / 409） | 残る管理者はちょうど1人（0 人にならない） |
 | S8 | 運営の口コミ削除（`PATCH /admin/reviews/{id}/hide`）の①同時削除 ②同時に元に戻す ③削除と元に戻すの同時実行 ④同じ業者への口コミ投稿と削除の同時実行 | ①②③ `[200, 200]`・④ `[201, 200]` | 削除の記録（日時・理由・実施者）は片方の組で揃うか全て空で、業者の件数（よかった／伸びしろ／合計）が公開中の口コミの数え直しと一致 |
+| S9 | NUL・制御文字・孤立サロゲートを含む入力（チャット本文・signup の name・招待コード付き業者登録の company_name・事前申込の message・案件の address_detail・入札 message・業者プロフィール intro_message・運営の成約強制終了 reason・運営の業者検索 q 等） | すべて 422（`disallowed_character`。RLO/タブ/CR は個別バリデータの `value_error` になる欄もある）。500 にならない | 何も保存されない（メッセージ件数・users・operators・operator_applications・冪等キーの cases・案件の bids・cancellations がいずれも増えない。招待コードの `used_at` は NULL のまま・業者プロフィールは基準値のまま・成約は `pending` のまま） |
 
 S10（`s10_signup_duplicate_email_race`）: 同じメールアドレスでの `POST /auth/signup` × 2・`POST /auth/operator/signup` × 2 → それぞれ `[201, 409]`（409 の文言は事前確認と同じ）・依頼者と業者とも 1 件。事前確認（SELECT）をすり抜けた後発が一意制約（`uq_users_email`・`uq_operators_contact_email`）に当たっても 500 にならないこと（2026-09-27 までは 500 で、例外の DETAIL のメールアドレスがログ・アラートへ残った）。
 
@@ -202,6 +203,13 @@ S8 はシナリオ中だけ2人目の運営を昇格させ、終了時に一般�
 S7 はラウンド中だけ接続先 DB の他の admin を一般ユーザーへ外す（終了時に戻す）ため、接続先が
 ローカル（127.0.0.1 / localhost / ::1）でなければ実行を拒否する。前回の実行が途中で止まって
 運営アカウントが admin から外れたまま残っていても、起動時に自動で戻す。
+S9 は同時実行ではなく実 PG でしか起きない入力由来の 500 の回帰（NUL は asyncpg の
+`CharacterNotInRepertoireError`、孤立サロゲートは `DataError: surrogates not allowed`）で
+あり、`KDZ_ROUNDS` に関係なく1周だけ流す（volley は使わない）。PC1 で `SELECT $1::text` に
+NUL・孤立サロゲートを渡し、PG 自体がどちらも例外にすることを陽性対照として先に確認する
+（成り立たなければ S9 の前提そのものが崩れているとして扱う）。PC2〜PC4 で ZWJ 絵文字・国旗・
+タグ旗・改行等の許可文字・正しいサロゲートペア・通常のクエリが素通りすることも確認する。
+S9 の実行順は S8 の後・S7 の前（S7 は運営の admin 権限を一時的に外すため必ず最後）。
 
 > Docker Desktop が `initializing Inference manager` / `Secrets Engine` のソケットエラーで
 > 起動しない場合は、`%LOCALAPPDATA%\Docker\run` と `%LOCALAPPDATA%\docker-secrets-engine` を

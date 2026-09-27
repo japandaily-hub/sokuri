@@ -586,11 +586,18 @@ async def test_item_name_with_contact_info_rejected_422(
 
 
 async def test_item_name_control_chars_stripped(client: AsyncClient):
-    """CaseItem.name の制御文字・双方向制御文字はサーバ側で除去される。"""
+    """CaseItem.name の制御文字・双方向制御文字はサーバ側で除去される。
+
+    NUL（U+0000）は request_char_guard.py の全体防御（すべての JSON リクエストで
+    NUL・孤立サロゲートを一括 422）が保存前に先に拒否するため、本テストの目的
+    （制御文字が除去されて201になること）を保つには使えなくなった（本来 NUL は
+    ここで422になるべき挙動であり、その回帰は test_request_char_guard.py 側で
+    確認する）。代わりに C0 制御文字の一例として BEL（chr(0x07)）を使う。
+    RLO（chr(0x202E)。RIGHT-TO-LEFT OVERRIDE。Unicode双方向制御文字。表示崩れ・
+    なりすまし対策として除去対象）も併せて除去されることを確認する。
+    """
     token = await _signup_user(client)
-    # \x00: 制御文字。‮: RIGHT-TO-LEFT OVERRIDE（Unicode双方向制御文字。
-    # 表示崩れ・なりすまし対策として除去対象）。
-    poisoned_name = "商品\x00名‮"
+    poisoned_name = "商品" + chr(0x07) + "名" + chr(0x202E)
     payload = {
         **_base_case_fields(),
         "photos": [],

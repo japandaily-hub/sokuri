@@ -7,6 +7,7 @@
 
 import { signOut } from "next-auth/react";
 import { isProtectedRoutePath } from "./protected-routes";
+import { prepareDisplayText } from "./text-guard";
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -409,11 +410,13 @@ export function sendMessage(
   body: string,
   token: string,
 ): Promise<MessageOut> {
-  return request(`/transactions/${encodeURIComponent(transactionId)}/messages`, {
-    method: "POST",
-    body: JSON.stringify({ body }),
-    token,
-  });
+  return withTextGuard(() =>
+    request(`/transactions/${encodeURIComponent(transactionId)}/messages`, {
+      method: "POST",
+      body: JSON.stringify({ body: guardDisplayText(body, "メッセージ") }),
+      token,
+    }),
+  );
 }
 
 export function markMessagesRead(
@@ -503,11 +506,17 @@ export function updateOperatorProfile(
   payload: OperatorProfileUpdatePayload,
   token: string,
 ): Promise<OperatorProfile> {
-  return request("/operator/profile", {
-    method: "PUT",
-    body: JSON.stringify(payload),
-    token,
-  });
+  return withTextGuard(() =>
+    request("/operator/profile", {
+      method: "PUT",
+      body: JSON.stringify({
+        ...payload,
+        business_hours: guardDisplayText(payload.business_hours, "対応時間"),
+        intro_message: guardDisplayText(payload.intro_message, "業者からのメッセージ"),
+      }),
+      token,
+    }),
+  );
 }
 
 /**
@@ -880,6 +889,53 @@ async function request<T>(
   } catch (e) {
     if (e instanceof KdzApiError) throw e;
     throw new KdzNetworkError(e);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 自由記述欄の整形（text-guard.ts の sanitizeDisplayText を使う。相手や公開画面に
+// 表示される自由記述欄の文字を、backend が拒否する前に落として送信する。
+// backend の 422 は理由が画面に出ないため、貼り付けた文章に見えない制御文字が
+// 混じっていただけの利用者が送信できなくならないようにする）。
+// ---------------------------------------------------------------------------
+
+/**
+ * 表示用自由記述欄の値をサーバー送信前に整形・検証する。value が文字列以外
+ * （undefined・null）の場合はそのまま返し、キーの有無や null の意味
+ * （明示的なクリア等。例: updateMyBid の message 省略時の現状維持）を変えない。
+ * 整形後に送信できない状態（拒否文字だけ／短すぎる）であれば、backend が返す
+ * 422 と同じ理由を日本語であらかじめ示すため KdzApiError(422, ...) を投げる。
+ * この throw は同期的に発生するため、呼び出し元は withTextGuard で包むこと。
+ */
+function guardDisplayText<T extends string | null | undefined>(
+  value: T,
+  label: string,
+  opts?: { minLength?: number },
+): T {
+  if (typeof value !== "string") return value;
+  const prepared = prepareDisplayText(value, opts);
+  if (prepared.ok) return prepared.value as T;
+  if (prepared.reason === "too_short") {
+    throw new KdzApiError(422, `${label}は${prepared.minLength}文字以上で入力してください。`);
+  }
+  throw new KdzApiError(
+    422,
+    `${label}に送信できない文字（見えない制御文字など）だけが入力されています。入力し直してください。`,
+  );
+}
+
+/**
+ * guardDisplayText の同期 throw（送信前の検証エラー）を Promise の reject に変換する。
+ * 送信関数は `return withTextGuard(() => request(...))` の形で本体を包む。request() の
+ * 呼び出し引数を組み立てる途中（JSON.stringify の中）で guardDisplayText が同期的に
+ * throw しても、send() の呼び出しを try/catch で囲むことで、呼び出し元の
+ * .then().catch() でも await ... catch でも同じように拾えるようにする。
+ */
+function withTextGuard<T>(send: () => Promise<T>): Promise<T> {
+  try {
+    return send();
+  } catch (error) {
+    return Promise.reject(error);
   }
 }
 
@@ -1667,13 +1723,21 @@ export function createCase(
   /** true の場合、401/403 を受けても signOut・画面遷移を行わない（r10 M9・uploadCasePhoto と同旨）。 */
   opts?: { skipAuthRedirect?: boolean },
 ): Promise<CaseOut> {
-  return request("/cases", {
-    method: "POST",
-    body: JSON.stringify(payload),
-    token,
-    signal,
-    skipAuthRedirect: opts?.skipAuthRedirect,
-  });
+  return withTextGuard(() =>
+    request("/cases", {
+      method: "POST",
+      body: JSON.stringify({
+        ...payload,
+        city: guardDisplayText(payload.city, "市区町村"),
+        address_detail: guardDisplayText(payload.address_detail, "番地・建物名・部屋番号"),
+        housing_type: guardDisplayText(payload.housing_type, "住居タイプ"),
+        floor_plan: guardDisplayText(payload.floor_plan, "間取り"),
+      }),
+      token,
+      signal,
+      skipAuthRedirect: opts?.skipAuthRedirect,
+    }),
+  );
 }
 
 export function listMyCases(token: string): Promise<CaseOut[]> {
@@ -1796,11 +1860,16 @@ export function createBid(
   payload: { amount: number; message?: string },
   token: string,
 ): Promise<BidOut> {
-  return request(`/cases/${encodeURIComponent(caseId)}/bids`, {
-    method: "POST",
-    body: JSON.stringify(payload),
-    token,
-  });
+  return withTextGuard(() =>
+    request(`/cases/${encodeURIComponent(caseId)}/bids`, {
+      method: "POST",
+      body: JSON.stringify({
+        ...payload,
+        message: guardDisplayText(payload.message, "入札メッセージ"),
+      }),
+      token,
+    }),
+  );
 }
 
 /**
@@ -1814,11 +1883,16 @@ export function updateMyBid(
   payload: { amount: number; message?: string | null },
   token: string,
 ): Promise<BidOut> {
-  return request(`/cases/${encodeURIComponent(caseId)}/bids/me`, {
-    method: "PATCH",
-    body: JSON.stringify(payload),
-    token,
-  });
+  return withTextGuard(() =>
+    request(`/cases/${encodeURIComponent(caseId)}/bids/me`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        ...payload,
+        message: guardDisplayText(payload.message, "入札メッセージ"),
+      }),
+      token,
+    }),
+  );
 }
 
 export function selectBid(
@@ -1891,11 +1965,13 @@ export function cancelTransaction(
   reason: string | null,
   token: string,
 ): Promise<TransactionOut> {
-  return request(`/transactions/${encodeURIComponent(transactionId)}/cancel`, {
-    method: "POST",
-    body: JSON.stringify({ reason }),
-    token,
-  });
+  return withTextGuard(() =>
+    request(`/transactions/${encodeURIComponent(transactionId)}/cancel`, {
+      method: "POST",
+      body: JSON.stringify({ reason: guardDisplayText(reason, "キャンセル理由") }),
+      token,
+    }),
+  );
 }
 
 /**
@@ -1908,27 +1984,39 @@ export function cancelCase(
   reason: string | null,
   token: string,
 ): Promise<CaseOut> {
-  return request(`/cases/${encodeURIComponent(caseId)}/cancel`, {
-    method: "POST",
-    body: JSON.stringify({ reason }),
-    token,
-  });
+  return withTextGuard(() =>
+    request(`/cases/${encodeURIComponent(caseId)}/cancel`, {
+      method: "POST",
+      body: JSON.stringify({ reason: guardDisplayText(reason, "取り下げ理由") }),
+      token,
+    }),
+  );
 }
 
 // ---------------------------------------------------------------------------
 // 減額申請
 // ---------------------------------------------------------------------------
 
+/** 減額理由の最小文字数（backend の ReductionCreateRequest.reason: Field(min_length=10) と同値）。 */
+export const REDUCTION_REASON_MIN_LENGTH = 10;
+
 export function createReduction(
   transactionId: string,
   payload: { requested_amount: number; reason: string },
   token: string,
 ): Promise<ReductionOut> {
-  return request(`/transactions/${encodeURIComponent(transactionId)}/reduction`, {
-    method: "POST",
-    body: JSON.stringify(payload),
-    token,
-  });
+  return withTextGuard(() =>
+    request(`/transactions/${encodeURIComponent(transactionId)}/reduction`, {
+      method: "POST",
+      body: JSON.stringify({
+        ...payload,
+        reason: guardDisplayText(payload.reason, "減額理由", {
+          minLength: REDUCTION_REASON_MIN_LENGTH,
+        }),
+      }),
+      token,
+    }),
+  );
 }
 
 export function decideReduction(

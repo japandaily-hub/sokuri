@@ -14,6 +14,7 @@ from pydantic import (
     EmailStr,
     Field,
     StringConstraints,
+    ValidationInfo,
     field_validator,
     model_validator,
 )
@@ -29,7 +30,10 @@ from app.core.limits import (
 )
 from app.db.models.enums import ItemCondition
 from app.services.message_guard import contains_contact_info
-from app.services.text_sanitize import normalize_and_strip_control_chars
+from app.services.text_sanitize import (
+    normalize_and_strip_control_chars,
+    reject_disallowed_display_chars,
+)
 
 # ──────────────────────────── 認証 ────────────────────────────
 
@@ -653,6 +657,16 @@ ServiceAreaPrefecture = Literal["東京都", "千葉県", "埼玉県", "神奈�
 SERVICE_AREA_PREFECTURES: tuple[str, ...] = get_args(ServiceAreaPrefecture)
 
 
+#: CaseCreateRequest の表示用自由記述欄 → 項目名（field_validator 側で
+#: info.field_name から引く。OperatorProfileUpdateRequest と同じ理由でモジュールレベルに置く）。
+_CASE_CREATE_TEXT_FIELD_LABELS: dict[str, str] = {
+    "city": "市区町村",
+    "address_detail": "番地・建物名・部屋番号",
+    "housing_type": "住居タイプ",
+    "floor_plan": "間取り",
+}
+
+
 class CaseCreateRequest(BaseModel):
     purpose: CasePurpose
     prefecture: ServiceAreaPrefecture
@@ -671,6 +685,20 @@ class CaseCreateRequest(BaseModel):
     # 同一ユーザー・同一キーの案件が直近10分に存在すれば新規作成せず 200 で
     # 既存案件を返す（r6 H-1）。未指定時は従来どおり常に新規作成する。
     idempotency_key: str | None = Field(default=None, max_length=64)
+
+    @field_validator(*_CASE_CREATE_TEXT_FIELD_LABELS)
+    @classmethod
+    def _validate_display_text(cls, v: str | None, info: ValidationInfo) -> str | None:
+        """業者に表示される住所・住居情報。制御文字・双方向制御文字を拒否する。
+
+        ``address_detail`` は長さ制約が無い（Field(max_length=...) を持たない）欄だが、
+        ここは mode="after"（既定）で走るため型は str | None に確定済みであり、
+        制約の有無に関わらず同じ判定を適用できる。孤立サロゲートを含む場合も
+        ここで日本語の理由付きで 422 になる（従来は保存時に asyncpg の
+        DataError で 500 になっていた欄。docs/ops/e2e.md 参照）。
+        """
+        label = _CASE_CREATE_TEXT_FIELD_LABELS[info.field_name]
+        return reject_disallowed_display_chars(v, field_label=label)
 
     @model_validator(mode="after")
     def _validate_total_photo_count(self) -> "CaseCreateRequest":
@@ -692,6 +720,16 @@ class CaseCancelRequest(BaseModel):
     """出品取り下げ（ユーザー向け）。TransactionCancelRequest と同型。"""
 
     reason: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("reason")
+    @classmethod
+    def _validate_display_text(cls, v: str | None) -> str | None:
+        """取り下げ理由（キャンセル記録に残る自由記述）。制御文字・双方向制御文字を拒否する。
+
+        現在はどの API からも読み出されない記録用の欄だが、同じ「理由」欄である成約の
+        キャンセル理由（相手方に表示される）と基準を揃えておく。
+        """
+        return reject_disallowed_display_chars(v, field_label="取り下げ理由")
 
 
 class CaseOut(BaseModel):
@@ -759,6 +797,12 @@ class BidCreateRequest(BaseModel):
     amount: int = Field(gt=0, le=100_000_000)
     message: str | None = Field(default=None, max_length=2000)
 
+    @field_validator("message")
+    @classmethod
+    def _validate_display_text(cls, v: str | None) -> str | None:
+        """依頼者に表示される入札メッセージ。制御文字・双方向制御文字を拒否する。"""
+        return reject_disallowed_display_chars(v, field_label="入札メッセージ")
+
 
 class BidUpdateRequest(BaseModel):
     """自社入札の引き上げ（``PATCH /cases/{case_id}/bids/me``）。
@@ -770,6 +814,16 @@ class BidUpdateRequest(BaseModel):
 
     amount: int = Field(gt=0, le=100_000_000)
     message: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("message")
+    @classmethod
+    def _validate_display_text(cls, v: str | None) -> str | None:
+        """依頼者に表示される入札メッセージ。制御文字・双方向制御文字を拒否する。
+
+        省略時（キー自体を送らない）はバリデータが呼ばれないため、fields_set による
+        「省略＝現状維持」判定（bids.py の PATCH /cases/{case_id}/bids/me）には影響しない。
+        """
+        return reject_disallowed_display_chars(v, field_label="入札メッセージ")
 
 
 class BidOut(BaseModel):
@@ -947,6 +1001,12 @@ class TransactionDetailOut(TransactionOut):
 class TransactionCancelRequest(BaseModel):
     reason: str | None = Field(default=None, max_length=2000)
 
+    @field_validator("reason")
+    @classmethod
+    def _validate_display_text(cls, v: str | None) -> str | None:
+        """相手方に表示されるキャンセル理由。制御文字・双方向制御文字を拒否する。"""
+        return reject_disallowed_display_chars(v, field_label="キャンセル理由")
+
 
 class TransactionListItem(BaseModel):
     """成約一覧（当事者向け・住所詳細なし）。"""
@@ -983,6 +1043,12 @@ class TransactionListItem(BaseModel):
 class ReductionCreateRequest(BaseModel):
     requested_amount: int = Field(gt=0)
     reason: str = Field(min_length=10, max_length=2000)
+
+    @field_validator("reason")
+    @classmethod
+    def _validate_display_text(cls, v: str) -> str:
+        """相手方に表示される減額理由。制御文字・双方向制御文字を拒否する。"""
+        return reject_disallowed_display_chars(v, field_label="減額理由")
 
 
 class ReductionDecisionRequest(BaseModel):
@@ -1356,6 +1422,12 @@ class OperatorApplicationApproveResponse(BaseModel):
 class MessageCreateRequest(BaseModel):
     body: str = Field(min_length=1, max_length=2000)
 
+    @field_validator("body")
+    @classmethod
+    def _validate_display_text(cls, v: str) -> str:
+        """相手に表示されるチャット本文。制御文字・双方向制御文字を拒否する（黙って除去しない）。"""
+        return reject_disallowed_display_chars(v, field_label="メッセージ")
+
 
 class MessageOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -1517,6 +1589,15 @@ class OperatorProfileOut(BaseModel):
     license_image_uploaded_at: datetime | None = None
 
 
+#: OperatorProfileUpdateRequest の表示用自由記述欄 → 項目名（field_validator 側で
+#: info.field_name から引く。クラス内に "_" 付きで定義すると Pydantic の private
+#: attribute 扱いになり model に混入してしまうため、モジュールレベルに置く）。
+_OPERATOR_PROFILE_TEXT_FIELD_LABELS: dict[str, str] = {
+    "intro_message": "業者からのメッセージ",
+    "business_hours": "対応時間",
+}
+
+
 class OperatorProfileUpdateRequest(BaseModel):
     """編集可能項目のみ受け付ける。審査確定項目（会社名・許可番号等）は含めない。"""
 
@@ -1545,6 +1626,13 @@ class OperatorProfileUpdateRequest(BaseModel):
                 raise ValueError("エリア・カテゴリに電話番号・メールアドレス・URLは記載できません。")
             cleaned.append(text)
         return cleaned
+
+    @field_validator(*_OPERATOR_PROFILE_TEXT_FIELD_LABELS)
+    @classmethod
+    def _validate_display_text(cls, v: str | None, info: ValidationInfo) -> str | None:
+        """依頼者に表示される自己紹介文・対応時間。制御文字・双方向制御文字を拒否する。"""
+        label = _OPERATOR_PROFILE_TEXT_FIELD_LABELS[info.field_name]
+        return reject_disallowed_display_chars(v, field_label=label)
 
 
 class OperatorPublicProfileOut(BaseModel):

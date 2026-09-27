@@ -30,6 +30,7 @@ Docker で立てた実 PostgreSQL に実マイグレーションを当てた環�
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import sys
 import uuid
@@ -90,6 +91,63 @@ def must(r: httpx.Response, *ok: int) -> dict[str, Any]:
     if r.status_code not in ok:
         raise ApiError(f"{r.request.method} {r.request.url} -> {r.status_code}: {r.text[:300]}")
     return r.json() if r.content else {}
+
+
+def ascii_json(obj: Any) -> bytes:
+    """孤立サロゲートを含みうる payload を安全に送るための ASCII エスケープ JSON バイト列。
+
+    httpx の ``json=`` 引数は内部で ``json.dumps(..., ensure_ascii=False)`` してから
+    UTF-8 へエンコードするため、孤立サロゲート（例: ``chr(0xD800)``）を含む値は送信前に
+    ``UnicodeEncodeError`` になる（実測。backend/tests/test_display_text_guard.py の
+    ``_post_json_allow_surrogates`` と同じ理由）。``ensure_ascii=True`` で ``\\uXXXX``
+    形式へエスケープした ASCII バイト列として送れば、サーバー側の ``json.loads`` が
+    同じ孤立サロゲートへ復元した状態で受け取れる。呼び出し側で
+    ``headers={**auth(token), "content-type": "application/json"}`` を明示すること
+    （``content=`` は httpx が Content-Type を自動付与しないため）。
+    """
+    return json.dumps(obj, ensure_ascii=True).encode("ascii")
+
+
+def probe(
+    sc: Scenario,
+    label: str,
+    r: httpx.Response,
+    *,
+    expected_type: str,
+    expected_loc: list[Any] | None = None,
+    msg_contains: str | None = None,
+) -> None:
+    """拒否レスポンスの形状（422・detail[0].type・loc・msg）を検査して sc に記録する。
+
+    ``!= 500`` を個別に check することで、422 になったこと自体の検証と「500 に
+    ならなかった」ことの検証を取り違えない（422 を期待して 500 が返っても
+    ``r.status_code == 422`` の check だけでは「500 でない」ことの明示的な失格に
+    ならず、他の failures に埋もれて読み落とされうるため）。
+    """
+    sc.codes.append(f"{label}: {r.status_code}")
+    sc.check(r.status_code != 500, f"{label}: 500 になった - {r.text[:200]}")
+    sc.check(r.status_code == 422, f"{label}: 422 でない: {r.status_code} - {r.text[:200]}")
+    if r.status_code != 422:
+        return
+    detail = r.json().get("detail") or []
+    sc.check(bool(detail), f"{label}: detail が空")
+    if not detail:
+        return
+    entry = detail[0]
+    sc.check(
+        entry.get("type") == expected_type,
+        f"{label}: type が {entry.get('type')!r}（期待 {expected_type!r}）",
+    )
+    if expected_loc is not None:
+        sc.check(
+            entry.get("loc") == expected_loc,
+            f"{label}: loc が {entry.get('loc')!r}（期待 {expected_loc!r}）",
+        )
+    if msg_contains is not None:
+        sc.check(
+            msg_contains in entry.get("msg", ""),
+            f"{label}: msg に {msg_contains!r} を含まない: {entry.get('msg')!r}",
+        )
 
 
 async def volley(*factories: Any) -> list[httpx.Response]:
@@ -853,6 +911,309 @@ async def s8_review_hide_race(
         await pg.execute("UPDATE users SET role = 'user' WHERE id = $1", uuid.UUID(admin_b_id))
 
 
+async def s9_unsafe_input_rejected(
+    c: httpx.AsyncClient, pg: asyncpg.Connection, admin_token: str, user_token: str, sc: Scenario
+) -> None:
+    """(9) NUL・制御文字・孤立サロゲートの入力（実 PG）: 500 にならず 422・何も保存されない。
+
+    S9 は入力検証の実 PG 回帰。他シナリオと異なり同時実行の検証ではないため、
+    KDZ_ROUNDS に関係なく1周だけ流す（volley は使わない）。日程 API
+    （``/schedule/propose``・``/schedule/confirm``）は使わない（別ブランチの 0046 で
+    修正予定の ``messages.kind`` VARCHAR(16) 超過により、実 PG では内容に関係なく
+    500 になる既知の別不具合があるため）。
+    """
+    txn_id, op_token = await new_transaction(c, admin_token, user_token, "s9")
+    case_id = await new_case(c, user_token)
+    invite_code = await new_invite(c, admin_token)
+    profile = must(await c.get(f"{V1}/operator/profile", headers=auth(op_token)), 200)
+    op_id = profile["operator_id"]
+
+    # ── 陽性対照（先に）: PG 自体が本当に NUL・孤立サロゲートを拒否することを確認する。
+    # 成り立たなければ「実 PG では 500 になる」という S9 の前提が崩れているため、
+    # 以降の 422 確認そのものが無意味になる（前提崩れは明示的に failures へ積む）。
+    try:
+        await pg.fetchval("SELECT $1::text", "x" + chr(0x00))
+        sc.check(False, "PC1: PG が NUL 入り text を例外なく受理した（S9 の前提崩れ）")
+    except Exception as exc:  # noqa: BLE001 -- 例外型そのものが確認対象
+        sc.facts.append(f"PC1: NUL は PG で {type(exc).__name__}")
+    try:
+        await pg.fetchval("SELECT $1::text", "x" + chr(0xD800))
+        sc.check(False, "PC1: PG が孤立サロゲート入り text を例外なく受理した（S9 の前提崩れ）")
+    except Exception as exc:  # noqa: BLE001
+        sc.facts.append(f"PC1: 孤立サロゲートは PG で {type(exc).__name__}")
+
+    # PC2: 改行・ZWJ 家族絵文字・国旗・タグ旗・ZWNJ・ZWSP・BOM・ソフトハイフン・0xE000・
+    # U+2028 を含むメッセージ → 201 で DB の body が完全一致する（除去も拒否もされない）。
+    allowed_body = (
+        "よろしくお願いします" + chr(0x0A)
+        + chr(0x1F468) + chr(0x200D) + chr(0x1F469) + chr(0x200D) + chr(0x1F467)  # ZWJ家族
+        + chr(0x1F1EF) + chr(0x1F1F5)  # 国旗（日本）
+        + chr(0x1F3F4) + chr(0xE0067) + chr(0xE0062) + chr(0xE0065) + chr(0xE006E) + chr(0xE0067) + chr(0xE007F)  # タグ旗
+        + chr(0x200C) + chr(0x200B) + chr(0xFEFF) + chr(0x00AD)  # ZWNJ・ZWSP・BOM・ソフトハイフン
+        + chr(0xE000) + chr(0x2028)  # 私用領域・LINE SEPARATOR
+    )
+    r_pc2 = must(
+        await c.post(
+            f"{V1}/transactions/{txn_id}/messages",
+            json={"body": allowed_body},
+            headers=auth(user_token),
+        ),
+        201,
+    )
+    db_body_pc2 = await pg.fetchval(
+        "SELECT body FROM messages WHERE id = $1", uuid.UUID(r_pc2["id"])
+    )
+    sc.check(db_body_pc2 == allowed_body, "PC2: 許可文字入りメッセージの body が DB と完全一致しない")
+
+    # PC3: ASCII エスケープの正しいペア絵文字 → 201（孤立サロゲートに分解されない）。
+    r_pc3 = must(
+        await c.post(
+            f"{V1}/transactions/{txn_id}/messages",
+            content=ascii_json({"body": "ok" + chr(0x1F600)}),
+            headers={**auth(user_token), "content-type": "application/json"},
+        ),
+        201,
+    )
+    sc.check(
+        r_pc3["body"] == "ok" + chr(0x1F600), "PC3: 正しいペア絵文字の body が一致しない"
+    )
+
+    # PC4: 通常の文字での検索クエリ → 200（クエリ検査が正常系を妨げない）。
+    r_pc4 = await c.get(
+        f"{V1}/admin/operators", params={"q": "通常の文字"}, headers=auth(admin_token)
+    )
+    sc.check(r_pc4.status_code == 200, f"PC4: 通常のクエリが {r_pc4.status_code}（期待 200）")
+
+    messages_baseline = await pg.fetchval(
+        "SELECT count(*) FROM messages WHERE transaction_id = $1", uuid.UUID(txn_id)
+    )
+    sc.facts.append(f"陽性対照後のメッセージ件数: {messages_baseline}（期待 2）")
+    sc.check(messages_baseline == 2, f"PC2・PC3 後のメッセージ件数が {messages_baseline}（期待 2）")
+
+    # ── 拒否（すべて 422。!= 500 も個別に check） ──
+    # P1-P3: body に NUL / ASCII エスケープ孤立サロゲート / 生バイト孤立サロゲート。
+    r_p1 = await c.post(
+        f"{V1}/transactions/{txn_id}/messages",
+        json={"body": "ng" + chr(0x00)},
+        headers=auth(user_token),
+    )
+    probe(sc, "P1", r_p1, expected_type="disallowed_character", expected_loc=["body", "body"])
+
+    r_p2 = await c.post(
+        f"{V1}/transactions/{txn_id}/messages",
+        content=ascii_json({"body": "ng" + chr(0xD800)}),
+        headers={**auth(user_token), "content-type": "application/json"},
+    )
+    probe(sc, "P2", r_p2, expected_type="disallowed_character", expected_loc=["body", "body"])
+
+    raw_body = b'{"body": "ng' + chr(0xD800).encode("utf-8", "surrogatepass") + b'"}'
+    r_p3 = await c.post(
+        f"{V1}/transactions/{txn_id}/messages",
+        content=raw_body,
+        headers={**auth(user_token), "content-type": "application/json"},
+    )
+    probe(sc, "P3", r_p3, expected_type="disallowed_character", expected_loc=["body", "body"])
+
+    # P4: キーに NUL（応答の loc は U+FFFD に置換される。値は反射しない）。
+    r_p4 = await c.post(
+        f"{V1}/transactions/{txn_id}/messages",
+        content=ascii_json({"body": "ok", "k" + chr(0x00): 1}),
+        headers={**auth(user_token), "content-type": "application/json"},
+    )
+    probe(
+        sc,
+        "P4",
+        r_p4,
+        expected_type="disallowed_character",
+        expected_loc=["body", "k" + chr(0xFFFD)],
+    )
+
+    # P5-P7: RLO / タブ / CR は全体防御（NUL・孤立サロゲートだけが対象）を素通りし、
+    # 表示用バリデータ（field_validator）が日本語文言の value_error で拒否する経路。
+    for label, ch in (("P5", chr(0x202E)), ("P6", chr(0x09)), ("P7", chr(0x0D))):
+        r = await c.post(
+            f"{V1}/transactions/{txn_id}/messages",
+            json={"body": "ng" + ch},
+            headers=auth(user_token),
+        )
+        probe(
+            sc,
+            label,
+            r,
+            expected_type="value_error",
+            msg_contains="メッセージに制御文字を含めることはできません。",
+        )
+
+    messages_after_rejections = await pg.fetchval(
+        "SELECT count(*) FROM messages WHERE transaction_id = $1", uuid.UUID(txn_id)
+    )
+    sc.check(
+        messages_after_rejections == messages_baseline,
+        f"P1-P7 拒否後もメッセージ件数が {messages_after_rejections}（期待 {messages_baseline}）",
+    )
+
+    # P8・P9: POST /auth/signup（認証なし）name に NUL / 孤立サロゲート。
+    email_p8 = f"s9-p8-{RUN_ID}@example.com"
+    r_p8 = await c.post(
+        f"{V1}/auth/signup",
+        json={"email": email_p8, "password": PASSWORD, "name": "x" + chr(0x00)},
+    )
+    probe(sc, "P8", r_p8, expected_type="disallowed_character", expected_loc=["body", "name"])
+    n_users_p8 = await pg.fetchval(
+        "SELECT count(*) FROM users WHERE lower(email) = lower($1)", email_p8
+    )
+    sc.check(n_users_p8 == 0, f"P8: users に {n_users_p8} 件作成された（期待 0）")
+
+    email_p9 = f"s9-p9-{RUN_ID}@example.com"
+    r_p9 = await c.post(
+        f"{V1}/auth/signup",
+        content=ascii_json({"email": email_p9, "password": PASSWORD, "name": "x" + chr(0xD800)}),
+        headers={"content-type": "application/json"},
+    )
+    probe(sc, "P9", r_p9, expected_type="disallowed_character", expected_loc=["body", "name"])
+    n_users_p9 = await pg.fetchval(
+        "SELECT count(*) FROM users WHERE lower(email) = lower($1)", email_p9
+    )
+    sc.check(n_users_p9 == 0, f"P9: users に {n_users_p9} 件作成された（期待 0）")
+
+    # P10: POST /auth/operator/signup（認証なし）company_name に NUL（未使用の招待コード付き）。
+    email_p10 = f"s9-p10-{RUN_ID}@example.com"
+    r_p10 = await c.post(
+        f"{V1}/auth/operator/signup",
+        json={
+            "invite_code": invite_code,
+            "company_name": "x" + chr(0x00),
+            "email": email_p10,
+            "password": PASSWORD,
+            "license_number": "第301234567890号",
+            "agreed": True,
+        },
+    )
+    probe(sc, "P10", r_p10, expected_type="disallowed_character")
+    n_operators_p10 = await pg.fetchval(
+        "SELECT count(*) FROM operators WHERE lower(contact_email) = lower($1)", email_p10
+    )
+    sc.check(n_operators_p10 == 0, f"P10: operators に {n_operators_p10} 件作成された（期待 0）")
+    invite_used_at = await pg.fetchval("SELECT used_at FROM invites WHERE code = $1", invite_code)
+    sc.check(invite_used_at is None, "P10: 招待コードの used_at が NULL でない（拒否後も未使用のはず）")
+
+    # P11: POST /operator-applications（認証なし）message に NUL（他は有効）。
+    email_p11 = f"s9-p11-{RUN_ID}@example.com"
+    application_payload = {
+        "company_name": "同時実行検証株式会社",
+        "representative_name": "代表 太郎",
+        "registered_address": "東京都千代田区丸の内1-1-1",
+        "contact_name": "担当 花子",
+        "email": email_p11,
+        "phone": "03-1234-5678",
+        "business_type": "corp",
+        "service_area": "東京都",
+        "message": "よろしくお願いします" + chr(0x00),
+        "license_number": "第301234567890号",
+        "bank_account": {
+            "bank_name": "みずほ銀行",
+            "branch_name": "東京営業部",
+            "account_type": "ordinary",
+            "account_number": "1234567",
+            "account_holder": "ドウジジッコウケンショウ",
+        },
+        "agreed": True,
+    }
+    r_p11 = await c.post(f"{V1}/operator-applications", json=application_payload)
+    probe(sc, "P11", r_p11, expected_type="disallowed_character")
+    n_apps_p11 = await pg.fetchval(
+        "SELECT count(*) FROM operator_applications WHERE lower(contact_email) = lower($1)",
+        email_p11,
+    )
+    sc.check(n_apps_p11 == 0, f"P11: operator_applications に {n_apps_p11} 件作成された（期待 0）")
+
+    # P12: POST /cases（依頼者）address_detail に ASCII エスケープ孤立サロゲート（冪等キー付き）。
+    idem_key_p12 = f"s9-p12-{RUN_ID}"
+    case_payload_p12 = {
+        "purpose": "引っ越し",
+        "prefecture": "東京都",
+        "city": "世田谷区",
+        "address_detail": "住所" + chr(0xD800),
+        "housing_type": "マンション",
+        "items": [],
+        "photos": [],
+        "idempotency_key": idem_key_p12,
+    }
+    r_p12 = await c.post(
+        f"{V1}/cases",
+        content=ascii_json(case_payload_p12),
+        headers={**auth(user_token), "content-type": "application/json"},
+    )
+    probe(sc, "P12", r_p12, expected_type="disallowed_character")
+    n_cases_p12 = await pg.fetchval(
+        "SELECT count(*) FROM cases WHERE idempotency_key = $1", idem_key_p12
+    )
+    sc.check(n_cases_p12 == 0, f"P12: 冪等キー {idem_key_p12} の cases が {n_cases_p12} 件（期待 0）")
+
+    # P13: POST /cases/{case}/bids（業者）message に NUL。
+    r_p13 = await c.post(
+        f"{V1}/cases/{case_id}/bids",
+        json={"amount": 12_345, "message": "ng" + chr(0x00)},
+        headers=auth(op_token),
+    )
+    probe(sc, "P13", r_p13, expected_type="disallowed_character")
+    n_bids_p13 = await pg.fetchval(
+        "SELECT count(*) FROM bids WHERE case_id = $1", uuid.UUID(case_id)
+    )
+    sc.check(n_bids_p13 == 0, f"P13: 案件 {case_id} の bids が {n_bids_p13} 件（期待 0）")
+
+    # P14: PUT /operator/profile（業者）intro_message に NUL（事前に PUT で基準値）。
+    baseline_intro = "よろしくお願いします（S9基準値）"
+    profile_payload_base = {
+        "areas": [],
+        "categories": [],
+        "strong_categories": [],
+        "business_hours": "平日9時から18時",
+        "intro_message": baseline_intro,
+        "show_message": True,
+        "accept_unsellable": False,
+    }
+    must(
+        await c.put(f"{V1}/operator/profile", json=profile_payload_base, headers=auth(op_token)),
+        200,
+    )
+    r_p14 = await c.put(
+        f"{V1}/operator/profile",
+        json={**profile_payload_base, "intro_message": "変更後" + chr(0x00)},
+        headers=auth(op_token),
+    )
+    probe(sc, "P14", r_p14, expected_type="disallowed_character")
+    intro_after = await pg.fetchval(
+        "SELECT intro_message FROM operator_profiles WHERE operator_id = $1", uuid.UUID(op_id)
+    )
+    sc.check(
+        intro_after == baseline_intro,
+        f"P14: intro_message が {intro_after!r}（期待 {baseline_intro!r}）",
+    )
+
+    # P15: PATCH /admin/transactions/{txn}/cancel（運営）reason に NUL。
+    r_p15 = await c.patch(
+        f"{V1}/admin/transactions/{txn_id}/cancel",
+        json={"reason": "強制終了" + chr(0x00)},
+        headers=auth(admin_token),
+    )
+    probe(sc, "P15", r_p15, expected_type="disallowed_character", expected_loc=["body", "reason"])
+    txn_status = await pg.fetchval(
+        "SELECT status FROM transactions WHERE id = $1", uuid.UUID(txn_id)
+    )
+    sc.check(txn_status == "pending", f"P15: 成約の status が {txn_status!r}（期待 'pending'）")
+    n_cancellations = await pg.fetchval(
+        "SELECT count(*) FROM cancellations WHERE transaction_id = $1", uuid.UUID(txn_id)
+    )
+    sc.check(n_cancellations == 0, f"P15: cancellations が {n_cancellations} 件（期待 0）")
+
+    # P16: GET /admin/operators?q=NUL（運営）クエリ NUL。
+    r_p16 = await c.get(
+        f"{V1}/admin/operators", params={"q": "x" + chr(0x00)}, headers=auth(admin_token)
+    )
+    probe(sc, "P16", r_p16, expected_type="disallowed_character", expected_loc=["query", "q"])
+
+
 # ──────────────────────────── エントリポイント ────────────────────────────
 _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
@@ -902,6 +1263,7 @@ async def run() -> int:
         Scenario("S6", "運営の強制終了と依頼者 complete の同時実行"),
         Scenario("S7", "最後の管理者2人の同時退会・相互降格・退会と降格の同時実行"),
         Scenario("S8", "運営の口コミ削除の同時2連投・元に戻すの同時2連投・削除と元に戻す・投稿と削除の同時実行"),
+        Scenario("S9", "NUL・制御文字・孤立サロゲートの入力（実 PG）: 500 にならず 422・何も保存されない"),
     ]
     # S10 は新規アカウントだけを使う独立のシナリオ（添字ではなく変数で渡す）。
     signup_race = Scenario("S10", "同じメールアドレスでの signup 同時2連投（依頼者・業者）")
@@ -930,6 +1292,10 @@ async def run() -> int:
             await s8_review_hide_race(
                 c, pg, admin_token, admin_user["id"], user_token, scenarios[7]
             )
+            # S9 は同時実行ではなく入力検証の実 PG 回帰（1周だけ）。S8 の後・S7 の前に置く
+            # （S7 が運営アカウントの admin 権限を一時的に外すため、それより前なら S9 は
+            # 通常の admin 権限で PATCH /admin/transactions/{id}/cancel 等を叩ける）。
+            await s9_unsafe_input_rejected(c, pg, admin_token, user_token, scenarios[8])
             # S7 は運営アカウントを一時的に admin から外すため、必ず最後に流す。
             await s7_last_admin_race(c, pg, admin_token, scenarios[6])
     except ApiError as exc:

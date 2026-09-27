@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+
+from app.api.request_char_guard import reject_unsafe_request_chars
 
 # NOTE: albums_router は Phase 2 機能（一括査定アルバム永続化）。
 # 現在は ENUM/テーブル状態の不整合により Railway デプロイで healthcheck failure を
@@ -26,7 +28,12 @@ from app.api.v1.endpoints.transactions import router as transactions_router
 from app.api.v1.endpoints.user_identity import router as user_identity_router
 from app.api.v1.endpoints.users import router as users_router
 
-api_router = APIRouter()
+# dependencies はコンストラクタで指定する（後から api_router.dependencies.append(...)
+# しても、既に include_router 済みのルートは self.dependencies を呼び出し時点で
+# コピーしているため効かない。app/api/request_char_guard.py のモジュール docstring
+# に fastapi/routing.py を実読して確認した根拠を記載）。NUL・孤立サロゲート
+# （保存できない文字）を全ルート共通で 422 拒否する最外周の防御。
+api_router = APIRouter(dependencies=[Depends(reject_unsafe_request_chars)])
 # ── カタヅケ既存 ──────────────────────────────────────────────────
 api_router.include_router(analyze_router, tags=["Analyze"])
 # NOTE: 旧 AssetWise の査定 API（/estimate・/assessments/*）は 2026-09-27 に撤去した。
