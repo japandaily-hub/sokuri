@@ -32,7 +32,6 @@ from app.schemas_katadzuke import (
     OperatorApplicationCreateResponse,
 )
 from app.config import get_settings
-from app.core.masking import mask_email
 from app.services import notify
 
 logger = logging.getLogger(__name__)
@@ -153,12 +152,14 @@ async def create_operator_application(
         await session.commit()
     except Exception as exc:
         await session.rollback()
-        # 会社名（個人事業主は氏名になりうる）とメールの平文はログに残さない。
+        # 例外の文字列とトレースバックは出さない。SQLAlchemy の例外は INSERT の引数（メール
+        # アドレス・氏名・住所・電話番号）をそのまま含むため。原因の切り分けは型と SQLSTATE で行う。
+        db_error = getattr(exc, "orig", None)
         logger.error(
-            "operator_applications: 申込の保存に失敗しました - email=%s - %s",
-            mask_email(body.email),
-            exc,
-            exc_info=True,
+            "operator_applications: 申込の保存に失敗しました - error=%s cause=%s sqlstate=%s",
+            type(exc).__name__,
+            type(db_error).__name__ if db_error is not None else None,
+            getattr(db_error, "sqlstate", None),
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
