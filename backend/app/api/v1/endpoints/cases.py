@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import Actor, get_case_viewer_actor, get_current_user
+from app.api.json_body_deps import require_json_body
 from app.api.rate_limit_deps import RateLimitGuard
 from app.db.models.bid import BID_STATUS_PENDING, BID_STATUS_REJECTED, BID_STATUS_WITHDRAWN, Bid
 from app.db.models.case import (
@@ -456,6 +457,9 @@ async def create_case(
     response: Response,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
+    # 依存は宣言順に実行される。認証（未認証は 401 で止まり数えない）の後、カウントより前に
+    # JSON 以外の本文を 415 で止める（require_json_body 参照）。
+    _json_only: None = Depends(require_json_body),
     _rl: object = Depends(RateLimitGuard("case_create")),
 ) -> CaseOut:
     """案件を作成して即座に返す（AI 解析は BackgroundTasks で後追いする）。

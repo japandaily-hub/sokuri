@@ -16,6 +16,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request,
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.json_body_deps import require_json_body
 from app.api.rate_limit_deps import RateLimitGuard
 from app.core.client_ip import (
     is_private_or_loopback,
@@ -81,37 +82,6 @@ def _client_ip_for_record(request: Request) -> str | None:
     return ip
 
 
-async def _require_json_body(request: Request) -> None:
-    """本文が JSON（Content-Type: application/json）の要求だけを通す。それ以外は 415。
-
-    I/O を持たないため ``async def`` にしている（同期関数の依存は FastAPI が
-    スレッドプールで実行する）。
-
-    全リクエストを数えるガード（``RateLimitGuard``）より前に置くこと。ブラウザは
-    application/json のクロスオリジン POST を CORS のプリフライト（許可オリジン以外は
-    拒否）なしには送れないが、text/plain・フォーム・Content-Type なしの「単純な
-    リクエスト」や、ブラウザ自身が送る報告（CSP の違反報告等）はプリフライトなしで
-    届きうる。これらは本文の検証で 422 になるものの、ガードはその前に数えるため、
-    通すと第三者のページが訪問者のブラウザから送らせるだけで訪問者の IP の枠を
-    使い切れてしまう。
-
-    受け付けるのは application/json ちょうど（charset 等のパラメータと大小文字は無視）。
-    正規の送信元（web の request()・E2E・テスト）はすべてこれを送るため、FastAPI が
-    JSON として読む application/*+json（例: Reporting API の application/reports+json）
-    までは広げない。Content-Type なしも拒否する。現在入る FastAPI 0.136 系は既定の
-    strict_content_type で Content-Type なしの本文を JSON として読まないが、pyproject は
-    fastapi>=0.115 で版を固定しておらず、読む版が入ると訪問者の IP で申込そのものを
-    作らせることもできるため。
-    """
-    media_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
-    if media_type == "application/json":
-        return
-    raise HTTPException(
-        status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-        detail="リクエストの形式が正しくありません。",
-    )
-
-
 @router.post(
     "/operator-applications",
     response_model=OperatorApplicationCreateResponse,
@@ -124,8 +94,8 @@ async def create_operator_application(
     background: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     # 依存は宣言順に実行される。JSON 以外の本文はカウントより前に 415 で止める
-    # （第三者のページから訪問者の IP の枠を使い切らせないため。_require_json_body 参照）。
-    _json_only: None = Depends(_require_json_body),
+    # （第三者のページから訪問者の IP の枠を使い切らせないため。require_json_body 参照）。
+    _json_only: None = Depends(require_json_body),
     # 同一IPからの申込数の制限（IP軸・全リクエストカウント・1時間5件）。ハンドラ本体
     # より前に判定・カウントされ、上限超過なら 429、解決できない X-Forwarded-For
     # なら 400 で止まる（_scope_spec の "operator_application" 分岐を参照）。

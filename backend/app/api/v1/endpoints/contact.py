@@ -46,6 +46,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request,
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_optional_user
+from app.api.json_body_deps import require_json_body
 from app.api.rate_limit_deps import RateLimitGuard
 from app.config import get_settings
 from app.db.models.contact_message import ContactMessage
@@ -159,6 +160,9 @@ async def create_contact(
     background: BackgroundTasks,
     request: Request,
     session: AsyncSession = Depends(get_session),
+    # 依存は宣言順に実行される。JSON 以外の本文はカウントより前に 415 で止める
+    # （第三者のページから訪問者の IP の枠を使い切らせないため。require_json_body 参照）。
+    _json_only: None = Depends(require_json_body),
     # security review N-2対応: /cases と scope名を分離した専用スコープ（IP軸・
     # アカウント軸とも10req/3600s）を使う。数値ルールは case_create を流用するが
     # バケット実体は独立する（_scope_spec の "contact" 分岐を参照）。

@@ -26,6 +26,7 @@ from app.api.deps import (
     assert_user_not_suspended,
     get_current_actor,
 )
+from app.api.json_body_deps import require_json_body
 from app.api.rate_limit_deps import RateLimitGuard
 from app.config import get_settings
 from app.core.http_errors import http_exception_factory
@@ -175,6 +176,9 @@ async def user_signup(
     body: UserSignupRequest,
     request: Request,
     session: AsyncSession = Depends(get_session),
+    # 依存は宣言順に実行される。JSON 以外の本文はカウントより前に 415 で止める
+    # （第三者のページから訪問者の IP の枠を使い切らせないため。require_json_body 参照）。
+    _json_only: None = Depends(require_json_body),
     _rl: object = Depends(RateLimitGuard("signup")),
 ) -> AuthTokenResponse:
     email = body.email.lower()
@@ -319,6 +323,9 @@ async def operator_signup(
     body: OperatorSignupRequest,
     request: Request,
     session: AsyncSession = Depends(get_session),
+    # 依存は宣言順に実行される。JSON 以外の本文はカウントより前に 415 で止める
+    # （第三者のページから訪問者の IP の枠を使い切らせないため。require_json_body 参照）。
+    _json_only: None = Depends(require_json_body),
     _rl: object = Depends(RateLimitGuard("signup")),
 ) -> AuthTokenResponse:
     if not body.agreed:
@@ -625,6 +632,9 @@ async def line_exchange(
     body: LineExchangeRequest,
     request: Request,
     session: AsyncSession = Depends(get_session),
+    # 依存は宣言順に実行される。JSON 以外の本文はカウントより前に 415 で止める
+    # （第三者のページから訪問者の IP の枠を使い切らせないため。require_json_body 参照）。
+    _json_only: None = Depends(require_json_body),
     _rl: object = Depends(RateLimitGuard("line_exchange")),
 ) -> AuthTokenResponse:
     line_user_id = await _fetch_line_user_id(body.line_access_token)

@@ -22,6 +22,7 @@ from google.genai.errors import APIError as GenAIAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
+from app.api.json_body_deps import require_json_body
 from app.api.rate_limit_deps import RateLimitGuard
 from app.db.models.item import Item
 from app.db.models.user import User
@@ -62,6 +63,9 @@ async def analyze(
     request: Request,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
+    # 依存は宣言順に実行される。認証（未認証は 401 で止まり数えない）の後、カウントより前に
+    # JSON 以外の本文を 415 で止める（require_json_body 参照）。
+    _json_only: None = Depends(require_json_body),
     _rl: object = Depends(RateLimitGuard("analyze")),
 ) -> AnalyzeResponse:
     """画像を解析して Item を永続化し、AnalyzeResponse を返す。
