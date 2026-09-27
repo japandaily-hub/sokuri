@@ -7,19 +7,24 @@
   設計時点で相互に確認できる。
 - ``verify_client_ip_relay``: 全 ``RelayReason`` の判定順序・境界値。
 - ``log_relay_outcome``: ログ文言・スロットリング・初回 WARNING 格上げ。
+- ``_ip_net_for_relay_log``: ログに出す中継IPの丸め（6to4・Teredoの埋め込み
+  IPv4対応）。
 """
 
 from __future__ import annotations
 
+import ipaddress
 import logging
 import secrets
 
 import pytest
 
+from app.core.client_ip import truncate_ip_for_log
 from app.core.client_ip_relay import (
     RELAY_VERSION,
     SIGNING_CONTEXT,
     RelayVerification,
+    _ip_net_for_relay_log,
     _reset_relay_log_state_for_tests,
     build_relay_header_value,
     canonical_relay_message,
@@ -971,3 +976,66 @@ class TestVerifyRequestUsesScopePathNotUrlPath:
             request, (_VALID_KEY,), clock=lambda: float(_VALID_TS)
         )
         assert result.reason == "bad_signature"
+
+
+# ──────────────────────────── _ip_net_for_relay_log（6to4・Teredo の丸め） ────────────────────────────
+
+
+class TestIpNetForRelayLog:
+    """6to4・Teredo 等 IPv4 を埋め込んだ IPv6 アドレスをログに出す際、埋め込まれた
+    IPv4 が丸められず全桁残ってしまわないことの固定（2回目レビュー指摘）。
+    ``rate_limit_deps._ip_net_for_log``（IP軸のバケット計算に使う丸め。ロジックは
+    変更しない）と同じ結果になることも確認する（ログを相関する際に表記が
+    食い違わないようにするため）。"""
+
+    def test_plain_ipv4_rounds_to_slash24(self) -> None:
+        assert _ip_net_for_relay_log("203.0.113.9") == "203.0.113.0/24"
+
+    def test_plain_ipv6_rounds_to_slash48(self) -> None:
+        assert _ip_net_for_relay_log("2001:db8:1:2::1") == "2001:db8:1::/48"
+
+    def test_sixtofour_rounds_embedded_ipv4_to_slash24_not_slash48(self) -> None:
+        """6to4（``2002::/16``）は埋め込みIPv4（32ビット）がちょうどアドレス
+        先頭48ビットに収まる形式のため、単純な IPv6 の /48 丸め
+        （``truncate_ip_for_log``）だと埋め込みIPv4が1桁も丸まらずログに残って
+        しまう（丸めの意味が無くなる）。この関数はそれを避け、埋め込みIPv4を
+        /24 に丸めた値を返す。"""
+        ip = "2002:cb00:7109::1"  # 203.0.113.9 を埋め込んだ 6to4 アドレス
+        assert ipaddress.IPv6Address(ip).sixtofour == ipaddress.IPv4Address("203.0.113.9")
+        assert _ip_net_for_relay_log(ip) == "203.0.113.0/24"
+        # 対比: 単純な truncate_ip_for_log（常に/48）だと埋め込みIPv4が全桁残る。
+        assert truncate_ip_for_log(ip) == "2002:cb00:7109::/48"
+        assert _ip_net_for_relay_log(ip) != truncate_ip_for_log(ip)
+
+    def test_teredo_rounds_embedded_client_ipv4_to_slash24(self) -> None:
+        """Teredo（``2001::/32``）の例示アドレス（RFC 4380）。埋め込みの
+        クライアントIPv4はアドレス末尾32ビット（/48の外）にあるため、単純な
+        /48 丸めでも実害は無いが、``rate_limit_deps`` 側の丸めと表記を一致
+        させるため、この関数でも埋め込みIPv4を /24 に丸めた値を返す。"""
+        ip = "2001:0000:4136:e378:8000:63bf:3fff:fdd2"
+        assert ipaddress.IPv6Address(ip).teredo == (
+            ipaddress.IPv4Address("65.54.227.120"),
+            ipaddress.IPv4Address("192.0.2.45"),
+        )
+        assert _ip_net_for_relay_log(ip) == "192.0.2.0/24"
+
+    def test_invalid_ip_returns_invalid(self) -> None:
+        assert _ip_net_for_relay_log("not-an-ip") == "invalid"
+
+    @pytest.mark.parametrize(
+        "ip",
+        [
+            "203.0.113.9",
+            "2001:db8:1:2::1",
+            "2002:cb00:7109::1",
+            "2001:0000:4136:e378:8000:63bf:3fff:fdd2",
+        ],
+    )
+    def test_matches_rate_limit_deps_ip_net_for_log(self, ip: str) -> None:
+        """``rate_limit_deps._ip_net_for_log``（IP軸のバケット計算に使う丸め。
+        禁止事項によりロジックは変更しない）と同一の生 IP に対して同じ丸め
+        結果になることを固定する（ログの相関のため。この関数を単体テスト
+        だけで完結させず、実際の呼び出し側との一致を確認する）。"""
+        from app.api.rate_limit_deps import _ip_net_for_log
+
+        assert _ip_net_for_relay_log(ip) == _ip_net_for_log(ip)

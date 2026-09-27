@@ -11,7 +11,18 @@ app/ 配下で、送信元 IP を運ぶヘッダ名の文字列や ``request.cli
 ``RateLimitGuard`` を使うこと（docs/ops/incidents.md 原則3「教訓はテストにする」）。
 
 文字列は構文木の定数として完全一致で調べるため、コメントや docstring・ログ文中の
-言及（"X-Forwarded-For ヘッダが…" 等）は対象にならない。
+言及（"X-Forwarded-For ヘッダが…" 等）は対象にならない。ヘッダ名の定数検査は
+``bytes`` リテラル（``b"x-forwarded-for"`` 等）にも及ぶ（ASGI の
+``scope["headers"]`` はヘッダ名・値とも小文字化された bytes のペアの列であり、
+``request.headers``（str キー）を経由せず ``scope["headers"]`` を直接走査する
+実装で文字列版の検査だけをすり抜けることを防ぐ。許可ファイルは str 版と同じ）。
+
+さらに、署名付き中継IP（I8）の内部シンボル（``_relayed_client_ip``・
+``_RELAY_ELIGIBLE_SCOPES``。ともに ``api/rate_limit_deps.py`` で定義）は、その
+定義元ファイル以外からの参照（import・関数呼び出し・属性アクセス）も禁止する。
+scope ゲート（``_RELAY_ELIGIBLE_SCOPES``）を経由せずに中継IPを取得する別経路が
+他のモジュールに生えることを防ぐ（下記 ``_RELAY_SYMBOL_ALLOWED_FILES`` が守る
+「署名検証を経ずにヘッダの値を使う実装」の禁止と対になる、もう一段内側の禁止）。
 """
 
 from __future__ import annotations
@@ -50,6 +61,17 @@ _RELAY_RESTRICTED_SYMBOLS = frozenset(
     {"RELAY_HEADER_NAME", "verify_client_ip_relay", "verify_request_client_ip_relay"}
 )
 
+# 署名付き中継IP（I8）の内部シンボル（scope ゲート・呼び出し口）→ その定義元
+# ファイル（api/rate_limit_deps.py）以外からの参照を禁止する。上記
+# ``_RELAY_SYMBOL_ALLOWED_FILES`` は「core/client_ip_relay.py の検証ロジックを
+# api/rate_limit_deps.py 以外が使わないこと」を守る一方、こちらは
+# api/rate_limit_deps.py 自身が定義する「対象 scope の一覧」「中継IPの取得口」
+# を、rate_limit_deps.py 以外の app/ コードが直接 import・参照しないことを守る
+# （scope ゲートを迂回して中継IPを取得する別経路が他モジュールに生えることの
+# 防止）。
+_RATE_LIMIT_DEPS_PRIVATE_SYMBOL_ALLOWED_FILES = frozenset({"api/rate_limit_deps.py"})
+_RATE_LIMIT_DEPS_PRIVATE_SYMBOLS = frozenset({"_relayed_client_ip", "_RELAY_ELIGIBLE_SCOPES"})
+
 
 def _app_sources() -> list[tuple[str, ast.AST]]:
     sources = []
@@ -69,9 +91,22 @@ def test_ip_headers_are_read_only_by_the_canonical_module():
     violations = []
     for relative, tree in _app_sources():
         for node in ast.walk(tree):
-            if not (isinstance(node, ast.Constant) and isinstance(node.value, str)):
+            if not isinstance(node, ast.Constant):
                 continue
-            header = node.value.strip().lower()
+            if isinstance(node.value, str):
+                header = node.value.strip().lower()
+            elif isinstance(node.value, bytes):
+                # ASGI の scope["headers"] はヘッダ名・値とも小文字化された
+                # bytes のペアの列（Starlette/Uvicorn とも仕様に従い小文字化
+                # して渡す）。str 定数の検査を bytes リテラルにすり替えるだけで
+                # 本ガードを回避できないよう、bytes リテラルも同じ判定にかける
+                # （非 ASCII は本ガード対象のヘッダ名と一致しえないため無視）。
+                try:
+                    header = node.value.decode("ascii").strip().lower()
+                except UnicodeDecodeError:
+                    continue
+            else:
+                continue
             allowed = _IP_HEADER_ALLOWED_FILES.get(header)
             if allowed is not None and relative not in allowed:
                 violations.append(f"{relative}:{node.lineno} {node.value!r}")
@@ -132,4 +167,38 @@ def test_relay_verification_symbols_used_only_by_allowed_files():
         "core/client_ip_relay.py・api/rate_limit_deps.py 以外で参照しています"
         "（署名検証を経ずにヘッダの値を使う実装の混入を防ぐため禁止）: "
         + ", ".join(violations)
+    )
+
+
+def test_relay_internal_symbols_used_only_by_rate_limit_deps():
+    """署名付き中継IP（I8）の内部シンボル（``_relayed_client_ip``・
+    ``_RELAY_ELIGIBLE_SCOPES``）を、定義元の ``api/rate_limit_deps.py`` 以外で
+    import・参照することを禁止する。
+
+    ``test_relay_verification_symbols_used_only_by_allowed_files`` が
+    「core/client_ip_relay.py の検証ロジックを api/rate_limit_deps.py 以外が
+    使わないこと」を守るのに対し、こちらは「api/rate_limit_deps.py 自身が
+    持つ scope ゲート・中継IPの取得口を、rate_limit_deps.py 以外の app/ コード
+    が直接参照しないこと」を守る、もう一段内側のガード。検査方法（3種の
+    識別子ノードを横断）は同テストと同じ。
+    """
+    violations = []
+    for relative, tree in _app_sources():
+        if relative in _RATE_LIMIT_DEPS_PRIVATE_SYMBOL_ALLOWED_FILES:
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.alias):
+                name = node.name
+            elif isinstance(node, ast.Name):
+                name = node.id
+            elif isinstance(node, ast.Attribute):
+                name = node.attr
+            else:
+                continue
+            if name in _RATE_LIMIT_DEPS_PRIVATE_SYMBOLS:
+                violations.append(f"{relative}:{node.lineno} {name}")
+    assert not violations, (
+        "_relayed_client_ip / _RELAY_ELIGIBLE_SCOPES を api/rate_limit_deps.py "
+        "以外で参照しています（scope ゲートを迂回して中継IPを取得・対象 scope "
+        "を書き換える実装の混入を防ぐため禁止）: " + ", ".join(violations)
     )

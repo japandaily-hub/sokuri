@@ -2,16 +2,27 @@
  * client-ip-relay.ts（利用者IPの署名付き中継ヘッダ）の「組み込み配線」に対する静的検査。
  *
  * 目的はデグレの検知（配線が外れたら落ちる）であり、完全な構文解析ではない。
- * src 配下のソースをテキストとして読み、正規表現・文字列検索の簡易な検査で以下4点を
+ * src 配下のソースをテキストとして読み、正規表現・文字列検索の簡易な検査で以下5点を
  * 確認する（詳細は各 describe 内のコメントを参照）:
  *   a. x-real-ip という文字列が現れるのは lib/client-ip-relay.ts と *.test.mts だけ。
  *   b. auth.ts / line-link.ts で serverBackendApiBase() を使う fetch には必ず
- *      redirect: "error" と clientIpRelayHeaders(...) の戻り値のスプレッドがある。
- *      LINE公式（LINE_TOKEN_URL）への fetch には中継ヘッダを付けていない。
+ *      redirect: "error" と clientIpRelayHeaders(...) の戻り値のスプレッドがある
+ *      （切り出した関数本体に含まれる fetch(...) 呼び出しが1個であることも併せて
+ *      検査する。2個以上あると「どちらの fetch を検査しているか」を区別できず、
+ *      この簡易検査の前提が崩れるため）。LINE公式（LINE_TOKEN_URL）への fetch には
+ *      中継ヘッダを付けていない。
  *   c. backend への fetch の headers に受信ヘッダそのもの（...request.headers 等）を
  *      丸ごと展開していない。
  *   d. Credentials の authorize が request?.headers を backendLogin に渡し、LINEの
  *      signIn が readIncomingRequestHeaders（try/catch付き headers()）を渡している。
+ *   e. clientIpRelayHeaders を import しているのは許可リスト（auth.ts /
+ *      lib/line-link.ts）だけ。新しい呼び出し元を追加する場合は、許可リストと
+ *      b〜dの検査対象一覧の両方を増やす必要がある（アサート失敗メッセージで案内する）。
+ *
+ * a〜eの判定に使う正規表現ベースの関数（importsClientIpRelayHeaders・
+ * countFetchCalls）自体の正しさは、末尾の自己テスト
+ * （describe "自己テスト: 静的検査の判定ロジック自体の検査"）で陽性・陰性の両方の
+ * 入力を使って別途確認する。
  *
  * コメント中の記述（この client-ip-relay.ts 自身の JSDoc が "redirect: \"error\"" 等の
  * 語句をそのまま説明文に含む等）に誤反応しないよう、行頭が "//"・"*"・"/*" の行
@@ -121,6 +132,35 @@ function sliceFunctionBody(lines: readonly string[], anchorIndex: number, label:
   );
 }
 
+/**
+ * text（コメント専用行を除いたソース全文。複数行可）に、clientIpRelayHeaders を
+ * named import する import 文があるかどうかを判定する。
+ * `import { ..., clientIpRelayHeaders, ... } from "..."` の形（`import type { ... }`・
+ * 複数行にわたる import 文のいずれも対象）にマッチする。import 文以外での識別子への
+ * 言及（呼び出し・コメント中の言及等）には反応しない。
+ *
+ * このファイル自身（e. のdescribe）が「許可リスト外からの import」を検知するために使う
+ * 判定ロジック。正しさは末尾の自己テストで別途確認する。
+ */
+function importsClientIpRelayHeaders(text: string): boolean {
+  return /import\s+(?:type\s+)?\{[^}]*\bclientIpRelayHeaders\b[^}]*\}\s*from\s*["'][^"']+["']/.test(
+    text,
+  );
+}
+
+/**
+ * block（sliceFunctionBody が切り出した関数本体の文字列）に含まれる fetch(...) 呼び出しの
+ * 個数を数える。
+ *
+ * b. の各 it は「関数内の fetch(...) 呼び出しは1個だけ」という前提のもとで、その1個が
+ * redirect: "error" と中継ヘッダのスプレッドを持つかを検査している（どのfetchを見ているかを
+ * 区別していない簡易検査のため）。2個以上あるとこの前提が崩れ、redirect: "error" が
+ * 欠けている方の fetch を見逃しうる。正しさは末尾の自己テストで別途確認する。
+ */
+function countFetchCalls(block: string): number {
+  return (block.match(/\bfetch\(/g) ?? []).length;
+}
+
 describe("前提: 走査対象パスの取り違え検知", () => {
   it("SRC_DIR配下で対象拡張子のソースファイルが一定数以上見つかる", () => {
     assert.ok(
@@ -173,6 +213,15 @@ describe('b. auth.ts / line-link.ts の backend fetch は redirect:"error" と�
       );
       for (const anchorIndex of anchors) {
         const block = sliceFunctionBody(file.lines, anchorIndex, label);
+        const fetchCallCount = countFetchCalls(block);
+        assert.ok(
+          fetchCallCount < 2,
+          `${label}: serverBackendApiBase()使用箇所（行index ${anchorIndex}）を含む関数内に` +
+            ` fetch( の呼び出しが${fetchCallCount}個見つかりました。このテストは「関数内の` +
+            'fetchは1個だけ」という前提で redirect:"error" 等を検査しているため、2個以上' +
+            "あるとどちらのfetchを検査しているか区別できず見逃しが起きえます。関数を分割するか、" +
+            "このテストの検査方法自体を見直してください。",
+        );
         assert.match(
           block,
           /redirect:\s*"error"/,
@@ -279,5 +328,116 @@ describe("d. authorize / signIn が受信ヘッダを backend 呼び出しへ渡
     assert.match(block, /try\s*{/, "readIncomingRequestHeaders に try { が見当たりません。");
     assert.match(block, /await\s+headers\(\)/, "readIncomingRequestHeaders に await headers() の呼び出しが見当たりません。");
     assert.match(block, /catch/, "readIncomingRequestHeaders に catch 節が見当たりません。");
+  });
+});
+
+describe("e. clientIpRelayHeaders の import は許可リスト（auth.ts / lib/line-link.ts）に限られる", () => {
+  /**
+   * clientIpRelayHeaders を import してよい relPath の許可リスト。
+   * b〜d の各 describe はこの許可リストのファイルだけを対象に redirect: "error" 等を
+   * 検査しているため、許可リスト外から import する新しい呼び出し元が現れても b〜d は
+   * 何も検知できない（検査対象に含まれないため）。この it が「許可リスト外からの
+   * import」自体を検知することで、新しい呼び出し元が b〜d の検査から漏れたまま
+   * 見過ごされることを防ぐ（セキュリティレビュー指摘 I-6 是正）。
+   */
+  const ALLOWED_CLIENT_IP_RELAY_HEADERS_IMPORTERS: readonly string[] = ["auth.ts", "lib/line-link.ts"];
+
+  it("許可リスト外のソースファイルが clientIpRelayHeaders を import していない", () => {
+    const offenders: string[] = [];
+    for (const file of ALL_SOURCE_FILES) {
+      if (file.relPath === "lib/client-ip-relay.ts") continue;
+      if (file.relPath.endsWith(".test.mts")) continue;
+      if (ALLOWED_CLIENT_IP_RELAY_HEADERS_IMPORTERS.includes(file.relPath)) continue;
+      if (importsClientIpRelayHeaders(file.lines.join("\n"))) {
+        offenders.push(file.relPath);
+      }
+    }
+    assert.deepEqual(
+      offenders,
+      [],
+      "clientIpRelayHeaders を import している新しい呼び出し元が見つかりました: " +
+        `[${offenders.join(", ")}]。この静的検査（b〜dの各describe）は許可リスト` +
+        "（auth.ts / lib/line-link.ts）だけを対象に redirect:\"error\" と中継ヘッダの" +
+        "スプレッドを検査しているため、新しい呼び出し元を追加する場合は、このテストの" +
+        "ALLOWED_CLIENT_IP_RELAY_HEADERS_IMPORTERS と、b〜dの各describe内の対象一覧" +
+        "（BACKEND_FETCH_TARGETS・TARGET_REL_PATHS等）の両方に追加してください。",
+    );
+  });
+
+  it("許可リストの各ファイルが走査結果に存在し、実際に clientIpRelayHeaders を import している（許可リストの空文字化・誤記の検知）", () => {
+    for (const relPath of ALLOWED_CLIENT_IP_RELAY_HEADERS_IMPORTERS) {
+      const file = fileByRelPath(relPath);
+      assert.ok(
+        importsClientIpRelayHeaders(file.lines.join("\n")),
+        `前提: 許可リストの ${relPath} が実際には clientIpRelayHeaders を import して` +
+          "いません。ファイルの移動・リネーム、または許可リスト自体の誤記の可能性が" +
+          "あります。",
+      );
+    }
+  });
+});
+
+describe("自己テスト: 静的検査の判定ロジック自体の検査", () => {
+  describe("importsClientIpRelayHeaders", () => {
+    it("通常の named import（他の識別子と同時 import）を陽性と判定する", () => {
+      assert.equal(
+        importsClientIpRelayHeaders(
+          'import { clientIpRelayHeaders, type HeaderReader } from "@/lib/client-ip-relay";',
+        ),
+        true,
+      );
+    });
+
+    it("import type { ... } の形でも陽性と判定する", () => {
+      assert.equal(
+        importsClientIpRelayHeaders('import type { clientIpRelayHeaders } from "@/lib/client-ip-relay";'),
+        true,
+      );
+    });
+
+    it("複数行にわたる import 文でも陽性と判定する", () => {
+      const src = [
+        "import {",
+        "  clientIpRelayHeaders,",
+        "  type HeaderReader,",
+        '} from "./client-ip-relay";',
+      ].join("\n");
+      assert.equal(importsClientIpRelayHeaders(src), true);
+    });
+
+    it("別の識別子だけを import する文字列を陰性と判定する", () => {
+      assert.equal(
+        importsClientIpRelayHeaders('import { serverBackendApiBase } from "@/lib/backend-api-base";'),
+        false,
+      );
+    });
+
+    it("import文以外での識別子への言及（呼び出し・コメント）を陰性と判定する", () => {
+      assert.equal(
+        importsClientIpRelayHeaders('const relayHeaders = await clientIpRelayHeaders("POST", url, h);'),
+        false,
+      );
+      assert.equal(
+        importsClientIpRelayHeaders(
+          "// clientIpRelayHeaders という語句への言及のみ（import文ではない）",
+        ),
+        false,
+      );
+    });
+  });
+
+  describe("countFetchCalls", () => {
+    it("fetch(...) 呼び出しが1個の文字列で1を返す", () => {
+      assert.equal(countFetchCalls('const res = await fetch(url, { method: "POST" });'), 1);
+    });
+
+    it("fetch(...) 呼び出しが2個の文字列で2を返す", () => {
+      const src = ["const a = await fetch(url1, {});", "const b = await fetch(url2, {});"].join("\n");
+      assert.equal(countFetchCalls(src), 2);
+    });
+
+    it("fetch(...) 呼び出しが0個の文字列で0を返す", () => {
+      assert.equal(countFetchCalls("const x = 1;"), 0);
+    });
   });
 });

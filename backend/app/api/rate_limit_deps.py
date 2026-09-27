@@ -358,13 +358,18 @@ def _build_key(scope: str, axis: str, digest: str) -> str:
 #     4 つ以上の /56 に /64 を持つ利用者は同じ /48 の他人を、上限まで使い切れば窓の残り
 #     時間だけ 429 にできる（login はパスワード照合の前に判定するので、正しいパスワード
 #     でも 429）。/56 を 1 つ持つ普通の世帯が塞げるのは自分の /56 だけ。IPv4 でも MAP-E・
-#     DS-Lite・携帯の CGNAT では 1 台で同じ巻き添えが起きる。本番の backend のホスト名には
-#     2026-09-27 時点で AAAA が無く、正規の利用者の IPv6 通信が無いので、今は被害者がいない。
+#     DS-Lite・携帯の CGNAT では 1 台で同じ巻き添えが起きる。2026-09-27 に公開DNS
+#     （dns.google）へ照会し、web（sokuri.vercel.app）・backend（sokuri-backend.onrender.com）
+#     とも AAAA レコードが無いことを確認した（＝利用者は web にすら IPv6 で到達できず、
+#     正規の利用者の IPv6 通信が無いので、今は被害者がいない）。
 #     本コードベースの前例（``_warn_cf_range_at_trust_position``）と同じく、いつでも使える
 #     抜け道より、運用で対処できる数えすぎを選ぶ。429 のログは axis（ip6_64・ip6_56・
 #     ip6_48）で区別でき、緊急停止スイッチ（RATE_LIMIT_ENABLED=false）ですぐ止められる。
-#   - 見直しの条件: 正規の IPv6 利用者が来たら見直す（Render が AAAA を有効にした時・
-#     I8 で login の IP を中継する時）。倍率と、段ごとの停止スイッチの要否を検討する。
+#   - 見直しの条件: web（Vercel）または backend のいずれかが AAAA を出すようになったら
+#     見直す。倍率と、段ごとの停止スイッチの要否を検討する（I8 の署名付き中継は
+#     login/line_exchange の IP軸判定をこの実装にそのまま委譲しているだけなので、
+#     web 自体が IPv6 に到達できない限り中継されるIPもIPv4のままであり、この条件を
+#     単独では満たさない）。
 #   - IPv4 はアドレス単位のまま変えない。IPv4 を埋め込んだ IPv6（IPv4 射影・6to4・Teredo）
 #     は、埋め込まれた IPv4 の 1 段で数える（``_canonical_address``）。
 _IPV6_56_LIMIT_MULTIPLIER = 2

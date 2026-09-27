@@ -189,6 +189,21 @@ class TestRelayDoesNotPolluteDirectHopsBucket:
     async def test_relayed_ip_does_not_pollute_direct_hops_bucket(
         self, client: AsyncClient, db_session: AsyncSession, monkeypatch
     ) -> None:
+        """中継が採用されている間、hops 方式が見る X-Forwarded-For
+        （Vercel 相当の固定送信元）に同じ値を乗せていても、hops 側のバケット
+        には一切カウントされないことを確かめる。
+
+        QA 指摘（見かけ倒しの回帰網だった問題）: 以前はこの中継要求に
+        X-Forwarded-For を付けていなかったため、hops 側の解決結果は
+        ASGITransport の ``request.client.host``（127.0.0.1・ループバック）に
+        なり、``is_private_or_loopback`` により IP軸そのものがスキップされて
+        いた（``_TEST_PUBLIC_IP_HEADERS`` docstring 参照）。そのため最後の
+        直接アクセスは「一度もカウントされていないバケット」への初回アクセス
+        に過ぎず、「中継が hops の枠を汚さない」ことを実際には何も検証できて
+        いなかった。中継要求にも同じ XFF を付けることで、hops 側のバケットが
+        実在しうる状態を作った上で、それでも汚染されていないこと（中継ヘッダ
+        無しの直接アクセスが200のまま）を確かめる。
+        """
         monkeypatch.setattr(
             get_settings(), "client_ip_relay_secrets", SecretStr(_RELAY_KEY_A_RAW)
         )
@@ -196,15 +211,22 @@ class TestRelayDoesNotPolluteDirectHopsBucket:
         for i in range(20):
             email = f"relay-nopollute-{i}@example.com"
             await _create_user(db_session, email)
+            headers = {
+                **_TEST_PUBLIC_IP_HEADERS,
+                **_relay_headers(_RELAY_KEY_A, ip=relay_ip),
+            }
             r = await client.post(
                 "/api/v1/auth/login",
                 json={"email": email, "password": "wrong-password"},
-                headers=_relay_headers(_RELAY_KEY_A, ip=relay_ip),
+                headers=headers,
             )
             assert r.status_code == 401
         await _create_user(
             db_session, "relay-nopollute-direct@example.com", password="correct-pass-np1"
         )
+        # 中継ヘッダを付けず、同じ XFF・正しいパスワードで直接アクセスする。
+        # hops 側のバケットが20回分カウントされていれば 429 になるはずだが、
+        # 中継採用時は hops のカウントに一切触れないため 200 のまま。
         r = await client.post(
             "/api/v1/auth/login",
             json={
@@ -951,3 +973,63 @@ class TestRelayIpv6TierIntegration:
             headers=_relay_headers(_RELAY_KEY_A, ip="2001:db8:1:9::ff"),
         )
         assert r.status_code == 429
+
+
+# ──────────────────────────── 19. 鍵ありで中継ヘッダ無しの absent WARNING（HTTP 統合） ────────────────────────────
+
+
+class TestAbsentWithKeysConfiguredEmitsWarningHttp:
+    """鍵（CLIENT_IP_RELAY_SECRETS）が設定されているのに中継ヘッダの無い要求を
+    実際に HTTP 経由で送ると、``log_relay_outcome`` の absent_with_keys WARNING
+    （2回目 security review L-A）が実際に配線されて出ることを確かめる。
+
+    ``tests/test_client_ip_relay.py`` の同名の単体テストは
+    ``log_relay_outcome`` を直接呼ぶため、``rate_limit_deps._relayed_client_ip``
+    の ``keys_configured=bool(keys)`` という配線（``get_settings()`` から鍵を
+    読み出し・``bool(keys)`` を計算して渡す部分）自体が外れても検知できない。
+    この HTTP 統合テストはその配線ごと固定する。
+    """
+
+    async def test_keys_configured_without_relay_header_emits_warning(
+        self, client: AsyncClient, db_session: AsyncSession, monkeypatch, caplog
+    ) -> None:
+        monkeypatch.setattr(
+            get_settings(), "client_ip_relay_secrets", SecretStr(_RELAY_KEY_A_RAW)
+        )
+        await _create_user(db_session, "relay-absent-with-keys@example.com")
+        with caplog.at_level(logging.WARNING, logger="app.core.client_ip_relay"):
+            r = await client.post(
+                "/api/v1/auth/login",
+                json={
+                    "email": "relay-absent-with-keys@example.com",
+                    "password": "wrong-password",
+                },
+                headers={"X-Forwarded-For": "198.51.100.201"},
+            )
+        assert r.status_code == 401
+        assert any(
+            "鍵（CLIENT_IP_RELAY_SECRETS）が設定されているのに" in rec.getMessage()
+            for rec in caplog.records
+        )
+
+    async def test_no_keys_configured_without_relay_header_emits_nothing(
+        self, client: AsyncClient, db_session: AsyncSession, monkeypatch, caplog
+    ) -> None:
+        """鍵が1本も無い場合は同じ要求（XFF あり・中継ヘッダ無し）でも無音の
+        まま（absent_with_keys WARNING は鍵が設定されている場合限定）。"""
+        monkeypatch.setattr(get_settings(), "client_ip_relay_secrets", SecretStr(""))
+        await _create_user(db_session, "relay-absent-no-keys@example.com")
+        with caplog.at_level(logging.WARNING, logger="app.core.client_ip_relay"):
+            r = await client.post(
+                "/api/v1/auth/login",
+                json={
+                    "email": "relay-absent-no-keys@example.com",
+                    "password": "wrong-password",
+                },
+                headers={"X-Forwarded-For": "198.51.100.202"},
+            )
+        assert r.status_code == 401
+        assert not any(
+            "鍵（CLIENT_IP_RELAY_SECRETS）が設定されているのに" in rec.getMessage()
+            for rec in caplog.records
+        )

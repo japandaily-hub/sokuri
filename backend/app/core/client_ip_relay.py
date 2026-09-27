@@ -216,7 +216,8 @@ class RelayVerification(NamedTuple):
     - ``skew_seconds``: ``now_epoch_seconds - int(timestamp)``。署名照合を
       通過した場合（expired/ip_unparseable/ip_not_public/ok）にのみ設定する。
     - ``rejected_ip_net``: ``ip_not_public`` の場合のみ、丸めた IP
-      （``truncate_ip_for_log`` 済み）を設定する。ログ出力専用で、生 IP は
+      （``_ip_net_for_relay_log`` 済み。6to4・Teredo 等 IPv4 を埋め込んだ IPv6
+      は埋め込まれた IPv4 を丸めた値になる）を設定する。ログ出力専用で、生 IP は
       一切保持しない。
     """
 
@@ -420,6 +421,50 @@ def build_relay_header_value(key: bytes, *, method: str, path: str, timestamp: i
     return f"{RELAY_VERSION};{ts_str};{ip};{signature}"
 
 
+def _ip_net_for_relay_log(ip: str) -> str:
+    """ログに出す中継IPの範囲を返す（IPv4 は /24・IPv6 は /48。ただし 6to4
+    （``2002::/16``）・Teredo（``2001::/32``）等 IPv4 を埋め込んだ IPv6 は、
+    埋め込まれた IPv4 を /24 に丸めた値にする。2回目レビュー指摘）。
+
+    ``truncate_ip_for_log`` は IPv6 を常に /48 に丸めるが、6to4 は埋め込みの
+    IPv4（32ビット）がちょうどアドレス先頭48ビットに収まる形式のため、単純な
+    /48 丸めでは埋め込みIPv4が1桁も丸まらずログにそのまま残ってしまい、丸めの
+    意味が無くなる。この関数は ``rate_limit_deps._ip_net_for_log``（IP軸の
+    バケット計算に使う ``_canonical_address`` 経由で同じ丸めをしている）と
+    **同じ結果になるように**、6to4・Teredo の埋め込みIPv4展開を独立に再現する
+    （ログを相関する際に、同一リクエストなのに表記が食い違わないようにする
+    ため。``tests/test_client_ip_relay.py`` にこの一致を固定するテストがある）。
+
+    本モジュールは ``app.config`` はもちろん ``app.api.rate_limit_deps`` も
+    import できない（rate_limit_deps が本モジュールを呼ぶ一方通行の依存関係
+    のため、逆方向の import は循環importになる。モジュール冒頭の docstring
+    参照）。そのため ``rate_limit_deps._canonical_address`` を re-use せず、
+    ここで必要な範囲だけ独立に再実装する。
+
+    Teredo は埋め込みのクライアントIPv4がアドレス末尾32ビット（/48 の外）に
+    あるため、単純な /48 丸めでも埋め込みIPv4は既に見えなくなっており実害は
+    無いが、``rate_limit_deps`` 側の丸めと表記を一致させるため同じ関数で扱う。
+
+    読めない値（``ipaddress.ip_address()`` が例外を送出する文字列）は
+    ``truncate_ip_for_log`` と同じ ``"invalid"`` を返す。呼び出し元
+    （``verify_client_ip_relay`` が正規化した ``normalized_ip``・
+    ``log_relay_outcome`` に渡る ``RelayVerification.ip``）はいずれも
+    ``ipaddress.ip_address()`` を通過済みの値のみのため実際にはここへは
+    落ちないはずだが、単体でも安全に使えるようにする。
+    """
+    try:
+        parsed = ipaddress.ip_address(ip)
+    except ValueError:
+        return "invalid"
+    if isinstance(parsed, ipaddress.IPv6Address):
+        embedded_ipv4 = parsed.sixtofour
+        if embedded_ipv4 is None and parsed.teredo is not None:
+            embedded_ipv4 = parsed.teredo[1]
+        if embedded_ipv4 is not None:
+            return truncate_ip_for_log(str(embedded_ipv4))
+    return truncate_ip_for_log(str(parsed))
+
+
 def verify_client_ip_relay(
     *,
     header_values: Sequence[str],
@@ -507,13 +552,34 @@ def verify_client_ip_relay(
         )
 
     normalized_ip = str(_unwrap_ipv4_mapped(parsed_ip))
+    # **この非公開アドレス判定は IPv4 射影（``::ffff:a.b.c.d``）だけを展開し、
+    # 6to4（``2002::/16``）・Teredo（``2001::/32``）は展開しない（対称化しない
+    # こと）**: IPv4 射影は素の IPv4 アドレスの単なる表記揺れのため展開するが
+    # （``_unwrap_ipv4_mapped``）、6to4・Teredo はそのままの IPv6 アドレスとして
+    # 「公開IPv6アドレスかどうか」を判定する。一方、採用後にIP軸のバケットを
+    # 作る ``rate_limit_deps._apply_ip_axis``（内部の ``_canonical_address``）は、
+    # 6to4・Teredo も埋め込みIPv4の1段に展開して数える。hops 経由の直接アクセス
+    # も同じ扱い（スキップせず数える。``rate_limit_deps.py`` の ``_IPV6_TIERS``
+    # 定数近くのコメント参照）であり、この「検証側は展開しない／カウント側は
+    # 展開する」という非対称自体は中継・hopsの両経路で一致している（経路間の
+    # ズレは無い）。
+    #
+    # 悪用可能性: この ``ip`` フィールドは攻撃者が自由に選べる値ではなく、web
+    # （Vercel）が実際に観測した TCP 接続元アドレスを署名して渡す値である。
+    # 他人の IPv4 が埋め込まれた 6to4/Teredo アドレスを「自分の接続元」として
+    # Vercel に観測させるには、その IPv4 宛の戻りパケット（TCP の SYN-ACK 等）
+    # を実際に受け取れる（＝その IPv4 への経路を実際に持っている）必要があり、
+    # 送信元アドレスを詐称するだけでは TCP のハンドシェイクが成立せず悪用でき
+    # ない。したがって、6to4/Teredo を展開しないことによる非公開アドレス判定の
+    # すり抜けを埋め合わせる目的で、この判定側を ``_canonical_address`` と
+    # 同じ展開に揃える（対称化する）必要は無い。
     if is_private_or_loopback(normalized_ip) or is_special_use_address(normalized_ip):
         return RelayVerification(
             None,
             "ip_not_public",
             key_slot=matched_slot,
             skew_seconds=skew_seconds,
-            rejected_ip_net=truncate_ip_for_log(normalized_ip),
+            rejected_ip_net=_ip_net_for_relay_log(normalized_ip),
         )
 
     return RelayVerification(
@@ -618,7 +684,11 @@ def log_relay_outcome(scope: str, v: RelayVerification, *, keys_configured: bool
     """``verify_client_ip_relay`` / ``verify_request_client_ip_relay`` の判定結果をログへ記録する。
 
     **ヘッダ値・署名・鍵・生 IP は絶対に出さない。** ``ip_net`` は常に
-    ``truncate_ip_for_log`` で /24（IPv4）・/48（IPv6）に丸めた値のみを使う。
+    ``_ip_net_for_relay_log`` で /24（IPv4）・/48（IPv6）に丸めた値のみを使う
+    （6to4・Teredo 等 IPv4 を埋め込んだ IPv6 は、埋め込まれた IPv4 を /24 に
+    丸めた値になる。単純な ``truncate_ip_for_log`` の /48 丸めだと 6to4 は
+    埋め込みIPv4が全桁残ってしまうため使わない。``_ip_net_for_relay_log``
+    docstring 参照）。
 
     - ``keys_configured``: 呼び出し時点で backend に有効な鍵
       （``CLIENT_IP_RELAY_SECRETS``）が1本以上あるか。``verify_client_ip_relay``
@@ -666,7 +736,7 @@ def log_relay_outcome(scope: str, v: RelayVerification, *, keys_configured: bool
         return
 
     if v.reason == "ok":
-        ip_net = truncate_ip_for_log(v.ip) if v.ip else "-"
+        ip_net = _ip_net_for_relay_log(v.ip) if v.ip else "-"
         # reason=="ok" は必ず署名照合（matched_slot の確定）を経由しているため
         # key_slot は理論上常に非 None のはず。-1 はここに到達しないはずの
         # 防御的なフォールバック値（型が ``int | None`` である以上、静的な
