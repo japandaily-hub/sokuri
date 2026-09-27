@@ -84,7 +84,7 @@ export async function GET(req: NextRequest) {
     return failWithLog(req, "token_exchange_failed");
   }
 
-  const result = await linkLineToCurrentUser(session.accessToken, lineAccessToken, reauthToken);
+  const result = await linkLineToCurrentUser(session.accessToken, lineAccessToken, reauthToken, req.headers);
   switch (result.outcome) {
     case "linked":
       return redirectWithCookiesCleared(req, "?linked=1");

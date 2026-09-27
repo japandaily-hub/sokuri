@@ -19,13 +19,19 @@
  *   リダイレクト文字列を返し、Credentials と同じ停止バナーを表示させる。
  *   ログイン済みユーザーの後付け連携（Bearer 付きexchange）は今回スコープ外。
  *   業者（Operator）のLINE単独新規作成はバックエンド側で行われない。
+ *
+ * サーバー側（このファイル）から backend を呼ぶ際は、backend の IP 単位レート制限が
+ * Vercel の送信元IPで数えられないよう、利用者IPを署名付きで中継する
+ * （詳細は lib/client-ip-relay.ts・backend/app/core/client_ip_relay.py）。
  */
 
 import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import LINE from "next-auth/providers/line";
 import type { Provider } from "next-auth/providers";
+import { headers } from "next/headers";
 import { serverBackendApiBase } from "@/lib/backend-api-base";
+import { clientIpRelayHeaders, type HeaderReader } from "@/lib/client-ip-relay";
 
 export type AccountType = "user" | "operator";
 
@@ -73,13 +79,19 @@ async function backendLogin(
   path: "/auth/login" | "/auth/operator/login",
   email: string,
   password: string,
+  incomingHeaders?: HeaderReader | null,
 ): Promise<BackendAuthResponse | null> {
   let res: Response;
   try {
-    res = await fetch(`${serverBackendApiBase()}${path}`, {
+    const url = `${serverBackendApiBase()}${path}`;
+    const relayHeaders = await clientIpRelayHeaders("POST", url, incomingHeaders);
+    res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...relayHeaders },
       body: JSON.stringify({ email, password }),
+      // redirect: "error" — backend からの 3xx に暗黙追従すると、署名済み中継ヘッダと
+      // パスワードがリダイレクト先の任意オリジンへ送られてしまう（client-ip-relay.ts 冒頭 JSDoc参照）。
+      redirect: "error",
     });
   } catch {
     throw new ServerUnavailableError();
@@ -114,16 +126,23 @@ async function backendLogin(
  * （backendLogin と異なり例外は投げない。OAuthプロバイダの signIn コールバックは
  * true/false/文字列URLを返す設計のため、ここでは判別可能な戻り値にとどめる）。
  * @param lineAccessToken LINE OAuthで取得したアクセストークン
+ * @param incomingHeaders 受信リクエストのヘッダ（利用者IPの署名付き中継用。
+ *   readIncomingRequestHeaders() の戻り値を渡す想定。null/undefinedなら中継しない）
  * @returns 交換成功時は { ok: true, data }、失敗時は { ok: false, code? }
  */
 async function backendLineExchange(
   lineAccessToken: string,
+  incomingHeaders?: HeaderReader | null,
 ): Promise<{ ok: true; data: BackendAuthResponse } | { ok: false; code?: string }> {
   try {
-    const res = await fetch(`${serverBackendApiBase()}/auth/line/exchange`, {
+    const url = `${serverBackendApiBase()}/auth/line/exchange`;
+    const relayHeaders = await clientIpRelayHeaders("POST", url, incomingHeaders);
+    const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...relayHeaders },
       body: JSON.stringify({ line_access_token: lineAccessToken }),
+      // redirect: "error" の理由は backendLogin と同じ（client-ip-relay.ts 冒頭 JSDoc参照）。
+      redirect: "error",
     });
     if (!res.ok) {
       // backend は停止アカウントの場合 403 { detail: { code: "account_suspended" } } を返す。
@@ -142,6 +161,26 @@ async function backendLineExchange(
   }
 }
 
+/**
+ * 受信リクエストのヘッダを読む（利用者IPの署名付き中継用）。
+ * LINEログインの signIn コールバックには元リクエストが渡らないため、next/headers の
+ * headers() を使って読み出す。signIn コールバックは Route Handler の中で動くため
+ * 通常は読めるが、呼び出し文脈によっては例外を投げうる
+ * （client-ip-relay.ts 冒頭 JSDoc「組み込み予定」の注意点を参照）ため try/catch で包み、
+ * 失敗時は null を返す（clientIpRelayHeaders 側で no_client_ip として扱われ、中継ヘッダ
+ * なしで fail-open する）。IP等の値はログに出さない。
+ */
+async function readIncomingRequestHeaders(): Promise<HeaderReader | null> {
+  try {
+    return await headers();
+  } catch {
+    console.warn(
+      "[auth] 受信ヘッダを読めないため、LINE ログインは利用者IPの中継なしで backend を呼びます",
+    );
+    return null;
+  }
+}
+
 /** LINE_CLIENT_ID/LINE_CLIENT_SECRET が両方設定されている場合のみプロバイダを構成する。 */
 function buildProviders(): Provider[] {
   const providers: Provider[] = [
@@ -149,11 +188,11 @@ function buildProviders(): Provider[] {
       id: "user-credentials",
       name: "ユーザーログイン",
       credentials: { email: {}, password: {} },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         const email = String(credentials?.email ?? "");
         const password = String(credentials?.password ?? "");
         if (!email || !password) return null;
-        const data = await backendLogin("/auth/login", email, password);
+        const data = await backendLogin("/auth/login", email, password, request?.headers);
         if (!data?.user) return null;
         return {
           id: data.user.id,
@@ -169,11 +208,11 @@ function buildProviders(): Provider[] {
       id: "operator-credentials",
       name: "業者ログイン",
       credentials: { email: {}, password: {} },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         const email = String(credentials?.email ?? "");
         const password = String(credentials?.password ?? "");
         if (!email || !password) return null;
-        const data = await backendLogin("/auth/operator/login", email, password);
+        const data = await backendLogin("/auth/operator/login", email, password, request?.headers);
         if (!data?.operator) return null;
         return {
           id: data.operator.id,
@@ -231,7 +270,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const lineAccessToken = account.access_token;
       if (!lineAccessToken) return false;
 
-      const result = await backendLineExchange(lineAccessToken);
+      const result = await backendLineExchange(lineAccessToken, await readIncomingRequestHeaders());
       if (!result.ok) {
         // 停止アカウントのみ、Credentials と同じ停止バナーへ誘導する
         // （/login?reason=suspended は login/page.tsx が読んで専用文言を表示する）。

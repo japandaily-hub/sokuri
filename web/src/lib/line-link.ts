@@ -9,6 +9,7 @@
  * state・reauth_token は共に短命 httpOnly cookie で受け渡す（CSRF対策 / 誤操作防止）。
  */
 import { serverBackendApiBase } from "./backend-api-base";
+import { clientIpRelayHeaders, type HeaderReader } from "./client-ip-relay";
 
 const LINE_AUTHORIZE_URL = "https://access.line.me/oauth2/v2.1/authorize";
 const LINE_TOKEN_URL = "https://api.line.me/oauth2/v2.1/token";
@@ -136,23 +137,35 @@ export type LineExchangeResult =
  * ログイン済みユーザーのLINE後付け連携。バックエンド POST /auth/line/exchange を
  * Bearer(セッションのaccessToken) 付きで呼び出す（未ログイン時の新規登録/ログイン用の
  * auth.ts側 backendLineExchange とは呼び出し方が異なる＝別関数として分離）。
+ * backend の IP 単位レート制限が Vercel の送信元IPで数えられないよう、利用者IPを
+ * 署名付きで中継する（詳細は client-ip-relay.ts 冒頭 JSDoc）。
+ * @param incomingHeaders 受信リクエストのヘッダ（利用者IPの署名付き中継用。
+ *   null/undefinedなら中継しない）
  */
 export async function linkLineToCurrentUser(
   sessionAccessToken: string,
   lineAccessToken: string,
   reauthToken: string | null,
+  incomingHeaders?: HeaderReader | null,
 ): Promise<LineExchangeResult> {
   try {
-    const res = await fetch(`${serverBackendApiBase()}/auth/line/exchange`, {
+    const url = `${serverBackendApiBase()}/auth/line/exchange`;
+    const relayHeaders = await clientIpRelayHeaders("POST", url, incomingHeaders);
+    const res = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${sessionAccessToken}`,
+        ...relayHeaders,
       },
       body: JSON.stringify({
         line_access_token: lineAccessToken,
         reauth_token: reauthToken ?? undefined,
       }),
+      // redirect: "error" — backend からの 3xx に暗黙追従すると、署名済み中継ヘッダと
+      // Bearerトークンがリダイレクト先の任意オリジンへ送られてしまう
+      // （client-ip-relay.ts 冒頭 JSDoc参照）。
+      redirect: "error",
     });
     if (res.status === 200) return { outcome: "linked" };
     if (res.status === 409) return { outcome: "already_linked" };
