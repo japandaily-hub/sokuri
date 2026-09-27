@@ -25,10 +25,14 @@
     - 有効にするのは環境変数 ``APP_LOG_LEVEL`` があるときだけ（本番は start.sh が既定値 INFO
       を渡す）。Settings（.env）ではなくプロセスの環境変数を読むのは、① テストが
       ``create_app(Settings(APP_ENV="production"))`` を直接呼ぶため、Settings の値で切り替えると
-      テストのロガーまで書き換わる ② Settings の生成より前から使える形にしておくため。
+      テストのロガーまで書き換わる ② ログの設定を Settings の生成・検証に依存させないため。
       未設定（テスト・ローカル開発）では何もしない＝従来どおり。
-    - 本文の改行は ``\\n`` にエスケープして1行に収める（利用者の入力を含む値で偽のログ行を
-      作られないようにする: CWE-117）。例外のトレースバックは従来どおり複数行で出す。
+    - 呼ぶのは app/main.py の ``create_app()`` の直前（import 時の [startup] ログや本番ガードの
+      CRITICAL を拾う）。それより前、main.py が他のモジュールを import している最中に出るログ
+      （Settings の検証時の WARNING 等）は設定前のため、従来どおり lastResort で本文だけが出る。
+    - 本文の改行などの制御文字はエスケープして1行に収める（利用者の入力を含む値で偽のログ行を
+      作られないようにする: CWE-117。ログビューアが改行とみなす U+0085・U+2028・U+2029 や
+      端末を操作できる ESC も含む。タブはそのまま）。例外のトレースバックは従来どおり複数行で出す。
     - 出力の直前に文中のメールアドレスを :func:`mask_emails_in_text` でマスクする（呼び出し側の
       マスク漏れや、例外文に含まれる値への安全網）。呼び出し側では引き続き
       :func:`app.core.masking.mask_email` で個別にマスクすること。
@@ -60,6 +64,29 @@ _ALLOWED_LEVELS: dict[str, int] = {
 #: 本モジュールが付けたハンドラの目印（何度呼ばれてもハンドラを1つに保つために使う）。
 _HANDLER_MARK = "_katazuke_app_log_handler"
 
+
+def _escape_for(code_point: int) -> str:
+    """制御文字1字を、見て分かるエスケープ表記（``\\n`` ``\\x1b`` ``\\u2028`` 等）にする。"""
+    named = {0x0A: "\\n", 0x0D: "\\r"}
+    if code_point in named:
+        return named[code_point]
+    return f"\\x{code_point:02x}" if code_point <= 0xFF else f"\\u{code_point:04x}"
+
+
+#: 本文のエスケープ対象（``str.translate`` 用の表）。C0 制御文字（タブを除く）・DEL・
+#: C1 制御文字（NEL を含む）と、``str.splitlines`` やログビューアが行区切りとみなす
+#: U+2028・U+2029。
+_MESSAGE_ESCAPES: dict[int, str] = {
+    code_point: _escape_for(code_point)
+    for code_point in (
+        *range(0x00, 0x09),
+        *range(0x0A, 0x20),
+        *range(0x7F, 0xA0),
+        0x2028,
+        0x2029,
+    )
+}
+
 logger = logging.getLogger(__name__)
 
 
@@ -71,7 +98,7 @@ class AppLogFormatter(logging.Formatter):
     """
 
     def format(self, record: logging.LogRecord) -> str:
-        message = record.getMessage().replace("\r", "\\r").replace("\n", "\\n")
+        message = record.getMessage().translate(_MESSAGE_ESCAPES)
         text = f"{record.levelname} [{record.name}] {message}"
         # トレースバックの文字列は標準の Formatter と同じく record にキャッシュする（他の
         # ハンドラも同じ文字列を使う）。マスクは戻り値にだけ掛け、record 自体は書き換えない。

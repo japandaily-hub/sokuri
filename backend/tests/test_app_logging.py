@@ -139,6 +139,20 @@ def test_formatter_escapes_newlines_and_masks_emails():
     assert text == "WARNING [app.main] email=t***@example.com\\nINFO [app.main] forged"
 
 
+def test_formatter_escapes_other_line_breaks_and_control_characters():
+    """ログビューアが改行とみなす NEL・U+2028・U+2029 や端末を操作できる ESC も1行の中に閉じ込める。
+
+    ツール経由の書き込みでエスケープ表記が実体化する事故を避けるため、入力は chr() で組み立てる。
+    """
+    backslash = chr(92)
+    raw = "".join(chr(code) for code in (0x0D, 0x0B, 0x0C, 0x1B, 0x00, 0x7F, 0x85, 0x2028, 0x2029))
+    record = logging.LogRecord("app.x", logging.INFO, __file__, 1, "a%sb", (raw + chr(9) + "日本語",), None)
+    text = app_logging.AppLogFormatter().format(record)
+    assert len(text.splitlines()) == 1
+    escaped = ["r", "x0b", "x0c", "x1b", "x00", "x7f", "x85", "u2028", "u2029"]
+    assert text == "INFO [app.x] a" + "".join(backslash + e for e in escaped) + chr(9) + "日本語b"
+
+
 def test_formatter_keeps_traceback_and_masks_emails_in_it():
     try:
         raise ValueError("Key (email)=(taro@example.com) already exists.")
