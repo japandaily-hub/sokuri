@@ -39,7 +39,12 @@ def _callee_name(func: ast.expr) -> str:
 
 
 def _is_logging_call(node: ast.Call) -> bool:
-    """``logger.info(...)`` / ``logging.warning(...)`` 等の呼び出しか。"""
+    """``logger.info(...)`` / ``logging.warning(...)`` 等の呼び出しか。
+
+    受け手の名前に "log" を含むものだけを見る（app 配下は全モジュールが
+    ``logger = logging.getLogger(__name__)`` の規約。``l = logging.getLogger(...)`` のような
+    別名は検出できないので使わないこと）。
+    """
     func = node.func
     if not isinstance(func, ast.Attribute) or func.attr not in _LOG_METHODS:
         return False
@@ -56,10 +61,27 @@ def _names_an_email(node: ast.AST) -> bool:
     return False
 
 
+def _is_email_lookup_call(node: ast.Call) -> bool:
+    """``obj.get("email")`` や ``getattr(obj, "contact_email")`` のような取り出しか。"""
+    key: ast.expr | None = None
+    if isinstance(node.func, ast.Attribute) and node.func.attr == "get" and node.args:
+        key = node.args[0]
+    elif isinstance(node.func, ast.Name) and node.func.id == "getattr" and len(node.args) >= 2:
+        key = node.args[1]
+    return (
+        isinstance(key, ast.Constant)
+        and isinstance(key.value, str)
+        and bool(_EMAIL_NAME_RE.search(key.value))
+    )
+
+
 def _raw_email_expressions(node: ast.AST):
     """マスク関数を通っていない「メールアドレスらしい式」を列挙する。"""
     if isinstance(node, ast.Call):
         if _callee_name(node.func) in _MASKING_FUNCS:
+            return
+        if _is_email_lookup_call(node):
+            yield node
             return
         # 呼び出される関数名そのもの（例: is_placeholder_email(...)）は値ではないので見ない。
         # ただし user.email.lower() の user.email のような受け手側は値として検査する。
@@ -105,6 +127,8 @@ def test_app_logging_calls_do_not_pass_raw_email_addresses():
         'logger.info(f"x {user.email}")',
         'logger.error("x %s", user.email.lower())',
         'logger.info("x %s", body["contact_email"])',
+        'logger.info("x %s", body.get("email"))',
+        'logger.warning("x %s", getattr(user, "contact_email"))',
         'logging.warning("x %s", settings.admin_emails)',
     ],
 )
@@ -120,6 +144,8 @@ def test_guard_detects_raw_email_patterns(source: str):
         'logger.info("x %s", user.email_notify_opt_in)',
         'logger.info("x %s", notify.is_placeholder_email(value))',
         'logger.info("x %s", len(recipients))',
+        'logger.info("x %s", options.get("timeout"))',
+        'logger.info("x %s", mask_email(body.get("email")))',
         'send_alert("x", f"email={user.email}")',
     ],
 )
@@ -135,6 +161,9 @@ def test_guard_allows_masked_or_unrelated_values(source: str):
         ("a@example.com と b@example.org", "a***@example.com と b***@example.org"),
         ("Key (email)=(taro@example.com) already exists.", "Key (email)=(t***@example.com) already exists."),
         ("@router と user@localhost はメールとして扱わない", "@router と user@localhost はメールとして扱わない"),
+        # 区切りなしで日本語に続くと、その日本語もローカル部として扱う（Unicode のアドレスも
+        # 隠すため）。残るのは先頭の1字だけで、アドレス本体は隠れる。
+        ("連絡先はtaro@example.comです", "連***@example.comです"),
         ("", ""),
     ],
 )
