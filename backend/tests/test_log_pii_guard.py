@@ -12,6 +12,7 @@ from __future__ import annotations
 import ast
 import pathlib
 import re
+import time
 
 import pytest
 
@@ -139,3 +140,11 @@ def test_guard_allows_masked_or_unrelated_values(source: str):
 )
 def test_mask_emails_in_text(text: str, expected: str):
     assert mask_emails_in_text(text) == expected
+
+
+def test_mask_emails_in_text_stays_linear_on_long_word_runs():
+    """全ログ行に掛かるため、「長い英数字の連続＋@」でも二乗時間にならない（旧式は2万字で数秒）。"""
+    started = time.perf_counter()
+    for text in ("a" * 50_000 + "@", "a" * 50_000 + "@example.com", ("x" * 70 + "@") * 700):
+        mask_emails_in_text(text)
+    assert time.perf_counter() - started < 1.0

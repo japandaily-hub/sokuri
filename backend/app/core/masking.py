@@ -14,7 +14,10 @@ import re
 #: 等も許すが、ログやアラート本文は ``email=<addr>``・``admin-grant:<addr>`` の形で書かれる
 #: ため、それらを含めると ``email=`` 等のラベルまで巻き込んで潰し、照合の手掛かりが消える。
 #: ドメイン部はドットを1つ以上要求する（``@router`` のような語や ``user@localhost`` は対象外）。
-_EMAIL_IN_TEXT_RE = re.compile(r"[\w.+'-]+@[\w-]+(?:\.[\w-]+)+")
+#: 全ログ行に掛かる（app/core/app_logging.py）ため計算量を線形に保つ: 先頭の後ろ読みで
+#: ローカル部の途中からの照合をやり直さず、長さは RFC 5321 の上限 64 字で打ち切る
+#: （無いと「長い英数字の連続＋@」で開始位置ごとに再走査し、2万字で数秒かかる）。
+_EMAIL_IN_TEXT_RE = re.compile(r"(?<![\w.+'-])[\w.+'-]{1,64}@[\w-]+(?:\.[\w-]+)+")
 
 
 def mask_account_number(account_number: str) -> str:
