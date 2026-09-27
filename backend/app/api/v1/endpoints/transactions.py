@@ -14,17 +14,20 @@ import unicodedata
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import Actor, get_current_actor
+from app.api.rate_limit_deps import RateLimitGuard
 from app.core.limits import (
     COMPLETION_REQUEST_COOLDOWN_HOURS,
     MAX_COMPLETION_REQUESTS_PER_TRANSACTION,
     MAX_REDUCTION_REQUESTS_PER_TRANSACTION,
+    MAX_SCHEDULE_PROPOSALS_PER_TRANSACTION,
+    MAX_TEXT_MESSAGES_PER_PARTY_PER_TRANSACTION,
 )
 from app.db.models.bid import Bid
 from app.db.models.case import Case, CaseItem
@@ -85,6 +88,20 @@ def _assert_txn_open(txn: Transaction) -> None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail=TRANSACTION_CLOSED_DETAIL
         )
+
+
+def _rate_limit_account_key(actor: Actor) -> str:
+    """レート制限のアカウント軸キー（``"{typ}:{id}"``）を組み立てる。
+
+    user と operator は別テーブルの UUID のため、名前空間を付けずに
+    ``str(actor.id)`` だけをキーにすると、両テーブル間でUUIDが一致した場合に
+    別人同士が同じバケットを共有してしまう（rate_limit_deps._scope_spec の
+    docstring にある「識別子自体を名前空間分離すること」と同じ考え方。auth.py の
+    login が "user:{email}" / "operator:{email}" で分離しているのと同型）。
+    管理者は _assert_party で "user" 側の当事者として通るが、キーは管理者自身の
+    User.id になる（依頼者本人のバケットは消費しない）。
+    """
+    return f"{actor.typ}:{actor.id}"
 
 
 @router.get(
@@ -763,6 +780,28 @@ def _to_message_out(message: Message, party: str) -> MessageOut:
     return out
 
 
+async def _count_messages(
+    session: AsyncSession,
+    txn_id: uuid.UUID,
+    *,
+    kind: str,
+    sender_type: str | None = None,
+) -> int:
+    """当該取引のメッセージ件数を **1クエリ**で数える（``_count_unread`` と同型）。
+
+    ``ix_messages_transaction_id_created_at`` の先頭列（transaction_id）で当該
+    取引だけを走査するため、取引数が積み上がってもこのクエリ自体のコストは
+    増えない（提示・通常発言とも上限があるため走査行数自体も頭打ちになる）。
+    """
+    stmt = select(func.count()).select_from(Message).where(
+        Message.transaction_id == txn_id, Message.kind == kind
+    )
+    if sender_type is not None:
+        stmt = stmt.where(Message.sender_type == sender_type)
+    count = await session.scalar(stmt)
+    return int(count or 0)
+
+
 @router.get(
     "/transactions/{transaction_id}/messages",
     response_model=list[MessageOut],
@@ -774,6 +813,11 @@ async def list_messages(
     actor: Actor = Depends(get_current_actor),
     session: AsyncSession = Depends(get_session),
 ) -> list[MessageOut]:
+    # 応答件数は MAX_TEXT_MESSAGES_PER_PARTY_PER_TRANSACTION（当事者ごと）×2 ＋
+    # MAX_SCHEDULE_PROPOSALS_PER_TRANSACTION ＋少数のシステムメッセージで頭打ちになる
+    # （L-4）。将来ページングを入れる場合、after は created_at の厳密な > 比較で、
+    # 同じ DB トランザクション内で作られた行は created_at が同じになり得るため、
+    # 件数で途中を切ると取りこぼす（(created_at, id) の複合カーソルが要る）。
     txn = await _get_txn(session, transaction_id)
     party = _assert_party(txn, actor)
 
@@ -798,14 +842,46 @@ async def create_message(
     transaction_id: uuid.UUID,
     body: MessageCreateRequest,
     background: BackgroundTasks,
+    request: Request,
     actor: Actor = Depends(get_current_actor),
     session: AsyncSession = Depends(get_session),
+    _rl: object = Depends(RateLimitGuard("message_send")),
 ) -> MessageOut:
+    # コストDoS対策のレート制限（アカウント軸のみ・全取引合計）。重い _get_txn より
+    # 前に数える（cases.cancel_case と同じ方式。成功・失敗を問わずハンドラ冒頭で
+    # 毎回カウントする）。
+    request.state.rate_limit.hit_account(_rate_limit_account_key(actor))
+
     txn = await _get_txn(session, transaction_id)
     party = _assert_party(txn, actor)
     # キャンセル済み・完了済みの取引には発言できない（r8-H3）。従来は 201 を返し、
     # 相手方に「終了済み案件への発言」が届き続けていた。
     _assert_txn_open(txn)
+
+    # 1取引・当事者（sender_type）ごとの送信件数上限（L-4）。数える単位は
+    # アカウントではなく sender_type のため、管理者が "user" 側として送った発言も
+    # 依頼者側の件数に入る（_assert_party の既存の扱い）。行ロックは取らない
+    # （チャットに行ロック待ちを持ち込まないため）。同時送信では上限を超えうるが、
+    # 超過は「同時に COUNT〜COMMIT の間にいられる件数」＝DB 接続プール
+    # （db_pool_size+db_max_overflow、既定 5+5=10）で頭打ちになり、1インスタンス
+    # あたり最大でも +9 件（レート制限の窓内バーストの方が大きいので、効いているのは
+    # プール）。利用者が書き込める kind（画像など）を増やすときは、この件数と
+    # list_messages の天井に含めること。
+    existing_count = await _count_messages(session, txn.id, kind="text", sender_type=party)
+    if existing_count >= MAX_TEXT_MESSAGES_PER_PARTY_PER_TRANSACTION:
+        by_admin = actor.typ == "user" and actor.user is not None and actor.user.role == "admin"
+        logger.warning(
+            "messages: 送信上限に到達 - transaction_id=%s party=%s by_admin=%s count=%d limit=%d",
+            txn.id,
+            party,
+            by_admin,
+            existing_count,
+            MAX_TEXT_MESSAGES_PER_PARTY_PER_TRANSACTION,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="この取引で送れるメッセージの上限に達しました。運営へお問い合わせください。",
+        )
 
     # sender_type はクライアント入力を受け取らず actor から自動判定する（なりすまし防止）。
     message = Message(
@@ -1091,9 +1167,16 @@ async def propose_schedule(
     transaction_id: uuid.UUID,
     body: ScheduleProposeRequest,
     background: BackgroundTasks,
+    request: Request,
     actor: Actor = Depends(get_current_actor),
     session: AsyncSession = Depends(get_session),
+    _rl: object = Depends(RateLimitGuard("schedule_propose")),
 ) -> MessageOut:
+    # コストDoS対策のレート制限（アカウント軸のみ・全取引合計）。重い _get_txn より
+    # 前に数える（cases.cancel_case と同じ方式。成功・失敗を問わずハンドラ冒頭で
+    # 毎回カウントする）。
+    request.state.rate_limit.hit_account(_rate_limit_account_key(actor))
+
     # 認可（当事者性）はロック取得より前に確認する（r6-verify-fix M1 と同じパターン）。
     await _assert_party_before_lock(session, transaction_id, actor)
     # 通知件数・間隔の判定を他の同時提示と直列化する（request_completion と同じ順序）。
@@ -1153,6 +1236,28 @@ async def propose_schedule(
         # 直近の抑止間隔内の提示があれば送らない（既存の5分抑止）。
         and not _is_within_schedule_proposal_notify_interval(last_proposed_at)
     )
+
+    # 1取引あたりの提示回数上限（L-4）。依頼者は既存の候補か日程調整ページ
+    # （固定の時間帯）から確定できるので取引は止まらない。提示済み候補を走査する
+    # 処理（確定時の照合など）が読む行数の天井になる。行ロックを取らないため同時提示
+    # では上限を超えうるが、超過は DB 接続プール（既定 10）で頭打ちになり、
+    # 1インスタンスあたり最大でも +9 回（1回最大10候補なので照合は最大約290候補）。
+    existing_count = await _count_messages(session, txn.id, kind="schedule_proposal")
+    if existing_count >= MAX_SCHEDULE_PROPOSALS_PER_TRANSACTION:
+        logger.warning(
+            "schedule_propose: 提示上限に到達 - transaction_id=%s party=%s count=%d limit=%d",
+            txn.id,
+            party,
+            existing_count,
+            MAX_SCHEDULE_PROPOSALS_PER_TRANSACTION,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"日程候補の提示は1取引につき{MAX_SCHEDULE_PROPOSALS_PER_TRANSACTION}"
+                "回までです。調整はメッセージでご相談ください。"
+            ),
+        )
 
     message = Message(
         transaction_id=txn.id,

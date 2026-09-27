@@ -214,6 +214,15 @@ class Settings(BaseSettings):
     # 無認証の公開参照（GET /vendors, GET /vendors/{id}）。IP軸・全リクエストカウント。
     rl_public_read_ip_max: int = 120
     rl_public_read_window_sec: int = 60
+    # チャットメッセージ送信（POST /transactions/{id}/messages）。認証済みの当事者
+    # のみが呼べるためアカウント軸のみ（IP軸は持たない）。取引をまたいだ全リクエスト
+    # 合計でカウントする（2026-09-26 日程API入力検証のセキュリティレビュー L-4）。
+    rl_message_send_account_max: int = 30
+    rl_message_send_window_sec: int = 60
+    # 日程候補提示（POST /transactions/{id}/schedule/propose）。同じくアカウント軸
+    # のみ・全取引合計でカウントする。
+    rl_schedule_propose_account_max: int = 10
+    rl_schedule_propose_window_sec: int = 600
     # InMemoryRateLimitStore のキー数ハードキャップ（メモリ枯渇防止）。
     # 10000 → 100000 に引き上げ（security review Medium-1）。1バケット数十
     # バイト規模のため 100000 件でも数MBで収まり、ハードキャップ到達自体を
@@ -256,6 +265,8 @@ class Settings(BaseSettings):
         "rl_case_create_ip_max",
         "rl_case_create_account_max",
         "rl_public_read_ip_max",
+        "rl_message_send_account_max",
+        "rl_schedule_propose_account_max",
         mode="after",
     )
     @classmethod
@@ -272,6 +283,8 @@ class Settings(BaseSettings):
         "rl_line_window_sec",
         "rl_case_create_window_sec",
         "rl_public_read_window_sec",
+        "rl_message_send_window_sec",
+        "rl_schedule_propose_window_sec",
         mode="after",
     )
     @classmethod

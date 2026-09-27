@@ -24,6 +24,22 @@ MAX_PHOTOS_PER_CASE = 150
 # 上限を変えた瞬間に画面と API が食い違う）。r10 V-M4 対応。
 MAX_REDUCTION_REQUESTS_PER_TRANSACTION = 2
 
+# 1取引あたりの日程候補提示（schedule_proposal）の上限回数。提示は取引の messages に
+# 1件ずつ積まれるため、上限が無いと提示済み候補を走査する処理（確定時の照合など。
+# 行ロックを保持したまま読む）と list_messages（ページングなしで全件を返す）の読む
+# 行数が際限なく増える。1回最大10候補（ScheduleProposeRequest.slots の上限）の
+# ため、走査はおおむね最大200候補で頭打ちになる（同時実行時の超過幅は
+# transactions.propose_schedule のコメント参照。2026-09-26 日程API入力検証の
+# セキュリティレビュー L-4）。
+MAX_SCHEDULE_PROPOSALS_PER_TRANSACTION = 20
+
+# 1取引・当事者（sender_type）ごとの通常発言（kind="text"）の上限件数。取引全体
+# で数えると片方が上限まで送り切って相手の発言枠を食い潰せてしまうため、当事者
+# ごとに数える。list_messages はページングなしで全件を返すため、この上限と
+# MAX_SCHEDULE_PROPOSALS_PER_TRANSACTION の2つがチャット一覧の応答件数の天井に
+# なる（2026-09-26 日程API入力検証のセキュリティレビュー L-4）。
+MAX_TEXT_MESSAGES_PER_PARTY_PER_TRANSACTION = 300
+
 # 口コミ（レビューのコメント）の上限文字数。web の入力欄（web/src/lib/review-verdict.ts の
 # REVIEW_COMMENT_MAX）と同じ値にする。schemas_katadzuke.ReviewCreateRequest の Field と
 # 無害化（_sanitize_free_text）の両方がここを参照する（2026-09-25 に 1000 → 300。alembic 0042 の段B）。

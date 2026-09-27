@@ -259,6 +259,8 @@ _SCOPE_MESSAGES: dict[str, str] = {
     "analyze": "画像解析のリクエストが集中しています。しばらく時間をおいて再度お試しください。",
     "contact": "お問い合わせが集中しています。時間をおいて再度お送りください。",
     "operator_application": "送信回数の上限に達しました。しばらく時間をおいて再度お試しください。",
+    "message_send": "メッセージの送信が集中しています。しばらく時間をおいて再度お試しください。",
+    "schedule_propose": "日程候補の提示が集中しています。しばらく時間をおいて再度お試しください。",
 }
 
 
@@ -294,6 +296,12 @@ def get_rate_limiter() -> RateLimiter:
         ),
         public_read_ip=RateLimitRule(
             settings.rl_public_read_ip_max, settings.rl_public_read_window_sec
+        ),
+        message_send_account=RateLimitRule(
+            settings.rl_message_send_account_max, settings.rl_message_send_window_sec
+        ),
+        schedule_propose_account=RateLimitRule(
+            settings.rl_schedule_propose_account_max, settings.rl_schedule_propose_window_sec
         ),
     )
     return RateLimiter(config=config)
@@ -700,6 +708,23 @@ def _scope_spec(scope: str, config: RateLimitConfig) -> _ScopeSpec:
         # DB の件数を数えており、ヘッダを付け替えるだけで回避できた。
         return _ScopeSpec(
             ip_rule=config.operator_application_ip, account_rule=None, count_all=True
+        )
+    if scope == "message_send":
+        # チャットメッセージ送信（POST /transactions/{id}/messages）: 認証済みの
+        # 当事者だけが呼ぶためアカウント軸のみ（IP軸を持たない＝同じ回線の他の
+        # 利用者を巻き込まない）。成功・失敗を問わずハンドラ冒頭の hit_account で
+        # 毎回数える（case_cancel と同じ方式。2026-09-26 日程API入力検証の
+        # セキュリティレビュー L-4）。
+        return _ScopeSpec(
+            ip_rule=None, account_rule=config.message_send_account, count_all=False
+        )
+    if scope == "schedule_propose":
+        # 日程候補提示（POST /transactions/{id}/schedule/propose）: 認証済みの
+        # 当事者だけが呼ぶためアカウント軸のみ（IP軸を持たない＝同じ回線の他の
+        # 利用者を巻き込まない）。成功・失敗を問わずハンドラ冒頭の hit_account で
+        # 毎回数える（case_cancel と同じ方式）。
+        return _ScopeSpec(
+            ip_rule=None, account_rule=config.schedule_propose_account, count_all=False
         )
     raise ValueError(f"未知の rate limit scope です: {scope!r}")
 

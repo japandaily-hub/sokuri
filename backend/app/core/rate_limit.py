@@ -97,6 +97,12 @@ class RateLimitConfig:
     # 値は従来のエンドポイント内のコード定数（同一IPから1時間5件）を引き継ぐ。
     # 従来どおり環境変数は持たず、get_rate_limiter() でも上書きしない。
     operator_application_ip: RateLimitRule = RateLimitRule(5, 3600)
+    # チャット送信・日程候補提示（いずれもアカウント軸のみ・全取引合計でカウント。
+    # 認証済みの当事者のみが呼べるため IP 軸は持たない）。デフォルト値は既存の
+    # RateLimitConfig(...) 呼び出し箇所（テスト含む）を壊さないために設定する
+    # （2026-09-26 日程API入力検証のセキュリティレビュー L-4）。
+    message_send_account: RateLimitRule = RateLimitRule(30, 60)
+    schedule_propose_account: RateLimitRule = RateLimitRule(10, 600)
 
 
 class RateLimitStore(Protocol):
