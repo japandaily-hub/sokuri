@@ -193,9 +193,20 @@ class R2Backend:
         client = _get_client()
         try:
             client.delete_object(Bucket=get_settings().r2_bucket, Key=self._full_key(key))
-        except Exception:  # noqa: BLE001 - 冪等・ベストエフォート。呼び出し元へ伝播させない。
+        except Exception as exc:  # noqa: BLE001 - 冪等・ベストエフォート。呼び出し元へ伝播させない。
+            # botocore の接続系例外は文言に送信先 URL（バケット・接頭辞・キーの全桁）を含む。
+            # storage_key は無認証の capability URL（GET /files/{storage_key}）なので、例外文や
+            # トレースバックは出さず、丸めたキーと例外の種類・エラーコードだけを残す。
+            # storage.mask_key_for_log は storage → storage_backends の import と循環するため
+            # ここで読み込む。
+            from app.services.storage import mask_key_for_log
+
             logger.warning(
-                "R2Backend.delete: オブジェクト削除に失敗（無視して続行）", exc_info=True
+                "R2Backend.delete: オブジェクト削除に失敗（無視して続行） - key=%s %s code=%s status=%s",
+                mask_key_for_log(key),
+                type(exc).__name__,
+                _error_code(exc) if isinstance(exc, ClientError) else "-",
+                _status_code(exc) if isinstance(exc, ClientError) else "-",
             )
 
     async def put(self, key: str, data: bytes, content_type: str) -> None:

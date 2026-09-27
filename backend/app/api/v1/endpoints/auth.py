@@ -560,9 +560,12 @@ async def _fetch_line_user_id(line_access_token: str) -> str:
 
     line_user_id = data.get("userId")
     if not line_user_id or not _LINE_USER_ID_RE.match(str(line_user_id)):
+        # userId は利用者を一意に示す外部 ID（Push の宛先）。書式が崩れていても値そのものは
+        # ログに出さず、型と長さだけを残す。
         logger.error(
-            "auth/line/exchange: LINE Profile API 応答の userId が不正な書式 - userId=%s",
-            line_user_id,
+            "auth/line/exchange: LINE Profile API 応答の userId が不正な書式 - type=%s length=%s",
+            type(line_user_id).__name__,
+            len(str(line_user_id)) if line_user_id is not None else 0,
         )
         raise _LINE_AUTH_FAILED()
     return str(line_user_id)

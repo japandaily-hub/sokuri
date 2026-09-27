@@ -10,6 +10,7 @@ StorageUnavailableError への変換）が正しく動くことを確認する�
 from __future__ import annotations
 
 import io
+import logging
 
 import pytest
 from botocore.exceptions import ClientError, EndpointConnectionError
@@ -161,6 +162,40 @@ async def test_delete_missing_key_does_not_raise(backend: R2Backend):
 async def test_delete_swallows_client_error(backend: R2Backend, fake_client: FakeR2Client):
     fake_client.delete_raises = _client_error("InternalError", 500, "DeleteObject")
     await backend.delete("whatever.jpg")  # 例外が漏れない
+
+
+_DELETE_FAILURE_KEY = "0123456789abcdef0123456789abcdef.jpg"
+
+
+@pytest.mark.parametrize(
+    ("raised", "expected"),
+    [
+        (
+            # 接続系の例外は文言に送信先 URL（バケット・接頭辞・キーの全桁）を含む。
+            EndpointConnectionError(
+                endpoint_url=f"https://test-bucket.acct.r2.cloudflarestorage.com/case-photos/{_DELETE_FAILURE_KEY}"
+            ),
+            "key=01234567... EndpointConnectionError code=- status=-",
+        ),
+        (_client_error("AccessDenied", 403, "DeleteObject"), "key=01234567... ClientError code=AccessDenied status=403"),
+    ],
+)
+async def test_delete_failure_log_keeps_storage_key_masked(
+    backend: R2Backend,
+    fake_client: FakeR2Client,
+    caplog: pytest.LogCaptureFixture,
+    raised: Exception,
+    expected: str,
+):
+    """storage_key は無認証の capability URL（GET /files/{storage_key}）なので、削除失敗のログには
+    丸めたキーと例外の種類・コードだけを残す（例外文・トレースバックは出さない）。"""
+    fake_client.delete_raises = raised
+    with caplog.at_level(logging.WARNING, logger=r2_module.__name__):
+        await backend.delete(_DELETE_FAILURE_KEY)
+    assert expected in caplog.text
+    assert _DELETE_FAILURE_KEY not in caplog.text
+    assert "cloudflarestorage.com" not in caplog.text
+    assert all(record.exc_info is None for record in caplog.records)
 
 
 # ──────────────────────────── 接続不能 ────────────────────────────
