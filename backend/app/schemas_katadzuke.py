@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 import unicodedata
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime
 from typing import Annotated, Literal, get_args
 
 from pydantic import (
@@ -13,7 +13,7 @@ from pydantic import (
     ConfigDict,
     EmailStr,
     Field,
-    StringConstraints,
+    StrictInt,
     ValidationInfo,
     field_validator,
     model_validator,
@@ -33,6 +33,12 @@ from app.services.message_guard import contains_contact_info
 from app.services.text_sanitize import (
     normalize_and_strip_control_chars,
     reject_disallowed_display_chars,
+)
+from app.services.visit_schedule import (
+    FIXED_VISIT_TIME_SLOTS,
+    MAX_SCHEDULE_CANDIDATES,
+    parse_iso_date,
+    validate_time_window,
 )
 
 # ──────────────────────────── 認証 ────────────────────────────
@@ -1452,20 +1458,12 @@ class MessageOut(BaseModel):
 # （2026-09-25 セキュリティレビュー Low 対応）。
 VISIT_TIME_SLOT_MAX_LENGTH = 32
 
-# 業者からの提示が無い取引でも依頼者が確定できる固定5択（日程調整ページ）。
+# 日程調整ページ（/schedule）から確定できる固定5択。
+# 単一の出所は services/visit_schedule.py の FIXED_VISIT_TIME_SLOTS で、
 # web/src/lib/visit-slots.ts の VISIT_TIME_SLOTS の value と1文字違わず一致させること
-# （日程調整ページと業者の候補日提示フォームが共有する唯一の定義）。
-# ここがずれると、日程調整ページ（固定5択）からの確定が
-# transactions.py の _assert_offered_time_slot で 422 になる。
-SCHEDULE_FIXED_TIME_SLOTS: frozenset[str] = frozenset(
-    {
-        "9:00〜12:00",
-        "12:00〜15:00",
-        "15:00〜18:00",
-        "18:00〜21:00",
-        "時間指定なし",
-    }
-)
+# （tests/test_schedule_input_validation.py が web 側の定義を読んで照合する）。
+# ここがずれると、日程調整ページ（固定5択）からの確定が confirm_schedule で 422 になる。
+SCHEDULE_FIXED_TIME_SLOTS: frozenset[str] = frozenset(FIXED_VISIT_TIME_SLOTS)
 
 #: 拒否する Unicode 双方向クラス（日程検証レビュー SEC-L2）。R（右から左に書く文字。
 #: ヘブライ文字等）/ AL（アラビア文字）/ AN（アラビア・インド数字）。
@@ -1476,7 +1474,7 @@ SCHEDULE_FIXED_TIME_SLOTS: frozenset[str] = frozenset(
 #: 双方向レンダリング規則により画面上は桁が入れ替わって見えることがある。
 #: _slot_month_days は論理順の文字列に対して正規表現で「2月3日」を拾うため、
 #: 業者・依頼者の画面に見えている見た目の日付と、実際に照合・確定される日付が
-#: ずれかねない。候補日・確定時間帯（ScheduleProposeRequest.slots /
+#: ずれかねない。確定時間帯（ScheduleProposeRequest は構造化済みのため対象外。
 #: ScheduleConfirmRequest.visit_time_slot）にのみ適用し、右から左の文字を書く
 #: 正当な用途がありうる note・お問い合わせ本文等の自由記述欄には適用しない。
 _REJECTED_BIDI_CLASSES = {"R", "AL", "AN"}
@@ -1496,54 +1494,82 @@ def _reject_rtl_chars(value: str, *, field_label: str) -> str:
     return value
 
 
-class ScheduleProposeRequest(BaseModel):
-    slots: list[
-        Annotated[str, StringConstraints(min_length=1, max_length=VISIT_TIME_SLOT_MAX_LENGTH)]
-    ] = Field(min_length=1, max_length=10)
+class ScheduleCandidateIn(BaseModel):
+    """業者が提示する候補1件（日程構造化 DESIGN §13.1・§13.3）。
 
-    @field_validator("slots")
+    表示（「2026年10月1日（木）9:00〜12:00」）はサーバーだけが作るため、ここでは
+    日付と開始・終了の時刻だけを受け取る。start/end はキーを省略できない（時間指定なしは
+    両方 null を明示する）。日付の範囲・当日の終わった枠・重複は日本時間の「今」で判定する
+    必要があるため propose_schedule で検査する（画面に出せる文字列の detail で返すため）。
+    """
+
+    # 余分なキー（旧画面の label 等）を黙って捨てず 422 にする（security review L-3 と同じ理由）。
+    model_config = ConfigDict(extra="forbid")
+
+    date: date
+    start: str | None
+    end: str | None
+
+    @field_validator("date", mode="before")
     @classmethod
-    def _validate_slots(cls, v: list[str]) -> list[str]:
-        """候補日ラベルは空白のみの値を禁止し、制御文字・右から左の文字を拒否する。
+    def _validate_date(cls, v: object) -> date:
+        """"YYYY-MM-DD" の文字列に限る（数値の UNIX 時刻や日時の文字列を日付として通さない）。"""
+        return parse_iso_date(v)
 
-        2026-09-25 セキュリティレビュー（Low）対応: 双方向制御文字（U+202E 等）や
-        ゼロ幅文字を候補ラベルに混ぜられると、依頼者のチャット・日程調整画面上で
-        候補の見た目（表示順や文字列そのもの）を偽装できてしまう。
-        右から左に書く文字（R/AL/AN）についても同様の見た目のずれが起こりうる
-        ため拒否する（日程検証レビュー SEC-L2、詳細は _REJECTED_BIDI_CLASSES 参照）。
-        """
-        for item in v:
-            if not item.strip():
-                raise ValueError("候補日に空白のみの値は指定できません。")
-            _reject_control_chars(item, field_label="候補日")
-            _reject_rtl_chars(item, field_label="候補日")
-        return v
+    @model_validator(mode="after")
+    def _validate_time_window(self) -> ScheduleCandidateIn:
+        """時刻の規則（両方 null か、6:00〜22:00・30分刻み・1時間以上）を満たすこと。"""
+        validate_time_window(self.start, self.end)
+        return self
 
 
-_JST = timezone(timedelta(hours=9))
+class ScheduleProposeRequest(BaseModel):
+    """候補日の提示（日程構造化 DESIGN §13.3）。最上位の未知のキーは無視する（既定の extra）。
+
+    candidates が無い・null（開いたままの旧タブが送る {"slots": [...]}）は None になり、
+    propose_schedule が認可・状態の判定の後で 422 schedule_client_outdated を返す
+    （Pydantic の配列形式の 422 は旧画面で汎用文言になり、再読み込みを案内できないため）。
+    """
+
+    candidates: (
+        Annotated[
+            list[ScheduleCandidateIn],
+            Field(min_length=1, max_length=MAX_SCHEDULE_CANDIDATES),
+        ]
+        | None
+    ) = None
 
 
-def _jst_today() -> date:
-    """日本時間の「今日」。訪問日の「本日以降」は JST の暦で判定する（transactions._today_jst と同じ定義。
-    サーバー（Render）は UTC なので ``date.today()`` だと JST 0:00〜9:00 に「昨日」が通り、
-    完了確定の依頼がすぐ可能になる。循環 import を避けるためここに持つ）。"""
-    return datetime.now(_JST).date()
+class ScheduleAcceptRequest(BaseModel):
+    """業者の提示から候補を選んで確定する（日程構造化 DESIGN §2.2・§13.3）。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    # StrictInt: true や "1"・1.0 を添字として通さない。
+    candidate_index: StrictInt = Field(ge=0, le=MAX_SCHEDULE_CANDIDATES - 1)
 
 
 class ScheduleConfirmRequest(BaseModel):
+    """日程調整ページ（/schedule）からの確定（日程構造化 DESIGN §13.3）。
+
+    visit_date の範囲・visit_time_slot の固定5種・当日の終わった枠・運営による代理の
+    ひとことは confirm_schedule で判定する（日本時間の「今日」で判定し、画面に出せる
+    文字列または dict の detail で返すため。以前ここにあった date.today() の検査は
+    サーバーの時計の暦（UTC）で判定しており、日本の 0:00〜9:00 に1日ずれていた）。
+    """
+
     visit_date: date
     visit_time_slot: str = Field(min_length=1, max_length=VISIT_TIME_SLOT_MAX_LENGTH)
     note: str | None = Field(default=None, max_length=500)
 
-    @field_validator("visit_date")
+    @field_validator("note")
     @classmethod
-    def _validate_visit_date(cls, v: date) -> date:
-        today = _jst_today()
-        if v < today:
-            raise ValueError("訪問日は本日以降を指定してください。")
-        if v > today + timedelta(days=365):
-            raise ValueError("訪問日が遠すぎます。")
-        return v
+    def _validate_note(cls, v: str | None) -> str | None:
+        """/schedule の textarea 由来のため改行だけを許し、ほかの制御文字を拒否する
+        （双方向制御文字等で業者のチャット上の見た目を偽装させない）。"""
+        if v is None:
+            return v
+        return _reject_non_newline_control_chars(v, field_label="業者へのひとこと")
 
     @field_validator("visit_time_slot")
     @classmethod
@@ -1558,17 +1584,6 @@ class ScheduleConfirmRequest(BaseModel):
         """
         v = _reject_control_chars(v, field_label="訪問時間帯")
         return _reject_rtl_chars(v, field_label="訪問時間帯")
-
-    @field_validator("note")
-    @classmethod
-    def _validate_note(cls, v: str | None) -> str | None:
-        """/schedule の textarea 由来のため改行のみ許可する。
-
-        2026-09-25 セキュリティレビュー（Low）対応。
-        """
-        if v is None:
-            return v
-        return _reject_non_newline_control_chars(v, field_label="業者へのひとこと")
 
 
 # ──────────────────────────── 業者プロフィール ────────────────────────────

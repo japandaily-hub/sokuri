@@ -7,12 +7,11 @@
 from __future__ import annotations
 
 import math
-import re
 
 import logging
-import unicodedata
 import uuid
 from datetime import date, datetime, timedelta, timezone
+from typing import Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from sqlalchemy import func, or_, select, update
@@ -36,14 +35,13 @@ from app.db.models.operator import Operator
 from app.db.models.transaction import Cancellation, Transaction
 from app.db.models.user import User
 from app.db.session import get_session
-from app.services.reminders import JST
 from app.schemas_katadzuke import (
     MessageCreateRequest,
     MessageOut,
     OperatorPublicOut,
     ReductionOut,
     ReviewOut,
-    SCHEDULE_FIXED_TIME_SLOTS,
+    ScheduleAcceptRequest,
     ScheduleConfirmRequest,
     ScheduleProposeRequest,
     TransactionAddressOut,
@@ -56,6 +54,18 @@ from app.schemas_katadzuke import (
 from app.services import notify, notify_dispatch
 from app.services.case_lock import lock_transaction_rows
 from app.services.case_view import build_case_masked_out
+from app.services.visit_schedule import (
+    VisitCandidate,
+    candidate_label,
+    fixed_visit_time_slot_candidate,
+    format_visit_label,
+    is_candidate_expired,
+    latest_visit_date,
+    now_jst,
+    parse_proposal_meta,
+    time_label,
+    today_jst,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +86,32 @@ TRANSACTION_CLOSED_DETAIL: dict[str, str] = {
 SCHEDULE_ALREADY_CONFIRMED_DETAIL: dict[str, str] = {
     "code": "schedule_already_confirmed",
     "message": "訪問日程は確定済みです。変更が必要な場合はメッセージでご相談ください。",
+}
+# 開いたままの旧画面からの日程の送信を、何も書き込まずに止める 422（日程構造化 DESIGN §2.1・
+# §2.3・§7）。旧 web も dict の detail の message をそのまま表示するため、再読み込みを案内できる。
+# 日程まわりの 422 は数値で書く（Starlette 1.x で status.HTTP_422_UNPROCESSABLE_ENTITY が
+# 非推奨になり、後継の HTTP_422_UNPROCESSABLE_CONTENT は古い版に無いため）。
+SCHEDULE_PROPOSE_CLIENT_OUTDATED_DETAIL: dict[str, str] = {
+    "code": "schedule_client_outdated",
+    "message": "画面が古いため送信できませんでした。ページを再読み込みしてから、もう一度候補日を送ってください。",
+}
+SCHEDULE_CONFIRM_CLIENT_OUTDATED_DETAIL: dict[str, str] = {
+    "code": "schedule_client_outdated",
+    "message": "この画面からは確定できません。ページを再読み込みしてから、もう一度お選びください。",
+}
+# 業者の提示からの確定（accept）で、選んだ提示・候補では確定できないときの detail
+# （日程構造化 DESIGN §2.2）。web は code で理由を出し分け、メッセージと取引を取り直す。
+SCHEDULE_PROPOSAL_SUPERSEDED_DETAIL: dict[str, str] = {
+    "code": "schedule_proposal_superseded",
+    "message": "業者から新しい候補日が届いています。最新の候補からお選びください。",
+}
+SCHEDULE_CANDIDATE_EXPIRED_DETAIL: dict[str, str] = {
+    "code": "schedule_candidate_expired",
+    "message": "この候補日は過ぎています。業者に新しい候補を依頼するか、日程調整ページからお選びください。",
+}
+SCHEDULE_PROPOSAL_LEGACY_DETAIL: dict[str, str] = {
+    "code": "schedule_proposal_legacy",
+    "message": "この候補は古い形式のため、ここでは確定できません。日程調整ページからお選びください。",
 }
 # 書き込みを許可する取引ステータス。既読ポインタ更新（mark_messages_read）は
 # 「過去ログを読んだ」記録に過ぎず終了後も正当なため、意図的に対象外とする。
@@ -308,6 +344,19 @@ def _assert_party(txn: Transaction, actor: Actor) -> str:
     )
 
 
+def _user_side_actor_role(txn: Transaction, actor: Actor) -> Literal["user", "admin"]:
+    """依頼者側の操作を誰が行ったか（"user"＝案件の所有者本人 / "admin"＝代理の運営）。
+
+    _assert_party は所有者本人と管理者の両方を "user" として通すため、所有者ではない
+    管理者の代理操作を見分ける（完了確定の completed_by・日程確定の confirmed_by・
+    代理の日程確定でのひとことの拒否に共通で使う）。_assert_party が "user" を返した後に呼ぶこと。
+    """
+    assert actor.user is not None
+    if actor.user.role == "admin" and txn.case.user_id != actor.user.id:
+        return "admin"
+    return "user"
+
+
 async def _owner(session: AsyncSession, txn: Transaction) -> User | None:
     """案件所有者（依頼者）を1クエリ（PK取得）で引く。
 
@@ -482,16 +531,24 @@ def _completion_request_available_at(last_requested_at: datetime | None) -> date
 
 
 def _today_jst(now_utc: datetime | None = None) -> date:
-    """日本時間での「今日」の日付。visit_date（訪問予定日）はJSTの暦で判定する
-    （reminders.py の訪問日超過リマインドと同じ理由・同じ JST 定義）。
+    """日本時間での「今日」の日付（実体は services/visit_schedule.today_jst）。
 
     now_utc を省略すると現在時刻を使うが、テストから固定時刻を注入できるように
     引数化している（monkeypatch で本関数自体を差し替えれば date.today() に依存せず
-    日付境界を固定できる）。
+    日付境界を固定できる。request_completion の訪問日ゲートのテストがこの名前を
+    差し替えるため、このモジュールに残す）。
     """
-    if now_utc is None:
-        now_utc = datetime.now(timezone.utc)
-    return now_utc.astimezone(JST).date()
+    return today_jst(now_utc)
+
+
+def _now_jst() -> datetime:
+    """日本時間の現在時刻（実体は services/visit_schedule.now_jst）。
+
+    日程の提示・確定の判定（日付の範囲・当日の終わった枠・候補の期限）は、1リクエストで
+    この関数を1回だけ呼んで「今」を決める（日付と時刻の判定の間に日付が変わらないように）。
+    テストは本関数を monkeypatch して時刻を固定する。
+    """
+    return now_jst()
 
 
 @router.post(
@@ -536,10 +593,7 @@ async def complete_transaction(
     # _assert_party は「本人」または「admin」を "user" として通す。案件所有者本人
     # ではない管理者が代行確定した場合を監査できるよう meta に記録する（通知文面は
     # どちらでも同一のまま。「誰が確定したか」に依存させない）。
-    assert actor.user is not None
-    completed_by = (
-        "admin" if actor.user.role == "admin" and txn.case.user_id != actor.user.id else "user"
-    )
+    completed_by = _user_side_actor_role(txn, actor)
     # 完了確定を両当事者のチャットに記録として残す（confirm_schedule の
     # schedule_confirmed と同じ「状態遷移の記録は system 名義」の方針）。
     session.add(
@@ -990,171 +1044,49 @@ def _is_within_schedule_proposal_notify_interval(last_proposed_at: datetime | No
     return datetime.now(timezone.utc) - last_proposed_at < _SCHEDULE_PROPOSAL_NOTIFY_INTERVAL
 
 
-# 候補日ラベル（例「2026年10月1日（木）9:00〜12:00」「9月7日（日）10:00〜12:00」）に
-# 含まれる「(YYYY年)◯月◯日」を抽出する。年は任意（業者の候補日提示が日付＋時間帯の
-# 選択式になってからのラベルは年入り、自由入力だった頃のラベルは年なし）。
-# ASCII の [0-9] のみを数字とみなす（Python の \d は Unicode の Nd 全体
-# 〔タイ数字等〕にも一致するが、NFKC 正規化はそれらを ASCII 数字へ変換しない
-# ため、\d のままだと web 側の判定と食い違う。日程検証レビュー SEC-I1/SEC-I4）。
-# 「10月 1日」のような数字と年・月・日の間の空白も許容する。
-_SLOT_DATE_PATTERN = re.compile(r"(?:([0-9]{4})\s*年\s*)?([0-9]+)\s*月\s*([0-9]+)\s*日")
+async def _latest_schedule_proposal_seq(session: AsyncSession, txn_id: uuid.UUID) -> int:
+    """指定取引の提示の seq の最大値（v2 の提示が無ければ 0）を1クエリで求める
+    （日程構造化 DESIGN §4・§13.3）。
 
-
-def _slot_dates(label: str) -> set[tuple[int | None, int, int]]:
-    """候補日ラベルに含まれる日付をすべて (年, 月, 日) の集合として返す（年の無い表記は年=None）。
-
-    NFKC 正規化してから、ASCII の [0-9] のみを数字とみなして照合する
-    （全角数字「１０月１日」や「㋈」「㏠」のような合字は NFKC 正規化で
-    半角数字・「月」「日」に分解されるため拾えるが、タイ数字のように
-    NFKC で ASCII化されない non-ASCII の数字文字は拾わない＝空集合になる。
-    日程検証レビュー SEC-I1/SEC-I4）。
-    web 側は web/src/lib/visit-slots.ts の parseSlotDate（チャットでの確定前の日付の
-    読み取り・日程調整ページの候補日の強調表示）が同じ正規表現で最初の1件を読み、
-    web/src/lib/categories.ts の slotMonthDays（表示用の formatVisitSchedule）が
-    同じ「◯月◯日」の部分で判定する。
+    「最新の提示」は件数や created_at ではなく seq の最大値で判定する（created_at は
+    PostgreSQL ではトランザクション開始時刻のため、ロック待ちで提示の順と逆転しうる。
+    件数は将来メッセージを削除できるようになると採番と食い違う）。seq を持たない v1 の
+    提示（meta.slots だけ）は集計で NULL として無視される。PostgreSQL では
+    COALESCE(MAX(CAST(messages.meta ->> 'seq' AS INTEGER)), 0) になり、走査は
+    messages.transaction_id の索引で当該取引の行に限られる。呼び出し元は取引の行ロックを
+    持っていること（propose の採番と accept の最新判定を直列化する）。
     """
-    normalized = unicodedata.normalize("NFKC", label)
-    return {
-        (int(year) if year else None, int(month), int(day))
-        for year, month, day in _SLOT_DATE_PATTERN.findall(normalized)
-    }
-
-
-def _slot_month_days(label: str) -> set[tuple[int, int]]:
-    """候補日ラベルに含まれる「◯月◯日」をすべて (月, 日) の集合として返す（年は見ない）。"""
-    return {(month, day) for _, month, day in _slot_dates(label)}
-
-
-def _slot_years(label: str) -> set[int]:
-    """候補日ラベルに明記された年の集合を返す（年の無いラベルは空集合）。"""
-    return {year for year, _, _ in _slot_dates(label) if year is not None}
-
-
-async def _assert_offered_time_slot(
-    session: AsyncSession, txn_id: uuid.UUID, visit_time_slot: str
-) -> None:
-    """visit_time_slot が固定時間帯か、業者提示済みの候補のいずれかであることを検証する。
-
-    2026-09-25 セキュリティレビュー（Low）対応: 確定前は文字数しか検証しておらず、
-    依頼者が API を直接呼べば任意の文字列（双方向制御文字を含む）を
-    「業者へ確定表示される時間帯」として送り込めた。日程調整ページ
-    （web/src/app/schedule/page.tsx）は固定5種のいずれかしか送らず、チャット
-    （web/src/components/kdz/ChatPanel.tsx）は業者の schedule_proposal の
-    meta.slots に載っている文字列をそのまま送る契約のため、どちらでもない値は
-    不正入力として拒否する。ChatPanel は直近だけでなく過去の提示カードからも
-    確定できる UI のため、直近1件ではなく当該取引の全 schedule_proposal
-    メッセージを対象にする（過去の提示からの正当な確定を誤って弾かないため）。
-    """
-    if visit_time_slot in SCHEDULE_FIXED_TIME_SLOTS:
-        return
-    rows = (
-        await session.scalars(
-            select(Message.meta).where(
-                Message.transaction_id == txn_id, Message.kind == "schedule_proposal"
-            )
+    latest_seq = await session.scalar(
+        select(func.coalesce(func.max(Message.meta["seq"].as_integer()), 0)).where(
+            Message.transaction_id == txn_id,
+            Message.kind == "schedule_proposal",
         )
-    ).all()
-    for meta in rows:
-        # meta は本来 {"slots": [...]} 形式の JSON 列だが、想定外に壊れた行
-        # （dict でない・slots が list でない）があっても 500 にせず無視する。
-        if not isinstance(meta, dict):
-            continue
-        slots = meta.get("slots")
-        if not isinstance(slots, list):
-            continue
-        if visit_time_slot in slots:
-            return
-    raise HTTPException(
-        # Starlette 1.2.1 では status.HTTP_422_UNPROCESSABLE_ENTITY が非推奨
-        # （改名後の HTTP_422_UNPROCESSABLE_CONTENT は pyproject の許容範囲に含む
-        # 旧 Starlette には無い）ため、どの版でも動く数値で書く
-        # （main.py の RequestValidationError ハンドラと同じ方針）。
-        status_code=422,
-        detail="候補にない時間帯は指定できません。業者が提示した候補日か、日程調整ページの時間帯から選んでください。",
     )
+    return int(latest_seq or 0)
 
 
-def _assert_slot_date_matches(visit_time_slot: str, visit_date: date) -> None:
-    """候補日ラベルに含まれる日付が visit_date と一致することを検証する。
+def _assert_proposal_candidates_acceptable(
+    candidates: list[VisitCandidate], now: datetime
+) -> None:
+    """提示する候補の意味の検証（日程構造化 DESIGN §13.3。日付範囲 → 当日の終わった枠 → 重複の順）。
 
-    2026-09-25 セキュリティレビュー（Low）対応: 例えば visit_date=10/1 のまま
-    visit_time_slot="9月28日 10:00" を送ると、業者画面には日付入りラベルが
-    そのまま表示される一方、通知・訪問日超過リマインド（services/reminders.py）は
-    visit_date を基準に動くため、業者に見える予定日と実際の基準日がずれる。
-    ラベルに日付が含まれない場合（固定5種の時間帯等）は対象外。
-    集合の等価比較で判定するため、ラベルに異なる日付が複数含まれる場合は
-    （要素数2以上の集合が要素数1の集合と等しくなることはないので）
-    常に不一致＝422になる。propose_schedule は本対応以降に作成される新規の
-    候補提示についてこの形を拒否するが、本対応より前に保存済みの提示
-    （旧データ）にこの関数が適用された場合も、同じ集合比較でそのまま422になる。
-    ラベルに年が明記されている場合（業者の候補日提示が日付＋時間帯の選択式になって
-    からの「2026年10月1日（木）…」）は年も visit_date と照合する。月日だけの照合だと
-    「2026年10月1日」の候補を visit_date=2027-10-01 で確定でき、同じずれが年の単位で
-    起きるため（web の parseSlotDate は明記された年をそのまま visit_date にする）。
+    正規の画面でも踏みうる検証のため、画面に出せる文字列の detail で 422 を返す
+    （Pydantic の配列形式の detail は画面で汎用文言になる）。日付は日本時間で判定する。
     """
-    month_days = _slot_month_days(visit_time_slot)
-    years = _slot_years(visit_time_slot)
-    if (month_days and month_days != {(visit_date.month, visit_date.day)}) or (
-        years and years != {visit_date.year}
-    ):
+    today = today_jst(now)
+    last_day = latest_visit_date(today)
+    if any(not today <= candidate.date <= last_day for candidate in candidates):
         raise HTTPException(
             status_code=422,
-            detail="候補日の日付と訪問日が一致しません。候補日をもう一度選び直してください。",
+            detail="候補日は本日（日本時間）から1年以内の日付を選んでください。",
         )
-
-
-# date.weekday()（月曜=0）の順の曜日。
-_WEEKDAYS_JA = "月火水木金土日"
-
-# 業者の候補（自由入力だった頃の候補や、API を直接呼んで提示された任意の文言）で
-# 確定したときに、日程確定メッセージの「時間帯」の行へ書く定型文。候補の文言そのものは
-# meta["operator_slot_label"] に入れ、画面が「業者が提示した候補」の別枠として表示する。
-SCHEDULE_CONFIRMED_OPERATOR_SLOT_TEXT = "業者が提示した候補のとおり"
-
-
-def _format_visit_date_ja(d: date) -> str:
-    """訪問日を「2026年10月1日（木）」の形にする。
-
-    業者の候補日提示フォーム（web/src/lib/visit-slots.ts の formatSlotLabel）が作る
-    候補ラベルの日付部分と同じ形（ゼロ埋めなし・全角の丸括弧）。
-    """
-    return f"{d.year}年{d.month}月{d.day}日（{_WEEKDAYS_JA[d.weekday()]}）"
-
-
-def _fixed_time_slot_of(visit_time_slot: str, visit_date: date) -> str | None:
-    """確定した時間帯を、運営の定型文で書ける固定時間帯（5種）に読み替える。
-
-    - 固定時間帯そのもの（日程調整ページで選んだ場合など）
-    - 業者の候補日提示フォームが作る「visit_date の日付＋固定時間帯」
-      （例「2026年10月1日（木）9:00〜12:00」）
-    のどちらかならその固定時間帯を返す。それ以外（自由入力だった頃の候補・API を直接
-    呼んで提示された任意の文言）は None を返し、呼び出し側は文言を運営名義の本文に
-    入れない（日程検証レビュー SEC-L1）。
-    """
-    if visit_time_slot in SCHEDULE_FIXED_TIME_SLOTS:
-        return visit_time_slot
-    date_prefix = _format_visit_date_ja(visit_date)
-    if visit_time_slot.startswith(date_prefix):
-        rest = visit_time_slot[len(date_prefix):]
-        if rest in SCHEDULE_FIXED_TIME_SLOTS:
-            return rest
-    return None
-
-
-def _schedule_confirmed_body(visit_date: date, fixed_time_slot: str | None) -> str:
-    """日程確定メッセージ（運営名義）の本文を定型文だけで組み立てる。
-
-    2026-09-27 ユーザー決定（日程検証レビュー SEC-L1・案 1A）: 以前は業者の候補ラベル
-    （自由入力・32字まで）をそのまま本文に入れていたため、「10月1日 ※運営:当日現金払い必須」
-    のような文面が運営名義の吹き出しに載った。本文に入るのは、サーバーが visit_date から
-    作る訪問日と、固定時間帯（5種）の値か SCHEDULE_CONFIRMED_OPERATOR_SLOT_TEXT だけ。
-    """
-    time_text = fixed_time_slot if fixed_time_slot is not None else SCHEDULE_CONFIRMED_OPERATOR_SLOT_TEXT
-    return (
-        "訪問日程が確定しました。\n"
-        f"訪問日：{_format_visit_date_ja(visit_date)}\n"
-        f"時間帯：{time_text}"
-    )
+    if any(is_candidate_expired(candidate, now) for candidate in candidates):
+        raise HTTPException(status_code=422, detail="終わった時間帯は候補にできません。")
+    # VisitCandidate は (date, start, end) で等価・ハッシュ可能な frozen dataclass。
+    if len(set(candidates)) != len(candidates):
+        raise HTTPException(
+            status_code=422, detail="同じ日付・時間帯の候補が重複しています。"
+        )
 
 
 @router.post(
@@ -1179,7 +1111,8 @@ async def propose_schedule(
 
     # 認可（当事者性）はロック取得より前に確認する（r6-verify-fix M1 と同じパターン）。
     await _assert_party_before_lock(session, transaction_id, actor)
-    # 通知件数・間隔の判定を他の同時提示と直列化する（request_completion と同じ順序）。
+    # 通知件数・間隔の判定と seq の採番を、他の同時提示・候補からの確定（accept）と
+    # 直列化する（request_completion と同じ順序）。
     await _lock_txn_rows(session, transaction_id)
     txn = await _get_txn(session, transaction_id)
     party = _assert_party(txn, actor)
@@ -1200,32 +1133,21 @@ async def propose_schedule(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail=SCHEDULE_ALREADY_CONFIRMED_DETAIL
         )
-
-    # 1つの候補に複数の異なる日付が混在すると、確定時に _assert_slot_date_matches の
-    # 集合比較が必ず不一致（422）になり、有効な候補として確定できなくなる
-    # （提示できても確定できない候補を事前に弾く）。同じ日付の重複表記
-    # （例「10月1日 10:00〜10月1日 12:00」）は1種類として扱うため許可する
-    # （2026-09-25 セキュリティレビュー Low 対応）。明記された年が2種類以上ある候補も、
-    # 確定時の年の照合が必ず不一致になるため同じく弾く。
-    for slot in body.slots:
-        if len(_slot_month_days(slot)) > 1 or len(_slot_years(slot)) > 1:
-            raise HTTPException(
-                status_code=422,
-                detail="1つの候補日に複数の日付は入れられません。候補を分けて入力してください。",
-            )
-        # 「2月30日」「13月1日」「2027年2月29日」のような実在しない日付を弾く（日程検証
-        # レビュー SEC-I5）。年が明記されていればその年、無ければ 2000年（うるう年）を
-        # 仮の基準に使い、年なしの2月29日を不当に弾かないようにする。month/day が
-        # 巨大な整数だと date() コンストラクタが OverflowError を送出しうるため
-        # 合わせて捕捉する（年 0000 は ValueError）。
-        for year, month, day in _slot_dates(slot):
-            try:
-                date(year if year is not None else 2000, month, day)
-            except (ValueError, OverflowError):
-                raise HTTPException(
-                    status_code=422,
-                    detail="存在しない日付が含まれています。日付を確認してください。",
-                )
+    # 開いたままの旧タブ（自由記述の {"slots": [...]}）からの送信は何も書き込まず、
+    # 再読み込みを促す（日程構造化 DESIGN §2.1・§7）。件数を Render のログで数え、7日連続で
+    # 0件になったら旧形式の判定を片付ける。業者の自由記述（ラベル本文）はログに出さない。
+    if body.candidates is None:
+        logger.warning(
+            "schedule.legacy_client path=propose transaction_id=%s operator_id=%s",
+            txn.id,
+            actor.id,
+        )
+        raise HTTPException(status_code=422, detail=SCHEDULE_PROPOSE_CLIENT_OUTDATED_DETAIL)
+    candidates = [
+        VisitCandidate(date=candidate.date, start=candidate.start, end=candidate.end)
+        for candidate in body.candidates
+    ]
+    _assert_proposal_candidates_acceptable(candidates, _now_jst())
 
     # Message 追加前に判定する（追加後だと今回分が常に1件以上ヒットし、通知が
     # 永久に抑止されてしまう）。
@@ -1236,12 +1158,11 @@ async def propose_schedule(
         # 直近の抑止間隔内の提示があれば送らない（既存の5分抑止）。
         and not _is_within_schedule_proposal_notify_interval(last_proposed_at)
     )
+    seq = await _latest_schedule_proposal_seq(session, txn.id) + 1
 
-    # 1取引あたりの提示回数上限（L-4）。依頼者は既存の候補か日程調整ページ
-    # （固定の時間帯）から確定できるので取引は止まらない。提示済み候補を走査する
-    # 処理（確定時の照合など）が読む行数の天井になる。行ロックを取らないため同時提示
-    # では上限を超えうるが、超過は DB 接続プール（既定 10）で頭打ちになり、
-    # 1インスタンスあたり最大でも +9 回（1回最大10候補なので照合は最大約290候補）。
+    # 1取引あたりの提示回数上限（L-4）。依頼者は最新の提示か日程調整ページ
+    # （固定の時間帯）から確定できるので取引は止まらない。提示メッセージの行数の天井になる。
+    # 上の _lock_txn_rows で取引の行を直列化しているため、同時提示でも上限は超えない。
     existing_count = await _count_messages(session, txn.id, kind="schedule_proposal")
     if existing_count >= MAX_SCHEDULE_PROPOSALS_PER_TRANSACTION:
         logger.warning(
@@ -1263,9 +1184,23 @@ async def propose_schedule(
         transaction_id=txn.id,
         sender_type="operator",
         sender_id=actor.id,
-        body=f"訪問日程の候補を{len(body.slots)}件提示しました。",
+        body=f"訪問日程の候補を{len(candidates)}件提示しました。",
         kind="schedule_proposal",
-        meta={"slots": body.slots},
+        # 表示（label）はサーバーだけが作る（日程構造化 DESIGN §3）。v2 に slots は持たせない
+        # （保存した重複データは消せず、将来ラベルを再解析する入口になるため）。
+        meta={
+            "v": 2,
+            "seq": seq,
+            "candidates": [
+                {
+                    "date": candidate.date.isoformat(),
+                    "start": candidate.start,
+                    "end": candidate.end,
+                    "label": candidate_label(candidate),
+                }
+                for candidate in candidates
+            ],
+        },
     )
     session.add(message)
 
@@ -1294,9 +1229,99 @@ async def propose_schedule(
 
 
 @router.post(
+    "/transactions/{transaction_id}/schedule/proposals/{proposal_id}/accept",
+    response_model=TransactionOut,
+    summary="業者が提示した候補での訪問日程の確定（所有ユーザーのみ・最新の提示のみ）",
+)
+async def accept_schedule_proposal(
+    transaction_id: uuid.UUID,
+    proposal_id: uuid.UUID,
+    body: ScheduleAcceptRequest,
+    background: BackgroundTasks,
+    request: Request,
+    actor: Actor = Depends(get_current_actor),
+    session: AsyncSession = Depends(get_session),
+    _rl: object = Depends(RateLimitGuard("schedule_accept")),
+) -> TransactionOut:
+    # コストDoS対策のレート制限（アカウント軸のみ・全取引合計。propose と同じ方式）。
+    request.state.rate_limit.hit_account(_rate_limit_account_key(actor))
+
+    # 認可（当事者性）はロック取得より前に確認する（r6-verify-fix M1）。
+    await _assert_party_before_lock(session, transaction_id, actor)
+    # 提示（propose）・完了・キャンセルと同じ行ロックで直列化する。propose と同時に押されても、
+    # 結果は「確定して、後から来た提示は 409」か「新しい提示が先に入り、この確定は
+    # superseded の 409」のどちらか一方に必ず決まる（日程構造化 DESIGN §4）。
+    await _lock_txn_rows(session, transaction_id)
+    txn = await _get_txn(session, transaction_id)
+    party = _assert_party(txn, actor)
+    if party != "user":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="日程確定はユーザー側のみ行えます。",
+        )
+    if txn.status != "pending":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="日程確定できる状態ではありません。",
+        )
+    # 提示は id・取引・種別の3条件で1行だけ引く（他の取引の提示や通常のメッセージの id を
+    # 渡されても確定に使わない＝IDOR 防止。ロックを持ったまま全提示を読み込まない）。
+    proposal = await session.scalar(
+        select(Message).where(
+            Message.id == proposal_id,
+            Message.transaction_id == txn.id,
+            Message.kind == "schedule_proposal",
+        )
+    )
+    if proposal is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="候補日の提示が見つかりません。ページを再読み込みしてください。",
+        )
+    parsed = parse_proposal_meta(proposal.meta)
+    if parsed.version != "v2":
+        # v1（業者の自由記述だけの旧形式）は解析せず、日程調整ページへ案内する。
+        # 構造化の反映前に本番でできた提示の残り具合を数えるため件数をログに残す。
+        logger.warning(
+            "schedule.legacy_proposal path=accept transaction_id=%s proposal_id=%s version=%s",
+            txn.id,
+            proposal.id,
+            parsed.version,
+        )
+        raise HTTPException(status_code=422, detail=SCHEDULE_PROPOSAL_LEGACY_DETAIL)
+    # 確定できるのは最新の提示だけ（ユーザー決定 2026-09-27）。最新は seq の最大値で判定する。
+    if parsed.seq != await _latest_schedule_proposal_seq(session, txn.id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=SCHEDULE_PROPOSAL_SUPERSEDED_DETAIL
+        )
+    if body.candidate_index >= len(parsed.candidates):
+        raise HTTPException(
+            status_code=422, detail="候補が見つかりません。ページを再読み込みしてください。"
+        )
+    candidate = parsed.candidates[body.candidate_index]
+    if is_candidate_expired(candidate, _now_jst()):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=SCHEDULE_CANDIDATE_EXPIRED_DETAIL
+        )
+    return await _apply_schedule_confirmation(
+        session,
+        background,
+        txn,
+        actor,
+        candidate,
+        source_meta={
+            "source": "proposal",
+            "proposal_id": str(proposal.id),
+            "candidate_index": body.candidate_index,
+        },
+        note_text="",
+    )
+
+
+@router.post(
     "/transactions/{transaction_id}/schedule/confirm",
     response_model=TransactionOut,
-    summary="訪問日程の確定（所有ユーザーのみ）",
+    summary="訪問日程の確定（日程調整ページ専用・所有ユーザーのみ）",
 )
 async def confirm_schedule(
     transaction_id: uuid.UUID,
@@ -1322,45 +1347,99 @@ async def confirm_schedule(
             status_code=status.HTTP_409_CONFLICT,
             detail="日程確定できる状態ではありません。",
         )
+    # 日程調整ページ（/schedule）の固定5種だけを受け付ける。旧依頼者タブが業者の候補ラベルで
+    # 確定する等の固定5種以外は、何も書き込まず再読み込みを促す（日程構造化 DESIGN §2.3・§7）。
+    # 送られてきた値（任意の文字列）はログに出さない。
+    candidate = fixed_visit_time_slot_candidate(body.visit_date, body.visit_time_slot)
+    if candidate is None:
+        logger.warning(
+            "schedule.legacy_client path=confirm transaction_id=%s user_id=%s",
+            txn.id,
+            actor.id,
+        )
+        raise HTTPException(status_code=422, detail=SCHEDULE_CONFIRM_CLIENT_OUTDATED_DETAIL)
+    now = _now_jst()
+    today = today_jst(now)
+    if body.visit_date < today:
+        raise HTTPException(status_code=422, detail="訪問日は本日以降を指定してください。")
+    if body.visit_date > latest_visit_date(today):
+        raise HTTPException(status_code=422, detail="訪問日は1年以内で指定してください。")
+    if is_candidate_expired(candidate, now):
+        raise HTTPException(
+            status_code=422,
+            detail="終わった時間帯は選べません。別の時間帯か日付をお選びください。",
+        )
+    note_text = body.note.strip() if body.note is not None else ""
+    # 運営の代理の確定ではひとことを受け付けない（依頼者本人の発言として保存されてしまうため。
+    # 日程検証レビュー SEC-I7）。空白だけのひとことはメッセージにならないため拒否しない。
+    if note_text and _user_side_actor_role(txn, actor) == "admin":
+        raise HTTPException(
+            status_code=422, detail="運営による代理の確定では、ひとことは送れません。"
+        )
+    return await _apply_schedule_confirmation(
+        session,
+        background,
+        txn,
+        actor,
+        candidate,
+        source_meta={"source": "calendar"},
+        note_text=note_text,
+    )
 
-    # 提示候補・固定候補以外の任意文字列を「確定した時間帯」として業者に見せない、
-    # かつ業者に見える日付と通知・訪問日超過リマインドの基準日（visit_date）が
-    # ずれないようにする（2026-09-25 セキュリティレビュー Low 対応）。
-    await _assert_offered_time_slot(session, txn.id, body.visit_time_slot)
-    _assert_slot_date_matches(body.visit_time_slot, body.visit_date)
 
-    txn.visit_date = body.visit_date
-    txn.visit_time_slot = body.visit_time_slot
+async def _apply_schedule_confirmation(
+    session: AsyncSession,
+    background: BackgroundTasks,
+    txn: Transaction,
+    actor: Actor,
+    candidate: VisitCandidate,
+    *,
+    source_meta: dict[str, str | int],
+    note_text: str,
+) -> TransactionOut:
+    """訪問日程を確定する（accept と confirm の共通の状態遷移。日程構造化 DESIGN §3・§4）。
+
+    呼び出し元が行ロック・当事者・状態・入力の判定を済ませていること。visit_date・
+    visit_time_slot（時刻だけの表示＝固定5種と同じ書式）・確定メッセージの本文は、どれも
+    サーバーが構造化データから作る（業者の自由記述も依頼者のひとことも本文に連結しない）。
+    note_text は前後の空白を除いた依頼者本人のひとこと（無ければ空文字）。
+    """
+    visit_time_slot = time_label(candidate.start, candidate.end)
+    label = format_visit_label(candidate.date, visit_time_slot)
+    txn.visit_date = candidate.date
+    txn.visit_time_slot = visit_time_slot
     txn.status = "visiting"
-
-    # 本文は運営の定型文だけ（_schedule_confirmed_body）。業者が書いた候補の文言は
-    # 運営名義の本文に入れず meta["operator_slot_label"] に分け、画面が「業者が提示した
-    # 候補」の別枠として表示する（日程検証レビュー SEC-L1）。固定時間帯に読み替えられる
-    # 候補は文言が運営の定型の語彙だけなので別枠を付けない。既存メッセージの本文は変えない。
-    fixed_time_slot = _fixed_time_slot_of(body.visit_time_slot, body.visit_date)
-    confirmed_meta: dict[str, str] = {
-        "visit_date": body.visit_date.isoformat(),
-        "visit_time_slot": body.visit_time_slot,
-    }
-    if fixed_time_slot is None:
-        confirmed_meta["operator_slot_label"] = body.visit_time_slot
     confirmed_message = Message(
         transaction_id=txn.id,
         sender_type="system",
         sender_id=None,
-        body=_schedule_confirmed_body(body.visit_date, fixed_time_slot),
+        body=f"訪問日程が {label} に確定しました。",
         kind="schedule_confirmed",
-        meta=confirmed_meta,
+        meta={
+            "v": 2,
+            **source_meta,
+            "visit_date": candidate.date.isoformat(),
+            "visit_time_slot": visit_time_slot,
+            "label": label,
+            # 完了確定の completed_by と同じ判定（所有者でない管理者の代理なら "admin"）。
+            "confirmed_by": _user_side_actor_role(txn, actor),
+        },
     )
     session.add(confirmed_message)
 
+    # commit 前にプリミティブ値へ取り出す（detached インスタンスの遅延ロードによる
+    # MissingGreenlet を避ける。下の flush より前に読む）。
+    operator_email = txn.bid.operator.contact_email
+    operator_line_user_id = txn.bid.operator.line_user_id
+    txn_id_str = str(txn.id)
+    visit_date_str = candidate.date.isoformat()
+
     # note（業者へのひとこと）は運営名義のシステムメッセージ本文に連結しない。
-    # schedule_confirmed はチャット上で運営名義（2026-09-27 以降は中央寄せの
-    # 「カタヅケからのお知らせ」枠・white-space: pre-wrap）として表示されるため、
-    # 依頼者の自由記述をそのまま連結すると運営のお知らせを装った文面を作れてしまう
+    # schedule_confirmed はチャット上で運営名義（アバター表示「運」・
+    # white-space: pre-wrap）として表示されるため、依頼者の自由記述をそのまま
+    # 連結すると運営のお知らせを装った文面を作れてしまう
     # （2026-09-25 セキュリティレビュー Low 対応）。依頼者本人の発言として
     # 別メッセージに分離する。
-    note_text = body.note.strip() if body.note is not None else ""
     if note_text:
         # created_at は TimestampMixin の server_default=func.now()（PostgreSQL では
         # トランザクション開始時刻・テストの SQLite は秒精度）で決まるため、同一
@@ -1390,8 +1469,6 @@ async def confirm_schedule(
         # だった点は変わらない）。そのため新着メッセージ通知
         # （dispatch_message_received）は重ねて送らない。
 
-    operator_email = txn.bid.operator.contact_email
-    operator_line_user_id = txn.bid.operator.line_user_id
     await session.commit()
     await session.refresh(txn)
 
@@ -1399,7 +1476,7 @@ async def confirm_schedule(
         notify_dispatch.dispatch_schedule_confirmed,
         operator_line_user_id,
         operator_email,
-        str(txn.id),
-        body.visit_date.isoformat(),
+        txn_id_str,
+        visit_date_str,
     )
     return TransactionOut.model_validate(txn)

@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import date, timedelta
 from typing import AsyncIterator
 
 import pytest
@@ -64,6 +65,7 @@ _SCHEDULE_LIMIT_DETAIL = (
 )
 _MESSAGE_SEND_RATE_LIMIT_MSG = "メッセージの送信が集中しています。しばらく時間をおいて再度お試しください。"
 _SCHEDULE_PROPOSE_RATE_LIMIT_MSG = "日程候補の提示が集中しています。しばらく時間をおいて再度お試しください。"
+_SCHEDULE_ACCEPT_RATE_LIMIT_MSG = "日程の確定が集中しています。しばらく時間をおいて再度お試しください。"
 
 
 @pytest.fixture
@@ -73,8 +75,14 @@ async def client(db_session: AsyncSession) -> AsyncIterator[AsyncClient]:
         yield ac
 
 
+def _propose_payload(days_ahead: int) -> dict:
+    """日程候補の提示（構造化）の本文。日付は本日起点（日本時間の範囲判定に掛からない +7 日以降）。"""
+    visit_day = (date.today() + timedelta(days=days_ahead)).isoformat()
+    return {"candidates": [{"date": visit_day, "start": "09:00", "end": "12:00"}]}
+
+
 def _rate_limiter_for_tests(
-    *, message_send_max: int = 2, schedule_propose_max: int = 1
+    *, message_send_max: int = 2, schedule_propose_max: int = 1, schedule_accept_max: int = 1
 ) -> RateLimiter:
     """レート制限を有効化したテスト専用インスタンス。
 
@@ -97,6 +105,7 @@ def _rate_limiter_for_tests(
             max_keys=10000,
             message_send_account=RateLimitRule(message_send_max, 60),
             schedule_propose_account=RateLimitRule(schedule_propose_max, 600),
+            schedule_accept_account=RateLimitRule(schedule_accept_max, 600),
         ),
         store=InMemoryRateLimitStore(),
     )
@@ -170,7 +179,7 @@ async def test_schedule_propose_409_at_limit_and_db_unchanged(
 
     r_ok = await client.post(
         f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": ["2026-07-10 午前"]},
+        json=_propose_payload(7),
         headers=_auth(op_token),
     )
     assert r_ok.status_code == 201, r_ok.text
@@ -180,7 +189,7 @@ async def test_schedule_propose_409_at_limit_and_db_unchanged(
 
     r_over = await client.post(
         f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": ["2026-07-11 午後"]},
+        json=_propose_payload(8),
         headers=_auth(op_token),
     )
     assert r_over.status_code == 409, r_over.text
@@ -338,7 +347,7 @@ async def test_closed_transaction_returns_transaction_closed_even_at_schedule_li
 
     r = await client.post(
         f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": ["2026-07-10 午前"]},
+        json=_propose_payload(7),
         headers=_auth(op_token),
     )
     assert r.status_code == 409, r.text
@@ -419,14 +428,14 @@ async def test_schedule_propose_rate_limited_independent_of_message_send(
 
         r_ok = await client.post(
             f"/api/v1/transactions/{txn_id}/schedule/propose",
-            json={"slots": ["2026-07-10 午前"]},
+            json=_propose_payload(7),
             headers=_auth(op_token),
         )
         assert r_ok.status_code == 201, r_ok.text
 
         r_blocked = await client.post(
             f"/api/v1/transactions/{txn_id}/schedule/propose",
-            json={"slots": ["2026-07-11 午後"]},
+            json=_propose_payload(8),
             headers=_auth(op_token),
         )
         assert r_blocked.status_code == 429
@@ -440,6 +449,54 @@ async def test_schedule_propose_rate_limited_independent_of_message_send(
             headers=_auth(op_token),
         )
         assert r_chat.status_code == 201, r_chat.text
+
+
+async def test_schedule_accept_rate_limited_returns_429_before_db_lookup(
+    db_session: AsyncSession,
+):
+    """accept（業者の提示からの確定）もアカウント軸でレート制限される。
+
+    上限（テストでは1回）に達すると、成功・失敗を問わず次の呼び出しは 429 になる。
+    hit_account はハンドラ冒頭（重い _get_txn より前）にあるため、存在しない取引・提示の
+    id でも 404 ではなく 429 になる。
+    """
+    test_app = create_test_app(db_session)
+    limiter = _rate_limiter_for_tests(schedule_propose_max=5, schedule_accept_max=1)
+    test_app.dependency_overrides[get_rate_limiter] = lambda: limiter
+
+    async with AsyncClient(
+        transport=ASGITransport(app=test_app), base_url="http://test"
+    ) as client:
+        admin_token = await _make_admin(client, db_session)
+        user_token = await _signup_user(client, "rl_accept_user@example.com")
+        op_token, _ = await _verified_operator(
+            client, db_session, admin_token, "rl_accept_op@example.com"
+        )
+        _, txn_id = await _create_transaction(client, user_token, op_token)
+
+        r_propose = await client.post(
+            f"/api/v1/transactions/{txn_id}/schedule/propose",
+            json=_propose_payload(7),
+            headers=_auth(op_token),
+        )
+        assert r_propose.status_code == 201, r_propose.text
+        proposal_id = r_propose.json()["id"]
+
+        r_ok = await client.post(
+            f"/api/v1/transactions/{txn_id}/schedule/proposals/{proposal_id}/accept",
+            json={"candidate_index": 0},
+            headers=_auth(user_token),
+        )
+        assert r_ok.status_code == 200, r_ok.text
+
+        r_blocked = await client.post(
+            f"/api/v1/transactions/{uuid.uuid4()}/schedule/proposals/{uuid.uuid4()}/accept",
+            json={"candidate_index": 0},
+            headers=_auth(user_token),
+        )
+        assert r_blocked.status_code == 429
+        assert "Retry-After" in r_blocked.headers
+        assert r_blocked.json() == {"detail": _SCHEDULE_ACCEPT_RATE_LIMIT_MSG}
 
 
 # ──────────────────────────── レート制限（非当事者・管理者、security review Info-2） ────────────────────────────

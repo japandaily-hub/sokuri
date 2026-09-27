@@ -12,7 +12,7 @@ tests/test_txn_state_integrity.py と同様、ヘルパーはこのファイル�
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import AsyncIterator
 
 import pytest
@@ -35,6 +35,7 @@ from app.db.models.operator import Operator
 from app.db.models.transaction import Cancellation, Transaction
 from app.db.models.user import User
 from app.db.session import get_session
+from app.services.visit_schedule import today_jst
 
 
 def create_test_app(session: AsyncSession) -> FastAPI:
@@ -213,7 +214,15 @@ async def test_message_and_schedule_blocked_on_closed_transaction(
 
     r = await client.post(
         f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": ["9月7日（日）10:00〜12:00"]},
+        json={
+            "candidates": [
+                {
+                    "date": (today_jst() + timedelta(days=7)).isoformat(),
+                    "start": "09:00",
+                    "end": "12:00",
+                }
+            ]
+        },
         headers=_auth(op_token),
     )
     assert r.status_code == 409, r.text

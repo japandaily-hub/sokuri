@@ -103,6 +103,11 @@ class RateLimitConfig:
     # （2026-09-26 日程API入力検証のセキュリティレビュー L-4）。
     message_send_account: RateLimitRule = RateLimitRule(30, 60)
     schedule_propose_account: RateLimitRule = RateLimitRule(10, 600)
+    # 業者の提示からの日程確定（POST /transactions/{id}/schedule/proposals/{id}/accept）。
+    # 同じくアカウント軸のみ・全取引合計。1取引で成功するのは1回きり（確定後は409）なので、
+    # 正規の利用では数回しか呼ばれない。環境変数は持たず、get_rate_limiter() でも上書きしない
+    # （operator_application_ip と同じ扱い）。
+    schedule_accept_account: RateLimitRule = RateLimitRule(10, 600)
 
 
 class RateLimitStore(Protocol):

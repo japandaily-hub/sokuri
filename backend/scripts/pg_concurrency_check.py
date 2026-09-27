@@ -35,7 +35,7 @@ import os
 import sys
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -52,6 +52,10 @@ ADMIN_EMAIL = "pgcheck-admin@example.com"
 PASSWORD = "PgCheck-Pass-2026"
 
 RUN_ID = uuid.uuid4().hex[:8]
+
+#: 日本時間（API は訪問日の範囲・期限を日本時間で判定する。app.services.visit_schedule.JST と同じ定義。
+#: 本スクリプトは app を import しない独立ツールのため自前で持つ）。
+JST = timezone(timedelta(hours=9), name="Asia/Tokyo")
 
 
 # ──────────────────────────── 結果の器 ────────────────────────────
@@ -148,6 +152,21 @@ def probe(
             msg_contains in entry.get("msg", ""),
             f"{label}: msg に {msg_contains!r} を含まない: {entry.get('msg')!r}",
         )
+
+
+def detail_of(r: httpx.Response) -> Any:
+    """応答の detail（文字列・dict のどちらも。JSON でない・detail が無ければ None）。"""
+    try:
+        body = r.json()
+    except ValueError:
+        return None
+    return body.get("detail") if isinstance(body, dict) else None
+
+
+def detail_code(r: httpx.Response) -> str | None:
+    """dict 形式の detail の code（文字列の detail・detail 無しは None）。"""
+    detail = detail_of(r)
+    return detail.get("code") if isinstance(detail, dict) else None
 
 
 async def volley(*factories: Any) -> list[httpx.Response]:
@@ -1214,6 +1233,175 @@ async def s9_unsafe_input_rejected(
     probe(sc, "P16", r_p16, expected_type="disallowed_character", expected_loc=["query", "q"])
 
 
+async def s11_schedule_propose_vs_accept(
+    c: httpx.AsyncClient, pg: asyncpg.Connection, admin_token: str, user_token: str, sc: Scenario
+) -> None:
+    """(11) 日程の提示（propose）と候補からの確定（accept）の同時実行 → 結果は必ず一方に決まる
+    （日程構造化 DESIGN §4・§10）。
+
+    propose と accept は同じ行ロック（lock_transaction_rows）で直列化し、accept は「その提示の seq が
+    COALESCE(MAX(CAST(meta ->> 'seq' AS INTEGER)), 0) と等しいか」で最新の提示だけを確定する。
+    SQLite（pytest）ではロックが no-op で、JSON の集計も SQLite の方言になるため、実 PG で次の3通りを撃つ:
+      - propose_vs_accept: 提示1の候補の accept と、提示2の propose を同時に →
+        (a) accept が先: accept 200・propose 409（schedule_already_confirmed）・提示の seq は [1]・
+            visiting・確定メッセージ1件
+        (b) propose が先: propose 201・accept 409（schedule_proposal_superseded）・seq は [1, 2]・
+            pending・確定メッセージ0件
+        のどちらか（両方成功・両方失敗・それ以外の組み合わせは、ロックか seq の判定が効いていない）
+      - accept_double: 最新の提示の accept を同時に2回 → [200, 409]・確定メッセージは1件・visiting・
+        visit_date / visit_time_slot がサーバーの作った値（候補の日付・固定枠の表示）
+      - admin_cancel_vs_accept: 運営の強制終了と accept を同時に → 強制終了は常に 200・最終状態は
+        cancelled・Cancellation は1行。accept は 200（先に確定し、その後に終了）か 409（終了済みで拒否）で、
+        確定メッセージの件数と一致する（ロックが無いと「cancelled を visiting へ上書き」が起きうる）
+    候補日は日本時間の今日から7日後にする（当日の終わった枠・日付範囲の判定に掛からない）。
+    """
+    visit_day = (datetime.now(JST) + timedelta(days=7)).date().isoformat()
+    # 固定枠の表示（波ダッシュは U+301C。全角チルダと取り違えないよう符号位置で組み立てる）。
+    morning_slot = "9:00" + chr(0x301C) + "12:00"
+    not_pending = "日程確定できる状態ではありません。"
+
+    def propose(txn_id: str, op_token: str, start: str, end: str) -> Any:
+        async def _call(cc: httpx.AsyncClient) -> httpx.Response:
+            return await cc.post(
+                f"{V1}/transactions/{txn_id}/schedule/propose",
+                json={"candidates": [{"date": visit_day, "start": start, "end": end}]},
+                headers=auth(op_token),
+            )
+
+        return _call
+
+    def accept(txn_id: str, proposal_id: str) -> Any:
+        async def _call(cc: httpx.AsyncClient) -> httpx.Response:
+            return await cc.post(
+                f"{V1}/transactions/{txn_id}/schedule/proposals/{proposal_id}/accept",
+                json={"candidate_index": 0},
+                headers=auth(user_token),
+            )
+
+        return _call
+
+    async def schedule_facts(txn_id: str) -> tuple[str, list[int], int]:
+        """(txn.status, 提示の seq の昇順, 確定メッセージの件数)。seq は API の集計と同じ CAST で読む。"""
+        key = uuid.UUID(txn_id)
+        txn_status = await pg.fetchval("SELECT status FROM transactions WHERE id = $1", key)
+        seqs = [
+            row["seq"]
+            for row in await pg.fetch(
+                "SELECT CAST(meta ->> 'seq' AS INTEGER) AS seq FROM messages"
+                " WHERE transaction_id = $1 AND kind = 'schedule_proposal' ORDER BY 1",
+                key,
+            )
+        ]
+        n_confirmed = await pg.fetchval(
+            "SELECT count(*) FROM messages"
+            " WHERE transaction_id = $1 AND kind = 'schedule_confirmed'",
+            key,
+        )
+        return txn_status, seqs, n_confirmed
+
+    for i in range(ROUNDS):
+        # ── propose_vs_accept: 提示1の accept と提示2の propose を同時に ──
+        txn_id, op_token = await new_transaction(c, admin_token, user_token, f"s11a{i}")
+        first = must(await propose(txn_id, op_token, "09:00", "12:00")(c), 201)
+        rs = await volley(
+            accept(txn_id, first["id"]), propose(txn_id, op_token, "12:00", "15:00")
+        )
+        acc, prop = rs[0].status_code, rs[1].status_code
+        facts = await schedule_facts(txn_id)
+        sc.codes.append(
+            f"r{i} propose_vs_accept: accept={acc}({detail_code(rs[0])})"
+            f" propose={prop}({detail_code(rs[1])})"
+        )
+        sc.facts.append(
+            f"r{i} propose_vs_accept: txn.status={facts[0]} seqs={facts[1]} confirmed={facts[2]}"
+        )
+        accept_won = (
+            acc == 200 and prop == 409 and detail_code(rs[1]) == "schedule_already_confirmed"
+        )
+        propose_won = (
+            acc == 409 and detail_code(rs[0]) == "schedule_proposal_superseded" and prop == 201
+        )
+        sc.check(
+            accept_won or propose_won,
+            f"r{i} propose_vs_accept: 結果が一方に決まっていない: accept={acc} propose={prop}",
+        )
+        if accept_won:
+            sc.check(
+                facts == ("visiting", [1], 1),
+                f"r{i} propose_vs_accept: 確定が先なのに {facts}（期待 visiting・[1]・1）",
+            )
+        elif propose_won:
+            sc.check(
+                facts == ("pending", [1, 2], 0),
+                f"r{i} propose_vs_accept: 提示が先なのに {facts}（期待 pending・[1, 2]・0）",
+            )
+
+        # ── accept_double: 最新の提示の accept を同時に2回 ──
+        txn_id, op_token = await new_transaction(c, admin_token, user_token, f"s11b{i}")
+        proposal = must(await propose(txn_id, op_token, "09:00", "12:00")(c), 201)
+        rs = await volley(accept(txn_id, proposal["id"]), accept(txn_id, proposal["id"]))
+        facts = await schedule_facts(txn_id)
+        visit = await pg.fetchrow(
+            "SELECT visit_date, visit_time_slot FROM transactions WHERE id = $1",
+            uuid.UUID(txn_id),
+        )
+        visit_values = (
+            visit["visit_date"].isoformat() if visit["visit_date"] else None,
+            visit["visit_time_slot"],
+        )
+        losers = [detail_of(r) for r in rs if r.status_code == 409]
+        sc.codes.append(f"r{i} accept_double: {codes(rs)}")
+        sc.facts.append(
+            f"r{i} accept_double: txn.status={facts[0]} confirmed={facts[2]} visit={visit_values}"
+        )
+        sc.check(codes(rs) == [200, 409], f"r{i} accept_double: 応答が [200,409] でない: {codes(rs)}")
+        sc.check(
+            losers == [not_pending],
+            f"r{i} accept_double: 後発の 409 の detail が {losers}（期待 {not_pending}）",
+        )
+        sc.check(
+            facts[0] == "visiting" and facts[2] == 1,
+            f"r{i} accept_double: status={facts[0]} 確定メッセージ={facts[2]}（期待 visiting・1）",
+        )
+        sc.check(
+            visit_values == (visit_day, morning_slot),
+            f"r{i} accept_double: 訪問日・時間帯が {visit_values}（期待 {(visit_day, morning_slot)}）",
+        )
+
+        # ── admin_cancel_vs_accept: 運営の強制終了と accept を同時に ──
+        txn_id, op_token = await new_transaction(c, admin_token, user_token, f"s11c{i}")
+        proposal = must(await propose(txn_id, op_token, "09:00", "12:00")(c), 201)
+
+        async def do_admin_cancel(cc: httpx.AsyncClient) -> httpx.Response:
+            return await cc.patch(
+                f"{V1}/admin/transactions/{txn_id}/cancel",
+                json={"reason": "同時実行検証（運営の強制終了と日程確定）"},
+                headers=auth(admin_token),
+            )
+
+        rs = await volley(do_admin_cancel, accept(txn_id, proposal["id"]))
+        adm, acc = rs[0].status_code, rs[1].status_code
+        facts = await schedule_facts(txn_id)
+        n_cxl = await pg.fetchval(
+            "SELECT count(*) FROM cancellations WHERE transaction_id = $1", uuid.UUID(txn_id)
+        )
+        sc.codes.append(f"r{i} admin_cancel_vs_accept: admin_cancel={adm} accept={acc}")
+        sc.facts.append(
+            f"r{i} admin_cancel_vs_accept: txn.status={facts[0]} cancellations={n_cxl}"
+            f" confirmed={facts[2]}"
+        )
+        sc.check(adm == 200, f"r{i} admin_cancel_vs_accept: 強制終了が {adm}（期待 200）")
+        sc.check(acc in (200, 409), f"r{i} admin_cancel_vs_accept: accept が {acc}（期待 200 か 409）")
+        sc.check(
+            facts[0] == "cancelled" and n_cxl == 1,
+            f"r{i} admin_cancel_vs_accept: status={facts[0]} cancellations={n_cxl}（期待 cancelled・1）",
+        )
+        sc.check(
+            facts[2] == (1 if acc == 200 else 0),
+            f"r{i} admin_cancel_vs_accept: accept={acc} なのに確定メッセージが {facts[2]} 件",
+        )
+
+
 # ──────────────────────────── エントリポイント ────────────────────────────
 _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
@@ -1268,6 +1456,11 @@ async def run() -> int:
     # S10 は新規アカウントだけを使う独立のシナリオ（添字ではなく変数で渡す）。
     signup_race = Scenario("S10", "同じメールアドレスでの signup 同時2連投（依頼者・業者）")
     scenarios.append(signup_race)
+    # S11（日程の提示と確定の同時実行）も添字ではなく変数で渡す。
+    schedule_race = Scenario(
+        "S11", "日程の提示と候補からの確定の同時実行・確定の二重押し・運営の強制終了と確定の同時実行"
+    )
+    scenarios.append(schedule_race)
     try:
         async with httpx.AsyncClient(timeout=60) as c:
             admin_token, admin_user = await signup_user(c, ADMIN_EMAIL, "運営 太郎")
@@ -1296,6 +1489,8 @@ async def run() -> int:
             # （S7 が運営アカウントの admin 権限を一時的に外すため、それより前なら S9 は
             # 通常の admin 権限で PATCH /admin/transactions/{id}/cancel 等を叩ける）。
             await s9_unsafe_input_rejected(c, pg, admin_token, user_token, scenarios[8])
+            # S11 は業者の作成と運営の強制終了に admin 権限を使うため、S7 より前に流す。
+            await s11_schedule_propose_vs_accept(c, pg, admin_token, user_token, schedule_race)
             # S7 は運営アカウントを一時的に admin から外すため、必ず最後に流す。
             await s7_last_admin_race(c, pg, admin_token, scenarios[6])
     except ApiError as exc:

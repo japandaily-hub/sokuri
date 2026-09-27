@@ -1,14 +1,26 @@
-"""日程調整 API（schedule/propose・schedule/confirm）の入力検証の回帰テスト。
+"""日程調整 API（schedule/confirm）の入力検証の回帰テスト。
 
-2026-09-25 セキュリティレビュー（Low）対応:
-- ScheduleProposeRequest.slots / ScheduleConfirmRequest.visit_time_slot・note への
-  制御文字混入・空白のみ・文字数超過の拒否（schemas_katadzuke.py）。
-- confirm_schedule が「業者提示済みの候補」か「日程調整ページの固定5択」以外を
-  弾く許可リスト照合、および候補ラベル内の日付と visit_date の一致照合
-  （app/api/v1/endpoints/transactions.py の _assert_offered_time_slot /
-  _assert_slot_date_matches）。
-- note（業者へのひとこと）を運営名義の schedule_confirmed システムメッセージから
-  分離し、依頼者本人の発言として別メッセージにすること。
+2026-09-25 セキュリティレビュー（Low）・2026-09-26 日程API入力検証レビュー対応のうち、
+日程候補の構造化（日付＋時刻・propose は {candidates}・accept 新設）後も有効な部分:
+- ScheduleConfirmRequest.visit_time_slot / note への制御文字・右から左に書く文字・
+  行区切り・文字数超過の拒否（schemas_katadzuke.py）。
+- confirm_schedule が固定5択（SCHEDULE_FIXED_TIME_SLOTS）以外を弾くこと。
+- note（業者へのひとこと）を運営名義の schedule_confirmed から分離し、依頼者本人の
+  発言として別メッセージにすること。
+- SCHEDULE_FIXED_TIME_SLOTS と web/src/lib/visit-slots.ts の VISIT_TIME_SLOTS の一致。
+
+構造化により次は不要になったため、このファイルから外した（理由: 業者の自由記述の候補
+ラベルをサーバーが受け取らず、日付・時刻から作り直すため）:
+- propose の slots（制御文字・文字数・複数日付・実在しない日付・年入りラベル）の検証と、
+  confirm のラベル照合（_assert_offered_time_slot / _assert_slot_date_matches /
+  _slot_dates 等）。propose の入力形・日付範囲・重複は tests/test_schedule_structured.py、
+  日付・時刻・ラベルの純関数は tests/test_visit_schedule_unit.py が検証する。
+- 業者の候補ラベルを運営名義の確定メッセージ本文に入れない（SEC-L1）ための
+  _fixed_time_slot_of / operator_slot_label。確定メッセージの本文はサーバーが日付・時刻から
+  作るため、業者の文言が入る経路そのものが無い（tests/test_schedule_structured.py）。
+- 訪問日の JST 判定を ScheduleConfirmRequest の validator（_jst_today）で行う方式。
+  confirm_schedule が now_jst() で判定する（tests/test_schedule_structured.py の
+  test_confirm_date_range_in_jst / test_confirm_today_follows_jst_not_utc）。
 
 in-memory SQLite + ASGITransport（conftest.py のフィクスチャを利用）。既存の
 tests/test_txn_state_integrity.py・tests/test_r8_abnormal_guards.py と同様、
@@ -24,23 +36,16 @@ from pathlib import Path
 from typing import AsyncIterator
 
 import pytest
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.endpoints.transactions import (
-    _assert_slot_date_matches,
-    _fixed_time_slot_of,
-    _format_visit_date_ja,
-    _slot_dates,
-    _slot_month_days,
-    _slot_years,
-)
 from app.api.v1.router import api_router
 from app.core.security import hash_password
 from app.db.models.user import User
 from app.db.session import get_session
 from app.schemas_katadzuke import SCHEDULE_FIXED_TIME_SLOTS
+from app.services.visit_schedule import FIXED_VISIT_TIME_SLOTS
 
 # 双方向制御・書式・ゼロ幅・私用領域等、拒否対象の制御文字
 # （schemas_katadzuke._REJECTED_CONTROL_CATEGORIES = Cc/Cf/Co/Cs の代表例）。
@@ -71,10 +76,6 @@ _ARABIC_ALEF = chr(0x0627)  # AL（ARABIC LETTER ALEF）
 _ARABIC_INDIC_DIGIT_ONE = chr(0x0661)  # AN（ARABIC-INDIC DIGIT ONE）
 RTL_BIDI_CHAR_SAMPLES = [_HEBREW_GERESH, _HEBREW_ALEF, _ARABIC_ALEF, _ARABIC_INDIC_DIGIT_ONE]
 RTL_BIDI_CHAR_IDS = ["hebrew_geresh_R", "hebrew_alef_R", "arabic_alef_AL", "arabic_indic_digit_AN"]
-
-# タイ数字（NFKC 正規化でも ASCII 化されない non-ASCII の数字。日程検証レビュー SEC-I1/SEC-I4）。
-_THAI_DIGIT_NINE = chr(0x0E50 + 9)
-_THAI_DIGIT_ONE = chr(0x0E50 + 1)
 
 # 固定5択のうちテストで具体値が何でもよい箇所に使う代表値。
 _ANY_FIXED_SLOT = "時間指定なし"
@@ -209,48 +210,6 @@ def _future_date(days: int = 7) -> date:
     return date.today() + timedelta(days=days)
 
 
-_FULLWIDTH_DIGITS = str.maketrans("0123456789", "０１２３４５６７８９")
-
-
-def _ja_date(d: date) -> str:
-    """確定メッセージの「訪問日：」の表記（例「2026年10月1日（木）」）。"""
-    return f"{d.year}年{d.month}月{d.day}日（{'月火水木金土日'[d.weekday()]}）"
-
-
-def _dated_slot_label(d: date, time_range: str = "10:00〜12:00") -> str:
-    """業者提示の日付入り候補ラベルを動的日付で組み立てる（例「9月7日（日）10:00〜12:00」）。"""
-    dow = "月火水木金土日"[d.weekday()]
-    return f"{d.month}月{d.day}日（{dow}）{time_range}"
-
-
-def _fullwidth_dated_slot_label(d: date, time_range: str = "10:00〜12:00") -> str:
-    """全角数字の候補ラベル（NFKC 正規化前提の日付照合を検証するため）。"""
-    dow = "月火水木金土日"[d.weekday()]
-    fw_month = str(d.month).translate(_FULLWIDTH_DIGITS)
-    fw_day = str(d.day).translate(_FULLWIDTH_DIGITS)
-    return f"{fw_month}月{fw_day}日（{dow}）{time_range}"
-
-
-def _spaced_dated_slot_label(d: date, time_range: str = "10:00〜12:00") -> str:
-    """月と日の間に空白を挟んだ候補ラベル（例「10月 1日 10:00〜12:00」）。"""
-    return f"{d.month}月 {d.day}日 {time_range}"
-
-
-def _ligature_month(month: int) -> str:
-    """1〜12月の電信記号合字（例 month=9 で「㋈」。NFKC正規化で「9月」に分解される）。"""
-    return chr(0x32C0 + month - 1)
-
-
-def _ligature_day(day: int) -> str:
-    """1〜31日の電信記号合字（例 day=1 で「㏠」。NFKC正規化で「1日」に分解される）。"""
-    return chr(0x33E0 + day - 1)
-
-
-def _ligature_dated_slot_label(d: date, time_range: str = "10:00〜12:00") -> str:
-    """電信記号合字の候補ラベル（例 d=9/1 で「㋈㏠10:00〜12:00」＝日程検証レビュー QA-L7）。"""
-    return f"{_ligature_month(d.month)}{_ligature_day(d.day)}{time_range}"
-
-
 async def _setup_txn(
     client: AsyncClient, db_session: AsyncSession, user_email: str, op_email: str
 ) -> tuple[str, str, str]:
@@ -265,111 +224,7 @@ async def _setup_txn(
     return user_token, op_token, txn_id
 
 
-# ──────────────── propose: 制御文字・空白のみ・文字数 ────────────────
-
-
-@pytest.mark.parametrize("bad_char", CONTROL_CHAR_SAMPLES, ids=CONTROL_CHAR_IDS)
-async def test_propose_rejects_control_chars_in_slot(
-    client: AsyncClient, db_session: AsyncSession, bad_char: str
-):
-    """双方向制御文字・ゼロ幅文字等を候補ラベルに混ぜると422になる。"""
-    _, op_token, txn_id = await _setup_txn(
-        client, db_session, "propose_ctrl_user@example.com", "propose_ctrl_op@example.com"
-    )
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": [f"2026-07-10 午前{bad_char}"]},
-        headers=_auth(op_token),
-    )
-    assert r.status_code == 422, r.text
-
-
-async def test_propose_slot_max_length_32_is_accepted(
-    client: AsyncClient, db_session: AsyncSession
-):
-    """VISIT_TIME_SLOT_MAX_LENGTH（32文字）ちょうどは受理される。"""
-    _, op_token, txn_id = await _setup_txn(
-        client, db_session, "propose_len32_user@example.com", "propose_len32_op@example.com"
-    )
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": ["a" * 32]},
-        headers=_auth(op_token),
-    )
-    assert r.status_code == 201, r.text
-
-
-async def test_propose_slot_max_length_33_is_rejected(
-    client: AsyncClient, db_session: AsyncSession
-):
-    """33文字は422になる（VISIT_TIME_SLOT_MAX_LENGTH＝32字。DB列 String(32) に合わせた上限）。"""
-    _, op_token, txn_id = await _setup_txn(
-        client, db_session, "propose_len33_user@example.com", "propose_len33_op@example.com"
-    )
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": ["a" * 33]},
-        headers=_auth(op_token),
-    )
-    assert r.status_code == 422, r.text
-
-
-@pytest.mark.parametrize("blank", [" ", "　"], ids=["halfwidth_space", "fullwidth_space"])
-async def test_propose_rejects_whitespace_only_slot(
-    client: AsyncClient, db_session: AsyncSession, blank: str
-):
-    """空白のみ（半角・全角）の候補は422になる。"""
-    _, op_token, txn_id = await _setup_txn(
-        client, db_session, "propose_blank_user@example.com", "propose_blank_op@example.com"
-    )
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": [blank]},
-        headers=_auth(op_token),
-    )
-    assert r.status_code == 422, r.text
-
-
-# ──────────────── propose: 1候補に複数日付を混在させる細工 ────────────────
-
-
-async def test_propose_rejects_slot_with_multiple_different_dates(
-    client: AsyncClient, db_session: AsyncSession
-):
-    """1つの候補ラベルに異なる日付が2つ含まれる場合は422（確定時の日付突合が破綻するため）。"""
-    _, op_token, txn_id = await _setup_txn(
-        client, db_session, "propose_multidate_user@example.com", "propose_multidate_op@example.com"
-    )
-    d1 = _future_date(5)
-    d2 = _future_date(6)
-    slot = f"{d1.month}月{d1.day}日 {d2.month}月{d2.day}日"
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": [slot]},
-        headers=_auth(op_token),
-    )
-    assert r.status_code == 422, r.text
-    assert r.json()["detail"] == "1つの候補日に複数の日付は入れられません。候補を分けて入力してください。"
-
-
-async def test_propose_allows_duplicate_same_date_mentions_in_one_slot(
-    client: AsyncClient, db_session: AsyncSession
-):
-    """同じ日付の重複表記（開始〜終了で同日を2回書く等）は1種類として許可される。"""
-    _, op_token, txn_id = await _setup_txn(
-        client, db_session, "propose_samedate_user@example.com", "propose_samedate_op@example.com"
-    )
-    d = _future_date(5)
-    slot = f"{d.month}月{d.day}日 10:00〜{d.month}月{d.day}日 12:00"
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": [slot]},
-        headers=_auth(op_token),
-    )
-    assert r.status_code == 201, r.text
-
-
-# ──────────────── confirm: 許可リスト（固定5択 or 業者提示済み候補） ────────────────
+# ──────────────── confirm: 許可リスト（固定5択のみ） ────────────────
 
 
 @pytest.mark.parametrize("fixed_slot", sorted(SCHEDULE_FIXED_TIME_SLOTS))
@@ -392,7 +247,8 @@ async def test_confirm_allows_each_fixed_time_slot_without_proposal(
 async def test_confirm_rejects_arbitrary_time_slot_without_proposal(
     client: AsyncClient, db_session: AsyncSession
 ):
-    """固定5択でも業者提示済みでもない任意文字列は422になる。"""
+    """固定5択以外の任意文字列は422（schedule_client_outdated）になり、何も書き込まれない。
+    業者の候補からの確定は accept 経由になったため、confirm は固定5択だけを受け付ける。"""
     user_token, _, txn_id = await _setup_txn(
         client, db_session, "arbitrary_slot_user@example.com", "arbitrary_slot_op@example.com"
     )
@@ -402,192 +258,7 @@ async def test_confirm_rejects_arbitrary_time_slot_without_proposal(
         headers=_auth(user_token),
     )
     assert r.status_code == 422, r.text
-    assert r.json()["detail"] == (
-        "候補にない時間帯は指定できません。業者が提示した候補日か、日程調整ページの時間帯から選んでください。"
-    )
-
-
-async def test_confirm_accepts_offered_dated_slot_matching_visit_date(
-    client: AsyncClient, db_session: AsyncSession
-):
-    """業者提示済みの日付入り候補で visit_date が一致すれば確定できる。
-
-    確定メッセージ（運営名義）の本文は定型文だけで、候補の文言は meta の
-    operator_slot_label に分かれる（日程検証レビュー SEC-L1。詳細は下の
-    「日程確定メッセージの本文」の節）。
-    """
-    user_token, op_token, txn_id = await _setup_txn(
-        client, db_session, "dated_slot_user@example.com", "dated_slot_op@example.com"
-    )
-    visit_date = _future_date(10)
-    label = _dated_slot_label(visit_date)
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": [label]},
-        headers=_auth(op_token),
-    )
-    assert r.status_code == 201, r.text
-
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/confirm",
-        json={"visit_date": visit_date.isoformat(), "visit_time_slot": label},
-        headers=_auth(user_token),
-    )
-    assert r.status_code == 200, r.text
-    assert r.json()["visit_time_slot"] == label
-
-    r = await client.get(f"/api/v1/transactions/{txn_id}/messages", headers=_auth(user_token))
-    assert r.status_code == 200, r.text
-    confirmed = next(m for m in r.json() if m["kind"] == "schedule_confirmed")
-    assert confirmed["body"] == (
-        "訪問日程が確定しました。\n"
-        f"訪問日：{_ja_date(visit_date)}\n"
-        "時間帯：業者が提示した候補のとおり"
-    )
-    assert confirmed["meta"]["operator_slot_label"] == label
-
-
-async def test_confirm_accepts_older_of_two_proposals(
-    client: AsyncClient, db_session: AsyncSession
-):
-    """ChatPanel は直近だけでなく過去の提示カードからも確定できるため、2件目の提示後でも
-    1件目（古い方）の候補で確定できる。
-    """
-    user_token, op_token, txn_id = await _setup_txn(
-        client, db_session, "two_proposals_user@example.com", "two_proposals_op@example.com"
-    )
-    old_date = _future_date(5)
-    old_label = _dated_slot_label(old_date)
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": [old_label]},
-        headers=_auth(op_token),
-    )
-    assert r.status_code == 201, r.text
-
-    new_date = _future_date(12)
-    new_label = _dated_slot_label(new_date)
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": [new_label]},
-        headers=_auth(op_token),
-    )
-    assert r.status_code == 201, r.text
-
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/confirm",
-        json={"visit_date": old_date.isoformat(), "visit_time_slot": old_label},
-        headers=_auth(user_token),
-    )
-    assert r.status_code == 200, r.text
-
-
-async def test_confirm_rejects_slot_offered_in_a_different_transaction(
-    client: AsyncClient, db_session: AsyncSession
-):
-    """別の取引に提示された候補ラベルを流用して確定しようとすると422になる。"""
-    user_token, op_token, txn1_id = await _setup_txn(
-        client, db_session, "cross_txn_user@example.com", "cross_txn_op@example.com"
-    )
-    txn2_id = await _create_transaction(client, user_token, op_token)
-
-    visit_date = _future_date(6)
-    label = _dated_slot_label(visit_date)
-    r = await client.post(
-        f"/api/v1/transactions/{txn1_id}/schedule/propose",
-        json={"slots": [label]},
-        headers=_auth(op_token),
-    )
-    assert r.status_code == 201, r.text
-
-    r = await client.post(
-        f"/api/v1/transactions/{txn2_id}/schedule/confirm",
-        json={"visit_date": visit_date.isoformat(), "visit_time_slot": label},
-        headers=_auth(user_token),
-    )
-    assert r.status_code == 422, r.text
-    assert r.json()["detail"] == (
-        "候補にない時間帯は指定できません。業者が提示した候補日か、日程調整ページの時間帯から選んでください。"
-    )
-
-
-# ──────────────── confirm: 候補日ラベルの日付と visit_date の突合 ────────────────
-
-
-async def test_confirm_rejects_offered_slot_when_visit_date_mismatches(
-    client: AsyncClient, db_session: AsyncSession
-):
-    """業者提示済みの候補でも、ラベル内の日付と visit_date が違えば422になる。"""
-    user_token, op_token, txn_id = await _setup_txn(
-        client, db_session, "date_mismatch_user@example.com", "date_mismatch_op@example.com"
-    )
-    proposed_date = _future_date(9)
-    label = _dated_slot_label(proposed_date)
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": [label]},
-        headers=_auth(op_token),
-    )
-    assert r.status_code == 201, r.text
-
-    wrong_date = proposed_date + timedelta(days=3)
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/confirm",
-        json={"visit_date": wrong_date.isoformat(), "visit_time_slot": label},
-        headers=_auth(user_token),
-    )
-    assert r.status_code == 422, r.text
-    assert r.json()["detail"] == "候補日の日付と訪問日が一致しません。候補日をもう一度選び直してください。"
-
-
-async def test_confirm_fullwidth_digit_slot_date_match(
-    client: AsyncClient, db_session: AsyncSession
-):
-    """全角数字の候補ラベル（NFKC正規化）でも visit_date が一致すれば確定できる。"""
-    user_token, op_token, txn_id = await _setup_txn(
-        client, db_session, "fullwidth_match_user@example.com", "fullwidth_match_op@example.com"
-    )
-    visit_date = _future_date(11)
-    label = _fullwidth_dated_slot_label(visit_date)
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": [label]},
-        headers=_auth(op_token),
-    )
-    assert r.status_code == 201, r.text
-
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/confirm",
-        json={"visit_date": visit_date.isoformat(), "visit_time_slot": label},
-        headers=_auth(user_token),
-    )
-    assert r.status_code == 200, r.text
-
-
-async def test_confirm_fullwidth_digit_slot_date_mismatch(
-    client: AsyncClient, db_session: AsyncSession
-):
-    """全角数字の候補ラベルでも、日付が違えば422になる（NFKC正規化後の照合が効いている確認）。"""
-    user_token, op_token, txn_id = await _setup_txn(
-        client, db_session, "fullwidth_mismatch_user@example.com", "fullwidth_mismatch_op@example.com"
-    )
-    proposed_date = _future_date(13)
-    label = _fullwidth_dated_slot_label(proposed_date)
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": [label]},
-        headers=_auth(op_token),
-    )
-    assert r.status_code == 201, r.text
-
-    wrong_date = proposed_date + timedelta(days=2)
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/confirm",
-        json={"visit_date": wrong_date.isoformat(), "visit_time_slot": label},
-        headers=_auth(user_token),
-    )
-    assert r.status_code == 422, r.text
-    assert r.json()["detail"] == "候補日の日付と訪問日が一致しません。候補日をもう一度選び直してください。"
+    assert r.json()["detail"]["code"] == "schedule_client_outdated"
 
 
 # ──────────────── confirm: 制御文字（visit_time_slot / note） ────────────────
@@ -740,42 +411,21 @@ async def test_confirm_note_message_visible_to_operator_and_counts_as_unread(
     assert r.json()["unread_count"] == 1
 
 
-# ──────────────── propose/confirm: 右から左に書く文字（R/AL/AN）の拒否 ────────────────
-
-
 @pytest.mark.parametrize("bad_char", RTL_BIDI_CHAR_SAMPLES, ids=RTL_BIDI_CHAR_IDS)
-async def test_propose_rejects_rtl_bidi_chars_in_slot(
+async def test_confirm_rejects_rtl_bidi_chars_in_visit_time_slot(
     client: AsyncClient, db_session: AsyncSession, bad_char: str
 ):
-    """双方向クラス R/AL/AN の文字を候補ラベルに混ぜると422になる（日程検証レビュー SEC-L2）。"""
-    _, op_token, txn_id = await _setup_txn(
-        client, db_session, "propose_rtl_user@example.com", "propose_rtl_op@example.com"
+    """双方向クラス R/AL/AN の文字を visit_time_slot に混ぜると422になる（日程検証レビュー SEC-L2）。"""
+    user_token, _, txn_id = await _setup_txn(
+        client, db_session, "confirm_rtl_user@example.com", "confirm_rtl_op@example.com"
     )
     r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": [f"2026-07-10 午前{bad_char}"]},
-        headers=_auth(op_token),
-    )
-    assert r.status_code == 422, r.text
-
-
-# ──────────────── propose/confirm: 行区切り・段落区切り（Zl/Zp）の拒否 ────────────────
-
-
-@pytest.mark.parametrize(
-    "bad_char", [_LINE_SEPARATOR, _PARAGRAPH_SEPARATOR], ids=["line_separator", "paragraph_separator"]
-)
-async def test_propose_rejects_unicode_line_and_paragraph_separators(
-    client: AsyncClient, db_session: AsyncSession, bad_char: str
-):
-    """Zl/Zp（U+2028・U+2029）は改行を許可しない候補日でも拒否される（日程検証レビュー SEC-L3）。"""
-    _, op_token, txn_id = await _setup_txn(
-        client, db_session, "propose_zlzp_user@example.com", "propose_zlzp_op@example.com"
-    )
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": [f"2026-07-10 午前{bad_char}"]},
-        headers=_auth(op_token),
+        f"/api/v1/transactions/{txn_id}/schedule/confirm",
+        json={
+            "visit_date": _future_date().isoformat(),
+            "visit_time_slot": f"9:00〜12:00{bad_char}",
+        },
+        headers=_auth(user_token),
     )
     assert r.status_code == 422, r.text
 
@@ -796,486 +446,6 @@ async def test_confirm_rejects_unicode_line_separator_in_visit_time_slot(
         headers=_auth(user_token),
     )
     assert r.status_code == 422, r.text
-
-
-# ──────────────── propose: 実在しない日付の拒否 ────────────────
-
-
-@pytest.mark.parametrize("invalid_label", ["2月30日", "13月1日"], ids=["feb_30", "month_13"])
-async def test_propose_rejects_nonexistent_calendar_date(
-    client: AsyncClient, db_session: AsyncSession, invalid_label: str
-):
-    """実在しない (月, 日) の候補は422になる（日程検証レビュー SEC-I5）。"""
-    _, op_token, txn_id = await _setup_txn(
-        client, db_session, "propose_baddate_user@example.com", "propose_baddate_op@example.com"
-    )
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": [invalid_label]},
-        headers=_auth(op_token),
-    )
-    assert r.status_code == 422, r.text
-    assert r.json()["detail"] == "存在しない日付が含まれています。日付を確認してください。"
-
-
-async def test_propose_accepts_leap_day_february_29(
-    client: AsyncClient, db_session: AsyncSession
-):
-    """「2月29日」は実在日付として提示できる（201）。
-
-    実在チェック（transactions.propose_schedule）は年を持たない候補ラベルの
-    (月, 日) を date(2000, 月, 日) で検証しており、2000年はうるう年のため
-    2月29日を弾かない。基準年をうるう年でない年に変えるとこの回帰が起きる
-    （日程検証レビュー QA-R-L1）。
-    """
-    _, op_token, txn_id = await _setup_txn(
-        client, db_session, "propose_feb29_user@example.com", "propose_feb29_op@example.com"
-    )
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": ["2月29日（木）10:00〜12:00"]},
-        headers=_auth(op_token),
-    )
-    assert r.status_code == 201, r.text
-
-
-async def test_propose_rejects_huge_month_number_without_500(
-    client: AsyncClient, db_session: AsyncSession
-):
-    """月の数字が巨大な候補は 500 にならず、実在しない日付と同じ422・detailで弾かれる。
-
-    date(2000, 月, 日) は月が C long に収まらないほど巨大だと ValueError ではなく
-    OverflowError を送出する。propose_schedule がこれを捕捉し損ねると生の
-    OverflowError が伝播して500になる（日程検証レビュー QA-R-I1）。
-    """
-    _, op_token, txn_id = await _setup_txn(
-        client, db_session, "propose_hugemonth_user@example.com", "propose_hugemonth_op@example.com"
-    )
-    label = "9" * 25 + "月1日"
-    assert len(label) <= 32
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": [label]},
-        headers=_auth(op_token),
-    )
-    assert r.status_code == 422, r.text
-    assert r.json()["detail"] == "存在しない日付が含まれています。日付を確認してください。"
-
-
-# ──────────────── confirm: 月日間の空白・電信記号合字の日付照合 ────────────────
-
-
-async def test_confirm_accepts_offered_slot_with_whitespace_between_month_and_day(
-    client: AsyncClient, db_session: AsyncSession
-):
-    """「10月 1日」のような月日間の空白を許容し、visit_date と一致すれば確定できる。"""
-    user_token, op_token, txn_id = await _setup_txn(
-        client, db_session, "spacer_match_user@example.com", "spacer_match_op@example.com"
-    )
-    d = _future_date(8)
-    label = _spaced_dated_slot_label(d)
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": [label]},
-        headers=_auth(op_token),
-    )
-    assert r.status_code == 201, r.text
-
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/confirm",
-        json={"visit_date": d.isoformat(), "visit_time_slot": label},
-        headers=_auth(user_token),
-    )
-    assert r.status_code == 200, r.text
-
-
-async def test_confirm_rejects_offered_slot_with_whitespace_when_visit_date_mismatches(
-    client: AsyncClient, db_session: AsyncSession
-):
-    """月日間に空白を含む候補でも、visit_date が違えば422になる。"""
-    user_token, op_token, txn_id = await _setup_txn(
-        client, db_session, "spacer_mismatch_user@example.com", "spacer_mismatch_op@example.com"
-    )
-    d = _future_date(9)
-    label = _spaced_dated_slot_label(d)
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": [label]},
-        headers=_auth(op_token),
-    )
-    assert r.status_code == 201, r.text
-
-    wrong_date = d + timedelta(days=3)
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/confirm",
-        json={"visit_date": wrong_date.isoformat(), "visit_time_slot": label},
-        headers=_auth(user_token),
-    )
-    assert r.status_code == 422, r.text
-    assert r.json()["detail"] == "候補日の日付と訪問日が一致しません。候補日をもう一度選び直してください。"
-
-
-async def test_confirm_accepts_offered_ligature_slot_matching_visit_date(
-    client: AsyncClient, db_session: AsyncSession
-):
-    """電信記号合字（例 ㋈㏠＝9月1日）の候補も NFKC 正規化後に日付一致すれば確定できる（日程検証レビュー QA-L7）。"""
-    user_token, op_token, txn_id = await _setup_txn(
-        client, db_session, "ligature_match_user@example.com", "ligature_match_op@example.com"
-    )
-    d = _future_date(14)
-    label = _ligature_dated_slot_label(d)
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": [label]},
-        headers=_auth(op_token),
-    )
-    assert r.status_code == 201, r.text
-
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/confirm",
-        json={"visit_date": d.isoformat(), "visit_time_slot": label},
-        headers=_auth(user_token),
-    )
-    assert r.status_code == 200, r.text
-
-
-async def test_confirm_rejects_offered_ligature_slot_when_visit_date_mismatches(
-    client: AsyncClient, db_session: AsyncSession
-):
-    """電信記号合字の候補でも、visit_date が違えば422になる（日程検証レビュー QA-L7）。"""
-    user_token, op_token, txn_id = await _setup_txn(
-        client, db_session, "ligature_mismatch_user@example.com", "ligature_mismatch_op@example.com"
-    )
-    d = _future_date(15)
-    label = _ligature_dated_slot_label(d)
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": [label]},
-        headers=_auth(op_token),
-    )
-    assert r.status_code == 201, r.text
-
-    wrong_date = d + timedelta(days=2)
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/confirm",
-        json={"visit_date": wrong_date.isoformat(), "visit_time_slot": label},
-        headers=_auth(user_token),
-    )
-    assert r.status_code == 422, r.text
-    assert r.json()["detail"] == "候補日の日付と訪問日が一致しません。候補日をもう一度選び直してください。"
-
-
-# ──────────────── 純関数テスト: _slot_month_days / _assert_slot_date_matches ────────────────
-
-
-def test_slot_month_days_ascii_digits():
-    assert _slot_month_days("9月7日（日）10:00〜12:00") == {(9, 7)}
-
-
-def test_slot_month_days_fullwidth_digits():
-    assert _slot_month_days("１０月１日") == {(10, 1)}
-
-
-def test_slot_month_days_ligature():
-    """電信記号合字は NFKC 正規化で「9月」「1日」に分解されて拾える（日程検証レビュー QA-L7）。"""
-    label = _ligature_month(9) + _ligature_day(1)
-    assert _slot_month_days(label) == {(9, 1)}
-
-
-def test_slot_month_days_whitespace_between_digits_and_kanji():
-    assert _slot_month_days("10月 1日") == {(10, 1)}
-
-
-def test_slot_month_days_thai_digits_yield_empty_set():
-    """タイ数字は ASCII の [0-9] に一致せず、NFKC でも ASCII化されないため拾わない
-    （日程検証レビュー SEC-I1/SEC-I4）。"""
-    label = f"{_THAI_DIGIT_NINE}月{_THAI_DIGIT_ONE}日"
-    assert _slot_month_days(label) == set()
-
-
-def test_slot_month_days_multiple_dates():
-    assert _slot_month_days("10月1日 10月2日") == {(10, 1), (10, 2)}
-
-
-def test_assert_slot_date_matches_allows_year_crossing_when_month_day_match():
-    """候補ラベルに年は含まれないため、年をまたいでも月日が一致すれば通る（日程検証レビュー QA-L8）。"""
-    _assert_slot_date_matches("1月5日（火）10:00〜12:00", date(2027, 1, 5))
-
-
-def test_assert_slot_date_matches_rejects_when_day_differs():
-    with pytest.raises(HTTPException) as exc_info:
-        _assert_slot_date_matches("1月5日（火）10:00〜12:00", date(2027, 1, 6))
-    assert exc_info.value.status_code == 422
-
-
-# ──────────────── 年入りの候補ラベル（日付＋時間帯の選択式・ボタン化 8dfda41 との統合） ────────────────
-
-
-def _year_dated_slot_label(d: date, time_value: str = _ANY_FIXED_SLOT) -> str:
-    """業者の候補日提示フォーム（web/src/lib/visit-slots.ts の formatSlotLabel）と同じ形の
-    年入りラベルを組み立てる（例「2026年10月1日（木）時間指定なし」）。"""
-    return f"{_ja_date(d)}{time_value}"
-
-
-def _future_date_not_feb29(days: int = 10) -> date:
-    """翌年の同じ月日が必ず実在する未来日（2月29日なら1日ずらす）。"""
-    d = _future_date(days)
-    return d + timedelta(days=1) if (d.month, d.day) == (2, 29) else d
-
-
-def test_slot_dates_with_and_without_year():
-    assert _slot_dates("2026年10月1日（木）9:00") == {(2026, 10, 1)}
-    assert _slot_dates("10月1日（木）9:00") == {(None, 10, 1)}
-    # 全角の年・空白入りも NFKC 正規化と空白の許容で拾う（web の parseSlotDate と同じ形）。
-    assert _slot_dates("２０２６年 １０月１日") == {(2026, 10, 1)}
-
-
-def test_slot_years_and_month_days_of_year_dated_label():
-    label = "2026年10月1日（木）時間指定なし"
-    assert _slot_years(label) == {2026}
-    assert _slot_month_days(label) == {(10, 1)}
-    assert _slot_years("10月1日（木）時間指定なし") == set()
-
-
-def test_assert_slot_date_matches_accepts_year_dated_label_matching_visit_date():
-    _assert_slot_date_matches("2026年10月1日（木）時間指定なし", date(2026, 10, 1))
-
-
-def test_assert_slot_date_matches_rejects_year_dated_label_when_year_differs():
-    """年入りラベルは年も照合する。月日だけ一致させて翌年の visit_date で確定すると、
-    業者に見える日付（2026年）と通知・リマインドの基準日（2027年）がずれるため422。"""
-    with pytest.raises(HTTPException) as exc_info:
-        _assert_slot_date_matches("2026年10月1日（木）時間指定なし", date(2027, 10, 1))
-    assert exc_info.value.status_code == 422
-
-
-async def test_confirm_year_dated_offered_slot_matching_visit_date(
-    client: AsyncClient, db_session: AsyncSession
-):
-    """業者の選択式フォームと同じ形の年入り候補は、年まで一致する visit_date で確定できる。"""
-    user_token, op_token, txn_id = await _setup_txn(
-        client, db_session, "year_slot_ok_user@example.com", "year_slot_ok_op@example.com"
-    )
-    visit_date = _future_date_not_feb29()
-    label = _year_dated_slot_label(visit_date)
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": [label]},
-        headers=_auth(op_token),
-    )
-    assert r.status_code == 201, r.text
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/confirm",
-        json={"visit_date": visit_date.isoformat(), "visit_time_slot": label},
-        headers=_auth(user_token),
-    )
-    assert r.status_code == 200, r.text
-
-
-async def test_confirm_rejects_year_dated_offered_slot_when_year_differs(
-    client: AsyncClient, db_session: AsyncSession
-):
-    """年入り候補を、月日だけ合わせて年の違う visit_date で確定しようとすると422（API を直接呼ぶ細工）。
-
-    visit_date は確定 API の上限（本日から365日）に収まる日にし、候補ラベルの側を翌年にする
-    （visit_date を翌年にすると上限の検証で先に弾かれ、年の照合を確かめられないため）。
-    """
-    user_token, op_token, txn_id = await _setup_txn(
-        client, db_session, "year_slot_ng_user@example.com", "year_slot_ng_op@example.com"
-    )
-    visit_date = _future_date_not_feb29()
-    label = _year_dated_slot_label(visit_date.replace(year=visit_date.year + 1))
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": [label]},
-        headers=_auth(op_token),
-    )
-    assert r.status_code == 201, r.text
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/confirm",
-        json={"visit_date": visit_date.isoformat(), "visit_time_slot": label},
-        headers=_auth(user_token),
-    )
-    assert r.status_code == 422, r.text
-    assert r.json()["detail"] == "候補日の日付と訪問日が一致しません。候補日をもう一度選び直してください。"
-
-
-async def test_propose_rejects_slot_with_two_different_years(
-    client: AsyncClient, db_session: AsyncSession
-):
-    """月日が同じでも明記された年が2種類ある候補は、確定時の年の照合が必ず不一致になるため422。"""
-    _, op_token, txn_id = await _setup_txn(
-        client, db_session, "two_years_user@example.com", "two_years_op@example.com"
-    )
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": ["2026年10月1日〜2027年10月1日"]},
-        headers=_auth(op_token),
-    )
-    assert r.status_code == 422, r.text
-    assert r.json()["detail"] == "1つの候補日に複数の日付は入れられません。候補を分けて入力してください。"
-
-
-@pytest.mark.parametrize(
-    ("label", "expected_status"),
-    [
-        ("2027年2月29日（月）時間指定なし", 422),  # 2027年は平年
-        ("2028年2月29日（火）時間指定なし", 201),  # 2028年はうるう年
-    ],
-    ids=["non_leap_year_feb29", "leap_year_feb29"],
-)
-async def test_propose_checks_feb29_against_the_stated_year(
-    client: AsyncClient, db_session: AsyncSession, label: str, expected_status: int
-):
-    """年が明記された候補はその年の暦で実在を確かめる（年なしは従来どおり2000年基準）。"""
-    _, op_token, txn_id = await _setup_txn(
-        client, db_session, "feb29_year_user@example.com", "feb29_year_op@example.com"
-    )
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": [label]},
-        headers=_auth(op_token),
-    )
-    assert r.status_code == expected_status, r.text
-
-
-# ──────────────── 日程確定メッセージの本文（運営名義は定型文だけ・日程検証レビュー SEC-L1） ────────────────
-
-# 固定時間帯のうち「9:00〜12:00」。〜（U+301C）を打ち間違えないよう定数から取る。
-_MORNING_FIXED_SLOT = next(s for s in SCHEDULE_FIXED_TIME_SLOTS if s.startswith("9:00"))
-
-
-def _expected_confirmed_body(visit_date: date, time_text: str) -> str:
-    return f"訪問日程が確定しました。\n訪問日：{_ja_date(visit_date)}\n時間帯：{time_text}"
-
-
-async def _confirmed_message(client: AsyncClient, txn_id: str, token: str) -> dict:
-    r = await client.get(f"/api/v1/transactions/{txn_id}/messages", headers=_auth(token))
-    assert r.status_code == 200, r.text
-    return next(m for m in r.json() if m["kind"] == "schedule_confirmed")
-
-
-async def test_confirmed_body_with_fixed_time_slot_has_no_operator_label(
-    client: AsyncClient, db_session: AsyncSession
-):
-    """固定時間帯（日程調整ページ）で確定すると、本文の時間帯はその値で、別枠用の文言は無い。"""
-    user_token, _, txn_id = await _setup_txn(
-        client, db_session, "body_fixed_user@example.com", "body_fixed_op@example.com"
-    )
-    visit_date = _future_date(10)
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/confirm",
-        json={"visit_date": visit_date.isoformat(), "visit_time_slot": _MORNING_FIXED_SLOT},
-        headers=_auth(user_token),
-    )
-    assert r.status_code == 200, r.text
-    confirmed = await _confirmed_message(client, txn_id, user_token)
-    assert confirmed["sender_type"] == "system"
-    assert confirmed["body"] == _expected_confirmed_body(visit_date, _MORNING_FIXED_SLOT)
-    assert confirmed["meta"]["visit_time_slot"] == _MORNING_FIXED_SLOT
-    assert "operator_slot_label" not in confirmed["meta"]
-
-
-async def test_confirmed_body_with_year_dated_fixed_slot_label_uses_fixed_wording(
-    client: AsyncClient, db_session: AsyncSession
-):
-    """業者の選択式フォームの候補（visit_date の日付＋固定時間帯）は、時間帯まで定型文で書き、
-    別枠用の文言を付けない（文言が運営の定型の語彙だけでできているため）。"""
-    user_token, op_token, txn_id = await _setup_txn(
-        client, db_session, "body_formlabel_user@example.com", "body_formlabel_op@example.com"
-    )
-    visit_date = _future_date_not_feb29()
-    label = _year_dated_slot_label(visit_date, _MORNING_FIXED_SLOT)
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": [label]},
-        headers=_auth(op_token),
-    )
-    assert r.status_code == 201, r.text
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/confirm",
-        json={"visit_date": visit_date.isoformat(), "visit_time_slot": label},
-        headers=_auth(user_token),
-    )
-    assert r.status_code == 200, r.text
-    confirmed = await _confirmed_message(client, txn_id, user_token)
-    assert confirmed["body"] == _expected_confirmed_body(visit_date, _MORNING_FIXED_SLOT)
-    assert confirmed["meta"]["visit_time_slot"] == label
-    assert "operator_slot_label" not in confirmed["meta"]
-
-
-async def test_confirmed_body_never_contains_operator_free_text(
-    client: AsyncClient, db_session: AsyncSession
-):
-    """業者の自由な文言（運営を名乗る文面）は運営名義の本文に入らず、両当事者とも
-    meta の operator_slot_label（画面では「業者が提示した候補」の別枠）で受け取る。"""
-    user_token, op_token, txn_id = await _setup_txn(
-        client, db_session, "body_freetext_user@example.com", "body_freetext_op@example.com"
-    )
-    visit_date = _future_date(10)
-    label = f"{visit_date.month}月{visit_date.day}日 ※運営:当日現金払い必須"
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": [label]},
-        headers=_auth(op_token),
-    )
-    assert r.status_code == 201, r.text
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/confirm",
-        json={"visit_date": visit_date.isoformat(), "visit_time_slot": label},
-        headers=_auth(user_token),
-    )
-    assert r.status_code == 200, r.text
-    for token in (user_token, op_token):
-        confirmed = await _confirmed_message(client, txn_id, token)
-        assert confirmed["body"] == _expected_confirmed_body(visit_date, "業者が提示した候補のとおり")
-        assert "運営" not in confirmed["body"]
-        assert confirmed["meta"]["operator_slot_label"] == label
-
-
-async def test_confirmed_body_treats_form_label_with_extra_text_as_operator_text(
-    client: AsyncClient, db_session: AsyncSession
-):
-    """日付＋固定時間帯の後ろに文言を足した候補は定型文として扱わず、別枠へ回す。"""
-    user_token, op_token, txn_id = await _setup_txn(
-        client, db_session, "body_extratext_user@example.com", "body_extratext_op@example.com"
-    )
-    visit_date = _future_date_not_feb29()
-    label = _year_dated_slot_label(visit_date, _MORNING_FIXED_SLOT) + " 要現金"
-    assert len(label) <= 32
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": [label]},
-        headers=_auth(op_token),
-    )
-    assert r.status_code == 201, r.text
-    r = await client.post(
-        f"/api/v1/transactions/{txn_id}/schedule/confirm",
-        json={"visit_date": visit_date.isoformat(), "visit_time_slot": label},
-        headers=_auth(user_token),
-    )
-    assert r.status_code == 200, r.text
-    confirmed = await _confirmed_message(client, txn_id, user_token)
-    assert confirmed["body"] == _expected_confirmed_body(visit_date, "業者が提示した候補のとおり")
-    assert "要現金" not in confirmed["body"]
-    assert confirmed["meta"]["operator_slot_label"] == label
-
-
-def test_format_visit_date_ja():
-    assert _format_visit_date_ja(date(2026, 10, 1)) == "2026年10月1日（木）"
-    assert _format_visit_date_ja(date(2028, 2, 29)) == "2028年2月29日（火）"
-
-
-def test_fixed_time_slot_of():
-    d = date(2026, 10, 1)
-    assert _fixed_time_slot_of(_MORNING_FIXED_SLOT, d) == _MORNING_FIXED_SLOT
-    assert _fixed_time_slot_of(f"2026年10月1日（木）{_MORNING_FIXED_SLOT}", d) == _MORNING_FIXED_SLOT
-    assert _fixed_time_slot_of("2026年10月1日（木）時間指定なし", d) == "時間指定なし"
-    # 年なし（自由入力だった頃の形）・別の日付・余計な文言つき・固定にない時間帯は定型文にしない。
-    assert _fixed_time_slot_of(f"10月1日（木）{_MORNING_FIXED_SLOT}", d) is None
-    assert _fixed_time_slot_of(f"2026年10月2日（金）{_MORNING_FIXED_SLOT}", d) is None
-    assert _fixed_time_slot_of(f"2026年10月1日（木）{_MORNING_FIXED_SLOT} ※運営", d) is None
-    assert _fixed_time_slot_of("2026年10月1日（木）10:00-12:00", d) is None
 
 
 # ──────────────── 定数ガード: SCHEDULE_FIXED_TIME_SLOTS とフロントエンドの一致 ────────────────
@@ -1301,33 +471,13 @@ def _read_frontend_time_slot_values() -> set[str]:
 def test_schedule_fixed_time_slots_matches_frontend_time_slots():
     """SCHEDULE_FIXED_TIME_SLOTS は web/src/lib/visit-slots.ts の VISIT_TIME_SLOTS の
     value 集合と1文字違わず一致すること。ここがずれると、日程調整ページ（固定5択）
-    からの確定が _assert_offered_time_slot（transactions.py）で422になる
+    からの確定が confirm_schedule（transactions.py）で422になる
     （2026-09-25 セキュリティレビュー Low 対応）。
     """
     assert SCHEDULE_FIXED_TIME_SLOTS == _read_frontend_time_slot_values()
 
 
-def test_visit_date_is_judged_in_jst(monkeypatch):
-    """訪問日の「本日以降」「1年以内」は JST の暦で判定する（UTC の date.today() だと JST 0:00〜9:00 に昨日が通る）。"""
-    import app.schemas_katadzuke as schemas
-    from app.schemas_katadzuke import ScheduleConfirmRequest
-
-    monkeypatch.setattr(schemas, "_jst_today", lambda: date(2026, 10, 6))
-    slot = "9:00〜12:00"
-    ScheduleConfirmRequest(visit_date=date(2026, 10, 6), visit_time_slot=slot)  # 当日は可
-    ScheduleConfirmRequest(visit_date=date(2027, 10, 6), visit_time_slot=slot)  # +365 日は可
-    for bad in (date(2026, 10, 5), date(2027, 10, 7)):
-        try:
-            ScheduleConfirmRequest(visit_date=bad, visit_time_slot=slot)
-        except ValueError:
-            continue
-        raise AssertionError(f"{bad} が通ってしまった")
-
-
-def test_jst_today_is_a_jst_calendar_date():
-    from datetime import datetime, timedelta, timezone
-
-    from app.schemas_katadzuke import _jst_today
-
-    jst_now = datetime.now(timezone(timedelta(hours=9))).date()
-    assert abs((_jst_today() - jst_now).days) <= 1  # 呼び出しの瞬間に日付が変わっても高々1日
+def test_schedule_fixed_time_slots_is_the_server_fixed_slot_definition():
+    """schemas の SCHEDULE_FIXED_TIME_SLOTS はサーバー側の単一の出所
+    （services/visit_schedule.FIXED_VISIT_TIME_SLOTS）と同じ集合であること。"""
+    assert SCHEDULE_FIXED_TIME_SLOTS == frozenset(FIXED_VISIT_TIME_SLOTS)

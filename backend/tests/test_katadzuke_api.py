@@ -2184,6 +2184,28 @@ async def test_pending_operator_can_chat(client: AsyncClient, db_session: AsyncS
 # ── 日程調整 ──
 
 
+def _future_candidates(*day_offsets: int) -> dict:
+    """日本時間の今日から day_offsets 日後の「9:00〜12:00」の候補を並べた propose の本文。
+
+    当日の終わった枠の拒否・日付範囲の判定に掛からないよう、1日以上先を使う。
+    """
+    from datetime import timedelta
+
+    from app.services.visit_schedule import today_jst
+
+    today = today_jst()
+    return {
+        "candidates": [
+            {
+                "date": (today + timedelta(days=offset)).isoformat(),
+                "start": "09:00",
+                "end": "12:00",
+            }
+            for offset in day_offsets
+        ]
+    }
+
+
 async def test_schedule_propose_operator_only(client: AsyncClient, db_session: AsyncSession):
     admin_token = await _make_admin(client, db_session)
     user_token = await _signup_user(client, "sched_propose_user@example.com")
@@ -2192,20 +2214,25 @@ async def test_schedule_propose_operator_only(client: AsyncClient, db_session: A
 
     r = await client.post(
         f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": ["2026-07-10 午前", "2026-07-11 午後"]},
+        json=_future_candidates(3, 4),
         headers=_auth(user_token),
     )
     assert r.status_code == 403
 
     r = await client.post(
         f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": ["2026-07-10 午前", "2026-07-11 午後"]},
+        json=_future_candidates(3, 4),
         headers=_auth(op_token),
     )
     assert r.status_code == 201
     data = r.json()
     assert data["kind"] == "schedule_proposal"
-    assert data["meta"]["slots"] == ["2026-07-10 午前", "2026-07-11 午後"]
+    assert data["meta"]["v"] == 2
+    assert data["meta"]["seq"] == 1
+    assert [c["date"] for c in data["meta"]["candidates"]] == [
+        c["date"] for c in _future_candidates(3, 4)["candidates"]
+    ]
+    assert "slots" not in data["meta"]
 
 
 async def test_schedule_confirm_user_only_and_status_transition(
@@ -2244,15 +2271,14 @@ async def test_schedule_confirm_user_only_and_status_transition(
     assert r.status_code == 200
     messages = r.json()
     kinds = [m["kind"] for m in messages]
-    assert "schedule_confirmed" in kinds
+    # ひとことは確定メッセージに連結せず、依頼者本人の発言として直後に並ぶ。
+    assert kinds == ["schedule_confirmed", "text"]
     # note（業者へのひとこと）は運営名義のシステムメッセージ本文に連結せず、
     # 依頼者本人（user）の発言として別メッセージに分離される
     # （2026-09-25 セキュリティレビュー Low 対応: 運営のお知らせを装う文面を
     # 作れてしまう不備の是正）。
-    confirmed_index = next(i for i, m in enumerate(messages) if m["kind"] == "schedule_confirmed")
-    confirmed = messages[confirmed_index]
+    confirmed, note_message = messages
     assert "在宅確認済み" not in confirmed["body"]
-    note_message = messages[confirmed_index + 1]
     assert note_message["kind"] == "text"
     assert note_message["sender_type"] == "user"
     assert note_message["body"] == "在宅確認済み"
@@ -2280,8 +2306,8 @@ async def _advance_to_visiting(
 ) -> None:
     """取引を visiting に進め、visit_date を指定日（既定: 本日）にする。
 
-    ScheduleConfirmRequest は本日以降の日付のみ許可するため、まず近未来日で確定させて
-    から DB で visit_date を直接書き換える（request_completion の訪問日ゲートのテスト用）。
+    日程の確定（confirm_schedule）は本日（日本時間）以降の日付のみ許可するため、まず近未来日で
+    確定させてから DB で visit_date を直接書き換える（request_completion の訪問日ゲートのテスト用）。
     """
     from datetime import date, timedelta
 
@@ -2726,7 +2752,7 @@ async def test_propose_schedule_notify_debounced_within_5_minutes(
     ) as dispatch_mock:
         r = await client.post(
             f"/api/v1/transactions/{txn_id}/schedule/propose",
-            json={"slots": ["2026-07-10 午前"]},
+            json=_future_candidates(1),
             headers=_auth(op_token),
         )
         assert r.status_code == 201, r.text
@@ -2739,7 +2765,7 @@ async def test_propose_schedule_notify_debounced_within_5_minutes(
     ) as dispatch_mock2:
         r = await client.post(
             f"/api/v1/transactions/{txn_id}/schedule/propose",
-            json={"slots": ["2026-07-11 午後"]},
+            json=_future_candidates(2),
             headers=_auth(op_token),
         )
         assert r.status_code == 201, r.text
@@ -2765,7 +2791,7 @@ async def test_propose_schedule_notify_debounced_within_5_minutes(
     ) as dispatch_mock3:
         r = await client.post(
             f"/api/v1/transactions/{txn_id}/schedule/propose",
-            json={"slots": ["2026-07-12 午前"]},
+            json=_future_candidates(3),
             headers=_auth(op_token),
         )
         assert r.status_code == 201, r.text
@@ -2795,7 +2821,7 @@ async def test_propose_schedule_no_notify_when_owner_missing(
     ) as dispatch_mock:
         r = await client.post(
             f"/api/v1/transactions/{txn_id}/schedule/propose",
-            json={"slots": ["2026-07-10 午前"]},
+            json=_future_candidates(1),
             headers=_auth(op_token),
         )
         assert r.status_code == 201, r.text
@@ -2822,7 +2848,7 @@ async def test_propose_schedule_rejects_when_visiting(
     # 確定前に1件提示しておき、確定後の再提示でメッセージが「増えない」ことを検証できるようにする。
     r = await client.post(
         f"/api/v1/transactions/{txn_id}/schedule/propose",
-        json={"slots": ["2026-07-13 午前"]},
+        json=_future_candidates(1),
         headers=_auth(op_token),
     )
     assert r.status_code == 201, r.text
@@ -2841,7 +2867,7 @@ async def test_propose_schedule_rejects_when_visiting(
     ) as dispatch_mock:
         r = await client.post(
             f"/api/v1/transactions/{txn_id}/schedule/propose",
-            json={"slots": ["2026-07-20 午前"]},
+            json=_future_candidates(2),
             headers=_auth(op_token),
         )
     assert r.status_code == 409, r.text
@@ -2870,14 +2896,14 @@ async def test_propose_schedule_notify_up_to_3_then_stops_at_4th(
 
     from app.db.models.message import Message
 
-    async def _propose_and_count_dispatch(slot: str) -> int:
+    async def _propose_and_count_dispatch(day_offset: int) -> int:
         with patch(
             "app.api.v1.endpoints.transactions.notify_dispatch.dispatch_schedule_proposed",
             new_callable=AsyncMock,
         ) as dispatch_mock:
             r = await client.post(
                 f"/api/v1/transactions/{txn_id}/schedule/propose",
-                json={"slots": [slot]},
+                json=_future_candidates(day_offset),
                 headers=_auth(op_token),
             )
             assert r.status_code == 201, r.text
@@ -2898,11 +2924,11 @@ async def test_propose_schedule_notify_up_to_3_then_stops_at_4th(
         await db_session.commit()
 
     for i in range(3):
-        call_count = await _propose_and_count_dispatch(f"2026-07-{10 + i} 午前")
+        call_count = await _propose_and_count_dispatch(1 + i)
         assert call_count == 1, f"{i + 1}件目は通知が1回出るはず"
         await _clear_debounce_window()
 
-    call_count = await _propose_and_count_dispatch("2026-07-20 午前")
+    call_count = await _propose_and_count_dispatch(10)
     assert call_count == 0, "4件目は通知が出ないはず"
 
 

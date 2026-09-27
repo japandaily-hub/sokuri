@@ -261,6 +261,7 @@ _SCOPE_MESSAGES: dict[str, str] = {
     "operator_application": "送信回数の上限に達しました。しばらく時間をおいて再度お試しください。",
     "message_send": "メッセージの送信が集中しています。しばらく時間をおいて再度お試しください。",
     "schedule_propose": "日程候補の提示が集中しています。しばらく時間をおいて再度お試しください。",
+    "schedule_accept": "日程の確定が集中しています。しばらく時間をおいて再度お試しください。",
 }
 
 
@@ -725,6 +726,12 @@ def _scope_spec(scope: str, config: RateLimitConfig) -> _ScopeSpec:
         # 毎回数える（case_cancel と同じ方式）。
         return _ScopeSpec(
             ip_rule=None, account_rule=config.schedule_propose_account, count_all=False
+        )
+    if scope == "schedule_accept":
+        # 業者の提示からの日程確定（accept）: schedule_propose と同じくアカウント軸のみ。
+        # 成功・失敗を問わずハンドラ冒頭の hit_account で毎回数える。
+        return _ScopeSpec(
+            ip_rule=None, account_rule=config.schedule_accept_account, count_all=False
         )
     raise ValueError(f"未知の rate limit scope です: {scope!r}")
 

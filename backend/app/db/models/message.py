@@ -25,8 +25,18 @@ class Message(Base, TimestampMixin):
 
     ``kind`` の種別:
       "text"               ユーザー・業者の通常発言
-      "schedule_proposal"  業者からの日程候補提示（meta.slots に候補一覧）
-      "schedule_confirmed" ユーザーによる日程確定（システムメッセージ）
+      "schedule_proposal"  業者からの日程候補提示（sender_type="operator"）。meta v2:
+                           {"v": 2, "seq": 取引内の提示の通し番号（最大値＝最新の提示）,
+                           "candidates": [{"date": "YYYY-MM-DD", "start": "HH:MM"|null,
+                           "end": "HH:MM"|null, "label": サーバーが作る表示}]}。
+                           旧形式（v1）は meta.slots（業者の自由記述の一覧）だけを持ち、
+                           表示にだけ使う（日程構造化 DESIGN §3）
+      "schedule_confirmed" 日程確定（システムメッセージ）。meta v2: {"v": 2,
+                           "source": "proposal"|"calendar", "proposal_id"・
+                           "candidate_index"（source="proposal" のときだけ）,
+                           "visit_date", "visit_time_slot", "label",
+                           "confirmed_by": "user"|"admin"}。旧形式は meta.visit_date・
+                           meta.visit_time_slot だけ
       "complete_request"   業者からの完了確定の依頼（sender_type="operator"）
       "completed"          完了確定（システムメッセージ。meta.final_amount・
                            meta.completed_by="user"|"admin"）
