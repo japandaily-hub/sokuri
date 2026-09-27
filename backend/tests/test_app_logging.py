@@ -19,6 +19,7 @@ import pathlib
 import subprocess
 import sys
 import textwrap
+import unicodedata
 
 import pytest
 
@@ -233,6 +234,55 @@ def test_formatter_escapes_bidi_and_zero_width_characters():
     assert text == "INFO [app.x] a" + "".join(backslash + e for e in ["u202e", "u2066", "u200b", "ufeff"]) + "b"
 
 
+def test_escape_table_covers_every_format_character():
+    """書式文字（Cf＝双方向制御文字・ゼロ幅文字・タグ文字・ソフトハイフン等）は1字残らずエスケープの表に入る。
+
+    表は範囲の直書きなので、Python を上げて Unicode に Cf が増えたらここで落ちる。
+    """
+    missing = [
+        hex(code_point)
+        for code_point in range(0x110000)
+        if unicodedata.category(chr(code_point)) == "Cf" and code_point not in app_logging._MESSAGE_ESCAPES
+    ]
+    assert missing == []
+    backslash = chr(92)
+    record = logging.LogRecord("app.x", logging.INFO, __file__, 1, "a%sb", (chr(0xE0041) + chr(0xAD),), None)
+    text = app_logging.AppLogFormatter().format(record)
+    assert text == "INFO [app.x] a" + backslash + "U000e0041" + backslash + "xadb"
+
+
+def test_formatter_masks_identifiers_right_after_control_characters():
+    """マスクはエスケープより先に掛ける（エスケープ後の "\\n" は英数字で終わり、境界判定を崩すため）。"""
+    backslash = chr(92)
+    record = logging.LogRecord(
+        "app.x",
+        logging.WARNING,
+        __file__,
+        1,
+        "to=%s key=%s",
+        (chr(10) + "U0123456789abcdef0123456789abcdef", chr(13) + "0123456789abcdef0123456789abcdef.jpg"),
+        None,
+    )
+    text = app_logging.AppLogFormatter().format(record)
+    assert text == "WARNING [app.x] to=" + backslash + "nU012… key=" + backslash + "r01234567..."
+
+
+def test_uvicorn_traceback_filter_never_raises(monkeypatch: pytest.MonkeyPatch):
+    """ロガーのフィルタの例外は logging に捕まらず uvicorn が 500 を返せなくなる。整形に失敗しても例外を出さず、
+    トレースバックは例外の種類だけに差し替える（隠す側に倒す）。"""
+
+    def _boom(_exc_info):
+        raise RuntimeError("formatter failed")
+
+    monkeypatch.setattr(app_logging._UvicornTracebackFilter._traceback_formatter, "formatException", _boom)
+    try:
+        raise ValueError("taro@example.com")
+    except ValueError:
+        record = logging.LogRecord("uvicorn.error", logging.ERROR, __file__, 1, "Exception", (), sys.exc_info())
+    assert app_logging._UvicornTracebackFilter().filter(record) is True
+    assert record.exc_text == "  | ValueError（トレースバックを整形できなかったため省略）"
+
+
 def test_formatter_masks_storage_keys_and_line_user_ids():
     """storage_key（無認証の capability URL）と LINE の userId（Push の宛先）も出力直前に丸める。"""
     record = logging.LogRecord(
@@ -330,6 +380,11 @@ _CHILD_SCRIPT = textwrap.dedent(
     except ValueError as exc:
         logging.getLogger("uvicorn.error").error("Exception in ASGI application\\n", exc_info=exc)
     sys.stderr.write("ROOT_HANDLERS=%d\\n" % len(logging.getLogger().handlers))
+    # 将来 root にハンドラが付いた場合（basicConfig 等）でも、httpx の INFO は流れないこと。
+    logging.basicConfig(level=logging.INFO, stream=sys.stderr)
+    logging.getLogger("httpx").info(
+        "HTTP Request: GET https://api.line.me/oauth2/v2.1/verify?access_token=SECRET-AFTER-ROOT-HANDLER"
+    )
     """
 )
 
@@ -379,9 +434,11 @@ def test_uvicorn_default_logging_plus_app_logging_emits_startup_info_once(tmp_pa
     assert "probe-warning" not in lines
     # uvicorn 自身の書式は変えない。
     assert lines.count("INFO:     probe-uvicorn") == 1
-    # root にはハンドラを付けず、httpx の INFO（クエリの access_token）も流さない。
+    # root にはハンドラを付けず、httpx の INFO（クエリの access_token）も流さない。後から root に
+    # ハンドラが付いても、httpx を WARNING に固定しているので流れない（固定しない場合は下のテスト）。
     assert "ROOT_HANDLERS=0" in lines
     assert not any("SECRET-ACCESS-TOKEN" in line for line in lines)
+    assert not any("SECRET-AFTER-ROOT-HANDLER" in line for line in lines)
     # 未処理例外のトレースバックも継続の印付き・マスク済み（見出しは uvicorn の書式のまま）。
     assert lines.count("ERROR:    Exception in ASGI application") == 1
     assert "  | Traceback (most recent call last):" in lines
@@ -404,6 +461,9 @@ def test_without_app_log_level_app_info_is_dropped_as_before(tmp_path: pathlib.P
     # 未処理例外のトレースバックは素通し（安全網は APP_LOG_LEVEL があるときだけ効く）。
     assert "ROOT_HANDLERS=0" in lines
     assert "ValueError: Key (email)=(taro@example.com) already exists." in lines
+    # httpx を固定しないと、root にハンドラが付いた時点で access_token 入りの URL が流れる
+    # （上のテストの「流れない」が固定の効果であることの確認）。
+    assert any("SECRET-AFTER-ROOT-HANDLER" in line for line in lines)
 
 
 # ──────────────── 起動経路（start.sh） ────────────────

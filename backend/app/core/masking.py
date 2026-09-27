@@ -26,6 +26,13 @@ _EMAIL_IN_TEXT_RE = re.compile(
     r"(?P<address>" + _EMAIL_LOCAL_CLASS + r"++@[\w-]++(?:\.[\w-]++)+)"
 )
 
+#: 1段目で拾えない「記号でつながった2件目以降」（例: ``to=a@x.jp&cc=b@y.jp`` の ``b@y.jp``）を拾う
+#: 2段目。1段目は後ろ読みでローカル部の途中からの照合を止めているため、直前のメールのドメインから
+#: 記号で連続する部分は開始位置になれない。区切りに使われる記号の直後からだけ、記号を含まない狭い
+#: ローカル部で照合する（所有量指定子で線形のまま。マスク済みの ``t***@...`` は ``*`` の直後が
+#: ``@`` でローカル部が空になるので一致しない）。
+_EMAIL_AFTER_SYMBOL_RE = re.compile(r"(?<=[!#$%&'*/=?^`{|}~])[\w.+-]++@[\w-]++(?:\.[\w-]++)+")
+
 #: 写真の storage_key（app/services/storage.py の new_storage_key: 32桁 hex＋拡張子）。無認証の
 #: capability URL（GET /files/{storage_key}）なので、storage.mask_key_for_log と同じく先頭8字だけ残す。
 _STORAGE_KEY_IN_TEXT_RE = re.compile(
@@ -71,9 +78,10 @@ def mask_emails_in_text(text: str) -> str:
     """
     if not text or "@" not in text:
         return text
-    return _EMAIL_IN_TEXT_RE.sub(
+    masked = _EMAIL_IN_TEXT_RE.sub(
         lambda match: (match.group("label") or "") + mask_email(match.group("address")), text
     )
+    return _EMAIL_AFTER_SYMBOL_RE.sub(lambda match: mask_email(match.group(0)), masked)
 
 
 def mask_sensitive_in_text(text: str) -> str:

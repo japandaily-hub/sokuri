@@ -47,6 +47,12 @@ _NON_REVEALING_BUILTINS = frozenset({"type", "len", "bool"})
 #: その取り込み後に対象へ加える。
 _EMAIL_NAME_RE = re.compile(
     r"(?:^|_)(?:emails?|line_user_ids?|storage_keys?|phones?|phone_numbers?|address(?:es)?)$"
+    # 人の名前の項目（汎用の name は種別名・ルール名等にも使うので対象外）と口座名義。
+    r"|(?:^|_)(?:family|given|full|contact|representative|company)_names?$"
+    r"|(?:^|_)account_holders?(?:_names?)?$"
+    # 秘密値（トークン・パスワード・API キー・Webhook の URL）。
+    r"|(?:^|_)(?:tokens?|passwords?|api_keys?|secrets?|webhook_urls?)$",
+    re.IGNORECASE,
 )
 
 
@@ -68,7 +74,10 @@ def _is_logging_call(node: ast.Call) -> bool:
     func = node.func
     if not isinstance(func, ast.Attribute) or func.attr not in _LOG_METHODS:
         return False
-    return "log" in _callee_name(func.value).lower()
+    receiver = func.value
+    if isinstance(receiver, ast.Call):  # logging.getLogger(__name__).info(...) の形
+        return _callee_name(receiver.func) == "getLogger"
+    return "log" in _callee_name(receiver).lower()
 
 
 def _names_an_email(node: ast.AST) -> bool:
@@ -158,6 +167,12 @@ def test_app_logging_calls_do_not_pass_raw_personal_identifiers():
         'logger.warning("x key=%s", storage_key)',
         'logger.info("x %s", user.phone)',
         'logger.info("x %s", profile.address)',
+        'logger.info("x %s", application.company_name)',
+        'logger.info("x %s", bank["account_holder"])',
+        'logger.warning("x %s", settings.alert_webhook_url)',
+        'logger.error("x %s", body.password)',
+        'logger.info("x %s", settings.JWT_SECRET)',
+        'logging.getLogger(__name__).info("x %s", user.email)',
     ],
 )
 def test_guard_detects_raw_email_patterns(source: str):
@@ -180,6 +195,9 @@ def test_guard_detects_raw_email_patterns(source: str):
         'logger.error("x type=%s length=%s", type(line_user_id).__name__, len(str(line_user_id)))',
         'logger.info("x has_email=%s", bool(user.email))',
         'logger.info("x missing=%s", line_user_id is None)',
+        'logger.info("RoutingRule name=%s を追加", rule_seed["name"])',
+        'logger.info("x %s", _ops_token_mismatch_count)',
+        'logger.info("x configured=%s", bool(settings.alert_webhook_url))',
         'send_alert("x", f"email={user.email}")',
     ],
 )
@@ -206,8 +224,14 @@ def test_guard_allows_masked_or_unrelated_values(source: str):
         ("to=taro@example.com", "t***@example.com"),
         # RFC の上限（64字）を超えるローカル部も隠す（長さで取りこぼさない）。
         ("x" * 70 + "@example.com", "x***@example.com"),
+        # 記号だけでつながった2件目以降も隠す（1段目は先のメールのドメインから続く部分を開始位置に
+        # できないため、区切り記号の直後から拾う2段目で補う）。
+        ("to=a@x.jp&cc=b@y.jp", "t***@x.jp&cc=b***@y.jp"),
+        ("a@x.jp|b@y.jp", "a***@x.jp|b***@y.jp"),
+        ("a@x.jp/b@y.jp", "a***@x.jp/b***@y.jp"),
         # マスク済みの値は何度掛けても変わらない。
         ("email=t***@example.com", "email=t***@example.com"),
+        ("t***@x.jp&cc=b***@y.jp", "t***@x.jp&cc=b***@y.jp"),
         ("", ""),
     ],
 )
@@ -244,6 +268,8 @@ def test_mask_functions_stay_linear_on_pathological_input():
         "@" * 20_000,
         "0" * 50_000 + ".jpg",
         "U" + "0" * 50_000,
+        "&" * 50_000 + "a@x.jp",
+        "&a" * 25_000 + "@",
     ):
         mask_sensitive_in_text(text)
     assert time.perf_counter() - started < 1.0

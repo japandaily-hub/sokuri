@@ -35,11 +35,11 @@
       （Settings の検証時の WARNING 等）は設定前のため、従来どおり lastResort で本文だけが出る。
     - 本文の制御文字はエスケープして1行に収める（利用者の入力を含む値で偽のログ行を作られない
       ようにする: CWE-117。改行・CR・ログビューアが改行とみなす NEL・U+2028・U+2029、端末を
-      操作できる ESC 等の制御文字、表示順を入れ替えたり文字を見えなくしたりする双方向制御文字・
-      ゼロ幅文字。タブはそのまま）。トレースバック等の複数行は各行の先頭に ``  | `` を付け、
-      行の中の制御文字も同じくエスケープする（例外文に入った入力で ``INFO [app...]`` から
-      始まる偽の行を作れないようにする）。
-    - 出力の直前に、文中のメールアドレス・写真の storage_key・LINE の userId を
+      操作できる ESC 等の制御文字と、書式文字＝Cf（表示順を入れ替える双方向制御文字・ゼロ幅文字・
+      見えないまま文字列を運べるタグ文字等）。タブはそのまま）。トレースバック等の複数行は各行の
+      先頭に ``  | `` を付け、行の中の制御文字も同じくエスケープする（例外文に入った入力で
+      ``INFO [app...]`` から始まる偽の行を作れないようにする）。
+    - 整形の際、エスケープより先に、文中のメールアドレス・写真の storage_key・LINE の userId を
       :func:`mask_sensitive_in_text` でマスクする（呼び出し側のマスク漏れや、例外文に含まれる値
       への安全網）。uvicorn.error が出す未処理例外のトレースバック（"Exception in ASGI
       application"）にも、uvicorn の書式を変えずに同じ処理を掛ける。呼び出し側では引き続き
@@ -87,31 +87,56 @@ logger = logging.getLogger(__name__)
 
 
 def _escape_for(code_point: int) -> str:
-    """制御文字1字を、見て分かるエスケープ表記（``\\n`` ``\\x1b`` ``\\u2028`` 等）にする。"""
+    """制御文字1字を、見て分かるエスケープ表記（``\\n`` ``\\x1b`` ``\\u2028`` ``\\U000e0041`` 等）にする。"""
     named = {0x0A: "\\n", 0x0D: "\\r"}
     if code_point in named:
         return named[code_point]
-    return f"\\x{code_point:02x}" if code_point <= 0xFF else f"\\u{code_point:04x}"
+    if code_point <= 0xFF:
+        return f"\\x{code_point:02x}"
+    if code_point <= 0xFFFF:
+        return f"\\u{code_point:04x}"
+    return f"\\U{code_point:08x}"
 
+
+#: 一般カテゴリ Cf（書式文字＝画面に出ない文字）の範囲（Unicode 15.1 時点）。表示順を入れ替える
+#: 双方向制御文字（CVE-2021-42574 と同じ類型）、ゼロ幅文字、見えないまま文字列を運べるタグ文字
+#: （"ASCII smuggling"）、ソフトハイフン等を含む。tests/test_app_logging.py が、実行中の Python の
+#: unicodedata で Cf の全文字がこの表に入っていることを確かめる（Python を上げて漏れたら CI が落ちる）。
+_FORMAT_CHAR_RANGES: tuple[tuple[int, int], ...] = (
+    (0x00AD, 0x00AD),
+    (0x0600, 0x0605),
+    (0x061C, 0x061C),
+    (0x06DD, 0x06DD),
+    (0x070F, 0x070F),
+    (0x0890, 0x0891),
+    (0x08E2, 0x08E2),
+    (0x180E, 0x180E),
+    (0x200B, 0x200F),
+    (0x202A, 0x202E),
+    (0x2060, 0x2064),
+    (0x2066, 0x206F),
+    (0xFEFF, 0xFEFF),
+    (0xFFF9, 0xFFFB),
+    (0x110BD, 0x110BD),
+    (0x110CD, 0x110CD),
+    (0x13430, 0x1343F),
+    (0x1BCA0, 0x1BCA3),
+    (0x1D173, 0x1D17A),
+    (0xE0001, 0xE0001),
+    (0xE0020, 0xE007F),
+)
 
 #: 本文のエスケープ対象（``str.translate`` 用の表）。C0 制御文字（タブを除く）・DEL・C1 制御文字
-#: （NEL を含む）、``str.splitlines`` やログビューアが行区切りとみなす U+2028・U+2029、表示順を
-#: 入れ替える双方向制御文字（U+061C・U+200E/F・U+202A〜E・U+2066〜9。CVE-2021-42574 と同じ類型）、
-#: 文字を見えなくするゼロ幅文字（U+200B〜D・U+2060〜4・U+FEFF）。
+#: （NEL を含む）、``str.splitlines`` やログビューアが行区切りとみなす U+2028・U+2029、書式文字（Cf）。
 _MESSAGE_ESCAPES: dict[int, str] = {
     code_point: _escape_for(code_point)
     for code_point in (
         *range(0x00, 0x09),
         *range(0x0A, 0x20),
         *range(0x7F, 0xA0),
-        0x061C,
-        *range(0x200B, 0x2010),
         0x2028,
         0x2029,
-        *range(0x202A, 0x202F),
-        *range(0x2060, 0x2065),
-        *range(0x2066, 0x206A),
-        0xFEFF,
+        *(code_point for start, end in _FORMAT_CHAR_RANGES for code_point in range(start, end + 1)),
     )
 }
 
@@ -135,17 +160,20 @@ class AppLogFormatter(logging.Formatter):
     """
 
     def format(self, record: logging.LogRecord) -> str:
-        message = record.getMessage().translate(_MESSAGE_ESCAPES)
+        # マスクは生の文字列に先に掛けてからエスケープする（エスケープ後の "\n" 等は英数字で終わり、
+        # storage_key・LINE userId の前の境界判定を崩す）。マスクは制御文字を生まない。
+        message = mask_sensitive_in_text(record.getMessage()).translate(_MESSAGE_ESCAPES)
         text = f"{record.levelname} [{record.name}] {message}"
         # トレースバックの文字列は標準の Formatter と同じく record にキャッシュする（他の
         # ハンドラも同じ文字列を使う）。整形とマスクは戻り値にだけ掛け、record は書き換えない。
         if record.exc_info and not record.exc_text:
             record.exc_text = self.formatException(record.exc_info)
         if record.exc_text:
-            text = f"{text}\n{_render_block(record.exc_text)}"
+            text = f"{text}\n{_render_block(mask_sensitive_in_text(record.exc_text))}"
         if record.stack_info:
-            text = f"{text}\n{_render_block(self.formatStack(record.stack_info))}"
-        return mask_sensitive_in_text(text)
+            stack = self.formatStack(record.stack_info)
+            text = f"{text}\n{_render_block(mask_sensitive_in_text(stack))}"
+        return text
 
 
 class _AppLogHandler(logging.StreamHandler):
@@ -175,15 +203,24 @@ class _UvicornTracebackFilter(logging.Filter):
 
     uvicorn の Formatter は ``record.exc_text`` のキャッシュをそのまま使うので、先に整えた文字列を
     入れておけば、uvicorn 自身の書式（"ERROR:    Exception in ASGI application"）は変わらない。
+    ロガーに付けたフィルタの例外は logging に捕まらず、uvicorn が 500 を返せず接続が宙づりになる
+    ため、整形に失敗しても例外は出さない（トレースバックは例外の種類だけに差し替える＝隠す側に倒す）。
     """
 
     _traceback_formatter = logging.Formatter()
 
     def filter(self, record: logging.LogRecord) -> bool:
         if record.exc_info and not record.exc_text:
-            record.exc_text = mask_sensitive_in_text(
-                _render_block(self._traceback_formatter.formatException(record.exc_info))
-            )
+            try:
+                record.exc_text = _render_block(
+                    mask_sensitive_in_text(self._traceback_formatter.formatException(record.exc_info))
+                )
+            except Exception:  # noqa: BLE001 -- 上記のとおり、ここから例外を出さない
+                error_type = record.exc_info[0]
+                record.exc_text = (
+                    f"{_CONTINUATION_PREFIX}{getattr(error_type, '__name__', error_type)}"
+                    "（トレースバックを整形できなかったため省略）"
+                )
         return True
 
 
