@@ -20,6 +20,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.core.alert_middleware import ServerErrorAlertMiddleware
+from app.core.app_logging import configure_app_logging_from_env
 from app.api.v1.router import api_router
 from app.config import Settings, get_settings
 from app.core.client_ip import (
@@ -602,4 +603,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     return app
 
 
+# 本番（start.sh が APP_LOG_LEVEL を渡す）でだけ app.* のログを stderr（Render のログ）へ出す。
+# create_app() が出す起動時のログ（[startup]・本番ガード）も残るよう、アプリの生成より前に行う。
+configure_app_logging_from_env()
 app = create_app()

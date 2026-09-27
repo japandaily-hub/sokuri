@@ -73,5 +73,13 @@ until alembic upgrade head > /tmp/alembic-last.log 2>&1; do
 done
 cat /tmp/alembic-last.log
 
+# APP_LOG_LEVEL: アプリ自身（app.* ロガー）のログをどのレベルから stderr（＝Render のログ）へ出すか。
+#   uvicorn は自分のロガー（uvicorn.*）しか設定しないため、これが無いと app.* の INFO は捨てられ
+#   （起動時シードや運営操作の監査ログが1行も残らない）、WARNING 以上もレベル・ロガー名の無い
+#   本文だけになる（2026-09-27 に Render のログで実測）。設定の本体は app/core/app_logging.py。
+#   冒頭の本番デフォルト値と同じ理由でここで既定値を与える（dashboard の値が優先）。
+#   ログ量を絞りたいときは dashboard で WARNING 等にする。
+export APP_LOG_LEVEL="${APP_LOG_LEVEL:-INFO}"
+
 echo "[start.sh] Launching uvicorn on port ${PORT:-8000}..."
 exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"

@@ -7,6 +7,15 @@
 
 from __future__ import annotations
 
+import re
+
+#: 自由文に紛れ込んだメールアドレスを拾う正規表現（:func:`mask_emails_in_text` 用）。
+#: ローカル部は文字・数字（Unicode を含む）と ``. _ + - '`` に限る。RFC 5322 は ``=`` や ``/``
+#: 等も許すが、ログやアラート本文は ``email=<addr>``・``admin-grant:<addr>`` の形で書かれる
+#: ため、それらを含めると ``email=`` 等のラベルまで巻き込んで潰し、照合の手掛かりが消える。
+#: ドメイン部はドットを1つ以上要求する（``@router`` のような語や ``user@localhost`` は対象外）。
+_EMAIL_IN_TEXT_RE = re.compile(r"[\w.+'-]+@[\w-]+(?:\.[\w-]+)+")
+
 
 def mask_account_number(account_number: str) -> str:
     """口座番号の下4桁のみ残しマスクする。4桁以下はそのまま返さず全マスクする。"""
@@ -31,3 +40,16 @@ def mask_email(email: str) -> str:
     if not local:
         return f"***@{domain}"
     return f"{local[0]}***@{domain}"
+
+
+def mask_emails_in_text(text: str) -> str:
+    """自由文に含まれるメールアドレスをすべて :func:`mask_email` の形式に置き換える。
+
+    例: ``"email=user@example.com\\nuser_id=1"`` -> ``"email=u***@example.com\\nuser_id=1"``。
+    運営アラートの本文（``email=...`` を含む）をそのままログへ書く箇所や、ログ出力の
+    直前の安全網（app/core/app_logging.py）で使う。呼び出し側で値が分かっている場合は、
+    従来どおり :func:`mask_email` で個別にマスクすること（本関数は取りこぼし対策）。
+    """
+    if not text or "@" not in text:
+        return text
+    return _EMAIL_IN_TEXT_RE.sub(lambda match: mask_email(match.group(0)), text)
