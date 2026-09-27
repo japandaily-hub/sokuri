@@ -1,5 +1,5 @@
 /**
- * バックエンド API の接続先解決（auth.ts / lib/line-link.ts / lib/api.ts が共有する単一の正本）。
+ * バックエンド API の接続先解決（auth.ts / lib/line-link.ts が共有する単一の正本）。
  *
  * 以前はこの3ファイルがそれぞれ「未設定なら本番 API にフォールバックする」処理を重複して持っていた。
  * そのため `web/.env.local` の無い worktree で next dev と E2E を回すと、NextAuth の authorize()
@@ -108,6 +108,8 @@ export function serverBackendApiBase(): string {
 /**
  * バックエンド API の接続先（ブラウザでも動くモジュール向け）。
  * ブラウザに届くのはビルド時に埋め込まれる `NEXT_PUBLIC_*` だけなので、サーバー専用の `API_URL` は見ない。
+ *
+ * 2026-09-27 に lib/api.ts を撤去したため、現在の呼び出し元はテストだけ。
  */
 export function publicBackendApiBase(): string {
   return resolveBackendApiBase(

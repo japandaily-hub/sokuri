@@ -139,8 +139,7 @@ assetwise/
 │   │   ├── api/v1/
 │   │   │   ├── router.py       # v1 ルーター集約
 │   │   │   └── endpoints/
-│   │   │       ├── analyze.py  # POST /v1/analyze（Vision + ルーティング）
-│   │   │       └── estimate.py # POST /v1/estimate（価格帯推定）
+│   │   │       └── analyze.py  # POST /v1/analyze（Vision + ルーティング）
 │   │   ├── db/
 │   │   │   ├── models/         # SQLAlchemy ORM モデル（item / assessment / channel / routing / defect）
 │   │   │   └── session.py      # AsyncSession ファクトリ

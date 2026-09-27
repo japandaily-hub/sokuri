@@ -17,7 +17,6 @@ from app.api.v1.endpoints.case_items import router as case_items_router
 from app.api.v1.endpoints.case_photos import router as case_photos_router
 from app.api.v1.endpoints.cases import router as cases_router
 from app.api.v1.endpoints.contact import router as contact_router
-from app.api.v1.endpoints.estimate import router as estimate_router
 from app.api.v1.endpoints.operator_applications import router as operator_applications_router
 from app.api.v1.endpoints.operator_license import router as operator_license_router
 from app.api.v1.endpoints.operator_profile import router as operator_profile_router
@@ -30,7 +29,9 @@ from app.api.v1.endpoints.users import router as users_router
 api_router = APIRouter()
 # ── カタヅケ既存 ──────────────────────────────────────────────────
 api_router.include_router(analyze_router, tags=["Analyze"])
-api_router.include_router(estimate_router, tags=["Estimate"])
+# NOTE: 旧 AssetWise の査定 API（/estimate・/assessments/*）は 2026-09-27 に撤去した。
+# 認証・回数制限の無い書き込み口で、web からの呼び出し元も本番の利用も無かったため。
+# DB テーブルは残置。
 # api_router.include_router(albums_router, tags=["Albums"])
 # ── カタヅケ（クローズドβ） ──────────────────────────────────────
 api_router.include_router(auth_router, tags=["Auth"])

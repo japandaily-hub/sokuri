@@ -6,11 +6,16 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.router import api_router
-from app.db.models.enums import CategoryTier, ItemCondition, RoutingMethod
+from app.config import Settings
+from app.db.models.assessment import Assessment, AssessmentRecommendation
+from app.db.models.defect import DefectEvidence
+from app.db.models.enums import AssessmentStatus, CategoryTier, ItemCondition
 from app.db.models.item import Item
 from app.db.session import get_session
+from app.main import create_app
 from app.services.vision import VisionResult
 
 def create_test_app(session: AsyncSession) -> FastAPI:
@@ -135,7 +140,7 @@ async def test_analyze_vision_called_with_image(client: AsyncClient):
         )
     m.assert_awaited_once_with("data:image/jpeg;base64,abc123")
 
-# --- /estimate ---
+# --- 旧 AssetWise 査定 API（2026-09-27 撤去）---
 async def _create_item(db_session: AsyncSession) -> Item:
     item = Item(
         category_tier=CategoryTier.HIGH_VALUE_STANDARD,
@@ -150,46 +155,90 @@ async def _create_item(db_session: AsyncSession) -> Item:
     await db_session.refresh(item)
     return item
 
-async def test_estimate_200(client: AsyncClient, db_session: AsyncSession):
-    item = await _create_item(db_session)
-    r = await client.post("/api/v1/estimate", json={"item_id": str(item.id), "condition": "good"})
-    assert r.status_code == 200
 
-async def test_estimate_has_assessment_id(client: AsyncClient, db_session: AsyncSession):
-    item = await _create_item(db_session)
-    r = await client.post("/api/v1/estimate", json={"item_id": str(item.id), "condition": "good"})
-    data = r.json()
-    assert "assessment_id" in data
-    uuid.UUID(data["assessment_id"])
+async def _create_assessment(db_session: AsyncSession, item: Item) -> Assessment:
+    """撤去済み /estimate が従来生成していたのと同じ形の Assessment を直接 DB に作る。"""
+    assessment = Assessment(
+        item_id=item.id,
+        status=AssessmentStatus.COMPLETED,
+        estimated_price_min=64000,
+        estimated_price_max=64000,
+        price_currency="JPY",
+    )
+    db_session.add(assessment)
+    await db_session.commit()
+    await db_session.refresh(assessment)
+    return assessment
 
-async def test_estimate_price_calculation(client: AsyncClient, db_session: AsyncSession):
-    item = await _create_item(db_session)
-    r = await client.post("/api/v1/estimate", json={"item_id": str(item.id), "condition": "good"})
-    data = r.json()
-    assert data["base_market_price"] == 80000
-    assert data["estimated_price"] == 64000  # 80000 * 0.8
 
-async def test_estimate_404_unknown_item(client: AsyncClient):
-    r = await client.post("/api/v1/estimate", json={"item_id": str(uuid.uuid4()), "condition": "good"})
-    assert r.status_code == 404
+async def _count_rows(db_session: AsyncSession, model: type) -> int:
+    return await db_session.scalar(select(func.count()).select_from(model)) or 0
 
-async def test_estimate_422_unknown_condition(client: AsyncClient, db_session: AsyncSession):
-    item = await _create_item(db_session)
-    r = await client.post("/api/v1/estimate", json={"item_id": str(item.id), "condition": "unknown"})
-    assert r.status_code == 422
 
-async def test_estimate_recommendations_is_list(client: AsyncClient, db_session: AsyncSession):
-    item = await _create_item(db_session)
-    r = await client.post("/api/v1/estimate", json={"item_id": str(item.id), "condition": "like_new"})
-    assert isinstance(r.json()["recommendations"], list)
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [
+        ("POST", "/api/v1/estimate"),
+        ("GET", "/api/v1/assessments/{assessment_id}"),
+        ("POST", "/api/v1/assessments/{assessment_id}/defects"),
+    ],
+)
+async def test_removed_assetwise_routes_return_404(client: AsyncClient, method: str, path: str):
+    """2026-09-27 に撤去した3エンドポイントは、401/405/422 ではなく404（ルート不在）を返す。"""
+    resolved_path = path.format(assessment_id=uuid.uuid4())
+    r = await client.request(method, resolved_path, json={} if method != "GET" else None)
+    assert r.status_code == 404, r.text
 
-async def test_estimate_with_mocked_routing(client: AsyncClient, db_session: AsyncSession):
-    from app.services.routing import RoutingResult
+
+async def test_removed_estimate_endpoint_404_and_no_rows_created_for_existing_item(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """実在する item_id・正しい形式のJSONで送っても404になり、assessments/recommendationsは増えない。"""
     item = await _create_item(db_session)
-    mock_result = RoutingResult(method=RoutingMethod.RULE, recommendations=[])
-    with patch("app.api.v1.endpoints.estimate.evaluate_routing_rules", new_callable=AsyncMock) as m:
-        m.return_value = mock_result
-        r = await client.post("/api/v1/estimate", json={"item_id": str(item.id), "condition": "good"})
-    assert r.status_code == 200
-    assert r.json()["routing_method"] == "rule"
-    m.assert_awaited_once()
+    assessments_before = await _count_rows(db_session, Assessment)
+    recommendations_before = await _count_rows(db_session, AssessmentRecommendation)
+
+    r = await client.post(
+        "/api/v1/estimate", json={"item_id": str(item.id), "condition": "good"}
+    )
+
+    assert r.status_code == 404, r.text
+    assert await _count_rows(db_session, Assessment) == assessments_before
+    assert await _count_rows(db_session, AssessmentRecommendation) == recommendations_before
+
+
+async def test_removed_defects_endpoint_404_and_no_rows_created_for_existing_assessment(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """実在する assessment_id・正しい形式のJSONで送っても404になり、defect_evidencesは増えない。"""
+    item = await _create_item(db_session)
+    assessment = await _create_assessment(db_session, item)
+    defects_before = await _count_rows(db_session, DefectEvidence)
+
+    r = await client.post(
+        f"/api/v1/assessments/{assessment.id}/defects",
+        json={"defect_image": "data:image/jpeg;base64,abc", "description": "左側面に傷"},
+    )
+
+    assert r.status_code == 404, r.text
+    assert await _count_rows(db_session, DefectEvidence) == defects_before
+
+
+def test_removed_assetwise_paths_absent_from_production_openapi_and_routes():
+    """本番相当設定のアプリで /estimate・/assessments 系のパスが OpenAPI・routes のいずれにも無い。"""
+    settings = Settings(
+        _env_file=None,
+        APP_ENV="production",
+        jwt_secret="a" * 64,
+        ALLOWED_ORIGINS="https://sokuri.vercel.app",
+    )
+    app = create_app(settings)
+
+    def _is_removed_path(path: str) -> bool:
+        return path == "/api/v1/estimate" or path.startswith("/api/v1/assessments")
+
+    openapi_paths = app.openapi()["paths"]
+    assert not any(_is_removed_path(p) for p in openapi_paths)
+
+    route_paths = [r.path for r in app.routes if hasattr(r, "path")]
+    assert not any(_is_removed_path(p) for p in route_paths)

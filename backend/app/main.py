@@ -297,11 +297,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(
         title="カタヅケ API",
         description=(
-            "全カテゴリ横断リユース・アグリゲーター — 写真から売却チャネルを AI で自動推奨する。\n\n"
-            "## フロー\n"
-            "1. **Identify**: `POST /api/v1/analyze` — 写真を投稿して製品を特定\n"
-            "2. **Evaluate**: `POST /api/v1/estimate` — コンディションを確定して見積もり取得\n"
-            "3. **Verify**: `POST /api/v1/assessments/{id}/defects` — 瑕疵写真を添付（必要時）\n"
+            "全カテゴリ横断リユース・アグリゲーター — 写真から売却チャネルを AI で自動推奨する。\n"
         ),
         version="0.1.0",
         lifespan=lifespan,

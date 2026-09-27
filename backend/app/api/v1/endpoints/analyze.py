@@ -48,8 +48,7 @@ _ANALYZE_FAILED_DETAIL = "画像を解析できませんでした。別の写真
         "画像から製品のスペック・カテゴリ・コンディション初期値を AI で推定する。\n\n"
         "- `base_image`: base64 エンコード画像（data: URL）のみ受け付ける"
         "（外部URLは受け付けない。security review M-5）\n"
-        "- 返却される `item_id` を `/estimate` に渡すこと\n"
-        "- `initial_condition` は AI 推定値。ユーザーが `/estimate` で上書き可能。"
+        "- `initial_condition` は AI による推定値。"
     ),
     responses={
         401: {"description": "認証が必要（要ログイン）"},
@@ -111,7 +110,7 @@ async def analyze(
         ) from exc
 
     # 2. Item を DB に保存。
-    #    base_market_price_jpy を attributes に埋め込み、/estimate で参照可能にする。
+    #    base_market_price_jpy は内部値として attributes に保存する（応答からは除く）。
     item = Item(
         category_tier=vision_result.category_tier,
         detected_name=vision_result.detected_name,
