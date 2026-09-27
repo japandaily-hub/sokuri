@@ -30,6 +30,7 @@ from app.api.json_body_deps import require_json_body
 from app.api.rate_limit_deps import RateLimitGuard
 from app.config import get_settings
 from app.core.http_errors import http_exception_factory
+from app.core.masking import mask_email
 from app.core.security import (
     REAUTH_PURPOSE_LINE_LINK,
     create_access_token,
@@ -117,7 +118,7 @@ async def _promote_to_admin_if_listed(session: AsyncSession, user: User) -> bool
         # しておく（ADMIN_EMAILS の設定不備・退職者アドレス残存の早期発見のため）。
         logger.warning(
             "admin promotion blocked (admin already exists): email=%s user_id=%s",
-            user.email,
+            mask_email(user.email),
             user.id,
         )
         alerts.fire_and_forget(
@@ -136,7 +137,7 @@ async def _promote_to_admin_if_listed(session: AsyncSession, user: User) -> bool
     # 別途確認すること（本修正の対象外・r3-review-security.md R-3）。
     logger.warning(
         "admin role granted: email=%s via=%s user_id=%s",
-        user.email,
+        mask_email(user.email),
         "login_promotion",
         user.id,
     )
@@ -234,7 +235,9 @@ async def user_signup(
         # security review C-1対応: サインアップ時の admin 付与はアカウント奪取の
         # 直接経路（ADMIN_EMAILS 未登録アドレスの land-grab）になりうるため、
         # 発生した瞬間を必ず WARNING ログに残す（アラート基盤が拾える形にする）。
-        logger.warning("admin role granted: email=%s via=%s user_id=%s", email, "signup", user.id)
+        logger.warning(
+            "admin role granted: email=%s via=%s user_id=%s", mask_email(email), "signup", user.id
+        )
         # N-1対応: WARNING ログのみでは検知漏れになりうるため、運営アラート
         # （severity=critical）でも通知する（login_promotion 側と同一パターン）。
         alerts.fire_and_forget(

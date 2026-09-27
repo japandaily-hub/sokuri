@@ -3550,12 +3550,14 @@ async def test_login_promotes_existing_user_to_admin_when_email_listed(
     user = await db_session.scalar(select(User).where(User.email == email))
     await db_session.refresh(user)
     assert user.role == "admin"
+    # ログにはマスクしたアドレスだけを残す（生のアドレスは第三者のログ基盤に残さない）。
     assert any(
         "admin role granted" in rec.message
         and "via=login_promotion" in rec.message
-        and email in rec.message
+        and "email=p***@example.com" in rec.message
         for rec in caplog.records
     )
+    assert all(email not in rec.getMessage() for rec in caplog.records)
 
 
 async def test_signup_grants_admin_and_logs_warning(
@@ -3575,9 +3577,12 @@ async def test_signup_grants_admin_and_logs_warning(
     assert r.status_code == 201, r.text
     assert r.json()["user"]["role"] == "admin"
     assert any(
-        "admin role granted" in rec.message and "via=signup" in rec.message and email in rec.message
+        "admin role granted" in rec.message
+        and "via=signup" in rec.message
+        and "email=l***@example.com" in rec.message
         for rec in caplog.records
     )
+    assert all(email not in rec.getMessage() for rec in caplog.records)
 
 
 async def test_signup_does_not_grant_admin_when_admin_already_exists(

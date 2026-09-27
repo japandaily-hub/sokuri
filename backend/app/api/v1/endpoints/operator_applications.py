@@ -32,6 +32,7 @@ from app.schemas_katadzuke import (
     OperatorApplicationCreateResponse,
 )
 from app.config import get_settings
+from app.core.masking import mask_email
 from app.services import notify
 
 logger = logging.getLogger(__name__)
@@ -152,10 +153,10 @@ async def create_operator_application(
         await session.commit()
     except Exception as exc:
         await session.rollback()
+        # 会社名（個人事業主は氏名になりうる）とメールの平文はログに残さない。
         logger.error(
-            "operator_applications: 申込の保存に失敗しました - company=%s email=%s - %s",
-            body.company_name,
-            body.email,
+            "operator_applications: 申込の保存に失敗しました - email=%s - %s",
+            mask_email(body.email),
             exc,
             exc_info=True,
         )
@@ -182,11 +183,7 @@ async def create_operator_application(
             notify.send_operator_application_admin_alert, admin_email, application.company_name
         )
 
-    logger.info(
-        "operator_applications: 新規申込を受け付けました - id=%s company=%s",
-        application.id,
-        application.company_name,
-    )
+    logger.info("operator_applications: 新規申込を受け付けました - id=%s", application.id)
     return OperatorApplicationCreateResponse(
         application_id=application.id, status=application.status
     )

@@ -23,7 +23,7 @@ from app.config import get_settings
 from app.core.crypto import decrypt_json
 from app.core.http_errors import http_exception_factory
 from app.db.models.bid import Bid
-from app.core.masking import mask_account_number
+from app.core.masking import mask_account_number, mask_email
 from app.db.models.case import Case
 from app.db.models.contact_message import ContactMessage
 from app.db.models.invite import Invite
@@ -537,7 +537,7 @@ async def delete_operator(
         "admin_operator_delete admin=%s operator=%s email=%s",
         admin.id,
         operator_id_value,
-        operator_email,
+        mask_email(operator_email),
     )
     alerts.fire_and_forget(
         alerts.send_alert(
@@ -1373,7 +1373,7 @@ async def promote_user_to_admin(
 
     logger.warning(
         "admin role granted: email=%s via=%s user_id=%s granted_by=%s",
-        target.email,
+        mask_email(target.email),
         "admin_promote",
         target.id,
         admin.id,
@@ -1427,7 +1427,7 @@ async def demote_admin_to_user(
 
     logger.warning(
         "admin role revoked: email=%s user_id=%s revoked_by=%s",
-        target.email,
+        mask_email(target.email),
         target.id,
         admin.id,
     )
@@ -1483,7 +1483,7 @@ async def delete_user(
         "admin_user_delete admin=%s user=%s email=%s",
         admin.id,
         target_id,
-        target_email,
+        mask_email(target_email),
     )
     alerts.fire_and_forget(
         alerts.send_alert(
@@ -1599,7 +1599,7 @@ async def reveal_operator_application_bank_account(
         "admin: 口座情報を復号しました - application_id=%s admin_id=%s admin_email=%s",
         application.id,
         admin.id,
-        admin.email,
+        mask_email(admin.email),
     )
     return OperatorApplicationBankAccountRevealOut(
         bank_name=decrypted["bank_name"],
@@ -1849,7 +1849,7 @@ async def list_identity_documents(
         len(rows),
         total or 0,
         admin.id,
-        admin.email,
+        mask_email(admin.email),
     )
     return UserIdentityDocumentAdminListResponse(
         items=[
@@ -1901,7 +1901,7 @@ async def get_identity_document_file_admin(
         document_id,
         side,
         admin.id,
-        admin.email,
+        mask_email(admin.email),
     )
     return Response(
         content=data,

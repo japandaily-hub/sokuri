@@ -21,6 +21,7 @@ from starlette.datastructures import UploadFile as StarletteUploadFile
 
 from app.api.deps import get_current_admin, get_current_operator
 from app.core.http_errors import http_exception_factory
+from app.core.masking import mask_email
 from app.db.models.operator import Operator
 from app.db.models.user import User
 from app.db.session import get_session
@@ -215,6 +216,6 @@ async def get_operator_license_image_admin(
         "admin: 許可証画像を閲覧しました - operator_id=%s admin_id=%s admin_email=%s",
         operator_id,
         admin.id,
-        admin.email,
+        mask_email(admin.email),
     )
     return Response(content=data, media_type=content_type)

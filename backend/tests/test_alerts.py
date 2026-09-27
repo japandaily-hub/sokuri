@@ -5,8 +5,10 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Any
 
+import httpx
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
@@ -191,3 +193,49 @@ async def test_send_alert_info_severity_uses_recovered_tag():
     assert ok
     payloads = [body for _, body in _FakeClient.calls]
     assert any("✅【Recovered】" in (p.get("text") or "") for p in payloads)
+
+
+async def test_alert_log_masks_email_but_delivery_keeps_it(caplog: pytest.LogCaptureFixture):
+    """ログ（第三者の基盤に7日残る）にはマスクした形だけ。運営の通知先には照合用に平文で届ける。"""
+    with caplog.at_level(logging.WARNING, logger=alerts.__name__):
+        ok = await alerts.send_alert(
+            "admin 権限が付与されました",
+            "email=grant-me@example.com\nvia=signup\nuser_id=1",
+            key="admin-grant:grant-me@example.com",
+        )
+    assert ok is True
+    assert "grant-me@example.com" not in caplog.text
+    assert "email=g***@example.com | via=signup | user_id=1" in caplog.text
+    assert any("email=grant-me@example.com" in (body.get("text") or "") for _, body in _FakeClient.calls)
+
+
+async def test_cooldown_log_masks_email_in_key(caplog: pytest.LogCaptureFixture):
+    await alerts.send_alert("admin 権限が付与されました", "本文", key="admin-grant:grant-me@example.com")
+    with caplog.at_level(logging.INFO, logger=alerts.__name__):
+        again = await alerts.send_alert("admin 権限が付与されました", "本文", key="admin-grant:grant-me@example.com")
+    assert again is False
+    assert "grant-me@example.com" not in caplog.text
+    assert "key=admin-grant:g***@example.com" in caplog.text
+
+
+async def test_webhook_failure_log_does_not_contain_webhook_url(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+):
+    """httpx の例外文には送信先 URL が入る。Webhook の URL は投稿権限そのものなのでログに出さない。"""
+    secret_url = "https://hooks.example.test/services/T000/B000/SECRET-WEBHOOK-TOKEN"
+    monkeypatch.setattr(get_settings(), "alert_webhook_url", secret_url)
+
+    class _RejectingClient(_FakeClient):
+        async def post(self, url: str, json: dict[str, Any] | None = None, headers: dict[str, str] | None = None):
+            request = httpx.Request("POST", url)
+            response = httpx.Response(404, request=request)
+            raise httpx.HTTPStatusError(
+                f"Client error '404 Not Found' for url '{url}'", request=request, response=response
+            )
+
+    monkeypatch.setattr(alerts.httpx, "AsyncClient", _RejectingClient)
+    with caplog.at_level(logging.ERROR, logger=alerts.__name__):
+        ok = await alerts._send_webhook("本文")
+    assert ok is False
+    assert "SECRET-WEBHOOK-TOKEN" not in caplog.text
+    assert "alerts: Webhook送信失敗（処理は継続） - HTTPStatusError status=404" in caplog.text
