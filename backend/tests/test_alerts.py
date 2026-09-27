@@ -11,11 +11,18 @@ from typing import Any
 import httpx
 import pytest
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+from fastapi.routing import APIRoute
 from httpx import ASGITransport, AsyncClient
 
 from app.config import get_settings
+from app.core import alert_middleware
 from app.core.alert_middleware import ServerErrorAlertMiddleware
 from app.services import alerts
+
+#: 形式どおりの写真の storage_key（32桁 hex＋拡張子）。GET /files/{storage_key} は無認証の capability URL。
+_STORAGE_KEY = "0123abcd" + "4567" * 6 + ".jpg"
+_MASKED_KEY = "0123abcd..."
 
 
 class _FakeResponse:
@@ -137,7 +144,7 @@ async def test_middleware_alerts_on_unhandled_exception_and_burst(monkeypatch: p
         await asyncio.sleep(0.05)  # fire_and_forget のタスクを消化
 
     keys = [k for _, k in sent]
-    assert "unhandled:/boom" in keys
+    assert "unhandled:GET /boom" in keys
     assert "5xx-burst" in keys
     assert not any(k and "/health" in k for k in keys)
     # バーストが続いている間は「収まった」通知は出ない
@@ -239,3 +246,366 @@ async def test_webhook_failure_log_does_not_contain_webhook_url(
     assert ok is False
     assert "SECRET-WEBHOOK-TOKEN" not in caplog.text
     assert "alerts: Webhook送信失敗（処理は継続） - HTTPStatusError status=404" in caplog.text
+
+
+# ──────────────── 本文と key に実パス（写真の storage_key）を入れない ────────────────
+
+
+async def _drain_alert_tasks() -> None:
+    """fire_and_forget で積まれた送信タスクがすべて終わるまで待つ。"""
+    for _ in range(200):
+        if not alerts._inflight_tasks:
+            return
+        await asyncio.sleep(0.01)
+    raise AssertionError("アラート送信のタスクが終わりません")
+
+
+def _client(app, *, raise_app_exceptions: bool = True) -> AsyncClient:  # noqa: ANN001
+    transport = ASGITransport(app=app, raise_app_exceptions=raise_app_exceptions)
+    return AsyncClient(transport=transport, base_url="http://test")
+
+
+def _record_sent(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, str, str | None]]:
+    """alerts.send_alert を差し替え、(件名, 本文, key) を記録する。"""
+    sent: list[tuple[str, str, str | None]] = []
+
+    async def fake_send_alert(
+        title: str, body: str, *, severity: str = "critical", key: str | None = None
+    ) -> bool:
+        sent.append((title, body, key))
+        return True
+
+    monkeypatch.setattr(alerts, "send_alert", fake_send_alert)
+    return sent
+
+
+async def test_unhandled_alert_names_route_template_and_hides_storage_key(monkeypatch: pytest.MonkeyPatch):
+    """本文・key はルートの型。実パスの storage_key もクエリも、例外文に入った鍵・メールも出さない。"""
+    sent = _record_sent(monkeypatch)
+    app = FastAPI()
+
+    @app.get("/api/v1/files/{storage_key}")
+    async def serve(storage_key: str) -> dict[str, str]:
+        raise RuntimeError(f"cannot read {storage_key} for taro@example.com")
+
+    app.add_middleware(ServerErrorAlertMiddleware)
+    async with _client(app, raise_app_exceptions=False) as client:
+        r = await client.get(f"/api/v1/files/{_STORAGE_KEY}", params={"token": "SECRET-QUERY-TOKEN"})
+        assert r.status_code == 500
+        await asyncio.sleep(0.05)
+
+    unhandled = [(body, key) for title, body, key in sent if title == "未処理の例外が発生しました"]
+    assert unhandled == [
+        (
+            f"GET /api/v1/files/{{storage_key}}\nRuntimeError: cannot read {_MASKED_KEY} for t***@example.com",
+            "unhandled:GET /api/v1/files/{storage_key}",
+        )
+    ]
+    for _, body, key in sent:
+        assert _STORAGE_KEY not in body and _STORAGE_KEY not in (key or "")
+        assert "SECRET-QUERY-TOKEN" not in body
+
+
+async def test_unhandled_alert_key_is_per_route_so_changing_the_path_cannot_bypass_cooldown():
+    """実パスを key にしていた頃は、パスを変えるたびに別 key＝クールダウン無視で通知でき、状態も増え続けた。"""
+    app = FastAPI()
+
+    @app.get("/api/v1/cases/{case_id}")
+    async def boom(case_id: str) -> dict[str, str]:
+        raise RuntimeError("kaboom")
+
+    app.add_middleware(ServerErrorAlertMiddleware)
+    async with _client(app, raise_app_exceptions=False) as client:
+        for index in range(30):
+            r = await client.get(f"/api/v1/cases/{index}-{'x' * index}")
+            assert r.status_code == 500
+        await _drain_alert_tasks()
+
+    expected_keys = ["unhandled:GET /api/v1/cases/{case_id}"]
+    assert [k for k in alerts._state.last_sent_at if k.startswith("unhandled:")] == expected_keys
+    assert [k for k in alerts._state.active if k.startswith("unhandled:")] == expected_keys
+    texts = [payload["text"] for _, payload in _FakeClient.calls]
+    # 未処理例外の通知は1回（残り29回はクールダウンで抑制）。5xx バースト（別 key）も1回。
+    assert sum("未処理の例外が発生しました" in text for text in texts) == 1
+    assert sum("5xx 応答が急増しています" in text for text in texts) == 1
+
+
+async def test_unrouted_exception_uses_fixed_key_and_quoted_masked_path(monkeypatch: pytest.MonkeyPatch):
+    """ルートに当たる前の例外（scope["route"] が無い）は key を固定し、本文のパスは quote＋伏せ字にする。"""
+    sent = _record_sent(monkeypatch)
+
+    async def failing_before_routing(scope, receive, send) -> None:  # noqa: ANN001 -- ASGI
+        raise RuntimeError("middleware failure")
+
+    app = ServerErrorAlertMiddleware(failing_before_routing)
+    async with _client(app, raise_app_exceptions=False) as client:
+        # デコード後のパスに改行・表示順を入れ替える文字（U+202E）・鍵が入る。
+        await client.get(f"/api/v1/files/{_STORAGE_KEY}%0Aforged?token=SECRET-QUERY-TOKEN")
+        await client.get("/x%E2%80%AEy%0AINFO%20forged")
+        await client.get("/other/1")
+        await asyncio.sleep(0.05)
+
+    unhandled = [(body, key) for title, body, key in sent if title == "未処理の例外が発生しました"]
+    assert [key for _, key in unhandled] == ["unhandled:(ルート外)"] * 3
+    assert [body.split("\n")[0] for body, _ in unhandled] == [
+        f"GET /api/v1/files/{_MASKED_KEY} (ルート外)",
+        "GET /x%E2%80%AEy%0AINFO%20forged (ルート外)",
+        "GET /other/1 (ルート外)",
+    ]
+    for body, _ in unhandled:
+        assert _STORAGE_KEY not in body and "SECRET-QUERY-TOKEN" not in body
+        assert chr(0x202E) not in body and "\nforged" not in body and "\nINFO" not in body
+
+
+async def test_unrouted_path_in_body_is_capped(monkeypatch: pytest.MonkeyPatch):
+    sent = _record_sent(monkeypatch)
+
+    async def failing_before_routing(scope, receive, send) -> None:  # noqa: ANN001 -- ASGI
+        raise RuntimeError("middleware failure")
+
+    app = ServerErrorAlertMiddleware(failing_before_routing)
+    async with _client(app, raise_app_exceptions=False) as client:
+        await client.get("/" + "a" * 5000)
+        await asyncio.sleep(0.05)
+
+    first_line = sent[0][1].split("\n")[0]
+    path_part = first_line.removeprefix("GET ").removesuffix(" (ルート外)")
+    assert len(path_part) == alert_middleware._UNROUTED_PATH_MAX_CHARS
+    assert path_part.endswith("…")
+
+
+async def test_burst_alert_names_route_template_not_real_path(monkeypatch: pytest.MonkeyPatch):
+    sent = _record_sent(monkeypatch)
+    app = FastAPI()
+
+    @app.get("/api/v1/files/{storage_key}")
+    async def unavailable(storage_key: str) -> JSONResponse:
+        return JSONResponse(status_code=503, content={"detail": "写真を取得できませんでした。"})
+
+    app.add_middleware(ServerErrorAlertMiddleware)
+    async with _client(app) as client:
+        for _ in range(3):
+            r = await client.get(f"/api/v1/files/{_STORAGE_KEY}", params={"token": "SECRET-QUERY-TOKEN"})
+            assert r.status_code == 503
+        await asyncio.sleep(0.05)
+
+    burst = [body for _, body, key in sent if key == "5xx-burst"]
+    assert burst and "（最新: GET /api/v1/files/{storage_key}）" in burst[-1]
+    assert all(_STORAGE_KEY not in body and "SECRET-QUERY-TOKEN" not in body for _, body, _ in sent)
+
+
+async def test_real_app_stack_exposes_route_template_to_the_middleware(monkeypatch: pytest.MonkeyPatch):
+    """本番の create_app()（CORS 等を含む実際の積み順）でも、外側のミドルウェアから scope["route"] が読める。"""
+    from app import main as main_module
+    from app.services import storage
+
+    sent = _record_sent(monkeypatch)
+
+    async def exploding_read(storage_key: str) -> None:
+        raise RuntimeError(f"storage exploded for {storage_key}")
+
+    monkeypatch.setattr(storage, "read_bytes", exploding_read)
+    app = main_module.create_app(get_settings())
+    async with _client(app, raise_app_exceptions=False) as client:
+        r = await client.get(f"/api/v1/files/{_STORAGE_KEY}", params={"token": "SECRET-QUERY-TOKEN"})
+        assert r.status_code == 500
+        await asyncio.sleep(0.05)
+
+    unhandled = [(body, key) for title, body, key in sent if title == "未処理の例外が発生しました"]
+    assert unhandled == [
+        (
+            f"GET /api/v1/files/{{storage_key}}\nRuntimeError: storage exploded for {_MASKED_KEY}",
+            "unhandled:GET /api/v1/files/{storage_key}",
+        )
+    ]
+
+
+async def test_unhandled_alert_is_sent_even_if_the_exception_cannot_be_stringified(monkeypatch: pytest.MonkeyPatch):
+    """例外の __str__ 自体が失敗しても、通知は代わりの文言で送り、元の例外で 500 を返す。"""
+    sent = _record_sent(monkeypatch)
+
+    class _UnprintableError(Exception):
+        def __str__(self) -> str:
+            raise ValueError("str failed")
+
+    app = FastAPI()
+
+    @app.get("/api/v1/cases/{case_id}")
+    async def boom(case_id: str) -> dict[str, str]:
+        raise _UnprintableError()
+
+    app.add_middleware(ServerErrorAlertMiddleware)
+    async with _client(app, raise_app_exceptions=False) as client:
+        r = await client.get("/api/v1/cases/1")
+        assert r.status_code == 500
+        await asyncio.sleep(0.05)
+
+    unhandled = [(body, key) for title, body, key in sent if title == "未処理の例外が発生しました"]
+    assert unhandled == [
+        (
+            "GET /api/v1/cases/{case_id}\n_UnprintableError: （例外の文字列を取得できませんでした）",
+            "unhandled:GET /api/v1/cases/{case_id}",
+        )
+    ]
+
+
+async def test_unhandled_alert_key_separates_methods_of_the_same_route(monkeypatch: pytest.MonkeyPatch):
+    """同じルートの型の GET と POST は別の異常として扱う（片方のクールダウンでもう片方を隠さない）。"""
+    sent = _record_sent(monkeypatch)
+    app = FastAPI()
+
+    @app.get("/api/v1/cases/{case_id}/bids")
+    async def list_bids(case_id: str) -> dict[str, str]:
+        raise RuntimeError("list failed")
+
+    @app.post("/api/v1/cases/{case_id}/bids")
+    async def create_bid(case_id: str) -> dict[str, str]:
+        raise RuntimeError("create failed")
+
+    app.add_middleware(ServerErrorAlertMiddleware)
+    async with _client(app, raise_app_exceptions=False) as client:
+        await client.get("/api/v1/cases/1/bids")
+        await client.post("/api/v1/cases/2/bids")
+        await client.get("/api/v1/cases/3/bids")
+        await asyncio.sleep(0.05)
+
+    keys = [key for title, _, key in sent if title == "未処理の例外が発生しました"]
+    assert keys == [
+        "unhandled:GET /api/v1/cases/{case_id}/bids",
+        "unhandled:POST /api/v1/cases/{case_id}/bids",
+        "unhandled:GET /api/v1/cases/{case_id}/bids",
+    ]
+
+
+async def test_unhandled_alert_puts_the_exception_message_on_one_escaped_line(monkeypatch: pytest.MonkeyPatch):
+    """例外文に入った入力で偽の行（「✅【Recovered】」等）や表示順の入れ替えを作らせない。"""
+    sent = _record_sent(monkeypatch)
+    app = FastAPI()
+    forged = "bad input\n✅【Recovered】 復旧しました https://evil.example/login" + chr(0x202E) + "gpj.exe"
+
+    @app.get("/api/v1/cases/{case_id}")
+    async def boom(case_id: str) -> dict[str, str]:
+        raise ValueError(forged)
+
+    app.add_middleware(ServerErrorAlertMiddleware)
+    async with _client(app, raise_app_exceptions=False) as client:
+        await client.get("/api/v1/cases/1")
+        await asyncio.sleep(0.05)
+
+    body = next(body for title, body, _ in sent if title == "未処理の例外が発生しました")
+    request_line, exception_line = body.split("\n")  # 区切りの改行は1つだけ
+    assert request_line == "GET /api/v1/cases/{case_id}"
+    assert exception_line == (
+        "ValueError: bad input\\n✅【Recovered】 復旧しました https://evil.example/login\\u202egpj.exe"
+    )
+    assert chr(0x202E) not in body
+
+
+async def test_unhandled_alert_bounds_work_on_huge_exception_messages(monkeypatch: pytest.MonkeyPatch):
+    sent = _record_sent(monkeypatch)
+    app = FastAPI()
+
+    @app.get("/api/v1/files/{storage_key}")
+    async def boom(storage_key: str) -> dict[str, str]:
+        raise RuntimeError(f"{storage_key} " + "x" * 2_000_000)
+
+    app.add_middleware(ServerErrorAlertMiddleware)
+    async with _client(app, raise_app_exceptions=False) as client:
+        await client.get(f"/api/v1/files/{_STORAGE_KEY}")
+        await asyncio.sleep(0.05)
+
+    body = next(body for title, body, _ in sent if title == "未処理の例外が発生しました")
+    exception_line = body.split("\n")[1]
+    assert exception_line.startswith(f"RuntimeError: {_MASKED_KEY} xxx")
+    assert len(exception_line) == len("RuntimeError: ") + alert_middleware._EXCEPTION_MESSAGE_MAX_CHARS
+    assert _STORAGE_KEY not in body
+
+
+async def test_burst_recovery_check_failure_does_not_fail_the_request(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+):
+    """通知の都合でリクエストを失敗させない（復旧判定が例外を出しても応答は通常どおり）。"""
+
+    def broken_check(self: ServerErrorAlertMiddleware) -> None:
+        raise ValueError("recovery check failed")
+
+    monkeypatch.setattr(ServerErrorAlertMiddleware, "_check_burst_recovered", broken_check)
+    app = _build_app()
+    with caplog.at_level(logging.WARNING, logger=alert_middleware.__name__):
+        async with _client(app) as client:
+            r = await client.get("/fine")
+    assert r.status_code == 200
+    assert "alert_middleware: 5xx 急増の復旧判定に失敗しました" in caplog.text
+
+
+async def test_alert_preparation_failure_never_replaces_the_original_exception(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+):
+    """通知の準備で失敗しても、アプリ本来の例外をそのまま再送出する（例外を差し替えない）。"""
+
+    def broken_describe(scope) -> tuple[str, str]:  # noqa: ANN001 -- ASGI scope
+        raise ValueError("describe failed")
+
+    monkeypatch.setattr(alert_middleware, "_describe_request", broken_describe)
+    monkeypatch.setattr(get_settings(), "alert_5xx_threshold", 1)
+
+    async def failing_app(scope, receive, send) -> None:  # noqa: ANN001 -- ASGI
+        raise RuntimeError("original failure")
+
+    async def receive() -> dict[str, Any]:
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    async def send(message: dict[str, Any]) -> None:
+        return None
+
+    middleware = ServerErrorAlertMiddleware(failing_app)
+    scope = {"type": "http", "method": "GET", "path": "/boom", "headers": []}
+    with caplog.at_level(logging.WARNING, logger=alert_middleware.__name__):
+        with pytest.raises(RuntimeError, match="original failure"):
+            await middleware(scope, receive, send)
+    assert "alert_middleware: 未処理例外の通知を準備できませんでした" in caplog.text
+
+
+# ──────────────── プロセス内の状態の上限 ────────────────
+
+
+async def test_tracked_keys_are_capped_and_the_oldest_are_forgotten_first(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+):
+    monkeypatch.setattr(alerts, "_MAX_TRACKED_KEYS", 3)
+    with caplog.at_level(logging.WARNING, logger=alerts.__name__):
+        for index in range(5):
+            assert await alerts.send_alert("障害", "本文", key=f"k{index}") is True
+    assert list(alerts._state.last_sent_at) == ["k2", "k3", "k4"]
+    assert list(alerts._state.active) == ["k2", "k3", "k4"]
+    assert "覚えておく key が上限 3 件を超えたため古いものから忘れました" in caplog.text
+    # 警告は間引く（最初の1件で1行）。累計は last_sent_at・active の両方で k0・k1 を忘れた 4 件。
+    assert "プロセス内累計 1 件" in caplog.text
+    assert alerts._evicted_key_count == 4
+
+    # 覚えている key は従来どおり抑制され、再発報で active の末尾（最新）へ移る。
+    assert await alerts.send_alert("障害", "本文", key="k2") is False
+    assert list(alerts._state.active) == ["k3", "k4", "k2"]
+    # 忘れた key は抑制できない（多めに届く側）。復旧の追跡も外れる。
+    assert alerts.is_active("k0") is False
+    assert await alerts.resolve_alert("k4", "復旧", "本文") is True
+    assert alerts.is_active("k4") is False
+
+
+async def test_key_cap_warning_is_throttled(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture):
+    """key を作る側の誤りで上限に張り付いても、警告は間引いて出す（ログを埋めない）。"""
+    monkeypatch.setattr(alerts, "_MAX_TRACKED_KEYS", 2)
+    with caplog.at_level(logging.WARNING, logger=alerts.__name__):
+        for index in range(20):
+            await alerts.send_alert("障害", "本文", key=f"flood-{index}")
+    warnings = [r for r in caplog.records if "覚えておく key が上限" in r.getMessage()]
+    assert len(warnings) == 1
+    assert len(alerts._state.last_sent_at) == 2
+
+
+def test_key_cap_leaves_room_for_every_route_template():
+    """ルートごとの key（unhandled:<メソッド> <型>）が互いを追い出さない大きさであること。"""
+    from app.main import app
+
+    route_count = sum(1 for route in app.routes if isinstance(route, APIRoute))
+    assert route_count * 2 < alerts._MAX_TRACKED_KEYS

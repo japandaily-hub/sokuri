@@ -9,6 +9,11 @@
 いずれも未設定なら送信をスキップしてログのみ残す（開発・テスト安全側）。送信失敗でも例外を投げない。
 同じ key のアラートは ALERT_COOLDOWN_SECONDS の間は再送しない（プロセス内メモリ。多重起動時は
 プロセスごとに抑制される＝最大でプロセス数ぶん届く。誤検知より取りこぼしを避ける設計）。
+
+key は固定名・ルートの型（core/alert_middleware.py）・管理者操作の対象ごとで、種類は有限に保つこと。
+利用者が自由に変えられる値（実パス・入力値）を key に入れると、値を変えるだけでクールダウンを
+回避して運営 LINE の配信枠を使い切れる。覚えておく key の数には上限（_MAX_TRACKED_KEYS）を設け、
+超えたら最も前に送った（発報した）key から忘れる（メモリが際限なく増えないようにする安全網）。
 """
 from __future__ import annotations
 
@@ -16,11 +21,12 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Literal, TypeVar
 
 import httpx
 
 from app.config import get_settings
+from app.core.log_throttle import ThrottledLogger
 from app.core.masking import mask_sensitive_in_text
 
 logger = logging.getLogger(__name__)
@@ -34,17 +40,31 @@ _BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/email"
 _LINE_PUSH_ENDPOINT = "https://api.line.me/v2/bot/message/push"
 _ALERT_TEXT_MAX = 1800  # LINE の 1 メッセージ上限(5000)より十分小さく、可読性を優先
 
+#: ``_State`` の last_sent_at・active それぞれに覚えておく key の上限。現在の key は固定名・
+#: ルートの型（約100）・管理者操作の対象ごとで、通常の運用では届かない。
+_MAX_TRACKED_KEYS = 1024
+
+_TrackedValue = TypeVar("_TrackedValue")
+
 
 @dataclass
 class _State:
+    #: key → 最後に送った時刻。送るたびに末尾へ付け直す（先頭が最も前に送った key）。
     last_sent_at: dict[str, float] = field(default_factory=dict)
-    #: critical / warning を送った（またはクールダウンで抑制した）key の集合。
+    #: critical / warning を送った（またはクールダウンで抑制した）key。値は使わない（順序付きの集合）。
     #: ``resolve_alert`` が「復旧」を送る根拠になる（発報していないものの復旧は送らない）。
-    active: set[str] = field(default_factory=set)
+    #: critical / warning の send_alert が呼ばれるたびに（クールダウンで抑制した場合も）末尾へ
+    #: 付け直す（先頭が、最も長く同じ異常の知らせが来ていない key）。
+    active: dict[str, None] = field(default_factory=dict)
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
 _state = _State()
+
+#: 上限を超えて key を忘れたときの警告の間引き（key を作る側の誤りで毎回出続けないように）。
+_eviction_warning_throttle = ThrottledLogger()
+#: 上限を超えて忘れた key のプロセス内累計（間引いた分も次に出る警告に含める）。
+_evicted_key_count = 0
 
 #: fire_and_forget が生成した Task の強参照。``asyncio.create_task`` の戻り値を
 #: 保持しないと、イベントループは Task を弱参照でしか持たないため GC に回収されて
@@ -59,8 +79,38 @@ def _truncate(text: str, limit: int = _ALERT_TEXT_MAX) -> str:
 
 def reset_state_for_tests() -> None:
     """テスト専用: クールダウン状態と発報中の key を初期化する。"""
+    global _evicted_key_count
     _state.last_sent_at.clear()
     _state.active.clear()
+    _evicted_key_count = 0
+    _eviction_warning_throttle.reset()
+
+
+def _remember_key(tracked: dict[str, _TrackedValue], key: str, value: _TrackedValue) -> None:
+    """key を末尾（最新）へ付け直し、上限を超えた分を先頭（最も古い）から忘れる。
+
+    ``_state.lock`` を持った状態で呼ぶこと。忘れた key は、last_sent_at なら次の同じ key の
+    アラートを抑制できなくなるだけ（多めに届く側）、active なら復旧の通知が出なくなる。
+    どちらも上限に届くのは key を作る側の誤りなので、間引いた警告で知らせる。
+    """
+    global _evicted_key_count
+    tracked.pop(key, None)
+    tracked[key] = value
+    evicted = 0
+    while len(tracked) > _MAX_TRACKED_KEYS:
+        del tracked[next(iter(tracked))]
+        evicted += 1
+    if evicted:
+        _evicted_key_count += evicted
+        total_evicted = _evicted_key_count
+        _eviction_warning_throttle.emit(
+            lambda: logger.warning(
+                "alerts: 覚えておく key が上限 %s 件を超えたため古いものから忘れました"
+                "（key に利用者の入力等が入っていないか確認。プロセス内累計 %s 件）",
+                _MAX_TRACKED_KEYS,
+                total_evicted,
+            )
+        )
 
 
 def is_active(key: str) -> bool:
@@ -79,7 +129,7 @@ async def resolve_alert(key: str, title: str, body: str) -> bool:
     async with _state.lock:
         if key not in _state.active:
             return False
-        _state.active.discard(key)
+        _state.active.pop(key, None)
     await send_alert(title, body, severity="info", key=f"{key}:recovered")
     return True
 
@@ -187,17 +237,18 @@ async def send_alert(
         # 異常（critical / warning）は「発報中」として記録する。クールダウンで抑制した場合も
         # 異常自体は続いているので記録する（後で resolve_alert が復旧を送れるように）。
         if severity != "info":
-            _state.active.add(dedupe_key)
+            _remember_key(_state.active, dedupe_key, None)
         last = _state.last_sent_at.get(dedupe_key)
         if last is not None and now - last < settings.alert_cooldown_seconds:
             logger.info("alerts: クールダウン中のため抑制 - key=%s", mask_sensitive_in_text(dedupe_key))
             return False
-        _state.last_sent_at[dedupe_key] = now
+        _remember_key(_state.last_sent_at, dedupe_key, now)
 
     text = _format_text(title, body, severity)
     subject = f"[カタヅケ監視][{_SEVERITY_SUBJECT.get(severity, severity.upper())}] {title}"
-    # 本文には運営が照合に使う email=... や、5xx の発生パス（/files/{storage_key} 等）が入る
-    # （LINE・メールへはそのまま送る）。ログは第三者の基盤に7日残るため、ログに書く分だけマスクする。
+    # 本文には運営が照合に使う email=... が入る（LINE・メールへはそのまま送る）。ログは第三者の基盤に
+    # 7日残るため、ログに書く分だけマスクする（5xx・未処理例外の発生箇所は、実パスではなくルートの型で
+    # 本文に入る＝写真の storage_key は含まない。core/alert_middleware.py）。
     logger.warning("alerts: %s", mask_sensitive_in_text(text).replace("\n", " | "))
     # 3チャネルは**同時**に走らせる（直列にしない）。アラートの主因の1つが
     # 「Brevo が枠切れ・キー失効でメールを送れない」ことであり（r6 H-3）、
