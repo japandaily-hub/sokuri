@@ -59,9 +59,14 @@
   white-space: pre-wrap;
   word-break: break-word;
   overflow-wrap: anywhere;
+  /* 結合文字を積み重ねた文字列（本対応前に保存された本文など）が行の外へはみ出して
+     隣の行に重ならないよう、自分の箱で切る（日程検証レビュー SEC-R4） */
+  overflow: hidden;
 }
 
-/* 業者が提示した候補（業者の文言）。運営の本文と分けるため、左の線と見出しで引用として示す */
+/* 業者が提示した候補（業者の文言）。運営の本文と分けるため、左の線と見出しで引用として示す。
+   出どころ（見出し）が文言より先に目に入るよう、見出しを太字・文言を通常の太さにする
+   （日程検証レビュー SEC-R1） */
 .kdz-chat-notice__quote {
   margin-top: 8px;
   padding: 2px 0 2px 10px;
@@ -70,14 +75,17 @@
 
 .kdz-chat-notice__quote-heading {
   font-size: 12px;
+  font-weight: 600;
   line-height: 1.5;
-  color: var(--body-soft);
+  color: var(--body);
 }
 
 .kdz-chat-notice__quote-text {
-  font-size: 13.5px;
+  font-size: 13px;
   line-height: 1.6;
   color: var(--body);
   word-break: break-word;
   overflow-wrap: anywhere;
+  /* 結合文字を積み重ねた業者の文言が引用の外（運営の本文の行）へはみ出さないよう切る（SEC-R4） */
+  overflow: hidden;
 }

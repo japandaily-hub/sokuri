@@ -80,6 +80,9 @@ export function slotMonthDays(slot: string): { month: number; day: number }[] {
  *   （`${日付ラベル} ${slot}`）。依頼者が API を直接叩いて visit_date と食い違う
  *   日付文言を候補ラベルに仕込んでも、表示上は必ず visit_date が先頭に出るようにする
  *   ための2026-09-25セキュリティレビュー（Low）是正。
+ * - 年は比べない。年入りラベル（業者の候補日提示フォームの「2026年10月1日（木）…」）の年は、
+ *   確定時に backend の confirm_schedule（_assert_slot_date_matches）が visit_date の年と
+ *   照合済みであることを前提にしている。その照合を緩めるときは、ここも年を比べるようにすること。
  */
 export function formatVisitSchedule(visitDate: string | null | undefined, rawSlot: string | null | undefined): string {
   const slot = rawSlot ? stripControlChars(rawSlot) : rawSlot;
