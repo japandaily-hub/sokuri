@@ -9,15 +9,32 @@ from __future__ import annotations
 
 import re
 
+#: メールアドレスのローカル部に使える文字（Unicode の文字・数字と RFC 5322 の記号。EmailStr が
+#: 受け付ける ``= / ! #`` 等を含む。含めないと ``taro=shop@x.jp`` の ``taro=`` が平文で残る）。
+_EMAIL_LOCAL_CLASS = r"[\w.!#$%&'*+/=?^`{|}~-]"
+
 #: 自由文に紛れ込んだメールアドレスを拾う正規表現（:func:`mask_emails_in_text` 用）。
-#: ローカル部は文字・数字（Unicode を含む）と ``. _ + - '`` に限る。RFC 5322 は ``=`` や ``/``
-#: 等も許すが、ログやアラート本文は ``email=<addr>``・``admin-grant:<addr>`` の形で書かれる
-#: ため、それらを含めると ``email=`` 等のラベルまで巻き込んで潰し、照合の手掛かりが消える。
-#: ドメイン部はドットを1つ以上要求する（``@router`` のような語や ``user@localhost`` は対象外）。
-#: 全ログ行に掛かる（app/core/app_logging.py）ため計算量を線形に保つ: 先頭の後ろ読みで
-#: ローカル部の途中からの照合をやり直さず、長さは RFC 5321 の上限 64 字で打ち切る
-#: （無いと「長い英数字の連続＋@」で開始位置ごとに再走査し、2万字で数秒かかる）。
-_EMAIL_IN_TEXT_RE = re.compile(r"(?<![\w.+'-])[\w.+'-]{1,64}@[\w-]+(?:\.[\w-]+)+")
+#: - 既知のラベル ``email=`` ``admin_email=`` は残す（照合の手掛かり）。それ以外の ``xxx=`` は
+#:   ローカル部として一緒に隠れる（隠す側に倒す）。``admin-grant:<addr>`` の ``:`` は区切りになる。
+#: - ドメイン部はドットを1つ以上要求する（``@router`` のような語や ``user@localhost`` は対象外）。
+#: - 全ログ行に掛かる（app/core/app_logging.py）ため計算量を線形に保つ: 先頭の後ろ読みで
+#:   ローカル部の途中からの照合をやり直さず、所有量指定子（``++``・Python 3.11+）で後戻りを
+#:   させない（無いと「長い英数字の連続＋@」で開始位置ごとに再走査し、2万字で数秒かかる）。
+_EMAIL_IN_TEXT_RE = re.compile(
+    r"(?<!" + _EMAIL_LOCAL_CLASS + r")"
+    r"(?P<label>(?:admin_)?email=)?"
+    r"(?P<address>" + _EMAIL_LOCAL_CLASS + r"++@[\w-]++(?:\.[\w-]++)+)"
+)
+
+#: 写真の storage_key（app/services/storage.py の new_storage_key: 32桁 hex＋拡張子）。無認証の
+#: capability URL（GET /files/{storage_key}）なので、storage.mask_key_for_log と同じく先頭8字だけ残す。
+_STORAGE_KEY_IN_TEXT_RE = re.compile(
+    r"(?<![0-9A-Za-z])([a-f0-9]{8})[a-f0-9]{24}\.(?:jpe?g|png|webp)(?![0-9A-Za-z])"
+)
+
+#: LINE の userId（"U"＋32桁 hex・auth.py の _LINE_USER_ID_RE）。Push の宛先そのものなので、
+#: line_notify._mask_line_user_id と同じく先頭4字だけ残す。
+_LINE_USER_ID_IN_TEXT_RE = re.compile(r"(?<![0-9A-Za-z])(U[0-9a-f]{3})[0-9a-f]{29}(?![0-9A-Za-z])")
 
 
 def mask_account_number(account_number: str) -> str:
@@ -49,10 +66,26 @@ def mask_emails_in_text(text: str) -> str:
     """自由文に含まれるメールアドレスをすべて :func:`mask_email` の形式に置き換える。
 
     例: ``"email=user@example.com\\nuser_id=1"`` -> ``"email=u***@example.com\\nuser_id=1"``。
-    運営アラートの本文（``email=...`` を含む）をそのままログへ書く箇所や、ログ出力の
-    直前の安全網（app/core/app_logging.py）で使う。呼び出し側で値が分かっている場合は、
-    従来どおり :func:`mask_email` で個別にマスクすること（本関数は取りこぼし対策）。
+    呼び出し側で値が分かっている場合は、従来どおり :func:`mask_email` で個別にマスクすること
+    （本関数は取りこぼし対策）。マスク済みの ``u***@example.com`` は何度掛けても変わらない。
     """
     if not text or "@" not in text:
         return text
-    return _EMAIL_IN_TEXT_RE.sub(lambda match: mask_email(match.group(0)), text)
+    return _EMAIL_IN_TEXT_RE.sub(
+        lambda match: (match.group("label") or "") + mask_email(match.group("address")), text
+    )
+
+
+def mask_sensitive_in_text(text: str) -> str:
+    """自由文中のメールアドレス・写真の storage_key・LINE の userId をまとめてマスクする。
+
+    運営アラートの本文をそのままログへ書く箇所（services/alerts.py）と、ログ出力の直前の
+    安全網（app/core/app_logging.py）で使う。呼び出し側で値が分かっている場合は、従来どおり
+    :func:`mask_email`・``storage.mask_key_for_log``・``line_notify._mask_line_user_id`` で
+    個別にマスクすること（本関数は取りこぼし対策）。
+    """
+    if not text:
+        return text
+    masked = mask_emails_in_text(text)
+    masked = _STORAGE_KEY_IN_TEXT_RE.sub(r"\1...", masked)
+    return _LINE_USER_ID_IN_TEXT_RE.sub(r"\1…", masked)

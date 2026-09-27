@@ -12,6 +12,7 @@
 """
 from __future__ import annotations
 
+import io
 import logging
 import os
 import pathlib
@@ -28,11 +29,20 @@ _BACKEND_DIR = pathlib.Path(__file__).resolve().parents[1]
 
 @pytest.fixture
 def app_logger(monkeypatch: pytest.MonkeyPatch):
-    """テスト中に書き換えた ``app`` ロガーの状態（ハンドラ・レベル・伝播）を元に戻す。"""
+    """テスト中に書き換えたロガーの状態を元に戻す。
+
+    ``app`` のハンドラ・レベル・伝播に加えて、設定関数が触る uvicorn.error のフィルタと
+    httpx / httpcore のレベルも戻す（他のテストへ持ち越さない）。
+    """
     target = logging.getLogger(app_logging.APP_LOGGER_NAME)
     saved_handlers = list(target.handlers)
     saved_level = target.level
     saved_propagate = target.propagate
+    uvicorn_error = logging.getLogger("uvicorn.error")
+    saved_uvicorn_filters = list(uvicorn_error.filters)
+    saved_third_party_levels = {
+        name: logging.getLogger(name).level for name in app_logging._QUIETED_THIRD_PARTY_LOGGERS
+    }
     monkeypatch.delenv(app_logging.APP_LOG_LEVEL_ENV, raising=False)
     yield target
     for handler in list(target.handlers):
@@ -41,6 +51,10 @@ def app_logger(monkeypatch: pytest.MonkeyPatch):
             handler.close()
     target.setLevel(saved_level)
     target.propagate = saved_propagate
+    for added in [f for f in uvicorn_error.filters if f not in saved_uvicorn_filters]:
+        uvicorn_error.removeFilter(added)
+    for name, level in saved_third_party_levels.items():
+        logging.getLogger(name).setLevel(level)
 
 
 def _marked_handlers(target: logging.Logger) -> list[logging.Handler]:
@@ -121,6 +135,63 @@ def test_caplog_still_captures_app_records_exactly_once(
     assert [r.getMessage() for r in caplog.records].count("probe-caplog") == 1
 
 
+def test_configure_quiets_url_logging_libraries_and_filters_uvicorn_tracebacks_once(
+    app_logger: logging.Logger, monkeypatch: pytest.MonkeyPatch
+):
+    """httpx / httpcore は INFO に送信先 URL をクエリごと出す（LINE の検証は access_token をクエリで
+    渡す）。将来 root にハンドラが付いても流れないよう WARNING に固定する。何度呼んでも増えない。"""
+    monkeypatch.setenv(app_logging.APP_LOG_LEVEL_ENV, "INFO")
+    app_logging.configure_app_logging_from_env()
+    app_logging.configure_app_logging_from_env()
+    for name in ("httpx", "httpcore"):
+        assert logging.getLogger(name).level == logging.WARNING
+    uvicorn_filters = [
+        f for f in logging.getLogger("uvicorn.error").filters if isinstance(f, app_logging._UvicornTracebackFilter)
+    ]
+    assert len(uvicorn_filters) == 1
+
+
+def test_uvicorn_error_traceback_is_prefixed_escaped_and_masked(
+    app_logger: logging.Logger, monkeypatch: pytest.MonkeyPatch
+):
+    """未処理例外のトレースバック（uvicorn.error）にも同じ安全網を掛ける。書式は uvicorn 側のまま。"""
+    monkeypatch.setenv(app_logging.APP_LOG_LEVEL_ENV, "INFO")
+    app_logging.configure_app_logging_from_env()
+    stream = io.StringIO()
+    capture = logging.StreamHandler(stream)
+    capture.setFormatter(logging.Formatter("%(levelname)s:    %(message)s"))
+    uvicorn_error = logging.getLogger("uvicorn.error")
+    # 他のテストの logging.config（disable_existing_loggers）で無効化されていても検査できるようにする。
+    monkeypatch.setattr(uvicorn_error, "disabled", False)
+    uvicorn_error.addHandler(capture)
+    try:
+        try:
+            raise ValueError("Key (email)=(taro@example.com) already exists.\nINFO [app.main] forged")
+        except ValueError as exc:
+            uvicorn_error.error("Exception in ASGI application\n", exc_info=exc)
+    finally:
+        uvicorn_error.removeHandler(capture)
+    lines = stream.getvalue().splitlines()
+    assert lines[0] == "ERROR:    Exception in ASGI application"
+    assert lines[1] == "  | Traceback (most recent call last):"
+    assert all(line.startswith("  | ") for line in lines[1:])
+    assert "  | ValueError: Key (email)=(t***@example.com) already exists." in lines
+    assert "  | INFO [app.main] forged" in lines
+    assert "taro@example.com" not in stream.getvalue()
+
+
+def test_handle_error_does_not_write_raw_arguments():
+    """書式と引数が合わないとき、標準の handleError は引数の生値を stderr に書く。種類と位置だけにする。"""
+    stream = io.StringIO()
+    handler = app_logging._AppLogHandler(stream)
+    handler.setFormatter(app_logging.AppLogFormatter())
+    record = logging.LogRecord(
+        "app.tests.probe", logging.INFO, "/app/app/x.py", 12, "%s %s", ("secret-arg@example.com",), None
+    )
+    handler.handle(record)
+    assert stream.getvalue() == "LOGGING_ERROR [app.tests.probe] TypeError at /app/app/x.py:12\n"
+
+
 # ──────────────── 書式 ────────────────
 
 
@@ -153,6 +224,31 @@ def test_formatter_escapes_other_line_breaks_and_control_characters():
     assert text == "INFO [app.x] a" + "".join(backslash + e for e in escaped) + chr(9) + "日本語b"
 
 
+def test_formatter_escapes_bidi_and_zero_width_characters():
+    """表示順を入れ替える双方向制御文字や、見えないゼロ幅文字も見える表記にする（入力は chr() で作る）。"""
+    backslash = chr(92)
+    raw = chr(0x202E) + chr(0x2066) + chr(0x200B) + chr(0xFEFF)
+    record = logging.LogRecord("app.x", logging.INFO, __file__, 1, "a%sb", (raw,), None)
+    text = app_logging.AppLogFormatter().format(record)
+    assert text == "INFO [app.x] a" + "".join(backslash + e for e in ["u202e", "u2066", "u200b", "ufeff"]) + "b"
+
+
+def test_formatter_masks_storage_keys_and_line_user_ids():
+    """storage_key（無認証の capability URL）と LINE の userId（Push の宛先）も出力直前に丸める。"""
+    record = logging.LogRecord(
+        "app.x",
+        logging.WARNING,
+        __file__,
+        1,
+        "key=%s to=%s id=%s",
+        ("0123456789abcdef0123456789abcdef.jpg", "U0123456789abcdef0123456789abcdef", "0123456789abcdef0123456789abcdef"),
+        None,
+    )
+    text = app_logging.AppLogFormatter().format(record)
+    # 拡張子の無い 32 桁 hex（案件等の ID）はそのまま残す。
+    assert text == "WARNING [app.x] key=01234567... to=U012… id=0123456789abcdef0123456789abcdef"
+
+
 def test_formatter_keeps_traceback_and_masks_emails_in_it():
     try:
         raise ValueError("Key (email)=(taro@example.com) already exists.")
@@ -161,11 +257,25 @@ def test_formatter_keeps_traceback_and_masks_emails_in_it():
     text = app_logging.AppLogFormatter().format(record)
     first, *rest = text.split("\n")
     assert first == "ERROR [app.x] 保存に失敗"
-    assert rest[0] == "Traceback (most recent call last):"
+    assert rest[0] == "  | Traceback (most recent call last):"
+    assert all(line.startswith("  | ") for line in rest)
     assert "taro@example.com" not in text
     assert "(t***@example.com)" in text
     # record 側のキャッシュ（他のハンドラと共有する）は書き換えない。
     assert "taro@example.com" in (record.exc_text or "")
+
+
+def test_formatter_keeps_forged_lines_inside_traceback_indented():
+    """例外文に改行と偽の行（"INFO [app...] ..."）が入っていても、行頭は必ず継続の印になる。"""
+    forged = "INFO [app.api.v1.endpoints.admin] admin: 口座情報を復号しました - admin_id=other"
+    try:
+        raise ValueError("x\n" + forged + chr(0x2028) + forged)
+    except ValueError:
+        record = logging.LogRecord("app.x", logging.ERROR, __file__, 1, "失敗", (), sys.exc_info())
+    lines = app_logging.AppLogFormatter().format(record).splitlines()
+    assert lines[0] == "ERROR [app.x] 失敗"
+    assert all(line.startswith("  | ") for line in lines[1:])
+    assert f"  | {forged}" + chr(92) + "u2028" + forged in lines
 
 
 # ──────────────── uvicorn と同じ設定の上での実挙動（別プロセス） ────────────────
@@ -210,6 +320,16 @@ _CHILD_SCRIPT = textwrap.dedent(
     asyncio.run(_main())
     logging.getLogger("app.probe").warning("probe-warning")
     logging.getLogger("uvicorn.error").info("probe-uvicorn")
+    # httpx は INFO に送信先 URL をクエリごと出す（LINE の検証は access_token をクエリで渡す）。
+    logging.getLogger("httpx").info(
+        "HTTP Request: GET https://api.line.me/oauth2/v2.1/verify?access_token=SECRET-ACCESS-TOKEN"
+    )
+    # 未処理例外は uvicorn.error が "Exception in ASGI application" として出す。
+    try:
+        raise ValueError("Key (email)=(taro@example.com) already exists.")
+    except ValueError as exc:
+        logging.getLogger("uvicorn.error").error("Exception in ASGI application\\n", exc_info=exc)
+    sys.stderr.write("ROOT_HANDLERS=%d\\n" % len(logging.getLogger().handlers))
     """
 )
 
@@ -259,6 +379,14 @@ def test_uvicorn_default_logging_plus_app_logging_emits_startup_info_once(tmp_pa
     assert "probe-warning" not in lines
     # uvicorn 自身の書式は変えない。
     assert lines.count("INFO:     probe-uvicorn") == 1
+    # root にはハンドラを付けず、httpx の INFO（クエリの access_token）も流さない。
+    assert "ROOT_HANDLERS=0" in lines
+    assert not any("SECRET-ACCESS-TOKEN" in line for line in lines)
+    # 未処理例外のトレースバックも継続の印付き・マスク済み（見出しは uvicorn の書式のまま）。
+    assert lines.count("ERROR:    Exception in ASGI application") == 1
+    assert "  | Traceback (most recent call last):" in lines
+    assert "  | ValueError: Key (email)=(t***@example.com) already exists." in lines
+    assert not any("taro@example.com" in line for line in lines)
 
 
 def test_without_app_log_level_app_info_is_dropped_as_before(tmp_path: pathlib.Path):
@@ -273,6 +401,9 @@ def test_without_app_log_level_app_info_is_dropped_as_before(tmp_path: pathlib.P
     # lastResort はレベルもロガー名も付けず本文だけを出す。
     assert "probe-warning" in lines
     assert lines.count("INFO:     probe-uvicorn") == 1
+    # 未処理例外のトレースバックは素通し（安全網は APP_LOG_LEVEL があるときだけ効く）。
+    assert "ROOT_HANDLERS=0" in lines
+    assert "ValueError: Key (email)=(taro@example.com) already exists." in lines
 
 
 # ──────────────── 起動経路（start.sh） ────────────────

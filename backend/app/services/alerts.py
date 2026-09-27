@@ -21,7 +21,7 @@ from typing import Literal
 import httpx
 
 from app.config import get_settings
-from app.core.masking import mask_emails_in_text
+from app.core.masking import mask_sensitive_in_text
 
 logger = logging.getLogger(__name__)
 
@@ -190,15 +190,15 @@ async def send_alert(
             _state.active.add(dedupe_key)
         last = _state.last_sent_at.get(dedupe_key)
         if last is not None and now - last < settings.alert_cooldown_seconds:
-            logger.info("alerts: クールダウン中のため抑制 - key=%s", mask_emails_in_text(dedupe_key))
+            logger.info("alerts: クールダウン中のため抑制 - key=%s", mask_sensitive_in_text(dedupe_key))
             return False
         _state.last_sent_at[dedupe_key] = now
 
     text = _format_text(title, body, severity)
     subject = f"[カタヅケ監視][{_SEVERITY_SUBJECT.get(severity, severity.upper())}] {title}"
-    # 本文には運営が照合に使う email=... が入る（LINE・メールへはそのまま送る）。ログは
-    # 第三者の基盤に7日残るため、ログに書く分だけマスクする。
-    logger.warning("alerts: %s", mask_emails_in_text(text).replace("\n", " | "))
+    # 本文には運営が照合に使う email=... や、5xx の発生パス（/files/{storage_key} 等）が入る
+    # （LINE・メールへはそのまま送る）。ログは第三者の基盤に7日残るため、ログに書く分だけマスクする。
+    logger.warning("alerts: %s", mask_sensitive_in_text(text).replace("\n", " | "))
     # 3チャネルは**同時**に走らせる（直列にしない）。アラートの主因の1つが
     # 「Brevo が枠切れ・キー失効でメールを送れない」ことであり（r6 H-3）、
     # メールの成否や遅延に LINE / Webhook を巻き込ませないため。gather の引数順は

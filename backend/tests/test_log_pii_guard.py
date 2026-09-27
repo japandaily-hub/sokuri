@@ -4,8 +4,11 @@
 点検し、生のメールアドレスを書いていた箇所（admin 権限の付与・剥奪、アカウント削除、口座情報・
 本人確認書類の閲覧監査の admin_email 等）を ``mask_email`` へ直した。Render のログは第三者の
 基盤に約7日残り、ダッシュボードの閲覧権限だけで読めるため、同じ書き方が戻ってきたら CI で落とす。
+メールのほか、LINE の userId（Push の宛先）・写真の storage_key（無認証の capability URL）・
+電話番号・住所も、それぞれのマスク関数を通さずに渡したら落とす。
 
-あわせて、自由文中のメールアドレスをまとめてマスクする ``mask_emails_in_text`` の振る舞いを確かめる。
+あわせて、自由文中の値をまとめてマスクする ``mask_emails_in_text`` / ``mask_sensitive_in_text`` の
+振る舞いを確かめる。
 """
 from __future__ import annotations
 
@@ -16,7 +19,7 @@ import time
 
 import pytest
 
-from app.core.masking import mask_emails_in_text
+from app.core.masking import mask_emails_in_text, mask_sensitive_in_text
 
 _BACKEND_DIR = pathlib.Path(__file__).resolve().parents[1]
 _APP_DIR = _BACKEND_DIR / "app"
@@ -25,9 +28,26 @@ _LOG_METHODS = frozenset(
     {"debug", "info", "warning", "warn", "error", "exception", "critical", "fatal", "log"}
 )
 #: この関数の引数の内側はマスク済みとみなして検査しない。
-_MASKING_FUNCS = frozenset({"mask_email", "mask_emails_in_text"})
-#: メールアドレス（またはその一覧）を表す名前: email / emails / xxx_email / xxx_emails。
-_EMAIL_NAME_RE = re.compile(r"(?:^|_)emails?$")
+_MASKING_FUNCS = frozenset(
+    {
+        "mask_email",
+        "mask_emails_in_text",
+        "mask_sensitive_in_text",
+        "mask_key_for_log",
+        "_mask_line_user_id",
+        "truncate_ip_for_log",
+        "mask_account_number",
+    }
+)
+#: 値そのものを明かさない組み込み関数（型名・長さ・真偽だけを出す）。引数の内側は検査しない。
+_NON_REVEALING_BUILTINS = frozenset({"type", "len", "bool"})
+#: 生で渡してはいけない値の名前（末尾一致）: email(s)・line_user_id(s)・storage_key(s)・
+#: phone(s)・phone_number(s)・address(es)（ip_address も含む）。生 IP の client_ip は、唯一の
+#: 該当箇所（operator_applications.py の件数超過ログ）を並走ブランチ 4cb6b9a が削除するため、
+#: その取り込み後に対象へ加える。
+_EMAIL_NAME_RE = re.compile(
+    r"(?:^|_)(?:emails?|line_user_ids?|storage_keys?|phones?|phone_numbers?|address(?:es)?)$"
+)
 
 
 def _callee_name(func: ast.expr) -> str:
@@ -76,9 +96,13 @@ def _is_email_lookup_call(node: ast.Call) -> bool:
 
 
 def _raw_email_expressions(node: ast.AST):
-    """マスク関数を通っていない「メールアドレスらしい式」を列挙する。"""
+    """マスク関数を通っていない「個人情報らしい式」を列挙する。"""
+    if isinstance(node, ast.Compare):
+        return  # 比較（x is None・a == b 等）の結果は真偽だけで、値そのものは出ない
     if isinstance(node, ast.Call):
         if _callee_name(node.func) in _MASKING_FUNCS:
+            return
+        if isinstance(node.func, ast.Name) and node.func.id in _NON_REVEALING_BUILTINS:
             return
         if _is_email_lookup_call(node):
             yield node
@@ -108,14 +132,14 @@ def _find_raw_email_logging(source: str, filename: str = "<test>") -> list[str]:
     return found
 
 
-def test_app_logging_calls_do_not_pass_raw_email_addresses():
+def test_app_logging_calls_do_not_pass_raw_personal_identifiers():
     violations: list[str] = []
     for path in sorted(_APP_DIR.rglob("*.py")):
         relative = path.relative_to(_BACKEND_DIR).as_posix()
         violations += _find_raw_email_logging(path.read_text(encoding="utf-8"), relative)
     assert violations == [], (
-        "ログへ生のメールアドレスを渡している箇所があります（app.core.masking.mask_email を通すこと）:\n"
-        + "\n".join(violations)
+        "ログへ生の個人情報（メール・LINE userId・storage_key・電話・住所）を渡している箇所があります"
+        "（mask_email / _mask_line_user_id / mask_key_for_log 等を通すこと）:\n" + "\n".join(violations)
     )
 
 
@@ -130,6 +154,10 @@ def test_app_logging_calls_do_not_pass_raw_email_addresses():
         'logger.info("x %s", body.get("email"))',
         'logger.warning("x %s", getattr(user, "contact_email"))',
         'logging.warning("x %s", settings.admin_emails)',
+        'logger.error("x userId=%s", line_user_id)',
+        'logger.warning("x key=%s", storage_key)',
+        'logger.info("x %s", user.phone)',
+        'logger.info("x %s", profile.address)',
     ],
 )
 def test_guard_detects_raw_email_patterns(source: str):
@@ -146,6 +174,12 @@ def test_guard_detects_raw_email_patterns(source: str):
         'logger.info("x %s", len(recipients))',
         'logger.info("x %s", options.get("timeout"))',
         'logger.info("x %s", mask_email(body.get("email")))',
+        'logger.info("x %s", _mask_line_user_id(line_user_id))',
+        'logger.warning("x key=%s", storage.mask_key_for_log(storage_key))',
+        'logger.warning("x ip_net=%s", truncate_ip_for_log(ip_address))',
+        'logger.error("x type=%s length=%s", type(line_user_id).__name__, len(str(line_user_id)))',
+        'logger.info("x has_email=%s", bool(user.email))',
+        'logger.info("x missing=%s", line_user_id is None)',
         'send_alert("x", f"email={user.email}")',
     ],
 )
@@ -164,6 +198,16 @@ def test_guard_allows_masked_or_unrelated_values(source: str):
         # 区切りなしで日本語に続くと、その日本語もローカル部として扱う（Unicode のアドレスも
         # 隠すため）。残るのは先頭の1字だけで、アドレス本体は隠れる。
         ("連絡先はtaro@example.comです", "連***@example.comです"),
+        # RFC が許す記号入りのローカル部も丸ごと隠す（記号より前を平文で残さない）。
+        ("email=taro.yamada=shop@example.com", "email=t***@example.com"),
+        ("first/last@example.com", "f***@example.com"),
+        # 既知のラベル（email= / admin_email=）は残し、未知の xxx= はローカル部ごと隠す（隠す側に倒す）。
+        ("admin_email=admin.user@katadzuke.jp", "admin_email=a***@katadzuke.jp"),
+        ("to=taro@example.com", "t***@example.com"),
+        # RFC の上限（64字）を超えるローカル部も隠す（長さで取りこぼさない）。
+        ("x" * 70 + "@example.com", "x***@example.com"),
+        # マスク済みの値は何度掛けても変わらない。
+        ("email=t***@example.com", "email=t***@example.com"),
         ("", ""),
     ],
 )
@@ -171,9 +215,35 @@ def test_mask_emails_in_text(text: str, expected: str):
     assert mask_emails_in_text(text) == expected
 
 
-def test_mask_emails_in_text_stays_linear_on_long_word_runs():
-    """全ログ行に掛かるため、「長い英数字の連続＋@」でも二乗時間にならない（旧式は2万字で数秒）。"""
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("GET /api/v1/files/0123456789abcdef0123456789abcdef.jpg 200", "GET /api/v1/files/01234567... 200"),
+        (
+            "endpoint URL: https://b.acct.r2.cloudflarestorage.com/case-photos/fedcba9876543210fedcba9876543210.webp",
+            "endpoint URL: https://b.acct.r2.cloudflarestorage.com/case-photos/fedcba98...",
+        ),
+        ("to=U0123456789abcdef0123456789abcdef push", "to=U012… push"),
+        # 拡張子の無い 32 桁 hex（案件等の ID）はそのまま残す。
+        ("case=0123456789abcdef0123456789abcdef", "case=0123456789abcdef0123456789abcdef"),
+        ("email=taro@example.com key=0123456789abcdef0123456789abcdef.png", "email=t***@example.com key=01234567..."),
+    ],
+)
+def test_mask_sensitive_in_text(text: str, expected: str):
+    assert mask_sensitive_in_text(text) == expected
+
+
+def test_mask_functions_stay_linear_on_pathological_input():
+    """全ログ行に掛かるため、「長い英数字の連続＋@」等でも二乗時間にならない（旧式は2万字で数秒）。"""
     started = time.perf_counter()
-    for text in ("a" * 50_000 + "@", "a" * 50_000 + "@example.com", ("x" * 70 + "@") * 700):
-        mask_emails_in_text(text)
+    for text in (
+        "a" * 50_000 + "@",
+        "a" * 50_000 + "@example.com",
+        ("x" * 70 + "@") * 700,
+        "." * 20_000 + "@x",
+        "@" * 20_000,
+        "0" * 50_000 + ".jpg",
+        "U" + "0" * 50_000,
+    ):
+        mask_sensitive_in_text(text)
     assert time.perf_counter() - started < 1.0
