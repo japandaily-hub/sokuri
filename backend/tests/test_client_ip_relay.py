@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import logging
+import secrets
 
 import pytest
 
@@ -23,6 +24,7 @@ from app.core.client_ip_relay import (
     build_relay_header_value,
     canonical_relay_message,
     compute_relay_signature,
+    inspect_relay_secrets,
     log_relay_outcome,
     parse_relay_secrets,
     verify_client_ip_relay,
@@ -31,8 +33,26 @@ from app.core.client_ip_relay import (
 _LOGGER_NAME = "app.core.client_ip_relay"
 
 # ──────────────────────────── 共通の既知ベクトル（web 側と共有） ────────────────────────────
+# 2026-09-27 security review L-2 以降、この2つの値は parse_relay_secrets /
+# inspect_relay_secrets 自身が「公開済みのテストベクトル鍵」として明示的に
+# 拒否する（TestRejectsKnownWeakOrTestKeys 参照）。ここでは verify/compute の
+# 既知ベクトルテスト（bytes の鍵を直接 verify_client_ip_relay に渡す。
+# parse_relay_secrets を経由しない）でのみ使い続ける。
 KEY_A = "katazuke-relay-test-vector-A-0123456789abcdefghijklmnopqrstuvwxyz"
 KEY_B = "katazuke-relay-test-vector-B-0123456789abcdefghijklmnopqrstuvwxyz"
+
+# parse_relay_secrets の「有効な鍵」の例に使う値（KEY_A/KEY_B は上記の理由で
+# parse を通らないため使えない）。
+_PARSE_VALID_KEY_1 = secrets.token_urlsafe(48)
+_PARSE_VALID_KEY_2 = secrets.token_urlsafe(48)
+
+
+def _diverse_key(length: int) -> str:
+    """テスト専用: ちょうど ``length`` 文字・十分に文字種が多い ASCII 鍵を
+    確定的に組み立てる（``secrets`` の乱数と違い、指定した長さちょうどの値を
+    再現性を持って得るための境界値テスト用ヘルパー）。"""
+    charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+    return "".join(charset[i % len(charset)] for i in range(length))
 
 _VALID_METHOD = "POST"
 _VALID_PATH = "/api/v1/auth/login"
@@ -80,11 +100,11 @@ class TestParseRelaySecrets:
         assert parse_relay_secrets(" , , ") == ()
 
     def test_single_key(self) -> None:
-        assert parse_relay_secrets(KEY_A) == (KEY_A.encode("ascii"),)
+        assert parse_relay_secrets(_PARSE_VALID_KEY_1) == (_PARSE_VALID_KEY_1.encode("ascii"),)
 
     def test_two_keys_preserve_order_and_strip_whitespace(self) -> None:
-        result = parse_relay_secrets(f"  {KEY_A}  ,  {KEY_B}  ")
-        assert result == (KEY_A.encode("ascii"), KEY_B.encode("ascii"))
+        result = parse_relay_secrets(f"  {_PARSE_VALID_KEY_1}  ,  {_PARSE_VALID_KEY_2}  ")
+        assert result == (_PARSE_VALID_KEY_1.encode("ascii"), _PARSE_VALID_KEY_2.encode("ascii"))
 
     def test_short_key_excluded_with_error_log_without_value_or_length(self, caplog) -> None:
         parse_relay_secrets.cache_clear()
@@ -120,18 +140,43 @@ class TestParseRelaySecrets:
             assert key_with_space not in record.getMessage()
 
     def test_duplicate_keys_are_deduplicated_preserving_order(self) -> None:
-        result = parse_relay_secrets(f"{KEY_A},{KEY_B},{KEY_A}")
-        assert result == (KEY_A.encode("ascii"), KEY_B.encode("ascii"))
+        result = parse_relay_secrets(
+            f"{_PARSE_VALID_KEY_1},{_PARSE_VALID_KEY_2},{_PARSE_VALID_KEY_1}"
+        )
+        assert result == (_PARSE_VALID_KEY_1.encode("ascii"), _PARSE_VALID_KEY_2.encode("ascii"))
 
     def test_five_keys_capped_to_four_with_error_log(self, caplog) -> None:
         parse_relay_secrets.cache_clear()
-        keys = [f"key-{i:02d}-" + "x" * 60 for i in range(5)]
+        keys = [secrets.token_urlsafe(48) for _ in range(5)]
         raw = ",".join(keys)
         with caplog.at_level(logging.ERROR, logger=_LOGGER_NAME):
             result = parse_relay_secrets(raw)
         assert len(result) == 4
         assert result == tuple(k.encode("ascii") for k in keys[:4])
         assert any("上限" in r.getMessage() for r in caplog.records)
+
+    def test_exactly_four_valid_keys_do_not_trigger_cap_error(self, caplog) -> None:
+        """QA L-1: MAX_KEYS ちょうど（4本）では上限超過のERRORが出ない。"""
+        parse_relay_secrets.cache_clear()
+        keys = [secrets.token_urlsafe(48) for _ in range(4)]
+        raw = ",".join(keys)
+        with caplog.at_level(logging.ERROR, logger=_LOGGER_NAME):
+            result = parse_relay_secrets(raw)
+        assert result == tuple(k.encode("ascii") for k in keys)
+        assert len(caplog.records) == 0
+
+    def test_exactly_min_length_key_is_accepted(self) -> None:
+        """QA L-1: ちょうど32文字（MIN_SECRET_LENGTH）の鍵は受理される。"""
+        parse_relay_secrets.cache_clear()
+        key = _diverse_key(32)
+        assert len(key) == 32
+        assert parse_relay_secrets(key) == (key.encode("ascii"),)
+
+    def test_secrets_token_urlsafe_48_is_accepted(self) -> None:
+        """推奨生成コマンド（``secrets.token_urlsafe(48)``）が実際に受理されることの確認。"""
+        parse_relay_secrets.cache_clear()
+        key = secrets.token_urlsafe(48)
+        assert parse_relay_secrets(key) == (key.encode("ascii"),)
 
     def test_all_invalid_returns_empty_with_disable_error_log(self, caplog) -> None:
         parse_relay_secrets.cache_clear()
@@ -141,6 +186,81 @@ class TestParseRelaySecrets:
         assert result == ()
         messages = [r.getMessage() for r in caplog.records]
         assert any("無効化" in m for m in messages)
+
+
+# ──────────────────────────── 既知のテスト鍵・弱い鍵の拒否（security review L-2） ────────────────────────────
+
+
+class TestRejectsKnownWeakOrTestKeys:
+    """本番の CLIENT_IP_RELAY_SECRETS に、公開済みのテストベクトル鍵や
+    人為的に偏った弱い鍵が誤って設定された場合に、他の無効候補と同じく
+    除外＋ERROR（値・長さは記録しない）になることを固定する。"""
+
+    @pytest.mark.parametrize(
+        "weak_key",
+        [
+            pytest.param(KEY_A, id="known_vector_a_exact_match"),
+            pytest.param(KEY_B, id="known_vector_b_exact_match"),
+            pytest.param(
+                "katazuke-relay-test-" + _diverse_key(20), id="katazuke_prefix_lowercase"
+            ),
+            pytest.param(
+                "HTTP-RELAY-TEST-KEY-" + _diverse_key(20),
+                id="http_prefix_uppercase_case_insensitive",
+            ),
+            pytest.param("a" * 32, id="single_distinct_char_repeated"),
+            pytest.param("ab12" * 8, id="four_distinct_chars_repeated"),
+        ],
+    )
+    def test_weak_or_known_key_excluded_with_error_log(self, weak_key: str, caplog) -> None:
+        parse_relay_secrets.cache_clear()
+        with caplog.at_level(logging.ERROR, logger=_LOGGER_NAME):
+            result = parse_relay_secrets(weak_key)
+        assert result == ()
+        messages = [r.getMessage() for r in caplog.records]
+        assert any("除外します" in m for m in messages)
+        for record in caplog.records:
+            message = record.getMessage()
+            assert weak_key not in message
+            assert str(len(weak_key)) not in message
+
+
+# ──────────────────────────── inspect_relay_secrets（parse_relay_secrets の検証本体） ────────────────────────────
+
+
+class TestInspectRelaySecrets:
+    """``inspect_relay_secrets``: security review L-4 で新設した検証本体。
+    ``parse_relay_secrets`` はこの ``.keys`` を返す薄いラッパーになる。"""
+
+    def test_rejected_count_excludes_max_keys_truncation_and_duplicates(self) -> None:
+        """MAX_KEYS超過による切り捨て・重複の除去は「不正な鍵」として
+        数えない（``RelaySecretsInspection`` docstring の契約）。"""
+        inspect_relay_secrets.cache_clear()
+        keys = [secrets.token_urlsafe(48) for _ in range(5)]
+        raw = ",".join(keys + [keys[0]])  # 5本の有効鍵 + 先頭の重複を1つ追加
+        result = inspect_relay_secrets(raw)
+        assert len(result.keys) == 4
+        assert result.rejected_count == 0
+
+    def test_rejected_count_counts_actual_invalid_candidates_only(self) -> None:
+        inspect_relay_secrets.cache_clear()
+        valid_key = secrets.token_urlsafe(48)
+        raw = f"{valid_key},too-short,{KEY_A}"
+        result = inspect_relay_secrets(raw)
+        assert result.keys == (valid_key.encode("ascii"),)
+        assert result.rejected_count == 2
+
+    def test_unset_returns_zero_rejected_count(self) -> None:
+        inspect_relay_secrets.cache_clear()
+        result = inspect_relay_secrets("")
+        assert result.keys == ()
+        assert result.rejected_count == 0
+
+    def test_parse_relay_secrets_is_thin_wrapper_over_inspect(self) -> None:
+        parse_relay_secrets.cache_clear()
+        inspect_relay_secrets.cache_clear()
+        valid_key = secrets.token_urlsafe(48)
+        assert parse_relay_secrets(valid_key) == inspect_relay_secrets(valid_key).keys
 
 
 # ──────────────────────────── 既知ベクトル（V1〜V3・否定ケース） ────────────────────────────
@@ -528,6 +648,31 @@ class TestLogRelayOutcome:
             log_relay_outcome("login", v)  # 2回目 INFO
             log_relay_outcome("login", v)  # スロットリングされ無出力
         assert len(caplog.records) == 2
+
+    def test_ok_with_cloudflare_range_ip_emits_additional_scoped_warning(self, caplog) -> None:
+        """security review M-2: 採用IPがCloudflareの公開レンジ内なら、判定
+        （採用・カウント継続）は変えずにWARNINGを追加で出す。生IPは出さない。"""
+        v = RelayVerification("172.68.10.20", "ok", key_slot=0, skew_seconds=1)
+        with caplog.at_level(logging.WARNING, logger=_LOGGER_NAME):
+            log_relay_outcome("login", v)
+        messages = [r.getMessage() for r in caplog.records]
+        assert any("Cloudflare" in m for m in messages)
+        for record in caplog.records:
+            assert "172.68.10.20" not in record.getMessage()
+
+    def test_ok_with_cloudflare_range_ip_warning_is_throttled_per_scope(self, caplog) -> None:
+        v = RelayVerification("172.68.10.20", "ok", key_slot=0, skew_seconds=1)
+        with caplog.at_level(logging.WARNING, logger=_LOGGER_NAME):
+            log_relay_outcome("login", v)
+            log_relay_outcome("login", v)
+        cf_records = [r for r in caplog.records if "Cloudflare" in r.getMessage()]
+        assert len(cf_records) == 1
+
+    def test_ok_with_non_cloudflare_ip_does_not_emit_cloudflare_warning(self, caplog) -> None:
+        v = RelayVerification("203.0.113.9", "ok", key_slot=0, skew_seconds=1)
+        with caplog.at_level(logging.WARNING, logger=_LOGGER_NAME):
+            log_relay_outcome("login", v)
+        assert not any("Cloudflare" in r.getMessage() for r in caplog.records)
 
     def test_unconfigured_warning_throttled_to_once(self, caplog) -> None:
         v = RelayVerification(None, "unconfigured")

@@ -28,11 +28,23 @@
 - **鍵はチャットやログに絶対に貼らない**（値そのものは backend のログにも一切出力されない設計）。
 - **投入・入れ替えの順序**: ① Render dashboard で `CLIENT_IP_RELAY_SECRETS` を設定 → 環境変数を変えたら**手動で再デプロイ**（`render.yaml` の envVars は既存サービスに同期されないため、dashboard での設定のみでは反映されない）→ ② Vercel 側の `CLIENT_IP_RELAY_SECRET` に同じ値を設定。**必ず Render を先に**行う（backend が新しい鍵を受け付けられる状態にしてから web に使わせる。逆順だと一時的に署名不一致で hops へフォールバックするだけで実害は無いが、確認の手間を減らすため）。
 - **反映確認**: `/readyz` の `config.client_ip_relay` が `true`（値そのものは返らない）。実際に採用されたかは、backend ログの `client_ip_relay: 起動後初めて署名付き中継の利用者IPを採用しました` という WARNING（scope ごとにプロセス起動後1回だけ出る）で確認する。2回目以降は INFO 格下げ・60秒に1回のスロットリングのため、ログ保持期間（Render 無料枠は7日）内に見つからないことがある。
+- **鍵の妥当性チェック**: `/readyz` の `config.client_ip_relay_secrets_valid` が `false`（＝`degraded_config` に `client_ip_relay_secrets_valid` が含まれる）の場合、`CLIENT_IP_RELAY_SECRETS` に設定した候補のどれかが除外されている（短すぎる・既知のテストベクトル鍵/命名パターンと一致・使用文字が偏っている、のいずれか）。`client_ip_relay`（鍵が1本以上有効か）とは独立したフラグで、こちらが `false` でも有効な鍵が残っていれば中継自体は動く。原因の詳細（何番目の候補か・理由）は backend ログの `client_ip_relay: CLIENT_IP_RELAY_SECRETS の…番目の鍵が…` という ERROR（値・長さは出ない）で確認する。鍵は `python -c "import secrets; print(secrets.token_urlsafe(48))"` 等、十分にランダムな値で生成すること（コピペミスやドキュメント例示値をそのまま貼っていないか疑う）。
+- **Vercel 側の環境変数設定**: `CLIENT_IP_RELAY_SECRET` は **Production 環境のみ**に設定し、**Sensitive（値をマスクする）** を有効にする。**Development / Preview のチェックは外す**（プレビューデプロイは URL を知っていれば誰でも触れるため、本番と同じ鍵を晒す経路になる）。本番以外の環境で試す必要がある場合も、**本番の鍵をそのまま使い回さない**（環境ごとに別の値にする。使い回すと、プレビュー環境の漏洩がそのまま本番の署名偽造に直結する）。
+- **本番投入後の偽装耐性の確認手順（security review M-2。必ず中継の採用 WARNING を確認した「後」に行う）**: 中継が効いていない状態でこの手順を行うと**全利用者のログインが最大15分止まる**ため、順序を厳守すること。
+  1. 自分の回線から web のログイン画面（Vercel）に対し、`x-real-ip`・`x-forwarded-for`・`x-vercel-forwarded-for`・`forwarded` の4ヘッダすべてに TEST-NET の値 A（例: `203.0.113.10`）を付けて、誤ったパスワードで20回送信する。
+  2. 値を TEST-NET の値 B（例: `203.0.113.11`）に変えて21回目を送信する。
+  3. **429 なら偽装は効いていない**（web が中継する実クライアントIPで正しく数えられている＝想定どおり）。**401 なら偽装できてしまっている**（自分で送ったヘッダの値で数えられている＝web 側が実クライアントIPではなく偽装可能なヘッダを中継してしまっている疑い）ため、直ちに Vercel 側の `CLIENT_IP_RELAY_SECRET` を削除して再デプロイし、中継を止めて hops 方式のみへ切り戻す。
+  4. この手順による影響は**自分の IP が最大15分ログインできなくなるだけ**（scope="login" の IP軸の窓が15分のため）。
 - **ローテーション（鍵の入れ替え）**: 新鍵への切替は Render 側を `NEW,OLD`（カンマ区切り・両方同時に有効）に設定 → Vercel 側を `NEW` のみに切替 → 反映確認後、Render 側も `NEW` のみに戻す（旧鍵 `OLD` を無効化）。
 - **停止（無効化・切り戻し）**: Vercel 側の鍵（`CLIENT_IP_RELAY_SECRET`）を削除して再デプロイすれば、中継ヘッダが送られなくなり自動的に hops 方式のみへ戻る（backend 側の鍵を消す必要は無い。backend 側だけ消したい場合も Render の値を空にして再デプロイすれば同様に hops のみへ戻る）。
+- **残るリスク（対策済みの上でなお残る既知の限界。解消済みと誤解しないこと）**:
+  1. **再送（リプレイ）耐性が無い**: v1 はノンスやリクエスト本文ハッシュを署名対象に含めていないため、有効なヘッダ値を盗聴・記録できた第三者は、時刻ずれが60秒以内であれば同じヘッダ値をそのまま再送して同じ利用者IPとしてカウントさせられる。ヘッダは TLS 区間内のみを流れ、web・backend とも生のヘッダ値をログや APM に記録しない前提のため実務上のリスクは小さいと判断している。将来 APM 等でリクエストヘッダを記録する仕組みを導入する場合は、v2 でノンスまたは本文ハッシュを署名に加えて1回限りの使用に強制する必要がある。
+  2. **共有 IPv4（携帯回線の CGNAT 等）の巻き添え**: 中継が正しく動作していても、同じキャリア NAT の裏にいる複数の利用者は同じ実クライアントIPとして数えられ、1人の連続失敗が同じ NAT 配下の他の利用者を巻き込みうる。ただし「全利用者が同一バケットを共有する」問題（本機能導入前の状態）と比べれば影響範囲ははるかに小さい。
+  3. **hops のドリフト検知が効かない範囲がある**: 中継が採用されている間（login/line_exchange が中継IPで数えられている間）は、hops 方式側のドリフト検知（診断用 scan との不一致 WARNING）は実行されない（中継が不採用でhopsにフォールバックしたときのみ動く）。他の scope（signup 等）では従来どおり常に動く。
+  4. **IPv6 の /64 集約は未対応**（別コミットで対応予定）: 同一利用者が IPv6 の異なるアドレス（同一 /64 内）でアクセスすると hops 方式・中継方式のいずれも別IPとして数えてしまう場合がある。hops 側・中継側の双方に効く形で別途対応する。
 
 ## 監視
-- 外形監視（GitHub Actions・5分毎）が /health・/readyz を確認し、異常は運営 LINE 公式アカウントへ通知。`/readyz` の `degraded_config` が非空（brevo・line_push・encryption_key・gemini・admin_emails・frontend_base_url の未設定）も warning で通知される。
+- 外形監視（GitHub Actions・5分毎）が /health・/readyz を確認し、異常は運営 LINE 公式アカウントへ通知。`/readyz` の `degraded_config` が非空（brevo・line_push・encryption_key・gemini・admin_emails・frontend_base_url の未設定、または `CLIENT_IP_RELAY_SECRETS` に不正な鍵が混じっている場合の `client_ip_relay_secrets_valid`）も warning で通知される。
 - メール送信キー未設定・送信失敗はアプリから critical/warning アラート。詳細は alerting.md。
 
 ## 自動運用（GitHub Actions「Ops cron」・`.github/workflows/ops-cron.yml`）

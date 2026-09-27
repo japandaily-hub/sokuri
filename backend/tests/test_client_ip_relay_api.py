@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import logging
+import secrets
 import time
 from unittest.mock import patch
 
@@ -23,14 +24,19 @@ from httpx import AsyncClient
 from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api import rate_limit_deps
 from app.config import get_settings
 from app.core.client_ip_relay import (
     RELAY_HEADER_NAME,
+    _reset_relay_log_state_for_tests,
     build_relay_header_value,
     compute_relay_signature,
+    inspect_relay_secrets,
     parse_relay_secrets,
 )
 from tests.test_rate_limit_api import (  # noqa: F401 -- フィクスチャ再エクスポート
+    SMALL_LINE_MAX,
+    SMALL_LOGIN_IP_MAX,
     _TEST_LINE_CLIENT_ID,
     _TEST_PUBLIC_IP_HEADERS,
     _create_operator,
@@ -39,12 +45,17 @@ from tests.test_rate_limit_api import (  # noqa: F401 -- フィクスチャ再�
     _signup_user,
     client,
     client_killswitch,
+    client_small_limits,
     fake_clock,
 )
 
 # ──────────────────────────── 中継用の鍵（HTTP統合テスト専用・固定ベクトルとは別） ────────────────────────────
-_RELAY_KEY_A_RAW = "http-relay-test-key-A-" + "1" * 20
-_RELAY_KEY_B_RAW = "http-relay-test-key-B-" + "2" * 20
+# security review L-2: parse_relay_secrets / inspect_relay_secrets が既知の
+# テスト鍵命名パターン（"katazuke-relay-test-"・"http-relay-test-key-" 接頭辞等）
+# を明示的に拒否するようになったため、ここでは実際に parse を通す必要がある
+# モジュール読み込み時生成のランダム鍵を使う（署名にも同じ鍵を使う）。
+_RELAY_KEY_A_RAW = secrets.token_urlsafe(48)
+_RELAY_KEY_B_RAW = secrets.token_urlsafe(48)
 _RELAY_KEY_A = _RELAY_KEY_A_RAW.encode("ascii")
 _RELAY_KEY_B = _RELAY_KEY_B_RAW.encode("ascii")
 
@@ -63,16 +74,26 @@ def _relay_headers(
 
 
 @pytest.fixture(autouse=True)
-def _clear_relay_secrets_cache():
-    """テスト間で ``parse_relay_secrets`` のキャッシュが干渉しないようにする。
+def _reset_relay_module_state():
+    """テスト間の相互干渉を防ぐ（QA L-2）。
 
-    ``@lru_cache`` は引数の生文字列自体をキーにするため、テストごとに異なる
-    鍵文字列を使えば本来は不要だが、明示的に毎回クリアすることで「前のテストの
-    キャッシュが残っていないか」を気にせず書けるようにする。
+    - ``parse_relay_secrets`` / ``inspect_relay_secrets`` の ``@lru_cache``:
+      引数の生文字列自体をキーにするため、テストごとに異なる鍵文字列を
+      使えば本来は不要だが、明示的に毎回クリアすることで「前のテストの
+      キャッシュが残っていないか」を気にせず書けるようにする。
+    - ``_reset_relay_log_state_for_tests()``: 起動後初回 WARNING 格上げの
+      scope 集合・スロットリング辞書をプロセス内グローバルとして持つため、
+      テストごとに初期化しないと前のテストの状態が漏れる（例えば "login"
+      scope が既に初回消費済みだと、本テストの最初の採用が WARNING ではなく
+      INFO になり、ログ関連のアサーションが崩れる）。
     """
     parse_relay_secrets.cache_clear()
+    inspect_relay_secrets.cache_clear()
+    _reset_relay_log_state_for_tests()
     yield
     parse_relay_secrets.cache_clear()
+    inspect_relay_secrets.cache_clear()
+    _reset_relay_log_state_for_tests()
 
 
 # ──────────────────────────── 1. 核心の回帰 ────────────────────────────
@@ -86,11 +107,14 @@ class TestRelayCoreBehavior:
             get_settings(), "client_ip_relay_secrets", SecretStr(_RELAY_KEY_A_RAW)
         )
         # 同じ XFF（Vercel 相当の固定送信元）でも、中継ヘッダの利用者IPで数える。
+        # QA M-1: ヘッダはループの外で1回だけ作らず、毎リクエスト作り直す
+        # （タイムスタンプを含むため、ループの外で1回だけ作って使い回すと
+        # 60秒を超えた瞬間に expired へ落ち偽陽性・偽陰性の原因になる）。
         vercel_xff = {"X-Forwarded-For": "198.51.100.200"}
-        headers = {**vercel_xff, **_relay_headers(_RELAY_KEY_A, ip="203.0.113.50")}
         for i in range(20):
             email = f"relay-core-{i}@example.com"
             await _create_user(db_session, email)
+            headers = {**vercel_xff, **_relay_headers(_RELAY_KEY_A, ip="203.0.113.50")}
             r = await client.post(
                 "/api/v1/auth/login",
                 json={"email": email, "password": "wrong-password"},
@@ -98,10 +122,11 @@ class TestRelayCoreBehavior:
             )
             assert r.status_code == 401
         await _create_user(db_session, "relay-core-final@example.com")
+        headers_final = {**vercel_xff, **_relay_headers(_RELAY_KEY_A, ip="203.0.113.50")}
         r = await client.post(
             "/api/v1/auth/login",
             json={"email": "relay-core-final@example.com", "password": "wrong-password"},
-            headers=headers,
+            headers=headers_final,
         )
         assert r.status_code == 429
 
@@ -257,14 +282,17 @@ _FALLBACK_CASES = [
 
 class TestUnacceptedRelayFallsBackToHops:
     @pytest.mark.parametrize("header_builder,ip_kind", _FALLBACK_CASES)
-    async def test_fallback_to_hops_after_20(
+    async def test_fallback_to_hops_after_login_ip_max(
         self,
-        client: AsyncClient,
+        client_small_limits: AsyncClient,
         db_session: AsyncSession,
         monkeypatch,
         header_builder,
         ip_kind: str,
     ) -> None:
+        """QA M-4: しきい値到達だけを確認するテストのため、login_ip_max を
+        小さくした ``client_small_limits`` を使い試験時間を短縮する（本番値
+        20 での核心の回帰は ``TestRelayCoreBehavior`` に別途残している）。"""
         monkeypatch.setattr(
             get_settings(), "client_ip_relay_secrets", SecretStr(_RELAY_KEY_A_RAW)
         )
@@ -273,10 +301,10 @@ class TestUnacceptedRelayFallsBackToHops:
             return f"10.9.{i}.1" if ip_kind == "private" else f"203.0.113.{i}"
 
         case_id = header_builder.__name__
-        for i in range(20):
+        for i in range(SMALL_LOGIN_IP_MAX):
             email = f"relay-fb-{case_id}-{i}@example.com"
             await _create_user(db_session, email)
-            r = await client.post(
+            r = await client_small_limits.post(
                 "/api/v1/auth/login",
                 json={"email": email, "password": "wrong-password"},
                 headers=header_builder(_ip_for(i)),
@@ -284,7 +312,7 @@ class TestUnacceptedRelayFallsBackToHops:
             assert r.status_code == 401
 
         await _create_user(db_session, f"relay-fb-{case_id}-final@example.com")
-        r = await client.post(
+        r = await client_small_limits.post(
             "/api/v1/auth/login",
             json={
                 "email": f"relay-fb-{case_id}-final@example.com",
@@ -295,12 +323,13 @@ class TestUnacceptedRelayFallsBackToHops:
         assert r.status_code == 429
 
     async def test_duplicate_relay_header_falls_back_to_hops(
-        self, client: AsyncClient, db_session: AsyncSession, monkeypatch
+        self, client_small_limits: AsyncClient, db_session: AsyncSession, monkeypatch
     ) -> None:
         """重複した中継ヘッダ（malformed）でも hops へフォールバックする。
 
         httpx の ``headers`` はリスト形式で重複キーを送れる（辞書だと後勝ちで
-        1本に潰れてしまうため、この検証にはリスト形式が必須）。
+        1本に潰れてしまうため、この検証にはリスト形式が必須）。QA M-4:
+        ``client_small_limits`` でしきい値到達までの試行回数を減らす。
         """
         monkeypatch.setattr(
             get_settings(), "client_ip_relay_secrets", SecretStr(_RELAY_KEY_A_RAW)
@@ -320,17 +349,17 @@ class TestUnacceptedRelayFallsBackToHops:
                 (RELAY_HEADER_NAME, value),
             ]
 
-        for i in range(20):
+        for i in range(SMALL_LOGIN_IP_MAX):
             email = f"relay-fb-dup-{i}@example.com"
             await _create_user(db_session, email)
-            r = await client.post(
+            r = await client_small_limits.post(
                 "/api/v1/auth/login",
                 json={"email": email, "password": "wrong-password"},
                 headers=_dup_headers(f"203.0.113.{i}"),
             )
             assert r.status_code == 401
         await _create_user(db_session, "relay-fb-dup-final@example.com")
-        r = await client.post(
+        r = await client_small_limits.post(
             "/api/v1/auth/login",
             json={"email": "relay-fb-dup-final@example.com", "password": "wrong-password"},
             headers=_dup_headers("203.0.113.199"),
@@ -381,8 +410,10 @@ class TestRelayIgnoredForIneligibleScopes:
 
 class TestKeyRotation:
     async def test_rotating_from_a_and_b_to_b_only_drops_a(
-        self, client: AsyncClient, db_session: AsyncSession, monkeypatch
+        self, client_small_limits: AsyncClient, db_session: AsyncSession, monkeypatch
     ) -> None:
+        """QA M-4: しきい値到達の確認は具体的に20回である必要が無いため、
+        ``client_small_limits``（login_ip_max=3）で試験時間を短縮する。"""
         settings = get_settings()
         monkeypatch.setattr(
             settings,
@@ -392,7 +423,7 @@ class TestKeyRotation:
         await _create_user(
             db_session, "relay-rotate-a@example.com", password="correct-pass-rot1"
         )
-        r = await client.post(
+        r = await client_small_limits.post(
             "/api/v1/auth/login",
             json={"email": "relay-rotate-a@example.com", "password": "correct-pass-rot1"},
             headers=_relay_headers(_RELAY_KEY_A, ip="203.0.113.80"),
@@ -402,7 +433,7 @@ class TestKeyRotation:
         await _create_user(
             db_session, "relay-rotate-b@example.com", password="correct-pass-rot2"
         )
-        r = await client.post(
+        r = await client_small_limits.post(
             "/api/v1/auth/login",
             json={"email": "relay-rotate-b@example.com", "password": "correct-pass-rot2"},
             headers=_relay_headers(_RELAY_KEY_B, ip="203.0.113.81"),
@@ -412,14 +443,14 @@ class TestKeyRotation:
         # B のみに切り替えると、A の署名は不採用になり hops へフォールバックする。
         monkeypatch.setattr(settings, "client_ip_relay_secrets", SecretStr(_RELAY_KEY_B_RAW))
         fixed_xff = {"X-Forwarded-For": "198.51.100.230"}
-        for i in range(20):
+        for i in range(SMALL_LOGIN_IP_MAX):
             email = f"relay-rotate-afterB-{i}@example.com"
             await _create_user(db_session, email)
             headers = {
                 **fixed_xff,
                 **_relay_headers(_RELAY_KEY_A, ip=f"203.0.113.{160 + i}"),
             }
-            r = await client.post(
+            r = await client_small_limits.post(
                 "/api/v1/auth/login",
                 json={"email": email, "password": "wrong-password"},
                 headers=headers,
@@ -427,7 +458,7 @@ class TestKeyRotation:
             assert r.status_code == 401
         await _create_user(db_session, "relay-rotate-afterB-final@example.com")
         headers_final = {**fixed_xff, **_relay_headers(_RELAY_KEY_A, ip="203.0.113.199")}
-        r = await client.post(
+        r = await client_small_limits.post(
             "/api/v1/auth/login",
             json={
                 "email": "relay-rotate-afterB-final@example.com",
@@ -448,21 +479,27 @@ class TestRelayLineExchange:
         settings = get_settings()
         monkeypatch.setattr(settings, "line_client_id", _TEST_LINE_CLIENT_ID)
         monkeypatch.setattr(settings, "client_ip_relay_secrets", SecretStr(_RELAY_KEY_A_RAW))
-        headers_a = _relay_headers(
-            _RELAY_KEY_A, ip="203.0.113.90", path="/api/v1/auth/line/exchange"
-        )
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get()):
+            # QA M-1: ヘッダはループの外で1回だけ作らず、毎リクエスト作り直す
+            # （タイムスタンプを含むため、使い回すと60秒経過時に expired へ
+            # 落ちて偽陽性・偽陰性の原因になる）。
             for _ in range(20):
+                headers_a = _relay_headers(
+                    _RELAY_KEY_A, ip="203.0.113.90", path="/api/v1/auth/line/exchange"
+                )
                 r = await client.post(
                     "/api/v1/auth/line/exchange",
                     json={"line_access_token": "dummy-line-token"},
                     headers=headers_a,
                 )
                 assert r.status_code == 200
+            headers_a_final = _relay_headers(
+                _RELAY_KEY_A, ip="203.0.113.90", path="/api/v1/auth/line/exchange"
+            )
             r = await client.post(
                 "/api/v1/auth/line/exchange",
                 json={"line_access_token": "dummy-line-token"},
-                headers=headers_a,
+                headers=headers_a_final,
             )
             assert r.status_code == 429
 
@@ -487,12 +524,13 @@ class TestRelayOperatorLogin:
         monkeypatch.setattr(
             get_settings(), "client_ip_relay_secrets", SecretStr(_RELAY_KEY_A_RAW)
         )
-        headers = _relay_headers(
-            _RELAY_KEY_A, ip="203.0.113.95", path="/api/v1/auth/operator/login"
-        )
+        # QA M-1: ヘッダはループの外で1回だけ作らず、毎リクエスト作り直す。
         for i in range(20):
             email = f"relay-op-{i}@example.com"
             await _create_operator(db_session, email)
+            headers = _relay_headers(
+                _RELAY_KEY_A, ip="203.0.113.95", path="/api/v1/auth/operator/login"
+            )
             r = await client.post(
                 "/api/v1/auth/operator/login",
                 json={"email": email, "password": "wrong-password"},
@@ -500,10 +538,13 @@ class TestRelayOperatorLogin:
             )
             assert r.status_code == 401
         await _create_operator(db_session, "relay-op-final@example.com")
+        headers_final = _relay_headers(
+            _RELAY_KEY_A, ip="203.0.113.95", path="/api/v1/auth/operator/login"
+        )
         r = await client.post(
             "/api/v1/auth/operator/login",
             json={"email": "relay-op-final@example.com", "password": "wrong-password"},
-            headers=headers,
+            headers=headers_final,
         )
         assert r.status_code == 429
 
@@ -559,8 +600,11 @@ class TestRelayAcceptedBypassesHopsValidation:
         assert r.status_code == 401
         assert r.status_code != 400
 
-    # ──────────────────────────── 11. 採用時は hops 用 WARNING が出ない ────────────────────────────
 
+# ──────────────────────────── 11. 採用時は hops 用 WARNING が出ない ────────────────────────────
+
+
+class TestRelayAcceptedEmitsNoHopsWarning:
     async def test_relay_accepted_with_private_xff_emits_no_hops_warning(
         self, client: AsyncClient, db_session: AsyncSession, monkeypatch, caplog
     ) -> None:
@@ -597,8 +641,11 @@ class TestRelayIgnoredWhenKillswitchOn:
         )
         await _create_user(db_session, "relay-killswitch@example.com")
         headers = _relay_headers(_RELAY_KEY_A, ip="203.0.113.99")
+        # QA M-4: キルスイッチONではレート制限自体が働かないため、繰り返し
+        # 回数はログが一切出ないことの確認材料に過ぎない（本番値20や100で
+        # ある必要が無い）。5回に減らして試験時間を短縮する。
         with caplog.at_level(logging.INFO, logger="app.core.client_ip_relay"):
-            for _ in range(100):
+            for _ in range(5):
                 r = await client_killswitch.post(
                     "/api/v1/auth/login",
                     json={
@@ -609,3 +656,197 @@ class TestRelayIgnoredWhenKillswitchOn:
                 )
                 assert r.status_code == 401
         assert len(caplog.records) == 0
+
+
+# ──────────────────────────── 13. 不採用の中継は 400 のフェイルクローズを回避できない ────────────────────────────
+
+
+class TestRejectedRelayCannotBypassFailClosedXff:
+    async def test_bad_signature_relay_with_malformed_xff_still_400(
+        self, client: AsyncClient, monkeypatch
+    ) -> None:
+        """security review L-6: 不採用（この例では鍵違いによる bad_signature）の
+        中継ヘッダは、XFF 不正時のフェイルクローズ（400）を回避する経路には
+        ならない（中継ヘッダを付与するだけで 400 を潜り抜けられないことの固定。
+        ``TestRelayAcceptedBypassesHopsValidation`` の「採用時は400にならない」
+        と対になる、不採用側の固定）。"""
+        monkeypatch.setattr(
+            get_settings(), "client_ip_relay_secrets", SecretStr(_RELAY_KEY_A_RAW)
+        )
+        headers = {
+            "X-Forwarded-For": "; DROP TABLE",
+            # 設定されている鍵は A のみだが、B で署名する→ bad_signature で不採用。
+            **_relay_headers(_RELAY_KEY_B, ip="203.0.113.120"),
+        }
+        r = await client.post(
+            "/api/v1/auth/login",
+            json={
+                "email": "relay-rejected-badsig-xff@example.com",
+                "password": "wrong-password",
+            },
+            headers=headers,
+        )
+        assert r.status_code == 400
+
+
+# ──────────────────────────── 14. 検証・ログ処理の例外はフォールバックし判定へ影響しない ────────────────────────────
+
+
+class TestRelayVerificationExceptionsDoNotBreakAuth:
+    async def test_verify_exception_falls_back_to_401_not_500(
+        self, client: AsyncClient, db_session: AsyncSession, monkeypatch, caplog
+    ) -> None:
+        """QA M-3 固定: 検証本体（verify_request_client_ip_relay）が例外を
+        送出しても 500 化せず、hops 方式へフォールバックして通常どおり 401 に
+        なる（本機能の障害が認証系全体を巻き込まないという設計契約の直接
+        検証）。WARNING/ERROR ログも出る。"""
+        monkeypatch.setattr(
+            get_settings(), "client_ip_relay_secrets", SecretStr(_RELAY_KEY_A_RAW)
+        )
+
+        def _boom(*args, **kwargs):
+            raise RuntimeError("boom-verify")
+
+        monkeypatch.setattr(rate_limit_deps, "verify_request_client_ip_relay", _boom)
+        await _create_user(db_session, "relay-verify-exc@example.com")
+        with caplog.at_level(logging.WARNING):
+            r = await client.post(
+                "/api/v1/auth/login",
+                json={"email": "relay-verify-exc@example.com", "password": "wrong-password"},
+                headers=_relay_headers(_RELAY_KEY_A, ip="203.0.113.121"),
+            )
+        assert r.status_code == 401
+        assert any(rec.levelno >= logging.WARNING for rec in caplog.records)
+
+    async def test_log_relay_outcome_exception_does_not_change_verdict(
+        self, client_small_limits: AsyncClient, db_session: AsyncSession, monkeypatch
+    ) -> None:
+        """QA M-3 固定: ログ出力（log_relay_outcome）が例外を送出しても判定
+        結果（採用可否・カウント）は変わらない。中継IPで login_ip_max 回
+        失敗させると、ログが壊れていても次の1回は429になる（＝正しく中継IPで
+        カウントされ続けたことの証明）。"""
+        monkeypatch.setattr(
+            get_settings(), "client_ip_relay_secrets", SecretStr(_RELAY_KEY_A_RAW)
+        )
+
+        def _boom(*args, **kwargs):
+            raise RuntimeError("boom-log")
+
+        monkeypatch.setattr(rate_limit_deps, "log_relay_outcome", _boom)
+        relay_ip = "203.0.113.122"
+        fixed_xff = {"X-Forwarded-For": "198.51.100.250"}
+        for i in range(SMALL_LOGIN_IP_MAX):
+            email = f"relay-log-exc-{i}@example.com"
+            await _create_user(db_session, email)
+            headers = {**fixed_xff, **_relay_headers(_RELAY_KEY_A, ip=relay_ip)}
+            r = await client_small_limits.post(
+                "/api/v1/auth/login",
+                json={"email": email, "password": "wrong-password"},
+                headers=headers,
+            )
+            assert r.status_code == 401
+        await _create_user(db_session, "relay-log-exc-final@example.com")
+        headers_final = {**fixed_xff, **_relay_headers(_RELAY_KEY_A, ip=relay_ip)}
+        r = await client_small_limits.post(
+            "/api/v1/auth/login",
+            json={"email": "relay-log-exc-final@example.com", "password": "wrong-password"},
+            headers=headers_final,
+        )
+        assert r.status_code == 429
+
+
+# ──────────────────────────── 15. 対象 scope の固定 ────────────────────────────
+
+
+def test_relay_eligible_scopes_is_fixed_to_login_and_line_exchange() -> None:
+    """QA: 中継の対象 scope（login/line_exchange の2つのみ）が変更されて
+    いないことを固定する。signup・case_create 等へ誤って拡大されると、鍵
+    漏洩時の悪用範囲が構造的に広がってしまうため、変更時は必ず設計判断を
+    経ること（``app.core.client_ip_relay`` モジュール docstring 参照）。"""
+    assert rate_limit_deps._RELAY_ELIGIBLE_SCOPES == frozenset({"login", "line_exchange"})
+
+
+# ──────────────────────────── 16. 既知の割り切り（v1）: 再送は受理される ────────────────────────────
+
+
+class TestReplayWithinWindowIsAcceptedKnownV1Tradeoff:
+    async def test_replaying_same_header_within_60s_is_counted_each_time(
+        self, client_small_limits: AsyncClient, db_session: AsyncSession, monkeypatch
+    ) -> None:
+        """既知の割り切り（v1）: 同一の中継ヘッダ値を60秒以内に再送すると、
+        タイムスタンプ・署名とも有効なままのため何度でも中継IPとして採用・
+        カウントされる（リプレイ対策を持たない）。理由と将来（v2）の対策
+        （ノンス・リクエスト本文ハッシュを署名に加え1回限りにする）は
+        ``app.core.client_ip_relay`` モジュール冒頭の docstring と
+        ``docs/ops/admin-operations.md`` の「署名付き中継IPの鍵」節に記載する。
+        ヘッダは TLS 内のみを流れどこにも記録しない前提のため実務上のリスクは
+        小さいと判断した上での意図的な割り切りであり、この固定テストは将来
+        v2 でノンスを導入した際にこの挙動が変わることを検知する回帰網も兼ねる。
+        """
+        monkeypatch.setattr(
+            get_settings(), "client_ip_relay_secrets", SecretStr(_RELAY_KEY_A_RAW)
+        )
+        # 意図的に1回だけ作り、以降すべての送信で使い回す（再送そのものの検証のため）。
+        replayed_headers = _relay_headers(_RELAY_KEY_A, ip="203.0.113.123")
+
+        for i in range(SMALL_LOGIN_IP_MAX):
+            email = f"relay-replay-{i}@example.com"
+            await _create_user(db_session, email)
+            r = await client_small_limits.post(
+                "/api/v1/auth/login",
+                json={"email": email, "password": "wrong-password"},
+                headers=replayed_headers,
+            )
+            assert r.status_code == 401
+
+        await _create_user(db_session, "relay-replay-final@example.com")
+        r_final = await client_small_limits.post(
+            "/api/v1/auth/login",
+            json={"email": "relay-replay-final@example.com", "password": "wrong-password"},
+            headers=replayed_headers,  # 同じヘッダをもう一度再送
+        )
+        assert r_final.status_code == 429
+
+
+# ──────────────────────────── 17. scope をまたいだ署名の使い回しは不採用（HTTP） ────────────────────────────
+
+
+class TestSignedForOneScopeRejectedOnAnother:
+    async def test_login_signed_header_sent_to_line_exchange_falls_back_to_hops(
+        self, client_small_limits: AsyncClient, monkeypatch
+    ) -> None:
+        """/auth/login 向けに署名したヘッダをそのまま /auth/line/exchange に
+        送っても、署名対象に含まれる PATH が一致しないため bad_signature で
+        不採用になり、line_exchange は hops（XFFベース）で数えられる
+        （``tests/test_client_ip_relay.py`` の単体テスト
+        ``test_path_confusion_across_scopes`` と対になる HTTP 経由の固定）。"""
+        settings = get_settings()
+        monkeypatch.setattr(settings, "line_client_id", _TEST_LINE_CLIENT_ID)
+        monkeypatch.setattr(settings, "client_ip_relay_secrets", SecretStr(_RELAY_KEY_A_RAW))
+        fixed_xff = {"X-Forwarded-For": "198.51.100.245"}
+
+        with patch.object(httpx.AsyncClient, "get", new=_mock_line_get()):
+            for _ in range(SMALL_LINE_MAX):
+                # /auth/login 用に署名したヘッダ（path が食い違うため bad_signature）。
+                mismatched_headers = {
+                    **fixed_xff,
+                    **_relay_headers(
+                        _RELAY_KEY_A, ip="203.0.113.130", path="/api/v1/auth/login"
+                    ),
+                }
+                r = await client_small_limits.post(
+                    "/api/v1/auth/line/exchange",
+                    json={"line_access_token": "dummy-line-token"},
+                    headers=mismatched_headers,
+                )
+                assert r.status_code == 200
+            mismatched_headers_final = {
+                **fixed_xff,
+                **_relay_headers(_RELAY_KEY_A, ip="203.0.113.130", path="/api/v1/auth/login"),
+            }
+            r = await client_small_limits.post(
+                "/api/v1/auth/line/exchange",
+                json={"line_access_token": "dummy-line-token"},
+                headers=mismatched_headers_final,
+            )
+            assert r.status_code == 429

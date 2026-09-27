@@ -19,9 +19,11 @@ import {
   CLIENT_IP_RELAY_HEADER,
   CLIENT_IP_RELAY_MIN_SECRET_LENGTH,
   CLIENT_IP_RELAY_SIGNING_CONTEXT,
+  _resetClientIpRelayLogStateForTests,
   buildClientIpRelayHeaders,
   canonicalRelayMessage,
   clientIpRelayHeaders,
+  isKnownWeakRelaySecret,
   isRelayableClientIp,
   isValidRelaySecret,
   signClientIpRelay,
@@ -43,6 +45,31 @@ function headersOf(values: Readonly<Record<string, string>>): HeaderReader {
     },
   };
 }
+
+/**
+ * clientIpRelayHeaders（環境変数ラッパー）のテスト専用: 実運用鍵を模した、十分に
+ * 長く高エントロピーなランダム英数字を生成する（isKnownWeakRelaySecret に該当
+ * しないことを期待する値。KEY_A/KEY_B は既知の弱い鍵として拒否されるようになった
+ * ため、ラッパーのテストでは本関数を使う。純関数 buildClientIpRelayHeaders の
+ * 既知ベクトルテストでは引き続き KEY_A/KEY_B を使う）。
+ */
+function randomRelaySecret(): string {
+  const CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const bytes = new Uint8Array(48);
+  globalThis.crypto.getRandomValues(bytes);
+  let out = "";
+  for (let i = 0; i < bytes.length; i++) {
+    out += CHARS[bytes[i] % CHARS.length];
+  }
+  return out;
+}
+
+// 各テストケースの前にプロセス内グローバル状態（一度きりログのフラグ・スロットリング
+// 状態）をリセットする。リセットしないと、あるテストケースで出したログが「既に出力
+// 済み」として後続のテストケースの検証（ログが出ることの確認）を誤って失敗させる。
+beforeEach(() => {
+  _resetClientIpRelayLogStateForTests();
+});
 
 /** buildClientIpRelayHeaders のデフォルト入力（既知ベクトルV1相当）。テストごとに一部だけ上書きする。 */
 function baseInput(
@@ -106,6 +133,20 @@ describe("canonicalRelayMessage", () => {
       "katazuke-client-ip-relay/v1\nPOST\n/api/v1/auth/operator/login\n1790000059\n::ffff:198.51.100.7",
     );
   });
+
+  it("methodが小文字'post'でもV1と同じ正規化メッセージになる（関数内で大文字化される）", () => {
+    assert.equal(
+      canonicalRelayMessage("post", "/api/v1/auth/login", "1790000000", "203.0.113.9"),
+      "katazuke-client-ip-relay/v1\nPOST\n/api/v1/auth/login\n1790000000\n203.0.113.9",
+    );
+  });
+
+  it("methodが混在大文字小文字'PoSt'でもV1と同じ正規化メッセージになる", () => {
+    assert.equal(
+      canonicalRelayMessage("PoSt", "/api/v1/auth/login", "1790000000", "203.0.113.9"),
+      "katazuke-client-ip-relay/v1\nPOST\n/api/v1/auth/login\n1790000000\n203.0.113.9",
+    );
+  });
 });
 
 describe("signClientIpRelay（既知ベクトル）", () => {
@@ -154,6 +195,15 @@ describe("signClientIpRelay（既知ベクトル）", () => {
   it("小文字16進数64桁で返す", async () => {
     const hex = await signClientIpRelay(KEY_A, V1_MESSAGE);
     assert.match(hex, /^[0-9a-f]{64}$/);
+  });
+
+  it("V1相当: methodを小文字'post'で組み立てても同じ署名になる（canonicalRelayMessage内で大文字化されるため）", async () => {
+    const lowerMessage = canonicalRelayMessage("post", "/api/v1/auth/login", "1790000000", "203.0.113.9");
+    assert.equal(lowerMessage, V1_MESSAGE);
+    assert.equal(
+      await signClientIpRelay(KEY_A, lowerMessage),
+      "db454b34038592236a42de40f8976210cb44ebac8f44f9c8e973664636f1bbb6",
+    );
   });
 });
 
@@ -254,6 +304,8 @@ describe("buildClientIpRelayHeaders（無効化: x-real-ip）", () => {
     "2001:DB8:85A3::8A2E:370:7334",
     "::ffff:198.51.100.7",
     "::1",
+    // ちょうど45文字（isRelayableClientIp が許容する上限）の境界値。
+    "1234:5678:9abc:def0:1234:5678:255.255.255.255",
   ];
   for (const valid of VALID_IPS) {
     it(`x-real-ip=${JSON.stringify(valid)} は生のまま中継される`, async () => {
@@ -276,6 +328,8 @@ describe("isRelayableClientIp（単体）", () => {
     "2001:DB8:85A3::8A2E:370:7334",
     "::ffff:198.51.100.7",
     "::1",
+    // ちょうど45文字（isRelayableClientIp が許容する上限）の境界値。
+    "1234:5678:9abc:def0:1234:5678:255.255.255.255",
   ];
   for (const ip of VALID) {
     it(`${JSON.stringify(ip)} は有効`, () => {
@@ -299,6 +353,92 @@ describe("isRelayableClientIp（単体）", () => {
       assert.equal(isRelayableClientIp(ip), false);
     });
   }
+});
+
+describe("isKnownWeakRelaySecret（単体）", () => {
+  it("既知のテストベクトル鍵（KEY_A・KEY_B）は完全一致で弱い鍵と判定される", () => {
+    assert.equal(isKnownWeakRelaySecret(KEY_A), true);
+    assert.equal(isKnownWeakRelaySecret(KEY_B), true);
+  });
+
+  it('接頭辞 "katazuke-relay-test-" は弱い鍵と判定される（大文字小文字を区別しない）', () => {
+    assert.equal(isKnownWeakRelaySecret(`katazuke-relay-test-${"x".repeat(40)}`), true);
+    assert.equal(isKnownWeakRelaySecret(`KATAZUKE-RELAY-TEST-${"X".repeat(40)}`), true);
+  });
+
+  it('接頭辞 "http-relay-test-key-" は弱い鍵と判定される（大文字小文字を区別しない）', () => {
+    assert.equal(isKnownWeakRelaySecret(`http-relay-test-key-${"x".repeat(40)}`), true);
+    assert.equal(isKnownWeakRelaySecret(`HTTP-RELAY-TEST-KEY-${"X".repeat(40)}`), true);
+  });
+
+  it("使用文字種が10種類未満（単調な値）は弱い鍵と判定される", () => {
+    assert.equal(isKnownWeakRelaySecret("a".repeat(40)), true);
+    // "abcdefghi" の9種類の文字だけを繰り返す（32文字以上・接頭辞にも該当しない）。
+    assert.equal(isKnownWeakRelaySecret("abcdefghi".repeat(5)), true);
+  });
+
+  it("使用文字種が10種類以上かつ既知の値・接頭辞に該当しなければ弱い鍵ではない", () => {
+    // "abcdefghij" の10種類ちょうど（境界値）。
+    assert.equal(isKnownWeakRelaySecret("abcdefghij".repeat(4)), false);
+    assert.equal(isKnownWeakRelaySecret(randomRelaySecret()), false);
+  });
+});
+
+describe("clientIpRelayHeaders（既知の弱い鍵は署名しない）", () => {
+  let originalVercel: string | undefined;
+  let originalVercelEnv: string | undefined;
+  let originalSecret: string | undefined;
+
+  beforeEach(() => {
+    originalVercel = process.env.VERCEL;
+    originalVercelEnv = process.env.VERCEL_ENV;
+    originalSecret = process.env.CLIENT_IP_RELAY_SECRET;
+    process.env.VERCEL = "1";
+    process.env.VERCEL_ENV = "production";
+  });
+
+  afterEach(() => {
+    if (originalVercel === undefined) delete process.env.VERCEL;
+    else process.env.VERCEL = originalVercel;
+    if (originalVercelEnv === undefined) delete process.env.VERCEL_ENV;
+    else process.env.VERCEL_ENV = originalVercelEnv;
+    if (originalSecret === undefined) delete process.env.CLIENT_IP_RELAY_SECRET;
+    else process.env.CLIENT_IP_RELAY_SECRET = originalSecret;
+  });
+
+  it("既知のテストベクトル鍵（KEY_A）ではヘッダを付けない（console.errorに鍵の値を出さない）", async (t) => {
+    process.env.CLIENT_IP_RELAY_SECRET = KEY_A;
+    const errorMock = t.mock.method(console, "error", () => undefined);
+    const headers = await clientIpRelayHeaders(
+      "POST",
+      BACKEND_LOGIN_URL,
+      headersOf({ "x-real-ip": "203.0.113.9" }),
+    );
+    assert.deepEqual(headers, {});
+    assert.ok(errorMock.mock.calls.length >= 1);
+    const args = errorMock.mock.calls.flatMap((call) => call.arguments.map((a) => String(a)));
+    assert.ok(!args.some((a) => a.includes(KEY_A)));
+  });
+
+  it('接頭辞一致する弱い鍵（"http-relay-test-key-..."）ではヘッダを付けない', async () => {
+    process.env.CLIENT_IP_RELAY_SECRET = `http-relay-test-key-${"x".repeat(40)}`;
+    const headers = await clientIpRelayHeaders(
+      "POST",
+      BACKEND_LOGIN_URL,
+      headersOf({ "x-real-ip": "203.0.113.9" }),
+    );
+    assert.deepEqual(headers, {});
+  });
+
+  it("十分に長くランダムな鍵ではヘッダを付ける", async () => {
+    process.env.CLIENT_IP_RELAY_SECRET = randomRelaySecret();
+    const headers = await clientIpRelayHeaders(
+      "POST",
+      BACKEND_LOGIN_URL,
+      headersOf({ "x-real-ip": "203.0.113.9" }),
+    );
+    assert.ok(CLIENT_IP_RELAY_HEADER in headers);
+  });
 });
 
 describe("buildClientIpRelayHeaders（無効化: method/url の正規化・字句検証）", () => {
@@ -340,6 +480,13 @@ describe("buildClientIpRelayHeaders（無効化: method/url の正規化・字�
     await expectSkipped(baseInput({ url: "not a valid url" }), "invalid_target");
   });
 
+  it("宛先が http:// （https以外のスキーム） → invalid_target", async () => {
+    await expectSkipped(
+      baseInput({ url: "http://sokuri-backend.onrender.com/api/v1/auth/login" }),
+      "invalid_target",
+    );
+  });
+
   it("methodが不正（数字を含む） → invalid_target", async () => {
     await expectSkipped(baseInput({ method: "PO5T" }), "invalid_target");
   });
@@ -354,23 +501,28 @@ describe("buildClientIpRelayHeaders（無効化: method/url の正規化・字�
 
 describe("clientIpRelayHeaders（環境変数ラッパー）", () => {
   let originalVercel: string | undefined;
+  let originalVercelEnv: string | undefined;
   let originalSecret: string | undefined;
 
   beforeEach(() => {
     originalVercel = process.env.VERCEL;
+    originalVercelEnv = process.env.VERCEL_ENV;
     originalSecret = process.env.CLIENT_IP_RELAY_SECRET;
   });
 
   afterEach(() => {
     if (originalVercel === undefined) delete process.env.VERCEL;
     else process.env.VERCEL = originalVercel;
+    if (originalVercelEnv === undefined) delete process.env.VERCEL_ENV;
+    else process.env.VERCEL_ENV = originalVercelEnv;
     if (originalSecret === undefined) delete process.env.CLIENT_IP_RELAY_SECRET;
     else process.env.CLIENT_IP_RELAY_SECRET = originalSecret;
   });
 
-  it('VERCEL="1" かつ有効なsecretならヘッダを1本返す', async () => {
+  it('VERCEL="1" かつ VERCEL_ENV="production" かつ有効なsecretならヘッダを1本返す', async () => {
     process.env.VERCEL = "1";
-    process.env.CLIENT_IP_RELAY_SECRET = KEY_A;
+    process.env.VERCEL_ENV = "production";
+    process.env.CLIENT_IP_RELAY_SECRET = randomRelaySecret();
     const headers = await clientIpRelayHeaders(
       "POST",
       BACKEND_LOGIN_URL,
@@ -381,7 +533,8 @@ describe("clientIpRelayHeaders（環境変数ラッパー）", () => {
 
   it("VERCELが無ければ空オブジェクトを返す", async () => {
     delete process.env.VERCEL;
-    process.env.CLIENT_IP_RELAY_SECRET = KEY_A;
+    process.env.VERCEL_ENV = "production";
+    process.env.CLIENT_IP_RELAY_SECRET = randomRelaySecret();
     const headers = await clientIpRelayHeaders(
       "POST",
       BACKEND_LOGIN_URL,
@@ -390,9 +543,39 @@ describe("clientIpRelayHeaders（環境変数ラッパー）", () => {
     assert.deepEqual(headers, {});
   });
 
+  it('VERCEL="true"（"1"という文字列と厳密一致しない）では付かない', async () => {
+    process.env.VERCEL = "true";
+    process.env.VERCEL_ENV = "production";
+    process.env.CLIENT_IP_RELAY_SECRET = randomRelaySecret();
+    const headers = await clientIpRelayHeaders(
+      "POST",
+      BACKEND_LOGIN_URL,
+      headersOf({ "x-real-ip": "203.0.113.9" }),
+    );
+    assert.deepEqual(headers, {});
+  });
+
+  const NON_PRODUCTION_VERCEL_ENVS: readonly (string | undefined)[] = ["preview", "development", undefined];
+  for (const vercelEnv of NON_PRODUCTION_VERCEL_ENVS) {
+    it(`VERCEL="1"でもVERCEL_ENV=${JSON.stringify(vercelEnv)}なら付かない`, async () => {
+      process.env.VERCEL = "1";
+      if (vercelEnv === undefined) delete process.env.VERCEL_ENV;
+      else process.env.VERCEL_ENV = vercelEnv;
+      process.env.CLIENT_IP_RELAY_SECRET = randomRelaySecret();
+      const headers = await clientIpRelayHeaders(
+        "POST",
+        BACKEND_LOGIN_URL,
+        headersOf({ "x-real-ip": "203.0.113.9" }),
+      );
+      assert.deepEqual(headers, {});
+    });
+  }
+
   it("URLが不正でも例外を投げずに{}を返し、console.warnでinvalid_targetを報告する", async (t) => {
     process.env.VERCEL = "1";
-    process.env.CLIENT_IP_RELAY_SECRET = KEY_A;
+    process.env.VERCEL_ENV = "production";
+    const secret = randomRelaySecret();
+    process.env.CLIENT_IP_RELAY_SECRET = secret;
     const warnMock = t.mock.method(console, "warn", () => undefined);
     const headers = await clientIpRelayHeaders(
       "POST",
@@ -405,12 +588,13 @@ describe("clientIpRelayHeaders（環境変数ラッパー）", () => {
     assert.ok(args.some((a) => a.includes("invalid_target")));
     // IPも鍵もログに出ないこと。
     assert.ok(!args.some((a) => a.includes("203.0.113.9")));
-    assert.ok(!args.some((a) => a.includes(KEY_A)));
+    assert.ok(!args.some((a) => a.includes(secret)));
   });
 
   it("無効なx-real-ipの場合もログにIPを出さない（invalid_client_ip）", async (t) => {
     process.env.VERCEL = "1";
-    process.env.CLIENT_IP_RELAY_SECRET = KEY_A;
+    process.env.VERCEL_ENV = "production";
+    process.env.CLIENT_IP_RELAY_SECRET = randomRelaySecret();
     const warnMock = t.mock.method(console, "warn", () => undefined);
     const suspiciousIp = "1.2.3.4:443";
     const headers = await clientIpRelayHeaders(
@@ -427,6 +611,7 @@ describe("clientIpRelayHeaders（環境変数ラッパー）", () => {
 
   it("secretが不正な場合、console.errorに鍵の値を出さない", async (t) => {
     process.env.VERCEL = "1";
+    process.env.VERCEL_ENV = "production";
     const badSecret = "short-secret-value-not-32-chars";
     assert.ok(badSecret.length < CLIENT_IP_RELAY_MIN_SECRET_LENGTH, "前提: 32文字未満のはず");
     process.env.CLIENT_IP_RELAY_SECRET = badSecret;
@@ -440,5 +625,72 @@ describe("clientIpRelayHeaders（環境変数ラッパー）", () => {
     assert.ok(errorMock.mock.calls.length >= 1);
     const args = errorMock.mock.calls.flatMap((call) => call.arguments.map((a) => String(a)));
     assert.ok(!args.some((a) => a.includes(badSecret)));
+  });
+
+  it("incomingHeaders.getが例外を投げても例外を外に出さず{}を返す", async () => {
+    process.env.VERCEL = "1";
+    process.env.VERCEL_ENV = "production";
+    process.env.CLIENT_IP_RELAY_SECRET = randomRelaySecret();
+    const throwingHeaders: HeaderReader = {
+      get(): string | null {
+        throw new Error("boom（想定外のHeaderReader実装からの例外）");
+      },
+    };
+    const headers = await clientIpRelayHeaders("POST", BACKEND_LOGIN_URL, throwingHeaders);
+    assert.deepEqual(headers, {});
+  });
+});
+
+describe("clientIpRelayHeaders（console.warnのスロットリング）", () => {
+  let originalVercel: string | undefined;
+  let originalVercelEnv: string | undefined;
+  let originalSecret: string | undefined;
+
+  beforeEach(() => {
+    originalVercel = process.env.VERCEL;
+    originalVercelEnv = process.env.VERCEL_ENV;
+    originalSecret = process.env.CLIENT_IP_RELAY_SECRET;
+    process.env.VERCEL = "1";
+    process.env.VERCEL_ENV = "production";
+    process.env.CLIENT_IP_RELAY_SECRET = randomRelaySecret();
+  });
+
+  afterEach(() => {
+    if (originalVercel === undefined) delete process.env.VERCEL;
+    else process.env.VERCEL = originalVercel;
+    if (originalVercelEnv === undefined) delete process.env.VERCEL_ENV;
+    else process.env.VERCEL_ENV = originalVercelEnv;
+    if (originalSecret === undefined) delete process.env.CLIENT_IP_RELAY_SECRET;
+    else process.env.CLIENT_IP_RELAY_SECRET = originalSecret;
+  });
+
+  it("同じreason・targetの警告は60秒以内では2回目が出ない", async (t) => {
+    const warnMock = t.mock.method(console, "warn", () => undefined);
+    const badHeaders = headersOf({ "x-real-ip": "1.2.3.4:443" }); // invalid_client_ip
+    await clientIpRelayHeaders("POST", BACKEND_LOGIN_URL, badHeaders);
+    await clientIpRelayHeaders("POST", BACKEND_LOGIN_URL, badHeaders);
+    assert.equal(warnMock.mock.calls.length, 1);
+  });
+
+  it("60秒経過後は再度警告される", async (t) => {
+    t.mock.timers.enable({ apis: ["Date"] });
+    const warnMock = t.mock.method(console, "warn", () => undefined);
+    const badHeaders = headersOf({ "x-real-ip": "1.2.3.4:443" });
+    await clientIpRelayHeaders("POST", BACKEND_LOGIN_URL, badHeaders);
+    t.mock.timers.tick(60_000);
+    await clientIpRelayHeaders("POST", BACKEND_LOGIN_URL, badHeaders);
+    assert.equal(warnMock.mock.calls.length, 2);
+  });
+
+  it("targetが異なれば別カウントとしてそれぞれ警告される", async (t) => {
+    const warnMock = t.mock.method(console, "warn", () => undefined);
+    const badHeaders = headersOf({ "x-real-ip": "1.2.3.4:443" });
+    await clientIpRelayHeaders("POST", BACKEND_LOGIN_URL, badHeaders);
+    await clientIpRelayHeaders(
+      "POST",
+      "https://sokuri-backend.onrender.com/api/v1/auth/operator/login",
+      badHeaders,
+    );
+    assert.equal(warnMock.mock.calls.length, 2);
   });
 });

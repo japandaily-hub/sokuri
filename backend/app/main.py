@@ -27,7 +27,7 @@ from app.core.client_ip import (
     resolve_client_ip,
     scan_client_ip_for_diagnostics_with_reason,
 )
-from app.core.client_ip_relay import parse_relay_secrets
+from app.core.client_ip_relay import inspect_relay_secrets
 from app.api.v1.endpoints.cases import sweep_stale_pending_ai
 from app.db.session import engine, get_background_session_factory
 from app.services import alerts, storage
@@ -211,6 +211,16 @@ def _config_readiness(settings: Settings) -> dict[str, bool]:
       （app.core.client_ip_relay）の鍵が1本以上有効かどうか。未設定は
       「中継を使わず従来どおり hops のみで数える」通常運用のため、
       ``_DEGRADED_CONFIG_EXEMPT_KEYS`` に含め degraded 扱いにしない。
+    - ``client_ip_relay_secrets_valid``: CLIENT_IP_RELAY_SECRETS に設定された
+      候補のうち、除外された（無効と判定された）ものが1本も無いか
+      （security review L-4）。**``client_ip_relay`` とは意味が異なる**:
+      ``client_ip_relay`` は「有効な鍵が1本以上あるか」（無くても劣化では
+      ない）を見るのに対し、これは「設定した値そのものに不正なものが
+      混じっていないか」（未設定＝候補ゼロなら不正の余地が無いため True）を
+      見る。**このキーは ``_DEGRADED_CONFIG_EXEMPT_KEYS`` に含めない**:
+      有効な鍵が1本でもあれば機能自体は継続するが、不正な鍵が混じっている
+      ＝コピペミスやテスト用の値を誤って貼った等の設定ミスの可能性が高く、
+      気付けないまま放置されるべきではないため（degraded_config に出す）。
     """
     try:
         from cryptography.fernet import Fernet
@@ -224,6 +234,7 @@ def _config_readiness(settings: Settings) -> dict[str, bool]:
     frontend_ok = bool(settings.frontend_base_url) and not (
         settings.app_env == "production" and "localhost" in settings.frontend_base_url
     )
+    relay_inspection = inspect_relay_secrets(settings.client_ip_relay_secrets.get_secret_value())
     return {
         "encryption_key": encryption_ok,
         "brevo": bool(settings.brevo_api_key),
@@ -236,9 +247,8 @@ def _config_readiness(settings: Settings) -> dict[str, bool]:
         ),
         "alerts_webhook": bool(settings.alert_webhook_url),
         "storage_r2": settings.resolved_storage_backend != "r2" or settings.r2_configured,
-        "client_ip_relay": bool(
-            parse_relay_secrets(settings.client_ip_relay_secrets.get_secret_value())
-        ),
+        "client_ip_relay": bool(relay_inspection.keys),
+        "client_ip_relay_secrets_valid": relay_inspection.rejected_count == 0,
     }
 
 

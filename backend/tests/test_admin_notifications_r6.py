@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import secrets
 import uuid
 from datetime import datetime, timezone
 from typing import Any, AsyncIterator
@@ -476,6 +477,9 @@ def test_config_readiness_flags_are_bool_only(monkeypatch):
         "storage_r2",
         # 署名付き中継IP（login/line_exchange限定・CLIENT_IP_RELAY_SECRETS）の鍵。
         "client_ip_relay",
+        # security review L-4: 設定された鍵のうち不正なもの（既知のテスト鍵・
+        # 短すぎる等）が1本も無いか。client_ip_relay とは独立したフラグ。
+        "client_ip_relay_secrets_valid",
     }
     assert all(isinstance(v, bool) for v in flags.values())
     # conftest が有効な APP_ENCRYPTION_KEY を注入しているので True。
@@ -554,6 +558,68 @@ async def test_readyz_degraded_config_excludes_client_ip_relay(db_engine, monkey
     payload = r.json()
     assert payload["config"]["client_ip_relay"] is False
     assert "client_ip_relay" not in payload["degraded_config"]
+    # 未設定（候補ゼロ）は不正な鍵が混じりようが無いため True・劣化なし。
+    assert payload["config"]["client_ip_relay_secrets_valid"] is True
+    assert "client_ip_relay_secrets_valid" not in payload["degraded_config"]
+
+
+async def test_readyz_client_ip_relay_secrets_valid_true_with_valid_key(
+    db_engine, monkeypatch
+) -> None:
+    """security review L-4: 有効な鍵のみが設定されている場合、両フラグとも
+    True で degraded_config に出ない。"""
+    import app.main as main_module
+
+    monkeypatch.setattr(main_module, "engine", db_engine)
+    from alembic.script import ScriptDirectory as _ScriptDirectory
+
+    monkeypatch.setattr(_ScriptDirectory, "get_current_head", lambda self: None)
+
+    settings = get_settings()
+    valid_key = secrets.token_urlsafe(48)
+    monkeypatch.setattr(settings, "client_ip_relay_secrets", SecretStr(valid_key))
+
+    app = main_module.create_app(settings)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        r = await ac.get("/readyz")
+    assert r.status_code == 200, r.text
+    payload = r.json()
+    assert payload["config"]["client_ip_relay"] is True
+    assert payload["config"]["client_ip_relay_secrets_valid"] is True
+    assert "client_ip_relay" not in payload["degraded_config"]
+    assert "client_ip_relay_secrets_valid" not in payload["degraded_config"]
+
+
+async def test_readyz_client_ip_relay_secrets_valid_false_with_rejected_key(
+    db_engine, monkeypatch
+) -> None:
+    """security review L-4: 有効な鍵が1本あっても、不正な鍵が1本でも混ざって
+    いれば client_ip_relay_secrets_valid だけが degraded_config に出る
+    （client_ip_relay 自体は有効な鍵があるため劣化にならない＝2つのフラグが
+    独立して動くことの固定）。"""
+    import app.main as main_module
+
+    monkeypatch.setattr(main_module, "engine", db_engine)
+    from alembic.script import ScriptDirectory as _ScriptDirectory
+
+    monkeypatch.setattr(_ScriptDirectory, "get_current_head", lambda self: None)
+
+    settings = get_settings()
+    valid_key = secrets.token_urlsafe(48)
+    too_short_key = "short-and-invalid"  # 32文字未満で除外される
+    monkeypatch.setattr(
+        settings, "client_ip_relay_secrets", SecretStr(f"{valid_key},{too_short_key}")
+    )
+
+    app = main_module.create_app(settings)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        r = await ac.get("/readyz")
+    assert r.status_code == 200, r.text
+    payload = r.json()
+    assert payload["config"]["client_ip_relay"] is True
+    assert payload["config"]["client_ip_relay_secrets_valid"] is False
+    assert "client_ip_relay" not in payload["degraded_config"]
+    assert "client_ip_relay_secrets_valid" in payload["degraded_config"]
 
 
 # ──────────────── H-3: 通知送信失敗の可視化 ────────────────

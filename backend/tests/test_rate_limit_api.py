@@ -213,6 +213,36 @@ async def client_killswitch(db_session: AsyncSession) -> AsyncIterator[AsyncClie
         yield ac
 
 
+#: ``client_small_limits`` が使う login_ip / line_ip の上限値。
+SMALL_LOGIN_IP_MAX = 3
+SMALL_LINE_MAX = 3
+
+
+@pytest.fixture
+async def client_small_limits(
+    db_session: AsyncSession, fake_clock: FakeClock
+) -> AsyncIterator[AsyncClient]:
+    """``login_ip_max`` / ``line_max`` を小さく（``SMALL_LOGIN_IP_MAX`` /
+    ``SMALL_LINE_MAX`` = 3）した以外は ``client`` と同じクライアント（QA M-4）。
+
+    「不採用→hopsへのフォールバック」「鍵の入れ替え」等、しきい値が具体的に
+    本番値（20）である必要のないテストで使うことで、1テストあたりのHTTP
+    リクエスト数を減らし試験時間を短縮する。核心の回帰（実際の本番値20で
+    しきい値に到達することの確認）は ``client`` を使う
+    ``TestRelayCoreBehavior`` に1本だけ残す。
+    """
+    test_app = create_test_app(db_session)
+    limiter = RateLimiter(
+        config=_config(login_ip_max=SMALL_LOGIN_IP_MAX, line_max=SMALL_LINE_MAX),
+        store=InMemoryRateLimitStore(clock=fake_clock),
+    )
+    test_app.dependency_overrides[get_rate_limiter] = lambda: limiter
+    async with AsyncClient(
+        transport=ASGITransport(app=test_app), base_url="http://test"
+    ) as ac:
+        yield ac
+
+
 # ──────────────────────────── login: アカウント軸 ────────────────────────────
 
 

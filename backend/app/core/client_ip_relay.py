@@ -29,7 +29,12 @@ import しないのは、この検証ロジック自体を HTTP・設定に依�
 **ヘッダ形式**: ``X-Katazuke-Client-Ip-Relay: v1;<10桁UNIX秒>;<IPの生文字列>;
 <HMAC-SHA256 小文字hex64桁>``。署名対象（ASCII限定）は
 ``"\\n".join((SIGNING_CONTEXT, METHOD大文字, PATH, TS文字列, IPの生文字列))``。
-``PATH`` は ``request.url.path``（クエリを含まない）。IP はヘッダの生文字列の
+``PATH`` は ``request.scope["path"]``（クエリを含まない・ルーティングが実際に
+使う値そのもの）。**``request.url.path`` は使わない（security review I-1）**:
+``request.url`` は Host ヘッダから URL 文字列を組み立て直してから再パースした
+結果であり、署名照合という完全性を要する処理にルーティングと無関係な文字列
+往復を持ち込みたくないため（詳細は ``verify_request_client_ip_relay``
+docstring）。IP はヘッダの生文字列の
 まま署名し、検証成功後にのみ正規化する（正規化ロジックのバグや表記揺れが
 署名検証をすり抜ける経路を作らないため。IPv4射影IPv6の展開・プライベート/
 特殊用途判定は署名検証を通過した後にのみ行う）。
@@ -46,6 +51,18 @@ import しないのは、この検証ロジック自体を HTTP・設定に依�
 （＝全断）ことは絶対に避ける。同様に、検証処理自体の予期しない例外も
 呼び出し側（``rate_limit_deps._relayed_client_ip``）で握りつぶし hops へ
 フォールバックする。
+
+**既知の割り切り（v1）: 再送（リプレイ）耐性を持たない。** 有効なヘッダ値を
+盗聴・記録できた第三者は、時刻ずれが ``MAX_CLOCK_SKEW_SECONDS`` 以内であれば
+同じヘッダ値をそのまま再送するだけで同じ利用者IPとしてカウントさせられる
+（ノンスやリクエスト本文のハッシュを署名対象に含めていないため。
+``tests/test_client_ip_relay_api.py`` の該当テストに固定化してある）。この
+ヘッダは HTTPS（TLS）区間内でのみ送受信され、web 側・backend 側とも生の
+ヘッダ値をログや APM に記録しない前提で設計しているため、実務上の悪用可能性は
+小さいと判断した上での意図的な割り切りである。将来 APM 等でリクエストヘッダを
+記録する仕組みを導入する場合は、v2 でノンスまたはリクエスト本文ハッシュを
+署名対象に加えて1回限りの使用を強制する必要がある（運用手順は
+``docs/ops/admin-operations.md`` の「署名付き中継IPの鍵」節も参照）。
 """
 
 from __future__ import annotations
@@ -63,6 +80,7 @@ from fastapi import Request
 
 from app.core.client_ip import (
     _unwrap_ipv4_mapped,
+    is_cloudflare_range,
     is_private_or_loopback,
     is_special_use_address,
     truncate_ip_for_log,
@@ -102,10 +120,33 @@ _MAX_HEADER_VALUE_LENGTH = 128
 # 委ねる（正規表現側は「そもそも IP らしくない文字（空白・角括弧・%等）を
 # 早期に弾く」役割に限定する）。
 _HEADER_RE = re.compile(r"(v[0-9]{1,3});([0-9]{10});([0-9A-Fa-f:.]{2,45});([0-9a-f]{64})")
-# request.url.path が取りうる形式（クエリを含まない絶対パス）。
+# request.scope["path"] が取りうる形式（クエリを含まない絶対パス）。
 _PATH_RE = re.compile(r"/[A-Za-z0-9/_.\-]{0,255}")
 # 大文字化後の HTTP メソッド名。
 _METHOD_RE = re.compile(r"[A-Z]{1,16}")
+
+# ──────────────── 既知のテスト鍵・弱い鍵の拒否（security review L-2） ────────────────
+# 公開済みのテストベクトル鍵（本ファイル・tests/test_client_ip_relay.py の
+# TestKnownVectors が使う固定値そのもの）が本番の CLIENT_IP_RELAY_SECRETS に
+# 誤って設定されると、署名が誰でも計算可能になり本機能が無意味になる。
+# 完全一致で拒否する。
+_REJECTED_EXACT_KEYS: frozenset[str] = frozenset(
+    {
+        "katazuke-relay-test-vector-A-0123456789abcdefghijklmnopqrstuvwxyz",
+        "katazuke-relay-test-vector-B-0123456789abcdefghijklmnopqrstuvwxyz",
+    }
+)
+# 上記以外にも、テスト用の命名規則で作られた鍵を丸ごと弾く接頭辞（比較前に
+# ``str.lower()`` するため大文字小文字は区別しない）。新しいテストベクトルを
+# 増やしても個別に ``_REJECTED_EXACT_KEYS`` へ追記する手間を減らす。
+_REJECTED_PREFIXES: tuple[str, ...] = ("katazuke-relay-test-", "http-relay-test-key-")
+# 鍵に含まれる文字の種類数（distinct count）の最小値。"a" * 32 のような
+# 人為的に偏った値は、正規のランダム生成（``secrets.token_urlsafe(48)`` は
+# 実測で最低29種類の文字を含む）とは明確に区別できる一方、16進数表記の鍵
+# （0-9a-f の16種類）はごく低確率（32文字中の異なり数が9以下になる確率は
+# 概算で約1/9000）で偶然この下限を割り込みうるため、拒否時のログで
+# 推奨の生成コマンドを案内する。
+_MIN_DISTINCT_CHARS = 10
 
 
 RelayReason = Literal[
@@ -144,8 +185,61 @@ class RelayVerification(NamedTuple):
     rejected_ip_net: str | None = None
 
 
+class RelaySecretsInspection(NamedTuple):
+    """``inspect_relay_secrets`` の返り値。
+
+    - ``keys``: 有効な鍵（順序保持・重複除去・``MAX_KEYS`` 以内）。
+    - ``rejected_count``: 除外された候補の本数（短すぎる・非ASCII・空白混入・
+      既知のテスト鍵/弱い鍵パターンとの一致、のいずれか）。**``MAX_KEYS``
+      超過による切り捨ては含まない**（切り捨てられた鍵それ自体は無効では
+      なく、正当なローテーション運用（一時的に5本以上を並べる等）を「不正な
+      鍵が混じっている」という劣化判定に混同させないため）。重複も含まない
+      （同じ有効な鍵を2回書いても「不正」ではない）。
+    """
+
+    keys: tuple[bytes, ...]
+    rejected_count: int
+
+
+def _relay_secret_rejection_reason(token: str) -> str | None:
+    """``token`` を ``CLIENT_IP_RELAY_SECRETS`` の1本として使えない理由
+    （ログ用の短い日本語。値・長さは一切含まない）を返す。使える場合は
+    ``None``。
+
+    判定順序（先に該当したものを理由として確定する。全て満たして初めて
+    ``None``）:
+      1. 基本要件（``MIN_SECRET_LENGTH`` 文字以上・ASCII印字可能・空白なし）。
+      2. 公開済みのテストベクトル鍵との完全一致（``_REJECTED_EXACT_KEYS``）。
+      3. 既知のテスト鍵の接頭辞との一致（``_REJECTED_PREFIXES``。大文字小文字
+         を区別しない）。
+      4. 使用文字の種類数が ``_MIN_DISTINCT_CHARS`` 未満（人為的に偏った値。
+         security review L-2）。
+    """
+    if (
+        len(token) < MIN_SECRET_LENGTH
+        or not token.isascii()
+        or not token.isprintable()
+        or any(ch.isspace() for ch in token)
+    ):
+        return (
+            f"要件（{MIN_SECRET_LENGTH}文字以上・ASCII印字可能文字のみ・"
+            "空白を含まない）を満たさない"
+        )
+    if token in _REJECTED_EXACT_KEYS:
+        return "公開済みのテストベクトル鍵と一致する"
+    if token.lower().startswith(_REJECTED_PREFIXES):
+        return "既知のテスト鍵の命名パターン（接頭辞）と一致する"
+    if len(set(token)) < _MIN_DISTINCT_CHARS:
+        return (
+            f"使用している文字の種類が{_MIN_DISTINCT_CHARS}種類未満で偏っている"
+            '（`python -c "import secrets; print(secrets.token_urlsafe(48))"` 等'
+            "で生成した値を推奨します）"
+        )
+    return None
+
+
 @lru_cache(maxsize=8)
-def parse_relay_secrets(raw: str) -> tuple[bytes, ...]:
+def inspect_relay_secrets(raw: str) -> RelaySecretsInspection:
     """``CLIENT_IP_RELAY_SECRETS``（カンマ区切り・先頭が新しい鍵）を解析する。
 
     各候補は次の全てを満たさなければ無効として除外し、``logger.error`` で
@@ -157,50 +251,61 @@ def parse_relay_secrets(raw: str) -> tuple[bytes, ...]:
       - ``str.isprintable()``（制御文字を含まない）。
       - 空白文字を含まない（``isprintable()`` は半角スペース単体を通して
         しまうため、別途明示的にチェックする）。
+      - 公開済みのテストベクトル鍵・既知のテスト鍵の接頭辞のいずれとも
+        一致しない（security review L-2。誤って本番に投入される事故を防ぐ。
+        判定の詳細は ``_relay_secret_rejection_reason`` 参照）。
+      - 使用文字の種類が ``_MIN_DISTINCT_CHARS`` 種類以上（同上）。
 
     有効な候補のみを対象に、順序を保ったまま重複を除去し、``MAX_KEYS`` を
     超える分は末尾を切り捨てて ``logger.error`` を出す（無効な候補の重複は
-    対象外＝無効な候補は毎回独立に除外・ログされる）。
+    対象外＝無効な候補は毎回独立に除外・ログされる。切り捨ても
+    ``rejected_count`` には含めない。理由は ``RelaySecretsInspection``
+    docstring 参照）。
 
     ``raw`` を分割・空要素除去した時点で候補が1つも無い場合（空文字列・
     空白のみ・カンマのみ）は「そもそも設定されていない」通常運用として
-    扱い、エラーは出さない。候補は存在したが有効な鍵が1本も残らなかった
-    場合のみ、「署名付き中継を無効化する（従来どおり hops で数える）」旨の
-    ``logger.error`` を出す（設定ミスに気付けるようにするため）。
+    扱い、エラーは出さない（``rejected_count`` も 0）。候補は存在したが
+    有効な鍵が1本も残らなかった場合のみ、「署名付き中継を無効化する
+    （従来どおり hops で数える）」旨の ``logger.error`` を出す（設定ミスに
+    気付けるようにするため）。
 
     **起動を止めない**: この関数はどのような ``raw`` を渡されても例外を
-    送出せず、常に ``tuple[bytes, ...]``（空の場合は ``()``）を返す。中継は
-    「無くても今どおり動く」上書き機能であるため、鍵の設定ミス1つで
-    認証系 API 全体の起動を失敗させることは避ける。
+    送出せず、常に ``RelaySecretsInspection``（鍵が無い場合は ``keys=()``）を
+    返す。中継は「無くても今どおり動く」上書き機能であるため、鍵の設定ミス
+    1つで認証系 API 全体の起動を失敗させることは避ける。
 
     ``@lru_cache`` によりプロセス内で ``raw`` の値ごとに1度だけ解析する
     （``settings.client_ip_relay_secrets`` は毎リクエスト同じ文字列を返すため、
     HMAC 鍵オブジェクトの再構築コストを避けられる）。テストで
     ``monkeypatch`` により新しい値を注入した場合は、その新しい文字列が
     そのままキャッシュキーになるため、明示的な ``cache_clear()`` は不要
-    （値が変われば別エントリとして扱われる）。
+    （値が変われば別エントリとして扱われる。同じ ``raw`` をテスト間で使い回す
+    場合のみ明示的な ``cache_clear()`` が必要）。
+
+    ログ出力・不正鍵の検知をこの関数に一本化しているのは、``/readyz`` が
+    「鍵は設定されているが不正な鍵が混じっている」ことを ``rejected_count``
+    経由で検知できるようにするため（security review L-4。``app.main.
+    _config_readiness`` 参照）。``parse_relay_secrets`` は鍵の中身だけを
+    必要とする既存の呼び出し側向けの薄いラッパーとして残す。
     """
     tokens = [token.strip() for token in raw.split(",")]
     tokens = [token for token in tokens if token]
     if not tokens:
         # 空・空白のみ・カンマのみ。「未設定」と同じ通常運用のため無音。
-        return ()
+        return RelaySecretsInspection(keys=(), rejected_count=0)
 
     valid_ordered: list[str] = []
     seen: set[str] = set()
+    rejected_count = 0
     for position, token in enumerate(tokens, start=1):
-        if (
-            len(token) < MIN_SECRET_LENGTH
-            or not token.isascii()
-            or not token.isprintable()
-            or any(ch.isspace() for ch in token)
-        ):
+        reason = _relay_secret_rejection_reason(token)
+        if reason is not None:
+            rejected_count += 1
             logger.error(
-                "client_ip_relay: CLIENT_IP_RELAY_SECRETS の%d番目の鍵が要件"
-                "（%d文字以上・ASCII印字可能文字のみ・空白を含まない）を満たさない"
-                "ため除外します（値・長さは記録しません）。",
+                "client_ip_relay: CLIENT_IP_RELAY_SECRETS の%d番目の鍵が%sため"
+                "除外します（値・長さは記録しません）。",
                 position,
-                MIN_SECRET_LENGTH,
+                reason,
             )
             continue
         if token in seen:
@@ -225,7 +330,24 @@ def parse_relay_secrets(raw: str) -> tuple[bytes, ...]:
             "hops のみで数えます）。"
         )
 
-    return tuple(token.encode("ascii") for token in valid_ordered)
+    return RelaySecretsInspection(
+        keys=tuple(token.encode("ascii") for token in valid_ordered),
+        rejected_count=rejected_count,
+    )
+
+
+@lru_cache(maxsize=8)
+def parse_relay_secrets(raw: str) -> tuple[bytes, ...]:
+    """``inspect_relay_secrets(raw).keys`` を返す薄いラッパー。
+
+    既存の呼び出し側（``rate_limit_deps._relayed_client_ip`` 等）は鍵の中身
+    だけを必要とするため、シグネチャ・戻り値の型を変えない。ログ出力・
+    不正鍵の検知（``rejected_count``）は ``inspect_relay_secrets`` に一本化
+    した（理由は同関数の docstring 参照）。自身も ``@lru_cache`` を持つが、
+    ``inspect_relay_secrets`` 側のキャッシュがヒットしていればここでの
+    キャッシュミスは属性アクセス1回分のコストに過ぎない。
+    """
+    return inspect_relay_secrets(raw).keys
 
 
 def canonical_relay_message(*, method: str, path: str, timestamp: str, ip: str) -> str:
@@ -369,12 +491,27 @@ def verify_request_client_ip_relay(
     複数存在する場合に先頭1件のみを返すため、"複数行=malformed" の判定を
     素通りさせてしまう。``app.core.client_ip.get_xff_raw`` の docstring で
     説明されている落とし穴と同種の理由）。
+
+    **``path`` は ``request.url.path`` ではなく ``request.scope.get("path", "")``
+    を使う（security review I-1）**: ``starlette.datastructures.URL`` は
+    ``scope["path"]`` と Host ヘッダから ``f"{scheme}://{host}{path}"`` という
+    文字列を組み立て、それを ``urlsplit()`` で再パースした結果から ``.path``
+    を取り出す実装になっている。現行の Starlette は Host ヘッダの文字種を
+    正規表現で検証してこの手の食い違いを塞いでいるが、ルーティング自体は
+    ``scope["path"]`` を直接見て一致判定するため、署名照合もそれと完全に
+    同じ値を使うべきである（Host ヘッダの検証・URL 文字列の組み立てという
+    ルーティングと無関係な依存を、完全性が要求される署名対象に持ち込まない
+    ようにする防御的な設計判断。将来 Starlette 側の実装が変わっても影響を
+    受けない）。``request.scope`` は ``Mapping`` であり ``"path"`` キーは
+    ASGI 仕様上 HTTP スコープに必須のため通常は欠落しないが、念のため
+    ``.get("path", "")`` とし、欠落時は空文字列（＝``_PATH_RE`` に一致せず
+    ``"malformed"`` になる）にフォールバックする。
     """
     header_values = request.headers.getlist(RELAY_HEADER_NAME)
     return verify_client_ip_relay(
         header_values=header_values,
         method=request.method,
-        path=request.url.path,
+        path=request.scope.get("path", ""),
         now_epoch_seconds=int(clock()),
         keys=keys,
     )
@@ -421,7 +558,16 @@ def log_relay_outcome(scope: str, v: RelayVerification) -> None:
       直接アクセス、または本機能の未反映段階）でログを埋め尽くさないため、
       何も出力しない。
     - ``"ok"``: 起動後 scope ごとの初回のみ WARNING（前述の理由）。以後は
-      INFO をスロットリング（60秒に1回）。
+      INFO をスロットリング（60秒に1回）。**加えて、採用した中継IPが
+      Cloudflare の公開レンジ内だった場合は、判定は変えず（採用・カウントは
+      継続）scope ごとにスロットリング付き WARNING を別途出す**
+      （security review M-2。Vercel の前段に Cloudflare 等のプロキシが
+      挟まり、web 側が受け取る「実クライアントIP」が実は利用者ではなく
+      そのプロキシの IP になっている疑いを検知するため。
+      ``app.core.client_ip.is_cloudflare_range`` は判定に使ってはならない
+      値だが、``RateLimitGuard`` の hops 方式側の同種の WARNING
+      （``rate_limit_deps._warn_cf_range_at_trust_position``）と同じ
+      トレードオフでカウントは継続する）。
     - ``"unconfigured"``: 中継ヘッダは来ているのに鍵が1本も無い、設定漏れの
       可能性が高い状態。スロットリング付き WARNING。
     - それ以外の不採用理由: スロットリング付き WARNING。理由別に安全な
@@ -432,7 +578,24 @@ def log_relay_outcome(scope: str, v: RelayVerification) -> None:
 
     if v.reason == "ok":
         ip_net = truncate_ip_for_log(v.ip) if v.ip else "-"
+        # reason=="ok" は必ず署名照合（matched_slot の確定）を経由しているため
+        # key_slot は理論上常に非 None のはず。-1 はここに到達しないはずの
+        # 防御的なフォールバック値（型が ``int | None`` である以上、静的な
+        # None チェックを省略しないための保険であり、実際に -1 が出力された
+        # 場合はそれ自体が verify_client_ip_relay 側のバグを示す）。
         key_slot = v.key_slot if v.key_slot is not None else -1
+        if v.ip is not None and is_cloudflare_range(v.ip):
+            _relay_throttle("ok_cloudflare_range", scope).emit(
+                lambda: logger.warning(
+                    "client_ip_relay: 中継IPが Cloudflare の公開レンジです"
+                    "（scope=%s ip_net=%s）。Vercel の前段に Cloudflare 等の"
+                    "プロキシが入り x-real-ip がプロキシの IP になっている"
+                    "疑いがあります（利用者が WARP 等を使っている場合にも"
+                    "出ます）。カウントは継続します。",
+                    scope,
+                    ip_net,
+                )
+            )
         if scope not in _relay_first_ok_logged_scopes:
             _relay_first_ok_logged_scopes.add(scope)
             logger.warning(

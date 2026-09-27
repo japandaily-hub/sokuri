@@ -30,6 +30,9 @@ _IP_HEADER_ALLOWED_FILES: dict[str, frozenset[str]] = {
     "x-real-ip": frozenset(),
     "forwarded": frozenset(),
     "true-client-ip": frozenset(),
+    # 署名付き中継IP（I8）。署名検証（verify_request_client_ip_relay）を経ずに
+    # このヘッダを読む実装を禁止する。
+    "x-katazuke-client-ip-relay": frozenset({"core/client_ip_relay.py"}),
 }
 
 # request.client.host（プロキシ配下では常にプロキシ自身の IP）を書いてよいファイル。

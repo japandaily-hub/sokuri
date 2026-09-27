@@ -982,6 +982,11 @@ _RELAY_ELIGIBLE_SCOPES: frozenset[str] = frozenset({"login", "line_exchange"})
 # 想定だが、本機能の障害が認証系 API 全体を巻き込まないよう、必ず握りつぶして
 # hops へフォールバックする。他の *_throttle と同じ理由でスロットリングする）。
 _relay_unexpected_error_throttle = ThrottledLogger()
+# ログ出力（log_relay_outcome）自体が例外を投げた場合の WARNING。検証本体の
+# 例外（_relay_unexpected_error_throttle）とは意図的に別インスタンスにする
+# （QA M-3: 2つの try を分ける理由と対で、スロットリングも独立させないと
+# 片方の頻発がもう片方の初回検知を隠してしまうため）。
+_relay_log_outcome_error_throttle = ThrottledLogger()
 
 
 def _relayed_client_ip(scope: str, request: Request) -> str | None:
@@ -989,19 +994,32 @@ def _relayed_client_ip(scope: str, request: Request) -> str | None:
 
     対象外 scope はヘッダを読みもせず ``None`` を返す（``_RELAY_ELIGIBLE_SCOPES``
     参照。鍵が万一漏洩した場合の悪用範囲を2 scope に構造的に限定する最初の
-    ゲート）。鍵の読み取り・ヘッダ検証は try で包み、予期しない例外が発生
-    しても ``None``（＝呼び出し側は hops 方式へフォールバック）を返す。
-    本機能はあくまで「無くても今どおり動く」上書きのため、ここでの障害が
-    ログイン・LINE連携そのものを 500 に巻き込むことは絶対に避ける。
+    ゲート）。
+
+    **検証本体とログ出力を別々の try で囲む（QA M-3）。** 1つの try に
+    まとめると、``log_relay_outcome``（ログ出力）側の不具合が、既に確定した
+    検証結果（``ok`` かどうか）まで巻き込んで握りつぶしてしまう
+    ――正しく採用できたはずの中継IPが、ログ処理のバグのせいで hops へ
+    フォールバックされる、という本末転倒が起こり得る。したがって:
+
+      1. 1つ目の try: 鍵の読み取り・署名検証本体。ここで例外が起きた場合は
+         ``None`` を返す（hops へフォールバック。本来この経路の障害は
+         認証系全体を巻き込んではならないため）。
+      2. 2つ目の try: ``log_relay_outcome`` の呼び出しのみ。ここで例外が
+         起きても握りつぶすだけで、**戻り値には一切影響させない**
+         （既に確定した ``verification`` の内容だけで戻り値を決める）。
+
+    どちらの try も、本機能はあくまで「無くても今どおり動く」上書きのため、
+    ここでの障害がログイン・LINE連携そのものを 500 に巻き込むことは絶対に
+    避ける。
     """
     if scope not in _RELAY_ELIGIBLE_SCOPES:
         return None
+
     try:
         settings = get_settings()
         keys = parse_relay_secrets(settings.client_ip_relay_secrets.get_secret_value())
         verification = verify_request_client_ip_relay(request, keys)
-        log_relay_outcome(scope, verification)
-        return verification.ip if verification.reason == "ok" else None
     except Exception:  # noqa: BLE001 -- 本機能の障害で認証系全体を巻き込まないため
         _relay_unexpected_error_throttle.emit(
             lambda: logger.exception(
@@ -1011,6 +1029,19 @@ def _relayed_client_ip(scope: str, request: Request) -> str | None:
             )
         )
         return None
+
+    try:
+        log_relay_outcome(scope, verification)
+    except Exception:  # noqa: BLE001 -- ログ処理の不具合で確定済みの検証結果を握りつぶさない
+        _relay_log_outcome_error_throttle.emit(
+            lambda: logger.exception(
+                "rate_limit: 署名付き中継IPの判定ログ出力中に予期しないエラーが"
+                "発生しました（scope=%s）。判定結果には影響しません。",
+                scope,
+            )
+        )
+
+    return verification.ip if verification.reason == "ok" else None
 
 
 def _apply_ip_axis(
