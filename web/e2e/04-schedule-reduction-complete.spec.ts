@@ -8,8 +8,8 @@
  * （newE2EContext は next dev の開発用オーバーレイを消す。helpers/test.ts）。
  *
  * 日程確定では「業者へのひとこと」に運営を名乗る文面を入れ、依頼者・業者の両チャットで
- * 運営名義の確定メッセージが中央のお知らせ枠（定型文）で出て、ひとことは枠の外の吹き出しに
- * 分かれることも確かめる（日程検証レビュー SEC-L1/SEC-I8）。
+ * 確定が「訪問日程が確定しました」の帯（サーバーが作った日付・時間帯だけ）で出て、ひとことは
+ * 帯の外の吹き出しに分かれることも確かめる（日程検証レビュー SEC-L1/SEC-I8・日程構造化 DESIGN §13.4）。
  */
 import { Page } from "@playwright/test";
 
@@ -23,22 +23,17 @@ let api: Api;
 let sellerToken: string;
 let vendor: OperatorSession;
 
-/** 固定時間帯「9:00〜12:00」。〜は U+301C（WAVE DASH）で、打ち間違えないよう文字コードから組み立てる。 */
-const MORNING_SLOT = `9:00${String.fromCharCode(0x301c)}12:00`;
-
 /**
- * 運営名義の日程確定メッセージが中央のお知らせ枠（role="note"）に定型文で出て、依頼者の
- * ひとことはその枠の外（本人の吹き出し）に出ることを確かめる。依頼者・業者のチャットで共通。
+ * 日程確定が「訪問日程が確定しました」の帯（ScheduleConfirmedBand）で出て、依頼者の
+ * ひとことはその帯の外（本人の吹き出し）に出ることを確かめる。依頼者・業者のチャットで共通。
+ * 当日の終わった枠は選べないため「時間指定なし」で確定している。
  */
-async function expectScheduleNoticeWithSeparateNote(page: Page, note: string): Promise<void> {
-  const notice = page.getByRole("note").filter({ hasText: "訪問日程が確定しました。" });
-  await expect(notice).toBeVisible({ timeout: 30_000 });
-  await expect(notice).toContainText("カタヅケからのお知らせ");
-  await expect(notice).toContainText(`時間帯：${MORNING_SLOT}`);
-  // 固定時間帯での確定なので「業者が提示した候補」の別枠は出ない。
-  await expect(notice.getByText("業者が提示した候補")).toHaveCount(0);
-  // ひとことは運営の枠に連結されず、枠の外の吹き出しとして出る。
-  await expect(notice).not.toContainText(note);
+async function expectScheduleBandWithSeparateNote(page: Page, note: string): Promise<void> {
+  const band = page.getByRole("group", { name: "訪問日程が確定しました" });
+  await expect(band).toBeVisible({ timeout: 30_000 });
+  await expect(band).toContainText("時間指定なし");
+  // ひとことは運営名義の帯に連結されず、帯の外の吹き出しとして出る。
+  await expect(band).not.toContainText(note);
   await expect(page.locator(".msg .bubble").filter({ hasText: note })).toBeVisible();
 }
 
@@ -68,7 +63,9 @@ test("日程確定 → 減額承認 → 完了確定を依頼 → 完了確定 �
   const todayDay = await page.evaluate(() => String(new Date().getDate()));
   await page.getByRole("button", { name: todayDay, exact: true }).click();
   await expect(page.getByText("希望時間帯を選んでください")).toBeVisible();
-  await page.getByRole("button", { name: /9:00〜12:00/ }).click();
+  // 当日の終わった時間帯は選べない（日本時間で判定。日程構造化 DESIGN §13.4）ため、実行時刻に
+  // かかわらず選べる「時間指定なし」を選ぶ。
+  await page.getByRole("button", { name: /時間指定なし/ }).click();
   // 運営を名乗る文面のひとこと（運営名義のお知らせに見えないことを後で両チャットで確かめる）。
   const note = `（運営補足）E2E ひとこと ${Date.now()}`;
   await page.getByLabel(/業者へのひとこと/).fill(note);
@@ -91,16 +88,16 @@ test("日程確定 → 減額承認 → 完了確定を依頼 → 完了確定 �
   await confirmModal(page, /減額を承認しますか？/, "承認する");
   await expect(page.getByText("業者から減額申請が届いています")).toBeHidden({ timeout: 30_000 });
 
-  // ---- 依頼者: 案件詳細のチャットで、日程確定のお知らせ枠とひとことの吹き出しが分かれている ----
-  await expectScheduleNoticeWithSeparateNote(page, note);
+  // ---- 依頼者: 案件詳細のチャットで、日程確定の帯とひとことの吹き出しが分かれている ----
+  await expectScheduleBandWithSeparateNote(page, note);
 
   // ---- 業者 context を前倒しで作成し、完了確定の依頼〜評価投稿まで使い回す ----
   const operatorContext = await newE2EContext(browser);
   try {
     const operatorPage = await operatorContext.newPage();
-    // ---- 業者: チャットでも、日程確定のお知らせ枠とお客様のひとことの吹き出しが分かれている ----
+    // ---- 業者: チャットでも、日程確定の帯とお客様のひとことの吹き出しが分かれている ----
     await loginAsOperator(operatorPage, ACCOUNTS.vendor, `/operator/chat/${txn.id}`);
-    await expectScheduleNoticeWithSeparateNote(operatorPage, note);
+    await expectScheduleBandWithSeparateNote(operatorPage, note);
     await operatorPage.goto(`/operator/transactions/${txn.id}`);
 
     // ---- 業者: 完了確定を依頼する ----

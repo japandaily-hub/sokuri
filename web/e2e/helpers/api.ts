@@ -51,6 +51,19 @@ export interface TransactionDetail extends TransactionSummary {
   reviews: { id: string; reviewer_type: "user" | "operator"; verdict: "good" | "improve"; comment: string | null }[];
 }
 
+/** 業者が提示する候補1件（日程構造化 DESIGN §13.3）。時間指定なしは start/end とも null。 */
+export interface ScheduleCandidateInput {
+  date: string;
+  start: string | null;
+  end: string | null;
+}
+
+/** 候補日提示のレスポンス（schedule_proposal メッセージ。meta v2 の label はサーバーが作る）。 */
+export interface ScheduleProposalMessage {
+  id: string;
+  meta: { v: number; seq: number; candidates: (ScheduleCandidateInput & { label: string })[] };
+}
+
 /** 運営の口コミ一覧（GET /admin/reviews）の1行。09-admin-reviews.spec.ts の状態確認用。 */
 export interface AdminReviewListItem {
   id: string;
@@ -258,12 +271,34 @@ export class Api {
     return expectJson<{ id: string }>(await this.sendMessageRaw(transactionId, body, token), 201, 200);
   }
 
-  async proposeSchedule(transactionId: string, slots: string[], operatorToken: string): Promise<{ id: string }> {
+  /**
+   * 業者の候補日提示（日程構造化 DESIGN §13.3）。候補は {date:"YYYY-MM-DD", start:"HH:MM"|null, end:"HH:MM"|null}
+   * （時間指定なしは start/end とも null）。表示ラベルはサーバーが作り、返り値の meta.candidates[].label に入る。
+   */
+  async proposeSchedule(
+    transactionId: string,
+    candidates: ScheduleCandidateInput[],
+    operatorToken: string,
+  ): Promise<ScheduleProposalMessage> {
     const res = await this.ctx.post(
       `${API_URL}/transactions/${encodeURIComponent(transactionId)}/schedule/propose`,
-      { headers: this.headers(operatorToken), data: { slots } },
+      { headers: this.headers(operatorToken), data: { candidates } },
     );
-    return expectJson<{ id: string }>(res, 201, 200);
+    return expectJson<ScheduleProposalMessage>(res, 201, 200);
+  }
+
+  /** 依頼者が最新の提示（proposalId）から候補（candidateIndex）を選んで訪問日程を確定する。 */
+  async acceptSchedule(
+    transactionId: string,
+    proposalId: string,
+    candidateIndex: number,
+    sellerToken: string,
+  ): Promise<TransactionSummary> {
+    const res = await this.ctx.post(
+      `${API_URL}/transactions/${encodeURIComponent(transactionId)}/schedule/proposals/${encodeURIComponent(proposalId)}/accept`,
+      { headers: this.headers(sellerToken), data: { candidate_index: candidateIndex } },
+    );
+    return expectJson<TransactionSummary>(res, 200);
   }
 
   async createReduction(

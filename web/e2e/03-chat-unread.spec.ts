@@ -1,8 +1,11 @@
 /**
  * (3) 依頼者チャット送信 → 業者ログイン（別 context）→ 取引一覧に未読1 → 返信 →
- * 候補日提案（日付入力＋時間帯ボタン） → 依頼者側にも候補日が届く。
+ * 候補日提案（日付入力＋時間帯ボタン） → 依頼者側に有効な「{label} で確定」が1つ届く →
+ * 押して確認モーダルで確定 → 依頼者・業者の両方のチャットに「訪問日程が確定しました」の帯。
  *
  * 未読カウントは r6 で入れた導線なので、依頼者→業者の向きで実際に増えることを見る。
+ * 日程の確定は日程構造化 DESIGN §13.4（最新の提示の候補ごとのボタン＋確認モーダル→accept API）。
+ * この spec は取引を visiting に進める（以降の ensureUnscheduledTransaction の対象からは外れる）。
  */
 import { BrowserContext, Page } from "@playwright/test";
 
@@ -10,7 +13,7 @@ import { Api, OperatorSession, loginAll } from "./helpers/api";
 import { ACCOUNTS, API_URL } from "./helpers/env";
 import { ensureUnscheduledTransaction } from "./helpers/fixtures";
 import { test, expect, newE2EContext } from "./helpers/test";
-import { loginAsOperator, loginAsUser } from "./helpers/ui";
+import { confirmModal, loginAsOperator, loginAsUser } from "./helpers/ui";
 
 let api: Api;
 let sellerToken: string;
@@ -27,7 +30,7 @@ test.afterAll(async () => {
   await api.dispose();
 });
 
-test("依頼者の送信が業者側で未読になり、業者が返信と候補日提案をできる", async ({ page, browser }) => {
+test("依頼者の送信が業者側で未読になり、業者の候補日提案から依頼者が訪問日程を確定できる", async ({ page, browser }) => {
   // pending・visit_date なしの取引を使う（visiting だと業者側で新しい候補日を提示できない）。
   const txn = await ensureUnscheduledTransaction(api, sellerToken, vendor);
 
@@ -50,11 +53,11 @@ test("依頼者の送信が業者側で未読になり、業者が返信と候�
   const DOW_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
   const expectedSlotLabel = `${target.getFullYear()}年${target.getMonth() + 1}月${target.getDate()}日（${DOW_LABELS[target.getDay()]}）9:00〜12:00`;
 
-  // 同日・同一取引の再実行では前回の候補日と同じラベルになりうるため、単純な visible 判定
-  // では新規追加を確認できない（前回分がそのまま見えているだけでも空振りで成立してしまう）。
-  // 依頼者側の件数は業者操作の前に確定させておき、送信後に +1 になることで検証する。
-  const matchingRadios = page.getByRole("radio", { name: expectedSlotLabel, exact: true });
-  const radioCountBefore = await matchingRadios.count();
+  // 依頼者側の候補カード（role="group"・名前「引き取り候補日」）の件数を業者操作の前に数えておき、
+  // +1 になった（＝今回の提示が届いた）ことを待ってから確定ボタンを押す。前回実行の提示が
+  // 最新として見えている間に押すと、置き換わった提示への確定（409 superseded）になってしまうため。
+  const proposalCards = page.getByRole("group", { name: "引き取り候補日", exact: true });
+  const cardCountBefore = await proposalCards.count();
 
   // ---- 業者: 別 context で未読を確認 ----
   // browser.newContext() ではなく newE2EContext()。375px 幅では左下の next dev 用
@@ -87,18 +90,44 @@ test("依頼者の送信が業者側で未読になり、業者が返信と候�
       .getByText(expectedSlotLabel, { exact: true });
     const slotCountBefore = await matchingSlotTexts.count();
 
-    // 候補日 1（role="group"）内で日付入力→時間帯ボタンを選ぶ（自由入力からボタン化）。
+    // 候補日 1（role="group"）内で日付入力→時間帯ボタンを選ぶ。前回の提示で初期入力されていても、
+    // 1行目をこの日付と 9:00〜12:00 に上書きする。
     const slot1 = vendorPage.getByRole("group", { name: "候補日 1" });
     await slot1.getByLabel("候補日 1 の日付").fill(targetIso);
     await slot1.getByRole("button", { name: /9:00〜12:00/ }).click();
+    await expect(slot1.getByText(expectedSlotLabel, { exact: true })).toBeVisible();
     await vendorPage.getByRole("button", { name: "候補日を送信する" }).click();
     await expect(matchingSlotTexts).toHaveCount(slotCountBefore + 1, { timeout: 30_000 });
+    // 送信した提示が最新（依頼者が確定できる提示）として「（最新）」付きで表示される。
+    await expect(vendorPage.getByText("提示した候補日（最新）", { exact: true })).toHaveCount(1);
+
+    // ---- 依頼者: 候補日が反映され（5秒間隔ポーリング。ページ遷移なしで届く）、
+    //      有効な「{label} で確定」が1つだけある ----
+    await expect(proposalCards).toHaveCount(cardCountBefore + 1, { timeout: 30_000 });
+    const acceptButton = page.getByRole("button", { name: `${expectedSlotLabel} で確定`, exact: true });
+    await expect(acceptButton).toHaveCount(1);
+    await expect(acceptButton).toBeEnabled();
+
+    // ---- 依頼者: 押して確認モーダルで確定する ----
+    await acceptButton.click();
+    await confirmModal(page, /訪問日程を確定しますか？/, "確定する");
+
+    // ---- 両者のチャットに「訪問日程が確定しました」の帯（候補のラベル入り）----
+    await expect(page.getByRole("group", { name: "訪問日程が確定しました" })).toContainText(expectedSlotLabel, {
+      timeout: 30_000,
+    });
+    // 確定後は取引が visiting になり、依頼者側の確定ボタンは消える（候補は文字だけになる）。
+    await expect(acceptButton).toHaveCount(0);
+    await expect(vendorPage.getByRole("group", { name: "訪問日程が確定しました" })).toContainText(expectedSlotLabel, {
+      timeout: 30_000,
+    });
   } finally {
     await vendorContext.close();
   }
 
-  // ---- 依頼者: 候補日が反映される（5秒間隔ポーリング。ページ遷移なしで届く）----
-  await expect(matchingRadios).toHaveCount(radioCountBefore + 1, { timeout: 30_000 });
+  await expect
+    .poll(async () => (await api.getTransaction(txn.id, sellerToken)).status, { timeout: 30_000 })
+    .toBe("visiting");
 
   // 依頼者側の未読が溜まったままだと後続テストの前提が濁るので既読化しておく。
   await api

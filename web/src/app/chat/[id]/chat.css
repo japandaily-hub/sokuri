@@ -336,21 +336,13 @@
   margin-bottom: 12px;
 }
 .chat-page .schedule-card-head .ic { width: 16px; height: 16px; color: var(--blue); }
-.chat-page .schedule-options { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
-.chat-page .schedule-opt {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13.5px;
-  color: var(--body);
-  cursor: pointer;
-  padding: 6px 0;
-}
-.chat-page .schedule-opt input[type="radio"] { accent-color: var(--blue); width: 16px; height: 16px; }
-.chat-page .schedule-opt label { cursor: pointer; }
-.chat-page .btn-schedule {
+/* 日程構造化 DESIGN §13.4: 最新の提示だけ候補ごとの「{label} で確定」ボタン（旧: ラジオ＋1ボタン）。
+   375px 幅（カードの内側は約254px）では年入りのラベルが1行に収まらないため、ボタン内で折り返す。 */
+.chat-page .schedule-cands { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.chat-page .schedule-cand { display: flex; flex-direction: column; gap: 4px; }
+.chat-page .btn-schedule-cand {
   width: 100%;
-  padding: 11px;
+  padding: 10px 12px;
   border-radius: 0;
   border: none;
   background: var(--blue);
@@ -358,11 +350,60 @@
   font-family: var(--head);
   font-size: 14px;
   font-weight: 600;
+  line-height: 1.5;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
   cursor: pointer;
   transition: background .2s;
 }
-.chat-page .btn-schedule:hover { background: var(--blue-d); }
-.chat-page .btn-schedule.confirmed { background: var(--green); cursor: default; }
+.chat-page .btn-schedule-cand:hover:not(:disabled) { background: var(--blue-d); }
+.chat-page .btn-schedule-cand:disabled { background: var(--line); color: var(--body-soft); cursor: not-allowed; }
+.chat-page .schedule-cand-note { font-size: 11.5px; color: var(--body-soft); }
+/* 確定できない提示（置き換わった v2・pending 以外）・旧形式の提示は候補を文字だけで並べる。 */
+.chat-page .schedule-cand-texts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+  font-size: 13.5px;
+  color: var(--body);
+  overflow-wrap: anywhere;
+}
+.chat-page .schedule-card.is-stale { border-color: var(--line); }
+.chat-page .schedule-card.is-stale .schedule-cand-texts { color: var(--body-soft); }
+.chat-page .schedule-card-note { margin: 0 0 6px; font-size: 12px; color: var(--body-soft); line-height: 1.6; }
+.chat-page .schedule-card-link { font-size: 12.5px; color: var(--blue); text-decoration: underline; overflow-wrap: anywhere; }
+/* 候補から確定できなかった理由（409 superseded / expired 等）。 */
+.chat-page .schedule-notice {
+  margin: 8px 20px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--blue);
+  background: var(--pale);
+  color: var(--navy);
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  flex-shrink: 0;
+}
+/* 「訪問日程が確定しました」の帯（components/kdz/ScheduleConfirmedBand.tsx）。 */
+.chat-page .sched-confirmed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 10px;
+  padding: 10px 14px;
+  background: #f0fdf4;
+  border: 1px solid var(--green);
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.chat-page .sched-confirmed-title { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--green); }
+.chat-page .sched-confirmed-title .ic { width: 16px; height: 16px; }
+.chat-page .sched-confirmed-label { color: var(--ink); white-space: pre-wrap; }
 
 /* メッセージ入力 */
 .chat-page .input-area {

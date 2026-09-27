@@ -11,7 +11,8 @@
  *
  * [id] は transaction_id として扱う。サイドバー「交渉中の案件」は listTransactions（業者向け）。
  * メッセージは listMessages のポーリング（表示中5秒間隔・document.hidden 時は停止）+ sendMessage。
- * 日程提示は proposeSchedule に接続する。
+ * 日程提示は proposeSchedule に接続する（日程構造化 DESIGN §13.4: 候補は {date,start,end} で送り、
+ * 表示ラベルはサーバーが作る。確定は依頼者が最新の提示から選ぶ）。
  */
 
 import "./chat.css";
@@ -19,9 +20,10 @@ import "./chat.css";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Ic } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
+import { ScheduleConfirmedBand } from "@/components/kdz/ScheduleConfirmedBand";
 import { useToken } from "@/components/kdz/Ui";
 import { ChatSystemNotice } from "@/components/kdz/ChatSystemNotice";
 import { stripControlChars } from "@/lib/categories";
@@ -36,13 +38,35 @@ import {
   LIST_MAX_LIMIT,
   markMessagesRead,
   proposeSchedule,
+  SCHEDULE_ERROR_CODE,
   sendMessage,
   toDisplayMessage,
   type MessageOut,
+  type ScheduleCandidateInput,
   type TransactionDetail,
   type TransactionListItem,
 } from "@/lib/katadzuke-api";
-import { VISIT_TIME_SLOTS, formatSlotLabel, toIsoDateString } from "@/lib/visit-slots";
+import {
+  CUSTOM_END_TIME_OPTIONS,
+  CUSTOM_START_TIME_OPTIONS,
+  DEFAULT_CUSTOM_END_TIME,
+  DEFAULT_CUSTOM_START_TIME,
+  VISIT_TIME_SLOTS,
+  addDaysIso,
+  findVisitTimeSlot,
+  formatSlotLabel,
+  formatVisitTime,
+  isCandidateExpired,
+  isValidIsoDate,
+  isValidVisitTimeRange,
+  jstTodayIso,
+  latestProposalId,
+  parseScheduleConfirmedMeta,
+  parseScheduleProposalMeta,
+  type ParsedScheduleProposal,
+  type ScheduleCandidate,
+  type VisitTimeSlotValue,
+} from "@/lib/visit-slots";
 
 /* ---- カレンダー線画（スプライト未収録のため inline。絵文字は使わない） ---- */
 function CalendarIc({ className }: { className?: string }) {
@@ -70,20 +94,58 @@ function yen(n: number): string {
   return `¥${n.toLocaleString()}`;
 }
 
-/** 候補日提案フォームの1行分の入力状態（日付 + 時間帯）。 */
-type SlotDraft = { date: string; time: string | null };
+/** 「時刻を指定」（30分刻みの開始・終了を選ぶ）を表す時間帯の選択値。 */
+const CUSTOM_TIME_CHOICE = "custom";
+
+/**
+ * 候補日提案フォームの1行分の入力状態。
+ * choice: 固定の時間帯（VISIT_TIME_SLOTS の value）／"custom"（時刻を指定）／null（未選択）。
+ * customStart/customEnd: 「時刻を指定」の開始・終了（"HH:MM"。choice が "custom" のときだけ使う）。
+ */
+type SlotDraft = {
+  date: string;
+  choice: VisitTimeSlotValue | typeof CUSTOM_TIME_CHOICE | null;
+  customStart: string;
+  customEnd: string;
+};
 
 /** 候補日の提案件数の上限（「＋ 候補日を追加」を無効化する閾値。2026-09-26 ボタン化）。 */
 const MAX_SLOT_DRAFTS = 10;
 
-/** 候補日入力の日付レンジ（何日後まで許可するか）。 */
+/**
+ * 候補日入力の日付レンジ（日本時間の今日から何日後まで許可するか）。サーバーは今日+365日まで
+ * 受け付けるが（日程構造化 DESIGN §13.1）、端末の時計のずれに備えて1日の余裕を残す。
+ */
 const MAX_SLOT_DATE_RANGE_DAYS = 364;
 
-/** base から days 日後の Date を作る（元の Date は変更しない）。 */
-function addDays(base: Date, days: number): Date {
-  const d = new Date(base);
-  d.setDate(d.getDate() + days);
-  return d;
+/** 空の入力行（「時刻を指定」の既定は 10:00〜12:00）。 */
+function emptySlotDraft(): SlotDraft {
+  return { date: "", choice: null, customStart: DEFAULT_CUSTOM_START_TIME, customEnd: DEFAULT_CUSTOM_END_TIME };
+}
+
+/** 入力行が初期状態（1行・日付も時間帯も未選択）のままか。最新の提示で初期入力してよいかの判定に使う。 */
+function isPristineDrafts(drafts: SlotDraft[]): boolean {
+  return drafts.length === 1 && drafts[0].date === "" && drafts[0].choice === null;
+}
+
+/** 入力行から送信する時刻（start/end）を求める。時間帯が未選択なら null。 */
+function draftTimes(draft: SlotDraft): { start: string | null; end: string | null } | null {
+  if (draft.choice === null) return null;
+  if (draft.choice === CUSTOM_TIME_CHOICE) return { start: draft.customStart, end: draft.customEnd };
+  const fixed = VISIT_TIME_SLOTS.find((slot) => slot.value === draft.choice);
+  return fixed ? { start: fixed.start, end: fixed.end } : null;
+}
+
+/** 提示済みの候補から入力行を作る（固定の時間帯に一致すればそのボタン、それ以外は「時刻を指定」）。 */
+function draftFromCandidate(candidate: ScheduleCandidate): SlotDraft {
+  const fixed = findVisitTimeSlot(candidate.start, candidate.end);
+  if (fixed) return { ...emptySlotDraft(), date: candidate.date, choice: fixed.value };
+  return {
+    date: candidate.date,
+    choice: CUSTOM_TIME_CHOICE,
+    customStart: candidate.start ?? DEFAULT_CUSTOM_START_TIME,
+    customEnd: candidate.end ?? DEFAULT_CUSTOM_END_TIME,
+  };
 }
 
 export default function OperatorChatPage() {
@@ -108,15 +170,18 @@ export default function OperatorChatPage() {
   const lastFetchedAtRef = useRef<string | undefined>(undefined);
 
   /* ---- 日程提案カード（候補日の編集 + 送信） ---- */
-  const [slots, setSlots] = useState<SlotDraft[]>([{ date: "", time: null }]);
+  const [slots, setSlots] = useState<SlotDraft[]>(() => [emptySlotDraft()]);
   const [scheduleVisible, setScheduleVisible] = useState(false);
   const [proposing, setProposing] = useState(false);
-  // 候補日入力の日付レンジ（今日から364日後まで）。画面を開いたまま日付をまたぐと
+  // 開いたままの古い画面と判定された（422 schedule_client_outdated）ときだけ「再読み込み」を出す。
+  const [proposeOutdated, setProposeOutdated] = useState(false);
+  // 候補日入力の日付レンジ（日本時間の今日から364日後まで）。画面を開いたまま日付をまたぐと
   // min/max が古いままになり過去日を選べてしまうため、useMemo でキャッシュせず
   // 描画のたびに new Date() から求める（送信時のバリデーションは handleSendSchedule
-  // 内で改めて計算し直す。こちらは <input type="date"> の min/max 表示専用）。
-  const todayIso = toIsoDateString(new Date());
-  const maxSlotDateIso = toIsoDateString(addDays(new Date(), MAX_SLOT_DATE_RANGE_DAYS));
+  // 内で改めて計算し直す。こちらは <input type="date"> の min/max・当日の終わった枠の表示専用）。
+  const now = new Date();
+  const todayIso = jstTodayIso(now);
+  const maxSlotDateIso = addDaysIso(todayIso, MAX_SLOT_DATE_RANGE_DAYS);
 
   /* ---- トースト ---- */
   const [toast, setToast] = useState<string | null>(null);
@@ -237,6 +302,14 @@ export default function OperatorChatPage() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages.length, scheduleVisible]);
 
+  /* ---- 最新の提示（seq が最大の v2。依頼者が確定できるのはこの提示の候補だけ） ---- */
+  const latestId = useMemo(() => latestProposalId(messages), [messages]);
+  const latestCandidates = useMemo(() => {
+    const latest = latestId ? messages.find((m) => m.id === latestId) : undefined;
+    const parsed = latest ? parseScheduleProposalMeta(latest.meta) : null;
+    return parsed?.version === 2 ? parsed.candidates : [];
+  }, [messages, latestId]);
+
   function selectTransaction(id: string) {
     if (id === transactionId) return;
     router.push(`/operator/chat/${id}`);
@@ -265,65 +338,132 @@ export default function OperatorChatPage() {
   function updateSlotDate(i: number, value: string) {
     setSlots((prev) => prev.map((s, idx) => (idx === i ? { ...s, date: value } : s)));
   }
-  function updateSlotTime(i: number, value: string) {
-    setSlots((prev) => prev.map((s, idx) => (idx === i ? { ...s, time: value } : s)));
+  function updateSlotChoice(i: number, value: SlotDraft["choice"]) {
+    setSlots((prev) => prev.map((s, idx) => (idx === i ? { ...s, choice: value } : s)));
+  }
+  function updateSlotCustomTime(i: number, field: "customStart" | "customEnd", value: string) {
+    setSlots((prev) => prev.map((s, idx) => (idx === i ? { ...s, [field]: value } : s)));
   }
   function removeSlot(i: number) {
     setSlots((prev) => prev.filter((_, idx) => idx !== i));
   }
   function addSlot() {
-    setSlots((prev) => (prev.length >= MAX_SLOT_DRAFTS ? prev : [...prev, { date: "", time: null }]));
+    setSlots((prev) => (prev.length >= MAX_SLOT_DRAFTS ? prev : [...prev, emptySlotDraft()]));
   }
   function toggleScheduleCard() {
     // ボタン自体を disabled にしているが、万一の誤発火に備えて関数側でも防ぐ
     // （訪問日程が確定済みの取引では新しい候補日を提示させない）。
     if (isVisiting) return;
-    setScheduleVisible((v) => {
-      const next = !v;
-      if (next) {
-        window.setTimeout(() => {
-          document.getElementById("schedule-propose")?.scrollIntoView({ behavior: "smooth", block: "center" });
-        }, 0);
-      }
-      return next;
-    });
+    const next = !scheduleVisible;
+    if (next) {
+      // 日程構造化 DESIGN §13.4: 最新の提示があれば、そのうち過ぎていない候補を最初から入れておく
+      // （入力途中の行があればそれを優先し、上書きしない）。
+      const openedAt = new Date();
+      const prefill = latestCandidates
+        .filter((candidate) => !isCandidateExpired(candidate, openedAt))
+        .slice(0, MAX_SLOT_DRAFTS)
+        .map(draftFromCandidate);
+      if (prefill.length > 0 && isPristineDrafts(slots)) setSlots(prefill);
+      window.setTimeout(() => {
+        document.getElementById("schedule-propose")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 0);
+    }
+    setScheduleVisible(next);
   }
   async function handleSendSchedule() {
     // 未完成行（日付・時間帯のどちらかが未選択）が1つでもあれば送信させない。
     // 初期状態の1行だけ空のまま送信した場合もここに含まれる（従来の「候補日を
     // 1つ以上入力してください」に相当）。
-    if (slots.length === 0 || slots.some((s) => !s.date || !s.time)) {
+    if (slots.length === 0 || slots.some((s) => !s.date || s.choice === null)) {
       showToast("候補日の日付と時間帯を選んでください");
       return;
     }
     // iOS は <input type="date"> の min/max 属性を強制しないため、送信時にも検査する。
     // 画面を開いたまま日付をまたいだ場合に備え、描画時の todayIso/maxSlotDateIso ではなく
-    // 送信ボタンを押した瞬間の new Date() で改めて求めた値と比較する。
-    const submitTodayIso = toIsoDateString(new Date());
-    const submitMaxSlotDateIso = toIsoDateString(addDays(new Date(), MAX_SLOT_DATE_RANGE_DAYS));
-    if (slots.some((s) => s.date < submitTodayIso || s.date > submitMaxSlotDateIso)) {
+    // 送信ボタンを押した瞬間の日本時間で改めて求めた値と比較する。
+    const submitNow = new Date();
+    const submitTodayIso = jstTodayIso(submitNow);
+    const submitMaxSlotDateIso = addDaysIso(submitTodayIso, MAX_SLOT_DATE_RANGE_DAYS);
+    if (slots.some((s) => !isValidIsoDate(s.date) || s.date < submitTodayIso || s.date > submitMaxSlotDateIso)) {
       showToast("候補日は本日から1年以内の日付を選んでください");
       return;
     }
+    const candidates: ScheduleCandidateInput[] = [];
+    for (const s of slots) {
+      const times = draftTimes(s);
+      if (!times) {
+        showToast("候補日の日付と時間帯を選んでください");
+        return;
+      }
+      candidates.push({ date: s.date, start: times.start, end: times.end });
+    }
+    if (candidates.some((c) => !isValidVisitTimeRange(c.start, c.end))) {
+      showToast("時刻は6:00〜22:00の間で、終了を開始の1時間以上あとにしてください");
+      return;
+    }
+    if (candidates.some((c) => isCandidateExpired(c, submitNow))) {
+      showToast("終わった時間帯は候補にできません");
+      return;
+    }
     if (!token || !transactionId || proposing) return;
-    // 同一ラベル（同じ日付・同じ時間帯の重複行）は順序を保って重複除去する（Set は挿入順を保持する）。
-    const dates = Array.from(new Set(slots.map((s) => formatSlotLabel(s.date, s.time as string))));
+    // 同じ日付・同じ時間帯の重複行は、順序を保って date|start|end で重複除去する（Set は挿入順を保持する）。
+    const seenKeys = new Set<string>();
+    const uniqueCandidates = candidates.filter((c) => {
+      const key = `${c.date}|${c.start}|${c.end}`;
+      if (seenKeys.has(key)) return false;
+      seenKeys.add(key);
+      return true;
+    });
     setProposing(true);
     try {
-      const msg = await proposeSchedule(transactionId, dates, token);
+      const msg = await proposeSchedule(transactionId, uniqueCandidates, token);
       setMessages((prev) => [...prev, msg]);
       lastFetchedAtRef.current = msg.created_at;
       setScheduleVisible(false);
-      setSlots([{ date: "", time: null }]);
+      setSlots([emptySlotDraft()]);
+      setProposeOutdated(false);
       showToast("候補日を送信しました");
     } catch (e) {
       showToast(toDisplayMessage(e, "候補日の送信に失敗しました"));
       // r8-fix-frontend2 H3 是正: 409 transaction_closed（取引終了後の候補日提案）を
       // 受けた場合、detail を再取得して終了バナー・提案ボタンの無効化に反映させる。
       if (e instanceof KdzApiError && e.status === 409) await reloadDetail();
+      if (e instanceof KdzApiError && e.code === SCHEDULE_ERROR_CODE.outdated) setProposeOutdated(true);
     } finally {
       setProposing(false);
     }
+  }
+
+  /**
+   * 送信済みの提示（自社の schedule_proposal）の候補一覧（日程構造化 DESIGN §13.4）。
+   * v2 はサーバーが作ったラベル、v1 は制御文字を除去した旧形式の文字列を出す。
+   * 依頼者が確定できる最新の提示に「（最新）」を付け、それ以前（v1 を含む）は灰色にする。
+   */
+  function renderSentProposal(messageId: string, proposal: ParsedScheduleProposal) {
+    const isLatest = proposal.version === 2 && messageId === latestId;
+    const captionId = `msg-slots-caption-${messageId}`;
+    const labels =
+      proposal.version === 2
+        ? proposal.candidates.map((c) => stripControlChars(c.label))
+        : proposal.version === 1
+          ? proposal.slots.map(stripControlChars).filter((label) => label !== "")
+          : [];
+    return (
+      <div className={`msg-slots-wrap${isLatest ? " is-latest" : " is-stale"}`}>
+        <div className="msg-slots-caption" id={captionId}>
+          提示した候補日{isLatest ? "（最新）" : ""}
+        </div>
+        {labels.length > 0 ? (
+          <ul className="msg-slots" aria-labelledby={captionId}>
+            {labels.map((label, si) => (
+              <li key={si}>{label}</li>
+            ))}
+          </ul>
+        ) : (
+          <div className="msg-slots-empty">候補日を表示できません</div>
+        )}
+      </div>
+    );
   }
 
   const peerInitial = "客";
@@ -487,12 +627,22 @@ export default function OperatorChatPage() {
                 ) : null}
                 {messages.map((m, i) => {
                   const showDateSep = i === 0 || formatDateSep(m.created_at) !== formatDateSep(messages[i - 1].created_at);
+                  if (m.kind === "schedule_confirmed" && parseScheduleConfirmedMeta(m.meta).version === 2) {
+                    // 日程構造化 DESIGN §13.4: v2 の確定は「訪問日程が確定しました」の帯で出す（旧形式は下のお知らせ枠）。
+                    return (
+                      <div key={m.id}>
+                        {showDateSep ? <div className="date-sep">{formatDateSep(m.created_at)}</div> : null}
+                        <ScheduleConfirmedBand body={m.body} meta={m.meta} />
+                      </div>
+                    );
+                  }
                   return (
                     <div key={m.id}>
                       {showDateSep ? <div className="date-sep">{formatDateSep(m.created_at)}</div> : null}
                       {/* 運営名義（system）は吹き出しではなく中央寄せのお知らせ枠で出し、お客様の発言
                           （左の吹き出し）と形で区別する（日程検証レビュー SEC-I8）。制御文字の除去と
-                          日程確定の「業者が提示した候補」の別枠は ChatSystemNotice が行う。依頼者・業者の
+                          日程確定（旧形式）の「業者が提示した候補」の別枠は ChatSystemNotice が行う。
+                          日程確定（v2）は上の帯（ScheduleConfirmedBand）で出す。依頼者・業者の
                           通常メッセージは絵文字の結合（ZWJ）等を壊さないよう本文を変えない。 */}
                       {isSystemNotice(m) ? (
                         <ChatSystemNotice message={m} time={formatTime(m.created_at)} />
@@ -502,15 +652,7 @@ export default function OperatorChatPage() {
                           <div>
                             <div className="msg-time">{formatTime(m.created_at)}</div>
                             <div className="bubble">{m.body}</div>
-                            {m.kind === "schedule_proposal" && Array.isArray(m.meta?.slots) ? (
-                              <ul className="msg-slots" aria-label="提示した候補日">
-                                {(m.meta?.slots as unknown[])
-                                  .filter((s): s is string => typeof s === "string")
-                                  .map((slot, si) => (
-                                    <li key={`${si}-${slot}`}>{stripControlChars(slot)}</li>
-                                  ))}
-                              </ul>
-                            ) : null}
+                            {m.kind === "schedule_proposal" ? renderSentProposal(m.id, parseScheduleProposalMeta(m.meta)) : null}
                           </div>
                         </div>
                       )}
@@ -526,7 +668,21 @@ export default function OperatorChatPage() {
                     </div>
                     <div className="sp-options">
                       {slots.map((slot, i) => {
-                        const preview = slot.date && slot.time ? formatSlotLabel(slot.date, slot.time) : null;
+                        const times = draftTimes(slot);
+                        const rangeValid = times ? isValidVisitTimeRange(times.start, times.end) : false;
+                        const dateOutOfRange = slot.date !== "" && (slot.date < todayIso || slot.date > maxSlotDateIso);
+                        const slotExpired =
+                          slot.date !== "" && times !== null && rangeValid && isCandidateExpired({ date: slot.date, end: times.end }, now);
+                        // 行ごとの注意（送信時の検査と同じ順）。無ければプレビュー（formatSlotLabel）を出す。
+                        const rowHint = dateOutOfRange
+                          ? "候補日は本日から1年以内の日付を選んでください"
+                          : times && !rangeValid
+                            ? "終了は開始の1時間以上あとにしてください"
+                            : slotExpired
+                              ? "終わった時間帯は候補にできません"
+                              : null;
+                        const preview = !rowHint && slot.date && times ? formatSlotLabel(slot.date, times.start, times.end) : "";
+                        const isCustom = slot.choice === CUSTOM_TIME_CHOICE;
                         return (
                           <div className="sp-opt-row" role="group" aria-label={`候補日 ${i + 1}`} key={i}>
                             <div className="sp-opt-head">
@@ -545,31 +701,83 @@ export default function OperatorChatPage() {
                             </div>
                             <div className="sp-time-slots">
                               {VISIT_TIME_SLOTS.map((ts) => {
-                                const isSelected = slot.time === ts.value;
+                                const isSelected = slot.choice === ts.value;
                                 // 業者向けだけ「時間指定なし」の小見出しを「時間は相談」に読み替える。
                                 // VISIT_TIME_SLOTS.label 自体は依頼者側と共有のため変えない。
                                 const sub = ts.value === "時間指定なし" ? "時間は相談" : ts.label;
+                                // 日程構造化 DESIGN §13.4: 当日の終わった枠は選べない（日本時間で判定）。
+                                const isOver = slot.date !== "" && isCandidateExpired({ date: slot.date, end: ts.end }, now);
                                 return (
                                   <button
                                     type="button"
                                     key={ts.value}
                                     className={`sp-time-btn${isSelected ? " selected" : ""}`}
                                     aria-pressed={isSelected}
-                                    onClick={() => updateSlotTime(i, ts.value)}
+                                    disabled={isOver}
+                                    onClick={() => updateSlotChoice(i, ts.value)}
                                   >
                                     {ts.value}
                                     <span className="sp-time-sub">{sub}</span>
                                   </button>
                                 );
                               })}
+                              <button
+                                type="button"
+                                className={`sp-time-btn${isCustom ? " selected" : ""}`}
+                                aria-pressed={isCustom}
+                                onClick={() => updateSlotChoice(i, CUSTOM_TIME_CHOICE)}
+                              >
+                                時刻を指定
+                                <span className="sp-time-sub">30分刻み</span>
+                              </button>
                             </div>
-                            {preview ? (
-                              <div className="sp-slot-preview">{preview}</div>
-                            ) : (
-                              <div className="sp-slot-preview sp-slot-preview-empty">
-                                日付と時間帯を選ぶと、送信される候補がここに表示されます
+                            {isCustom ? (
+                              <div className="sp-custom-time">
+                                <label className="sp-custom-field">
+                                  <span className="sp-custom-label">開始</span>
+                                  <select
+                                    className="sp-time-select"
+                                    value={slot.customStart}
+                                    onChange={(e) => updateSlotCustomTime(i, "customStart", e.target.value)}
+                                    aria-label={`候補日 ${i + 1} の開始時刻`}
+                                  >
+                                    {CUSTOM_START_TIME_OPTIONS.map((time) => (
+                                      <option key={time} value={time}>
+                                        {formatVisitTime(time)}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                                <span className="sp-custom-sep" aria-hidden="true">
+                                  〜
+                                </span>
+                                <label className="sp-custom-field">
+                                  <span className="sp-custom-label">終了</span>
+                                  <select
+                                    className="sp-time-select"
+                                    value={slot.customEnd}
+                                    onChange={(e) => updateSlotCustomTime(i, "customEnd", e.target.value)}
+                                    aria-label={`候補日 ${i + 1} の終了時刻`}
+                                  >
+                                    {CUSTOM_END_TIME_OPTIONS.map((time) => (
+                                      <option
+                                        key={time}
+                                        value={time}
+                                        disabled={slot.date !== "" && isCandidateExpired({ date: slot.date, end: time }, now)}
+                                      >
+                                        {formatVisitTime(time)}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
                               </div>
-                            )}
+                            ) : null}
+                            <div
+                              className={`sp-slot-preview${rowHint ? " sp-slot-preview-error" : preview ? "" : " sp-slot-preview-empty"}`}
+                              aria-live="polite"
+                            >
+                              {rowHint ?? (preview || "日付と時間帯を選ぶと、送信される候補がここに表示されます")}
+                            </div>
                           </div>
                         );
                       })}
@@ -585,6 +793,14 @@ export default function OperatorChatPage() {
                     >
                       {proposing ? "送信中…" : "候補日を送信する"}
                     </button>
+                    {latestId ? (
+                      <p className="sp-supersede-note">新しく送ると、前に送った候補は選べなくなります。</p>
+                    ) : null}
+                    {proposeOutdated ? (
+                      <button type="button" className="btn-add-slot sp-reload" onClick={() => window.location.reload()}>
+                        ページを再読み込みする
+                      </button>
+                    ) : null}
                   </div>
                 ) : null}
               </div>

@@ -6,10 +6,12 @@
  *   （左右寄せ・アバター付き）ではなく中央寄せの枠に「カタヅケからのお知らせ」のラベルを付けて出す
  *   （相手の発言と形で区別する。以前はアバターの1文字「運」だけが違い、日程確定の直後に並ぶ
  *   依頼者のひとことが運営の続きに見え得た）。
- * - 日程確定メッセージ（kind="schedule_confirmed"）の本文は運営の定型文だけで、業者が書いた
- *   候補の文言は meta.operator_slot_label に入る（backend の confirm_schedule）。画面はそれを
+ * - 旧形式の日程確定メッセージ（kind="schedule_confirmed"・meta v2 でないもの）の本文は運営の
+ *   定型文だけで、業者が書いた候補の文言は meta.operator_slot_label に入っている。画面はそれを
  *   「業者が提示した候補」の別枠として、運営の本文と分けて表示する。2026-09-27 より前の
  *   日程確定メッセージには operator_slot_label が無く、本文（業者の文言を含み得る）をそのまま出す。
+ *   日程構造化（DESIGN §13）以降の確定メッセージ（meta v2）は本文・meta ともサーバーが日付・時刻から
+ *   作り、業者の文言を含まないため operator_slot_label は付かず、画面は ScheduleConfirmedBand の帯で出す。
  *
  * @/ の import を持たない純関数のみを置く（node --test でアプリ全体を起動せず単体検証するため）。
  * 単体テスト: src/lib/chat-system-notice.test.mts。

@@ -8,6 +8,7 @@
 import { signOut } from "next-auth/react";
 import { isProtectedRoutePath } from "./protected-routes";
 import { prepareDisplayText } from "./text-guard";
+import type { VisitTimeSlotValue } from "./visit-slots";
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -226,9 +227,9 @@ export interface TransactionListItem {
   final_amount: number | null;
   visit_date: string | null;
   /**
-   * confirmSchedule で設定される訪問時間帯（例: 固定時間帯なら "9:00〜12:00"、
-   * 業者が提示した候補由来なら "2026年10月1日（木）9:00〜12:00"〔日付＋時間帯の選択式〕や
-   * 自由入力だった頃の "10月1日（木）10:00〜12:00" 等）。未確定時は null。
+   * 日程確定で設定される訪問時間帯（例: "9:00〜12:00"・"10:30〜12:00"・"時間指定なし"。
+   * 日程構造化 DESIGN §13 以降はサーバーが時刻だけのラベルを作る。旧データには日付入りのラベル等が
+   * 残りうる）。未確定時は null。
    * [推測] backend の TransactionListItem に本フィールドが追加されるまでは undefined
    * のまま届く想定（r10 対応）。formatVisitSchedule(visit_date, visit_time_slot) に
    * そのまま渡せば、未対応期間中も visit_date のみの表示にフォールバックする。
@@ -274,7 +275,11 @@ export interface TransactionOut {
   fee_amount: number;
   /** "YYYY-MM-DD" 形式（date型）。ISO日時ではないため new Date() でのUTC解釈は不可（JST日付がズレる）。 */
   visit_date: string | null;
-  /** 例: 固定時間帯なら "9:00〜12:00"、業者提示の候補由来なら "2026年10月1日（木）9:00〜12:00" 等。confirmSchedule で設定される訪問時間帯。未確定時は null。 */
+  /**
+   * 例: "9:00〜12:00"・"10:30〜12:00"・"時間指定なし"。日程確定（acceptScheduleCandidate /
+   * confirmSchedule）で設定される訪問時間帯。未確定時は null。表示は formatVisitSchedule を通す
+   * （旧データの日付入りラベル等は付けずに日付だけを出す）。
+   */
   visit_time_slot: string | null;
   status: TransactionStatus;
   created_at: string;
@@ -378,9 +383,13 @@ export function getReductionQuota(txn: {
 export type MessageSenderType = "user" | "operator" | "system";
 /**
  * complete_request（業者→ユーザー: 完了確定の依頼。sender_type="operator"）／
- * completed（system: 完了確定の記録。2026-09-26 ボタン化）を追加。sender_type="system" のメッセージ
- * （schedule_confirmed・completed 等）は ChatPanel・業者チャットとも中央寄せのお知らせ枠
- * （components/kdz/ChatSystemNotice）で、それ以外は schedule_proposal を除き汎用の吹き出しで描画する。
+ * completed（system: 完了確定の記録。2026-09-26 ボタン化）を追加。sender_type="system" の
+ * メッセージは ChatPanel・業者チャットとも中央寄せのお知らせ枠（components/kdz/ChatSystemNotice）で描画する。
+ * ただし schedule_proposal は提示カード、v2 の schedule_confirmed は日程構造化 DESIGN §13.4 の
+ * 「訪問日程が確定しました」の帯（components/kdz/ScheduleConfirmedBand）で描く
+ * （旧形式の schedule_confirmed は ChatSystemNotice のまま。meta.operator_slot_label を別枠で出す）。
+ * schedule_proposal / schedule_confirmed の meta は visit-slots.ts の parseScheduleProposalMeta /
+ * parseScheduleConfirmedMeta で版（v2 / 旧形式）を読み分けてから使う。
  */
 export type MessageKind = "text" | "schedule_proposal" | "schedule_confirmed" | "system" | "complete_request" | "completed";
 
@@ -433,23 +442,76 @@ export function markMessagesRead(
 // 日程調整
 // ---------------------------------------------------------------------------
 
-/** 訪問日程の候補提示（落札業者のみ）。 */
+/**
+ * 業者が提示する候補1件（日程構造化 DESIGN §13.3）。表示ラベルはサーバーが作るため送らない。
+ * 例: { date: "2026-10-01", start: "09:00", end: "12:00" }（時間指定なしは start/end とも null）。
+ */
+export interface ScheduleCandidateInput {
+  /** "YYYY-MM-DD"（日本時間の今日〜1年以内）。 */
+  date: string;
+  /** "HH:MM"（ゼロ詰め・分は 00 か 30。06:00 ≤ start < end ≤ 22:00・60分以上）。 */
+  start: string | null;
+  end: string | null;
+}
+
+/**
+ * 日程 API が dict 形式の detail で返す code（KdzApiError.code で判別する）。
+ * - superseded / expired: accept の 409（より新しい提示がある・候補が過ぎている）
+ * - legacy: accept の 422（旧形式・未知の版の提示はチャットから確定できない）
+ * - outdated: propose / confirm の 422（開いたままの古い画面からの送信）
+ */
+export const SCHEDULE_ERROR_CODE = {
+  superseded: "schedule_proposal_superseded",
+  expired: "schedule_candidate_expired",
+  legacy: "schedule_proposal_legacy",
+  outdated: "schedule_client_outdated",
+} as const;
+
+/**
+ * 訪問日程の候補提示（落札業者のみ）。候補は1〜10件。
+ * 成功すると meta が {v:2, seq, candidates:[{date,start,end,label}]} の MessageOut（201）が返る。
+ */
 export function proposeSchedule(
   transactionId: string,
-  slots: string[],
+  candidates: ScheduleCandidateInput[],
   token: string,
 ): Promise<MessageOut> {
   return request(`/transactions/${encodeURIComponent(transactionId)}/schedule/propose`, {
     method: "POST",
-    body: JSON.stringify({ slots }),
+    body: JSON.stringify({ candidates }),
     token,
   });
 }
 
-/** 訪問日程の確定（所有ユーザーのみ）。 */
+/**
+ * 業者の提示から候補を1つ選んで訪問日程を確定する（所有ユーザーのみ。確定できるのは最新の提示だけ）。
+ * proposalId は schedule_proposal メッセージの id、candidateIndex は meta.candidates の添字。
+ * 409 schedule_proposal_superseded / schedule_candidate_expired、422 schedule_proposal_legacy は
+ * KdzApiError.code（SCHEDULE_ERROR_CODE）で判別できる。
+ */
+export function acceptScheduleCandidate(
+  transactionId: string,
+  proposalId: string,
+  candidateIndex: number,
+  token: string,
+): Promise<TransactionOut> {
+  return request(
+    `/transactions/${encodeURIComponent(transactionId)}/schedule/proposals/${encodeURIComponent(proposalId)}/accept`,
+    {
+      method: "POST",
+      body: JSON.stringify({ candidate_index: candidateIndex }),
+      token,
+    },
+  );
+}
+
+/**
+ * 訪問日程の確定（/schedule 専用・所有ユーザーのみ）。任意の日付＋固定5種の時間帯
+ * （VISIT_TIME_SLOTS の value）だけを受け付ける（それ以外は 422 schedule_client_outdated）。
+ */
 export function confirmSchedule(
   transactionId: string,
-  payload: { visit_date: string; visit_time_slot: string; note?: string },
+  payload: { visit_date: string; visit_time_slot: VisitTimeSlotValue; note?: string },
   token: string,
 ): Promise<TransactionOut> {
   return request(`/transactions/${encodeURIComponent(transactionId)}/schedule/confirm`, {

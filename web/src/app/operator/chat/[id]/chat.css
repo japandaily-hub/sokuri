@@ -422,6 +422,59 @@
   transition: background .2s;
 }
 .opchat-page .btn-send-schedule:hover { background: var(--blue-d); }
+/* 日程構造化 DESIGN §13.4: 当日の終わった枠（日本時間）は選べない。 */
+.opchat-page .sp-time-btn:disabled { opacity: .45; cursor: not-allowed; }
+/* 「時刻を指定」の開始・終了（30分刻み）。375px 幅でも2つ並び、狭ければ折り返す。
+   select も date 入力と同じく iOS の自動拡大を避けるため 16px にする。 */
+.opchat-page .sp-custom-time { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px; }
+.opchat-page .sp-custom-field { display: flex; flex-direction: column; gap: 2px; flex: 1 1 96px; min-width: 0; }
+.opchat-page .sp-custom-label { font-size: 11px; color: var(--body-soft); }
+.opchat-page .sp-time-select {
+  width: 100%;
+  min-width: 0;
+  font-family: var(--sans);
+  font-size: 16px;
+  color: var(--ink);
+  background: #fff;
+  border: 1.5px solid var(--line);
+  border-radius: 0;
+  padding: 6px 8px;
+}
+.opchat-page .sp-time-select:focus { border-color: var(--blue); }
+.opchat-page .sp-custom-sep { padding-bottom: 9px; color: var(--body-soft); }
+/* 行ごとの注意（1年以内でない・1時間未満・終わった時間帯）。 */
+.opchat-page .sp-slot-preview-error { color: var(--danger); border-color: var(--danger); }
+/* 最新の提示があるときの注記（送信ボタンの下）。 */
+.opchat-page .sp-supersede-note { margin-top: 8px; font-size: 11.5px; line-height: 1.6; color: var(--body-soft); }
+.opchat-page .sp-reload { margin-top: 6px; }
+
+/* 送信済みの提示の候補一覧（最新に「（最新）」、それ以前は灰色）。 */
+.opchat-page .msg-slots-wrap { margin-top: 6px; font-size: 12.5px; line-height: 1.6; }
+.opchat-page .msg.me .msg-slots-wrap { text-align: right; }
+.opchat-page .msg-slots-caption { font-size: 11px; color: var(--body-soft); }
+.opchat-page .msg-slots-wrap.is-latest .msg-slots-caption { color: var(--blue); font-weight: 600; }
+.opchat-page .msg-slots li { color: var(--ink); overflow-wrap: anywhere; }
+.opchat-page .msg-slots-wrap.is-stale .msg-slots li,
+.opchat-page .msg-slots-empty { color: var(--body-soft); }
+
+/* 「訪問日程が確定しました」の帯（components/kdz/ScheduleConfirmedBand.tsx）。 */
+.opchat-page .sched-confirmed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 10px;
+  padding: 10px 14px;
+  background: #f0fdf4;
+  border: 1px solid var(--green);
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.opchat-page .sched-confirmed-title { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--green); }
+.opchat-page .sched-confirmed-title .ic { width: 16px; height: 16px; }
+.opchat-page .sched-confirmed-label { color: var(--ink); white-space: pre-wrap; }
 
 /* 入力エリア */
 .opchat-page .input-area {

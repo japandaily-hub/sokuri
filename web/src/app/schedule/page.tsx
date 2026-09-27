@@ -20,15 +20,24 @@ import {
   type MessageOut,
   type TransactionDetail,
 } from "@/lib/katadzuke-api";
-import { VISIT_TIME_SLOTS as TIME_SLOTS, parseSlotDate } from "@/lib/visit-slots";
+import {
+  VISIT_TIME_SLOTS as TIME_SLOTS,
+  isCandidateExpired,
+  jstTodayIso,
+  latestProposalId,
+  parseScheduleProposalMeta,
+  type VisitTimeSlotValue,
+} from "@/lib/visit-slots";
 
 /* ============================================================
    訪問日程調整ページ（カタヅケ）
    ?transaction_id= で対象成約を指定。未指定時は自分の成約一覧から
    「訪問日調整中（pending）」の最初の1件を自動選択する。
-   カレンダー選択 + 時間帯選択で confirmSchedule を実送信する。
-   業者が propose_schedule で提示した候補（チャット由来）があれば
-   優先候補として表示するが、無くても任意の未来日を選べる。
+   カレンダー選択 + 時間帯選択（固定5種）で confirmSchedule を実送信する。
+   業者の最新の提示（チャットの schedule_proposal・meta v2）の候補日を
+   優先候補としてハイライトするが、無くても任意の未来日を選べる
+   （日程構造化 DESIGN §13.4。候補のラベルは解析しない）。
+   「今日」「当日の終わった枠」はサーバーと同じく日本時間で判定する。
    ============================================================ */
 
 /** 進捗ステップ（出品→入札・交渉→日程調整→訪問・完了）。今回は「日程調整」がactive。 */
@@ -70,7 +79,8 @@ function SchedulePageInner() {
   const [detail, setDetail] = useState<TransactionDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [proposedSlots, setProposedSlots] = useState<string[]>([]);
+  /** 業者の最新の提示（v2）の候補日（"YYYY-MM-DD"）。ハイライト専用。 */
+  const [proposedDates, setProposedDates] = useState<string[]>([]);
 
   /* ---- transaction_id 未指定時: pending状態の取引を自動選択 ---- */
   useEffect(() => {
@@ -114,13 +124,12 @@ function SchedulePageInner() {
       } catch {
         /* 候補日の補助表示に過ぎないため、取得失敗しても致命的ではない */
       }
-      const latestProposal = [...messages].reverse().find((m) => m.kind === "schedule_proposal");
-      // 日程検証レビュー SEC-I6: 壊れた meta（文字列以外の要素）が混じっていても後段の処理が
-      // 落ちないよう、文字列だけに絞る。
-      const slots = Array.isArray(latestProposal?.meta?.slots)
-        ? (latestProposal?.meta?.slots as unknown[]).filter((s): s is string => typeof s === "string")
-        : [];
-      setProposedSlots(slots);
+      // 日程構造化 DESIGN §13.4: ハイライトは最新の提示（seq が最大の v2）の候補の日付から作る。
+      // 旧形式（v1）の自由記述はラベルを解析しないため、ハイライトしない（任意の日付は選べる）。
+      const latestId = latestProposalId(messages);
+      const latestProposal = latestId ? messages.find((m) => m.id === latestId) : undefined;
+      const parsed = latestProposal ? parseScheduleProposalMeta(latestProposal.meta) : null;
+      setProposedDates(parsed?.version === 2 ? parsed.candidates.map((c) => c.date) : []);
     } catch (e) {
       setLoadError(toDisplayMessage(e, "成約情報の取得に失敗しました"));
     } finally {
@@ -133,9 +142,11 @@ function SchedulePageInner() {
   }, [load]);
 
   /* ---- カレンダー表示月（今日を含む月から開始） ---- */
+  // サーバーは「今日」を日本時間で判定するため、ブラウザのタイムゾーンに依らず日本時間の今日を使う
+  // （年月日だけを new Date(y, m-1, d) のローカル日付として持ち、各セルのローカル日付と比べる）。
   const today = useMemo(() => {
-    const d = new Date();
-    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const [year, month, day] = jstTodayIso().split("-").map(Number);
+    return new Date(year, month - 1, day);
   }, []);
   const [viewYear, setViewYear] = useState(() => today.getFullYear());
   const [viewMonth, setViewMonth] = useState(() => today.getMonth());
@@ -143,18 +154,17 @@ function SchedulePageInner() {
   /* ---- 業者提示候補日のハイライト用セット（ISO形式をこのページのキー形式へ変換） ---- */
   const proposedDayKeys = useMemo(() => {
     const set = new Set<string>();
-    for (const slot of proposedSlots) {
-      const iso = parseSlotDate(slot, today);
-      if (!iso) continue;
+    // proposedDates は parseScheduleProposalMeta が実在する "YYYY-MM-DD" だけを通したもの。
+    for (const iso of proposedDates) {
       const [year, month, day] = iso.split("-").map(Number);
       set.add(`${year}-${month}-${day}`);
     }
     return set;
-  }, [proposedSlots, today]);
+  }, [proposedDates]);
 
   /* ---- 選択状態 ---- */
   const [selectedDate, setSelectedDate] = useState<SelectedDate | null>(null);
-  const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const [selectedTime, setSelectedTime] = useState<VisitTimeSlotValue | null>(null);
   const [note, setNote] = useState("");
 
   /* ---- 送信状態 ---- */
@@ -224,23 +234,43 @@ function SchedulePageInner() {
 
   const canConfirm = !!selectedDate && !!selectedTime && !submitting;
   const confirmDateText = selectedDate ? `${selectedDate.year}年${selectedDate.label}` : null;
+  /** 選択中の日付（"YYYY-MM-DD"）。当日の終わった枠の判定と確定リクエストに使う。 */
+  const selectedIsoDate = selectedDate
+    ? `${selectedDate.year}-${String(selectedDate.month).padStart(2, "0")}-${String(selectedDate.day).padStart(2, "0")}`
+    : null;
+  // 日程構造化 DESIGN §13.4: 当日の終わった枠（日本時間）は選べない。描画のたびに今の時刻で判定する
+  // （確定時は handleConfirm で改めて判定し、最後はサーバーが判定する）。
+  const renderNow = new Date();
+  const isSlotOver = (end: string | null) =>
+    selectedIsoDate !== null && isCandidateExpired({ date: selectedIsoDate, end }, renderNow);
+  const hasOverSlot = TIME_SLOTS.some((slot) => isSlotOver(slot.end));
 
   async function handleConfirm() {
-    if (!selectedDate || !selectedTime || !token || !transactionId || submitting) return;
+    if (!selectedDate || !selectedIsoDate || !selectedTime || !token || !transactionId || submitting) return;
+    // 画面を開いたまま日付・時刻をまたいだ場合に備え、押した瞬間の日本時間で検査する
+    // （サーバーの 422 と同じ文言。サーバー側でも同じ判定をする）。
+    const submitNow = new Date();
+    if (selectedIsoDate < jstTodayIso(submitNow)) {
+      setSubmitError("訪問日は本日以降を指定してください。");
+      return;
+    }
+    const selectedSlot = TIME_SLOTS.find((slot) => slot.value === selectedTime);
+    if (isCandidateExpired({ date: selectedIsoDate, end: selectedSlot?.end ?? null }, submitNow)) {
+      setSubmitError("終わった時間帯は選べません。別の時間帯か日付をお選びください。");
+      return;
+    }
+    // ひとことは送信前に改行以外の制御文字（双方向制御・ゼロ幅等）を除去する
+    // （backend は拒否して 422 になるため、コピペ由来の不可視文字で送信に失敗させない）。
+    const cleanedNote = stripControlCharsKeepNewlines(note).trim();
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const mm = String(selectedDate.month).padStart(2, "0");
-      const dd = String(selectedDate.day).padStart(2, "0");
       await confirmSchedule(
         transactionId,
         {
-          visit_date: `${selectedDate.year}-${mm}-${dd}`,
+          visit_date: selectedIsoDate,
           visit_time_slot: selectedTime,
-          // 日程検証レビュー SEC-I9: 絵文字の結合文字（ZWJ）・旗の国コード用タグ文字・表計算からの
-          // 貼り付けで混じるタブ等が残っていると backend の 422（画面では理由の出ない
-          // 汎用エラー）になるため、複数行は許しつつ送信前に落とす。
-          note: stripControlCharsKeepNewlines(note).trim() || undefined,
+          note: cleanedNote || undefined,
         },
         token,
       );
@@ -418,12 +448,14 @@ function SchedulePageInner() {
               <div className="time-slots">
                 {TIME_SLOTS.map((slot) => {
                   const isSelected = selectedTime === slot.value;
+                  const isOver = isSlotOver(slot.end);
                   return (
                     <button
                       type="button"
                       key={slot.value}
-                      className={`time-slot${isSelected ? " selected" : ""}`}
+                      className={`time-slot${isOver ? " disabled" : isSelected ? " selected" : ""}`}
                       aria-pressed={isSelected}
+                      disabled={isOver}
                       onClick={() => setSelectedTime(slot.value)}
                     >
                       {slot.value}
@@ -432,6 +464,7 @@ function SchedulePageInner() {
                   );
                 })}
               </div>
+              {hasOverSlot ? <p className="note-hint">終わった時間帯は選べません。</p> : null}
             </div>
           ) : null}
 

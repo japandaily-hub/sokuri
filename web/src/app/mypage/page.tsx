@@ -150,7 +150,7 @@ function statusChipInfo(c: CaseOut): { label: string; cls: string } {
 /**
  * 出品カード（実データ版）。
  * unreadCount: 成約後の取引に紐づく未読チャット件数（無ければ undefined）。
- * visitInfo: 訪問日時（"9月10日（水） 10:00-12:00" 等）。訪問予定のある取引
+ * visitInfo: 訪問日時（"9月10日（水） 9:00〜12:00" 等。formatVisitSchedule の出力）。訪問予定のある取引
  *   （status===pending/visiting）が紐づく場合のみ渡される（r10 対応）。
  */
 function LotCard({

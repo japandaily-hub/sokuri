@@ -29,11 +29,10 @@ export function vendorCategoryName(id: string): string {
  * - Cs（孤立サロゲート）
  * - Zl（行区切り U+2028）・Zp（段落区切り U+2029）: 改行と同じ見た目・効果を持つため、
  *   複数行を許さない1行項目に紛れ込むと表示・入力を崩す
- * 新規入力は backend が 422 で拒否するため、ここでの用途はあくまで
- * (1) 拒否導入前から保存済みだった値を表示する際の二重の防御と、
- * (2) 業者の候補日（自由入力だった頃に保存されたものを含む）をチャットで表示する際の整形に限る
- *     （業者の候補日の入力は日付＋時間帯の選択式になり、送信前の整形は不要になった）。
- * 複数行を許す項目（システムメッセージの表示・/schedule のひとこと等）には使わず
+ * 日程構造化 DESIGN §13 以降、候補日のラベル・確定値はサーバーが構造化データから作るため、
+ * ここでの用途は表示時の二重の防御に限る: (1) 旧形式（v1）の提示に残る業者の自由記述の候補、
+ * (2) サーバーが作った候補日ラベル（meta の label）、(3) visitDate が不正な場合のそのままの表示。
+ * 複数行を許す項目（旧形式の確定メッセージ本文・/schedule のひとこと等）には使わず
  * stripControlCharsKeepNewlines を使うこと。
  */
 export function stripControlChars(text: string): string {
@@ -43,8 +42,9 @@ export function stripControlChars(text: string): string {
 /**
  * 複数行を許す項目用: stripControlChars と同じ Cc/Cf/Co/Cs を除去するが、改行（\n）
  * だけは残す（Zl/Zp はこの関数の対象外。改行として扱いたい複数行項目でそこまで
- * 除去する必要はないため）。運営名義システムメッセージの表示（components/kdz/ChatSystemNotice.tsx。
- * 依頼者チャット・業者チャットで共通）、/schedule の「業者へのひとこと」の送信前整形に使う。
+ * 除去する必要はないため）。運営名義システムメッセージの表示（components/kdz/ChatSystemNotice.tsx）、
+ * 旧形式の確定メッセージ本文の表示（components/kdz/ScheduleConfirmedBand.tsx）、/schedule の
+ * 「業者へのひとこと」の送信前整形に使う。
  * \r・\t・双方向制御・ゼロ幅（ZWJ含む）等は改行以外の Cc/Cf/Co/Cs として除去されるため、
  * 絵文字の結合（ZWJ）を前提にした表示が必要な依頼者・業者の通常メッセージ本文には使わない。
  */
@@ -52,50 +52,50 @@ export function stripControlCharsKeepNewlines(text: string): string {
   return text.replace(/(?!\n)[\p{Cc}\p{Cf}\p{Co}\p{Cs}]/gu, "");
 }
 
+const DOW_LABELS = ["日", "月", "火", "水", "木", "金", "土"] as const;
+
 /**
- * slot（候補日ラベル）から「◯月◯日」パターンを全て抽出し、月日の数値配列で返す
- * （backend の `_SLOT_DATE_PATTERN` と同じパターン）。`slot.normalize("NFKC")` してから
- * `/([0-9]+)\s*月\s*([0-9]+)\s*日/g` を当てるため、全角数字や月間ligature（例:
- * U+32C0台の「㋀」等）は NFKC で ASCII 数字＋「月」「日」に正規化されてから拾われる一方、
- * タイ数字等 NFKC で ASCII 数字に変換されないものは拾えない。「10月 1日」のように
- * 数字と月/日の間に空白が入っていても許容する。該当が無ければ空配列を返す
- * （呼び出し側で「日付を解析できない」扱いにする）。
+ * 時間帯のうち「時間指定なし」（visit-slots.ts の VISIT_TIME_SLOTS の固定値の写し。
+ * node --test で単体検証するため categories.ts は visit-slots.ts を import できない。
+ * 固定5種がすべて表示されることは categories.test.mts で VISIT_TIME_SLOTS と照合する）。
  */
-export function slotMonthDays(slot: string): { month: number; day: number }[] {
-  const matches = [...slot.normalize("NFKC").matchAll(/([0-9]+)\s*月\s*([0-9]+)\s*日/g)];
-  return matches.map((m) => ({ month: Number(m[1]), day: Number(m[2]) }));
+const NO_TIME_PREFERENCE_SLOT = "時間指定なし";
+
+/** 時刻の範囲の時間帯（例: "9:00〜12:00"・"10:30〜12:00"。波ダッシュは U+301C）。日程構造化 DESIGN §13.4。 */
+const TIME_RANGE_SLOT_PATTERN = /^\d{1,2}:\d{2}〜\d{1,2}:\d{2}$/;
+
+/**
+ * visitDate（"YYYY-MM-DD"）を `${M}月${D}日（曜）` にする。Date.UTC と getUTC* で求めるため
+ * ブラウザのタイムゾーンに依存しない。形式違い・実在しない日付なら、制御文字を除去した
+ * visitDate の文字列そのものを返す（表示が消えるより保守的）。
+ */
+function formatVisitDateLabel(visitDate: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(visitDate);
+  if (m) {
+    const year = Number(m[1]);
+    const month = Number(m[2]);
+    const day = Number(m[3]);
+    const d = new Date(Date.UTC(year, month - 1, day));
+    if (d.getUTCFullYear() === year && d.getUTCMonth() === month - 1 && d.getUTCDate() === day) {
+      return `${month}月${day}日（${DOW_LABELS[d.getUTCDay()]}）`;
+    }
+  }
+  return stripControlChars(visitDate);
 }
 
 /**
- * 訪問予定の表示。
- * - rawSlot（業者の自由入力）は stripControlChars で制御文字（双方向制御・ゼロ幅等）を
- *   除去してから使う。
- * - visitDate が無ければ、除去後の slot をそのまま返す（無ければ空文字）。
- * - 日付ラベルは `${M}月${D}日（曜）`（visitDate が不正な日付なら visitDate の文字列そのもの）。
- * - slot が空文字なら日付ラベルのみを返す。
- * - slot 内の「◯月◯日」を slotMonthDays() で拾い集め、1つ以上あって**すべて**
- *   visit_date の月日と一致する場合に限り slot のみを返す（日付を重ねて表示しない）。
- *   日付が1つも無い・1つでも visit_date と食い違う・visitDate 自体が不正な日付の場合は、
- *   通知・リマインドの基準である visit_date を正として先頭に出す
- *   （`${日付ラベル} ${slot}`）。依頼者が API を直接叩いて visit_date と食い違う
- *   日付文言を候補ラベルに仕込んでも、表示上は必ず visit_date が先頭に出るようにする
- *   ための2026-09-25セキュリティレビュー（Low）是正。
- * - 年は比べない。年入りラベル（業者の候補日提示フォームの「2026年10月1日（木）…」）の年は、
- *   確定時に backend の confirm_schedule（_assert_slot_date_matches）が visit_date の年と
- *   照合済みであることを前提にしている。その照合を緩めるときは、ここも年を比べるようにすること。
+ * 訪問予定の表示（日程構造化 DESIGN §13.4）。
+ * - 日付は常に visitDate から作る（`${M}月${D}日（曜）`）。visitDate が無ければ空文字
+ *   （時間帯だけを出しても訪問予定にならないため）。
+ * - rawSlot（visit_time_slot）は、固定値（「時間指定なし」または時刻の範囲）か
+ *   `^\d{1,2}:\d{2}〜\d{1,2}:\d{2}$` に一致するときだけ半角空白を挟んで後ろに付ける。
+ *   日付入りの旧ラベル・業者の自由記述・制御文字入り・書式違い（"10:00-12:00" 等）は付けない
+ *   （ラベルを解析せず、業者の文字列を訪問予定の表示に載せない。SEC-N1 / N2 / L1）。
  */
 export function formatVisitSchedule(visitDate: string | null | undefined, rawSlot: string | null | undefined): string {
-  const slot = rawSlot ? stripControlChars(rawSlot) : rawSlot;
-  if (!visitDate) return slot ?? "";
-  const d = new Date(`${visitDate}T00:00:00`);
-  const label = Number.isNaN(d.getTime())
-    ? visitDate
-    : `${d.getMonth() + 1}月${d.getDate()}日（${["日", "月", "火", "水", "木", "金", "土"][d.getDay()]}）`;
-  if (!slot) return label;
-  const dateMatches = slotMonthDays(slot);
-  const matchesVisitDate =
-    !Number.isNaN(d.getTime()) &&
-    dateMatches.length > 0 &&
-    dateMatches.every((m) => m.month === d.getMonth() + 1 && m.day === d.getDate());
-  return matchesVisitDate ? slot : `${label} ${slot}`;
+  if (!visitDate) return "";
+  const dateLabel = formatVisitDateLabel(visitDate);
+  const slot = rawSlot ?? "";
+  const showSlot = slot === NO_TIME_PREFERENCE_SLOT || TIME_RANGE_SLOT_PATTERN.test(slot);
+  return showSlot ? `${dateLabel} ${slot}` : dateLabel;
 }

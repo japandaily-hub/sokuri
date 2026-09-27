@@ -13,19 +13,26 @@
  * スタイルは web/src/app/chat/[id]/chat.css をそのまま流用する（katazuke.css の CSS変数を
  * 継承する設計のため、cases/[id] 側の Tailwind/kdz-Ui.tsx 基盤とは別スタイル基盤の混在を許容する。
  * これは本コンポーネントのスコープ外の統一は行わない、というタスク方針に基づく）。
+ *
+ * 日程の確定（日程構造化 DESIGN §13.4）: 業者の最新の提示（meta v2 の seq が最大のもの）だけ、
+ * 候補ごとの「{label} で確定」ボタン → ConfirmModal → accept API で確定する。
+ * ラベルを解析して confirm API に送る旧来の確定（handleConfirmSchedule）は撤去した。
  */
 
 import "@/app/chat/[id]/chat.css";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { ConfirmModal } from "@/components/kdz/ConfirmModal";
+import { ScheduleConfirmedBand } from "@/components/kdz/ScheduleConfirmedBand";
 import { useToken } from "@/components/kdz/Ui";
 import { ChatSystemNotice } from "@/components/kdz/ChatSystemNotice";
 import { stripControlChars } from "@/lib/categories";
 import { isSystemNotice } from "@/lib/chat-system-notice";
 import {
+  acceptScheduleCandidate,
   CANCELLED_BY_LABEL,
-  confirmSchedule as apiConfirmSchedule,
   getTransaction,
   KdzApiError,
   listMessages,
@@ -36,7 +43,13 @@ import {
   type MessageOut,
   type TransactionDetail,
 } from "@/lib/katadzuke-api";
-import { parseSlotDate, toIsoDateString, VISIT_TIME_SLOT_MAX_LENGTH } from "@/lib/visit-slots";
+import {
+  isCandidateExpired,
+  latestProposalId,
+  parseScheduleConfirmedMeta,
+  parseScheduleProposalMeta,
+  type ParsedScheduleProposal,
+} from "@/lib/visit-slots";
 
 const POLL_INTERVAL_MS = 5000;
 
@@ -60,6 +73,9 @@ function CalendarIc({ className }: { className?: string }) {
     </svg>
   );
 }
+
+/** 確認モーダルで確定しようとしている候補（提示メッセージの id・候補の添字・表示ラベル）。 */
+type AcceptTarget = { proposalId: string; candidateIndex: number; label: string };
 
 export interface ChatPanelProps {
   /** チャット対象の取引ID（transaction_id）。 */
@@ -105,9 +121,12 @@ export function ChatPanel({
   const [sending, setSending] = useState(false);
   const lastFetchedAtRef = useRef<string | undefined>(undefined);
 
-  /* ---- 日程確定操作の状態 ---- */
-  const [schedulePickByMsg, setSchedulePickByMsg] = useState<Record<string, number>>({});
-  const [confirmingMsgId, setConfirmingMsgId] = useState<string | null>(null);
+  /* ---- 日程確定操作の状態（日程構造化 DESIGN §13.4: 候補ごとのボタン＋確認モーダル） ---- */
+  const [acceptTarget, setAcceptTarget] = useState<AcceptTarget | null>(null);
+  const [accepting, setAccepting] = useState(false);
+  const [acceptError, setAcceptError] = useState<string | null>(null);
+  // 409（新しい提示・過ぎた候補・状態の変化）等で確定できなかった理由。モーダルを閉じた後も読めるよう残す。
+  const [scheduleNotice, setScheduleNotice] = useState<string | null>(null);
 
   /* ---- トースト ---- */
   const [toast, setToast] = useState<string | null>(null);
@@ -150,7 +169,18 @@ export function ChatPanel({
         const batch = await listMessages(transactionId, token, after);
         if (batch.length > 0) {
           lastFetchedAtRef.current = batch[batch.length - 1].created_at;
-          setMessages((prev) => (initial ? batch : [...prev, ...batch]));
+          // 確定後・409 後の全件取り直しとポーリングの差分取得が重なっても、同じメッセージを二重に並べない。
+          setMessages((prev) => {
+            if (initial) return batch;
+            const knownIds = new Set(prev.map((m) => m.id));
+            const fresh = batch.filter((m) => !knownIds.has(m.id));
+            return fresh.length > 0 ? [...prev, ...fresh] : prev;
+          });
+          // 日程調整ページ・運営の代理など別の経路で日程が確定した場合も、候補の確定ボタンが
+          // 押せるまま残らないよう取引を取り直す（初回の全件取得は reloadDetail の effect が別に取る）。
+          if (!initial && batch.some((m) => m.kind === "schedule_confirmed")) {
+            await reloadDetail();
+          }
         } else if (initial) {
           setMessages([]);
         }
@@ -159,7 +189,7 @@ export function ChatPanel({
         setMessagesError(toDisplayMessage(e, "メッセージの取得に失敗しました"));
       }
     },
-    [token, transactionId],
+    [token, transactionId, reloadDetail],
   );
 
   useEffect(() => {
@@ -202,6 +232,9 @@ export function ChatPanel({
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages.length]);
 
+  /* ---- 確定できる「最新の提示」（seq が最大の v2。サーバーの superseded 判定と同じ定義） ---- */
+  const latestId = useMemo(() => latestProposalId(messages), [messages]);
+
   async function handleSend() {
     const text = draft.trim();
     if (!text || !token || !transactionId || sending) return;
@@ -221,48 +254,47 @@ export function ChatPanel({
     }
   }
 
-  async function handleConfirmSchedule(msg: MessageOut, slots: string[]) {
-    if (!token || !transactionId || confirmingMsgId) return;
-    const idx = schedulePickByMsg[msg.id] ?? 0;
-    // stripControlChars を通さず生の slotLabel のまま送る。backend はこの取引で業者が
-    // 提示した候補（保存済みの文字列）と完全一致するかで照合するため、ここで整形すると
-    // 一致せず 422 になる（表示用の整形は下記 JSX 側の stripControlChars で別途行う）。
-    const slotLabel = slots[idx];
-    if (!slotLabel) return;
-    // 確定 API（ScheduleConfirmRequest.visit_time_slot）は32字までしか受け付けない（超えると 422）。
-    // 候補日が自由入力だった頃の長い候補は、送信前に弾いて日程調整ページへ案内する（2026-09-26 ボタン化）。
-    if (slotLabel.length > VISIT_TIME_SLOT_MAX_LENGTH) {
-      showToast("候補日の形式を解析できませんでした。日程調整ページからお選びください。");
-      return;
-    }
-    const now = new Date();
-    const visitDate = parseSlotDate(slotLabel, now);
-    if (!visitDate) {
-      showToast("候補日の形式を解析できませんでした。日程調整ページからお選びください。");
-      return;
-    }
-    // 年入りラベルは過去日でも解析自体は成功するため、確定前に過去日を弾く
-    // （年なし旧形式は繰り上げ推定で必ず未来日になるため、このガードは年入りのみ発火する）。
-    if (visitDate < toIsoDateString(now)) {
-      showToast("この候補日は過ぎています。日程調整ページからお選びください。");
-      return;
-    }
-    setConfirmingMsgId(msg.id);
+  function openAcceptModal(target: AcceptTarget) {
+    setAcceptError(null);
+    setScheduleNotice(null);
+    setAcceptTarget(target);
+  }
+
+  function closeAcceptModal() {
+    setAcceptTarget(null);
+    setAcceptError(null);
+  }
+
+  /**
+   * 確認モーダルで「確定する」を押したときの処理（日程構造化 DESIGN §13.4）。
+   * 成功したら取引とメッセージを取り直して「訪問日程が確定しました」の帯を出す。
+   * 409（schedule_proposal_superseded・schedule_candidate_expired・pending 以外）・404（提示が無い）・
+   * 422（schedule_proposal_legacy・添字の範囲外）は同じ候補では二度と確定できないため、モーダルを閉じて
+   * サーバーの理由を出し、メッセージ（全件）と取引を取り直す。全件にするのは、created_at が
+   * 前後して差分取得で取りこぼした新しい提示も確実に拾うため。
+   * それ以外（通信失敗・5xx・429 等）はモーダル内にエラーを出し、そのまま再試行できるようにする。
+   */
+  async function handleAccept() {
+    if (!acceptTarget || !token || !transactionId || accepting) return;
+    setAccepting(true);
+    setAcceptError(null);
     try {
-      await apiConfirmSchedule(
-        transactionId,
-        { visit_date: visitDate, visit_time_slot: slotLabel },
-        token,
-      );
+      await acceptScheduleCandidate(transactionId, acceptTarget.proposalId, acceptTarget.candidateIndex, token);
+      setAcceptTarget(null);
+      setScheduleNotice(null);
       showToast("日程を確定しました");
-      await Promise.all([reloadDetail(), fetchMessages(false)]);
+      await Promise.all([reloadDetail(), fetchMessages(true)]);
     } catch (e) {
-      showToast(toDisplayMessage(e, "日程の確定に失敗しました"));
-      // r8-fix-frontend2 H3 是正: 409 transaction_closed（取引終了後の日程確定）を
-      // 受けた場合、detail を再取得して終了バナー・ボタン無効化に反映させる。
-      if (e instanceof KdzApiError && e.status === 409) await reloadDetail();
+      const message = toDisplayMessage(e, "日程の確定に失敗しました");
+      if (e instanceof KdzApiError && (e.status === 409 || e.status === 404 || e.status === 422)) {
+        setAcceptTarget(null);
+        setScheduleNotice(message);
+        await Promise.all([reloadDetail(), fetchMessages(true)]);
+      } else {
+        setAcceptError(message);
+      }
     } finally {
-      setConfirmingMsgId(null);
+      setAccepting(false);
     }
   }
 
@@ -273,6 +305,103 @@ export function ChatPanel({
   const isClosed = detail?.status === "cancelled" || detail?.status === "completed";
   // r8-fix-frontend5 対応: 落札業者が退会済みの場合、送信・日程確定に進めないよう無効化する。
   const operatorDeleted = detail?.operator_deleted === true;
+  // 候補から確定できるのは pending（訪問日調整中）の取引だけ（backend も pending 以外は 409）。
+  const canAcceptSchedule = detail?.status === "pending" && !operatorDeleted;
+  // 確定できない状態のときに最新の候補カードへ出す理由（旧: 確定ボタンの文言）。
+  const scheduleClosedNote = operatorDeleted
+    ? "業者退会のため確定できません"
+    : isClosed && detail
+      ? `この取引は終了しています（${TXN_STATUS_LABEL[detail.status]}）`
+      : "日程確定済み";
+  const scheduleHref = `/schedule?transaction_id=${encodeURIComponent(transactionId)}`;
+  // 過ぎた候補の判定（日本時間）は描画のたびに今の時刻で行う（確定時はサーバーが改めて判定する）。
+  const now = new Date();
+
+  /** 候補を文字だけで並べる（確定できない提示・置き換わった提示・旧形式の提示用）。 */
+  function renderCandidateTexts(labels: string[]) {
+    return (
+      <ul className="schedule-cand-texts">
+        {labels.map((label, li) => (
+          <li key={li}>{label}</li>
+        ))}
+      </ul>
+    );
+  }
+
+  /** 1件の schedule_proposal の候補カード本体を、版と状態ごとに描き分ける（日程構造化 DESIGN §13.4）。 */
+  function renderProposalBody(message: MessageOut, proposal: ParsedScheduleProposal) {
+    if (proposal.version === 2) {
+      const labels = proposal.candidates.map((c) => stripControlChars(c.label));
+      if (message.id !== latestId) {
+        return (
+          <>
+            {renderCandidateTexts(labels)}
+            <p className="schedule-card-note">新しい候補が届いています</p>
+          </>
+        );
+      }
+      if (!canAcceptSchedule) {
+        return (
+          <>
+            {renderCandidateTexts(labels)}
+            <p className="schedule-card-note">{scheduleClosedNote}</p>
+          </>
+        );
+      }
+      return (
+        <>
+          <ul className="schedule-cands">
+            {proposal.candidates.map((candidate, ci) => {
+              const label = labels[ci];
+              const expired = isCandidateExpired(candidate, now);
+              const noteId = `schedule-cand-note-${message.id}-${ci}`;
+              return (
+                <li className="schedule-cand" key={ci}>
+                  <button
+                    type="button"
+                    className="btn-schedule-cand"
+                    disabled={expired}
+                    aria-describedby={expired ? noteId : undefined}
+                    onClick={() => openAcceptModal({ proposalId: message.id, candidateIndex: ci, label })}
+                  >
+                    {label} で確定
+                  </button>
+                  {expired ? (
+                    <span className="schedule-cand-note" id={noteId}>
+                      過ぎた候補です
+                    </span>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+          <Link href={scheduleHref} className="schedule-card-link">
+            どれも合わない場合は日程調整ページで選ぶ
+          </Link>
+        </>
+      );
+    }
+    // 旧形式（v1: 業者の自由記述）・未知の版はチャットから確定できない（accept は 422 legacy）。
+    // 文字だけ（制御文字を除去）を出し、確定は日程調整ページへ案内する。
+    const legacyLabels =
+      proposal.version === 1 ? proposal.slots.map(stripControlChars).filter((label) => label !== "") : [];
+    return (
+      <>
+        {legacyLabels.length > 0 ? (
+          renderCandidateTexts(legacyLabels)
+        ) : (
+          <p className="schedule-card-note">この候補日はここでは表示できません。</p>
+        )}
+        {canAcceptSchedule ? (
+          <Link href={scheduleHref} className="schedule-card-link">
+            日程調整ページで選ぶ
+          </Link>
+        ) : (
+          <p className="schedule-card-note">{scheduleClosedNote}</p>
+        )}
+      </>
+    );
+  }
 
   const mainContent = (
     <div className="chat-main" aria-label="交渉チャット">
@@ -372,6 +501,13 @@ export function ChatPanel({
             <div style={{ padding: "8px 20px", fontSize: 12.5, color: "var(--danger)" }}>{messagesError}</div>
           ) : null}
 
+          {/* 候補から確定できなかった理由（新しい提示が届いた・候補が過ぎた等。サーバーの文言をそのまま出す）。 */}
+          {scheduleNotice ? (
+            <div className="schedule-notice" role="alert">
+              {scheduleNotice}
+            </div>
+          ) : null}
+
           {/* メッセージ */}
           <div className="messages-area" ref={messagesRef} role="log" aria-live="polite" aria-relevant="additions">
             {messages.map((m, i) => {
@@ -380,6 +516,17 @@ export function ChatPanel({
               // （左右の吹き出し）と形で区別する（日程検証レビュー SEC-I8）。制御文字の除去
               // （SEC-L5）と日程確定の「業者が提示した候補」の別枠（SEC-L1）は ChatSystemNotice が行う。
               // 依頼者・業者の通常メッセージは絵文字の結合（ZWJ）等を壊さないよう本文を変えない。
+              // 日程確定（v2）は日程構造化 DESIGN §13.4 の「訪問日程が確定しました」の帯で出す
+              // （サーバーが作った meta.label だけを出す）。旧形式の日程確定は運営名義のお知らせ枠のまま
+              // （2026-09-27 より前の本文と、業者の候補を別枠で出す operator_slot_label を保つ）。
+              if (m.kind === "schedule_confirmed" && parseScheduleConfirmedMeta(m.meta).version === 2) {
+                return (
+                  <div key={m.id}>
+                    {showDateSep ? <div className="date-sep">{formatDateSep(m.created_at)}</div> : null}
+                    <ScheduleConfirmedBand body={m.body} meta={m.meta} />
+                  </div>
+                );
+              }
               if (isSystemNotice(m)) {
                 return (
                   <div key={m.id}>
@@ -389,12 +536,10 @@ export function ChatPanel({
                 );
               }
               if (m.kind === "schedule_proposal") {
-                // 日程検証レビュー SEC-I6: 壊れた meta（文字列以外の要素）が混じっていても
-                // stripControlChars に非文字列を渡して落ちないよう、文字列だけに絞る。
-                const slots = Array.isArray(m.meta?.slots)
-                  ? (m.meta?.slots as unknown[]).filter((s): s is string => typeof s === "string")
-                  : [];
-                const pick = schedulePickByMsg[m.id] ?? 0;
+                const proposal = parseScheduleProposalMeta(m.meta);
+                // 灰色にするのは新しい提示に置き換わった v2 だけ（v1・unknown は日程調整ページへの案内を出す）。
+                const isStale = proposal.version === 2 && m.id !== latestId;
+                const headId = `schedule-card-head-${m.id}`;
                 return (
                   <div key={m.id}>
                     {showDateSep ? <div className="date-sep">{formatDateSep(m.created_at)}</div> : null}
@@ -405,43 +550,17 @@ export function ChatPanel({
                         <div className="bubble">{m.body}</div>
                       </div>
                     </div>
-                    <div className="schedule-card" id={`schedule-card-${m.id}`}>
-                      <div className="schedule-card-head">
+                    <div
+                      className={`schedule-card${isStale ? " is-stale" : ""}`}
+                      id={`schedule-card-${m.id}`}
+                      role="group"
+                      aria-labelledby={headId}
+                    >
+                      <div className="schedule-card-head" id={headId}>
                         <CalendarIc />
                         引き取り候補日
                       </div>
-                      <div className="schedule-options" role="radiogroup" aria-label="引き取り候補日">
-                        {slots.map((opt, si) => (
-                          <div className="schedule-opt" key={opt}>
-                            <input
-                              type="radio"
-                              name={`schedule-${m.id}`}
-                              id={`s-${m.id}-${si}`}
-                              checked={pick === si}
-                              onChange={() =>
-                                setSchedulePickByMsg((prev) => ({ ...prev, [m.id]: si }))
-                              }
-                            />
-                            <label htmlFor={`s-${m.id}-${si}`}>{stripControlChars(opt)}</label>
-                          </div>
-                        ))}
-                      </div>
-                      <button
-                        type="button"
-                        className="btn-schedule"
-                        onClick={() => handleConfirmSchedule(m, slots)}
-                        disabled={confirmingMsgId === m.id || detail?.status !== "pending" || operatorDeleted}
-                      >
-                        {operatorDeleted
-                          ? "業者退会のため確定できません"
-                          : isClosed && detail
-                            ? TXN_STATUS_LABEL[detail.status]
-                            : detail?.status !== "pending"
-                              ? "日程確定済み"
-                              : confirmingMsgId === m.id
-                                ? "確定中…"
-                                : `${stripControlChars(slots[pick] ?? "")} を選ぶ`}
-                      </button>
+                      {renderProposalBody(m, proposal)}
                     </div>
                   </div>
                 );
@@ -506,15 +625,40 @@ export function ChatPanel({
     </div>
   );
 
+  /* ---- 画面の上に重ねる要素（トースト・日程確定の確認モーダル） ---- */
+  // 確認モーダル（position: fixed）は document.body へポータルで描く。embedded 時は案件詳細の
+  // 表示アニメーション（transform）を持つ祖先の中に入りうるため、その箱に閉じ込められないようにする。
+  // acceptTarget はボタン操作でしか立たない（サーバー描画では常に null）ため document を参照してよい。
+  const overlays = (
+    <>
+      {toast ? (
+        <div className="kdz-toast" role="status">
+          {toast}
+        </div>
+      ) : null}
+      {acceptTarget
+        ? createPortal(
+            <ConfirmModal
+              title="訪問日程を確定しますか？"
+              message={`${acceptTarget.label} で確定しますか？確定すると業者に通知され、変更はメッセージでの相談になります。`}
+              confirmLabel="確定する"
+              cancelLabel="やめる"
+              busy={accepting}
+              error={acceptError}
+              onCancel={closeAcceptModal}
+              onConfirm={() => void handleAccept()}
+            />,
+            document.body,
+          )
+        : null}
+    </>
+  );
+
   if (variant === "embedded") {
     return (
       <div className={`chat-page chat-embed-panel${className ? ` ${className}` : ""}`}>
         {mainContent}
-        {toast ? (
-          <div className="kdz-toast" role="status">
-            {toast}
-          </div>
-        ) : null}
+        {overlays}
       </div>
     );
   }
@@ -522,11 +666,7 @@ export function ChatPanel({
   return (
     <>
       {mainContent}
-      {toast ? (
-        <div className="kdz-toast" role="status">
-          {toast}
-        </div>
-      ) : null}
+      {overlays}
     </>
   );
 }
