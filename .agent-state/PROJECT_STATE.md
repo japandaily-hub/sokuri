@@ -14,6 +14,14 @@
   - **レビュー**: security／QA とも Critical/High/Medium 0（Low のみ）。反映: 構文木ガードの強化（照合 verify_password と record_failure が枠の中・ハンドラが async def・dependencies= の RateLimitGuard も対象・内包表記の async for）、テスト追加（窓の境界・キャンセル時の解放・無効化した実コンテキスト）、docstring 3 か所。見送り: 複数段が同時に上限超過のときログの axis が従来（広い段から）と異なりうる点（応答・文言・Retry-After は不変）。
   - **合流**: I8（exciting-meninsky 185e8aa）とは merge-tree で衝突なし（I8 のコメント「login の record_failure」は attempt.record_failure() の意味になる）。L-4（zealous-colden）・業者一覧（public-read-cross-site-gate）・メール上限（fervent-hermann）との衝突は土台 7bbce51 と同数・同箇所（この変更では増えない）。/estimate の構造テスト（書き込みルートに RateLimitGuard）には影響なし（login の Depends は残した）。
   - **残（範囲外）**: 同時送信 1 回ぶんの DB 照会は N 件起きる（照合は上限まで）。scrypt の照合はイベントループ上で同期実行のまま（to_thread へ移すなら枠の中で＝メタガードの見直しとセットで）。uvicorn を複数ワーカー・複数インスタンスにすると上限が N 倍に緩む（プロセス内ストアの既知の制約＝その時点で RedisRateLimitStore〔reserve は Lua で原子的に〕へ）。応答時間でアカウントの有無が分かる（user が無いと scrypt を計算しない・既存・Low）＝ダミーハッシュで1回照合する修正は別タスク。
+更新: 2026-09-27（Claude・I8＝ログイン/LINE の回数制限が Vercel の送信元 IP で数えられる問題を、署名付きの利用者 IP 中継で是正（e02ab0f〜・**未 push・本番の鍵は未設定**。IPv6 3段化 1d14e6f の上）。直前: IPv6 のレート制限を /64・/56・/48 の3段で数える修正＝1d14e6f・未 push）
+
+## 現在フェーズ
+- **2026-09-27 I8: ログイン・LINE ログイン・LINE 連携の回数制限を、Vercel の送信元ではなく利用者の IP で数える（Claude・ブランチ claude/exciting-meninsky-ef1a21 の e02ab0f〜＝7bbce51 の直後・未 push＝本番未反映・鍵未設定）**: 09-26 に `/api/v1/_diag/client-ip` の実測とコードで確定（web がサーバー側から /auth/login・/auth/operator/login・/auth/line/exchange を呼ぶため backend の IP 軸が Vercel(iad1) の送信元で数えられ、誰でも20回の誤ログインで全員を最大15分止められた）。
+  - **仕組み**: web（Vercel 本番のみ・VERCEL=1 かつ VERCEL_ENV=production）が x-real-ip を HMAC-SHA256 で署名したヘッダ `X-Katazuke-Client-Ip-Relay: v1;<ts>;<ip>;<sig>` を付ける（`web/src/lib/client-ip-relay.ts`・auth.ts の authorize(credentials, request)・LINE の signIn は headers()・line-link.ts）。backend は scope login/line_exchange に限り、署名・時刻±60秒・公開アドレスを満たすときだけ採用し、IPv6 3段の `_apply_ip_axis` で hops の段を**置き換える**。不採用・例外はすべて従来の hops（400 にしない）。鍵は Render `CLIENT_IP_RELAY_SECRETS`（カンマ区切り・入れ替え用）／Vercel `CLIENT_IP_RELAY_SECRET`（Production のみ・Sensitive）。未設定なら両側とも従来と同一動作。
+  - **検証**: security/QA レビュー4周（最終 Critical/High/Medium 0）。backend 全件 1654 passed（185e8aa 時点）＋最後の修正後の関連 396 passed、web 単体 239 passed・tsc/eslint 0・next build 成功。本番では app.* の INFO が出ない（別セッションで修正中）ため、採用は `(scope, key_slot)` ごとの初回だけ WARNING で記録する。
+  - **運用手順**: docs/ops/admin-operations.md「署名付き中継IPの鍵」（投入順・/readyz の client_ip_relay／client_ip_relay_secrets_valid・入れ替え・停止・偽装耐性の確認手順・残るリスク）。
+  - **見送り（要相談）**: 中継が来ていないこと（ok の欠測）の監視化、再送（リプレイ）対策の v2（本文ハッシュ案）、AAAA の出現の自動監視。
 - **2026-09-27 IPv6 のレート制限の IP 軸を /64・/56・/48 の3段で数える（Claude・ブランチ claude/infallible-matsumoto-7eb7c5 の 1d14e6f＝bd5018d の直後・未 push＝本番未反映）**: 土台の bd5018d・cb98349 は、4cb6b9a・e84be17 を origin/main 11b97c1 に載せ替えたもので、I8 のセッションが作成した（backend は同一）。09-27 のセキュリティレビューで判明した既存の問題。IP 軸のキーが解決した IP の文字列全体だったため、IPv6 の利用者は /64（IPoE の HGW なら /56）の中で送信元アドレスを替えるだけで毎回新しいバケットになり、全スコープの IP 軸を回避できた。本番の backend のホスト名は AAAA なしで、DNS 経由の IPv6 は未到達。Cloudflare の IPv6 エニーキャストへ直接つなげるかは未確認。
   - **修正**（`backend/app/api/rate_limit_deps.py`）:
     - `_apply_ip_axis`（IP 軸のキー生成と判定の唯一の入口）が、`_ip_axis_buckets` で段を作る。
@@ -139,6 +147,9 @@
 - なし（push はユーザー判断）。
 
 ## 次アクション
+- **P1（ユーザー）: I8（e02ab0f〜）の push 判断と本番の鍵の設定**。push するとこのブランチの土台（業者事前申込の修正 cb98349・bd5018d、IPv6 3段化 1d14e6f・7bbce51）も一緒に出る。鍵が無い間は挙動が変わらないので、push → 鍵の設定の2段で進める。
+  - 鍵の設定: ローカルで `python -c "import secrets; print(secrets.token_urlsafe(48))"`（画面・チャットに出さない）→ Render の CLIENT_IP_RELAY_SECRETS に設定して手動デプロイ → /readyz の config.client_ip_relay=true → Vercel の CLIENT_IP_RELAY_SECRET（Production・Sensitive）に同じ値 → Production を再デプロイ。
+  - 確認: ログイン・LINE ログイン各1回で Render に `(scope, key_slot=0)` の初回採用 WARNING、その ip_net が自分の回線の /24 と一致、不採用 WARNING が無いこと。その後 admin-operations.md の偽装耐性の確認手順（22件のメール・内部対照・陽性対照）。
 - **P1（ユーザー）: IPv6 の /64・/56・/48 化（1d14e6f）の push 判断**（本番デプロイ。マイグレーション・環境変数の変更なし）。
   - 土台は bd5018d（origin/main 11b97c1 の上に cb98349＝4cb6b9a と bd5018d＝e84be17）なので、push すると業者事前申込の偽装回避修正（下の P1）も一緒に出る。
   - push 前に `git fetch` → `git log origin/main..HEAD` で、cb98349・bd5018d・1d14e6f（と本記録）だけであることを確かめる。origin/main が進んでいたら rebase し、backend の pytest をやり直す。
