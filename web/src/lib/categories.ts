@@ -43,8 +43,8 @@ export function stripControlChars(text: string): string {
 /**
  * 複数行を許す項目用: stripControlChars と同じ Cc/Cf/Co/Cs を除去するが、改行（\n）
  * だけは残す（Zl/Zp はこの関数の対象外。改行として扱いたい複数行項目でそこまで
- * 除去する必要はないため）。運営名義システムメッセージの表示（ChatPanel.tsx /
- * operator/chat/[id]/page.tsx）、/schedule の「業者へのひとこと」の送信前整形に使う。
+ * 除去する必要はないため）。運営名義システムメッセージの表示（components/kdz/ChatSystemNotice.tsx。
+ * 依頼者チャット・業者チャットで共通）、/schedule の「業者へのひとこと」の送信前整形に使う。
  * \r・\t・双方向制御・ゼロ幅（ZWJ含む）等は改行以外の Cc/Cf/Co/Cs として除去されるため、
  * 絵文字の結合（ZWJ）を前提にした表示が必要な依頼者・業者の通常メッセージ本文には使わない。
  */

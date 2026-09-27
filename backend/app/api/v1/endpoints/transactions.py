@@ -1027,6 +1027,60 @@ def _assert_slot_date_matches(visit_time_slot: str, visit_date: date) -> None:
         )
 
 
+# date.weekday()（月曜=0）の順の曜日。
+_WEEKDAYS_JA = "月火水木金土日"
+
+# 業者の候補（自由入力だった頃の候補や、API を直接呼んで提示された任意の文言）で
+# 確定したときに、日程確定メッセージの「時間帯」の行へ書く定型文。候補の文言そのものは
+# meta["operator_slot_label"] に入れ、画面が「業者が提示した候補」の別枠として表示する。
+SCHEDULE_CONFIRMED_OPERATOR_SLOT_TEXT = "業者が提示した候補のとおり"
+
+
+def _format_visit_date_ja(d: date) -> str:
+    """訪問日を「2026年10月1日（木）」の形にする。
+
+    業者の候補日提示フォーム（web/src/lib/visit-slots.ts の formatSlotLabel）が作る
+    候補ラベルの日付部分と同じ形（ゼロ埋めなし・全角の丸括弧）。
+    """
+    return f"{d.year}年{d.month}月{d.day}日（{_WEEKDAYS_JA[d.weekday()]}）"
+
+
+def _fixed_time_slot_of(visit_time_slot: str, visit_date: date) -> str | None:
+    """確定した時間帯を、運営の定型文で書ける固定時間帯（5種）に読み替える。
+
+    - 固定時間帯そのもの（日程調整ページで選んだ場合など）
+    - 業者の候補日提示フォームが作る「visit_date の日付＋固定時間帯」
+      （例「2026年10月1日（木）9:00〜12:00」）
+    のどちらかならその固定時間帯を返す。それ以外（自由入力だった頃の候補・API を直接
+    呼んで提示された任意の文言）は None を返し、呼び出し側は文言を運営名義の本文に
+    入れない（日程検証レビュー SEC-L1）。
+    """
+    if visit_time_slot in SCHEDULE_FIXED_TIME_SLOTS:
+        return visit_time_slot
+    date_prefix = _format_visit_date_ja(visit_date)
+    if visit_time_slot.startswith(date_prefix):
+        rest = visit_time_slot[len(date_prefix):]
+        if rest in SCHEDULE_FIXED_TIME_SLOTS:
+            return rest
+    return None
+
+
+def _schedule_confirmed_body(visit_date: date, fixed_time_slot: str | None) -> str:
+    """日程確定メッセージ（運営名義）の本文を定型文だけで組み立てる。
+
+    2026-09-27 ユーザー決定（日程検証レビュー SEC-L1・案 1A）: 以前は業者の候補ラベル
+    （自由入力・32字まで）をそのまま本文に入れていたため、「10月1日 ※運営:当日現金払い必須」
+    のような文面が運営名義の吹き出しに載った。本文に入るのは、サーバーが visit_date から
+    作る訪問日と、固定時間帯（5種）の値か SCHEDULE_CONFIRMED_OPERATOR_SLOT_TEXT だけ。
+    """
+    time_text = fixed_time_slot if fixed_time_slot is not None else SCHEDULE_CONFIRMED_OPERATOR_SLOT_TEXT
+    return (
+        "訪問日程が確定しました。\n"
+        f"訪問日：{_format_visit_date_ja(visit_date)}\n"
+        f"時間帯：{time_text}"
+    )
+
+
 @router.post(
     "/transactions/{transaction_id}/schedule/propose",
     response_model=MessageOut,
@@ -1174,25 +1228,31 @@ async def confirm_schedule(
     txn.visit_time_slot = body.visit_time_slot
     txn.status = "visiting"
 
-    # 候補日ラベル（例「9月7日（日）10:00〜12:00」）に日付が含まれる場合は ISO 日付を重ねて出さない
-    if _slot_month_days(body.visit_time_slot):
-        confirm_body = f"訪問日程が {body.visit_time_slot} に確定しました。"
-    else:
-        confirm_body = f"訪問日程が {body.visit_date} {body.visit_time_slot} に確定しました。"
+    # 本文は運営の定型文だけ（_schedule_confirmed_body）。業者が書いた候補の文言は
+    # 運営名義の本文に入れず meta["operator_slot_label"] に分け、画面が「業者が提示した
+    # 候補」の別枠として表示する（日程検証レビュー SEC-L1）。固定時間帯に読み替えられる
+    # 候補は文言が運営の定型の語彙だけなので別枠を付けない。既存メッセージの本文は変えない。
+    fixed_time_slot = _fixed_time_slot_of(body.visit_time_slot, body.visit_date)
+    confirmed_meta: dict[str, str] = {
+        "visit_date": body.visit_date.isoformat(),
+        "visit_time_slot": body.visit_time_slot,
+    }
+    if fixed_time_slot is None:
+        confirmed_meta["operator_slot_label"] = body.visit_time_slot
     confirmed_message = Message(
         transaction_id=txn.id,
         sender_type="system",
         sender_id=None,
-        body=confirm_body,
+        body=_schedule_confirmed_body(body.visit_date, fixed_time_slot),
         kind="schedule_confirmed",
-        meta={"visit_date": body.visit_date.isoformat(), "visit_time_slot": body.visit_time_slot},
+        meta=confirmed_meta,
     )
     session.add(confirmed_message)
 
     # note（業者へのひとこと）は運営名義のシステムメッセージ本文に連結しない。
-    # schedule_confirmed はチャット上で運営名義（アバター表示「運」・
-    # white-space: pre-wrap）として表示されるため、依頼者の自由記述をそのまま
-    # 連結すると運営のお知らせを装った文面を作れてしまう
+    # schedule_confirmed はチャット上で運営名義（2026-09-27 以降は中央寄せの
+    # 「カタヅケからのお知らせ」枠・white-space: pre-wrap）として表示されるため、
+    # 依頼者の自由記述をそのまま連結すると運営のお知らせを装った文面を作れてしまう
     # （2026-09-25 セキュリティレビュー Low 対応）。依頼者本人の発言として
     # 別メッセージに分離する。
     note_text = body.note.strip() if body.note is not None else ""

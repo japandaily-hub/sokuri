@@ -30,6 +30,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.endpoints.transactions import (
     _assert_slot_date_matches,
+    _fixed_time_slot_of,
+    _format_visit_date_ja,
     _slot_dates,
     _slot_month_days,
     _slot_years,
@@ -208,6 +210,11 @@ def _future_date(days: int = 7) -> date:
 
 
 _FULLWIDTH_DIGITS = str.maketrans("0123456789", "０１２３４５６７８９")
+
+
+def _ja_date(d: date) -> str:
+    """確定メッセージの「訪問日：」の表記（例「2026年10月1日（木）」）。"""
+    return f"{d.year}年{d.month}月{d.day}日（{'月火水木金土日'[d.weekday()]}）"
 
 
 def _dated_slot_label(d: date, time_range: str = "10:00〜12:00") -> str:
@@ -403,8 +410,11 @@ async def test_confirm_rejects_arbitrary_time_slot_without_proposal(
 async def test_confirm_accepts_offered_dated_slot_matching_visit_date(
     client: AsyncClient, db_session: AsyncSession
 ):
-    """業者提示済みの日付入り候補で visit_date が一致すれば確定でき、確定メッセージに
-    ISO日付を重ねない（候補ラベル自体に日付が含まれるため）。
+    """業者提示済みの日付入り候補で visit_date が一致すれば確定できる。
+
+    確定メッセージ（運営名義）の本文は定型文だけで、候補の文言は meta の
+    operator_slot_label に分かれる（日程検証レビュー SEC-L1。詳細は下の
+    「日程確定メッセージの本文」の節）。
     """
     user_token, op_token, txn_id = await _setup_txn(
         client, db_session, "dated_slot_user@example.com", "dated_slot_op@example.com"
@@ -429,7 +439,12 @@ async def test_confirm_accepts_offered_dated_slot_matching_visit_date(
     r = await client.get(f"/api/v1/transactions/{txn_id}/messages", headers=_auth(user_token))
     assert r.status_code == 200, r.text
     confirmed = next(m for m in r.json() if m["kind"] == "schedule_confirmed")
-    assert confirmed["body"] == f"訪問日程が {label} に確定しました。"
+    assert confirmed["body"] == (
+        "訪問日程が確定しました。\n"
+        f"訪問日：{_ja_date(visit_date)}\n"
+        "時間帯：業者が提示した候補のとおり"
+    )
+    assert confirmed["meta"]["operator_slot_label"] == label
 
 
 async def test_confirm_accepts_older_of_two_proposals(
@@ -999,8 +1014,7 @@ def test_assert_slot_date_matches_rejects_when_day_differs():
 def _year_dated_slot_label(d: date, time_value: str = _ANY_FIXED_SLOT) -> str:
     """業者の候補日提示フォーム（web/src/lib/visit-slots.ts の formatSlotLabel）と同じ形の
     年入りラベルを組み立てる（例「2026年10月1日（木）時間指定なし」）。"""
-    dow = "月火水木金土日"[d.weekday()]
-    return f"{d.year}年{d.month}月{d.day}日（{dow}）{time_value}"
+    return f"{_ja_date(d)}{time_value}"
 
 
 def _future_date_not_feb29(days: int = 10) -> date:
@@ -1123,6 +1137,145 @@ async def test_propose_checks_feb29_against_the_stated_year(
         headers=_auth(op_token),
     )
     assert r.status_code == expected_status, r.text
+
+
+# ──────────────── 日程確定メッセージの本文（運営名義は定型文だけ・日程検証レビュー SEC-L1） ────────────────
+
+# 固定時間帯のうち「9:00〜12:00」。〜（U+301C）を打ち間違えないよう定数から取る。
+_MORNING_FIXED_SLOT = next(s for s in SCHEDULE_FIXED_TIME_SLOTS if s.startswith("9:00"))
+
+
+def _expected_confirmed_body(visit_date: date, time_text: str) -> str:
+    return f"訪問日程が確定しました。\n訪問日：{_ja_date(visit_date)}\n時間帯：{time_text}"
+
+
+async def _confirmed_message(client: AsyncClient, txn_id: str, token: str) -> dict:
+    r = await client.get(f"/api/v1/transactions/{txn_id}/messages", headers=_auth(token))
+    assert r.status_code == 200, r.text
+    return next(m for m in r.json() if m["kind"] == "schedule_confirmed")
+
+
+async def test_confirmed_body_with_fixed_time_slot_has_no_operator_label(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """固定時間帯（日程調整ページ）で確定すると、本文の時間帯はその値で、別枠用の文言は無い。"""
+    user_token, _, txn_id = await _setup_txn(
+        client, db_session, "body_fixed_user@example.com", "body_fixed_op@example.com"
+    )
+    visit_date = _future_date(10)
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/schedule/confirm",
+        json={"visit_date": visit_date.isoformat(), "visit_time_slot": _MORNING_FIXED_SLOT},
+        headers=_auth(user_token),
+    )
+    assert r.status_code == 200, r.text
+    confirmed = await _confirmed_message(client, txn_id, user_token)
+    assert confirmed["sender_type"] == "system"
+    assert confirmed["body"] == _expected_confirmed_body(visit_date, _MORNING_FIXED_SLOT)
+    assert confirmed["meta"]["visit_time_slot"] == _MORNING_FIXED_SLOT
+    assert "operator_slot_label" not in confirmed["meta"]
+
+
+async def test_confirmed_body_with_year_dated_fixed_slot_label_uses_fixed_wording(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """業者の選択式フォームの候補（visit_date の日付＋固定時間帯）は、時間帯まで定型文で書き、
+    別枠用の文言を付けない（文言が運営の定型の語彙だけでできているため）。"""
+    user_token, op_token, txn_id = await _setup_txn(
+        client, db_session, "body_formlabel_user@example.com", "body_formlabel_op@example.com"
+    )
+    visit_date = _future_date_not_feb29()
+    label = _year_dated_slot_label(visit_date, _MORNING_FIXED_SLOT)
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/schedule/propose",
+        json={"slots": [label]},
+        headers=_auth(op_token),
+    )
+    assert r.status_code == 201, r.text
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/schedule/confirm",
+        json={"visit_date": visit_date.isoformat(), "visit_time_slot": label},
+        headers=_auth(user_token),
+    )
+    assert r.status_code == 200, r.text
+    confirmed = await _confirmed_message(client, txn_id, user_token)
+    assert confirmed["body"] == _expected_confirmed_body(visit_date, _MORNING_FIXED_SLOT)
+    assert confirmed["meta"]["visit_time_slot"] == label
+    assert "operator_slot_label" not in confirmed["meta"]
+
+
+async def test_confirmed_body_never_contains_operator_free_text(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """業者の自由な文言（運営を名乗る文面）は運営名義の本文に入らず、両当事者とも
+    meta の operator_slot_label（画面では「業者が提示した候補」の別枠）で受け取る。"""
+    user_token, op_token, txn_id = await _setup_txn(
+        client, db_session, "body_freetext_user@example.com", "body_freetext_op@example.com"
+    )
+    visit_date = _future_date(10)
+    label = f"{visit_date.month}月{visit_date.day}日 ※運営:当日現金払い必須"
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/schedule/propose",
+        json={"slots": [label]},
+        headers=_auth(op_token),
+    )
+    assert r.status_code == 201, r.text
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/schedule/confirm",
+        json={"visit_date": visit_date.isoformat(), "visit_time_slot": label},
+        headers=_auth(user_token),
+    )
+    assert r.status_code == 200, r.text
+    for token in (user_token, op_token):
+        confirmed = await _confirmed_message(client, txn_id, token)
+        assert confirmed["body"] == _expected_confirmed_body(visit_date, "業者が提示した候補のとおり")
+        assert "運営" not in confirmed["body"]
+        assert confirmed["meta"]["operator_slot_label"] == label
+
+
+async def test_confirmed_body_treats_form_label_with_extra_text_as_operator_text(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """日付＋固定時間帯の後ろに文言を足した候補は定型文として扱わず、別枠へ回す。"""
+    user_token, op_token, txn_id = await _setup_txn(
+        client, db_session, "body_extratext_user@example.com", "body_extratext_op@example.com"
+    )
+    visit_date = _future_date_not_feb29()
+    label = _year_dated_slot_label(visit_date, _MORNING_FIXED_SLOT) + " 要現金"
+    assert len(label) <= 32
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/schedule/propose",
+        json={"slots": [label]},
+        headers=_auth(op_token),
+    )
+    assert r.status_code == 201, r.text
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/schedule/confirm",
+        json={"visit_date": visit_date.isoformat(), "visit_time_slot": label},
+        headers=_auth(user_token),
+    )
+    assert r.status_code == 200, r.text
+    confirmed = await _confirmed_message(client, txn_id, user_token)
+    assert confirmed["body"] == _expected_confirmed_body(visit_date, "業者が提示した候補のとおり")
+    assert "要現金" not in confirmed["body"]
+    assert confirmed["meta"]["operator_slot_label"] == label
+
+
+def test_format_visit_date_ja():
+    assert _format_visit_date_ja(date(2026, 10, 1)) == "2026年10月1日（木）"
+    assert _format_visit_date_ja(date(2028, 2, 29)) == "2028年2月29日（火）"
+
+
+def test_fixed_time_slot_of():
+    d = date(2026, 10, 1)
+    assert _fixed_time_slot_of(_MORNING_FIXED_SLOT, d) == _MORNING_FIXED_SLOT
+    assert _fixed_time_slot_of(f"2026年10月1日（木）{_MORNING_FIXED_SLOT}", d) == _MORNING_FIXED_SLOT
+    assert _fixed_time_slot_of("2026年10月1日（木）時間指定なし", d) == "時間指定なし"
+    # 年なし（自由入力だった頃の形）・別の日付・余計な文言つき・固定にない時間帯は定型文にしない。
+    assert _fixed_time_slot_of(f"10月1日（木）{_MORNING_FIXED_SLOT}", d) is None
+    assert _fixed_time_slot_of(f"2026年10月2日（金）{_MORNING_FIXED_SLOT}", d) is None
+    assert _fixed_time_slot_of(f"2026年10月1日（木）{_MORNING_FIXED_SLOT} ※運営", d) is None
+    assert _fixed_time_slot_of("2026年10月1日（木）10:00-12:00", d) is None
 
 
 # ──────────────── 定数ガード: SCHEDULE_FIXED_TIME_SLOTS とフロントエンドの一致 ────────────────

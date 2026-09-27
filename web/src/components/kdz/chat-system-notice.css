@@ -1,0 +1,83 @@
+/* ============================================================
+   チャットのお知らせ枠（ChatSystemNotice）固有スタイル
+   依頼者チャット（chat/[id]/chat.css）・業者チャット（operator/chat/[id]/chat.css）の
+   どちらの中でも同じ見た目になるよう、全クラスを .kdz-chat-notice 配下に限定し、
+   色・書体は katazuke.css の CSS 変数だけを使う（角丸0・影なし＝人の森整合テーマ）。
+   吹き出し（左右寄せ・アバター付き）と形で区別するため、中央寄せ・アバターなしにする
+   （日程検証レビュー SEC-I8・2026-09-27 ユーザー決定）。
+   ============================================================ */
+
+.kdz-chat-notice {
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 10px 14px 12px;
+  background: var(--pale-2);
+  border: 1px solid var(--line);
+  border-radius: 0;
+  font-family: var(--ui);
+  color: var(--ink);
+}
+
+/* 日付区切りの直後に来たときだけ、区切り線と枠がくっつかないよう間を空ける */
+.date-sep + .kdz-chat-notice {
+  margin-top: 12px;
+}
+
+.kdz-chat-notice__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--body-soft);
+}
+
+.kdz-chat-notice__icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.kdz-chat-notice__label {
+  font-weight: 600;
+}
+
+.kdz-chat-notice__time {
+  margin-left: auto;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.kdz-chat-notice__body {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.7;
+  font-variant-numeric: tabular-nums;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* 業者が提示した候補（業者の文言）。運営の本文と分けるため、左の線と見出しで引用として示す */
+.kdz-chat-notice__quote {
+  margin-top: 8px;
+  padding: 2px 0 2px 10px;
+  border-left: 2px solid var(--body-soft);
+}
+
+.kdz-chat-notice__quote-heading {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--body-soft);
+}
+
+.kdz-chat-notice__quote-text {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--body);
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}

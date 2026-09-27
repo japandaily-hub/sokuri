@@ -4,6 +4,7 @@
  * 業者 交渉チャット（/operator/chat/[id]）。
  * デザイン正典: docs/design_handoff_katazuke/業者チャット.html をピクセル忠実に再現。
  * これは業者(operator)側の画面。送信メッセージ（自社）は青バブルで右、相手（ユーザー）は白バブルで左。
+ * 運営名義（system）のメッセージは中央寄せのお知らせ枠（components/kdz/ChatSystemNotice）。
  *
  * 動的ルート([id])。/operator は SiteChrome の BARE_PREFIXES 対象で共通クロムが付かないため、
  * ページ自身が専用ヘッダー（戻る矢印 + ロゴ + タイトル + 業者管理バッジ + 会社名 + 通知ベル）と全画面レイアウトを描く。
@@ -22,7 +23,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Ic } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
 import { useToken } from "@/components/kdz/Ui";
-import { stripControlChars, stripControlCharsKeepNewlines } from "@/lib/categories";
+import { ChatSystemNotice } from "@/components/kdz/ChatSystemNotice";
+import { stripControlChars } from "@/lib/categories";
+import { isSystemNotice } from "@/lib/chat-system-notice";
 import {
   CANCELLED_BY_LABEL,
   TXN_STATUS_LABEL,
@@ -487,27 +490,30 @@ export default function OperatorChatPage() {
                   return (
                     <div key={m.id}>
                       {showDateSep ? <div className="date-sep">{formatDateSep(m.created_at)}</div> : null}
-                      <div className={`msg ${m.mine ? "me" : "them"}`}>
-                        <div className="msg-avatar">{m.mine ? "自" : m.sender_type === "system" ? "運" : peerInitial}</div>
-                        <div>
-                          <div className="msg-time">{formatTime(m.created_at)}</div>
-                          {/* 日程検証レビュー SEC-L5: 本対応前に保存された運営名義（system）メッセージへの
-                              二重の防御として表示直前に制御文字（改行以外）を除去する。依頼者・
-                              業者の通常メッセージは絵文字の結合（ZWJ）等を壊さないよう変えない。 */}
-                          <div className="bubble">
-                            {m.sender_type === "system" ? stripControlCharsKeepNewlines(m.body) : m.body}
+                      {/* 運営名義（system）は吹き出しではなく中央寄せのお知らせ枠で出し、お客様の発言
+                          （左の吹き出し）と形で区別する（日程検証レビュー SEC-I8）。制御文字の除去と
+                          日程確定の「業者が提示した候補」の別枠は ChatSystemNotice が行う。依頼者・業者の
+                          通常メッセージは絵文字の結合（ZWJ）等を壊さないよう本文を変えない。 */}
+                      {isSystemNotice(m) ? (
+                        <ChatSystemNotice message={m} time={formatTime(m.created_at)} />
+                      ) : (
+                        <div className={`msg ${m.mine ? "me" : "them"}`}>
+                          <div className="msg-avatar">{m.mine ? "自" : peerInitial}</div>
+                          <div>
+                            <div className="msg-time">{formatTime(m.created_at)}</div>
+                            <div className="bubble">{m.body}</div>
+                            {m.kind === "schedule_proposal" && Array.isArray(m.meta?.slots) ? (
+                              <ul className="msg-slots" aria-label="提示した候補日">
+                                {(m.meta?.slots as unknown[])
+                                  .filter((s): s is string => typeof s === "string")
+                                  .map((slot, si) => (
+                                    <li key={`${si}-${slot}`}>{stripControlChars(slot)}</li>
+                                  ))}
+                              </ul>
+                            ) : null}
                           </div>
-                          {m.kind === "schedule_proposal" && Array.isArray(m.meta?.slots) ? (
-                            <ul className="msg-slots" aria-label="提示した候補日">
-                              {(m.meta?.slots as unknown[])
-                                .filter((s): s is string => typeof s === "string")
-                                .map((slot, si) => (
-                                  <li key={`${si}-${slot}`}>{stripControlChars(slot)}</li>
-                                ))}
-                            </ul>
-                          ) : null}
                         </div>
-                      </div>
+                      )}
                     </div>
                   );
                 })}

@@ -377,8 +377,9 @@ export function getReductionQuota(txn: {
 export type MessageSenderType = "user" | "operator" | "system";
 /**
  * complete_request（業者→ユーザー: 完了確定の依頼。sender_type="operator"）／
- * completed（system: 完了確定の記録。2026-09-26 ボタン化）を追加。表示側の追加描画は不要
- * （ChatPanel・業者チャットともに schedule_proposal 以外は汎用の吹き出しとして描画するため）。
+ * completed（system: 完了確定の記録。2026-09-26 ボタン化）を追加。sender_type="system" のメッセージ
+ * （schedule_confirmed・completed 等）は ChatPanel・業者チャットとも中央寄せのお知らせ枠
+ * （components/kdz/ChatSystemNotice）で、それ以外は schedule_proposal を除き汎用の吹き出しで描画する。
  */
 export type MessageKind = "text" | "schedule_proposal" | "schedule_confirmed" | "system" | "complete_request" | "completed";
 

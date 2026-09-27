@@ -20,7 +20,9 @@ import "@/app/chat/[id]/chat.css";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useToken } from "@/components/kdz/Ui";
-import { stripControlChars, stripControlCharsKeepNewlines } from "@/lib/categories";
+import { ChatSystemNotice } from "@/components/kdz/ChatSystemNotice";
+import { stripControlChars } from "@/lib/categories";
+import { isSystemNotice } from "@/lib/chat-system-notice";
 import {
   CANCELLED_BY_LABEL,
   confirmSchedule as apiConfirmSchedule,
@@ -374,10 +376,18 @@ export function ChatPanel({
           <div className="messages-area" ref={messagesRef} role="log" aria-live="polite" aria-relevant="additions">
             {messages.map((m, i) => {
               const showDateSep = i === 0 || formatDateSep(m.created_at) !== formatDateSep(messages[i - 1].created_at);
-              // 日程検証レビュー SEC-L5: 本対応前に保存された運営名義（system）メッセージへの二重の防御として
-              // 表示直前に制御文字（改行以外）を除去する。依頼者・業者の通常メッセージは絵文字の
-              // 結合（ZWJ）等を壊さないよう、ここでは一切変更しない。
-              const bodyText = m.sender_type === "system" ? stripControlCharsKeepNewlines(m.body) : m.body;
+              // 運営名義（system）は吹き出しではなく中央寄せのお知らせ枠で出し、業者・自分の発言
+              // （左右の吹き出し）と形で区別する（日程検証レビュー SEC-I8）。制御文字の除去
+              // （SEC-L5）と日程確定の「業者が提示した候補」の別枠（SEC-L1）は ChatSystemNotice が行う。
+              // 依頼者・業者の通常メッセージは絵文字の結合（ZWJ）等を壊さないよう本文を変えない。
+              if (isSystemNotice(m)) {
+                return (
+                  <div key={m.id}>
+                    {showDateSep ? <div className="date-sep">{formatDateSep(m.created_at)}</div> : null}
+                    <ChatSystemNotice message={m} time={formatTime(m.created_at)} />
+                  </div>
+                );
+              }
               if (m.kind === "schedule_proposal") {
                 // 日程検証レビュー SEC-I6: 壊れた meta（文字列以外の要素）が混じっていても
                 // stripControlChars に非文字列を渡して落ちないよう、文字列だけに絞る。
@@ -392,7 +402,7 @@ export function ChatPanel({
                       <div className="msg-avatar">{bizInitial}</div>
                       <div>
                         <div className="msg-time">{formatTime(m.created_at)}</div>
-                        <div className="bubble">{bodyText}</div>
+                        <div className="bubble">{m.body}</div>
                       </div>
                     </div>
                     <div className="schedule-card" id={`schedule-card-${m.id}`}>
@@ -440,10 +450,10 @@ export function ChatPanel({
                 <div key={m.id}>
                   {showDateSep ? <div className="date-sep">{formatDateSep(m.created_at)}</div> : null}
                   <div className={`msg ${m.mine ? "me" : "them"}`}>
-                    <div className="msg-avatar">{m.mine ? "自" : m.sender_type === "system" ? "運" : bizInitial}</div>
+                    <div className="msg-avatar">{m.mine ? "自" : bizInitial}</div>
                     <div>
                       <div className="msg-time">{formatTime(m.created_at)}</div>
-                      <div className="bubble">{bodyText}</div>
+                      <div className="bubble">{m.body}</div>
                     </div>
                   </div>
                 </div>
