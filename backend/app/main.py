@@ -20,7 +20,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.core.alert_middleware import ServerErrorAlertMiddleware
-from app.core.app_logging import configure_app_logging_from_env
+from app.core.app_logging import configure_app_logging_from_env, install_log_redaction
 from app.core.error_summary import describe_exception
 from app.api.v1.router import api_router
 from app.config import Settings, get_settings
@@ -612,6 +612,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     return app
 
 
+# uvicorn のログ（アクセスログ・未処理例外のトレースバック）の写真の鍵・クエリの値・メール等を伏せる。
+# 漏えいを防ぐ対策なので、ログの出し方の設定（APP_LOG_LEVEL）に依らず常に付ける（app/core/app_logging.py）。
+install_log_redaction()
 # 本番（start.sh が APP_LOG_LEVEL を渡す）でだけ app.* のログを stderr（Render のログ）へ出す。
 # create_app() が出す起動時のログ（[startup]・本番ガード）も残るよう、アプリの生成より前に行う。
 configure_app_logging_from_env()

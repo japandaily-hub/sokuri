@@ -43,6 +43,18 @@ _STORAGE_KEY_IN_TEXT_RE = re.compile(
 #: line_notify._mask_line_user_id と同じく先頭4字だけ残す。
 _LINE_USER_ID_IN_TEXT_RE = re.compile(r"(?<![0-9A-Za-z])(U[0-9a-f]{3})[0-9a-f]{29}(?![0-9A-Za-z])")
 
+#: 写真の capability URL の区間（``GET /api/v1/files/{storage_key}``・``PUT /api/v1/upload/{storage_key}``。
+#: ID 以外のパス引数を持つルートはこの2つだけ＝2026-09-27 に実アプリのルート表で確認）。
+#: storage_key の形式に合わない値も含め、直後の区間を先頭8字＋``...``に丸める（隠す側に倒す）。
+#: 8字以下の区間（``/upload/presign`` 等）はそのまま残る。
+_CAPABILITY_PATH_SEGMENT_RE = re.compile(r"(/(?:files|upload)/)([^/?]{8})[^/?]+")
+
+#: クエリの名前として残してよい形（英字か ``_`` で始まる 32 字以内の識別子）。値は常に伏せる。
+_QUERY_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_.-]{0,31}")
+
+#: 伏せた値の表記。
+_MASKED_VALUE = "***"
+
 
 def mask_account_number(account_number: str) -> str:
     """口座番号の下4桁のみ残しマスクする。4桁以下はそのまま返さず全マスクする。"""
@@ -97,3 +109,44 @@ def mask_sensitive_in_text(text: str) -> str:
     masked = mask_emails_in_text(text)
     masked = _STORAGE_KEY_IN_TEXT_RE.sub(r"\1...", masked)
     return _LINE_USER_ID_IN_TEXT_RE.sub(r"\1…", masked)
+
+
+def mask_query_string(query: str) -> str:
+    """クエリ文字列の値をすべて伏せる（例: ``token=abc&q=taro@x.jp`` -> ``token=***&q=***``）。
+
+    診断用の ``?token=``（DIAG_TOKEN）や検索語 ``?q=``（氏名・メールアドレスが入りうる）の値を
+    ログに残さないため。名前は照合の手掛かりとして残すが、識別子の形でない組（``=`` の無いもの・
+    ``%`` や記号を含む名前）は組ごと ``***`` にする。空の組（``&&``・末尾の ``&``）は捨てる。
+    """
+    masked_pairs: list[str] = []
+    for pair in query.split("&"):
+        if not pair:
+            continue
+        name, has_value, _ = pair.partition("=")
+        if has_value and _QUERY_NAME_RE.fullmatch(name):
+            masked_pairs.append(f"{name}={_MASKED_VALUE}")
+        else:
+            masked_pairs.append(_MASKED_VALUE)
+    return "&".join(masked_pairs)
+
+
+def mask_request_target_for_log(target: str) -> str:
+    """ログ・運営アラートへ出す「パス（``?`` クエリ）」から、写真の鍵とクエリの値を伏せる。
+
+    ``GET /api/v1/files/{storage_key}`` は無認証の capability URL（storage_key を知っていれば誰でも
+    写真を取れる）なので、ログを読める人が写真を取れないよう次の順で処理する:
+
+    1. ``/files/``・``/upload/`` の直後の区間を先頭8字＋``...``にする（``storage.mask_key_for_log`` と
+       同じ形。形式に合わない値も丸める）。
+    2. パスの残りに :func:`mask_sensitive_in_text` を掛ける（他の位置の storage_key・メール・LINE userId）。
+    3. 最初の ``?`` より後ろ（クエリ）は :func:`mask_query_string` で値を伏せる。
+
+    uvicorn のアクセスログのパスは ``urllib.parse.quote`` 済みで ``?`` は区切りにしか現れない。
+    デコード済みのパス（ASGI の ``scope["path"]``）を渡す場合は、先に ``quote`` して改行・制御文字と
+    ``?`` を ``%XX`` にしておくこと（core/alert_middleware.py）。
+    """
+    path, has_query, query = target.partition("?")
+    path = mask_sensitive_in_text(_CAPABILITY_PATH_SEGMENT_RE.sub(r"\1\2...", path))
+    if not has_query:
+        return path
+    return f"{path}?{mask_query_string(query)}"

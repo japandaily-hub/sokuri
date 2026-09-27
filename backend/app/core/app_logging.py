@@ -42,8 +42,8 @@
     - 整形の際、エスケープより先に、文中のメールアドレス・写真の storage_key・LINE の userId を
       :func:`mask_sensitive_in_text` でマスクする（呼び出し側のマスク漏れや、例外文に含まれる値
       への安全網）。uvicorn.error が出す未処理例外のトレースバック（"Exception in ASGI
-      application"）にも、uvicorn の書式を変えずに同じ処理を掛ける。呼び出し側では引き続き
-      ``mask_email`` 等で個別にマスクすること。
+      application"）にも、uvicorn の書式を変えずに同じ処理を掛ける（こちらは下の「伏せ字」と同じく
+      APP_LOG_LEVEL に依らず常に）。呼び出し側では引き続き ``mask_email`` 等で個別にマスクすること。
     - DB 例外（PostgreSQL の DETAIL＝一意制約違反のキーの値・CHECK 違反の行全体を文言に抱える）と
       検証エラー（入力値を抱える）は、メール等のマスクでは氏名・住所・電話番号が残る。トレースバックは
       :func:`app.core.error_summary.format_exception_for_log` で両者の文言だけを要約（型・SQLSTATE・
@@ -52,6 +52,24 @@
       取りこぼし対策。APP_LOG_LEVEL が無く本ハンドラが付かない開発・テストでは効かない）。
     - 整形に失敗したとき（書式と引数の不一致）、標準の ``Handler.handleError`` は引数の生値を
       マスクを通さず stderr へ書くため、例外の種類と発生箇所だけを1行で出す。
+
+uvicorn のログの伏せ字（:func:`install_log_redaction`）:
+    uvicorn は1リクエスト1行のアクセスログ（``uvicorn.access``）に、パスとクエリ文字列をそのまま
+    出す。写真の ``GET /api/v1/files/{storage_key}`` は無認証の capability URL なので、Render の
+    ログ（約7日・ダッシュボードの権限で読める）を読める人が写真を取れてしまう。``/readyz?token=``・
+    ``/api/v1/_diag/client-ip?token=`` の DIAG_TOKEN や検索語 ``?q=`` も同じく残る。
+
+    - パスの storage_key を先頭8字＋``...``に丸め、クエリは値を伏せる（書式は uvicorn のまま）。
+      引数の位置に依らず文字列の引数すべてに掛ける（uvicorn が引数の並びを変えても伏せる側に倒す。
+      パス以外の引数＝接続元・メソッド・HTTP の版には伏せる対象が無いので変わらない）。
+      ``uvicorn.error`` の WebSocket の行（``'%s - "WebSocket %s" 403'`` 等）のパスにも掛ける。
+    - 未処理例外のトレースバックの整形（上記）も同じ入口で付ける。
+    - **``APP_LOG_LEVEL`` に依らず常に付ける。** 上の app.* の設定は「ログを出すか・どのレベルか」
+      の切り替えだが、こちらは漏えいを防ぐ対策で、無いと気付かないまま漏れ続ける（app.* の INFO が
+      出ていなかった件も数か月気付かれなかった）。起動経路が start.sh を通らない場合（Render の
+      開始コマンドの変更等）でも効くよう、app/main.py の import 時に呼ぶ。ローカル開発の
+      アクセスログとトレースバックも伏せ字・継続の印付きになるが、テスト（TestClient・httpx の
+      ASGITransport）は uvicorn を通らないので影響しない。
 """
 
 from __future__ import annotations
@@ -66,7 +84,7 @@ from app.core.error_summary import (
     format_exception_for_log,
     is_value_bearing_exception,
 )
-from app.core.masking import mask_sensitive_in_text
+from app.core.masking import mask_request_target_for_log, mask_sensitive_in_text
 
 #: 設定対象のロガー名。``logging.getLogger(__name__)`` を使う app 配下の全モジュールがこの子になる。
 APP_LOGGER_NAME = "app"
@@ -91,6 +109,14 @@ _QUIETED_THIRD_PARTY_LOGGERS = ("httpx", "httpcore")
 
 #: 未処理例外のトレースバックを出す uvicorn のロガー（書式は uvicorn のまま、中身だけ整える）。
 _UVICORN_ERROR_LOGGER_NAME = "uvicorn.error"
+
+#: 1リクエスト1行のアクセスログを出す uvicorn のロガー。uvicorn（protocols/http の h11_impl・
+#: httptools_impl）は引数 ``(client_addr, method, full_path, http_version, status_code)`` で出す。
+#: full_path は ``urllib.parse.quote(scope["path"])`` に生のクエリ文字列をつないだもの（0.48 で確認）。
+_UVICORN_ACCESS_LOGGER_NAME = "uvicorn.access"
+
+#: 伏せ字の処理に失敗した引数の代わりに出す文字列（隠す側に倒す）。
+_REDACTION_FAILED_PLACEHOLDER = "<hidden>"
 
 #: トレースバック等の継続行の先頭に付ける印（1行目の本文と区別し、偽の行頭を作らせない）。
 _CONTINUATION_PREFIX = "  | "
@@ -183,6 +209,15 @@ def _render_message(record: logging.LogRecord) -> str:
     return message % args
 
 
+def escape_control_characters(text: str) -> str:
+    """制御文字・行区切り・書式文字（Cf）をエスケープ表記にして1行に収める（app.* のログ本文と同じ表）。
+
+    ログ以外（運営アラートの本文に入れる例外文等）でも、利用者の入力を含みうる文字列で偽の行や
+    表示順の入れ替えを作らせないために使う。マスクを掛ける場合はマスクが先（AppLogFormatter 参照）。
+    """
+    return text.translate(_MESSAGE_ESCAPES)
+
+
 class AppLogFormatter(logging.Formatter):
     """``LEVEL [ロガー名] 本文`` の1行（例外時はその後ろに ``  | `` 付きのトレースバック）へ整形する。
 
@@ -261,6 +296,48 @@ class _UvicornTracebackFilter(logging.Filter):
         return True
 
 
+def _redact_log_argument(value: object) -> object:
+    """ログの引数1つ（文字列のとき）から、写真の鍵とクエリの値を伏せる。失敗したら全体を伏せる。"""
+    if not isinstance(value, str):
+        return value
+    try:
+        return mask_request_target_for_log(value)
+    except Exception:  # noqa: BLE001 -- フィルタから例外を出さない（下のクラスを参照）
+        return _REDACTION_FAILED_PLACEHOLDER
+
+
+class _RequestTargetRedactionFilter(logging.Filter):
+    """uvicorn のログの引数に入るリクエストのパス（``?`` クエリ）から、写真の鍵とクエリの値を伏せる。
+
+    uvicorn.access の AccessFormatter は ``record.args`` を ``(client_addr, method, full_path,
+    http_version, status_code)`` として読む。引数の位置に依らず文字列の引数すべてに
+    :func:`mask_request_target_for_log` を掛けるので、書式
+    （``INFO:     1.2.3.4:5678 - "GET /api/v1/files/0123abcd... HTTP/1.1" 200 OK``）は変えずに、
+    uvicorn が引数の並びや数を変えても伏せる側に倒れる（接続元・メソッド・HTTP の版には伏せる対象が
+    無いので変わらない）。``mask_bare_message`` のときは、引数の無い記録の本文そのものにも掛ける
+    （uvicorn.access の記録はすべてリクエストの行のため。uvicorn.error には付けない＝通常の文言を
+    崩さない）。ロガーに付けたフィルタの例外は uvicorn の応答処理まで伝わるため外へ出さない。
+    """
+
+    def __init__(self, *, mask_bare_message: bool) -> None:
+        super().__init__()
+        self._mask_bare_message = mask_bare_message
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            args = record.args
+            if isinstance(args, Mapping):
+                record.args = {name: _redact_log_argument(value) for name, value in args.items()}
+            elif isinstance(args, tuple) and args:
+                record.args = tuple(_redact_log_argument(value) for value in args)
+            elif self._mask_bare_message and isinstance(record.msg, str):
+                record.msg = _redact_log_argument(record.msg)
+        except Exception:  # noqa: BLE001 -- 想定外の引数（独自の Mapping 等）でも例外を出さず、本文ごと伏せる
+            record.msg = _REDACTION_FAILED_PLACEHOLDER
+            record.args = ()
+        return True
+
+
 def _find_app_handler(app_logger: logging.Logger) -> logging.Handler | None:
     """本モジュールが以前に付けたハンドラを返す（無ければ None）。"""
     for handler in app_logger.handlers:
@@ -282,6 +359,38 @@ def _attach_uvicorn_traceback_filter() -> None:
     uvicorn_error = logging.getLogger(_UVICORN_ERROR_LOGGER_NAME)
     if not any(isinstance(existing, _UvicornTracebackFilter) for existing in uvicorn_error.filters):
         uvicorn_error.addFilter(_UvicornTracebackFilter())
+
+
+def _attach_request_target_filter(logger_name: str, *, mask_bare_message: bool) -> None:
+    """uvicorn のロガーにパス（クエリ）の伏せ字フィルタを1つだけ付ける。"""
+    target = logging.getLogger(logger_name)
+    if not any(isinstance(existing, _RequestTargetRedactionFilter) for existing in target.filters):
+        target.addFilter(_RequestTargetRedactionFilter(mask_bare_message=mask_bare_message))
+
+
+def install_log_redaction() -> bool:
+    """uvicorn のログに伏せ字のフィルタを付ける（``APP_LOG_LEVEL`` に依らず常に・何度呼んでも1つ）。
+
+    - uvicorn.access: パスの写真の鍵とクエリの値を伏せる。
+    - uvicorn.error: WebSocket の行のパスを同じく伏せ、未処理例外のトレースバックを整形・マスクする。
+
+    Returns:
+        フィルタが付いている状態なら True（2回目以降の呼び出しも True）。付けられなければ False。
+
+    ロガー（ハンドラではなく）に付けるので、uvicorn が起動時に ``logging.config.dictConfig`` で
+    ハンドラを付け直しても外れない（dictConfig は既存のロガーのフィルタを消さない）。付ける処理の
+    失敗で例外は投げない（ログのためにサービスの起動を止めない）。
+    """
+    try:
+        _attach_request_target_filter(_UVICORN_ACCESS_LOGGER_NAME, mask_bare_message=True)
+        _attach_request_target_filter(_UVICORN_ERROR_LOGGER_NAME, mask_bare_message=False)
+        _attach_uvicorn_traceback_filter()
+    except Exception:  # noqa: BLE001 -- 上記のとおり起動を止めない
+        logger.warning(
+            "logging: uvicorn のログの伏せ字フィルタを付けられませんでした", exc_info=True
+        )
+        return False
+    return True
 
 
 def configure_app_logging_from_env() -> bool:

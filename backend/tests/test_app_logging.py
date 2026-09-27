@@ -448,9 +448,10 @@ def test_uvicorn_default_logging_plus_app_logging_emits_startup_info_once(tmp_pa
 
 
 def test_without_app_log_level_app_info_is_dropped_as_before(tmp_path: pathlib.Path):
-    """APP_LOG_LEVEL が無い場合は従来どおり（本番で起きていた症状の再現）。
+    """APP_LOG_LEVEL が無い場合、app.* の出力は従来どおり（本番で起きていた症状の再現）。
 
     上のテストの検査が「何を見れば修正の有無を区別できるか」を正しく捉えていることの確認も兼ねる。
+    uvicorn のログの伏せ字（トレースバックのマスクを含む）は APP_LOG_LEVEL に依らず効く。
     """
     lines = _run_child(tmp_path, None)
 
@@ -459,9 +460,12 @@ def test_without_app_log_level_app_info_is_dropped_as_before(tmp_path: pathlib.P
     # lastResort はレベルもロガー名も付けず本文だけを出す。
     assert "probe-warning" in lines
     assert lines.count("INFO:     probe-uvicorn") == 1
-    # 未処理例外のトレースバックは素通し（安全網は APP_LOG_LEVEL があるときだけ効く）。
     assert "ROOT_HANDLERS=0" in lines
-    assert "ValueError: Key (email)=(taro@example.com) already exists." in lines
+    # 未処理例外のトレースバックの整形・マスクは APP_LOG_LEVEL に依らず常に効く（漏えい対策のため
+    # app.main の import 時に app_logging.install_log_redaction で付ける。アクセスログの伏せ字と同じ）。
+    assert lines.count("ERROR:    Exception in ASGI application") == 1
+    assert "  | ValueError: Key (email)=(t***@example.com) already exists." in lines
+    assert not any("taro@example.com" in line for line in lines)
     # httpx を固定しないと、root にハンドラが付いた時点で access_token 入りの URL が流れる
     # （上のテストの「流れない」が固定の効果であることの確認）。
     assert any("SECRET-AFTER-ROOT-HANDLER" in line for line in lines)
