@@ -27,6 +27,7 @@ from app.core.client_ip import (
     resolve_client_ip,
     scan_client_ip_for_diagnostics_with_reason,
 )
+from app.core.client_ip_relay import parse_relay_secrets
 from app.api.v1.endpoints.cases import sweep_stale_pending_ai
 from app.db.session import engine, get_background_session_factory
 from app.services import alerts, storage
@@ -49,7 +50,9 @@ _logged_degraded_config: list[str] | None = None
 #: 運営向けアラートは LINE / メール / Webhook の代替経路を持ち、Webhook を使わない運用でも
 #: 障害通知そのものは成立するため、``alerts_webhook`` 未設定を「劣化」とは扱わない
 #: （``config`` の bool 表示自体は維持し、運用判断の材料としては残す）。
-_DEGRADED_CONFIG_EXEMPT_KEYS: frozenset[str] = frozenset({"alerts_webhook"})
+#: ``client_ip_relay``（署名付き中継IPの鍵）も同様の理由で除外する: 未設定は
+#: 「中継を使わず従来どおり hops のみで数える」通常運用そのものであり、劣化ではない。
+_DEGRADED_CONFIG_EXEMPT_KEYS: frozenset[str] = frozenset({"alerts_webhook", "client_ip_relay"})
 
 
 async def _run_seed() -> None:
@@ -203,6 +206,11 @@ def _config_readiness(settings: Settings) -> dict[str, bool]:
       R2 を使わない構成（ローカルディスク運用）では常に True（劣化ではない）とし、
       R2 を使う構成で認証情報が不完全（``r2_configured`` が False）な場合のみ False
       にする（security review 指摘対応）。
+    - ``client_ip_relay``: CLIENT_IP_RELAY_SECRETS。web サーバーが署名付きで
+      中継する利用者IPを login/line_exchange の2 scope 限定で採用する機能
+      （app.core.client_ip_relay）の鍵が1本以上有効かどうか。未設定は
+      「中継を使わず従来どおり hops のみで数える」通常運用のため、
+      ``_DEGRADED_CONFIG_EXEMPT_KEYS`` に含め degraded 扱いにしない。
     """
     try:
         from cryptography.fernet import Fernet
@@ -228,6 +236,9 @@ def _config_readiness(settings: Settings) -> dict[str, bool]:
         ),
         "alerts_webhook": bool(settings.alert_webhook_url),
         "storage_r2": settings.resolved_storage_backend != "r2" or settings.r2_configured,
+        "client_ip_relay": bool(
+            parse_relay_secrets(settings.client_ip_relay_secrets.get_secret_value())
+        ),
     }
 
 

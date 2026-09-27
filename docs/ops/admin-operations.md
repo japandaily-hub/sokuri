@@ -23,6 +23,14 @@
 - **spin-down 対策**: Render 無料枠はアイドルでスピンダウンし、その間は背景ループも止まる。このため GitHub Actions「Ops cron」が**毎時 7 分に外から `POST /admin/jobs/reminders` を叩く**（起こす＋1周回す）。背景ループと二重に走っても送信済みの印で重複しない。
 - **再送したい / 送らないようにしたい**: 送信済みの印は `transactions.overdue_reminded_at` / `cases.no_bid_reminded_at` / `cases.bids_pending_reminded_at`。再送は DB で該当行を NULL に戻す（管理画面の操作は用意していない）。通知の送信自体に失敗した場合は再送されず、運営 LINE へ warning アラートが飛ぶ想定だが、この経路は現状 `notify_dispatch` 側で例外が握り潰されるため実際には発火しないことが判明している（別件で要修正・[bids-pending reminder に付随して発見]）。
 
+## 署名付き中継IPの鍵（CLIENT_IP_RELAY_SECRETS）
+- **何のための鍵か**: web(Vercel) がサーバー側から呼ぶ `/auth/login`・`/auth/operator/login`・`/auth/line/exchange` は、backend からは常に Vercel の送信元IPに見えるため、レート制限のIP軸（本来は X-Forwarded-For の hops 方式）が全利用者で共有されてしまう。web が実際の利用者IPを HMAC 署名して中継し、backend は署名が正しい場合のみ `login`・`line_exchange` の2 scope 限定でそのIPを採用する（それ以外の scope・不採用時は常に従来どおり hops 方式）。
+- **鍵はチャットやログに絶対に貼らない**（値そのものは backend のログにも一切出力されない設計）。
+- **投入・入れ替えの順序**: ① Render dashboard で `CLIENT_IP_RELAY_SECRETS` を設定 → 環境変数を変えたら**手動で再デプロイ**（`render.yaml` の envVars は既存サービスに同期されないため、dashboard での設定のみでは反映されない）→ ② Vercel 側の `CLIENT_IP_RELAY_SECRET` に同じ値を設定。**必ず Render を先に**行う（backend が新しい鍵を受け付けられる状態にしてから web に使わせる。逆順だと一時的に署名不一致で hops へフォールバックするだけで実害は無いが、確認の手間を減らすため）。
+- **反映確認**: `/readyz` の `config.client_ip_relay` が `true`（値そのものは返らない）。実際に採用されたかは、backend ログの `client_ip_relay: 起動後初めて署名付き中継の利用者IPを採用しました` という WARNING（scope ごとにプロセス起動後1回だけ出る）で確認する。2回目以降は INFO 格下げ・60秒に1回のスロットリングのため、ログ保持期間（Render 無料枠は7日）内に見つからないことがある。
+- **ローテーション（鍵の入れ替え）**: 新鍵への切替は Render 側を `NEW,OLD`（カンマ区切り・両方同時に有効）に設定 → Vercel 側を `NEW` のみに切替 → 反映確認後、Render 側も `NEW` のみに戻す（旧鍵 `OLD` を無効化）。
+- **停止（無効化・切り戻し）**: Vercel 側の鍵（`CLIENT_IP_RELAY_SECRET`）を削除して再デプロイすれば、中継ヘッダが送られなくなり自動的に hops 方式のみへ戻る（backend 側の鍵を消す必要は無い。backend 側だけ消したい場合も Render の値を空にして再デプロイすれば同様に hops のみへ戻る）。
+
 ## 監視
 - 外形監視（GitHub Actions・5分毎）が /health・/readyz を確認し、異常は運営 LINE 公式アカウントへ通知。`/readyz` の `degraded_config` が非空（brevo・line_push・encryption_key・gemini・admin_emails・frontend_base_url の未設定）も warning で通知される。
 - メール送信キー未設定・送信失敗はアプリから critical/warning アラート。詳細は alerting.md。

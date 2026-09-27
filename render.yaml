@@ -108,3 +108,8 @@ services:
                                 # 実測は /api/v1/_diag/client-ip で行い、resolved_ip が
                                 # 自分の実グローバルIPと一致することを必ず確認すること。
                                 # 過大にすると偽装可能、過小にすると全ユーザーが同一IP扱いになる。
+      - key: CLIENT_IP_RELAY_SECRETS
+        sync: false             # dashboard で手動入力（git 漏洩防止）。web(Vercel)側の
+                                 # CLIENT_IP_RELAY_SECRET と同じ値を設定する（login/line_exchange
+                                 # 限定の署名付き中継IP採用。app/core/client_ip_relay.py）。
+                                 # 未設定なら中継を使わず従来どおり hops のみで数える。

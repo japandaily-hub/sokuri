@@ -177,6 +177,20 @@ class Settings(BaseSettings):
     # 用途は診断表示とドリフト検知（RateLimitGuard が毎リクエスト自動比較し
     # 不一致ならWARNING）のみに限定し、レート制限の判定には一切使わない。
     trusted_proxy_hops: int = 1
+    # web サーバー（Vercel）が中継する利用者IPを署名付きで受け取るための
+    # 共有鍵（カンマ区切り・先頭が新しい鍵）。対象は login / line_exchange の
+    # 2 scope 限定（app.api.rate_limit_deps._RELAY_ELIGIBLE_SCOPES）。web が
+    # Vercel の実クライアントIP（x-real-ip 相当）を HMAC 署名して中継する
+    # 経路の検証に使う。hops 方式（trusted_proxy_hops）が引き続き正本であり、
+    # この鍵は当該2 scope のみの上書き手段に過ぎない。各鍵は32文字以上の
+    # 印字可能ASCII文字列で空白を含まないこと。不正な鍵は起動時のバリデーション
+    # ではなく実行時に自動的に除外され ERROR ログが出るのみで、起動は止めない
+    # （validator はここには足さない。検証とログ出力は app.core.client_ip_relay
+    # に一本化する）。生成: python -c "import secrets; print(secrets.token_urlsafe(48))"
+    # 詳細: app/core/client_ip_relay.py
+    client_ip_relay_secrets: SecretStr = Field(
+        default=SecretStr(""), alias="CLIENT_IP_RELAY_SECRETS"
+    )
     # login（user/operator 共通）アカウント軸・IP軸の上限と共通窓。
     # ※ #1〜#4 は列挙防止のため応答文言・窓長を必ず同一にする。片方だけ変更しないこと。
     rl_login_account_max: int = 5

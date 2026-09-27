@@ -45,6 +45,11 @@ CDN構成ドリフトの早期検知シグナル専用**に格下げし、レー
 （``resolve_client_ip_with_reason`` / ``RateLimitGuard``）からは完全に排除
 している。正本は引き続き固定段数の hops 方式（``resolve_client_ip_with_reason``）
 である。
+
+**署名付き中継（新設・別軸）**: web サーバーが署名付きで中継する利用者IPを
+``login`` / ``line_exchange`` の2 scope 限定で上書き手段として採用する
+仕組みを ``app.core.client_ip_relay`` に別途持つ。本モジュールの hops 方式が
+正本であることに変わりはなく、詳細・判定順序は client_ip_relay.py を参照。
 """
 
 from __future__ import annotations

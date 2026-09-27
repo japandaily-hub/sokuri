@@ -31,6 +31,11 @@ from app.core.client_ip import (
     scan_client_ip_for_diagnostics,
     truncate_ip_for_log,
 )
+from app.core.client_ip_relay import (
+    log_relay_outcome,
+    parse_relay_secrets,
+    verify_request_client_ip_relay,
+)
 from app.core.http_errors import http_exception_factory
 from app.core.log_throttle import ThrottledLogger
 from app.core.rate_limit import (
@@ -962,6 +967,52 @@ class NoopRateLimitContext:
 NOOP_RATE_LIMIT_CONTEXT = NoopRateLimitContext()
 
 
+# ──────────────── 署名付き中継IP（login/line_exchange 限定の上書き） ────────────────
+#
+# web（Vercel）がサーバー側から認証系 API を呼ぶ構成では、hops 方式で解決される
+# IP が利用者ではなく Vercel の送信元になり、この2 scope の IP 軸が全利用者で
+# 共有されてしまう問題があった（詳細背景は app.core.client_ip_relay モジュール
+# 冒頭）。対象を2 scope に限定するのは、万一 CLIENT_IP_RELAY_SECRETS が漏洩
+# しても、悪用可能な範囲を「ログイン試行回数」「LINE連携試行回数」の水増しに
+# 限定し、他の scope（signup・case_create 等のコストDoS対策）には一切影響
+# させないため。
+_RELAY_ELIGIBLE_SCOPES: frozenset[str] = frozenset({"login", "line_exchange"})
+
+# 中継の検証処理自体が予期しない例外を投げた場合の WARNING（本来起こらない
+# 想定だが、本機能の障害が認証系 API 全体を巻き込まないよう、必ず握りつぶして
+# hops へフォールバックする。他の *_throttle と同じ理由でスロットリングする）。
+_relay_unexpected_error_throttle = ThrottledLogger()
+
+
+def _relayed_client_ip(scope: str, request: Request) -> str | None:
+    """署名付き中継ヘッダを検証し、採用できる場合のみ利用者IPを返す。
+
+    対象外 scope はヘッダを読みもせず ``None`` を返す（``_RELAY_ELIGIBLE_SCOPES``
+    参照。鍵が万一漏洩した場合の悪用範囲を2 scope に構造的に限定する最初の
+    ゲート）。鍵の読み取り・ヘッダ検証は try で包み、予期しない例外が発生
+    しても ``None``（＝呼び出し側は hops 方式へフォールバック）を返す。
+    本機能はあくまで「無くても今どおり動く」上書きのため、ここでの障害が
+    ログイン・LINE連携そのものを 500 に巻き込むことは絶対に避ける。
+    """
+    if scope not in _RELAY_ELIGIBLE_SCOPES:
+        return None
+    try:
+        settings = get_settings()
+        keys = parse_relay_secrets(settings.client_ip_relay_secrets.get_secret_value())
+        verification = verify_request_client_ip_relay(request, keys)
+        log_relay_outcome(scope, verification)
+        return verification.ip if verification.reason == "ok" else None
+    except Exception:  # noqa: BLE001 -- 本機能の障害で認証系全体を巻き込まないため
+        _relay_unexpected_error_throttle.emit(
+            lambda: logger.exception(
+                "rate_limit: 署名付き中継IPの検証中に予期しないエラーが発生しました"
+                "（scope=%s）。従来どおり hops で数えます。",
+                scope,
+            )
+        )
+        return None
+
+
 def _apply_ip_axis(
     scope: str,
     limiter: RateLimiter,
@@ -1093,6 +1144,16 @@ class RateLimitGuard:
       ならスロットリング付き WARNING を出す（``_check_scan_drift``）。CDN
       構成変更・``TRUSTED_PROXY_HOPS`` ドリフトを能動的なポーリングなしで
       検知するための唯一の早期シグナル。
+    - **署名付き中継による上書き（新設・``login`` / ``line_exchange`` の
+      2 scope 限定）**: ``app.core.client_ip_relay`` が検証した署名付き
+      中継ヘッダの利用者IPが採用可能（``reason == "ok"``）な場合、hops
+      方式の解決・プライベート/特殊アドレス判定・CFレンジ判定・ドリフト
+      検知は一切行わず、その中継IPで直接 IP 軸を判定する
+      （``_relayed_client_ip`` / ``_apply_ip_axis``）。不採用（ヘッダ無し・
+      鍵未設定・署名不一致・期限切れ・形式不正・非公開IP等、理由を問わず）
+      の場合は、常に従来どおり hops 方式へフォールバックする。対象外の
+      scope（この2つ以外）はヘッダを読みもしない。詳細な判定順序・背景は
+      ``app.core.client_ip_relay`` モジュール冒頭を参照。
     """
 
     def __init__(self, scope: str) -> None:
@@ -1110,7 +1171,26 @@ class RateLimitGuard:
         spec = _scope_spec(self._scope, limiter.config)
 
         ip_buckets: tuple[_IpBucket, ...] = ()
-        if spec.ip_rule is not None:
+        # 署名付き中継（login/line_exchange 限定・_RELAY_ELIGIBLE_SCOPES）。
+        # 対象外 scope、および ip_rule を持たない scope ではヘッダを読みもせず
+        # None が返る。
+        relayed_ip = (
+            _relayed_client_ip(self._scope, request) if spec.ip_rule is not None else None
+        )
+        if relayed_ip is not None:
+            # 中継IPを採用する場合、hops 方式の解決・プライベート/特殊アドレス
+            # 判定・CFレンジ判定・ドリフト検知は一切行わない。中継ヘッダの検証
+            # （app.core.client_ip_relay.verify_client_ip_relay）が既に非公開
+            # アドレスの排除・署名・鮮度を確認済みのため、hops 方式と同じ
+            # 追加判定を重ねる必要が無い（むしろ中継IPに hops 用の判定を
+            # 適用すると意味的に誤り）。
+            # hops で解決した IP の段に「足す」のではなく「置き換える」（ctx.ip_buckets を
+            # 中継IPの段だけにする）。足すと login の record_failure が Vercel の送信元の
+            # 段にも記録され、全利用者で共有する枠が復活してしまう。
+            ip_buckets = _apply_ip_axis(
+                self._scope, limiter, spec.ip_rule, count_all=spec.count_all, ip=relayed_ip
+            )
+        elif spec.ip_rule is not None:
             settings = get_settings()
             # IP 解決は resolve_client_ip_with_reason（正本・単一入口）を
             # 経由する。戻り値は ClientIpResolution（ip, reason）。reason で

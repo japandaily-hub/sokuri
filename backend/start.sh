@@ -35,7 +35,16 @@ export TRUSTED_PROXY_HOPS="${TRUSTED_PROXY_HOPS:-3}"
 #   （render.yaml を false にしても上記のとおり既存サービスには反映されない）。
 export RATE_LIMIT_ENABLED="${RATE_LIMIT_ENABLED:-true}"
 
-echo "[start.sh] rate limit: enabled=${RATE_LIMIT_ENABLED} trusted_proxy_hops=${TRUSTED_PROXY_HOPS}"
+# CLIENT_IP_RELAY_SECRETS: web(Vercel)が署名付きで中継する利用者IPの検証鍵
+# （login/line_exchange 限定・app/core/client_ip_relay.py）。値そのものは
+# 絶対に出力せず、設定の有無（set/unset）だけをログで確認できるようにする。
+if [ -n "${CLIENT_IP_RELAY_SECRETS:-}" ]; then
+  _client_ip_relay_status="set"
+else
+  _client_ip_relay_status="unset"
+fi
+
+echo "[start.sh] rate limit: enabled=${RATE_LIMIT_ENABLED} trusted_proxy_hops=${TRUSTED_PROXY_HOPS} client_ip_relay=${_client_ip_relay_status}"
 
 # マイグレーション失敗でも uvicorn は必ず起動する（2026-07 全断障害の教訓）。
 # 旧設計は「alembic 失敗 → set -e で即終了 → uvicorn 未起動 → クラッシュループ」で、

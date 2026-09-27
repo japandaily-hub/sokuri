@@ -19,6 +19,7 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
+from pydantic import SecretStr
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -473,6 +474,8 @@ def test_config_readiness_flags_are_bool_only(monkeypatch):
         "alerts_webhook",
         # security review 指摘対応: R2 移行に伴い、R2 使用時の設定完全性を可視化する。
         "storage_r2",
+        # 署名付き中継IP（login/line_exchange限定・CLIENT_IP_RELAY_SECRETS）の鍵。
+        "client_ip_relay",
     }
     assert all(isinstance(v, bool) for v in flags.values())
     # conftest が有効な APP_ENCRYPTION_KEY を注入しているので True。
@@ -522,6 +525,35 @@ async def test_readyz_reports_degraded_config_but_stays_ready(db_engine, monkeyp
     assert "gemini" in payload["degraded_config"]
     # 値そのもの（キー文字列）は payload に一切現れない。
     assert "api_key" not in r.text.lower()
+
+
+async def test_readyz_degraded_config_excludes_client_ip_relay(db_engine, monkeypatch):
+    """client_ip_relay は config に bool で出るが degraded_config には出ない。
+
+    署名付き中継IP（CLIENT_IP_RELAY_SECRETS）は「無くても今どおり hops で
+    数える」通常運用のための上書き手段であり、未設定単体は運用上の劣化では
+    ない（r10 の alerts_webhook 除外テストと同じ設計判断）。
+    """
+    import app.main as main_module
+
+    monkeypatch.setattr(main_module, "engine", db_engine)
+    # テスト DB は create_all で alembic_version を持たないため、期待ヘッドの
+    # 解決を None に固定してテーブル有無ベースの判定へ落とす（r10 exempt
+    # テストと同じ理由。Linux CI では alembic.ini が読めてしまうため）。
+    from alembic.script import ScriptDirectory as _ScriptDirectory
+
+    monkeypatch.setattr(_ScriptDirectory, "get_current_head", lambda self: None)
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "client_ip_relay_secrets", SecretStr(""))
+
+    app = main_module.create_app(settings)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        r = await ac.get("/readyz")
+    assert r.status_code == 200, r.text
+    payload = r.json()
+    assert payload["config"]["client_ip_relay"] is False
+    assert "client_ip_relay" not in payload["degraded_config"]
 
 
 # ──────────────── H-3: 通知送信失敗の可視化 ────────────────
