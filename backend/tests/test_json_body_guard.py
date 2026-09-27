@@ -633,7 +633,8 @@ def find_json_gate_violations(
     （``_scope_spec(...).ip_rule is not None and count_all``）のガードを持つルート。
     この条件は ``RateLimitGuard`` の scope 定義から機械的に決まるため、新しい
     スコープを追加した際の付け忘れもここで検知できる。本文を持たない GET・HEAD
-    （public_read）は対象外、本文を持たないそれ以外のメソッドと本文がフォームの
+    （public_read）は対象外（クロスサイト要求ゲートの構造検査
+    ``tests/test_cross_site_guard.py`` の対象）、本文を持たないそれ以外のメソッドと本文がフォームの
     ルートは、JSON ゲートでは守れないので違反として報告する。本文が JSON のルートは、
     ゲート（``gate``。自己検査で差し替えるための引数）がガードより前にあり、ゲートが
     リクエスト由来の引数を持たず、認証依存があればそれもガードより前にあること。
@@ -662,6 +663,8 @@ def find_json_gate_violations(
             if route.body_field is None:
                 if set(route.methods or ()) <= _BODYLESS_METHODS:
                     # 本文を持たない GET（public_read）はこのゲートでは守れない対象外。
+                    # クロスサイト要求ゲート（app.api.cross_site_deps）が守り、付け忘れは
+                    # tests/test_cross_site_guard.py の構造検査が落とす。
                     continue
                 violations.append(
                     f"{route.path}: 本文のない {sorted(route.methods or ())} が IP 軸を全件"

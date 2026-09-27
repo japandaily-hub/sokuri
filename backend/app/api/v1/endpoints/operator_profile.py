@@ -24,6 +24,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.cross_site_deps import reject_cross_site_browser_request
 from app.api.deps import get_current_operator
 from app.api.rate_limit_deps import RateLimitGuard
 from app.core.http_errors import http_exception_factory
@@ -174,6 +175,9 @@ async def update_my_operator_profile(
 async def get_vendor_public_profile(
     operator_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),
+    # 第三者のページが訪問者のブラウザから送らせた要求は、数える前に 403 で止める
+    # （訪問者の IP の枠を使い切らせないため。reject_cross_site_browser_request 参照）。
+    _no_cross_site: None = Depends(reject_cross_site_browser_request),
     _rl: object = Depends(RateLimitGuard("public_read")),
 ) -> OperatorPublicProfileOut:
     operator = await session.get(Operator, operator_id)
@@ -242,6 +246,9 @@ async def list_vendors(
     session: AsyncSession = Depends(get_session),
     limit: int = Query(default=100, ge=1, le=200),
     offset: int = Query(default=0, ge=0, le=1000),
+    # 第三者のページが訪問者のブラウザから送らせた要求は、数える前に 403 で止める
+    # （訪問者の IP の枠を使い切らせないため。reject_cross_site_browser_request 参照）。
+    _no_cross_site: None = Depends(reject_cross_site_browser_request),
     _rl: object = Depends(RateLimitGuard("public_read")),
 ) -> list[OperatorPublicListItemOut]:
     """業者一覧。個人情報（連絡先・許可番号）は含めない。
