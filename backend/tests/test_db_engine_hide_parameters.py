@@ -19,8 +19,17 @@ from sqlalchemy.ext.asyncio import create_async_engine
 _BACKEND_DIR = pathlib.Path(__file__).resolve().parents[1]
 
 
-@pytest.mark.parametrize(("app_env", "expected"), [("production", "True"), ("development", "False")])
-def test_engine_hides_sql_parameters_only_in_production(app_env: str, expected: str):
+@pytest.mark.parametrize(
+    ("app_env", "expected"),
+    [
+        ("production", "True"),
+        ("development", "False"),
+        # 綴りゆれ・未知の値は隠す側に倒す（表示するのは development のときだけ）。
+        ("Production", "True"),
+        ("staging", "True"),
+    ],
+)
+def test_engine_hides_sql_parameters_except_in_development(app_env: str, expected: str):
     """エンジンはモジュールの読み込み時に作られるため、環境変数を変えた別プロセスで確かめる。"""
     env = {key: value for key, value in os.environ.items() if key not in {"APP_ENV", "DATABASE_URL"}}
     env.update(
