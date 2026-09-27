@@ -1,6 +1,6 @@
 # 取引あたりの日程提示・チャット件数の上限とレート制限 — 決定・レビュー記録（2026-09-27・Claude）
 
-コード中の「L-4」は、2026-09-26 日程 API 入力検証のセキュリティレビュー（ブランチ claude/pensive-mestorf-cba971 の `.agent-state/schedule-validation/REVIEW.md` の SEC-L4）を指す。本ファイルの SEC-xx / QA-xx は今回のレビューの番号。対応コミットは c2623c0（ブランチ claude/zealous-colden-554ea6。2026-09-27 時点で未 push・push はユーザー承認事項）。
+コード中の「L-4」は、2026-09-26 日程 API 入力検証のセキュリティレビュー（ブランチ claude/pensive-mestorf-cba971 の `.agent-state/schedule-validation/REVIEW.md` の SEC-L4）を指す。本ファイルの SEC-xx / QA-xx は今回のレビューの番号。対応コミットはブランチ claude/zealous-colden-554ea6 の「fix(backend): 取引あたりの日程提示・チャット件数に上限とレート制限を設ける（L-4）」（2026-09-27 時点で origin/main=11b97c1 の上・未 push・push はユーザー承認事項。載せ直すとハッシュが変わるため、push 後の記録で確定値を書く）。
 
 ## 背景（重大度 Low）
 
@@ -74,8 +74,8 @@
 本件はマイグレーションなし・backend のみ。
 
 1. lamarr の 0046（messages.kind の拡幅）をマイグレーション先行で反映 → 本番 /readyz で head=0046 を確認 → lamarr の残り。先に入れないと、本番の提示は 500 のままで、本件のレート制限が再試行 10 回で 429 を返して原因を見えにくくする（SEC-I3）。
-2. 本件（L-4）。
-3. pensive（09-26 の日程検証）。確定時の照合が初日から上限つきの行数になるよう、本件の後か同時にする。
+2. cool-burnell（claude/cool-burnell-bccf9c＝lamarr の上に 09-26 の日程検証〔pensive〕を載せ替え＋L-1/I-8。元の pensive ブランチはこれで置き換え。別セッションが作業中）。
+3. 本件（L-4）を cool-burnell の結果の上へ載せ直してから push する。確定時の照合（2 に含まれる）が上限なしで動く期間をなくすため、2 と間を空けない。
 
 ## 検証
 
@@ -89,7 +89,8 @@
 ## 別ブランチとの合流メモ（git merge-tree で試算済み）
 
 - **lamarr（claude/amazing-lamarr-866796）**: transactions.py だけが衝突する（limits.py は自動で統合される）。衝突は import・propose_schedule の引数（`background` と `request` の両方を残す）・本体冒頭の 3 か所。**注意: 件数判定のブロックは衝突せずに lamarr の `_schedule_proposal_stats` の後ろへ自動で並ぶため、そのままだと件数を 2 回数え、「行ロックを取らない」というコメントが事実と合わなくなる。** 合流後の順序は「hit_account → `_assert_party_before_lock` →（任意）ロック前の件数判定で上限到達ならロックを取らずに 409 → `_lock_txn_rows` → `_get_txn`/`_assert_party` → `_assert_txn_open` → pending 判定 → `_schedule_proposal_stats` の件数で上限を再判定（ロック下なので厳密）→ 通知の判定」にし、コメントを直す。
-- **pensive（claude/pensive-mestorf-cba971）**: propose_schedule の 1 か所だけが衝突する。件数上限（409）と提示時の日付検証（422）の両方を残す（順は「終了済み → 件数上限 → 日付検証」。安い件数判定を先に）。confirm_schedule の `_assert_offered_time_slot` は、提示が上限でおおむね 20 行になるので変更不要。合流時に、照合のクエリを transaction_id・kind='schedule_proposal' に加えて sender_type='operator' でも絞ると多層防御になる（SEC-I1 の付記）。
+- **pensive（claude/pensive-mestorf-cba971）**: 単独なら propose_schedule の 1 か所だけが衝突する。件数上限（409）と提示時の日付検証（422）の両方を残す。confirm_schedule の `_assert_offered_time_slot` は、提示が上限でおおむね 20 行になるので変更不要。照合のクエリを transaction_id・kind='schedule_proposal' に加えて sender_type='operator' でも絞ると多層防御になる（SEC-I1 の付記）。
+- **cool-burnell（claude/cool-burnell-bccf9c・11:46 の b847ea4 で試算）**: pensive は cool-burnell に置き換わる予定。衝突は transactions.py の 3 か所（import・引数・本体冒頭。lamarr と同じ）と PROJECT_STATE.md・docs/TODO.md（同じ位置への追記）。**lamarr と同じく件数判定のブロックは衝突せずに「visiting の 409 → 日付検証（422）→ `_schedule_proposal_stats` → 本件の件数判定」の順に自動で並ぶ**ので、`_schedule_proposal_stats` の件数で上限を判定する形（ロック下で厳密）に書き換え、`_count_messages` による 2 回目の COUNT と「行ロックを取らない」コメントを消す。
 - どの順で main に入っても、本件の変更は propose_schedule の周辺で衝突する。解消は Claude が行う。
 
 ## 範囲外・見送り（別タスク候補）
