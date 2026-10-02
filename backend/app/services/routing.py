@@ -122,7 +122,7 @@ async def _llm_fallback(
 
     TODO(Phase 5): Gemini に category_tier / condition / base_market_price を渡して
     最適チャネルを推論させ、AssessmentRecommendation を生成する。
-    現時点では空リストを返し、EstimateResponse の recommendations は [] になる。
+    現時点では空リストを返し、呼び出し元（旧 /estimate）は 2026-09-27 に撤去済みで、現在は呼ばれない。
     """
     return []
 
