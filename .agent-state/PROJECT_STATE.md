@@ -1,9 +1,19 @@
 # PROJECT_STATE — カタヅケ（ソクウリ）
 
-更新: 2026-09-27（Claude・IPv6 のレート制限を /64・/56・/48 の3段で数える修正＝1d14e6f・**未 push**（業者事前申込の偽装回避修正 cb98349＝4cb6b9a の上）。直前: 開発時・E2E が本番 API に届かないようにする変更（backend-api-base.ts・E2E の4段の localhost 検査）を反映）
+更新: 2026-10-02（Claude・パスワード照合の回数制限を同時送信で超えられる問題 M-3 の修正＝ブランチ claude/sleepy-nash-0dc3ec・**未 push**（IPv6 3段化 7bbce51 の上）。直前: IPv6 のレート制限を /64・/56・/48 の3段で数える修正＝1d14e6f）
 
 ## 現在フェーズ
 - **2026-10-02 認証もレート制限も無い旧査定 API の撤去（Claude・8e0b4ab＋修正・ローカルコミットのみ・未 push）**: POST /estimate・GET /assessments/{id}・POST /assessments/{id}/defects（旧 AssetWise）を削除。根拠: web の呼び出し元なし（lib/api.ts は未 import）・Render ログ 7 日（09-20〜09-27）で 0 件（陽性対照 /admin/jobs 毎日 8〜9 件）・所有者列が無く認証だけでは他人の行に書ける。ユーザー決定は「撤去」「/analyze は残す」。web の lib/api.ts も削除。DB テーブル（items・assessments・recommendations・defect_evidences）・モデル・services/routing・affiliate・seed は**残置**（DROP は別途マイグレーションの段階反映で判断。その前に本番 3 表の件数・created_at 範囲・defect_evidences.description の最大長を読み取り専用で確認＝ログ保持 7 日より前の悪用の痕跡）。再発防止: backend/tests/test_write_routes_protected.py＝全書き込みルートに必須認証か「IP 軸で全件数える RateLimitGuard」を要求（例外は理由付き許可リスト: operator-applications・login 2 本）。変更前コードで /estimate・/defects を検出して落ちること、contact のガードを外すと落ちることを確認。**検証**: 全件 pytest 1462 passed、tsc（src・e2e）・eslint 0・node --test 155。security／QA レビュー Critical/High 0（M-1 スコープを見る判定・M-2 許可リスト理由・L-1 claims 除外・L-2 mount 検査・dependencies 陽性対照を反映）。**未対応・要判断**: 本番 /docs・/openapi.json の非公開化（L-5）／GET・/admin 配下への検査拡張（L-3/L-4）／/analyze の撤去（web 呼び出し元なし・Gemini 枠を使う）／operator-applications の XFF 偽装は cb98349 の合流待ち。**push 後の確認**: /health commit・本番 POST /api/v1/estimate が 404・/openapi.json に /estimate・/assessments が無い。別セッション（login 同時送信バイパス）とは rate_limit 系ファイルを編集しない・RateLimitGuard('login') を残す点を確認済み。
+- **2026-09-27〜10-02 パスワード照合の回数制限を同時送信で超えられる問題（セキュリティレビュー M-3・既存）を塞ぐ（Claude・ブランチ claude/sleepy-nash-0dc3ec の 41cb166＋レビュー反映＝7bbce51〔IPv6 3段〕の直後・未 push＝本番未反映）**: user_login／operator_login は「ガードが IP 軸を peek → `check_account`（peek）→ await で DB 照会 → 照合 → `record_failure`」の順で、peek と記録の間の await の間に同時送信（single-packet attack 等）がそろって peek を通り、1 つの窓でアカウント軸（5）・IP 軸（20。IPv6 は各段）の上限を超えて照合できた。
+  - **修正**:
+    - `app/core/rate_limit.py`: ストアに「照合中の予約」`reserve`／`release`。判定＝窓内の失敗＋期限内の予約＋この1回 ≤ 上限。失敗は従来どおり hit。予約は窓の長さで期限切れ（外し忘れても枠が恒久的に減らない・定期スイープでも消す）、reset は他の要求の予約を消さない、peek も予約を数える。緊急停止中はストアに触れない。
+    - `app/api/rate_limit_deps.py`: `ctx.password_attempt(key)` が返す枠 `PasswordAttempt`（with 文）。入口で IP 軸の全段→アカウント軸を予約し、超えたら予約を外して 429（文言は不変・両軸同一）。`record_failure`／`record_success` で確定、抜けるときに必ず外す。ctx の `record_failure`／`reset_account` は廃止。`_IpBucket.ip_net`（枠が IP 軸で弾いたときも丸めた範囲だけをログへ）。緊急停止時は何もしない枠。
+    - 呼び出し 9 か所（auth.py の login 2・users.py 4・operator_profile.py 3）を枠に統一。login は DB 照会の await の**後**に枠を開き、枠の中に await を置かない＝予約はほかの要求から見えず、判定は修正前の peek と同じ値を記録と同じ同期区間で行う（正しいパスワードは同時でも 429 にならない）。DB を引く前の `check_account` は近道として残す。users.py・operator_profile.py の 7 か所は元々 await を挟まず競合しないが、照合を to_thread へ移しても再発しないよう統一。
+  - **方式の比較**: ①DB 照会の前から予約＝同時の正しいパスワードが 429（変異テストで 8 件中 3 件など）→不採用 ②キーごとの asyncio.Lock＝待ち行列・複数キーの獲得順・Redis へ移せない→不採用 ③peek を照合直前へ移すだけ＝将来 await が入ると再発 → ③の置き場所＋予約で補強を採用。
+  - **検証**: 新規 `tests/test_rate_limit_concurrency.py`（36 件）。DB 照会の手前で全要求をそろえる待ち合わせで同時送信を決定的に再現: 修正前はアカウント軸 12/12・業者 12/12・IPv4 の IP 軸 30/30・IPv6 /56 段 10/10 件を照合（上限 5・5・20・6）→ 修正後は上限の件数だけ照合し残りは同一文言の 429。正しいパスワードの同時ログイン（同一アカウント 8 件・失敗 3 回後の 4 件・同一 IP 6 人）は全件 200、緊急停止はストアに一切触れない。予約・枠の単体テスト（枠の中に await を置いても上限が守られる等）、構文木のメタガード（失敗のみカウントのスコープは必ず枠・枠は他スコープで使わない・枠の中に await なし）。変異テスト 9 通りをすべて検出。pytest 全件 1560 件成功（8 分割の並列実行・CI と同じ TZ）、ruff 0（変更ファイル）、不可視文字 0。**実 uvicorn＋本物の TCP 同時接続**（使い捨て SQLite・127.0.0.1 のみ・スクリプト内で起動停止）でも、修正前（7bbce51 を書き出したもの）は同じアカウントへ誤パスワード 30 件同時が 30 件とも照合（上限 5）・同じ IP から実在の別アカウント 30 件が 30 件とも照合（上限 20）→ 修正後は 5 件・20 件で止まり残りは 429、正しいパスワード 8 件同時は前後とも全件 200。存在しないアカウント宛て（照合の scrypt が無い）は手元の SQLite が速く、修正前でも重なりは 21/20 件程度（本番の PostgreSQL は往復が長く重なりやすい）。
+  - **レビュー**: security／QA とも Critical/High/Medium 0（Low のみ）。反映: 構文木ガードの強化（照合 verify_password と record_failure が枠の中・ハンドラが async def・dependencies= の RateLimitGuard も対象・内包表記の async for）、テスト追加（窓の境界・キャンセル時の解放・無効化した実コンテキスト）、docstring 3 か所。見送り: 複数段が同時に上限超過のときログの axis が従来（広い段から）と異なりうる点（応答・文言・Retry-After は不変）。
+  - **合流**: I8（exciting-meninsky 185e8aa）とは merge-tree で衝突なし（I8 のコメント「login の record_failure」は attempt.record_failure() の意味になる）。L-4（zealous-colden）・業者一覧（public-read-cross-site-gate）・メール上限（fervent-hermann）との衝突は土台 7bbce51 と同数・同箇所（この変更では増えない）。/estimate の構造テスト（書き込みルートに RateLimitGuard）には影響なし（login の Depends は残した）。
+  - **残（範囲外）**: 同時送信 1 回ぶんの DB 照会は N 件起きる（照合は上限まで）。scrypt の照合はイベントループ上で同期実行のまま（to_thread へ移すなら枠の中で＝メタガードの見直しとセットで）。uvicorn を複数ワーカー・複数インスタンスにすると上限が N 倍に緩む（プロセス内ストアの既知の制約＝その時点で RedisRateLimitStore〔reserve は Lua で原子的に〕へ）。応答時間でアカウントの有無が分かる（user が無いと scrypt を計算しない・既存・Low）＝ダミーハッシュで1回照合する修正は別タスク。
 - **2026-09-27 IPv6 のレート制限の IP 軸を /64・/56・/48 の3段で数える（Claude・ブランチ claude/infallible-matsumoto-7eb7c5 の 1d14e6f＝bd5018d の直後・未 push＝本番未反映）**: 土台の bd5018d・cb98349 は、4cb6b9a・e84be17 を origin/main 11b97c1 に載せ替えたもので、I8 のセッションが作成した（backend は同一）。09-27 のセキュリティレビューで判明した既存の問題。IP 軸のキーが解決した IP の文字列全体だったため、IPv6 の利用者は /64（IPoE の HGW なら /56）の中で送信元アドレスを替えるだけで毎回新しいバケットになり、全スコープの IP 軸を回避できた。本番の backend のホスト名は AAAA なしで、DNS 経由の IPv6 は未到達。Cloudflare の IPv6 エニーキャストへ直接つなげるかは未確認。
   - **修正**（`backend/app/api/rate_limit_deps.py`）:
     - `_apply_ip_axis`（IP 軸のキー生成と判定の唯一の入口）が、`_ip_axis_buckets` で段を作る。
@@ -21,7 +31,7 @@
     - 修正前の実装では、新しい統合テスト 8 本がすべて失敗。/64 のみ・/56 の段なし・弾かれた要求も数える・広い段の peek を省く、の4通りに壊した実装も、それぞれ該当テストが検出。
     - security／QA レビュー（2段版と3段版の再レビュー）は Critical/High 0。反映した指摘: M-1・M-2・L-1・L-2・R-1・R-4・R-5、QA の Medium 2・Low 5。
   - **残（範囲外・未実装）**:
-    - login の peek→await→record の追い越し（既存・M-3）。
+    - login の peek→await→record の追い越し（既存・M-3）。→ 2026-10-02 ブランチ claude/sleepy-nash-0dc3ec で対応（上の M-3 の記録・未 push）。
     - 段ごとの停止スイッチ。AAAA の出現と ip6_* の 429 件数の監視。
     - login のデバイス Cookie／Turnstile（security は I8 で IPv6 を中継する前の必須条件として推奨）。
     - Cloudflare の Pseudo IPv4（上書き）が有効な場合、IPv6 の利用者は 240.0.0.0/4 で届き、特殊用途スキップで IP 軸が外れる可能性（要実測）。
