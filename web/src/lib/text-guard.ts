@@ -207,25 +207,43 @@ export type PreparedDisplayText =
  * 表示用自由記述欄を整形し、送信可能かどうかを判定する（sanitizeDisplayText の
  * 呼び出し元がまとめて使う想定の上位関数。katadzuke-api.ts の guardDisplayText から
  * 呼ばれる）。
- * - 元の文字列が空白のみでない（trim() が空でない）のに、整形後が空白のみになった
- *   場合（拒否文字だけが入力されていた場合）は "only_disallowed"。
- * - opts.minLength 指定時、整形後のコードポイント数がそれ未満なら "too_short"
- *   （元が空白のみの場合はこの判定自体を行わない。必須入力かどうかの判定は
- *   呼び出し側の既存の画面チェックに委ねる）。
- * - それ以外は "ok"（value は整形後の文字列）。空文字・空白のみの入力もここでは
- *   "ok" として返す（同上の理由。既存の画面側の必須チェックに任せる）。
+ * - 元の文字列が空白のみでない（trim() が空でない）のに、整形後を trim() したものが
+ *   空になった場合（拒否文字だけが入力されていた場合）は "only_disallowed"
+ *   （この判定を minLength の判定より先に行い、拒否文字だけの入力では
+ *   "too_short" ではなく "only_disallowed" の文言を優先する）。
+ * - opts.minLength 指定時、整形後を trim() したもののコードポイント数がそれ未満なら
+ *   "too_short"。元の文字列が空白のみか（hasContent）に関係なく判定するため、
+ *   タブ・改行・空白だけの入力（整形後は半角空白・LF だけになる）もここで
+ *   "too_short" になる（QAレビュー是正: 従来は hasContent が false の場合に
+ *   この判定自体をスキップしていたため、タブだけの入力等が minLength をすり抜けて
+ *   "ok" になっていた）。
+ * - それ以外は "ok"（value は整形後の文字列。trim はしない）。minLength 未指定時は、
+ *   空文字・空白のみの入力も "ok" として返す（必須入力かどうかの判定は呼び出し側の
+ *   既存の画面チェックに委ねる）。
+ *
+ * trim() した上で数える理由と、trim しない value を返しても安全なことの論証:
+ * 呼び出し側の画面（例: 減額申請フォーム）の必須文字数チェックは見た目の文字数
+ * （trim 後）で判定しているため、ここでの判定もそれと揃える。一方 backend の
+ * min_length 制約は受け取った文字列を trim せずに数える。trim は文字を取り除く
+ * だけの操作なので、trim 後のコードポイント数は trim 前（sanitized）のコードポイント数
+ * を超えない。したがってこの関数が "too_short" にならず "ok" を返した入力は、
+ * value（= 整形後の文字列。trim していない）のコードポイント数が
+ * 「trim 後のコードポイント数（>= minLength が確認済み）」以上になり、
+ * 結果として value のコードポイント数も必ず minLength 以上になる。
+ * よって web がここで "ok" を返した入力を送信すれば、backend の min_length も必ず満たす。
  */
 export function prepareDisplayText(
   text: string,
   opts?: { minLength?: number },
 ): PreparedDisplayText {
   const sanitized = sanitizeDisplayText(text);
+  const trimmedSanitized = sanitized.trim();
   const hasContent = text.trim() !== "";
-  if (hasContent && sanitized.trim() === "") {
+  if (hasContent && trimmedSanitized === "") {
     return { ok: false, reason: "only_disallowed" };
   }
   const minLength = opts?.minLength;
-  if (hasContent && minLength != null && countCodePoints(sanitized) < minLength) {
+  if (minLength != null && countCodePoints(trimmedSanitized) < minLength) {
     return { ok: false, reason: "too_short", minLength };
   }
   return { ok: true, value: sanitized };

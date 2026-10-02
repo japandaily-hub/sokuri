@@ -344,4 +344,66 @@ describe("prepareDisplayText", () => {
   it("minLength未指定なら短い文章でもok", () => {
     assert.deepEqual(prepareDisplayText("短い"), { ok: true, value: "短い" });
   });
+
+  // QAレビュー是正: minLength の判定は hasContent（元の trim() が空でないこと）に
+  // 関係なく常に行う。タブ・改行・空白だけの入力は整形後 trim() すると空になるため、
+  // ここで "too_short" になる（従来は hasContent が false としてこの判定自体を
+  // スキップしていたため、タブ10個のような入力が minLength をすり抜けて "ok" になっていた）。
+  it("タブ10個＋minLength=10はtoo_short（タブは半角空白に整形され、trimで消えるため）", () => {
+    const tabs = String.fromCharCode(0x09).repeat(10);
+    const result = prepareDisplayText(tabs, { minLength: 10 });
+    assert.deepEqual(result, { ok: false, reason: "too_short", minLength: 10 });
+  });
+
+  it("空文字＋minLength=10はtoo_short", () => {
+    const result = prepareDisplayText("", { minLength: 10 });
+    assert.deepEqual(result, { ok: false, reason: "too_short", minLength: 10 });
+  });
+
+  it("空白10個＋minLength=10はtoo_short", () => {
+    const spaces = " ".repeat(10);
+    const result = prepareDisplayText(spaces, { minLength: 10 });
+    assert.deepEqual(result, { ok: false, reason: "too_short", minLength: 10 });
+  });
+
+  it("「理由です」＋空白6個（見た目は10文字）はtoo_short（末尾の空白はtrimで消える）", () => {
+    const input = "理由です" + " ".repeat(6);
+    assert.equal(input.length, 10);
+    const result = prepareDisplayText(input, { minLength: 10 });
+    assert.deepEqual(result, { ok: false, reason: "too_short", minLength: 10 });
+  });
+
+  describe("性質: minLength=10でokを返すなら value のコードポイント数は必ず10以上（backendのmin_lengthを必ず満たす論証の裏付け）", () => {
+    const rlo = String.fromCharCode(0x202e);
+    const lrm = String.fromCharCode(0x200e);
+    const tab = String.fromCharCode(0x09);
+    const crlf = String.fromCharCode(0x0d) + String.fromCharCode(0x0a);
+    const emoji = String.fromCodePoint(0x1f600);
+    const samples: readonly string[] = [
+      "", // 空文字
+      " ".repeat(10), // 空白だけ
+      tab.repeat(10), // タブだけ
+      "理由です" + " ".repeat(6), // 見た目は10文字だが末尾が空白
+      "理由です" + lrm.repeat(6), // 見た目は10文字だが拒否文字入り
+      "これは十分な長さの理由です", // 通常文
+      emoji.repeat(5), // 絵文字5個（コードポイント数5）
+      emoji.repeat(6), // 絵文字6個（コードポイント数6。まだ10未満）
+      `理由は${crlf}なるべく詳しく書きます`, // 改行入り
+      rlo + rlo, // 拒否文字だけ
+      `  十分に長い理由の本文です  `, // 前後に空白を含む
+      "短い",
+      "十文字ちょうどの文章です",
+    ];
+    for (const sample of samples) {
+      it(`sample=${JSON.stringify(sample)}`, () => {
+        const result = prepareDisplayText(sample, { minLength: 10 });
+        if (result.ok) {
+          assert.ok(
+            countCodePoints(result.value) >= 10,
+            `okなのにvalueのコードポイント数が10未満: ${JSON.stringify(result.value)}`,
+          );
+        }
+      });
+    }
+  });
 });
