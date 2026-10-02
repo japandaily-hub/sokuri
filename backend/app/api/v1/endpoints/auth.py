@@ -264,17 +264,23 @@ async def user_login(
     # アドレスを知るだけで（例: user 側を誤パスワードで5回叩く）相手の
     # operator 側ログインまで巻き添えでブロックできてしまう。
     rl_account_key = f"user:{email}"
+    # 上限に達しているアカウントは DB を引く前に 429 にする（近道。判定の本体は下の枠）。
     ctx.check_account(rl_account_key)
 
     user = await session.scalar(select(User).where(User.email == email))
-    if (
-        user is None
-        or user.password_hash is None
-        or not verify_password(body.password, user.password_hash)
-    ):
-        ctx.record_failure(rl_account_key)
-        raise _LOGIN_FAILED()
-    ctx.reset_account(rl_account_key)
+    # 照合は password_attempt の枠の中で行い、枠の中には await を置かない。枠に入るときに
+    # IP軸・アカウント軸の上限を判定し、失敗の記録までを同じ同期区間で確定させる
+    # （上の peek だけで照合すると、DB 照会の await の間に同時に届いた要求がどれも
+    # peek を通り、上限を超えて照合できる＝セキュリティレビュー M-3）。
+    with ctx.password_attempt(rl_account_key) as attempt:
+        if (
+            user is None
+            or user.password_hash is None
+            or not verify_password(body.password, user.password_hash)
+        ):
+            attempt.record_failure()
+            raise _LOGIN_FAILED()
+        attempt.record_success()
     # 停止判定はレート制限（総当たり対策）とは別関心のビジネスルールのため、
     # リセット後に判定する（operator_login と同じ順序）。deps.py の
     # assert_user_not_suspended と同一の detail（security review L-2対応の
@@ -413,6 +419,7 @@ async def operator_login(
     # 最優先）。同一メールで user/operator 双方が存在する場合にストアキーの
     # 実体まで共有されるのを防ぐ（上限値・窓・文言は user_login と同一のまま）。
     rl_account_key = f"operator:{email}"
+    # 上限に達しているアカウントは DB を引く前に 429 にする（近道。判定の本体は下の枠）。
     ctx.check_account(rl_account_key)
 
     # 退会済み業者は contact_email がトムストン化されるため通常は一致しないが、
@@ -422,17 +429,20 @@ async def operator_login(
             Operator.contact_email == email, Operator.deleted_at.is_(None)
         )
     )
-    if (
-        operator is None
-        or operator.password_hash is None
-        or not verify_password(body.password, operator.password_hash)
-    ):
-        ctx.record_failure(rl_account_key)
-        raise _LOGIN_FAILED()
-    # パスワード照合の成功をレート制限上の「成功」境界とする（アカウント軸をリセット）。
-    # 停止判定はレート制限（総当たり対策）とは別関心のビジネスルールのため、
-    # リセット後に判定する。
-    ctx.reset_account(rl_account_key)
+    # 照合は password_attempt の枠の中で行い、枠の中には await を置かない（理由は
+    # user_login と同じ。DB 照会の await の後で上限を判定し、記録まで同じ同期区間で確定）。
+    with ctx.password_attempt(rl_account_key) as attempt:
+        if (
+            operator is None
+            or operator.password_hash is None
+            or not verify_password(body.password, operator.password_hash)
+        ):
+            attempt.record_failure()
+            raise _LOGIN_FAILED()
+        # パスワード照合の成功をレート制限上の「成功」境界とする（アカウント軸をリセット）。
+        # 停止判定はレート制限（総当たり対策）とは別関心のビジネスルールのため、
+        # リセット後に判定する。
+        attempt.record_success()
     # R3再レビュー Medium対応: 停止時の detail を独自の文字列で組み立てず、
     # deps.py の assert_operator_not_suspended（dict detail・SUSPENDED_ACCOUNT_DETAIL
     # 共用）に委譲する（user_login・LINE連携経路と契約を一本化する）。

@@ -318,16 +318,17 @@ async def issue_operator_reauth_token(
 ) -> ReauthTokenResponse:
     ctx = request.state.rate_limit
     account_key = str(operator.id)
-    ctx.check_account(account_key)
-
-    # operator は operator_signup で必ず password_hash を持つため、実際には
-    # 到達しない想定だが、user側と対称の構造を保つため念のため判定する。
-    if operator.password_hash is None:
-        raise _OPERATOR_REAUTH_LINE_ONLY()
-    if not verify_password(body.current_password, operator.password_hash):
-        ctx.record_failure(account_key)
-        raise _OPERATOR_REAUTH_WRONG_PASSWORD()
-    ctx.reset_account(account_key)
+    # 上限の判定と失敗の記録は照合を包む枠で行う（枠の中に await を置かない。
+    # rate_limit_deps.PasswordAttempt 参照）。
+    with ctx.password_attempt(account_key) as attempt:
+        # operator は operator_signup で必ず password_hash を持つため、実際には
+        # 到達しない想定だが、user側と対称の構造を保つため念のため判定する。
+        if operator.password_hash is None:
+            raise _OPERATOR_REAUTH_LINE_ONLY()
+        if not verify_password(body.current_password, operator.password_hash):
+            attempt.record_failure()
+            raise _OPERATOR_REAUTH_WRONG_PASSWORD()
+        attempt.record_success()
 
     token = create_reauth_token(operator.id, "operator")
     return ReauthTokenResponse(
@@ -359,16 +360,15 @@ async def unlink_operator_line(
 ) -> None:
     ctx = request.state.rate_limit
     account_key = str(operator.id)
-    ctx.check_account(account_key)
-
-    # パスワード未設定（実際には到達しない想定だが念のため。user側と対称）の
-    # うちは、解除するとログイン手段が完全に消滅するため解除自体を許可しない。
-    if operator.password_hash is None:
-        raise _OPERATOR_LINE_UNLINK_NO_PASSWORD()
-    if not verify_password(body.current_password, operator.password_hash):
-        ctx.record_failure(account_key)
-        raise _OPERATOR_LINE_UNLINK_WRONG_PASSWORD()
-    ctx.reset_account(account_key)
+    with ctx.password_attempt(account_key) as attempt:
+        # パスワード未設定（実際には到達しない想定だが念のため。user側と対称）の
+        # うちは、解除するとログイン手段が完全に消滅するため解除自体を許可しない。
+        if operator.password_hash is None:
+            raise _OPERATOR_LINE_UNLINK_NO_PASSWORD()
+        if not verify_password(body.current_password, operator.password_hash):
+            attempt.record_failure()
+            raise _OPERATOR_LINE_UNLINK_WRONG_PASSWORD()
+        attempt.record_success()
 
     operator.line_user_id = None
     await session.commit()
@@ -443,15 +443,14 @@ async def delete_my_operator_account(
     """
     ctx = request.state.rate_limit
     account_key = str(operator.id)
-    ctx.check_account(account_key)
-
-    # operator は operator_signup で必ず password_hash を持つ想定だが、user側
-    # （LINE専用ユーザーはパスワード確認不要）と同型に念のため分岐する。
-    if operator.password_hash is not None:
-        if not verify_password(body.password, operator.password_hash):
-            ctx.record_failure(account_key)
-            raise _OPERATOR_DELETE_WRONG_PASSWORD()
-        ctx.reset_account(account_key)
+    with ctx.password_attempt(account_key) as attempt:
+        # operator は operator_signup で必ず password_hash を持つ想定だが、user側
+        # （LINE専用ユーザーはパスワード確認不要）と同型に念のため分岐する。
+        if operator.password_hash is not None:
+            if not verify_password(body.password, operator.password_hash):
+                attempt.record_failure()
+                raise _OPERATOR_DELETE_WRONG_PASSWORD()
+            attempt.record_success()
 
     await _delete_and_anonymize_operator(session, operator)
 

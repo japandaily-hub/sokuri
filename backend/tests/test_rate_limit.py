@@ -1106,7 +1106,7 @@ class TestApplyIpAxis:
 
     def test_check_only_mode_counts_nothing_until_failures_are_recorded(self) -> None:
         """失敗のみカウント（login）の呼び方（count_all=False）では、何度通しても数えず、
-        キーも作らない。``record_failure`` で記録して初めて全段が数えられる。
+        キーも作らない。照合の枠の ``record_failure`` で記録して初めて全段が数えられる。
         record_failure が狭い段しか記録しない実装だと、同じ /56 の別の /64 を使うだけで
         /56・/48 の段に届かない。"""
         from fastapi import HTTPException
@@ -1122,7 +1122,8 @@ class TestApplyIpAxis:
                 limiter=limiter, scope="login", account_rule=None, ip_buckets=buckets
             )
             for _ in range(3):
-                ctx.record_failure("user:ipv6-check-only@example.com")
+                with ctx.password_attempt("user:ipv6-check-only@example.com") as attempt:
+                    attempt.record_failure()
 
         for _ in range(10):
             _apply_ip_axis("login", limiter, rule, count_all=False, ip="2001:db8:8:1::1")

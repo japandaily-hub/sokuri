@@ -452,14 +452,15 @@ async def change_my_password(
 ) -> PasswordChangeResponse:
     ctx = request.state.rate_limit
     account_key = str(user.id)
-    ctx.check_account(account_key)
-
-    if user.password_hash is None:
-        raise _LINE_ONLY_PASSWORD_CHANGE()
-    if not verify_password(body.current_password, user.password_hash):
-        ctx.record_failure(account_key)
-        raise _WRONG_CURRENT_PASSWORD()
-    ctx.reset_account(account_key)
+    # 上限の判定と失敗の記録は照合を包む枠で行う（枠の中に await を置かない。
+    # rate_limit_deps.PasswordAttempt 参照）。
+    with ctx.password_attempt(account_key) as attempt:
+        if user.password_hash is None:
+            raise _LINE_ONLY_PASSWORD_CHANGE()
+        if not verify_password(body.current_password, user.password_hash):
+            attempt.record_failure()
+            raise _WRONG_CURRENT_PASSWORD()
+        attempt.record_success()
 
     user.password_hash = hash_password(body.new_password)
     user.password_changed_at = datetime.now(timezone.utc)
@@ -497,15 +498,14 @@ async def issue_reauth_token(
 ) -> ReauthTokenResponse:
     ctx = request.state.rate_limit
     account_key = str(user.id)
-    ctx.check_account(account_key)
-
-    # LINE専用ユーザー（password_hash=None）はパスワードによる再認証手段が無い。
-    if user.password_hash is None:
-        raise _REAUTH_LINE_ONLY()
-    if not verify_password(body.current_password, user.password_hash):
-        ctx.record_failure(account_key)
-        raise _REAUTH_WRONG_PASSWORD()
-    ctx.reset_account(account_key)
+    with ctx.password_attempt(account_key) as attempt:
+        # LINE専用ユーザー（password_hash=None）はパスワードによる再認証手段が無い。
+        if user.password_hash is None:
+            raise _REAUTH_LINE_ONLY()
+        if not verify_password(body.current_password, user.password_hash):
+            attempt.record_failure()
+            raise _REAUTH_WRONG_PASSWORD()
+        attempt.record_success()
 
     token = create_reauth_token(user.id, "user")
     return ReauthTokenResponse(
@@ -537,16 +537,15 @@ async def unlink_line(
 ) -> None:
     ctx = request.state.rate_limit
     account_key = str(user.id)
-    ctx.check_account(account_key)
-
-    # LINE専用ユーザー（password_hash=None）が解除するとログイン手段が完全に
-    # 消滅するため、パスワード未設定のうちは解除自体を許可しない。
-    if user.password_hash is None:
-        raise _LINE_UNLINK_NO_PASSWORD()
-    if not verify_password(body.current_password, user.password_hash):
-        ctx.record_failure(account_key)
-        raise _LINE_UNLINK_WRONG_PASSWORD()
-    ctx.reset_account(account_key)
+    with ctx.password_attempt(account_key) as attempt:
+        # LINE専用ユーザー（password_hash=None）が解除するとログイン手段が完全に
+        # 消滅するため、パスワード未設定のうちは解除自体を許可しない。
+        if user.password_hash is None:
+            raise _LINE_UNLINK_NO_PASSWORD()
+        if not verify_password(body.current_password, user.password_hash):
+            attempt.record_failure()
+            raise _LINE_UNLINK_WRONG_PASSWORD()
+        attempt.record_success()
 
     user.line_user_id = None
     await session.commit()
@@ -888,17 +887,16 @@ async def delete_my_account(
 ) -> AccountDeleteResponse:
     ctx = request.state.rate_limit
     account_key = str(user.id)
-    ctx.check_account(account_key)
+    with ctx.password_attempt(account_key) as attempt:
+        if not body.confirm:
+            raise _DELETE_CONFIRM_REQUIRED()
 
-    if not body.confirm:
-        raise _DELETE_CONFIRM_REQUIRED()
-
-    # LINE専用ユーザー（password_hash=None）はパスワード確認不要。
-    if user.password_hash is not None:
-        if not body.password or not verify_password(body.password, user.password_hash):
-            ctx.record_failure(account_key)
-            raise _DELETE_WRONG_PASSWORD()
-        ctx.reset_account(account_key)
+        # LINE専用ユーザー（password_hash=None）はパスワード確認不要（何も数えない）。
+        if user.password_hash is not None:
+            if not body.password or not verify_password(body.password, user.password_hash):
+                attempt.record_failure()
+                raise _DELETE_WRONG_PASSWORD()
+            attempt.record_success()
 
     if await _is_last_active_admin(session, user):
         raise _delete_last_admin_conflict()

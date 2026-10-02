@@ -17,6 +17,7 @@ import ipaddress
 import logging
 from dataclasses import dataclass
 from functools import lru_cache
+from types import TracebackType
 from typing import NamedTuple, NoReturn
 
 from fastapi import Depends, HTTPException, Request, status
@@ -394,15 +395,20 @@ class _IpBucket:
     ``store_key``: ``_build_key(scope, axis, digest)`` の結果。
     ``rule``: この段に適用する上限（広い段は倍率を掛けた値）。
     ``key_prefix``: digest の先頭12桁（超過時ログ用）。
+    ``ip_net``: 超過時ログに出す IP の範囲（``_ip_net_for_log``。照合の枠
+    ``PasswordAttempt`` が IP軸で弾いたときも、ガードと同じ値をログに出すため）。
     """
 
     axis: str
     store_key: str
     rule: RateLimitRule
     key_prefix: str
+    ip_net: str
 
 
-def _make_ip_bucket(scope: str, axis: str, material: str, rule: RateLimitRule) -> _IpBucket:
+def _make_ip_bucket(
+    scope: str, axis: str, material: str, rule: RateLimitRule, ip_net: str
+) -> _IpBucket:
     """材料（IPv4 アドレス・IPv6 の CIDR 等）をハッシュして ``_IpBucket`` を1つ作る。"""
     digest = _hash_identity(material)
     return _IpBucket(
@@ -410,6 +416,7 @@ def _make_ip_bucket(scope: str, axis: str, material: str, rule: RateLimitRule) -
         store_key=_build_key(scope, axis, digest),
         rule=rule,
         key_prefix=digest[:12],
+        ip_net=ip_net,
     )
 
 
@@ -464,11 +471,16 @@ def _ip_axis_buckets(scope: str, ip: str, rule: RateLimitRule) -> tuple[_IpBucke
       スロットリング付きの WARNING を出す。例外（500）にもスキップ（抜け道）にもしない。
     """
     address = _canonical_address(ip)
+    ip_net = _ip_net_for_log(ip)
     if address is None:
         _warn_unparseable_ip(scope)
-        return (_make_ip_bucket(scope, _UNPARSEABLE_IP_AXIS, _UNPARSEABLE_IP_MATERIAL, rule),)
+        return (
+            _make_ip_bucket(
+                scope, _UNPARSEABLE_IP_AXIS, _UNPARSEABLE_IP_MATERIAL, rule, ip_net
+            ),
+        )
     if isinstance(address, ipaddress.IPv4Address):
-        return (_make_ip_bucket(scope, "ip", str(address), rule),)
+        return (_make_ip_bucket(scope, "ip", str(address), rule, ip_net),)
 
     address_int = int(address)
     return tuple(
@@ -479,6 +491,7 @@ def _ip_axis_buckets(scope: str, ip: str, rule: RateLimitRule) -> tuple[_IpBucke
             rule
             if tier.limit_multiplier == 1
             else RateLimitRule(rule.max_requests * tier.limit_multiplier, rule.window_seconds),
+            ip_net,
         )
         for tier in _IPV6_TIERS
     )
@@ -553,7 +566,7 @@ def _scope_spec(scope: str, config: RateLimitConfig) -> _ScopeSpec:
 
     **重要（security review 指摘・再発防止）: 「設定値の共有」と
     「カウンタ実体（ストアキー）の共有」は別物である。** 同一 scope 文字列を
-    使っても、``check_account``/``record_failure``/``reset_account`` に渡す
+    使っても、``check_account``/``password_attempt`` に渡す
     識別子（account_raw）が同じであれば同一バケットを共有してしまう。
     user 用と operator 用で同一メールアドレスが使われた場合、両者のアカウント軸
     バケットが意図せず共有され、無認証の第三者が相手のメールアドレスを知る
@@ -674,15 +687,22 @@ class RateLimitContext:
     ``ip_buckets`` は IP軸の「数える単位」の並び（``_apply_ip_axis`` が
     ``_ip_axis_buckets`` で作る。IPv4 は1個、IPv6 は /64・/56・/48 の3個）。
     空タプルは IP軸スキップ、またはそもそも IP軸を持たないスコープを
-    意味する。``record_failure`` はこの全段を記録する。
+    意味する。照合の失敗（``PasswordAttempt.record_failure``）はこの全段を記録する。
 
-    呼び出し規約（設計書 §6）:
+    呼び出し規約（失敗のみカウント方式。設計書 §6 を M-3 で改めた）:
         ctx = request.state.rate_limit
-        ctx.check_account(account_key)      # 超過なら 429 を raise
-        ... 認証判定 ...
-        ctx.record_failure(account_key)     # IP軸の全段・アカウント軸をカウント
-        raise _LOGIN_FAILED()               # 失敗パス
-        ctx.reset_account(account_key)      # 成功パス（アカウント軸のみリセット）
+        ctx.check_account(account_key)      # 任意: DB を引く前の早期の 429（peek）
+        user = await ...                    # 照合の材料をそろえる（await はここまで）
+        with ctx.password_attempt(account_key) as attempt:   # 上限なら 429 を raise
+            if not verify_password(...):
+                attempt.record_failure()    # IP軸の全段・アカウント軸をカウント
+                raise _LOGIN_FAILED()       # 失敗パス
+            attempt.record_success()        # 成功パス（アカウント軸のみリセット）
+
+    上限の判定の本体は ``password_attempt`` で、``check_account`` は DB を引く前に
+    弾くための近道にすぎない。``check_account`` だけで判定して照合すると、その後の
+    ``await`` の間に同時に届いた要求がどれも peek を通り、上限を超えて照合できる
+    （2026-09-27 セキュリティレビュー M-3。``PasswordAttempt`` 参照）。
     """
 
     limiter: RateLimiter
@@ -691,7 +711,11 @@ class RateLimitContext:
     ip_buckets: tuple[_IpBucket, ...] = ()
 
     def check_account(self, account_raw: str) -> None:
-        """アカウント軸の事前チェック（peek）。超過なら 429 を raise する。"""
+        """アカウント軸の事前チェック（peek）。超過なら 429 を raise する。
+
+        照合の可否の判定には使わない（``password_attempt`` が行う）。上限に達している
+        アカウントについて、DB の照会などの重い処理より前に 429 を返すための近道。
+        """
         if self.account_rule is None:
             return
         digest = _hash_identity(account_raw)
@@ -707,33 +731,19 @@ class RateLimitContext:
                 ip_net=None,
             )
 
-    def record_failure(self, account_raw: str) -> None:
-        """失敗を記録する（IP軸の全段・アカウント軸をカウント）。
+    def password_attempt(self, account_raw: str) -> PasswordAttempt:
+        """パスワード照合1回分の枠を返す（``with`` 文で使う。``PasswordAttempt`` 参照）。"""
+        return PasswordAttempt(self, account_raw)
 
-        IP軸は ``ip_buckets`` の全段（IPv4なら1段、IPv6なら /64・/56・/48 の3段）を
-        それぞれの ``rule`` で記録する。ここでは 429 を raise しない（呼び出し元が
-        この後で本来の失敗 HTTPException（401等）を raise する契約のため。超過判定は
-        次回リクエスト時の事前チェックで行われる）。IP軸は意図的にリセットしない
-        （設計書 §4: 同一IPから「自分のアカウントに成功→他人を攻撃」を繰り返すと
-        IP軸が無意味化するため）。
-        """
-        for bucket in self.ip_buckets:
-            self.limiter.record(bucket.store_key, bucket.rule)
-        if self.account_rule is not None:
-            digest = _hash_identity(account_raw)
-            self.limiter.record(_build_key(self.scope, "acct", digest), self.account_rule)
-
-    def reset_account(self, account_raw: str) -> None:
-        """成功時にアカウント軸のみリセットする（IP軸はリセットしない）。"""
-        if self.account_rule is None:
-            return
+    def _account_key(self, account_raw: str) -> tuple[str, str]:
+        """アカウント軸のストアキーと、ログ用の digest 先頭12桁。"""
         digest = _hash_identity(account_raw)
-        self.limiter.reset(_build_key(self.scope, "acct", digest))
+        return _build_key(self.scope, "acct", digest), digest[:12]
 
     def hit_account(self, account_raw: str) -> None:
         """アカウント軸を無条件でカウントし、超過なら 429 を raise する。
 
-        ``record_failure`` （失敗時のみカウントする login 等の方式）とは異なり、
+        ``PasswordAttempt``（失敗時のみカウントする login 等の方式）とは異なり、
         成功/失敗を問わず毎リクエストをコストとして数える方式のスコープ
         （例: case_create のコストDoS対策）向け。**IP軸には一切触れない**
         （count_all 方式のスコープでは IP軸は ``RateLimitGuard.__call__`` が
@@ -756,22 +766,192 @@ class RateLimitContext:
             )
 
 
+# PasswordAttempt の状態（__enter__ 前 → 枠の中 → 成否の確定後 → with を抜けた後）。
+_ATTEMPT_NEW = "new"
+_ATTEMPT_OPEN = "open"
+_ATTEMPT_SETTLED = "settled"
+_ATTEMPT_CLOSED = "closed"
+
+
+class PasswordAttempt:
+    """失敗のみカウント方式（login・password_change・account_delete・line_link_reauth）で、
+    パスワード照合1回分の上限の判定と記録をまとめる枠。
+
+    ``RateLimitContext.password_attempt()`` が返し、``with`` 文でだけ使う（呼び出し規約は
+    ``RateLimitContext`` の docstring）。
+
+    **なぜ必要か（2026-09-27 セキュリティレビュー M-3）**: 以前は「peek で判定 → ``await``
+    で DB を照会 → 照合 → 失敗なら記録」の順だった。peek と記録の間に ``await`` があると、
+    同時に届いた要求（single-packet attack 等）はどれも、ほかの要求の失敗が記録される前に
+    peek を通るため、1 つの窓でアカウント軸・IP軸（IPv6 は各段）の上限を超えて照合できた。
+
+    **仕組み**: ``__enter__`` で IP軸の全段（``ctx.ip_buckets``）→ アカウント軸の順に
+    ``RateLimiter.reserve`` で枠を予約する。判定は「窓内の失敗の記録 + 照合中の予約 +
+    この1回」が上限以下か。どれかで超えたら、それまでに取った予約を外して、その段・軸の
+    429（ガードと同じ ``_raise_429``。文言はスコープ共通なので、アカウント軸と IP軸で同一
+    ＝列挙防止を保つ）。予約は ``record_failure``／``record_success`` か、``with`` を抜けた
+    とき（例外を含む）に外す。失敗の記録は従来どおり ``hit``、成功はアカウント軸のリセット。
+    成否のどちらも呼ばずに抜けた場合（照合前の 409・例外など）は何も数えない（従来と同じ）。
+
+    **正しいパスワードの利用者を 429 にしないための置き場所（重要）**: 枠は照合の材料
+    （利用者の行など）をそろえる ``await`` の後に開き、枠の中に ``await`` を置かない。
+    そうすれば予約はほかの要求から一度も見えず、判定は「失敗の記録 + この1回」だけに
+    なる（修正前の peek と同じ判定を、記録と同じ同期区間で行う）。照合の前の ``await`` から
+    予約すると、照合中の要求まで上限に数えるため、同時に届いた正しいパスワードの要求が、
+    ほかの要求の照合が終わるまでの一瞬に 429 になりうる。枠の中に ``await`` を置いても
+    上限は守られる（予約が見えるようになり、照合中の分だけ早めに 429 になる）ので、
+    照合を ``asyncio.to_thread`` 等へ移す場合も、この枠の中で行えば M-3 は再発しない。
+
+    緊急停止スイッチ（RATE_LIMIT_ENABLED=false）のときは ``NoopRateLimitContext`` が
+    ``_NoopPasswordAttempt`` を返し、ストアに一切触れない。
+    """
+
+    def __init__(self, ctx: RateLimitContext, account_raw: str) -> None:
+        self._ctx = ctx
+        self._account_raw = account_raw
+        self._account_store_key: str | None = None
+        # 取った予約（ストアキー, token）。緊急停止中の limiter なら token は None。
+        self._held: list[tuple[str, int | None]] = []
+        self._state = _ATTEMPT_NEW
+
+    def __enter__(self) -> PasswordAttempt:
+        if self._state != _ATTEMPT_NEW:
+            raise RuntimeError("PasswordAttempt は1回の with 文でだけ使えます。")
+        self._state = _ATTEMPT_OPEN
+        ctx = self._ctx
+        try:
+            for bucket in ctx.ip_buckets:
+                self._reserve_or_raise_429(
+                    bucket.store_key,
+                    bucket.rule,
+                    axis=bucket.axis,
+                    key_prefix=bucket.key_prefix,
+                    ip_net=bucket.ip_net,
+                )
+            if ctx.account_rule is not None:
+                account_store_key, account_key_prefix = ctx._account_key(self._account_raw)
+                self._account_store_key = account_store_key
+                self._reserve_or_raise_429(
+                    account_store_key,
+                    ctx.account_rule,
+                    axis="account",
+                    key_prefix=account_key_prefix,
+                    ip_net=None,
+                )
+        except BaseException:
+            # __enter__ が例外で終わると with は __exit__ を呼ばないので、ここで外す。
+            self._close()
+            raise
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
+        self._close()
+
+    def record_failure(self) -> None:
+        """照合の失敗を記録する（IP軸の全段・アカウント軸に1回ずつ）。
+
+        ここでは 429 を raise しない（呼び出し元がこの後で本来の失敗 HTTPException
+        （401 等）を raise する契約のため。上限に達したかは次の要求の判定で分かる）。
+        IP軸は意図的にリセットしない（設計書 §4: 同一IPから「自分のアカウントに成功→
+        他人を攻撃」を繰り返すと IP軸が無意味化するため）。
+        """
+        self._settle()
+        ctx = self._ctx
+        for bucket in ctx.ip_buckets:
+            ctx.limiter.record(bucket.store_key, bucket.rule)
+        if self._account_store_key is not None and ctx.account_rule is not None:
+            ctx.limiter.record(self._account_store_key, ctx.account_rule)
+        self._release_all()
+
+    def record_success(self) -> None:
+        """照合の成功。アカウント軸だけをリセットする（IP軸は数えもリセットもしない）。"""
+        self._settle()
+        if self._account_store_key is not None:
+            self._ctx.limiter.reset(self._account_store_key)
+        self._release_all()
+
+    def _reserve_or_raise_429(
+        self,
+        store_key: str,
+        rule: RateLimitRule,
+        *,
+        axis: str,
+        key_prefix: str,
+        ip_net: str | None,
+    ) -> None:
+        reservation = self._ctx.limiter.reserve(store_key, rule)
+        if not reservation.verdict.allowed:
+            _raise_429(
+                scope=self._ctx.scope,
+                axis=axis,
+                rule=rule,
+                verdict=reservation.verdict,
+                key_prefix=key_prefix,
+                ip_net=ip_net,
+            )
+        self._held.append((store_key, reservation.token))
+
+    def _settle(self) -> None:
+        if self._state != _ATTEMPT_OPEN:
+            raise RuntimeError(
+                "record_failure／record_success は with 文の中で、1回の照合につき1度だけ"
+                "呼べます。"
+            )
+        self._state = _ATTEMPT_SETTLED
+
+    def _release_all(self) -> None:
+        held, self._held = self._held, []
+        for store_key, token in held:
+            self._ctx.limiter.release(store_key, token)
+
+    def _close(self) -> None:
+        self._release_all()
+        self._state = _ATTEMPT_CLOSED
+
+
+class _NoopPasswordAttempt:
+    """``NoopRateLimitContext.password_attempt()`` が返す、何もしない枠（ストアに触れない）。"""
+
+    def __enter__(self) -> _NoopPasswordAttempt:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
+        return None
+
+    def record_failure(self) -> None:
+        return None
+
+    def record_success(self) -> None:
+        return None
+
+
+# 状態を持たないため、全要求で共有して問題ない。
+_NOOP_PASSWORD_ATTEMPT = _NoopPasswordAttempt()
+
+
 class NoopRateLimitContext:
     """``RATE_LIMIT_ENABLED=false``（キルスイッチ ON）時に使う no-op 実装。
 
     IP 解決すら行わない完全バイパス。ハンドラ側は常に
-    ``request.state.rate_limit.record_failure(...)`` 等を呼ぶだけでよく、
+    ``request.state.rate_limit.password_attempt(...)`` 等を呼ぶだけでよく、
     ``if enabled:`` 分岐がハンドラに一切現れない（DRY／可読性維持）。
     """
 
     def check_account(self, account_raw: str) -> None:
         return None
 
-    def record_failure(self, account_raw: str) -> None:
-        return None
-
-    def reset_account(self, account_raw: str) -> None:
-        return None
+    def password_attempt(self, account_raw: str) -> _NoopPasswordAttempt:
+        return _NOOP_PASSWORD_ATTEMPT
 
     def hit_account(self, account_raw: str) -> None:
         return None
@@ -859,8 +1039,8 @@ class RateLimitGuard:
       IP 軸を ``hit``（カウント）し、超過なら即座に 429 を raise する
       （事前に hit 1回で完結する。設計書 §4）。
     - 失敗のみカウント方式のスコープ（login）は、ここでは ``peek``
-      （非消費の事前判定）のみを行う。実カウントはハンドラ側の
-      ``ctx.record_failure()`` で行われる。
+      （非消費の事前判定）のみを行う。照合の可否の判定と実カウントは、ハンドラ側の
+      ``ctx.password_attempt()`` の枠で行われる（``PasswordAttempt`` 参照）。
     - **IP軸の段数（IPv6）**: IP軸のキー生成・判定は ``_apply_ip_axis``
       （内部で ``_ip_axis_buckets`` を使う）に一本化されている。IPv4 は
       従来どおりアドレス単位の1段。IPv6 は要求ごとに送信元アドレスを

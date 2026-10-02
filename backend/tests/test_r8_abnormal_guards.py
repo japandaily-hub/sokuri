@@ -707,7 +707,7 @@ async def test_operator_withdraw_rate_limited_returns_429(db_session: AsyncSessi
     """誤パスワード連打で scope=account_delete のアカウント軸が429を返す（r8-verify-fix）。
 
     ``RateLimitGuard("account_delete")`` は ip_rule=None / count_all=False のため、
-    ハンドラが ``ctx.check_account()`` / ``record_failure()`` を呼ばない限り**何も
+    ハンドラが照合を ``ctx.password_attempt()`` の枠で包まない限り**何も
     しない**（これが H-4 の原因そのもの）。呼び忘れの再発を捕まえるため、429 到達を
     実証する。conftest の既定（RATE_LIMIT_ENABLED=false）に依存せず、
     test_user_profile_ext.py と同じパターンでテスト専用の RateLimiter を注入する。
