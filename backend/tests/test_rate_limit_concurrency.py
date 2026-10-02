@@ -710,6 +710,43 @@ class TestPasswordAttempt:
             attempt.record_success()
         assert ctx.password_attempt("x") is ctx.password_attempt("y")
 
+    def test_recorded_window_expiry_reopens_reservations(self) -> None:
+        """記録済みの窓がちょうど切れたら、失敗は数えずに予約が通る。"""
+        clock, store = _store()
+        store.hit("k", 900, 1)
+        assert not store.reserve("k", 900, 1).verdict.allowed
+        clock.advance(900)
+        assert store.reserve("k", 900, 1).verdict.allowed
+
+    async def test_cancellation_inside_the_attempt_releases(self) -> None:
+        ctx, store = _context(account_max=1, ip="198.51.100.11", ip_max=1)
+        entered = asyncio.Event()
+
+        async def hold() -> None:
+            with ctx.password_attempt("user:cancel@example.com"):
+                entered.set()
+                await asyncio.sleep(3600)
+
+        task = asyncio.create_task(hold())
+        await entered.wait()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert store._reservations == {}  # noqa: SLF001
+        assert len(store) == 0
+
+    def test_disabled_limiter_in_a_real_context_never_touches_the_store(self) -> None:
+        limiter = RateLimiter(
+            config=_config(enabled=False),
+            store=_StoreThatMustNotBeTouched(),  # type: ignore[arg-type]
+        )
+        ctx = RateLimitContext(
+            limiter=limiter, scope="login", account_rule=RateLimitRule(1, 900)
+        )
+        for _ in range(3):
+            with ctx.password_attempt("user:disabled@example.com") as attempt:
+                attempt.record_failure()
+
 
 # ──────────────────────── メタガード: 照合の枠の置き場所（構文木で検査） ────────────────────────
 
@@ -723,9 +760,11 @@ _PASSWORD_ATTEMPT_SCOPES = frozenset(
 
 
 def _guard_scopes(function: ast.AsyncFunctionDef | ast.FunctionDef) -> set[str]:
-    """引数の既定値に書かれた ``RateLimitGuard("<scope>")`` の scope。"""
+    """引数の既定値・デコレータ（``dependencies=[...]``）に書かれた ``RateLimitGuard("<scope>")``
+    の scope。"""
     scopes = set()
-    for node in ast.walk(function.args):
+    sources: list[ast.AST] = [function.args, *function.decorator_list]
+    for node in (child for source in sources for child in ast.walk(source)):
         if (
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Name)
@@ -760,8 +799,23 @@ def _awaits_inside(block: ast.With) -> list[int]:
             continue
         if isinstance(node, (ast.Await, ast.AsyncFor, ast.AsyncWith)):
             lines.append(node.lineno)
+        if isinstance(node, ast.comprehension) and node.is_async:
+            lines.append(node.iter.lineno)
         pending.extend(ast.iter_child_nodes(node))
     return lines
+
+
+def _calls_named(root: ast.AST, name: str) -> list[ast.Call]:
+    """``name(...)`` または ``x.name(...)`` の呼び出し。"""
+    return [
+        node
+        for node in ast.walk(root)
+        if isinstance(node, ast.Call)
+        and (
+            (isinstance(node.func, ast.Name) and node.func.id == name)
+            or (isinstance(node.func, ast.Attribute) and node.func.attr == name)
+        )
+    ]
 
 
 def _endpoint_functions() -> list[tuple[str, ast.AsyncFunctionDef | ast.FunctionDef]]:
@@ -791,6 +845,30 @@ class TestPasswordAttemptPlacementGuard:
                 missing.append(f"{filename}:{function.lineno} {function.name} {sorted(scopes)}")
         assert len(found) >= 9, f"対象のハンドラが足りません（検査の前提が崩れています）: {found}"
         assert not missing, "照合を password_attempt の枠で包んでいません: " + ", ".join(missing)
+
+    def test_password_checks_and_failure_records_are_inside_the_attempt(self) -> None:
+        """照合（verify_password）は枠の中でだけ行い、枠には失敗の記録がある。照合を枠の外に
+        出すと、上限を超えた要求でも scrypt が走る（CPU を使わせる攻撃の上限が外れる）。
+        ハンドラは async def のまま（def にすると別スレッドで並行に動き、ロックの無い
+        ストアの前提が崩れる）。"""
+        violations = []
+        for filename, function in _endpoint_functions():
+            if not (_guard_scopes(function) & _PASSWORD_ATTEMPT_SCOPES):
+                continue
+            where = f"{filename}:{function.lineno} {function.name}"
+            if not isinstance(function, ast.AsyncFunctionDef):
+                violations.append(f"{where}: async def ではない")
+            blocks = _password_attempt_blocks(function)
+            inside = {
+                id(call) for block in blocks for call in _calls_named(block, "verify_password")
+            }
+            for call in _calls_named(function, "verify_password"):
+                if id(call) not in inside:
+                    violations.append(f"{where}:{call.lineno} verify_password が枠の外")
+            for block in blocks:
+                if not _calls_named(block, "record_failure"):
+                    violations.append(f"{where}:{block.lineno} 枠に record_failure が無い")
+        assert not violations, "照合の枠の使い方が約束と違います: " + ", ".join(violations)
 
     def test_attempts_are_used_only_in_password_scopes(self) -> None:
         violations = []

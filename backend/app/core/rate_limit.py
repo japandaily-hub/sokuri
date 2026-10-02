@@ -8,6 +8,7 @@ FastAPI を import しない**。単体テストを HTTP なしで書けるよ�
 ``(window_start_monotonic, count, window_seconds, limit)`` の1組のみを
 保持するため、キーあたりメモリは O(1)（スライディングログのように失敗回数分の
 リストを持たない。攻撃者がリストを膨らませて新たな DoS 面を作れてしまうため）。
+これとは別に、照合中の予約（下記）を key ごとに最大 limit 件だけ持つ。
 
 既知の弱点として、ウィンドウ境界で瞬間的に最大2倍のバーストを許すが、
 オンライン総当たり対策としては無意味な差として受容する（設計書 §1）。
@@ -111,7 +112,7 @@ class RateLimitStore(Protocol):
         ...
 
     def peek(self, key: str, window_seconds: int, limit: int) -> RateLimitVerdict:
-        """カウントを増やさず判定のみ行う（消費なし）。"""
+        """カウントを増やさず判定のみ行う（消費なし。照合中の予約も数える）。"""
         ...
 
     def reset(self, key: str) -> None:

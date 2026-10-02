@@ -551,7 +551,8 @@ class _ScopeSpec:
     ip_rule: RateLimitRule | None
     account_rule: RateLimitRule | None
     # True: 全リクエストを IP 軸で事前カウント（signup / line_exchange）。
-    # False: IP 軸は事前は peek のみ、実カウントは失敗時の record_failure で行う（login）。
+    # False: IP 軸は事前は peek のみ、実カウントは照合の枠の失敗時
+    # （PasswordAttempt.record_failure）で行う（login）。
     count_all: bool
 
 
