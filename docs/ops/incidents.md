@@ -37,6 +37,7 @@ Claude / Codex はセッション開始時に本ファイルの「原則」と�
 | 外形監視の HEAD 対応 | `/health` `/readyz` が HEAD を受ける（UptimeRobot は HEAD で叩く。GET 専用だと 405＝Down 誤判定） | `backend/tests/test_main.py` | pytest（CI） |
 | アプリログの出力経路 | 本番（uvicorn の既定のログ設定）で app.* の INFO が捨てられない・lastResort と二重にならない・uvicorn の書式を変えない・start.sh が APP_LOG_LEVEL を渡す | `backend/tests/test_app_logging.py`（別プロセスで uvicorn の Config を作ってから app.main を読み込む） | pytest（CI） |
 | ログの個人情報 | logging 呼び出しへ生のメール・LINE userId・storage_key・電話・住所・人名の項目・口座名義・秘密値（`xxx.email`・`["contact_email"]`・`.get("email")` 等）をマスク関数を通さず渡さない。書式側でも整形時に文中のメール・storage_key・LINE userId をマスクし、制御文字・書式文字をエスケープ（未処理例外のトレースバックにも適用）。失敗時ログ（R2／ローカルディスクの削除失敗・業者申込の保存失敗）の中身も検査 | `backend/tests/test_log_pii_guard.py`・`test_failure_log_privacy.py`・`test_storage_backends.py`・`app/core/app_logging.py` | pytest（CI）／本番の出力時 |
+| DB 例外の値 | DB 例外（PostgreSQL の DETAIL・SQL の引数）・検証エラーの入力値をログ・運営アラートへ出さない（型・SQLSTATE・制約名だけ）。DB を扱う except 節で例外を要約なしに出口へ渡すと落ちる | `backend/app/core/error_summary.py`・`tests/test_db_error_log_guard.py`・`test_db_error_log_privacy.py`・`test_error_summary.py` | pytest（CI）／本番の出力時 |
 | CI build の外部取得の一時失敗 | next/font の Google Fonts 取得の一時失敗で main を赤くしない（それ以外の build 失敗は即失敗のまま） | `ci.yml` web ジョブの Build（`An error occurred in next/font` のときだけ 15 秒後に 1 回再試行） | push (main)・PR ごと |
 
 ## 台帳
