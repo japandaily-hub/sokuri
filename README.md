@@ -170,7 +170,7 @@ assetwise/
 │   │   │   ├── result/         # 査定結果・送客チャネル
 │   │   │   └── globals.css
 │   │   ├── components/         # ChannelCard / ConditionCard / DefectUploader
-│   │   └── lib/                # api.ts（API クライアント）/ format.ts
+│   │   └── lib/                # katadzuke-api.ts（API クライアント）/ format.ts
 │   ├── package.json
 │   ├── next.config.ts
 │   ├── tailwind.config.ts
