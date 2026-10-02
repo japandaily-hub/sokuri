@@ -61,14 +61,6 @@ _MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 #: ここに載っていて、かつ実際に保護が付いていないルートだけが検査を通過する。
 #: 許可リストの陳腐化（実在しないエントリ・既に保護が付いたエントリ）も検出する。
 _ALLOWLIST: dict[tuple[str, str], str] = {
-    ("POST", "/api/v1/operator-applications"): (
-        "app/api/v1/endpoints/operator_applications.py の create_operator_application が、"
-        "operator_applications テーブルの直近1時間・同一IPの件数を DB で数える独自のレート"
-        "制限（_RATE_LIMIT_MAX_PER_IP_PER_WINDOW）を持つ。/business フォームからの公開申込"
-        "口のため認証は要求しない。注意: その IP は X-Forwarded-For の先頭（利用者が書ける値）"
-        "から取るため偽装で回避できる。修正（cb98349・IPv6 3段化 1d14e6f）は別ブランチにあり、"
-        "main に合流するまで実効性は限定的（この許可リストの完了条件に紐づける）。"
-    ),
     ("POST", "/api/v1/auth/login"): (
         "RateLimitGuard('login') は事前の確認だけで数えない（count_all=False）。失敗時の "
         "record_failure をハンドラ内で呼ぶ作り。振る舞いは tests/test_rate_limit_api.py 等で固定。"
@@ -422,3 +414,21 @@ def test_self_check_mount_and_unknown_route_types_are_foreign() -> None:
     expected_mounts = 2 if hasattr(fastapi_routing, "iter_route_contexts") else 1
     assert sum(type(r).__name__ == "Mount" for r in foreign) == expected_mounts
     assert unknown in foreign
+
+
+def test_allowlisted_login_routes_keep_login_rate_limit_guard() -> None:
+    """許可リスト（ガード単体は数えない login 系）でも、事前確認のガードは外せない。
+
+    許可リストの理由は「record_failure をハンドラで数える」ことだが、テストはガードの有無を
+    見ないため、ガードを消しても合格してしまう（security review M-1）。ここで存在を固定する。
+    """
+    app = _production_app()
+    for path in ("/api/v1/auth/login", "/api/v1/auth/operator/login"):
+        route = _find_route(app, "POST", path)
+        scopes = {
+            node.call._scope
+            for node in _iter_dependant_nodes(route.dependant)
+            if isinstance(node.call, RateLimitGuard)
+        }
+        assert "login" in scopes, f"POST {path} から RateLimitGuard('login') が外れています: {scopes}"
+
