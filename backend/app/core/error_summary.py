@@ -69,6 +69,8 @@ _MAX_VALIDATION_ITEMS = 10
 _MAX_CAUSE_DEPTH = 8
 #: exception group の入れ子をたどる上限（標準の traceback と同じ値）。
 _MAX_GROUP_DEPTH = 10
+#: exception group で並べるサブ例外の上限（標準の traceback と同じ値）。
+_MAX_GROUP_WIDTH = 15
 
 _CAUSE_HEADER = "\nThe above exception was the direct cause of the following exception:\n\n"
 _CONTEXT_HEADER = "\nDuring handling of the above exception, another exception occurred:\n\n"
@@ -219,11 +221,14 @@ def describe_db_error(exc: BaseException) -> str:
     return str(info) if info is not None else type(exc).__name__
 
 
-def _loc_text(loc: object) -> str:
+def _loc_text(loc: object, *, keys_are_input: bool = False) -> str:
     if not isinstance(loc, (tuple, list)) or not loc:
         return "?"
     parts: list[str] = []
-    for part in loc:
+    for position, part in enumerate(loc):
+        if keys_are_input and position == len(loc) - 1:
+            parts.append("?")  # extra_forbidden の末尾は利用者が送ったキー名
+            continue
         if isinstance(part, int) and not isinstance(part, bool):
             parts.append(str(part))
         elif isinstance(part, str) and _LOC_NAME_RE.fullmatch(part):
@@ -240,7 +245,8 @@ def _validation_fields_text(exc: BaseException) -> str:
     except Exception:  # noqa: BLE001 -- 要約のために元の処理を壊さない
         return "errors=?"
     items = [
-        f"{_loc_text(error.get('loc'))}:{_identifier(error.get('type')) or '?'}"
+        f"{_loc_text(error.get('loc'), keys_are_input=error.get('type') == 'extra_forbidden')}"
+        f":{_identifier(error.get('type')) or '?'}"
         for error in errors[:_MAX_VALIDATION_ITEMS]
         if isinstance(error, dict)
     ]
@@ -326,14 +332,18 @@ def _format_single(exc: BaseException, *, redact: bool, seen: set[int], depth: i
         if depth >= _MAX_GROUP_DEPTH:
             parts.append("  ...（exception group の入れ子が深いため以降を省略）\n")
         else:
-            for index, sub_exc in enumerate(exc.exceptions, 1):
+            for index, sub_exc in enumerate(exc.exceptions[:_MAX_GROUP_WIDTH], 1):
                 parts.append(f"  +---------------- {index} ----------------\n")
-                sub_text = "".join(_format_chain(sub_exc, seen=seen, depth=depth + 1))
+                sub_text = "".join(_format_chain(sub_exc, seen=seen, depth=depth + 1, redact=redact))
                 parts.extend("    " + line for line in sub_text.splitlines(keepends=True))
+            if len(exc.exceptions) > _MAX_GROUP_WIDTH:
+                parts.append(f"  ...（ほか {len(exc.exceptions) - _MAX_GROUP_WIDTH} 件を省略）{chr(10)}")
     return parts
 
 
-def _format_chain(exc: BaseException, *, seen: set[int], depth: int) -> list[str]:
+def _format_chain(
+    exc: BaseException, *, seen: set[int], depth: int, redact: bool = False
+) -> list[str]:
     """``__cause__`` / ``__context__`` の連鎖を、標準のトレースバックと同じく古いものから並べる。"""
     # (例外, その例外の後に置く見出し, 文言を伏せるか) を新しい順に集める。見出しは「この例外が次に
     # 新しい例外の原因（cause）か、処理中に起きたか（context）」。DB 例外の cause・context はドライバ内部の
@@ -341,7 +351,6 @@ def _format_chain(exc: BaseException, *, seen: set[int], depth: int) -> list[str
     chain: list[tuple[BaseException, str | None, bool]] = []
     current: BaseException | None = exc
     header: str | None = None
-    redact = False
     while current is not None and id(current) not in seen:
         seen.add(id(current))
         chain.append((current, header, redact))
