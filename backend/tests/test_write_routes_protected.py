@@ -21,7 +21,6 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from dataclasses import dataclass
 from typing import Any
 
 from fastapi import APIRouter, Depends, FastAPI
@@ -34,6 +33,11 @@ from app.api import deps
 from app.api.rate_limit_deps import RateLimitGuard, _scope_spec, get_rate_limiter
 from app.config import Settings
 from app.main import create_app
+from tests.effective_routes import (
+    EffectiveApiRoute,
+    effective_api_routes,
+    iter_original_and_effective,
+)
 
 _STRONG_JWT_SECRET = "a" * 64  # test_main.py と同じダミー強鍵（長さのみ検証対象）。
 
@@ -89,54 +93,6 @@ def _counts_every_request_by_ip(guard: RateLimitGuard) -> bool:
     return spec.ip_rule is not None and spec.count_all
 
 
-@dataclass(frozen=True)
-class _EffectiveApiRoute:
-    """include_router の prefix・dependencies を反映した「実際に受け付ける」APIRoute の姿。
-
-    fastapi 0.136 系までは include_router が APIRoute を prefix・依存込みで複製して
-    ``app.routes`` に平坦に積んでいたため、``app.routes`` の APIRoute をそのまま見ればよかった。
-    fastapi 0.142 系では include_router が ``_IncludedRouter``（遅延ラッパ）を1件積むだけになり、
-    中の APIRoute は prefix 無しの元のまま。実効のパス・依存木は ``iter_route_contexts`` が返す
-    コンテキスト側にしか無いため、両方の版をこの形に揃えてから検査する。
-    """
-
-    path: str
-    methods: frozenset[str]
-    dependant: Dependant
-
-
-def _iter_original_and_effective(app: FastAPI) -> Iterator[tuple[BaseRoute, Any]]:
-    """アプリの全ルートを (元のルート, 実効ルート) の組で平坦に返す。
-
-    新しい fastapi（``iter_route_contexts`` を持つ版）は include 済みルーターを再帰的に展開し、
-    実効ルートは prefix・include 時の依存を反映した ``RouteContext``。古い fastapi は
-    ``app.routes`` が既に平坦で、元のルート＝実効ルート。
-    """
-    iter_route_contexts = getattr(fastapi_routing, "iter_route_contexts", None)
-    if iter_route_contexts is None:
-        for route in app.routes:
-            yield route, route
-        return
-    for route_context in iter_route_contexts(app.routes):
-        yield route_context.original_route, route_context
-
-
-def _api_routes(app: FastAPI) -> list[_EffectiveApiRoute]:
-    routes: list[_EffectiveApiRoute] = []
-    for original, effective in _iter_original_and_effective(app):
-        if not isinstance(original, APIRoute):
-            continue
-        assert effective.dependant is not None, f"依存木の無い APIRoute: {effective.path}"
-        routes.append(
-            _EffectiveApiRoute(
-                path=effective.path,
-                methods=frozenset(effective.methods or ()),
-                dependant=effective.dependant,
-            )
-        )
-    return routes
-
-
 def _foreign_routes(app: FastAPI) -> list[BaseRoute]:
     """APIRoute 以外で、読み取り専用（GET/HEAD のみの素の Route。/docs 等）と言い切れないもの。
 
@@ -145,7 +101,7 @@ def _foreign_routes(app: FastAPI) -> list[BaseRoute]:
     これらは依存木を検査できないため、存在した時点で失敗させる。
     """
     foreign: list[BaseRoute] = []
-    for original, effective in _iter_original_and_effective(app):
+    for original, effective in iter_original_and_effective(app):
         if isinstance(original, APIRoute):
             continue
         methods = set(getattr(effective, "methods", None) or ())
@@ -155,7 +111,7 @@ def _foreign_routes(app: FastAPI) -> list[BaseRoute]:
     return foreign
 
 
-def _protection_reasons(route: _EffectiveApiRoute) -> set[str]:
+def _protection_reasons(route: EffectiveApiRoute) -> set[str]:
     """ルートが持つ保護の種類（"auth" / "rate_limit"）を集める。
 
     ``Dependant.call`` は ``Depends(...)`` に渡した callable そのもの
@@ -172,16 +128,16 @@ def _protection_reasons(route: _EffectiveApiRoute) -> set[str]:
     return reasons
 
 
-def _is_protected(route: _EffectiveApiRoute) -> bool:
+def _is_protected(route: EffectiveApiRoute) -> bool:
     return bool(_protection_reasons(route))
 
 
-def _mutating_routes(app: FastAPI) -> list[_EffectiveApiRoute]:
-    return [route for route in _api_routes(app) if route.methods & _MUTATING_METHODS]
+def _mutating_routes(app: FastAPI) -> list[EffectiveApiRoute]:
+    return [route for route in effective_api_routes(app) if route.methods & _MUTATING_METHODS]
 
 
-def _find_route(app: FastAPI, method: str, path: str) -> _EffectiveApiRoute:
-    for route in _api_routes(app):
+def _find_route(app: FastAPI, method: str, path: str) -> EffectiveApiRoute:
+    for route in effective_api_routes(app):
         if route.path == path and method in route.methods:
             return route
     raise AssertionError(f"ルートが見つかりません: {method} {path}")

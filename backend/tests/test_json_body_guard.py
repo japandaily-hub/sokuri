@@ -31,7 +31,6 @@ import fastapi.params as fastapi_params
 import pytest
 from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request
 from fastapi.dependencies.models import Dependant
-from fastapi.routing import APIRoute
 from httpx import ASGITransport, AsyncClient
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -60,6 +59,7 @@ from app.core.security import create_access_token, hash_password
 from app.db.models.user import User
 from app.db.session import get_session
 from app.main import create_app
+from tests.effective_routes import effective_api_routes
 from tests.test_katadzuke_api import _application_payload
 
 _UNSUPPORTED_MEDIA_TYPE_DETAIL = "リクエストの形式が正しくありません。"
@@ -649,9 +649,7 @@ def find_json_gate_violations(
     checked_routes: set[tuple[str, str]] = set()
     auth_checked_paths: set[str] = set()
 
-    for route in app.routes:
-        if not isinstance(route, APIRoute):
-            continue
+    for route in effective_api_routes(app):
         order = _dependency_execution_order(route.dependant)
         for guard_index, dep in enumerate(order):
             if not isinstance(dep.call, RateLimitGuard):

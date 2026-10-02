@@ -26,7 +26,6 @@ from typing import Any, AsyncIterator, Callable, Iterator
 import pytest
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.routing import APIRoute
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -49,6 +48,7 @@ from app.core.rate_limit import (
 )
 from app.db.session import get_session
 from app.main import create_app
+from tests.effective_routes import effective_api_routes
 from tests.test_json_body_guard import (
     _BODYLESS_METHODS,
     _STRUCTURAL_CHECK_CONFIG,
@@ -593,9 +593,7 @@ def find_cross_site_gate_violations(
     checked_routes: set[tuple[str, str]] = set()
     gate_name = getattr(gate, "__name__", repr(gate))
 
-    for route in app.routes:
-        if not isinstance(route, APIRoute):
-            continue
+    for route in effective_api_routes(app):
         methods = set(route.methods or ())
         if not methods or not methods <= _BODYLESS_METHODS:
             continue
