@@ -336,8 +336,8 @@ def _format_single(exc: BaseException, *, redact: bool, seen: set[int], depth: i
 def _format_chain(exc: BaseException, *, seen: set[int], depth: int) -> list[str]:
     """``__cause__`` / ``__context__`` の連鎖を、標準のトレースバックと同じく古いものから並べる。"""
     # (例外, その例外の後に置く見出し, 文言を伏せるか) を新しい順に集める。見出しは「この例外が次に
-    # 新しい例外の原因（cause）か、処理中に起きたか（context）」。DB 例外の cause はドライバ内部の
-    # 一部（asyncpg が値の変換に失敗した TypeError 等）なので文言を伏せる。context は別の出来事なので伏せない。
+    # 新しい例外の原因（cause）か、処理中に起きたか（context）」。DB 例外の cause・context はドライバ内部の
+    # 一部（asyncpg が値の変換に失敗した TypeError 等）でありうるので文言を伏せる。
     chain: list[tuple[BaseException, str | None, bool]] = []
     current: BaseException | None = exc
     header: str | None = None
@@ -351,7 +351,8 @@ def _format_chain(exc: BaseException, *, seen: set[int], depth: int) -> list[str
             current = current.__cause__
         elif current.__context__ is not None and not current.__suppress_context__:
             header = _CONTEXT_HEADER
-            redact = False
+            # DB 例外の context は、ドライバ内部が明示の from なしで投げた例外でありうる（値入りの文言）。
+            redact = redact or is_db_exception(current)
             current = current.__context__
         else:
             current = None

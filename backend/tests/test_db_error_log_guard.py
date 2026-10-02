@@ -26,7 +26,7 @@ import re
 _APP_DIR = pathlib.Path(__file__).resolve().parents[1] / "app"
 
 _LOG_METHODS = {"debug", "info", "warning", "warn", "error", "critical", "exception", "log"}
-_LOGGER_RECEIVER_RE = re.compile(r"(^|\.)_?(logger|log|_logger)$")
+_LOGGER_RECEIVER_RE = re.compile(r"(^|\.)_?(logger|log)$|getLogger\(.*\)$", re.IGNORECASE)
 #: 例外を通してよい要約・判定の関数（中を通った例外の文言は出口へ出ない）。
 _ALLOWED_WRAPPERS = {
     "type",
@@ -41,7 +41,9 @@ _ALLOWED_WRAPPERS = {
     "_operator_signup_conflict",
 }
 #: 出口とみなす呼び出し（ログ以外）。
-_SINK_CALLS = {"send_alert", "resolve_alert", "HTTPException"}
+_SINK_CALLS = {"send_alert", "resolve_alert", "HTTPException", "JSONResponse"}
+#: 呼ぶだけで例外の文言（トレースバック）を取り出す関数。出口の式に現れたら例外の生の利用とみなす。
+_RAW_TEXT_CALLS = {"format_exc", "format_exception", "format_exception_only", "print_exc"}
 _DB_EXCEPTION_TYPES_RE = re.compile(
     r"IntegrityError|DBAPIError|SQLAlchemyError|StatementError|OperationalError|DataError"
     r"|ProgrammingError|InterfaceError|PendingRollbackError|DatabaseError|asyncpg"
@@ -52,8 +54,16 @@ _DB_TRY_BODY_RE = re.compile(
 )
 
 #: 対象の節のうち、例外の文言をそのまま出している既知の箇所（理由を必ず書く）。増やさないこと。
-_ALLOWED_SITES: dict[tuple[str, str], str] = {
-    ("main.py", "readyz"): (
+_OPERATOR_APPLICATION_REASON = (
+    "業者申込の保存失敗ログ。例外の別名 db_error（exc.orig）から出すのは型名と sqlstate だけで、"
+    "文言は出さない（4a955a0）。並走セッションが operator_applications.py を触っているため書き換えない。"
+)
+_ALLOWED_SITES: dict[tuple[str, str, str], str] = {
+    ("api/v1/endpoints/operator_applications.py", "create_operator_application",
+     "type(db_error).__name__ if db_error is not None else None"): _OPERATOR_APPLICATION_REASON,
+    ("api/v1/endpoints/operator_applications.py", "create_operator_application",
+     "getattr(db_error, 'sqlstate', None)"): _OPERATOR_APPLICATION_REASON,
+    ("main.py", "readyz", "exc"): (
         "/readyz の DB 到達性（SELECT 1）とスキーマ状態（alembic_version）の確認。パラメータも行の値も"
         "持たない問い合わせで、DETAIL に利用者の値は入らない。別セッション（I8）が /readyz を改修中の"
         "ため触らない。本番では出力直前の安全網（AppLogFormatter の引数の差し替え）で要約される。"
@@ -78,15 +88,20 @@ def _is_log_call(call: ast.Call) -> bool:
     )
 
 
-def _raw_uses(expr: ast.AST, name: str) -> list[ast.Name]:
-    """``expr`` の中で、許可された関数を通らずに現れる ``name`` の出現。"""
+def _raw_uses(expr: ast.AST, names: set[str]) -> list[ast.AST]:
+    """``expr`` の中で、許可された関数を通らずに現れる ``names``（例外とその別名）の出現。
+
+    ``traceback.format_exc()`` 等（例外の文言を取り出す呼び出し）も生の利用として数える。
+    """
     parents: dict[ast.AST, ast.AST] = {}
     for parent in ast.walk(expr):
         for child in ast.iter_child_nodes(parent):
             parents[child] = parent
-    raw: list[ast.Name] = []
+    raw: list[ast.AST] = []
     for node in ast.walk(expr):
-        if not (isinstance(node, ast.Name) and node.id == name):
+        is_name = isinstance(node, ast.Name) and node.id in names
+        is_text_call = isinstance(node, ast.Call) and _func_name(node.func) in _RAW_TEXT_CALLS
+        if not (is_name or is_text_call):
             continue
         current: ast.AST | None = node
         allowed = False
@@ -125,6 +140,25 @@ def _sink_expressions(body: list[ast.stmt]) -> list[ast.AST]:
     return sinks
 
 
+def _tainted_names(body: list[ast.stmt], exc_name: str) -> set[str]:
+    """例外 ``exc_name`` と、それを生のまま代入した別名（``msg = str(exc)`` 等。要約関数を通したものは除く）。"""
+    names = {exc_name}
+    assignments = [
+        node
+        for node in ast.walk(ast.Module(body=body, type_ignores=[]))
+        if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
+    ]
+    changed = True
+    while changed:
+        changed = False
+        for node in assignments:
+            target = node.targets[0].id  # type: ignore[union-attr]
+            if target not in names and _raw_uses(node.value, names):
+                names.add(target)
+                changed = True
+    return names
+
+
 def _in_scope(try_node: ast.Try, handler: ast.ExceptHandler) -> bool:
     if handler.type is not None and _DB_EXCEPTION_TYPES_RE.search(ast.unparse(handler.type)):
         return True
@@ -157,8 +191,9 @@ def _violations_in_source(source: str, filename: str) -> list[tuple[str, str, in
         for handler in try_node.handlers:
             if handler.name is None or not _in_scope(try_node, handler):
                 continue
+            tainted = _tainted_names(handler.body, handler.name)
             for sink in _sink_expressions(handler.body):
-                for use in _raw_uses(sink, handler.name):
+                for use in _raw_uses(sink, tainted):
                     found.append((filename, owner.get(handler, "<module>"), use.lineno, ast.unparse(sink)))
     return found
 
@@ -172,7 +207,7 @@ def _scan_app() -> list[tuple[str, str, int, str]]:
 
 
 def test_db_exception_handlers_do_not_emit_raw_exception_text():
-    unexpected = [v for v in _scan_app() if (v[0], v[1]) not in _ALLOWED_SITES]
+    unexpected = [v for v in _scan_app() if (v[0], v[1], v[3]) not in _ALLOWED_SITES]
     assert unexpected == [], (
         "DB 例外を扱う except 節で、例外の文言をそのまま出口（ログ・アラート・応答・書式）へ渡しています。"
         " describe_exception(exc) を通してください（app/core/error_summary.py）: "
@@ -182,7 +217,7 @@ def test_db_exception_handlers_do_not_emit_raw_exception_text():
 
 def test_allowed_sites_are_still_needed():
     """許可リストが古くならないこと（直したら外す）。"""
-    present = {(v[0], v[1]) for v in _scan_app()}
+    present = {(v[0], v[1], v[3]) for v in _scan_app()}
     assert set(_ALLOWED_SITES) <= present, sorted(set(_ALLOWED_SITES) - present)
 
 
@@ -217,6 +252,15 @@ async def fixed(session, logger, alerts):
         alerts.send_alert("失敗", f"直近のエラー: {describe_exception(exc)}")
         raise HTTPException(status_code=500, detail="保存に失敗しました。") from exc
 
+async def aliased(session, logger):
+    try:
+        await session.commit()
+    except Exception as exc:
+        detail = str(exc)
+        logger.error(detail)
+        logging.getLogger("x").error(traceback.format_exc())
+        return JSONResponse(content={"detail": detail})
+
 async def not_db(client, logger):
     try:
         await client.post("https://api.line.me/v2/bot/message/push")
@@ -231,4 +275,7 @@ async def not_db(client, logger):
         ("save", 9),
         ("save", 10),
         ("save", 11),
+        ("aliased", 35),
+        ("aliased", 36),
+        ("aliased", 37),
     }
