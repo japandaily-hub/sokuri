@@ -21,11 +21,14 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from dataclasses import dataclass
 from typing import Any
 
 from fastapi import APIRouter, Depends, FastAPI
+from fastapi import routing as fastapi_routing
 from fastapi.dependencies.models import Dependant
 from fastapi.routing import APIRoute
+from starlette.routing import BaseRoute, Route
 
 from app.api import deps
 from app.api.rate_limit_deps import RateLimitGuard, _scope_spec, get_rate_limiter
@@ -94,7 +97,73 @@ def _counts_every_request_by_ip(guard: RateLimitGuard) -> bool:
     return spec.ip_rule is not None and spec.count_all
 
 
-def _protection_reasons(route: APIRoute) -> set[str]:
+@dataclass(frozen=True)
+class _EffectiveApiRoute:
+    """include_router の prefix・dependencies を反映した「実際に受け付ける」APIRoute の姿。
+
+    fastapi 0.136 系までは include_router が APIRoute を prefix・依存込みで複製して
+    ``app.routes`` に平坦に積んでいたため、``app.routes`` の APIRoute をそのまま見ればよかった。
+    fastapi 0.142 系では include_router が ``_IncludedRouter``（遅延ラッパ）を1件積むだけになり、
+    中の APIRoute は prefix 無しの元のまま。実効のパス・依存木は ``iter_route_contexts`` が返す
+    コンテキスト側にしか無いため、両方の版をこの形に揃えてから検査する。
+    """
+
+    path: str
+    methods: frozenset[str]
+    dependant: Dependant
+
+
+def _iter_original_and_effective(app: FastAPI) -> Iterator[tuple[BaseRoute, Any]]:
+    """アプリの全ルートを (元のルート, 実効ルート) の組で平坦に返す。
+
+    新しい fastapi（``iter_route_contexts`` を持つ版）は include 済みルーターを再帰的に展開し、
+    実効ルートは prefix・include 時の依存を反映した ``RouteContext``。古い fastapi は
+    ``app.routes`` が既に平坦で、元のルート＝実効ルート。
+    """
+    iter_route_contexts = getattr(fastapi_routing, "iter_route_contexts", None)
+    if iter_route_contexts is None:
+        for route in app.routes:
+            yield route, route
+        return
+    for route_context in iter_route_contexts(app.routes):
+        yield route_context.original_route, route_context
+
+
+def _api_routes(app: FastAPI) -> list[_EffectiveApiRoute]:
+    routes: list[_EffectiveApiRoute] = []
+    for original, effective in _iter_original_and_effective(app):
+        if not isinstance(original, APIRoute):
+            continue
+        assert effective.dependant is not None, f"依存木の無い APIRoute: {effective.path}"
+        routes.append(
+            _EffectiveApiRoute(
+                path=effective.path,
+                methods=frozenset(effective.methods or ()),
+                dependant=effective.dependant,
+            )
+        )
+    return routes
+
+
+def _foreign_routes(app: FastAPI) -> list[BaseRoute]:
+    """APIRoute 以外で、読み取り専用（GET/HEAD のみの素の Route。/docs 等）と言い切れないもの。
+
+    Mount・WebSocketRoute・書き込みメソッドを持つ Route に加え、展開できなかった未知の
+    ラッパ型（将来の fastapi が include_router の表現をまた変えた場合など）も検出する。
+    これらは依存木を検査できないため、存在した時点で失敗させる。
+    """
+    foreign: list[BaseRoute] = []
+    for original, effective in _iter_original_and_effective(app):
+        if isinstance(original, APIRoute):
+            continue
+        methods = set(getattr(effective, "methods", None) or ())
+        if type(original) is Route and methods and methods <= {"GET", "HEAD"}:
+            continue
+        foreign.append(original)
+    return foreign
+
+
+def _protection_reasons(route: _EffectiveApiRoute) -> set[str]:
     """ルートが持つ保護の種類（"auth" / "rate_limit"）を集める。
 
     ``Dependant.call`` は ``Depends(...)`` に渡した callable そのもの
@@ -111,21 +180,17 @@ def _protection_reasons(route: APIRoute) -> set[str]:
     return reasons
 
 
-def _is_protected(route: APIRoute) -> bool:
+def _is_protected(route: _EffectiveApiRoute) -> bool:
     return bool(_protection_reasons(route))
 
 
-def _mutating_routes(app: FastAPI) -> list[APIRoute]:
-    return [
-        route
-        for route in app.routes
-        if isinstance(route, APIRoute) and route.methods and route.methods & _MUTATING_METHODS
-    ]
+def _mutating_routes(app: FastAPI) -> list[_EffectiveApiRoute]:
+    return [route for route in _api_routes(app) if route.methods & _MUTATING_METHODS]
 
 
-def _find_route(app: FastAPI, method: str, path: str) -> APIRoute:
-    for route in app.routes:
-        if isinstance(route, APIRoute) and route.path == path and method in route.methods:
+def _find_route(app: FastAPI, method: str, path: str) -> _EffectiveApiRoute:
+    for route in _api_routes(app):
+        if route.path == path and method in route.methods:
             return route
     raise AssertionError(f"ルートが見つかりません: {method} {path}")
 
@@ -149,13 +214,7 @@ def test_all_mutating_routes_require_auth_or_rate_limit_or_are_allowlisted() -> 
     app = _production_app()
     routes = _mutating_routes(app)
     assert routes, "検査対象の書き込みルートが1件も見つからない（アプリの組み立てを確認）。"
-    foreign = [
-        r for r in app.routes
-        if not isinstance(r, APIRoute) and (
-            type(r).__name__ in {"Mount", "WebSocketRoute"}
-            or (getattr(r, "methods", None) and set(r.methods) & _MUTATING_METHODS)
-        )
-    ]
+    foreign = _foreign_routes(app)
     assert not foreign, f"APIRoute 以外の書き込み口（mount 等）は検査できません: {foreign}"
 
     matched_allowlist_keys: set[tuple[str, str]] = set()
@@ -308,3 +367,58 @@ def test_self_check_optional_auth_only_is_a_violation() -> None:
         return {"ok": True}
 
     assert not _is_protected(_find_route(app, "POST", "/mutate"))
+
+
+def test_self_check_include_router_prefix_and_dependencies_are_reflected() -> None:
+    """include_router(prefix=..., dependencies=[...]) で付けた prefix・依存も実効ルートに反映される。
+
+    fastapi 0.142 系は include_router を遅延ラッパで表現し、元の APIRoute は prefix も include 時の
+    依存も持たない。元のルートだけを見ると「パスが見つからない」「保護なし」と誤判定する
+    （2026-10 の CI 失敗の再発防止）。入れ子の include も同様に展開されること。
+    """
+    inner = APIRouter()
+
+    @inner.post("/mutate")
+    async def mutate() -> dict[str, bool]:  # pragma: no cover - 呼び出さない
+        return {"ok": True}
+
+    outer = APIRouter()
+    outer.include_router(inner, prefix="/inner", dependencies=[Depends(deps.get_current_user)])
+    unprotected = APIRouter()
+
+    @unprotected.post("/open")
+    async def open_mutate() -> dict[str, bool]:  # pragma: no cover - 呼び出さない
+        return {"ok": True}
+
+    app = FastAPI()
+    app.include_router(outer, prefix="/api")
+    app.include_router(unprotected, prefix="/api")
+
+    assert _protection_reasons(_find_route(app, "POST", "/api/inner/mutate")) == {"auth"}
+    assert not _is_protected(_find_route(app, "POST", "/api/open"))
+    assert {r.path for r in _mutating_routes(app)} == {"/api/inner/mutate", "/api/open"}
+    assert not _foreign_routes(app)
+
+
+def test_self_check_mount_and_unknown_route_types_are_foreign() -> None:
+    """Mount・include 済みルーター内の Mount・展開できない未知のルート型は「検査不能」として検出される。"""
+    from starlette.applications import Starlette
+
+    app = FastAPI()
+    app.mount("/sub", Starlette())
+    nested = APIRouter()
+    nested.mount("/nested-sub", Starlette())
+    app.include_router(nested, prefix="/api")
+
+    class _UnknownWrapper(BaseRoute):
+        """将来の fastapi が導入するかもしれない未知のラッパ型の代役。"""
+
+    unknown = _UnknownWrapper()
+    app.router.routes.append(unknown)
+
+    foreign = _foreign_routes(app)
+    # 旧 fastapi の include_router は内側ルーターの Mount を複製しない（到達不能なので検査不要）。
+    # 新 fastapi は遅延ラッパ経由で到達可能になるため、検出されなければならない。
+    expected_mounts = 2 if hasattr(fastapi_routing, "iter_route_contexts") else 1
+    assert sum(type(r).__name__ == "Mount" for r in foreign) == expected_mounts
+    assert unknown in foreign
