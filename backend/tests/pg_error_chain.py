@@ -1,6 +1,8 @@
 """PostgreSQL（asyncpg）経由の DB 例外を、本番と同じ連鎖・同じクラスで作るテスト用の部品。
 
-本番の連鎖（2026-09-27 時点の SQLAlchemy 2.0 / asyncpg 0.31 で確認）:
+本番の連鎖（2026-09-27 時点の SQLAlchemy 2.0 / asyncpg 0.31 で確認。2026-10-05 に SQLAlchemy 2.1.2
+でも同じ3段であることを確認。2.1 では中段がサブクラス（UniqueViolationError 等）になり、``detail``・
+``orig`` 属性が付く。中段は :func:`_raise_translated` で入れてある版の本物の処理を通して作る）:
 
     asyncpg の例外（文言に DETAIL を含む。asyncpg/exceptions/_base.py の PostgresError.__str__）
       ↑ __cause__（sqlalchemy/dialects/postgresql/asyncpg.py の _handle_exception:
@@ -25,7 +27,10 @@ import logging
 import asyncpg
 from asyncpg.exceptions import DataError as AsyncpgDataError
 from asyncpg.exceptions import PostgresError
-from sqlalchemy.dialects.postgresql.asyncpg import AsyncAdapt_asyncpg_dbapi
+from sqlalchemy.dialects.postgresql.asyncpg import (
+    AsyncAdapt_asyncpg_connection,
+    AsyncAdapt_asyncpg_dbapi,
+)
 from sqlalchemy.exc import DBAPIError
 
 from app.core.app_logging import AppLogFormatter
@@ -109,15 +114,41 @@ def failing(error: BaseException):
     return _raise
 
 
-def _translate(driver_error: BaseException) -> Exception:
-    """SQLAlchemy の asyncpg アダプタと同じ対応表・同じ文言で DBAPI 例外に包み直す。"""
-    mapping = _DBAPI._asyncpg_error_translate
-    for super_ in type(driver_error).__mro__:
-        if super_ in mapping:
-            translated = mapping[super_](f"{type(driver_error)}: {driver_error}")
-            translated.pgcode = translated.sqlstate = getattr(driver_error, "sqlstate", None)
-            return translated
-    raise AssertionError(f"対応表に無い asyncpg の例外です: {type(driver_error)!r}")
+class _OpenAsyncpgConnection:
+    """アダプタの _handle_exception が見る ``is_closed()`` だけを持つ、接続中の asyncpg 接続の代役。"""
+
+    def is_closed(self) -> bool:
+        return False
+
+
+def _raise_translated(driver_error: BaseException) -> None:
+    """SQLAlchemy の asyncpg アダプタの本物の処理（AsyncAdapt_asyncpg_connection._handle_exception）で
+    DBAPI 例外に包み直して送出する。
+
+    対応表・文言・付く属性は SQLAlchemy の版で変わる（2.0: 文言 ``"<class ...>: <文言>"``・orig は
+    ``AsyncAdapt_asyncpg_dbapi.IntegrityError``。2.1: 文言は ``args[0]``・orig は ``UniqueViolationError``
+    等のサブクラスで ``detail``＝DETAIL と ``orig``＝asyncpg の例外も持つ）。手で写すと片方の版の形に
+    なるため、入れてある版の実装をそのまま通す（本番と同じ形の例外で検査する）。
+    """
+    adapter = AsyncAdapt_asyncpg_connection.__new__(AsyncAdapt_asyncpg_connection)
+    adapter.dbapi = _DBAPI
+    adapter._connection = _OpenAsyncpgConnection()
+    adapter._transaction = None
+    adapter._handle_exception(driver_error)
+    raise AssertionError("_handle_exception が例外を送出しなかった")
+
+
+def adapter_error_qualname(driver_error_type: type[BaseException]) -> str:
+    """``driver_error_type`` をアダプタが包み直した DBAPI 例外の ``モジュール.型``（トレースバックの表記）。
+
+    例: 2.0 では ``...AsyncAdapt_asyncpg_dbapi.IntegrityError``、2.1 では
+    ``...AsyncAdapt_asyncpg_dbapi.UniqueViolationError``。
+    """
+    for super_ in driver_error_type.__mro__:
+        translated = _DBAPI._asyncpg_error_translate.get(super_)
+        if translated is not None:
+            return f"{translated.__module__}.{translated.__qualname__}"
+    raise AssertionError(f"対応表に無い asyncpg の例外です: {driver_error_type!r}")
 
 
 def raise_through_sqlalchemy(
@@ -137,7 +168,7 @@ def raise_through_sqlalchemy(
             try:
                 raise driver_error
             except BaseException as caught:  # noqa: BLE001 -- 何でも包み直す（本番のアダプタと同じ）
-                raise _translate(caught) from caught
+                _raise_translated(caught)
         except AsyncAdapt_asyncpg_dbapi.Error as dbapi_error:
             raise DBAPIError.instance(
                 statement,

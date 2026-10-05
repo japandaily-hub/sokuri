@@ -13,6 +13,8 @@
   key を実パスにすると、パスを変えるだけでクールダウンを回避して運営 LINE の配信枠を使い切れ、
   alerts のプロセス内の状態も際限なく増える。ルートの型は FastAPI がルーティング時に
   ``scope["route"]``（APIRoute）へ入れる（fastapi/routing.py の ``APIRoute.matches``・0.136 で確認）。
+  0.14x では include_router の prefix が ``scope["route"]`` に入らないため、FastAPI が scope に置く
+  実効ルートから prefix 込みの型を読む（:func:`_effective_route`）。
   Starlette の Router は同じ scope 辞書を ``scope.update(child_scope)`` で更新するので、外側にいる
   本ミドルウェアからも例外後・応答後に読める。ルートに当たる前（外側のミドルウェア等）で起きた
   例外には ``scope["route"]`` が無いので、key は固定の ``unhandled:(ルート外)`` にし、本文には
@@ -58,9 +60,40 @@ def _now() -> float:
     return time.monotonic()
 
 
+#: FastAPI（0.14x）がルーティング時に選んだ「実効ルート」（include_router の prefix 込み）を置く scope の
+#: 場所。``scope["fastapi"]["effective_route_context"]``（fastapi/routing.py の _FASTAPI_SCOPE_KEY・
+#: _FASTAPI_EFFECTIVE_ROUTE_CONTEXT_KEY）。FastAPI の内部の置き場所なので、無い・形が違うときは
+#: ``scope["route"]`` に戻す（どちらもルートの型で、実パスの値は入らない）。
+_FASTAPI_SCOPE_KEY = "fastapi"
+_FASTAPI_EFFECTIVE_ROUTE_CONTEXT_KEY = "effective_route_context"
+
+
+def _effective_route(scope):  # noqa: ANN001, ANN202 -- ASGI scope / FastAPI の内部オブジェクト
+    """include_router の prefix 込みのルート（パスの型と ``methods`` を持つもの）。
+
+    FastAPI 0.136 までは include_router がルートを prefix 付きで複製していたので、``scope["route"]``
+    の ``path`` が ``/api/v1/files/{storage_key}`` だった。0.14x（2026-10-05 に 0.142.2 で確認）は
+    複製せず、``scope["route"]`` には元の APIRoute（``path`` は prefix 無しの ``/files/{storage_key}``）
+    が入り、prefix 込みの型は実効ルートの ``path`` にある。実効ルートは、その元のルートが
+    ``scope["route"]`` と同じときだけ使う（別のルートの情報を取り違えない）。
+    """
+    route = scope.get("route")
+    fastapi_scope = scope.get(_FASTAPI_SCOPE_KEY)
+    if isinstance(fastapi_scope, dict):
+        effective = fastapi_scope.get(_FASTAPI_EFFECTIVE_ROUTE_CONTEXT_KEY)
+        if (
+            effective is not None
+            and route is not None
+            and getattr(effective, "original_route", None) is route
+            and isinstance(getattr(effective, "path", None), str)
+        ):
+            return effective
+    return route
+
+
 def _route_template(scope) -> str | None:  # noqa: ANN001 -- ASGI scope
-    """FastAPI が ``scope["route"]`` に入れた APIRoute のパスの型（例: ``/api/v1/files/{storage_key}``）。"""
-    template = getattr(scope.get("route"), "path", None)
+    """ルーティングで当たったルートのパスの型（例: ``/api/v1/files/{storage_key}``）。"""
+    template = getattr(_effective_route(scope), "path", None)
     if isinstance(template, str) and template:
         return template
     return None
@@ -81,7 +114,7 @@ def _describe_request(scope) -> tuple[str, str]:  # noqa: ANN001 -- ASGI scope
     method = str(scope.get("method", ""))[:_METHOD_MAX_CHARS]
     template = _route_template(scope)
     if template is not None:
-        route_methods = getattr(scope.get("route"), "methods", None) or ()
+        route_methods = getattr(_effective_route(scope), "methods", None) or ()
         route_name = f"{method} {template}" if method in route_methods else template
         return route_name, f"{method} {template}"
     quoted_path = quote(str(scope.get("path", "")), safe="/", errors="backslashreplace")

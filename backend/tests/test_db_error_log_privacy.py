@@ -153,7 +153,9 @@ def test_probe_errors_really_carry_the_values_in_their_text():
     )
     logging.StreamHandler(stream).handle(record)
     assert PROBE_ADDRESS in stream.getvalue()
-    assert PROBE_PHONE in str(exc)
+    # asyncpg の例外の文言（DETAIL）には版によらず入る。SQLAlchemy 2.0 は SQLAlchemy の例外の文言にも
+    # 入れるが、2.1 の asyncpg アダプタは入れない（DETAIL はアダプタ例外の detail 属性に移った）。
+    assert PROBE_PHONE in str(exc.orig.__cause__)
 
 
 # ──────────────── 未処理例外のアラート（app/core/alert_middleware.py） ────────────────

@@ -9,10 +9,12 @@ from __future__ import annotations
 import traceback
 
 import pytest
+from asyncpg.exceptions import UniqueViolationError
 from fastapi.exceptions import ResponseValidationError
 from pydantic import BaseModel, EmailStr, ValidationError
 from sqlalchemy import text
-from sqlalchemy.exc import IntegrityError, PendingRollbackError
+from sqlalchemy.dialects.postgresql.asyncpg import AsyncAdapt_asyncpg_dbapi
+from sqlalchemy.exc import DBAPIError, IntegrityError, PendingRollbackError, StatementError
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.core import error_summary
@@ -24,7 +26,7 @@ from app.core.error_summary import (
     is_unique_violation,
     is_validation_error,
 )
-from tests.pg_error_chain import asyncpg_argument_data_error, pg_server_error
+from tests.pg_error_chain import adapter_error_qualname, asyncpg_argument_data_error, pg_server_error
 
 _EMAIL = "leak-probe@example.com"
 _NAME = "漏洩確認太郎"
@@ -73,16 +75,30 @@ def _assert_no_raw_values(output: str) -> None:
         assert raw not in output, f"{raw!r} が出力に残っている: {output!r}"
 
 
+def _assert_carries_detail_value(exc: BaseException, value: str) -> None:
+    """陽性対照: サーバのエラーの DETAIL にある ``value`` を、要約しなければ出る形で例外が抱えている。
+
+    どの版でも asyncpg の例外（``orig.__cause__``）の文言と標準のトレースバックに入る。SQLAlchemy 2.0 は
+    アダプタ・SQLAlchemy の例外の文言にも入れる。2.1 のアダプタは文言を asyncpg の本文（``args[0]``）
+    だけにし、DETAIL は ``orig.detail`` に持つ。
+    """
+    assert value in str(exc.orig.__cause__)
+    assert value in "".join(traceback.format_exception(exc))
+    if hasattr(exc.orig, "detail"):  # SQLAlchemy 2.1 以降のアダプタ
+        assert value in exc.orig.detail
+    else:
+        assert value in str(exc)
+        assert value in str(exc.orig)
+
+
 # ──────────────── DB 例外の要約 ────────────────
 
 
 @pytest.mark.parametrize("hide_parameters", [True, False])
 def test_unique_violation_is_summarized_to_types_and_identifiers(hide_parameters: bool):
     exc = pg_server_error(_UNIQUE_FIELDS, params=_PARAMS, hide_parameters=hide_parameters)
-    # 前提: 例外の文字列そのものには DETAIL の値が入っている（本番で漏れていた経路の再現になっている）。
-    assert _EMAIL in str(exc)
-    assert _EMAIL in str(exc.orig)
-    assert _EMAIL in str(exc.orig.__cause__)
+    # 前提: 例外が DETAIL の値を抱えている（本番で漏れていた経路の再現になっている）。
+    _assert_carries_detail_value(exc, _EMAIL)
     assert (_NAME in str(exc)) is not hide_parameters
 
     summary = describe_exception(exc)
@@ -97,7 +113,7 @@ def test_unique_violation_is_summarized_to_types_and_identifiers(hide_parameters
 def test_check_violation_row_is_not_kept():
     """CHECK 違反の DETAIL は行全体（氏名・住所・電話番号・パスワードのハッシュ）。"""
     exc = pg_server_error(_CHECK_FIELDS, params=_PARAMS)
-    assert _ADDRESS in str(exc)
+    _assert_carries_detail_value(exc, _ADDRESS)
     summary = describe_exception(exc)
     assert summary == (
         "IntegrityError orig=IntegrityError driver=CheckViolationError"
@@ -138,8 +154,12 @@ def test_asyncpg_argument_encoding_error_is_summarized():
 
 
 def test_pending_rollback_error_embeds_the_original_message_so_it_is_summarized():
-    """PendingRollbackError は本文に「元の例外」の文言（DETAIL を含む）を丸ごと入れる。"""
-    original = pg_server_error(_UNIQUE_FIELDS)
+    """PendingRollbackError は本文に「元の例外」の文言を丸ごと入れる。
+
+    元の例外は本文（M）に入力値が入る 22 系にする（SQLAlchemy 2.0 は DETAIL も文言に入れるが、2.1 の
+    asyncpg アダプタは入れないため、版によらず値が文言に入る例で検査する）。
+    """
+    original = pg_server_error(_INVALID_TEXT_FIELDS)
     exc = PendingRollbackError(
         "This Session's transaction has been rolled back due to a previous exception during flush."
         f" Original exception was: {original}"
@@ -191,6 +211,39 @@ def test_identifiers_that_do_not_look_like_schema_names_are_not_echoed():
     malformed = pg_server_error({"C": "23505", "M": "x", "n": "uq_users_email"})
     malformed.orig.sqlstate = "23505; DROP"
     assert "sqlstate=?" in describe_exception(malformed)
+
+
+def test_orig_is_the_pep249_category_whichever_sqlalchemy_version_is_installed():
+    """SQLAlchemy 2.1 の asyncpg アダプタは orig を IntegrityError のサブクラス（UniqueViolationError 等）で
+    作り、DETAIL（値）を ``detail`` に持たせる。旧版の環境でも同じ形を作り、要約が版によらず
+    ``orig=IntegrityError`` で、``detail`` の値も出ないことを確かめる（本番は依存の版を固定していない）。"""
+    adapter_integrity_error = AsyncAdapt_asyncpg_dbapi.IntegrityError
+    subclass_like_2_1 = type(
+        "UniqueViolationError", (adapter_integrity_error,), {"__module__": adapter_integrity_error.__module__}
+    )
+    orig = subclass_like_2_1(f"duplicate key value violates unique constraint ({_EMAIL})")
+    orig.detail = f"Key (email)=({_EMAIL}) already exists."
+    orig.pgcode = orig.sqlstate = "23505"
+    exc = DBAPIError.instance(
+        "INSERT INTO users (email) VALUES ($1)", (_EMAIL,), orig, AsyncAdapt_asyncpg_dbapi.Error,
+        hide_parameters=True,
+    )
+    assert isinstance(exc, IntegrityError)
+    assert describe_exception(exc) == "IntegrityError orig=IntegrityError sqlstate=23505 constraint=-"
+    _assert_no_raw_values(format_exception_for_log(exc))
+
+
+def test_orig_category_ignores_same_named_classes_outside_the_driver_layer():
+    """アプリ側の同名クラス（IntegrityError 等）は PEP 249 の分類として扱わず、型名をそのまま出す。"""
+
+    class IntegrityError(Exception):  # noqa: N818 -- ドライバ層の分類名と同じ名前であることが検査の要点
+        pass
+
+    class _AppSpecificError(IntegrityError):
+        pass
+
+    exc = StatementError("x", "SELECT 1", None, _AppSpecificError("app"))
+    assert describe_exception(exc) == "StatementError orig=_AppSpecificError sqlstate=- constraint=-"
 
 
 # ──────────────── 検証エラー・それ以外の例外 ────────────────
@@ -266,8 +319,10 @@ def test_traceback_keeps_frames_and_replaces_only_db_messages():
     assert lines[0] == "Traceback (most recent call last):"
     assert text_out.count("The above exception was the direct cause of the following exception:") == 2
     assert "asyncpg.exceptions.UniqueViolationError: sqlstate=23505 constraint=uq_users_email table=users" in lines
+    # 中段の見出しは実際のクラス（SQLAlchemy 2.0 は IntegrityError、2.1 は UniqueViolationError）。
+    # 要約の orig= は版によらず PEP 249 の分類名（IntegrityError）。
     assert (
-        "sqlalchemy.dialects.postgresql.asyncpg.AsyncAdapt_asyncpg_dbapi.IntegrityError:"
+        f"{adapter_error_qualname(UniqueViolationError)}:"
         " driver=UniqueViolationError sqlstate=23505 constraint=uq_users_email table=users"
     ) in lines
     assert lines[-1] == (
@@ -353,6 +408,6 @@ def test_traceback_falls_back_to_type_names_when_formatting_fails(monkeypatch: p
     text_out = format_exception_for_log(exc)
     assert text_out == (
         "（トレースバックを整形できなかったため例外の型だけを記録）sqlalchemy.exc.IntegrityError"
-        " <- sqlalchemy.dialects.postgresql.asyncpg.AsyncAdapt_asyncpg_dbapi.IntegrityError"
+        f" <- {adapter_error_qualname(UniqueViolationError)}"
         " <- asyncpg.exceptions.UniqueViolationError"
     )

@@ -420,6 +420,40 @@ async def test_real_app_stack_exposes_route_template_to_the_middleware(monkeypat
     ]
 
 
+async def test_nested_router_prefixes_stay_in_the_route_template(monkeypatch: pytest.MonkeyPatch):
+    """入れ子の include_router（prefix にパス変数を含む）でも、key・本文は prefix 込みのルートの型。
+
+    FastAPI 0.14x は include_router でルートを複製せず、scope["route"].path が prefix 無しになる
+    （0.136 までは prefix 込み）。どちらの版でも prefix 込みの型になり、実パスの値は入らない。
+    """
+    from fastapi import APIRouter
+
+    sent = _record_sent(monkeypatch)
+    files = APIRouter()
+
+    @files.get("/files/{storage_key}")
+    async def boom(storage_key: str) -> dict[str, str]:
+        raise RuntimeError("boom")
+
+    cases = APIRouter(prefix="/cases/{case_id}")
+    cases.include_router(files)
+    app = FastAPI()
+    app.include_router(cases, prefix="/api/v1")
+    app.add_middleware(ServerErrorAlertMiddleware)
+    async with _client(app, raise_app_exceptions=False) as client:
+        r = await client.get(f"/api/v1/cases/CASE-VALUE-42/files/{_STORAGE_KEY}")
+        assert r.status_code == 500
+        await asyncio.sleep(0.05)
+
+    unhandled = [(body, key) for title, body, key in sent if title == "未処理の例外が発生しました"]
+    assert unhandled == [
+        (
+            "GET /api/v1/cases/{case_id}/files/{storage_key}\nRuntimeError: boom",
+            "unhandled:GET /api/v1/cases/{case_id}/files/{storage_key}",
+        )
+    ]
+
+
 async def test_unhandled_alert_is_sent_even_if_the_exception_cannot_be_stringified(monkeypatch: pytest.MonkeyPatch):
     """例外の __str__ 自体が失敗しても、通知は代わりの文言で送り、元の例外で 500 を返す。"""
     sent = _record_sent(monkeypatch)

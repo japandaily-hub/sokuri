@@ -6,7 +6,9 @@
     ``Failing row contains (...)``＝行全体（氏名・住所・電話番号・パスワードのハッシュを含みうる）。
     22 系（``invalid input syntax for type uuid: "..."`` 等）は本文そのものに入力値が入る。asyncpg が
     クライアント側で出す DataError も ``invalid input for query argument $1: '<値の先頭40字>' (...)``
-    を含む。SQLAlchemy の例外文はこれらをそのまま抱え（``orig`` と ``__cause__`` の3段とも同じ文言）、
+    を含む。SQLAlchemy の例外文はこれらをそのまま抱え（2.0 は ``orig`` と ``__cause__`` の3段とも同じ文言。
+    2.1 の asyncpg アダプタは文言を本文 M だけにし DETAIL を ``orig.detail`` に移したが、22 系の本文の値と
+    ``__cause__``＝asyncpg の例外の DETAIL はトレースバックに残る）、
     app/db/session.py の hide_parameters が消すのは ``[parameters: ...]`` だけなので、
     ``logger.error("... %s", exc)``・トレースバック・未処理例外のアラート本文を通って値が残っていた。
 
@@ -51,6 +53,23 @@ _DRIVER_MODULE_PREFIXES: tuple[str, ...] = (
     "psycopg2",
     "sqlalchemy.dialects",
     "sqlalchemy.connectors",
+)
+
+#: PEP 249 が定める DBAPI 例外の標準の分類名。``orig=`` にはこの分類名を出す（下の
+#: :func:`_dbapi_category_name`）。
+_DBAPI_STANDARD_ERROR_NAMES = frozenset(
+    {
+        "Warning",
+        "Error",
+        "InterfaceError",
+        "DatabaseError",
+        "DataError",
+        "OperationalError",
+        "IntegrityError",
+        "InternalError",
+        "ProgrammingError",
+        "NotSupportedError",
+    }
 )
 
 #: 一意制約違反の SQLSTATE（PostgreSQL の unique_violation）。
@@ -108,9 +127,14 @@ class DbErrorInfo:
         return f"{self.error_type} {self.fields_text()}"
 
 
-def _is_driver_exception(exc: BaseException) -> bool:
-    module = type(exc).__module__ or ""
+def _is_driver_module(module: object) -> bool:
+    if not isinstance(module, str):
+        return False
     return any(module == prefix or module.startswith(prefix + ".") for prefix in _DRIVER_MODULE_PREFIXES)
+
+
+def _is_driver_exception(exc: BaseException) -> bool:
+    return _is_driver_module(type(exc).__module__)
 
 
 def _is_asyncpg_exception(exc: BaseException) -> bool:
@@ -156,6 +180,23 @@ def _sqlstate(value: object) -> str | None:
     return "?"
 
 
+def _dbapi_category_name(orig: BaseException) -> str:
+    """orig（DBAPI 例外）の PEP 249 の分類名（IntegrityError 等）。分類が無ければ型名をそのまま返す。
+
+    SQLAlchemy 2.1 の asyncpg アダプタは、2.0 では ``AsyncAdapt_asyncpg_dbapi.IntegrityError`` だった
+    orig を ``UniqueViolationError``・``CheckViolationError`` 等の細かいサブクラスで作る
+    （sqlalchemy/dialects/postgresql/asyncpg.py の _asyncpg_error_translate）。型名をそのまま出すと、
+    依存の版（本番は版を固定していない）によって同じ障害の要約が変わり、ログの検索や運営アラートの
+    読み方がずれる。細かい種類は ``driver=``（asyncpg の例外の型）に出るので、``orig=`` は版に
+    よらない PEP 249 の分類にそろえる。ドライバ層のモジュールで定義されたクラスだけを分類として
+    扱う（アプリ側の同名の例外を取り違えない）。
+    """
+    for klass in type(orig).__mro__:
+        if klass.__name__ in _DBAPI_STANDARD_ERROR_NAMES and _is_driver_module(klass.__module__):
+            return klass.__name__
+    return type(orig).__name__
+
+
 def _find_driver_exception(exc: BaseException, orig: BaseException | None) -> BaseException | None:
     """asyncpg の例外（SQLSTATE・制約名・表名・列名を持つ）を ``__cause__`` の連鎖から探す。
 
@@ -189,7 +230,9 @@ def _first_attr(names: Iterable[str], *objects: object) -> object:
 def db_error_info(exc: BaseException) -> DbErrorInfo | None:
     """DB 例外から型名と識別子だけを取り出す（DB 例外でなければ None）。
 
-    - orig: SQLAlchemy の例外が包む DBAPI 例外（asyncpg 経由ではアダプタの IntegrityError 等）。
+    - orig: SQLAlchemy の例外が包む DBAPI 例外の PEP 249 の分類名（asyncpg 経由ではアダプタの
+      IntegrityError 等。SQLAlchemy の版によらない。:func:`_dbapi_category_name`）。2.1 のアダプタ
+      例外は ``detail``（DETAIL＝値）と ``orig``（asyncpg の例外）も持つが、どちらも読まない。
     - driver: asyncpg の例外（UniqueViolationError・DataError 等。種類が最も具体的に分かる）。
     - sqlstate: orig の sqlstate / pgcode（アダプタが asyncpg から写す）か asyncpg の sqlstate。
     - constraint / table / column: asyncpg がサーバのエラー項目（n / t / c）から入れる値。
@@ -202,7 +245,7 @@ def db_error_info(exc: BaseException) -> DbErrorInfo | None:
     driver = _find_driver_exception(exc, orig)
     return DbErrorInfo(
         error_type=type(exc).__name__,
-        orig_type=type(orig).__name__ if orig is not None else None,
+        orig_type=_dbapi_category_name(orig) if orig is not None else None,
         driver_type=type(driver).__name__ if driver is not None and driver is not exc else None,
         sqlstate=_sqlstate(_first_attr(("sqlstate", "pgcode"), orig, driver, exc)),
         constraint=_identifier(_first_attr(("constraint_name",), driver, orig, exc)),
