@@ -11,7 +11,7 @@ GitHub は失敗時に「Run failed」メールを送るが、復旧時には何
             → 「[RECOVERED] {表示名} が正常に戻りました」を1回だけ送る
     正常    それ以外は何も送らない
 
-状態はキャッシュに持たず、GitHub API の実行履歴（同じワークフロー・同じブランチ・push）から
+状態はキャッシュに持たず、GitHub API の実行履歴（同じワークフロー・同じブランチ・push。今回の実行が載るまで取り直す）から
 直前の結論を引く＝ワークフロー側に restore/save の手順が要らない。
 
 環境変数:
@@ -52,11 +52,16 @@ for _stream in (sys.stdout, sys.stderr):
 _DECISIVE = ("success", "failure")
 
 
-def fetch_previous_runs(repo: str, workflow_file: str, branch: str, token: str, *, per_page: int = 20, event: str = "") -> list[dict]:
-    """同じワークフロー・ブランチの完了済み実行を新しい順で返す（event 指定時はその種別だけ。失敗時は空）。"""
+def fetch_previous_runs(repo: str, workflow_file: str, branch: str, token: str, *, per_page: int = 50, event: str = "") -> list[dict]:
+    """同じワークフロー・ブランチの実行を新しい順で返す（event 指定時はその種別だけ。失敗時は空）。
+
+    ``status=completed`` では絞らない。2026-10-02 に、この絞り込みの一覧が直近の完了実行を返さず
+    （#238 の判定で #237 が、#239 の判定で #160〜#238 が欠けた）、復旧を「正常」と誤判定して
+    [RECOVERED] が出なかった。完了かどうかは ``decide`` が conclusion（success / failure）で見る。
+    """
     url = (
         f"https://api.github.com/repos/{repo}/actions/workflows/{workflow_file}/runs"
-        f"?branch={branch}&status=completed&per_page={per_page}" + (f"&event={event}" if event else "")
+        f"?branch={branch}&per_page={per_page}" + (f"&event={event}" if event else "")
     )
     req = urllib.request.Request(
         url,
@@ -68,6 +73,52 @@ def fetch_previous_runs(repo: str, workflow_file: str, branch: str, token: str, 
     except (urllib.error.URLError, ValueError, TimeoutError) as e:
         print(f"previous runs unavailable: {type(e).__name__}: {e}", file=sys.stderr)
         return []
+
+
+def history_is_stale(run_number: int, runs: list[dict]) -> bool:
+    """取得した履歴が古い（今回の実行自身が載っていない）か。
+
+    絞り込みなしの一覧には、実行中の今回の実行も必ず載る。載っていなければ、一覧が最新でなく、
+    直前の結論を取り違える恐れがある（上記の誤判定の再発検知）。履歴が空のときは別扱い
+    （取得失敗・初回。呼び出し側が従来どおり扱う）。
+    """
+    if not runs or run_number <= 0:
+        return False
+    return not any(int(r.get("run_number") or 0) == run_number for r in runs)
+
+
+def load_history(
+    repo: str,
+    workflow_file: str,
+    branch: str,
+    token: str,
+    run_number: int,
+    *,
+    event: str = "",
+    attempts: int = 4,
+    wait_seconds: float = 15.0,
+    fetch=None,
+    sleep=time.sleep,
+) -> list[dict]:
+    """履歴を取得し、古い（今回の実行が載っていない）間は ``wait_seconds`` 待って取り直す。
+
+    それでも古いままなら、最後に取得した履歴を返して警告を出す（通知を止めるより、
+    欠測を警告つきで判定する方が「障害の連絡が来ない」より安全）。
+    """
+    fetch = fetch or fetch_previous_runs
+    runs: list[dict] = []
+    for attempt in range(1, max(attempts, 1) + 1):
+        runs = fetch(repo, workflow_file, branch, token, event=event)
+        if not history_is_stale(run_number, runs):
+            return runs
+        print(
+            f"warning: 履歴に今回の実行 #{run_number} が載っていません（取得 {attempt}/{attempts}）。",
+            file=sys.stderr,
+        )
+        if attempt < attempts:
+            sleep(wait_seconds)
+    print("warning: 履歴が古いまま判定します（直前の結論が不正確な可能性）", file=sys.stderr)
+    return runs
 
 
 def decide(result: str, run_number: int, runs: list[dict]) -> tuple[str, dict | None, str | None]:
@@ -104,7 +155,7 @@ def main() -> int:
     label = os.environ.get("LABEL") or workflow_file
     dry = os.environ.get("DRY_RUN") == "1"
 
-    runs = fetch_previous_runs(repo, workflow_file, branch, token, event=event) if token else []
+    runs = load_history(repo, workflow_file, branch, token, run_number, event=event) if token else []
     kind, prev, since = decide(result, run_number, runs)
     prev_desc = f"#{prev.get('run_number')} {prev.get('conclusion')}" if prev else "なし"
     print(f"result={result} run#{run_number} prev={prev_desc} → {kind}")
