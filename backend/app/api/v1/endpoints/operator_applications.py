@@ -20,8 +20,7 @@ from app.api.json_body_deps import require_json_body
 from app.api.rate_limit_deps import RateLimitGuard
 from app.core.client_ip import (
     is_private_or_loopback,
-    is_pseudo_ipv4_address,
-    is_special_use_address,
+    is_skippable_special_use_address,
     resolve_client_ip_with_reason,
 )
 from app.core.crypto import encrypt_json
@@ -76,7 +75,7 @@ def _client_ip_for_record(request: Request) -> str | None:
     if (
         ip is None
         or is_private_or_loopback(ip)
-        or (is_special_use_address(ip) and not is_pseudo_ipv4_address(ip))
+        or is_skippable_special_use_address(ip)
         or len(ip) > _CLIENT_IP_MAX_LENGTH
     ):
         return None

@@ -226,6 +226,16 @@ def is_private_or_loopback(ip: str) -> bool:
     return _is_private_or_loopback_addr(parsed)
 
 
+def is_skippable_special_use_address(ip: str) -> bool:
+    """信頼位置（hops 方式）で IP 軸をスキップしてよい特殊アドレスか。
+
+    ``is_special_use_address`` から Pseudo IPv4（240/4）を除いたもの。ガード
+    （``rate_limit_deps``）と業者申込の記録（``operator_applications``）が同じ判定を使うための
+    唯一の入口で、240/4 の例外をどちらか片方にだけ書き忘れないようにする。
+    """
+    return is_special_use_address(ip) and not is_pseudo_ipv4_address(ip)
+
+
 def is_special_use_address(ip: str) -> bool:
     """IP が「未指定アドレス（``0.0.0.0`` / ``::``）・マルチキャスト・IETF
     予約済みアドレス」のいずれかかどうかを判定する（``is_private_or_loopback``
@@ -270,8 +280,10 @@ def is_pseudo_ipv4_address(ip: str) -> bool:
     ``is_special_use_address`` は 240/4 を「IETF 予約済み」としてスキップ側に分類するが、
     CF ゾーンの Pseudo IPv4（ヘッダ上書き）が有効だと、IPv6 の利用者の接続元が信頼位置に
     240/4 として書かれる。スキップすると IPv6 で接続するだけで IP 軸を免れるため、信頼位置
-    （hops 方式）ではスキップせず、通常の IPv4 として 1 段で数える（値は /64 の接頭辞から作られる
-    ハッシュなので、数えれば /64 単位で数えたのと同じになる）。``255.255.255.255`` は
+    （hops 方式）ではスキップせず、通常の IPv4 として 1 段で数える。値が IPv6 のどの単位から作られるかは
+    CF の実装依存で未実測 [要確認]。/64 単位なら /64 で数えたのと同じだが、/56・/48 の段は効かず、
+    アドレス全体由来なら一時アドレスで枠を替えられる（それでもスキップして全く数えないよりは
+    悪くならない）。``255.255.255.255`` は
     限定ブロードキャストでありここには含めない（従来どおり特殊扱い）。
     不正な文字列は ``False``。IPv4 射影 IPv6 は展開してから判定する。
     """

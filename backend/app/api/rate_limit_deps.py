@@ -27,7 +27,7 @@ from app.core.client_ip import (
     is_cloudflare_range,
     is_private_or_loopback,
     is_pseudo_ipv4_address,
-    is_special_use_address,
+    is_skippable_special_use_address,
     resolve_client_ip_with_reason,
     scan_client_ip_for_diagnostics,
     truncate_ip_for_log,
@@ -1186,6 +1186,9 @@ class RateLimitGuard:
                キャスト・IETF予約済み。プロキシ実装や LB 構成変更（unknown な
                接続元の代替表記等）を意味する新設の判定（IPv4射影IPv6の
                正規化バグ修正と合わせて追加。security review Critical）。
+               **ただし 240.0.0.0/4（255.255.255.255 を除く）は CF の Pseudo IPv4
+               （IPv6 利用者の接続元）なのでスキップせず数える
+               （``is_skippable_special_use_address``）。**
         2. **攻撃者が誘発できる条件（WARNING のみ・カウント継続）**:
            ``is_cloudflare_range(ip)`` が True の場合。信頼位置が CF レンジ内
            ＝``TRUSTED_PROXY_HOPS`` が実構成より小さい疑いだが、Cloudflare
@@ -1283,7 +1286,7 @@ class RateLimitGuard:
                     # 疑い。全断を構造的に防ぐため IP軸をスキップする
                     # （アカウント軸は通常どおり適用）。
                     _warn_private_ip_skip(self._scope, ip)
-                elif is_special_use_address(ip) and not is_pseudo_ipv4_address(ip):
+                elif is_skippable_special_use_address(ip):
                     # 攻撃者が誘発できない条件その2: 未指定/マルチキャスト/
                     # 予約済みアドレス（新設。security review Critical）。
                     _warn_special_address_skip(self._scope, ip)
