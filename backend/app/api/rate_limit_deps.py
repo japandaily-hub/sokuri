@@ -26,6 +26,7 @@ from app.config import get_settings
 from app.core.client_ip import (
     is_cloudflare_range,
     is_private_or_loopback,
+    is_pseudo_ipv4_address,
     is_special_use_address,
     resolve_client_ip_with_reason,
     scan_client_ip_for_diagnostics,
@@ -58,6 +59,7 @@ _unresolvable_xff_throttle = ThrottledLogger()
 _ip_axis_skipped_throttle = ThrottledLogger()
 _private_ip_skip_throttle = ThrottledLogger()
 _special_address_skip_throttle = ThrottledLogger()
+_pseudo_ipv4_throttle = ThrottledLogger()
 _cf_range_at_trust_position_throttle = ThrottledLogger()
 _scan_drift_throttle = ThrottledLogger()
 _unparseable_ip_throttle = ThrottledLogger()
@@ -106,6 +108,22 @@ def _warn_private_ip_skip(scope: str, ip: str) -> None:
             "rate_limit: 信頼位置のIPがプライベート/ループバックのため IP軸をスキップ"
             "しました（scope=%s ip_net=%s）。TRUSTED_PROXY_HOPS の誤設定で内部プロキシIPを"
             "掴んでいる疑いがあります。/api/v1/_diag/client-ip で実測して確認してください。",
+            scope,
+            _ip_net_for_log(ip),
+        )
+    )
+
+
+def _warn_pseudo_ipv4_counted(scope: str, ip: str) -> None:
+    """信頼位置が Pseudo IPv4（240.0.0.0/4）のため、スキップせず通常の IPv4 として数えた際の警告。
+
+    CF ゾーンの Pseudo IPv4 が有効＝利用者が IPv6 で届いている。backend が AAAA を持った
+    証拠でもあるため、IPv6 の巻き添え（/64 単位）の観測に使う。生 IP は丸めた値のみ出す。
+    """
+    _pseudo_ipv4_throttle.emit(
+        lambda: logger.warning(
+            "rate_limit: 信頼位置のIPが Pseudo IPv4（240.0.0.0/4）です。IPv6 の接続元として"
+            "通常の IPv4 と同様に数えます（scope=%s ip_net=%s）。",
             scope,
             _ip_net_for_log(ip),
         )
@@ -1265,11 +1283,15 @@ class RateLimitGuard:
                     # 疑い。全断を構造的に防ぐため IP軸をスキップする
                     # （アカウント軸は通常どおり適用）。
                     _warn_private_ip_skip(self._scope, ip)
-                elif is_special_use_address(ip):
+                elif is_special_use_address(ip) and not is_pseudo_ipv4_address(ip):
                     # 攻撃者が誘発できない条件その2: 未指定/マルチキャスト/
                     # 予約済みアドレス（新設。security review Critical）。
                     _warn_special_address_skip(self._scope, ip)
                 else:
+                    if is_pseudo_ipv4_address(ip):
+                        # 240/4 は IPv6 利用者の Pseudo IPv4。スキップすると IPv6 で
+                        # 接続するだけで IP 軸を免れる（security review M-1）ため数える。
+                        _warn_pseudo_ipv4_counted(self._scope, ip)
                     if is_cloudflare_range(ip):
                         # 攻撃者が誘発できる条件: CFレンジは Cloudflare
                         # Workers 等から無料で送り込めるため、スキップすると

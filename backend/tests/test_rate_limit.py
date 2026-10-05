@@ -17,6 +17,7 @@ from starlette.datastructures import Headers
 from app.core.client_ip import (
     is_cloudflare_range,
     is_private_or_loopback,
+    is_pseudo_ipv4_address,
     is_special_use_address,
     is_trusted_proxy_ip,
     resolve_client_ip,
@@ -547,6 +548,27 @@ class TestIsSpecialUseAddress:
     )
     def test_ordinary_addresses_return_false(self, ip: str) -> None:
         assert is_special_use_address(ip) is False
+
+    @pytest.mark.parametrize(
+        ("ip", "expected"),
+        [
+            ("240.0.0.1", True),  # Pseudo IPv4（CF が IPv6 の接続元を書き換えた値）
+            ("255.255.255.254", True),  # 240/4 の末尾（ブロードキャストではない）
+            ("::ffff:240.0.0.1", True),  # IPv4 射影 IPv6 も展開して判定
+            ("255.255.255.255", False),  # 限定ブロードキャストは対象外（特殊扱いのまま）
+            ("239.255.255.255", False),  # マルチキャスト末尾（240/4 の1つ手前）
+            ("203.0.113.5", False),
+            ("2001:db8::1", False),
+            ("not-an-ip", False),
+        ],
+    )
+    def test_is_pseudo_ipv4_address(self, ip: str, expected: bool) -> None:
+        assert is_pseudo_ipv4_address(ip) is expected
+
+    def test_pseudo_ipv4_is_still_special_use_for_other_callers(self) -> None:
+        """is_special_use_address 自体は 240/4 を特殊扱いのまま（中継 IP の検証は従来どおり拒否）。
+        hops 経路だけが is_pseudo_ipv4_address で例外にする。"""
+        assert is_special_use_address("240.0.0.1") is True
 
     def test_invalid_value_returns_false(self) -> None:
         assert is_special_use_address("not-an-ip") is False

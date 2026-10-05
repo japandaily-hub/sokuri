@@ -202,3 +202,5 @@
 - md 校正73箇所適用、docx 再生成、新デッキ pptx（38枚）`docs/vision_katazuke_for_hitonomori_20260907_presentation.pptx`
 - Google スライド ID 1L6GM-_EIUUtB463HrGySolQGhuDYftydqXIOyMQ8SNo／Google ドキュメント ID 1nJgcS3lWN3s9OTwSWxVcwby85zhfHZ4ETB_RCSp_KLw（いずれもマイドライブ直下。docs フォルダは毎時ミラーで Google ネイティブ文書が消えるため置かない）
 - 詳細は memory: katazuke-hitonomori-deck-v2-20260907
+
+- **2026-10-05 M-1: 信頼位置が Cloudflare の Pseudo IPv4（240.0.0.0/4）のときは IP 軸をスキップせず数える（Claude）**: security review M-1。`is_special_use_address` が 240/4 を「IETF 予約済み」としてスキップ側に分類しており、CF ゾーンの Pseudo IPv4 が有効（＝IPv6 利用者の接続元が 240/4 で届く）だと、IPv6 で接続するだけで signup・operator_application・contact・line_exchange の IP 軸を免れた。`is_pseudo_ipv4_address` を新設し、hops 経路（rate_limit_deps・operator_applications の記録）では 240/4（255.255.255.255 を除く）を通常の IPv4 として 1 段で数える。初回に WARNING（`Pseudo IPv4`）。`is_special_use_address` 自体は変更なし（中継 IP の検証は拒否のまま）。対照: 修正を外すと新テスト 2 件が落ちる。**Pseudo IPv4 が実際に有効かは未実測**（backend に AAAA が無く IPv6 経路が無いため）。

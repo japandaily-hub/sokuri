@@ -813,7 +813,7 @@ class TestSpecialUseAddressAtTrustPositionSkipsIpAxis:
         [
             "0.0.0.0",  # 未指定 (IPv4)
             "224.0.0.1",  # マルチキャスト
-            "240.0.0.1",  # IETF予約済み (Class E)
+            "255.255.255.255",  # 限定ブロードキャスト
         ],
     )
     async def test_special_use_address_skips_ip_axis_but_not_400(
@@ -831,6 +831,36 @@ class TestSpecialUseAddressAtTrustPositionSkipsIpAxis:
                 headers=headers,
             )
             assert r.status_code == 401
+
+
+class TestPseudoIpv4AtTrustPositionIsCounted:
+    """信頼位置が Cloudflare の Pseudo IPv4（240.0.0.0/4）のときは、スキップせず数える。
+
+    CF ゾーンの Pseudo IPv4 が有効だと IPv6 の利用者の接続元が 240/4 として届く。「IETF 予約済み」
+    としてスキップすると、IPv6 で接続するだけで IP 軸を免れる（security review M-1）。
+    """
+
+    async def test_pseudo_ipv4_is_counted_and_eventually_429(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        headers = {"X-Forwarded-For": "240.0.0.1"}
+        for i in range(20):
+            email = f"pseudo-v4-{i}@example.com"
+            await _create_user(db_session, email)
+            r = await client.post(
+                "/api/v1/auth/login",
+                json={"email": email, "password": "wrong-password"},
+                headers=headers,
+            )
+            assert r.status_code == 401
+        await _create_user(db_session, "pseudo-v4-21@example.com")
+        r = await client.post(
+            "/api/v1/auth/login",
+            json={"email": "pseudo-v4-21@example.com", "password": "wrong-password"},
+            headers=headers,
+        )
+        # スキップされていれば 401 のまま。数えているので 21 回目（上限 20 超過）で 429。
+        assert r.status_code == 429
 
 
 # ──────── CFレンジは攻撃者が誘発可能 → スキップせずカウント継続（WARNINGのみ） ────────
@@ -1669,7 +1699,8 @@ class TestOperatorApplicationIpAxis:
             ("127.0.0.1", False),  # ループバック
             ("0.0.0.0", False),  # 未指定
             ("224.0.0.1", False),  # マルチキャスト
-            ("240.0.0.1", False),  # 予約済み
+            ("240.0.0.1", True),  # Pseudo IPv4（IPv6 利用者。数える）
+            ("255.255.255.255", False),  # 限定ブロードキャスト
         ],
     )
     async def test_recorded_ip_matches_what_the_guard_counts(

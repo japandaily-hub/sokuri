@@ -246,6 +246,11 @@ def is_special_use_address(ip: str) -> bool:
 
     IPv4 射影 IPv6 も展開してから判定する（``is_private_or_loopback`` と
     同じ前処理。表記揺れ対策）。不正な文字列は ``False`` を返す。
+
+    **例外**: 信頼位置（hops 方式）では ``240.0.0.0/4`` を ``is_pseudo_ipv4_address`` で
+    スキップ対象から外す（CF の Pseudo IPv4 は IPv6 利用者の接続元。呼び出し側で
+    ``and not is_pseudo_ipv4_address(ip)`` を付ける）。この関数自体は従来どおり 240/4 を
+    特殊扱いのまま返す（署名付き中継 IP の検証などは拒否のままでよい）。
     """
     try:
         parsed = ipaddress.ip_address(ip)
@@ -253,6 +258,31 @@ def is_special_use_address(ip: str) -> bool:
         return False
     parsed = _unwrap_ipv4_mapped(parsed)
     return bool(parsed.is_unspecified or parsed.is_multicast or parsed.is_reserved)
+
+
+_PSEUDO_IPV4_NETWORK = ipaddress.ip_network("240.0.0.0/4")
+_LIMITED_BROADCAST = ipaddress.ip_address("255.255.255.255")
+
+
+def is_pseudo_ipv4_address(ip: str) -> bool:
+    """Cloudflare の Pseudo IPv4（``240.0.0.0/4``。IPv6 の接続元を IPv4 風に書き換えた値）か。
+
+    ``is_special_use_address`` は 240/4 を「IETF 予約済み」としてスキップ側に分類するが、
+    CF ゾーンの Pseudo IPv4（ヘッダ上書き）が有効だと、IPv6 の利用者の接続元が信頼位置に
+    240/4 として書かれる。スキップすると IPv6 で接続するだけで IP 軸を免れるため、信頼位置
+    （hops 方式）ではスキップせず、通常の IPv4 として 1 段で数える（値は /64 の接頭辞から作られる
+    ハッシュなので、数えれば /64 単位で数えたのと同じになる）。``255.255.255.255`` は
+    限定ブロードキャストでありここには含めない（従来どおり特殊扱い）。
+    不正な文字列は ``False``。IPv4 射影 IPv6 は展開してから判定する。
+    """
+    try:
+        parsed = ipaddress.ip_address(ip)
+    except ValueError:
+        return False
+    parsed = _unwrap_ipv4_mapped(parsed)
+    return (
+        parsed.version == 4 and parsed in _PSEUDO_IPV4_NETWORK and parsed != _LIMITED_BROADCAST
+    )
 
 
 # ── Cloudflare 公開IPレンジ ─────────────────────────────────────────
