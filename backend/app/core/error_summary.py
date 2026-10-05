@@ -39,9 +39,13 @@ import traceback
 from collections.abc import Collection, Iterable
 from dataclasses import dataclass
 
-from fastapi.exceptions import ValidationException as _FastAPIValidationException
 from pydantic import ValidationError as _PydanticValidationError
 from sqlalchemy.exc import PendingRollbackError, StatementError
+
+try:  # 依存は版固定されていない。ログの安全網の import 失敗でアプリを起動不能にしない。
+    from fastapi.exceptions import ValidationException as _FastAPIValidationException
+except ImportError:  # pragma: no cover - 将来の fastapi が名前を変えた場合の退避
+    _FastAPIValidationException = ()  # type: ignore[assignment,misc]
 
 #: ドライバ（DBAPI）層の例外が定義されているモジュール。SQLAlchemy の asyncpg アダプタが包み直した
 #: 例外（AsyncAdapt_asyncpg_dbapi.IntegrityError 等）は ``sqlalchemy.dialects`` 配下にある。
@@ -153,9 +157,13 @@ def is_db_exception(exc: object) -> bool:
     return isinstance(exc, (StatementError, PendingRollbackError)) or _is_driver_exception(exc)
 
 
+def _as_tuple(value: object) -> tuple:
+    return value if isinstance(value, tuple) else (value,)
+
+
 def is_validation_error(exc: object) -> bool:
     """入力値を文言に抱える検証エラー（pydantic の ValidationError・FastAPI の検証例外）か。"""
-    return isinstance(exc, (_PydanticValidationError, _FastAPIValidationException))
+    return isinstance(exc, (_PydanticValidationError, *_as_tuple(_FastAPIValidationException)))
 
 
 def is_value_bearing_exception(exc: object) -> bool:

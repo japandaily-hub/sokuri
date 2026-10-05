@@ -62,7 +62,7 @@ LINE Notify は 2025年3月に終了しているため、Messaging API の別チ
 **通知の死活（デッドマンスイッチ）**: 通知が必要だったのに全チャネル（メール / LINE / Webhook）で送信に失敗した実行は、Step Summary に `**通知全滅**` を書いて **終了コード 1** で終わります（Actions が赤くなり、GitHub の workflow 失敗メールが最後の砦になります）。従来は常に 0 で終了し、Step Summary も正常時と同じ「通知: なし」だったため、`ALERT_LINE_CHANNEL_ACCESS_TOKEN` の失効・Brevo の Authorised IPs 制限・Secrets の消失で**障害通知が 1 通も届かないのに Actions は緑のまま**でした。正常時（通知が不要な実行）は `notify()` を一度も呼ばないため、この判定には掛かりません。
 
 ### アプリ内監視（`app/core/alert_middleware.py`）
-- 未処理例外: 1件で即通知（`key = unhandled:<path>`、同じパスはクールダウン中は再送しない）。例外はそのまま再送出され、既定の 500 応答は変わりません。
+- 未処理例外: 1件で即通知（`key = unhandled:<METHOD> <ルートの型>`＝実パスではなく `/api/v1/files/{storage_key}` のような型。ルート外で起きた例外は固定の `unhandled:(ルート外)`。同じ key はクールダウン中は再送しない。本文のパスは伏せ字、例外文は DB 例外・検証エラーなら型・SQLSTATE・制約名・項目のみ）。例外はそのまま再送出され、既定の 500 応答は変わりません。
 - 5xx バースト: 直近 `ALERT_5XX_WINDOW_SECONDS` 秒間に `ALERT_5XX_THRESHOLD` 件以上の 5xx（例外由来を含む）で通知（`key = 5xx-burst`）。
 - 5xx バーストの収束: バースト通知後、`ALERT_5XX_WINDOW_SECONDS` 秒間 5xx が 1 件も無ければ `[RECOVERED] 5xx 応答の急増が収まりました` を 1 回だけ送る（`key = 5xx-burst-recovered`）。判定はリクエスト到来時（/health のピング含む）に行うため、遅くとも次の外形監視ピングで出る。
 - `/health` と `/readyz` 自身の失敗は集計しません（外形監視が拾うため）。
