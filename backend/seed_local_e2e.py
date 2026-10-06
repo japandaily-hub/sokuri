@@ -43,7 +43,7 @@ def must(r: httpx.Response, *codes: int) -> dict:
 
 
 def signup_or_login_user(c: httpx.Client, email: str, password: str, name: str) -> str:
-    r = c.post(f"{BASE}/auth/signup", json={"email": email, "password": password, "name": name})
+    r = c.post(f"{BASE}/auth/signup", json={"agreed_terms": True, "email": email, "password": password, "name": name})
     if r.status_code == 409:
         r = c.post(f"{BASE}/auth/login", json={"email": email, "password": password})
         return must(r, 200)["access_token"]

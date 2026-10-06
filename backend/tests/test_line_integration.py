@@ -84,7 +84,7 @@ async def _make_admin(client: AsyncClient, db_session: AsyncSession) -> str:
 async def _signup_user(client: AsyncClient, email: str = "line_user1@example.com") -> str:
     r = await client.post(
         "/api/v1/auth/signup",
-        json={"email": email, "password": "password123", "name": "テスト太郎"},
+        json={"agreed_terms": True, "email": email, "password": "password123", "name": "テスト太郎"},
     )
     assert r.status_code == 201
     return r.json()["access_token"]
@@ -609,7 +609,7 @@ class TestLineExchange:
         line_user_id = "U2dce194fdcc4602dd6b5ab2b7d05b975"
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r = await client.post(
-                "/api/v1/auth/line/exchange", json={"line_access_token": "dummy-line-token"}
+                "/api/v1/auth/line/exchange", json={"agreed_terms": True, "line_access_token": "dummy-line-token"}
             )
         assert r.status_code == 200, r.text
         body = r.json()
@@ -628,14 +628,14 @@ class TestLineExchange:
         line_user_id = "Ufb142e6145592de63fcdbd015c32670d"
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r1 = await client.post(
-                "/api/v1/auth/line/exchange", json={"line_access_token": "dummy-line-token"}
+                "/api/v1/auth/line/exchange", json={"agreed_terms": True, "line_access_token": "dummy-line-token"}
             )
         assert r1.status_code == 200
         user_id_1 = r1.json()["user"]["id"]
 
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r2 = await client.post(
-                "/api/v1/auth/line/exchange", json={"line_access_token": "dummy-line-token"}
+                "/api/v1/auth/line/exchange", json={"agreed_terms": True, "line_access_token": "dummy-line-token"}
             )
         assert r2.status_code == 200
         assert r2.json()["user"]["id"] == user_id_1
@@ -657,7 +657,7 @@ class TestLineExchange:
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token", "reauth_token": reauth_token},
+                json={"agreed_terms": True, "line_access_token": "dummy-line-token", "reauth_token": reauth_token},
                 headers=_auth(user_token),
             )
         assert r.status_code == 200, r.text
@@ -675,7 +675,7 @@ class TestLineExchange:
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r1 = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token", "reauth_token": reauth1},
+                json={"agreed_terms": True, "line_access_token": "dummy-line-token", "reauth_token": reauth1},
                 headers=_auth(user1_token),
             )
         assert r1.status_code == 200
@@ -686,7 +686,7 @@ class TestLineExchange:
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r2 = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token", "reauth_token": reauth2},
+                json={"agreed_terms": True, "line_access_token": "dummy-line-token", "reauth_token": reauth2},
                 headers=_auth(user2_token),
             )
         assert r2.status_code == 409
@@ -698,7 +698,7 @@ class TestLineExchange:
             new=AsyncMock(side_effect=httpx.ConnectTimeout("timeout")),
         ):
             r = await client.post(
-                "/api/v1/auth/line/exchange", json={"line_access_token": "dummy-line-token"}
+                "/api/v1/auth/line/exchange", json={"agreed_terms": True, "line_access_token": "dummy-line-token"}
             )
         assert r.status_code == 502
 
@@ -710,7 +710,7 @@ class TestLineExchange:
             new=_mock_line_get(profile_response=mock_response),
         ):
             r = await client.post(
-                "/api/v1/auth/line/exchange", json={"line_access_token": "dummy-line-token"}
+                "/api/v1/auth/line/exchange", json={"agreed_terms": True, "line_access_token": "dummy-line-token"}
             )
         assert r.status_code == 502
 
@@ -719,7 +719,7 @@ class TestLineExchange:
         line_user_id = "Ubea37442e8d539d05f802f5c5b7f0983"
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r = await client.post(
-                "/api/v1/auth/line/exchange", json={"line_access_token": "dummy-line-token"}
+                "/api/v1/auth/line/exchange", json={"agreed_terms": True, "line_access_token": "dummy-line-token"}
             )
         assert r.status_code == 200
         email = r.json()["user"]["email"]
@@ -741,7 +741,7 @@ class TestLineAudienceVerification:
             httpx.AsyncClient, "get", new=_mock_line_get(verify_response=mismatched)
         ):
             r = await client.post(
-                "/api/v1/auth/line/exchange", json={"line_access_token": "dummy-line-token"}
+                "/api/v1/auth/line/exchange", json={"agreed_terms": True, "line_access_token": "dummy-line-token"}
             )
         assert r.status_code == 401
 
@@ -750,7 +750,7 @@ class TestLineAudienceVerification:
         expired = _mock_line_verify_response(expires_in=0)
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(verify_response=expired)):
             r = await client.post(
-                "/api/v1/auth/line/exchange", json={"line_access_token": "dummy-line-token"}
+                "/api/v1/auth/line/exchange", json={"agreed_terms": True, "line_access_token": "dummy-line-token"}
             )
         assert r.status_code == 401
 
@@ -761,7 +761,7 @@ class TestLineAudienceVerification:
             httpx.AsyncClient, "get", new=_mock_line_get(verify_response=error_res)
         ):
             r = await client.post(
-                "/api/v1/auth/line/exchange", json={"line_access_token": "dummy-line-token"}
+                "/api/v1/auth/line/exchange", json={"agreed_terms": True, "line_access_token": "dummy-line-token"}
             )
         assert r.status_code == 401
 
@@ -771,7 +771,7 @@ class TestLineAudienceVerification:
         monkeypatch.setattr(settings, "line_client_id", "")
         with patch.object(httpx.AsyncClient, "get", new=AsyncMock()) as mock_get:
             r = await client.post(
-                "/api/v1/auth/line/exchange", json={"line_access_token": "dummy-line-token"}
+                "/api/v1/auth/line/exchange", json={"agreed_terms": True, "line_access_token": "dummy-line-token"}
             )
         assert r.status_code == 503
         mock_get.assert_not_called()
@@ -785,7 +785,7 @@ class TestLineAudienceVerification:
             httpx.AsyncClient, "get", new=_mock_line_get(profile_response=bad_profile)
         ):
             r = await client.post(
-                "/api/v1/auth/line/exchange", json={"line_access_token": "dummy-line-token"}
+                "/api/v1/auth/line/exchange", json={"agreed_terms": True, "line_access_token": "dummy-line-token"}
             )
         assert r.status_code == 401
 
@@ -806,7 +806,7 @@ class TestLineCrossAccountConflict:
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r1 = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token", "reauth_token": reauth_token},
+                json={"agreed_terms": True, "line_access_token": "dummy-line-token", "reauth_token": reauth_token},
                 headers=_auth(user_token),
             )
         assert r1.status_code == 200
@@ -816,7 +816,7 @@ class TestLineCrossAccountConflict:
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r2 = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token", "reauth_token": op_reauth_token},
+                json={"agreed_terms": True, "line_access_token": "dummy-line-token", "reauth_token": op_reauth_token},
                 headers=_auth(op_token),
             )
         assert r2.status_code == 409
@@ -833,7 +833,7 @@ class TestLineCrossAccountConflict:
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r1 = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token", "reauth_token": op_reauth_token},
+                json={"agreed_terms": True, "line_access_token": "dummy-line-token", "reauth_token": op_reauth_token},
                 headers=_auth(op_token),
             )
         assert r1.status_code == 200
@@ -843,7 +843,7 @@ class TestLineCrossAccountConflict:
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r2 = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token", "reauth_token": reauth_token},
+                json={"agreed_terms": True, "line_access_token": "dummy-line-token", "reauth_token": reauth_token},
                 headers=_auth(user_token),
             )
         assert r2.status_code == 409
@@ -860,7 +860,7 @@ class TestLineCrossAccountConflict:
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r1 = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token", "reauth_token": op_reauth_token},
+                json={"agreed_terms": True, "line_access_token": "dummy-line-token", "reauth_token": op_reauth_token},
                 headers=_auth(op_token),
             )
         assert r1.status_code == 200
@@ -868,7 +868,7 @@ class TestLineCrossAccountConflict:
         # Bearerなしで同じ line_user_id が新規User作成を試みる。
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r2 = await client.post(
-                "/api/v1/auth/line/exchange", json={"line_access_token": "dummy-line-token"}
+                "/api/v1/auth/line/exchange", json={"agreed_terms": True, "line_access_token": "dummy-line-token"}
             )
         assert r2.status_code == 409
 
@@ -954,7 +954,7 @@ class TestPlaceholderEmailNotLeaked:
         line_user_id = "U290490d51e46a6b89d6f562abebf6028"
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r = await client.post(
-                "/api/v1/auth/line/exchange", json={"line_access_token": "dummy-line-token"}
+                "/api/v1/auth/line/exchange", json={"agreed_terms": True, "line_access_token": "dummy-line-token"}
             )
         assert r.status_code == 200
         line_user_token = r.json()["access_token"]
@@ -985,7 +985,7 @@ class TestPlaceholderEmailNotLeaked:
         line_user_id = "U7114a0aef5d01adcd7a5d83c00c8e54e"
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r = await client.post(
-                "/api/v1/auth/line/exchange", json={"line_access_token": "dummy-line-token"}
+                "/api/v1/auth/line/exchange", json={"agreed_terms": True, "line_access_token": "dummy-line-token"}
             )
         assert r.status_code == 200
         line_user_token = r.json()["access_token"]
@@ -1008,7 +1008,7 @@ class TestPlaceholderEmailNotLeaked:
         line_user_id = "U871ae97fa0ac5cdea646eaeaef41fe0f"
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r = await client.post(
-                "/api/v1/auth/line/exchange", json={"line_access_token": "dummy-line-token"}
+                "/api/v1/auth/line/exchange", json={"agreed_terms": True, "line_access_token": "dummy-line-token"}
             )
         assert r.status_code == 200
         line_user_token = r.json()["access_token"]
@@ -1063,7 +1063,7 @@ class TestLineExchangeReauthAndRebind:
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token"},
+                json={"agreed_terms": True, "line_access_token": "dummy-line-token"},
                 headers=_auth(user_token),
             )
         assert r.status_code == 401
@@ -1081,7 +1081,7 @@ class TestLineExchangeReauthAndRebind:
             r = await client.post(
                 "/api/v1/auth/line/exchange",
                 json={
-                    "line_access_token": "dummy-line-token",
+                    "agreed_terms": True, "line_access_token": "dummy-line-token",
                     "reauth_token": other_reauth,
                 },
                 headers=_auth(user_token),
@@ -1109,7 +1109,7 @@ class TestLineExchangeReauthAndRebind:
             r = await client.post(
                 "/api/v1/auth/line/exchange",
                 json={
-                    "line_access_token": "dummy-line-token",
+                    "agreed_terms": True, "line_access_token": "dummy-line-token",
                     "reauth_token": expired_token,
                 },
                 headers=_auth(user_token),
@@ -1127,7 +1127,7 @@ class TestLineExchangeReauthAndRebind:
             r = await client.post(
                 "/api/v1/auth/line/exchange",
                 json={
-                    "line_access_token": "dummy-line-token",
+                    "agreed_terms": True, "line_access_token": "dummy-line-token",
                     # 通常のaccess_token自身をreauth_tokenとして流用しようとする攻撃を想定。
                     "reauth_token": user_token,
                 },
@@ -1155,7 +1155,7 @@ class TestLineExchangeReauthAndRebind:
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token"},
+                json={"agreed_terms": True, "line_access_token": "dummy-line-token"},
                 headers=_auth(token),
             )
         assert r.status_code == 200, r.text
@@ -1171,7 +1171,7 @@ class TestLineExchangeReauthAndRebind:
             r1 = await client.post(
                 "/api/v1/auth/line/exchange",
                 json={
-                    "line_access_token": "dummy-line-token",
+                    "agreed_terms": True, "line_access_token": "dummy-line-token",
                     "reauth_token": reauth1,
                 },
                 headers=_auth(user_token),
@@ -1185,7 +1185,7 @@ class TestLineExchangeReauthAndRebind:
             r2 = await client.post(
                 "/api/v1/auth/line/exchange",
                 json={
-                    "line_access_token": "dummy-line-token",
+                    "agreed_terms": True, "line_access_token": "dummy-line-token",
                     "reauth_token": reauth2,
                 },
                 headers=_auth(user_token),
@@ -1203,7 +1203,7 @@ class TestLineExchangeReauthAndRebind:
             r1 = await client.post(
                 "/api/v1/auth/line/exchange",
                 json={
-                    "line_access_token": "dummy-line-token",
+                    "agreed_terms": True, "line_access_token": "dummy-line-token",
                     "reauth_token": reauth1,
                 },
                 headers=_auth(user_token),
@@ -1213,7 +1213,7 @@ class TestLineExchangeReauthAndRebind:
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r2 = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token"},
+                json={"agreed_terms": True, "line_access_token": "dummy-line-token"},
                 headers=_auth(user_token),
             )
         assert r2.status_code == 200
@@ -1242,7 +1242,7 @@ class TestLineExchangeReauthAndRebind:
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token"},
+                json={"agreed_terms": True, "line_access_token": "dummy-line-token"},
                 headers=_auth(user_token),
             )
         assert r.status_code == 401
@@ -1264,7 +1264,7 @@ class TestLineExchangeReauthAndRebind:
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r2 = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token"},
+                json={"agreed_terms": True, "line_access_token": "dummy-line-token"},
                 headers=_auth(user_token),
             )
         assert r2.status_code == 401
@@ -1285,7 +1285,7 @@ class TestLineExchangeReauthAndRebind:
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token"},
+                json={"agreed_terms": True, "line_access_token": "dummy-line-token"},
                 headers=_auth(op_token),
             )
         assert r.status_code == 403
@@ -1304,7 +1304,7 @@ class TestLineExchangeReauthAndRebind:
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id_1)):
             r1 = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token", "reauth_token": op_reauth_token_1},
+                json={"agreed_terms": True, "line_access_token": "dummy-line-token", "reauth_token": op_reauth_token_1},
                 headers=_auth(op_token),
             )
         assert r1.status_code == 200
@@ -1317,7 +1317,7 @@ class TestLineExchangeReauthAndRebind:
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id_2)):
             r2 = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token", "reauth_token": op_reauth_token_2},
+                json={"agreed_terms": True, "line_access_token": "dummy-line-token", "reauth_token": op_reauth_token_2},
                 headers=_auth(op_token),
             )
         assert r2.status_code == 409
@@ -1335,7 +1335,7 @@ class TestLineExchangeReauthAndRebind:
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token"},
+                json={"agreed_terms": True, "line_access_token": "dummy-line-token"},
                 headers=_auth(op_token),
             )
         assert r.status_code == 401
@@ -1353,7 +1353,7 @@ class TestLineExchangeReauthAndRebind:
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r1 = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token", "reauth_token": op_reauth_token},
+                json={"agreed_terms": True, "line_access_token": "dummy-line-token", "reauth_token": op_reauth_token},
                 headers=_auth(op_token),
             )
         assert r1.status_code == 200
@@ -1361,7 +1361,7 @@ class TestLineExchangeReauthAndRebind:
         with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
             r2 = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token"},
+                json={"agreed_terms": True, "line_access_token": "dummy-line-token"},
                 headers=_auth(op_token),
             )
         assert r2.status_code == 200
@@ -1383,7 +1383,7 @@ class TestLineExchangeReauthAndRebind:
             r = await client.post(
                 "/api/v1/auth/line/exchange",
                 json={
-                    "line_access_token": "dummy-line-token",
+                    "agreed_terms": True, "line_access_token": "dummy-line-token",
                     "reauth_token": user_reauth_token,
                 },
                 headers=_auth(op_token),
@@ -1407,7 +1407,7 @@ class TestLineExchangeReauthAndRebind:
             r = await client.post(
                 "/api/v1/auth/line/exchange",
                 json={
-                    "line_access_token": "dummy-line-token",
+                    "agreed_terms": True, "line_access_token": "dummy-line-token",
                     "reauth_token": op_reauth_token,
                 },
                 headers=_auth(user_token),
@@ -1435,7 +1435,7 @@ class TestLineExchangeReauthAndRebind:
         ):
             r2 = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token"},
+                json={"agreed_terms": True, "line_access_token": "dummy-line-token"},
                 headers=_auth(token),
             )
         assert r2.status_code == 401
@@ -1448,7 +1448,7 @@ class TestSignupRejectsPlaceholderEmail:
     async def test_user_signup_rejects_line_placeholder_email_422(self, client: AsyncClient):
         r = await client.post(
             "/api/v1/auth/signup",
-            json={
+            json={"agreed_terms": True, 
                 "email": "line-Uabc123@line.katazuke.internal",
                 "password": "password123",
                 "name": "テスト",
@@ -1459,7 +1459,7 @@ class TestSignupRejectsPlaceholderEmail:
     async def test_user_signup_rejects_deleted_placeholder_email_422(self, client: AsyncClient):
         r = await client.post(
             "/api/v1/auth/signup",
-            json={
+            json={"agreed_terms": True, 
                 "email": "deleted-abc123@deleted.katazuke.internal",
                 "password": "password123",
                 "name": "テスト",

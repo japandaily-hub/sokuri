@@ -94,7 +94,7 @@ async def _make_operator(
 
 async def _signup_user(client: AsyncClient, email: str) -> str:
     r = await client.post(
-        "/api/v1/auth/signup", json={"email": email, "password": "password123"}
+        "/api/v1/auth/signup", json={"agreed_terms": True, "email": email, "password": "password123"}
     )
     assert r.status_code == 201, r.text
     return r.json()["access_token"]

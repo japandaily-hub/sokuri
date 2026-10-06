@@ -60,7 +60,7 @@ def _auth(token: str) -> dict[str, str]:
 async def _signup_user(client: AsyncClient, email: str = "user1@example.com") -> str:
     r = await client.post(
         "/api/v1/auth/signup",
-        json={"email": email, "password": "password123", "name": "テスト太郎"},
+        json={"agreed_terms": True, "email": email, "password": "password123", "name": "テスト太郎"},
     )
     assert r.status_code == 201, r.text
     return r.json()["access_token"]

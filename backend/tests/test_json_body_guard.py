@@ -304,7 +304,7 @@ def _gate_target_endpoints() -> list[_GateTargetEndpoint]:
         _GateTargetEndpoint(
             "auth_signup",
             "/api/v1/auth/signup",
-            {"email": "gate-signup@example.com", "password": "password123", "name": "テスト太郎"},
+            {"agreed_terms": True, "email": "gate-signup@example.com", "password": "password123", "name": "テスト太郎"},
         ),
         _GateTargetEndpoint(
             "auth_operator_signup",
@@ -320,7 +320,7 @@ def _gate_target_endpoints() -> list[_GateTargetEndpoint]:
         _GateTargetEndpoint(
             "auth_line_exchange",
             "/api/v1/auth/line/exchange",
-            {"line_access_token": "dummy-line-token"},
+            {"agreed_terms": True, "line_access_token": "dummy-line-token"},
         ),
         _GateTargetEndpoint(
             "contact",
@@ -416,7 +416,7 @@ class TestPerEndpointGateBeforeCounting:
         FastAPI も同じ先頭の値で本文を JSON として読む（正しい本文なら 201 で登録される）。
         """
         body = json.dumps(
-            {"email": "gate-dup-ct@example.com", "password": "password123", "name": "テスト太郎"}
+            {"agreed_terms": True, "email": "gate-dup-ct@example.com", "password": "password123", "name": "テスト太郎"}
         ).encode("utf-8")
 
         r = await client.post(

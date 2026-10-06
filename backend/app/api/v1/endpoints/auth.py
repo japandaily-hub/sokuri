@@ -47,6 +47,7 @@ from app.db.session import get_session
 from app.schemas_katadzuke import (
     AuthTokenResponse,
     CURRENT_OPERATOR_TERMS_VERSION,
+    CURRENT_USER_TERMS_VERSION,
     LineExchangeRequest,
     OperatorLoginRequest,
     OperatorOut,
@@ -184,6 +185,35 @@ _OPERATOR_EMAIL_UNIQUE_CONSTRAINTS = frozenset({"uq_operators_contact_email"})
 _OPERATOR_INVITE_CODE_UNIQUE_CONSTRAINTS = frozenset({"uix_operators_invite_code_notnull"})
 
 
+# 依頼者の利用規約・プライバシーポリシーへの同意が無い新規作成（3周目の法務監査）。
+# web は detail.code で判別し、LINE の新規登録では同意のチェックへ案内する（auth.ts）。
+TERMS_AGREEMENT_REQUIRED_CODE = "terms_agreement_required"
+_TERMS_AGREEMENT_REQUIRED = http_exception_factory(
+    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+    detail={
+        "code": TERMS_AGREEMENT_REQUIRED_CODE,
+        "message": "利用規約・プライバシーポリシーへの同意が必要です。"
+        "同意のチェックを入れてから、もう一度お試しください。",
+    },
+)
+
+
+def _require_user_terms_agreement(agreed_terms: bool, terms_version: str | None, *, via: str) -> None:
+    """依頼者アカウントの新規作成の前に、利用規約への同意を確認する（無ければ 422）。
+
+    同意の判定は ``agreed_terms is True`` だけ（スキーマ側も strict で真偽値以外を拒否する）。
+    ``terms_version`` は画面が表示していた版数の参考値で、記録には使わない
+    （記録する版数はサーバーの ``CURRENT_USER_TERMS_VERSION``）。現行と食い違う場合は、古い画面の
+    残存を運用で見つけられるよう INFO に「食い違いがあった」ことだけを残す（値そのものは
+    利用者が自由に送れる文字列なのでログに出さない）。
+    """
+    if agreed_terms is not True:
+        logger.info("auth/%s: 利用規約への同意が無い新規作成を拒否", via)
+        raise _TERMS_AGREEMENT_REQUIRED()
+    if terms_version is not None and terms_version != CURRENT_USER_TERMS_VERSION:
+        logger.info("auth/%s: 画面の規約の版数が現行と異なる（記録は現行の版数）", via)
+
+
 def _operator_signup_conflict(exc: IntegrityError) -> HTTPException | None:
     """業者登録の一意制約違反を、事前確認と同じ応答に対応付ける（該当しなければ None）。"""
     if is_unique_violation(
@@ -215,6 +245,8 @@ async def user_signup(
     _json_only: None = Depends(require_json_body),
     _rl: object = Depends(RateLimitGuard("signup")),
 ) -> AuthTokenResponse:
+    # 利用規約への同意（業者登録の body.agreed と同じく、他の検証より先に判定する）。
+    _require_user_terms_agreement(body.agreed_terms, body.terms_version, via="signup")
     email = body.email.lower()
     # LINE専用アカウント用の内部プレースホルダドメイン（line.katazuke.internal /
     # deleted.katazuke.internal）での新規登録は拒否する（実在しない内部専用メールを
@@ -249,6 +281,8 @@ async def user_signup(
         password_hash=hash_password(body.password),
         name=body.name,
         role=role,
+        agreed_terms_version=CURRENT_USER_TERMS_VERSION,
+        agreed_at=datetime.now(timezone.utc),
     )
     # 「入札情報・サービスに関するメール通知を受け取る」の任意チェック。
     # 未送信（None）は「選択なし」として既定値（email_notify_opt_in=True・
@@ -894,6 +928,11 @@ async def line_exchange(
             detail="このLINEアカウントは既に別のアカウントと連携されています。",
         )
 
+    # 未登録の LINE アカウントからの新規作成だけ、利用規約への同意を必須にする（3周目の法務監査）。
+    # 既存ユーザーのログイン（上の existing_user 分岐）・Bearer 付きの連携は従来どおり同意を見ない
+    # （後方互換。LINE ログインはログインと新規登録を兼ねるため、画面はチェックした時だけ送る）。
+    _require_user_terms_agreement(body.agreed_terms, body.terms_version, via="line/exchange")
+
     # 新規作成。LINE Profile API は email を返さないため、今回は email 突合による
     # 二重アカウント統合は行わずシンプルに新規作成する（スコープ外・将来対応）。
     # User.email は NOT NULL + UNIQUE 制約のため、実メールが確定するまでの
@@ -905,6 +944,8 @@ async def line_exchange(
         name=None,
         role="user",
         line_user_id=line_user_id,
+        agreed_terms_version=CURRENT_USER_TERMS_VERSION,
+        agreed_at=datetime.now(timezone.utc),
     )
     session.add(new_user)
     try:

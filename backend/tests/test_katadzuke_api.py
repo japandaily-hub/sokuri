@@ -94,7 +94,7 @@ async def _make_admin(client: AsyncClient, db_session: AsyncSession) -> str:
 async def _signup_user(client: AsyncClient, email: str = "user1@example.com") -> str:
     r = await client.post(
         "/api/v1/auth/signup",
-        json={"email": email, "password": "password123", "name": "テスト太郎"},
+        json={"agreed_terms": True, "email": email, "password": "password123", "name": "テスト太郎"},
     )
     assert r.status_code == 201
     return r.json()["access_token"]
@@ -202,7 +202,7 @@ async def test_signup_duplicate_email_409(client: AsyncClient):
     await _signup_user(client)
     r = await client.post(
         "/api/v1/auth/signup",
-        json={"email": "user1@example.com", "password": "password123"},
+        json={"agreed_terms": True, "email": "user1@example.com", "password": "password123"},
     )
     assert r.status_code == 409
 
@@ -4219,7 +4219,7 @@ async def test_login_promotes_existing_user_to_admin_when_email_listed(
     email = "promote-me@example.com"
     r = await client.post(
         "/api/v1/auth/signup",
-        json={"email": email, "password": "password123", "name": "昇格太郎"},
+        json={"agreed_terms": True, "email": email, "password": "password123", "name": "昇格太郎"},
     )
     assert r.status_code == 201
     assert r.json()["user"]["role"] == "user"
@@ -4258,7 +4258,7 @@ async def test_signup_grants_admin_and_logs_warning(
     with caplog.at_level(logging.WARNING):
         r = await client.post(
             "/api/v1/auth/signup",
-            json={"email": email, "password": "password123", "name": "初代管理者"},
+            json={"agreed_terms": True, "email": email, "password": "password123", "name": "初代管理者"},
         )
     assert r.status_code == 201, r.text
     assert r.json()["user"]["role"] == "admin"
@@ -4296,7 +4296,7 @@ async def test_signup_does_not_grant_admin_when_admin_already_exists(
 
     r = await client.post(
         "/api/v1/auth/signup",
-        json={"email": landgrab_email, "password": "password123", "name": "二人目"},
+        json={"agreed_terms": True, "email": landgrab_email, "password": "password123", "name": "二人目"},
     )
     assert r.status_code == 201, r.text
     assert r.json()["user"]["role"] == "user"
@@ -4342,7 +4342,7 @@ async def test_login_promotion_blocked_fires_warning_alert_when_admin_exists(
     landgrab_email = "landgrab-blocked@example.com"
     r = await client.post(
         "/api/v1/auth/signup",
-        json={"email": landgrab_email, "password": "password123", "name": "二人目"},
+        json={"agreed_terms": True, "email": landgrab_email, "password": "password123", "name": "二人目"},
     )
     assert r.status_code == 201, r.text
 
@@ -4381,7 +4381,7 @@ async def test_signup_admin_grant_fires_critical_alert(
     ) as alert_mock:
         r = await client.post(
             "/api/v1/auth/signup",
-            json={"email": email, "password": "password123", "name": "初代管理者"},
+            json={"agreed_terms": True, "email": email, "password": "password123", "name": "初代管理者"},
         )
         await asyncio.sleep(0.05)  # fire_and_forget のタスクを消化
     assert r.status_code == 201, r.text

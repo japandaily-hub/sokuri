@@ -75,7 +75,7 @@ async def _signup_user(client: AsyncClient, email: str, name: str = "依頼者�
     """(access_token, user_id) を返す。"""
     r = await client.post(
         "/api/v1/auth/signup",
-        json={"email": email, "password": _USER_PASSWORD, "name": name},
+        json={"agreed_terms": True, "email": email, "password": _USER_PASSWORD, "name": name},
     )
     assert r.status_code == 201, r.text
     data = r.json()

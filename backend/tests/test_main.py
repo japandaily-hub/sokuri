@@ -186,7 +186,7 @@ async def test_signup_validation_error_does_not_reflect_submitted_password(
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         r = await client.post(
             "/api/v1/auth/signup",
-            json={"email": "reflect-test@example.com", "password": submitted_password},
+            json={"agreed_terms": True, "email": "reflect-test@example.com", "password": submitted_password},
         )
     assert r.status_code == 422
     assert submitted_password not in r.text
@@ -204,7 +204,7 @@ async def test_validation_error_response_keeps_loc_msg_type_for_web_compat(
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         r = await client.post(
             "/api/v1/auth/signup",
-            json={"email": "not-an-email", "password": "validpassword123"},
+            json={"agreed_terms": True, "email": "not-an-email", "password": "validpassword123"},
         )
     assert r.status_code == 422
     body = r.json()

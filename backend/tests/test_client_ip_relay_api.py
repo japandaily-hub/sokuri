@@ -509,7 +509,7 @@ class TestRelayLineExchange:
                 )
                 r = await client.post(
                     "/api/v1/auth/line/exchange",
-                    json={"line_access_token": "dummy-line-token"},
+                    json={"agreed_terms": True, "line_access_token": "dummy-line-token"},
                     headers=headers_a,
                 )
                 assert r.status_code == 200
@@ -518,7 +518,7 @@ class TestRelayLineExchange:
             )
             r = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token"},
+                json={"agreed_terms": True, "line_access_token": "dummy-line-token"},
                 headers=headers_a_final,
             )
             assert r.status_code == 429
@@ -528,7 +528,7 @@ class TestRelayLineExchange:
             )
             r = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token"},
+                json={"agreed_terms": True, "line_access_token": "dummy-line-token"},
                 headers=headers_b,
             )
             assert r.status_code == 200
@@ -856,7 +856,7 @@ class TestSignedForOneScopeRejectedOnAnother:
                 }
                 r = await client_small_limits.post(
                     "/api/v1/auth/line/exchange",
-                    json={"line_access_token": "dummy-line-token"},
+                    json={"agreed_terms": True, "line_access_token": "dummy-line-token"},
                     headers=mismatched_headers,
                 )
                 assert r.status_code == 200
@@ -866,7 +866,7 @@ class TestSignedForOneScopeRejectedOnAnother:
             }
             r = await client_small_limits.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token"},
+                json={"agreed_terms": True, "line_access_token": "dummy-line-token"},
                 headers=mismatched_headers_final,
             )
             assert r.status_code == 429

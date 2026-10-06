@@ -171,7 +171,7 @@ async def _analyze_via_api(db_session, base_image: str):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         r = await client.post(
             "/api/v1/auth/signup",
-            json={"email": f"analyze-{uuid.uuid4().hex[:8]}@example.com", "password": "password123", "name": "解析 太郎"},
+            json={"agreed_terms": True, "email": f"analyze-{uuid.uuid4().hex[:8]}@example.com", "password": "password123", "name": "解析 太郎"},
         )
         assert r.status_code == 201, r.text
         token = r.json()["access_token"]

@@ -195,7 +195,7 @@ async def signup_user(c: httpx.AsyncClient, email: str, name: str) -> tuple[str,
     ``AuthTokenResponse.user`` に ``id`` と ``role`` が入るため、別途 /users/me を
     叩く必要はない（``/users/me`` は GET 未定義でサブリソースのみ）。
     """
-    r = await c.post(f"{V1}/auth/signup", json={"email": email, "password": PASSWORD, "name": name})
+    r = await c.post(f"{V1}/auth/signup", json={"agreed_terms": True, "email": email, "password": PASSWORD, "name": name})
     if r.status_code == 409:
         d = must(await c.post(f"{V1}/auth/login", json={"email": email, "password": PASSWORD}), 200)
     else:
@@ -562,7 +562,7 @@ async def s10_signup_duplicate_email_race(pg: asyncpg.Connection, sc: Scenario) 
 
         async def do_user_signup(cc: httpx.AsyncClient) -> httpx.Response:
             return await cc.post(
-                f"{V1}/auth/signup", json={"email": user_email, "password": PASSWORD, "name": "同時 登録"}
+                f"{V1}/auth/signup", json={"agreed_terms": True, "email": user_email, "password": PASSWORD, "name": "同時 登録"}
             )
 
         rs = await volley(do_user_signup, do_user_signup)
@@ -1075,7 +1075,7 @@ async def s9_unsafe_input_rejected(
     email_p8 = f"s9-p8-{RUN_ID}@example.com"
     r_p8 = await c.post(
         f"{V1}/auth/signup",
-        json={"email": email_p8, "password": PASSWORD, "name": "x" + chr(0x00)},
+        json={"agreed_terms": True, "email": email_p8, "password": PASSWORD, "name": "x" + chr(0x00)},
     )
     probe(sc, "P8", r_p8, expected_type="disallowed_character", expected_loc=["body", "name"])
     n_users_p8 = await pg.fetchval(

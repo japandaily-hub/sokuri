@@ -133,7 +133,7 @@ async def _make_admin(client: AsyncClient, db_session: AsyncSession) -> str:
 async def _signup_user(client: AsyncClient, email: str = _USER_EMAIL) -> tuple[str, str]:
     r = await client.post(
         "/api/v1/auth/signup",
-        json={"email": email, "password": "password123", "name": "テスト太郎"},
+        json={"agreed_terms": True, "email": email, "password": "password123", "name": "テスト太郎"},
     )
     assert r.status_code == 201, r.text
     data = r.json()
@@ -318,7 +318,7 @@ async def test_deleted_operator_old_token_is_revoked_on_every_path(
     ):
         r = await client.post(
             "/api/v1/auth/line/exchange",
-            json={"line_access_token": "dummy-line-token"},
+            json={"agreed_terms": True, "line_access_token": "dummy-line-token"},
             headers=_auth(op_token),
         )
     _assert_revoked(r, "POST /api/v1/auth/line/exchange")
@@ -360,7 +360,7 @@ async def test_active_operator_token_keeps_working_on_every_path(
     with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
         r = await client.post(
             "/api/v1/auth/line/exchange",
-            json={"line_access_token": "dummy-line-token", "reauth_token": op_reauth_token},
+            json={"agreed_terms": True, "line_access_token": "dummy-line-token", "reauth_token": op_reauth_token},
             headers=_auth(op_token),
         )
     assert r.status_code == 200, r.text

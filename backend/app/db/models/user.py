@@ -115,3 +115,9 @@ class User(Base, TimestampMixin):
     email_notify_updated_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # 利用規約・プライバシーポリシーへの同意の証跡（alembic 0048。Operator の同名列と同じ形）。
+    # 新規作成（POST /auth/signup・/auth/line/exchange の未登録 LINE の作成分岐）でのみ、
+    # サーバーが現行の版数（schemas_katadzuke.CURRENT_USER_TERMS_VERSION）と同意時刻を確定して記録する。
+    # 0048 より前に作られたユーザーは NULL のまま（推測の値で埋めない・再同意は求めない）。
+    agreed_terms_version: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    agreed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)

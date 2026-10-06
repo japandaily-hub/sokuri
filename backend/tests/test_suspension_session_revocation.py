@@ -165,7 +165,7 @@ async def _make_admin(client: AsyncClient, db_session: AsyncSession) -> str:
 async def _signup_user(client: AsyncClient, email: str) -> tuple[str, uuid.UUID]:
     r = await client.post(
         "/api/v1/auth/signup",
-        json={"email": email, "password": _USER_PASSWORD, "name": "依頼者太郎"},
+        json={"agreed_terms": True, "email": email, "password": _USER_PASSWORD, "name": "依頼者太郎"},
     )
     assert r.status_code == 201, r.text
     return r.json()["access_token"], uuid.UUID(r.json()["user"]["id"])
@@ -410,7 +410,7 @@ async def test_user_pre_suspension_token_is_revoked_after_unsuspend_on_every_pat
         r = await client.post(
             "/api/v1/auth/line/exchange",
             json={
-                "line_access_token": "dummy-line-token",
+                "agreed_terms": True, "line_access_token": "dummy-line-token",
                 "reauth_token": create_reauth_token(user_id, "user"),
             },
             headers=_auth(old_token),
@@ -455,7 +455,7 @@ async def test_operator_pre_suspension_token_is_revoked_after_unsuspend_on_every
         r = await client.post(
             "/api/v1/auth/line/exchange",
             json={
-                "line_access_token": "dummy-line-token",
+                "agreed_terms": True, "line_access_token": "dummy-line-token",
                 "reauth_token": create_reauth_token(op_id, "operator"),
             },
             headers=_auth(old_token),
@@ -539,7 +539,7 @@ async def test_operator_relogin_after_unsuspend_restores_access(
         r = await client.post(
             "/api/v1/auth/line/exchange",
             json={
-                "line_access_token": "dummy-line-token",
+                "agreed_terms": True, "line_access_token": "dummy-line-token",
                 "reauth_token": create_reauth_token(op_id, "operator"),
             },
             headers=_auth(new_token),
@@ -654,7 +654,7 @@ async def _line_login(client: AsyncClient, line_user_id: str = _LINE_USER_ID_FOR
     """Bearer を付けない LINE ログイン（交換）。パスワードを持たない利用者の唯一の入口。"""
     with patch.object(httpx.AsyncClient, "get", new=_mock_line_get(line_user_id)):
         return await client.post(
-            "/api/v1/auth/line/exchange", json={"line_access_token": "dummy-line-token"}
+            "/api/v1/auth/line/exchange", json={"agreed_terms": True, "line_access_token": "dummy-line-token"}
         )
 
 

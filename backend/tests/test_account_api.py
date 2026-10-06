@@ -74,7 +74,7 @@ async def _signup_user(
 ) -> str:
     r = await client.post(
         "/api/v1/auth/signup",
-        json={"email": email, "password": password, "name": "テスト太郎"},
+        json={"agreed_terms": True, "email": email, "password": password, "name": "テスト太郎"},
     )
     assert r.status_code == 201, r.text
     return r.json()["access_token"]
@@ -301,7 +301,7 @@ async def test_signup_email_notify_opt_in_true_is_persisted(
 ):
     r = await client.post(
         "/api/v1/auth/signup",
-        json={
+        json={"agreed_terms": True, 
             "email": "optin@example.com",
             "password": "password123",
             "name": "テスト太郎",
@@ -321,7 +321,7 @@ async def test_signup_email_notify_opt_in_false_is_persisted(
 ):
     r = await client.post(
         "/api/v1/auth/signup",
-        json={
+        json={"agreed_terms": True, 
             "email": "optout@example.com",
             "password": "password123",
             "name": "テスト太郎",
@@ -342,7 +342,7 @@ async def test_signup_email_notify_opt_in_omitted_defaults_to_true_without_times
     """省略（旧クライアント）は「選択なし」＝既定値のまま・updated_atはNULLのまま。"""
     r = await client.post(
         "/api/v1/auth/signup",
-        json={
+        json={"agreed_terms": True, 
             "email": "optomit@example.com",
             "password": "password123",
             "name": "テスト太郎",
@@ -1034,7 +1034,7 @@ async def test_delete_account_then_resignup_with_same_email(client: AsyncClient)
 
     r = await client.post(
         "/api/v1/auth/signup",
-        json={"email": email, "password": "brandnewpass1", "name": "再登録ユーザー"},
+        json={"agreed_terms": True, "email": email, "password": "brandnewpass1", "name": "再登録ユーザー"},
     )
     assert r.status_code == 201
 

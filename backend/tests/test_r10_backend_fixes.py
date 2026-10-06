@@ -85,7 +85,7 @@ async def _make_admin(client: AsyncClient, db_session: AsyncSession, email: str)
 async def _signup_user(client: AsyncClient, email: str, name: str = "依頼者太郎") -> tuple[str, str]:
     r = await client.post(
         "/api/v1/auth/signup",
-        json={"email": email, "password": "password123", "name": name},
+        json={"agreed_terms": True, "email": email, "password": "password123", "name": name},
     )
     assert r.status_code == 201, r.text
     return r.json()["access_token"], r.json()["user"]["id"]

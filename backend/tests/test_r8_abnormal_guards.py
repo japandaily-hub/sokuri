@@ -84,7 +84,7 @@ async def _signup_user(
 ) -> tuple[str, str]:
     r = await client.post(
         "/api/v1/auth/signup",
-        json={"email": email, "password": "password123", "name": "テスト太郎"},
+        json={"agreed_terms": True, "email": email, "password": "password123", "name": "テスト太郎"},
     )
     assert r.status_code == 201, r.text
     data = r.json()

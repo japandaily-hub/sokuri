@@ -205,7 +205,7 @@ async def test_bank_account_save_failure_log_keeps_traceback_without_db_values(
 ):
     r = await client.post(
         "/api/v1/auth/signup",
-        json={"email": "bank-privacy@example.com", "password": "password123", "name": "テスト太郎"},
+        json={"agreed_terms": True, "email": "bank-privacy@example.com", "password": "password123", "name": "テスト太郎"},
     )
     assert r.status_code == 201, r.text
     token = r.json()["access_token"]

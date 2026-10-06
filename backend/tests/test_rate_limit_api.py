@@ -124,7 +124,7 @@ async def _signup_user(
     """
     return await client.post(
         "/api/v1/auth/signup",
-        json={"email": email, "password": password, "name": "テスト太郎"},
+        json={"agreed_terms": True, "email": email, "password": password, "name": "テスト太郎"},
         headers=headers if headers is not None else _TEST_PUBLIC_IP_HEADERS,
     )
 
@@ -758,7 +758,7 @@ class TestMalformedXffFailsClosed:
     async def test_signup_with_unresolvable_xff_is_rejected_400(self, client: AsyncClient):
         r = await client.post(
             "/api/v1/auth/signup",
-            json={
+            json={"agreed_terms": True, 
                 "email": "malformed-xff-signup@example.com",
                 "password": "password123",
                 "name": "テスト太郎",
@@ -904,7 +904,7 @@ class TestCloudflareRangeAtTrustPositionDoesNotBypassIpAxis:
         （フェイルクローズしない。400にならないことの確認）。"""
         r = await client.post(
             "/api/v1/auth/signup",
-            json={
+            json={"agreed_terms": True, 
                 "email": "cf-range-signup@example.com",
                 "password": "password123",
                 "name": "テスト太郎",
@@ -1355,13 +1355,13 @@ class TestLineExchange:
             for _ in range(20):
                 r = await client.post(
                     "/api/v1/auth/line/exchange",
-                    json={"line_access_token": "dummy-line-token"},
+                    json={"agreed_terms": True, "line_access_token": "dummy-line-token"},
                     headers=_TEST_PUBLIC_IP_HEADERS,
                 )
                 assert r.status_code == 200
             r = await client.post(
                 "/api/v1/auth/line/exchange",
-                json={"line_access_token": "dummy-line-token"},
+                json={"agreed_terms": True, "line_access_token": "dummy-line-token"},
                 headers=_TEST_PUBLIC_IP_HEADERS,
             )
         assert r.status_code == 429

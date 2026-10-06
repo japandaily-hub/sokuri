@@ -196,7 +196,7 @@ async def test_retry_exhaustion_maps_to_503_via_analyze_endpoint(
         # /analyze は認証必須（R3-operator ADD-1対応）のため、テスト用ユーザーで認証する。
         signup_res = await client.post(
             "/api/v1/auth/signup",
-            json={
+            json={"agreed_terms": True, 
                 "email": "vision-retry-analyze@example.com",
                 "password": "password123",
                 "name": "テスト太郎",

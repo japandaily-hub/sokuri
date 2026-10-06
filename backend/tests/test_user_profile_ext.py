@@ -51,7 +51,7 @@ async def _signup_user(
 ) -> str:
     r = await client.post(
         "/api/v1/auth/signup",
-        json={"email": email, "password": password, "name": "テスト太郎"},
+        json={"agreed_terms": True, "email": email, "password": password, "name": "テスト太郎"},
     )
     assert r.status_code == 201, r.text
     return r.json()["access_token"]

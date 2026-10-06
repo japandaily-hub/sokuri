@@ -88,7 +88,7 @@ async def test_user_signup_concurrent_duplicate_email_returns_the_precheck_409_o
     monkeypatch.setattr(db_session, "commit", failing(pg_server_error(fields)))
     with caplog.at_level(logging.WARNING, logger=_AUTH_LOGGER):
         r = await client.post(
-            "/api/v1/auth/signup", json={"email": PROBE_EMAIL, "password": "password123", "name": PROBE_NAME}
+            "/api/v1/auth/signup", json={"agreed_terms": True, "email": PROBE_EMAIL, "password": "password123", "name": PROBE_NAME}
         )
     assert r.status_code == 409, r.text
     assert r.json() == _EMAIL_TAKEN
@@ -102,7 +102,7 @@ async def test_user_signup_concurrent_duplicate_email_returns_the_precheck_409_o
 
 async def test_user_signup_precheck_and_race_give_the_same_response(client: AsyncClient):
     """事前確認で弾く通常の重複（従来の経路）と応答が同じであること。"""
-    body = {"email": "precheck-dup@example.com", "password": "password123", "name": "先発"}
+    body = {"agreed_terms": True, "email": "precheck-dup@example.com", "password": "password123", "name": "先発"}
     assert (await client.post("/api/v1/auth/signup", json=body)).status_code == 201
     r = await client.post("/api/v1/auth/signup", json=body)
     assert r.status_code == 409
@@ -124,7 +124,7 @@ async def test_user_signup_concurrent_duplicate_email_returns_409_on_sqlite(
 
     monkeypatch.setattr(db_session, "commit", _commit_after_the_first_signup)
     r = await client.post(
-        "/api/v1/auth/signup", json={"email": email, "password": "password123", "name": "後発"}
+        "/api/v1/auth/signup", json={"agreed_terms": True, "email": email, "password": "password123", "name": "後発"}
     )
     assert r.status_code == 409, r.text
     assert r.json() == _EMAIL_TAKEN
@@ -139,13 +139,13 @@ async def test_user_signup_other_integrity_errors_stay_500(
     """一意制約（users.email）以外の違反は 409 に偽装せず、障害として 500 のまま。"""
     monkeypatch.setattr(db_session, "commit", failing(pg_server_error(CHECK_ROW_FIELDS)))
     r = await client.post(
-        "/api/v1/auth/signup", json={"email": PROBE_EMAIL, "password": "password123", "name": PROBE_NAME}
+        "/api/v1/auth/signup", json={"agreed_terms": True, "email": PROBE_EMAIL, "password": "password123", "name": PROBE_NAME}
     )
     assert r.status_code == 500
     other_unique = unique_violation_fields("users", "ix_users_line_user_id", "line_user_id", PROBE_LINE_USER_ID)
     monkeypatch.setattr(db_session, "commit", failing(pg_server_error(other_unique)))
     r = await client.post(
-        "/api/v1/auth/signup", json={"email": PROBE_EMAIL, "password": "password123", "name": PROBE_NAME}
+        "/api/v1/auth/signup", json={"agreed_terms": True, "email": PROBE_EMAIL, "password": "password123", "name": PROBE_NAME}
     )
     assert r.status_code == 500
 
@@ -246,7 +246,7 @@ async def test_line_exchange_new_user_conflict_log_has_no_line_user_id_or_email(
     fields = unique_violation_fields("users", "ix_users_line_user_id", "line_user_id", PROBE_LINE_USER_ID)
     monkeypatch.setattr(db_session, "commit", failing(pg_server_error(fields)))
     with caplog.at_level(logging.ERROR, logger=_AUTH_LOGGER):
-        r = await client.post("/api/v1/auth/line/exchange", json={"line_access_token": "token-x"})
+        r = await client.post("/api/v1/auth/line/exchange", json={"agreed_terms": True, "line_access_token": "token-x"})
     assert r.status_code == 409, r.text
     records = _auth_records(caplog)
     assert [record.getMessage() for record in records] == [

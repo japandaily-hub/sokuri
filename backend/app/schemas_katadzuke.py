@@ -70,6 +70,20 @@ class UserSignupRequest(BaseModel):
     # email_notify_opt_in は既定値 True のまま・email_notify_updated_at も
     # NULL のままにする（auth.py user_signup 参照）。
     email_notify_opt_in: bool | None = Field(default=None)
+    # 利用規約・プライバシーポリシーへの同意（3周目の法務監査）。true 以外（未送信・false）は
+    # 422 で登録を拒否する（判定は auth.py の _require_user_terms_agreement）。strict で
+    # "true"・1 などの取り違えを同意とみなさない。
+    agreed_terms: bool = Field(default=False, strict=True, description="利用規約・プライバシーポリシーへの同意")
+    # 画面が表示していた規約の版数（参考値）。記録する版数はサーバーの
+    # CURRENT_USER_TERMS_VERSION で確定し、この値は信用しない（業者の同意と同じ方針）。
+    terms_version: str | None = Field(default=None, max_length=32)
+
+
+# 依頼者向け利用規約・プライバシーポリシーの現行バージョン（/terms・/privacy の「最終改定」の日付）。
+# 規約を改定したら、この値と web の USER_TERMS_VERSION（src/lib/line-consent.ts）を同じ日付に揃える。
+# クライアントからは受け取らず、同意時点でサーバーがこの値を確定させて記録する
+# （CURRENT_OPERATOR_TERMS_VERSION と同じ理由）。
+CURRENT_USER_TERMS_VERSION = "2026-10-06"
 
 
 class UserLoginRequest(BaseModel):
@@ -114,6 +128,11 @@ class LineExchangeRequest(BaseModel):
 
     line_access_token: str = Field(min_length=1, max_length=4096)
     reauth_token: str | None = Field(default=None, max_length=4096)
+    # 利用規約・プライバシーポリシーへの同意（UserSignupRequest と同じ意味）。LINE ログインは
+    # 既存ユーザーのログインと新規登録を兼ねるため、必須にするのは Bearer なしで未登録の
+    # LINE アカウントから依頼者を新規作成する分岐だけ（既存ユーザーのログイン・連携では見ない）。
+    agreed_terms: bool = Field(default=False, strict=True, description="利用規約・プライバシーポリシーへの同意")
+    terms_version: str | None = Field(default=None, max_length=32)
 
 
 class UserOut(BaseModel):

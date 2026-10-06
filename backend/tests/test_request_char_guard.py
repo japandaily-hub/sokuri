@@ -1193,7 +1193,7 @@ async def test_production_handler_nul_body_returns_422_with_loc_msg_type(
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         r = await client.post(
             "/api/v1/auth/signup",
-            json={"email": "prod-nul@example.com", "password": "password123", "name": "x" + chr(0x00)},
+            json={"agreed_terms": True, "email": "prod-nul@example.com", "password": "password123", "name": "x" + chr(0x00)},
         )
     assert r.status_code == 422
     entry = r.json()["detail"][0]
