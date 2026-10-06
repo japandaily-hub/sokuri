@@ -77,5 +77,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # 表の削除は ACCESS EXCLUSIVE ロックを取るため、upgrade と同じく待ちを短く打ち切る（QA L-1）。
+    _shorten_lock_timeout_on_postgresql()
     op.drop_index("ix_password_reset_tokens_account", table_name=_TABLE)
     op.drop_table(_TABLE)
