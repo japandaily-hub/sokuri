@@ -84,6 +84,7 @@ test("運営が口コミを削除・元に戻せる。報告→問い合わせ�
   await page.locator("#name").fill("E2E 口コミ通報");
   await page.locator("#email").fill(contactEmail);
   await page.locator("#message").fill("この口コミは不適切な内容です。削除をお願いします。");
+  await page.locator("#privacy-agree").check(); // M-8: 送信をもって同意とみなさず、チェックで明示的に同意を得る
   await page.getByRole("button", { name: "送信する" }).click();
   await expect(page.getByText("送信を受け付けました")).toBeVisible({ timeout: 30_000 });
 
