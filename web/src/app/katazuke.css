@@ -711,6 +711,8 @@ section:has(> .vt){position:relative;}
    ただし UA の :link/:visited に依存しないことを明示しておく（a{color:inherit} だけに頼らない）。 */
 .footer ul a,.footer ul a:link,.footer ul a:visited{color:var(--body-soft);transition:color .2s;}
 .footer ul a:hover,.footer ul a:visited:hover{color:var(--primary);}
+/* M-12: タッチ端末ではフッターのリンクの高さを 44px 確保する（行間 9px を高さに振り替える） */
+@media (pointer:coarse){.footer ul{gap:0;}.footer ul a{display:inline-flex;align-items:center;min-height:44px;}}
 .footer-bottom a,.footer-bottom a:link,.footer-bottom a:visited,
 .footer .about a,.footer .about a:link,.footer .about a:visited{color:var(--body-soft);}
 .footer-bottom{margin-top:40px;padding-top:24px;border-top:1px solid var(--line);

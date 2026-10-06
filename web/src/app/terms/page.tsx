@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { publicPageMetadata } from "@/lib/seo";
 import "./terms.css";
 import { TermsTabs } from "./TermsTabs";
 import { RevealLines } from "@/components/kdz/interactions";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicPageMetadata({
+  path: "/terms",
   title: "利用規約",
   description:
     "カタヅケの利用規約です。ユーザー利用規約・業者利用規約について定めています。",
-  alternates: { canonical: "/terms" },
-};
+});
 
 /** 冒頭の「要点」。本文（TermsTabs）の要約であり、根拠となる条を併記する。
  *  ラウンド5 指摘（12）で本文の各条に id（ユーザー側 tu-N／業者側 tb-N）を振ったため、
@@ -18,7 +19,7 @@ const POINTS: { no: string; lead: string; body: string; ref: string; href: strin
   {
     no: "01",
     lead: "ユーザーの費用は0円です。",
-    body: "出品・査定・お断りまで、ユーザーに費用の請求はありません。",
+    body: "出品からお断りまで、ユーザーに費用の請求はありません。",
     ref: "ユーザー利用規約 第6条",
     href: "#tu-6",
   },
@@ -78,7 +79,7 @@ export default function TermsPage() {
           <span className="legal-head__en">TERMS</span>
           <h1>利用規約</h1>
           <p className="legal-head__meta">
-            制定・施行：2026年4月1日　最終改定：2026年9月18日
+            制定・施行：2026年4月1日　最終改定：2026年10月6日
           </p>
           {/* ラウンド4 指摘（Med・業者視点）: 本ページは着地時にユーザー利用規約のペインが
               開くため、/business の同意チェックから来た業者が「同意対象の業者利用規約」に

@@ -286,7 +286,7 @@ export default function VendorListPage() {
                       </Link>
                       <span className="vendor-tag">運営審査済み</span>
                       {v.accept_unsellable ? (
-                        <span className="vendor-tag vendor-tag-blue">値がつかない物もOK</span>
+                        <span className="vendor-tag vendor-tag-blue">まとめての引き取りに対応</span>
                       ) : null}
                     </div>
                     <div className="vendor-row-rating">

@@ -1,47 +1,27 @@
 "use client";
 
-/** メールアドレス確認完了（bareルート / 共通ヘッダー・フッターなし）。
- *  全画面中央寄せカード + confettiアニメ + 3ステップ説明。
- *  メールは URLパラメータ ?email= から取得（デモ表示用）。
- *  実際の確認処理はバックエンド未配線のため、本ページは「確認完了」表示のみを担う。 */
+/** メールアドレスの確認についての案内（bareルート / 共通ヘッダー・フッターなし）。
+ *
+ *  H-1: バックエンドにメールアドレス確認の API は無い（2026-10-06 時点で backend/app に
+ *  verify_email 系の処理は 0 件）。確認していないのに「確認が完了しました」と出すと虚偽の表示に
+ *  なるため、完了表示はしない。URL の ?email= は表示しない（任意の文字列を公式画面に出せる＝
+ *  なりすましの文面に使えるため）。?token= が付いている場合は「この画面では確認していない」ことと、
+ *  心当たりがない場合の連絡先を案内する（トークンの値は画面に出さない）。確認 API を実装したら、
+ *  成功応答を受けたときだけ完了を出し、表示するアドレスはサーバーの応答の値を使うこと。
+ *  noindex は layout.tsx で付けている。 */
 
 import "./verify-email.css";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Ic } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
 
-const CONFETTI_COLORS = ["#1447e0", "#8fb4ff", "#e5a323", "#6f93f2", "#f3981d", "#d7e6ff"];
-
-type ConfettiDot = {
-  background: string;
-  left: string;
-  top: string;
-  animationDelay: string;
-  animationDuration: string;
-};
-
 function VerifyEmailContent() {
   const params = useSearchParams();
-  const email = params.get("email") || "example@email.com";
-
-  /* confetti は Math.random を使うため、ハイドレーション不一致回避にマウント後に生成 */
-  const [dots, setDots] = useState<ConfettiDot[]>([]);
-  useEffect(() => {
-    const next: ConfettiDot[] = [];
-    for (let i = 0; i < 12; i++) {
-      next.push({
-        background: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
-        left: `${Math.random() * 100 - 10}%`,
-        top: `${Math.random() * 20 - 10}%`,
-        animationDelay: `${i * 0.07}s`,
-        animationDuration: `${0.9 + Math.random() * 0.6}s`,
-      });
-    }
-    setDots(next);
-  }, []);
+  // トークンは有無で案内を分けるだけに使う（値は検証も表示もしない）。
+  const hasToken = (params.get("token") ?? "").trim().length > 0;
 
   return (
     <div className="verify-page">
@@ -50,7 +30,7 @@ function VerifyEmailContent() {
       </Link>
 
       <div className="confirm-card">
-        {/* アイコン（confetti はマウント後に重ねる） */}
+        {/* アイコン（確認 API が無いため、完了を示す紙吹雪は出さない） */}
         <div className="confirm-ic-wrap">
           <div className="confirm-circle">
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -59,33 +39,26 @@ function VerifyEmailContent() {
               <path d="M16 19l2 2 4-4" />
             </svg>
           </div>
-          {dots.map((d, i) => (
-            <span
-              key={i}
-              className="confetti-dot"
-              aria-hidden="true"
-              style={{
-                background: d.background,
-                left: d.left,
-                top: d.top,
-                animationDelay: d.animationDelay,
-                animationDuration: d.animationDuration,
-              }}
-            />
-          ))}
         </div>
 
         <h1 className="confirm-title">
-          メールアドレスの確認が
+          メールアドレスの
           <br />
-          完了しました。
+          確認について
         </h1>
-        <p className="confirm-sub">
-          ご登録ありがとうございます。下記のメールアドレスで受け付けました。
-          <br />
-          さっそく出品を始めましょう。
-        </p>
-        <div className="confirm-email">{email}</div>
+        {hasToken ? (
+          <p className="confirm-sub">
+            この画面では、メールアドレスの確認の処理を行っていません。
+            <br />
+            心当たりのないメールのリンクからこの画面を開いた場合は、情報を入力せず、お問い合わせからご連絡ください。
+          </p>
+        ) : (
+          <p className="confirm-sub">
+            現在、カタヅケではメールアドレスの確認手続きを行っていません。
+            <br />
+            会員登録がお済みの方は、ログインしてそのままご利用いただけます。
+          </p>
+        )}
 
         {/* ステップ */}
         <div className="welcome-steps">
@@ -93,27 +66,27 @@ function VerifyEmailContent() {
             <div className="ws-num">1</div>
             <div className="ws-body">
               <strong>出品する</strong>
-              <span>写真を撮って不用品を出品。5分で完了します。</span>
+              <span>品物を1点ずつ撮って出品します。</span>
             </div>
           </div>
           <div className="welcome-step">
             <div className="ws-num">2</div>
             <div className="ws-body">
               <strong>入札を待つ</strong>
-              <span>登録業者が競い合って入札。自動的にお知らせが届きます。</span>
+              <span>登録業者が入札します。入札が届くとお知らせします。</span>
             </div>
           </div>
           <div className="welcome-step">
             <div className="ws-num">3</div>
             <div className="ws-body">
               <strong>業者を選んで引き取り</strong>
-              <span>気に入った業者を選べばOK。お支払い方法は、成約後に業者からご案内します。日程はチャットでご相談ください。</span>
+              <span>届いた入札から1社を選びます。お支払い方法は、成約後にご案内します。訪問の日程は画面上で調整します。</span>
             </div>
           </div>
         </div>
 
-        <Link href="/create" className="btn btn-primary btn-block btn-lg">
-          さっそく出品してみる
+        <Link href="/login" className="btn btn-primary btn-block btn-lg">
+          ログインする
           <Ic name="arrow" />
         </Link>
         <Link href="/" className="btn btn-ghost btn-block btn-swipe" style={{ marginTop: 10 }}>
@@ -122,8 +95,6 @@ function VerifyEmailContent() {
       </div>
 
       <div className="confirm-bottom">
-        <Link href="/login">ログイン</Link>
-        {"　·　"}
         <Link href="/faq">よくある質問</Link>
         {"　·　"}
         <Link href="/contact">お問い合わせ</Link>

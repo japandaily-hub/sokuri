@@ -32,7 +32,7 @@ export const metadata: Metadata = {
     template: "%s | カタヅケ",
   },
   description:
-    "家じゅうの不用品を、1点ずつ撮って、あとは待つだけ。登録業者が買取総額で競い合い、連絡が来るのはあなたが選んだ1社だけ。値がつかない物もまとめて回収。営業電話に追われない、家まるごとの片付け買取マッチング。",
+    "家じゅうの不用品を、1点ずつ撮って、あとは待つだけ。登録業者が買取総額で入札し、連絡が来るのはあなたが選んだ1社だけ。営業電話に追われない、家まるごとの片付け買取マッチング。",
   keywords: [
     "片付け 買取",
     "不用品 買取",
@@ -45,7 +45,8 @@ export const metadata: Metadata = {
   authors: [{ name: "カタヅケ" }],
   creator: "カタヅケ",
   publisher: "カタヅケ",
-  alternates: { canonical: "/" },
+  // canonical は各ページで指定する（ここに "/" を置くと、指定のない子ページ（/forbidden 等）の
+  // canonical がトップになる。L-1）。トップは page.tsx が "/" を指定している。
   openGraph: {
     type: "website",
     locale: "ja_JP",
@@ -53,13 +54,13 @@ export const metadata: Metadata = {
     siteName: "カタヅケ",
     title: "カタヅケ｜家まるごと、まとめて片付け買取",
     description:
-      "1点ずつ撮って、あとは待つだけ。業者が買取総額で競い合います。連絡は選んだ1社だけ。値がつかない物もまとめて回収。",
+      "1点ずつ撮って、あとは待つだけ。業者が買取総額で入札します。連絡は選んだ1社だけ。",
     images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "カタヅケ｜家まるごと片付け買取" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "カタヅケ｜家まるごと、まとめて片付け買取",
-    description: "1点ずつ撮って、あとは待つだけ。業者が買取総額で競い合います。連絡は選んだ1社だけ。",
+    description: "1点ずつ撮って、あとは待つだけ。業者が買取総額で入札します。連絡は選んだ1社だけ。",
     images: ["/opengraph-image"],
   },
   robots: {
@@ -82,9 +83,10 @@ const ORG_LD = {
   "@type": "Organization",
   name: "カタヅケ",
   url: SITE_URL,
-  logo: `${SITE_URL}/icon.svg`,
+  // M-10: /icon.svg は存在しない（404）。app/icon.png のファイル規約で配信される /icon.png を指す。
+  logo: `${SITE_URL}/icon.png`,
   description:
-    "家まるごと、まとめて片付け買取。業者が買取総額で競い合う、営業電話に追われない不用品買取マッチング。",
+    "家まるごと、まとめて片付け買取。業者が買取総額で入札する、営業電話に追われない不用品買取マッチング。",
   areaServed: ["東京都", "千葉県", "埼玉県", "神奈川県"],
   sameAs: [],
 };
@@ -96,7 +98,7 @@ const WEBSITE_LD = {
   url: SITE_URL,
   inLanguage: "ja-JP",
   description:
-    "家じゅうの不用品を、1点ずつ撮って、あとは待つだけ。登録業者が買取総額で競い合う片付け買取マッチング。",
+    "家じゅうの不用品を、1点ずつ撮って、あとは待つだけ。登録業者が買取総額で入札する片付け買取マッチング。",
 };
 
 /** .rv（スクロールでフェードイン）の堅牢化（BRIEF §1.7）。IntersectionObserver が使え、かつ
