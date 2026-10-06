@@ -6,6 +6,7 @@
  * backend には触れない（確定 API は route で差し替え、実際の再設定はしない）。
  *
  * 注意: この spec は追加しただけで未実行（作業中は E2E スタックを別の確認で使っていたため）。
+ *       フラグメント形式（#token=...&type=...）のケースは QA M-2 で追加（これも未実行）。
  */
 import { test, expect } from "./helpers/test";
 
@@ -34,6 +35,30 @@ test.describe("パスワード再設定の確定画面 token の 3 態", () => {
 
     await expect(page.getByText("パスワードを再設定しました")).toBeVisible();
     expect(postedBody).toMatchObject({ token: VALID_TOKEN, account_type: "user" });
+  });
+
+  test("あり（実際のメールのリンク形式）: フラグメント #token=...&type=... でも入力欄が出て、URL から token が消え、確定 API へ渡る", async ({ page }) => {
+    // backend が送るメールのリンクは token を ?query ではなく #フラグメントに置く（サーバーのログ・Referer に残さないため）。
+    let postedBody: Record<string, unknown> | null = null;
+    await page.route("**/auth/password-reset/confirm", async (route) => {
+      postedBody = route.request().postDataJSON() as Record<string, unknown>;
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ detail: "ok" }) });
+    });
+
+    await page.goto(`${CONFIRM_URL}#token=${VALID_TOKEN}&type=operator`, { waitUntil: "domcontentloaded" });
+
+    await expect(page.locator(".reset-panel-title").filter({ hasText: "新しいパスワードの設定" })).toBeVisible();
+    await expect(page.getByText("このリンクは使えません")).toHaveCount(0);
+    // フラグメントごと URL から消えている（履歴・共有に token を残さない）。
+    expect(page.url()).not.toContain("token=");
+    expect(new URL(page.url()).hash).toBe("");
+
+    await page.locator("#reset-new-pw").fill("new-password-123");
+    await page.locator("#reset-new-pw2").fill("new-password-123");
+    await page.getByRole("button", { name: "パスワードを再設定する" }).click();
+
+    await expect(page.getByText("パスワードを再設定しました")).toBeVisible();
+    expect(postedBody).toMatchObject({ token: VALID_TOKEN, account_type: "operator" });
   });
 
   test("なし: token が無いリンクは「このリンクは使えません」", async ({ page }) => {
