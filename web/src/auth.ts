@@ -29,9 +29,16 @@ import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import LINE from "next-auth/providers/line";
 import type { Provider } from "next-auth/providers";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { serverBackendApiBase } from "@/lib/backend-api-base";
 import { clientIpRelayHeaders, type HeaderReader } from "@/lib/client-ip-relay";
+import {
+  LINE_TERMS_CONSENT_COOKIE,
+  LINE_TERMS_REQUIRED_REASON,
+  TERMS_AGREEMENT_REQUIRED_CODE,
+  lineExchangeConsentFields,
+  type LineExchangeConsentFields,
+} from "@/lib/line-consent";
 
 export type AccountType = "user" | "operator";
 
@@ -128,6 +135,9 @@ async function backendLogin(
  * @param lineAccessToken LINE OAuthで取得したアクセストークン
  * @param incomingHeaders 受信リクエストのヘッダ（利用者IPの署名付き中継用。
  *   readIncomingRequestHeaders() の戻り値を渡す想定。null/undefinedなら中継しない）
+ * 本文には利用規約への同意の項目（readLineTermsConsent()。ボタン押下時の Cookie）を載せる。同意が
+ * 無ければ載せず、既存ユーザーのログインはそのまま通り、未登録の LINE アカウントの新規作成は
+ * backend が 422（code: "terms_agreement_required"）で拒否する。
  * @returns 交換成功時は { ok: true, data }、失敗時は { ok: false, code? }
  */
 async function backendLineExchange(
@@ -137,10 +147,11 @@ async function backendLineExchange(
   try {
     const url = `${serverBackendApiBase()}/auth/line/exchange`;
     const relayHeaders = await clientIpRelayHeaders("POST", url, incomingHeaders);
+    const consent = await readLineTermsConsent();
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...relayHeaders },
-      body: JSON.stringify({ line_access_token: lineAccessToken }),
+      body: JSON.stringify({ line_access_token: lineAccessToken, ...consent }),
       // redirect: "error" の理由は backendLogin と同じ（client-ip-relay.ts 冒頭 JSDoc参照）。
       redirect: "error",
     });
@@ -178,6 +189,28 @@ async function readIncomingRequestHeaders(): Promise<HeaderReader | null> {
       "[auth] 受信ヘッダを読めないため、LINE ログインは利用者IPの中継なしで backend を呼びます",
     );
     return null;
+  }
+}
+
+/**
+ * LINE ボタンを押した時点の利用規約への同意（components/kdz/auth.tsx の LineConsentAuth が置く
+ * 短命の Cookie）を読み、LINE 交換の本文に足す項目を返す。読んだ Cookie は1回で消す
+ * （同じブラウザの次の LINE ログインへ同意を持ち越さない。消せない文脈では Max-Age で自然に消える）。
+ * 読めない・無い・形式違いは「同意なし」（空）。値（版数の日付）はログに出さない。
+ */
+async function readLineTermsConsent(): Promise<LineExchangeConsentFields> {
+  try {
+    const store = await cookies();
+    const consent = lineExchangeConsentFields(store.get(LINE_TERMS_CONSENT_COOKIE)?.value);
+    try {
+      store.delete({ name: LINE_TERMS_CONSENT_COOKIE, path: "/api/auth" });
+    } catch {
+      /* 書き込めない文脈（読み取り専用）では Max-Age=600 で自然に消えるのに任せる */
+    }
+    return consent;
+  } catch {
+    console.warn("[auth] 受信 Cookie を読めないため、LINE ログインは利用規約への同意なしで backend を呼びます");
+    return {};
   }
 }
 
@@ -276,6 +309,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // （/login?reason=suspended は login/page.tsx が読んで専用文言を表示する）。
         // それ以外の失敗は従来通り false で不成立にする（不完全なセッションを作らない）。
         if (result.code === "account_suspended") return "/login?reason=suspended";
+        // 未登録の LINE アカウントで同意が届かなかった（Cookie の期限切れ・ブロック等）。
+        // 同意のチェックへ案内する（login/page.tsx が reason を読んで文言を出す）。
+        if (result.code === TERMS_AGREEMENT_REQUIRED_CODE) return `/login?reason=${LINE_TERMS_REQUIRED_REASON}`;
         return false;
       }
       const { data } = result;

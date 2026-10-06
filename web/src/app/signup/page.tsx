@@ -12,6 +12,7 @@ import { signupUser, toDisplayMessage, clearRedirectLoopStorage, KdzApiError } f
 import { Ic } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
 import { PasswordField, LineConsentAuth, TrustRow } from "@/components/kdz/auth";
+import { USER_TERMS_VERSION } from "@/lib/line-consent";
 import { Reveal } from "@/components/kdz/interactions";
 import "./signup.css";
 
@@ -95,7 +96,15 @@ export default function SignupPage() {
       setBusy(true);
       setAuthErr(null);
       try {
-        await signupUser({ email, password, name: name || undefined, email_notify_opt_in: agree2 });
+        // 同意（agree1）はサーバーにも記録する（3周目の法務監査）。上の判定で agree1 が true のときだけ到達する。
+        await signupUser({
+          email,
+          password,
+          name: name || undefined,
+          email_notify_opt_in: agree2,
+          agreed_terms: true,
+          terms_version: USER_TERMS_VERSION,
+        });
         const res = await signIn("user-credentials", { email, password, redirect: false });
         if (res?.error) throw new Error("登録後のログインに失敗しました。");
         // r3 再レビュー3回目 是正: 新規登録直後のログイン成功でもループ検知の発火履歴をリセットする。

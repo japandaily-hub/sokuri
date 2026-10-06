@@ -1013,6 +1013,13 @@ export function signupUser(payload: {
   name?: string;
   /** お知らせメール（入札の通知・リマインド）を受け取るか。省略時はサーバー既定（受け取る）。 */
   email_notify_opt_in?: boolean;
+  /**
+   * 利用規約・プライバシーポリシーへの同意（3周目の法務監査）。true 以外は backend が 422
+   * （detail.code: "terms_agreement_required"）で拒否する。画面は同意のチェック後にだけ呼ぶ。
+   */
+  agreed_terms: true;
+  /** 画面が表示していた規約の版数（参考値。記録する版数は backend が確定する）。 */
+  terms_version?: string;
 }): Promise<AuthTokenResponse> {
   return request("/auth/signup", { method: "POST", body: JSON.stringify(payload) });
 }

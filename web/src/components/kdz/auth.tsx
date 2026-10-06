@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useId, useState, type ReactNode } from "react";
 import { signIn } from "next-auth/react";
-import { canStartLineAuth, lineConsentHint } from "@/lib/line-consent";
+import { buildLineTermsConsentCookie, canStartLineAuth, lineConsentHint } from "@/lib/line-consent";
 import { KdzLogo } from "./Logo";
 
 /** 認証画面の上部バー（ロゴ + 右リンク）。 */
@@ -154,6 +154,11 @@ export function LineAuthButton({
  * メール登録フォーム（/signup 手順3）と同じ必須チェックをボタンの上に置き、同意前はボタンを無効にする。
  * 押せるかどうかの判定は lib/line-consent.ts の純関数（単体テストあり）に寄せ、ここは描画だけを持つ。
  *
+ * 3周目の法務監査（中）: 同意は画面だけでなくサーバーにも記録する。押した時点で同意の版数を短命の
+ * Cookie に置き、auth.ts の signIn コールバックが LINE 交換の本文に `agreed_terms: true` として載せる
+ * （backend は未登録の LINE アカウントを新規作成するときだけ必須にし、版数と日時を保存する。
+ * 経路の設計は lib/line-consent.ts の「同意の値をサーバーへ届ける」を参照）。
+ *
  * 無効化したボタンには、理由（同意が必要なこと）を aria-describedby で結ぶ。
  * ボタンの色（LINE のブランドカラー）は変えない（コントラストの扱いは運営判断の待ち・M-11）。
  */
@@ -198,6 +203,8 @@ export function LineConsentAuth({
           // disabled の取りこぼし（古いブラウザ・支援技術の操作）に備え、押下時にも判定し直す。
           if (!canStartLineAuth({ agreed, busy })) return;
           setBusy(true);
+          // 同意した版数をコールバック（/api/auth/callback/line）へ運ぶ。同意済みのときだけここに来る。
+          document.cookie = buildLineTermsConsentCookie(window.location.protocol === "https:");
           void signIn("line", { callbackUrl });
         }}
       >

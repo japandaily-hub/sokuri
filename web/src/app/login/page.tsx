@@ -12,6 +12,7 @@ import { Reveal } from "@/components/kdz/interactions";
 import { safeInternalPath } from "@/lib/safe-path";
 import { USER_HOME_PATH, resolvePostLoginPath } from "@/lib/post-login-path";
 import { clearRedirectLoopStorage } from "@/lib/katadzuke-api";
+import { LINE_TERMS_REQUIRED_MESSAGE, LINE_TERMS_REQUIRED_REASON } from "@/lib/line-consent";
 import "./login.css";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -80,6 +81,9 @@ function LoginForm() {
   // { code: "account_suspended" } で返した際、共通処理（katadzuke-api.ts）が
   // signOut 後にここへ ?reason=suspended 付きで遷移させる。
   const suspended = params.get("reason") === "suspended";
+  // 3周目の法務監査（中）: 未登録の LINE アカウントで同意が backend に届かなかった（同意の Cookie の
+  // 期限切れ等）とき、auth.ts の signIn コールバックが ?reason=terms_required 付きでここへ戻す。
+  const lineTermsRequired = params.get("reason") === LINE_TERMS_REQUIRED_REASON;
   const { data: session, status } = useSession();
   const accountType = session?.accountType;
   const role = session?.role;
@@ -227,6 +231,15 @@ function LoginForm() {
                 （src/auth.ts の line プロバイダ → backend /auth/line/exchange が依頼者を新規作成）。
                 既存ユーザー向けの「ログインすると同意」の一文では新規登録の同意として足りないため、
                 /signup と同じ必須の同意チェック方式にする（みなし同意はやめた）。 */}
+            {lineTermsRequired ? (
+              <div className="auth-error" role="alert">
+                <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: "none", stroke: "var(--danger)", strokeWidth: 2, strokeLinecap: "round", flexShrink: 0 }}>
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 8v4M12 16h.01" />
+                </svg>
+                <span>{LINE_TERMS_REQUIRED_MESSAGE}</span>
+              </div>
+            ) : null}
             <LineConsentAuth callbackUrl={callbackUrl} />
 
             <div className="auth-divider">メールアドレスで登録した方</div>
