@@ -588,7 +588,7 @@ export default function OperatorCaseDetailPage() {
                     step={BID_STEP}
                     value={raiseAmount}
                     onChange={(e) => setRaiseAmount(e.target.value)}
-                    placeholder={String(caseData.my_bid.amount + BID_STEP)}
+                    placeholder="現在額より高い金額"
                     aria-describedby="raiseAmountHint"
                   />
                 </div>

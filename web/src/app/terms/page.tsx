@@ -18,8 +18,8 @@ export const metadata: Metadata = publicPageMetadata({
 const POINTS: { no: string; lead: string; body: string; ref: string; href: string }[] = [
   {
     no: "01",
-    lead: "ユーザーの費用は0円です。",
-    body: "出品からお断りまで、ユーザーに費用の請求はありません。",
+    lead: "カタヅケの利用料は0円です（業者との取引にかかる費用は業者ごとに異なります）。",
+    body: "出品からお断りまで、カタヅケからユーザーに利用料を請求することはありません。",
     ref: "ユーザー利用規約 第6条",
     href: "#tu-6",
   },

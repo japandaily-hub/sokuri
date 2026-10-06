@@ -68,7 +68,7 @@ export default function OgImage() {
             AI を主語にした査定は実装に無く（CONSTRAINTS §3・BRIEF §4.1）、本文も
             「写真と品目から」で統一しているため、OG だけ残すと誇張表示になる。 */}
         <div style={{ display: "flex", position: "absolute", top: "72px", right: "80px", border: "1px solid #1447e0", color: "#1447e0", fontSize: "22px", fontWeight: 400, padding: "8px 20px", letterSpacing: "0.08em" }}>
-          写真査定 × リユース
+          写真 × 入札 × リユース
         </div>
 
         {/* Middle: headline */}
@@ -131,7 +131,7 @@ export default function OgImage() {
               background: "#ffffff",
             }}
           >
-            完全無料
+            カタヅケの利用料は無料
           </div>
           <div
             style={{
@@ -151,7 +151,7 @@ export default function OgImage() {
               background: "#ffffff",
             }}
           >
-            写真で査定
+            写真で入札
           </div>
           <div
             style={{

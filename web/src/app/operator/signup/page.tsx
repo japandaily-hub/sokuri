@@ -139,7 +139,7 @@ export default function OperatorSignupPage() {
             {/* 参加条件の要点。左カラムの1行（審査制）を、右カラムの事実で受ける */}
             <ul className="op-points">
               <li>古物商許可の確認</li>
-              <li>初期費用0円</li>
+              <li>カタヅケの初期利用料0円</li>
               <li>下見なし</li>
             </ul>
 
