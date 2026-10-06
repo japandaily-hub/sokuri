@@ -183,6 +183,8 @@ export interface CaseMasked {
   top_bid_amount?: number | null;
   /** 自社入札があり、それが現在の最高額であれば true。自社入札が無ければ null。 */
   is_top_bidder?: boolean | null;
+  /** 自社が最高額で、同額の他社入札もあるとき true（単独なら false。判定不能・旧応答は null/undefined）。 */
+  is_tied_for_top?: boolean | null;
 }
 
 export interface BidOut {

@@ -36,6 +36,11 @@ test("一覧の首位文言: 2社以上の首位は同額の可能性を添え�
   assert.equal(topBidderLabel(true, 2), "自社が最高額（同額の可能性あり）");
   assert.equal(topBidderLabel(false, 3), "他社が上回り中");
   assert.equal(topBidderLabel(undefined, 3), null);
+  // backend が同額フラグを返すときは断定する（R2-04）。
+  assert.equal(topBidderLabel(true, 3, false), "自社が単独の最高額");
+  assert.equal(topBidderLabel(true, 3, true), "自社が最高額（他社と同額で並んでいます）");
+  assert.equal(topBidderLabel(true, 3, null), "自社が最高額（同額の可能性あり）");
+  assert.equal(topBidderLabel(false, 3, true), "他社が上回り中");
 });
 
 test("初回入札の確認モーダルの桁表示: 境界と不正値", () => {

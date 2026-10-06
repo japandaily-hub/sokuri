@@ -41,6 +41,7 @@ import {
   type TransactionDetail,
 } from "@/lib/katadzuke-api";
 import { toIsoDateString } from "@/lib/visit-slots";
+import { meaningfulCaseSummary } from "@/lib/case-detail-view";
 import { ReviewComposer } from "@/components/kdz/ReviewComposer";
 import { REVIEW_VERDICT_LABEL } from "@/lib/review-verdict";
 
@@ -400,10 +401,10 @@ export default function OperatorTransactionPage() {
             </div>
           ) : null}
 
-          {txn.case?.ai_summary ? (
+          {meaningfulCaseSummary(txn.case?.ai_summary) ? (
             <div className="op-card">
               <p className="op-ai-summary">AI要約</p>
-              <p>{txn.case.ai_summary}</p>
+              <p>{meaningfulCaseSummary(txn.case?.ai_summary)}</p>
             </div>
           ) : null}
 
@@ -549,9 +550,6 @@ export default function OperatorTransactionPage() {
             <h2 className="modal-title" id="reductionModalTitle">減額を申請しますか？</h2>
             <p className="modal-sub">ユーザーの承認後に金額が確定します。承認されるまでは現在の金額のままです。</p>
             <div className="modal-biz">
-              <div className="modal-biz-avatar" style={{ background: "var(--gold)" }}>
-                ¥
-              </div>
               <div>
                 <div className="modal-biz-name">{formatYen(currentAmount)} → {formatYen(modal.amount)}</div>
                 <div className="modal-biz-amount" style={{ fontSize: 13, fontWeight: 600, color: "var(--body-soft)" }}>{modal.reason}</div>

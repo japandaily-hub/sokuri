@@ -29,7 +29,7 @@ import { ChatSystemNotice } from "@/components/kdz/ChatSystemNotice";
 import { stripControlChars } from "@/lib/categories";
 import { advanceCursor, appendNewMessages, cursorToAfterParam } from "@/lib/chat-cursor";
 import { isSystemNotice } from "@/lib/chat-system-notice";
-import { formatJstDateSeparator, formatJstDateTime, formatJstTime } from "@/lib/datetime";
+import { formatJstDate, formatJstDateSeparator, formatJstDateTime, formatJstTime } from "@/lib/datetime";
 import { isImeComposingKey, messageLengthState } from "@/lib/message-length";
 import { MessageLengthCounter } from "@/components/kdz/MessageLengthCounter";
 import {
@@ -473,7 +473,6 @@ export default function OperatorChatPage() {
   // 入力中の本文の文字数状態（上限超過なら送信ボタンを無効化し、カウンタに理由を出す）。
   const draftLength = messageLengthState(draft);
   const peerInitial = "客";
-  const caseIdShort = detail?.case_id ? detail.case_id.slice(0, 8).toUpperCase() : "";
   const statusLabel = detail ? TXN_STATUS_LABEL[detail.status] : "";
   // r8-fix-frontend2 H3 是正: キャンセル済み・完了済みの取引ではチャットの続行操作
   // （送信・日程提案）を無効化し、事実に即した終了表示に切り替える。
@@ -537,7 +536,7 @@ export default function OperatorChatPage() {
                 <span className={`case-status status-${t.status === "pending" ? "waiting" : t.status === "visiting" ? "scheduled" : "negotiating"}`}>
                   {TXN_STATUS_LABEL[t.status]}
                 </span>
-                <div className="case-id">{t.id.slice(0, 8).toUpperCase()}</div>
+                <div className="case-id">{formatJstDate(t.created_at)}の成約</div>
                 <div className="case-preview">
                   {t.prefecture} {t.city}
                 </div>
@@ -558,8 +557,16 @@ export default function OperatorChatPage() {
               読み込み中…
             </div>
           ) : detailError ? (
-            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--body-soft)" }}>
-              {detailError}
+            // 取得できなかった（他社の取引・存在しない取引など）ときは、合意額や日程提案のような操作を出さず、
+            // 次の行動（取引一覧へ戻る）だけを出す（V-07/R2-01）。
+            <div
+              role="alert"
+              style={{ flex: 1, display: "flex", flexDirection: "column", gap: 14, alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center", color: "var(--body-soft)" }}
+            >
+              <p style={{ margin: 0 }}>{detailError}</p>
+              <Link href="/operator/transactions" className="btn btn-primary">
+                取引一覧へ戻る
+              </Link>
             </div>
           ) : (
             <>
@@ -569,7 +576,7 @@ export default function OperatorChatPage() {
                 <div className="peer-info">
                   <div className="peer-name">依頼者</div>
                   <div className="peer-sub">
-                    {detail?.case?.prefecture} {detail?.case?.city}　{caseIdShort}
+                    {detail?.case?.prefecture} {detail?.case?.city}
                   </div>
                 </div>
                 <div className="amount-chip">
@@ -883,12 +890,9 @@ export default function OperatorChatPage() {
         </div>
 
         {/* 右パネル（出品内容） */}
+        {detail ? (
         <aside className="detail-panel" aria-label="出品内容">
           <div className="dp-head">出品内容</div>
-          <div className="dp-case-id">
-            <div className="lbl">案件ID</div>
-            <div className="val">{caseIdShort}</div>
-          </div>
           <div className="dp-info">
             <div className="dp-row">
               <span className="lbl">エリア</span>
@@ -911,6 +915,7 @@ export default function OperatorChatPage() {
             引き取り日程を提案
           </button>
         </aside>
+        ) : null}
       </div>
 
       {toast ? (

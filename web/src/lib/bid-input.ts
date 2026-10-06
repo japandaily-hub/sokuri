@@ -60,8 +60,16 @@ export function classifyBidPosition(
  * 一覧には他社の個別金額が無く、同額で並んでいるかを断定できない。2社以上が入札していて
  * 自社が首位のときは「同額の可能性あり」と添え、「勝っている」と読み違えないようにする（V-03）。
  */
-export function topBidderLabel(isTopBidder: boolean | null | undefined, bidCount: number): string | null {
+export function topBidderLabel(
+  isTopBidder: boolean | null | undefined,
+  bidCount: number,
+  isTiedForTop?: boolean | null,
+): string | null {
   if (isTopBidder == null) return null;
   if (!isTopBidder) return "他社が上回り中";
+  // backend が同額かどうかを返す場合はそれに従う（同額なら並びを、単独なら最高額を断定してよい）。
+  if (isTiedForTop === true) return "自社が最高額（他社と同額で並んでいます）";
+  if (isTiedForTop === false) return "自社が単独の最高額";
+  // 同額かどうか分からない（旧応答）ときだけ「可能性あり」と添える。
   return bidCount >= 2 ? "自社が最高額（同額の可能性あり）" : "自社が最高額";
 }

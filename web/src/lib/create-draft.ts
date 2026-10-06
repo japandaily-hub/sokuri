@@ -33,7 +33,6 @@ export interface CreateDraftChoices {
   floorPlans: readonly string[];
 }
 
-// eslint-disable-next-line no-control-regex
 const CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/;
 
 /** 既定値と同じ（＝まだ何も入力していない）下書きか。保存の要否判定に使う。 */

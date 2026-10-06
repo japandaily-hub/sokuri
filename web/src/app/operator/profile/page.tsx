@@ -21,12 +21,13 @@
 import "./profile.css";
 
 import Link from "next/link";
-import { signOut } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmModal } from "@/components/kdz/ConfirmModal";
 import { Ic, type IcName } from "@/components/kdz/Icons";
 import { OperatorHeader } from "@/components/kdz/OperatorHeader";
 import { formatJstDate } from "@/lib/datetime";
+import { maskEmail } from "@/lib/mask-email";
 import { vendorCategoryName } from "@/lib/categories";
 import { useToken } from "@/components/kdz/Ui";
 import {
@@ -143,6 +144,9 @@ const MESSAGE_MAX = 500;
 
 export default function OperatorProfilePage() {
   const { token, loading: tokenLoading } = useToken();
+  const { data: sessionData } = useSession();
+  /** 通知先（ログイン時点の登録メール）の伏せ字表示。取れなければ表示しない。 */
+  const maskedNoticeEmail = maskEmail(sessionData?.user?.email);
 
   const [profile, setProfile] = useState<OperatorProfile | null>(null);
   const [initialState, setInitialState] = useState<ProfileState>(EMPTY_STATE);
@@ -571,7 +575,7 @@ export default function OperatorProfilePage() {
                   <div className="upload-body">
                     <strong>許可証の画像</strong>
                     <span>
-                      JPG / PNG / WEBP・10MBまで。
+                      JPG / PNG / WEBP・10MBまで。許可証以外の個人情報（住所・生年月日・顔写真・マイナンバーなど）が写り込まないようにしてください。
                       {profile.license_image_uploaded_at
                         ? `アップロード済み（${formatJstDate(profile.license_image_uploaded_at)}）`
                         : "未アップロードです。"}
@@ -730,11 +734,11 @@ export default function OperatorProfilePage() {
                   <div>
                     <h4>通知とお預かりしている情報</h4>
                     <p>
-                      入札結果・取引のお知らせは、ご登録のメールアドレスにお送りします（通知先の変更は
+                      入札結果・取引のお知らせは、ご登録のメールアドレス{maskedNoticeEmail ? `（${maskedNoticeEmail}。ログイン時点の登録内容です）` : ""}にお送りします（通知先の変更は
                       <Link href="/contact">お問い合わせ</Link>
                       から承ります）。お申し込み時に振込先口座をご登録いただいた場合、その確認・変更・削除も
                       <Link href="/contact">お問い合わせ</Link>
-                      から承ります。
+                      から承ります。口座の登録状況はこの画面では確認できません。
                     </p>
                   </div>
                 </div>

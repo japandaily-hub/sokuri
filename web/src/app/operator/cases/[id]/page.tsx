@@ -29,6 +29,7 @@ import {
   isBidMessageWithinLimit,
 } from "@/lib/bid-input";
 import { DisclosureNotice } from "@/components/kdz/DisclosureNotice";
+import { meaningfulCaseSummary } from "@/lib/case-detail-view";
 import {
   BID_STATUS_LABEL,
   CASE_ITEM_CONDITION_LABEL,
@@ -445,10 +446,10 @@ export default function OperatorCaseDetailPage() {
             </div>
           ))}
 
-          {caseData.ai_summary ? (
+          {meaningfulCaseSummary(caseData.ai_summary) ? (
             <div className="op-card">
               <p className="op-ai-summary">AI要約</p>
-              <p>{caseData.ai_summary}</p>
+              <p>{meaningfulCaseSummary(caseData.ai_summary)}</p>
             </div>
           ) : null}
 

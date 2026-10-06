@@ -122,7 +122,7 @@ function LotCard({ c }: { c: CaseMasked }) {
               <span className="status-chip negotiating">最高額 {formatYen(c.top_bid_amount)}</span>
               {c.my_bid ? (
                 <span className={`status-chip ${c.is_top_bidder ? "live" : "warn"}`}>
-                  {topBidderLabel(c.is_top_bidder, c.bid_count) ?? "他社が上回り中"}
+                  {topBidderLabel(c.is_top_bidder, c.bid_count, c.is_tied_for_top) ?? "他社が上回り中"}
                 </span>
               ) : null}
             </div>

@@ -165,6 +165,7 @@ type Lot = {
   topBidAmount?: number | null;
   /** 自社入札があり、それが最高額なら true。backend 未対応の間は undefined。 */
   isTopBidder?: boolean | null;
+  isTiedForTop?: boolean | null;
 };
 
 function toLot(c: CaseMasked): Lot {
@@ -182,6 +183,7 @@ function toLot(c: CaseMasked): Lot {
     itemsLabel: caseItemsLabel(c) ?? c.id.slice(0, 8),
     topBidAmount: c.top_bid_amount,
     isTopBidder: c.is_top_bidder,
+    isTiedForTop: c.is_tied_for_top,
   };
 }
 
@@ -272,7 +274,7 @@ function LotCard({
             <div className="lot-meta" style={{ marginTop: 4 }}>
               <span className={`status-chip ${lot.isTopBidder ? "live" : "negotiating"}`}>
                 最高額 ¥{yen(lot.topBidAmount)}
-                {lot.myBid && topBidderLabel(lot.isTopBidder, lot.bidCount) ? `・${topBidderLabel(lot.isTopBidder, lot.bidCount)}` : ""}
+                {lot.myBid && topBidderLabel(lot.isTopBidder, lot.bidCount, lot.isTiedForTop) ? `・${topBidderLabel(lot.isTopBidder, lot.bidCount, lot.isTiedForTop)}` : ""}
               </span>
             </div>
           ) : lot.topBidAmount === null && lot.bidCount === 0 ? (
@@ -408,7 +410,7 @@ function LotCompactRow({ lot, changed }: { lot: Lot; changed: boolean }) {
         {lot.myBid ? (
           <span className="lot-compact-mybid">
             自社 <strong>¥{yen(lot.myBid)}</strong>
-            {topBidderLabel(lot.isTopBidder, lot.bidCount) ? `・${topBidderLabel(lot.isTopBidder, lot.bidCount)}` : ""}
+            {topBidderLabel(lot.isTopBidder, lot.bidCount, lot.isTiedForTop) ? `・${topBidderLabel(lot.isTopBidder, lot.bidCount, lot.isTiedForTop)}` : ""}
           </span>
         ) : null}
       </div>
@@ -1068,17 +1070,12 @@ export default function OperatorDashboardPage() {
           <p className="modal-sub">以下の金額でこの案件に入札します。ユーザーに選ばれると成約・取引に進めます。入札後は取り消せません（金額の引き上げのみ可能です）。</p>
           <div className="modal-amount">
             ¥{modalAmount ? yen(modalAmount) : "—"}
-            <span>円</span>
           </div>
           {modalAmount && formatYenReading(modalAmount) ? (
             <p className="modal-sub" data-testid="bid-modal-reading">
               （{formatYenReading(modalAmount)}）
             </p>
           ) : null}
-          <p className="modal-warn">
-            <Ic name="shield" />
-            提示した金額を大きく下回る減額は、現物確認の場でのユーザーの合意が必要です。
-          </p>
           <div className="modal-actions">
             <button type="button" className="btn-modal-cancel" onClick={() => setModalLotId(null)}>
               キャンセル
