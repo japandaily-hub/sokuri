@@ -155,7 +155,7 @@ export default function PhotoGuidePage() {
               <span className="btn-line__tile" aria-hidden="true" />
               <span className="btn-line__body">
                 <span className="btn-line__label">LINEではじめる（無料）</span>
-                <span className="btn-line__sub">LINEアカウントでログインできます</span>
+                <span className="btn-line__sub">規約に同意のうえ登録・ログイン</span>
               </span>
               <Ic name="arrow" className="btn-line__arr" />
             </Link>
@@ -384,7 +384,7 @@ export default function PhotoGuidePage() {
           <p>
             1点ずつ撮って、まとめて出すだけ。1点ずつ売る手間も、しつこい営業電話もありません。
             <br />
-            出品からお断りまで、ユーザーの費用は一切かかりません。
+            カタヅケの利用料はかかりません（出張・運搬・処分の費用の扱いは業者ごとに異なります）。
           </p>
           <div className="pg-cta-btns">
             {/* ヒーローと同一の 2 トーン構造。同じ文言のボタンが違う見た目で並ばないよう揃える。 */}
@@ -393,7 +393,7 @@ export default function PhotoGuidePage() {
               <span className="btn-line__tile" aria-hidden="true" />
               <span className="btn-line__body">
                 <span className="btn-line__label">LINEではじめる（無料）</span>
-                <span className="btn-line__sub">LINEアカウントでログインできます</span>
+                <span className="btn-line__sub">規約に同意のうえ登録・ログイン</span>
               </span>
               <Ic name="arrow" className="btn-line__arr" />
             </Link>

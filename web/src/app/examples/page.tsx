@@ -59,7 +59,7 @@ const FILTERS: { label: string; tag: string }[] = [
  *  数字で出すのは金額（¥0）とエリア（4都県）の2項目に絞り、残る2項目は text（ラベル先行の
  *  文型・本文と同じ級数）にする。文言はいずれも既存のサービス条件の再掲で、新しい約束はしない。 */
 const STATS: { num?: string; unit?: string; text?: string; label: string; minor?: boolean }[] = [
-  { num: "¥0", label: "出品から成約まで無料" },
+  { num: "¥0", label: "カタヅケの利用料（出品から成約まで）" },
   { text: "連絡が来るのは、選んだ1社だけ", label: "選ばなかった業者には自動でお断りが入ります" },
   { num: "4", unit: "都県", label: "東京・千葉・埼玉・神奈川", minor: true },
   { text: "家電からブランド品まで対応", label: "12のカテゴリから選んで出品できます", minor: true },
@@ -282,7 +282,7 @@ export default function ExamplesPage() {
           {/* ============ CTA ============ */}
           {/* 押す直前の安心1行（.section-cta / /signup の既存文言の再掲。新しい約束は足さない） */}
           <p className="cases-assure">
-            出品からお断りまで無料　／　連絡が来るのは、あなたが選んだ1社だけ
+            カタヅケの利用料は無料　／　連絡が来るのは、あなたが選んだ1社だけ
           </p>
           <Reveal className="cases-cta">
             <div className="cases-cta-inner">
@@ -290,7 +290,7 @@ export default function ExamplesPage() {
               <p>
                 1点ずつ撮って、業者に競ってもらうだけ。
                 <br />
-                出品からお断りまで、ユーザーの費用は一切かかりません。
+                カタヅケの利用料はかかりません（出張・運搬・処分の費用の扱いは業者ごとに異なります）。
               </p>
               <div className="cases-cta-actions">
                 <Link href="/create" className="btn btn-primary btn-lg">

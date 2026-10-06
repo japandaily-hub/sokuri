@@ -24,7 +24,8 @@ function VerifyEmailContent() {
   const hasToken = (params.get("token") ?? "").trim().length > 0;
 
   return (
-    <div className="verify-page">
+    <main id="main" className="verify-page">
+      {/* N-10（2周目監査）: スキップリンク（#main）の飛び先を持たせる（h1 は下の確認カードにある）。 */}
       <Link href="/" className="confirm-logo" aria-label="カタヅケ トップへ">
         <KdzLogo size={22} />
       </Link>
@@ -80,7 +81,7 @@ function VerifyEmailContent() {
             <div className="ws-num">3</div>
             <div className="ws-body">
               <strong>業者を選んで引き取り</strong>
-              <span>届いた入札から1社を選びます。お支払い方法は、成約後にご案内します。訪問の日程は画面上で調整します。</span>
+              <span>届いた入札から1社を選びます。お支払い方法は、成約後にご案内します。訪問の日程は、取引画面で業者が出す日時の候補から選んで決めます。</span>
             </div>
           </div>
         </div>
@@ -99,7 +100,7 @@ function VerifyEmailContent() {
         {"　·　"}
         <Link href="/contact">お問い合わせ</Link>
       </div>
-    </div>
+    </main>
   );
 }
 

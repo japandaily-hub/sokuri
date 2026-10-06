@@ -218,7 +218,7 @@ export function LpChrome() {
           <span className="btn-line__tile" aria-hidden="true" />
           <span className="btn-line__body">
             <span className="btn-line__label">LINEではじめる</span>
-            <span className="btn-line__sub">出品からお断りまで無料</span>
+            <span className="btn-line__sub">カタヅケの利用料は無料</span>
           </span>
           <Ic name="arrow" className="btn-line__arr" />
         </Link>
@@ -266,7 +266,7 @@ export function LpChrome() {
             <span className="btn-line__tile" aria-hidden="true" />
             <span className="btn-line__body">
               <span className="btn-line__label">LINEではじめる（無料）</span>
-              <span className="btn-line__sub">LINEアカウントでログインできます</span>
+              <span className="btn-line__sub">規約に同意のうえ登録・ログイン</span>
             </span>
             <Ic name="arrow" className="btn-line__arr" />
           </Link>

@@ -224,8 +224,8 @@ const POINT_BLOCKS: PointBlock[] = [
       {
         h: "梱包も発送も不要。玄関先で引き渡すだけ",
         /* L-6: 日程は候補の提示と承諾（schedule の提示・accept）で決まる実装のため、
-           「あなたの都合で選べる」とは書かない。 */
-        p: <>訪問日時は、候補から選んで業者と調整できます。大型家具や大量の品も、まとめて相談OK。</>,
+           「あなたの都合で選べる」とは書かない。N-13: 日程の説明は /legal・/verify-email と同じ1文に揃える。 */
+        p: <>訪問の日程は、取引画面で業者が出す日時の候補から選んで決めます。大型家具や大量の品も、まとめて相談OK。</>,
       },
     ],
     cells: [
@@ -763,17 +763,20 @@ export default function LpPage() {
           <div className="lp-container">
             <Reveal className="lp-fee__panel" variant="up">
               <span className="eyebrow">料金について</span>
-              <h2>費用は、一切かかりません</h2>
+              {/* N-1（2周目監査・高）: 無料なのは「カタヅケの利用料」に限る。業者との取引の費用（出張・運搬・処分）は
+                  業者ごとに異なる（/faq「費用・料金」と同じ書き方）。引き取りの段階まで含めて例外なしに「無料」「¥0」と
+                  言い切らず、その注記を ¥0 と同じ視野に置く。 */}
+              <h2>カタヅケの利用料は、かかりません</h2>
               <p className="lp-en">price / free of charge</p>
-              <p className="lp-fee__lead">出品から引き取りまで、すべて無料です。</p>
+              <p className="lp-fee__lead">出品から成約まで、カタヅケの利用料は0円です。</p>
 
               <div className="lp-fee__zero">
-                <span className="lp-fee__label">あなたのお支払い</span>
+                <span className="lp-fee__label">カタヅケの利用料</span>
                 <strong className="lp-fee__num">¥0</strong>
-                <span className="lp-fee__note">出品・お断り・引き取りの、どの段階でも無料です。</span>
+                <span className="lp-fee__note">出品・お断り・成約の、どの段階でも利用料はかかりません。</span>
                 {/* 打消し表示は ¥0 と同一視野・本文サイズで置く（最小級の※にしない） */}
                 <span className="lp-fee__caution">
-                  訪問時の現物確認で写真と状態が違えば、業者から金額のご相談が届くことがあります。納得できなければお断りできます（お断りにも費用はかかりません）。
+                  出張・運搬・処分にかかる費用の扱いは業者ごとに異なります。成約前にお確かめください。訪問時の現物確認で写真と状態が違えば、業者から金額のご相談が届くことがあります。納得できなければお断りできます。
                 </span>
               </div>
 
@@ -793,7 +796,7 @@ export default function LpPage() {
                   <span className="btn-line__tile" aria-hidden="true" />
                   <span className="btn-line__body">
                     <span className="btn-line__label">LINEではじめる（無料）</span>
-                    <span className="btn-line__sub">LINEアカウントでログインできます</span>
+                    <span className="btn-line__sub">規約に同意のうえ登録・ログイン</span>
                   </span>
                   <Ic name="arrow" className="btn-line__arr" />
                 </Link>

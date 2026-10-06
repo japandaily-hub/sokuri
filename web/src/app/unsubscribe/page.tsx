@@ -22,7 +22,8 @@ function UnsubscribeContent() {
   const email = params.get("email") ?? "";
 
   return (
-    <div className="unsub-page">
+    <main id="main" className="unsub-page">
+      {/* N-10（2周目監査）: スキップリンク（#main）の飛び先を持たせる。 */}
       <div className="form-card">
         <h1>メールの受け取りについて</h1>
         <p>
@@ -43,7 +44,14 @@ function UnsubscribeContent() {
         <p>
           アカウントそのものの削除をご希望の場合は、
           <Link href="/mypage/withdraw">退会手続き</Link>
-          からお手続きください。退会後は、法令上保存が必要な期間を除き、個人情報を遅滞なく削除します。
+          からお手続きください。
+        </p>
+        {/* N-5（2周目監査・中）: 「法令上の期間を除き遅滞なく削除」は実装・プライバシーポリシー第8条と合わない
+            （残す記録の理由は法令ではなく取引の整合と紛争への対応。保存期間の定めもない）。第8条の要旨に揃えて参照させる。 */}
+        <p>
+          退会されると、氏名・電話番号・住所・振込口座・本人確認書類の画像などを消去します。出品の内容や入札・取引・チャット・評価の記録は、取引の相手方の記録でもあるため、取引の整合と紛争への対応のために残します。消去する情報と残す記録の詳細は、
+          <Link href="/privacy#pp-8">プライバシーポリシー 第8条</Link>
+          をご覧ください。
         </p>
         <div style={{ marginTop: 28 }}>
           <Link href="/" className="btn btn-primary">
@@ -54,7 +62,7 @@ function UnsubscribeContent() {
       <p className="unsub-footnote">
         ご不明な点は <a href="mailto:katazuke.info@gmail.com">katazuke.info@gmail.com</a> までお問い合わせください。
       </p>
-    </div>
+    </main>
   );
 }
 

@@ -83,7 +83,7 @@ export function Dock({
   // （page.tsx のヒーロー/中段/下部CTAと同じ理由）。
   href = "/login?callbackUrl=%2Fmypage",
   label = "LINEで無料ではじめる",
-  sub = "LINEアカウントでログインできます",
+  sub = "規約に同意のうえ登録・ログイン",
 }: { href?: string; label?: string; sub?: string }) {
   const [ctaInView, setCtaInView] = useState(false);
   useEffect(() => {

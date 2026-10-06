@@ -244,10 +244,12 @@ const FLOW: { n: string; h: string; p: string }[] = [
 
 /** 登録要件 */
 const REQUIREMENTS: { icon: "shield" | "people" | "tag" | "check-circle"; h: string; p: string }[] = [
-  { icon: "shield", h: "古物商許可証", p: "古物営業法に基づく古物商許可を取得していること。登録時に許可証のコピーをご提出いただきます。" },
+  { icon: "shield", h: "古物商許可証", p: "古物営業法に基づく古物商許可を取得していること。登録の審査で、ご提出いただく許可証の画像と許可番号を確認します。" },
   { icon: "people", h: "法人または個人事業主", p: "事業として買取・リユースを営んでいること。個人での副業・転売目的の登録はお断りしています。" },
   { icon: "tag", h: "対応エリア内での訪問買取", p: "東京都・千葉県・埼玉県・神奈川県のいずれかで訪問買取ができること。" },
-  { icon: "check-circle", h: "特定商取引法の遵守", p: "訪問買取において特定商取引法（法定書面の交付、クーリング・オフが適用される取引への対応等）を遵守していること。審査時に確認させていただきます。" },
+  /* N-6（2周目監査・中）: 「特定商取引法の遵守…審査時に確認」は削除した。運営の審査画面・API に特商法・法定書面を
+     確認する項目は無く、審査で見ているのは許可証の画像と許可番号だけ（H-5 と同じ型の過大記載になる）。
+     確認するなら審査のチェック項目を実装してから書くこと。 */
 ];
 
 /** 業者向けFAQ（共通 FaqAccordion で描画） */
@@ -822,7 +824,7 @@ export default function BusinessPage() {
             <div className="section-head">
               <span className="eyebrow">ご利用条件</span>
               <h2>登録要件</h2>
-              <p className="sub">ユーザーの安心のため、登録時に以下を確認させていただきます。</p>
+              <p className="sub">次の条件を満たす事業者さまを対象としています。登録の審査では、古物商許可証の画像と許可番号を確認します。</p>
             </div>
             <Reveal className="media-split media-split--rev biz-req-split">
               <Reveal as="figure" variant="zoom" className="img-frame img-frame--1x1 img-frame--pale biz-req-fig sp-bleed">
