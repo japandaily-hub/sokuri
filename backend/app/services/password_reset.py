@@ -27,6 +27,9 @@
   期限切れで、1アカウントの行数は高々5行に保たれる）。
 - 管理者（``role == "admin"``）は自己再設定の対象外（security review M-2）。要求は同じ 202 で
   メールを送らず、運営アラートを1通出す（本文は種別とマスク済み ID のみ）。
+  ADMIN_EMAILS に載っているがまだ ``role="user"`` のアカウント（ログイン時に管理者へ昇格し
+  うる）も同じく対象外にする（security review L-8。メールの乗っ取りから再設定→昇格の
+  経路を断つ）。
 
 既存ログインの失効（再設定の確定時）:
 - 依頼者: パスワード変更（``PUT /users/me/password``）と同じ ``password_changed_at`` を
@@ -49,6 +52,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.core.error_summary import describe_exception
 from app.core.security import hash_password
 from app.db import session as db_session_module
@@ -250,6 +254,21 @@ async def issue_reset_token(
     return raw_token
 
 
+def _is_admin_or_listed_admin(account: User | Operator) -> bool:
+    """自己再設定の対象外とする依頼者アカウントか（管理者・ADMIN_EMAILS 該当者）。
+
+    ADMIN_EMAILS の照合は auth._is_listed_admin_email と同じく前後空白・大文字小文字を
+    揃えてから行う（User.email は LINE 連携経由だと正規化が保証されない）。
+    業者アカウントは管理者にならないので対象外にしない。
+    """
+    if not isinstance(account, User):
+        return False
+    if account.role == "admin":
+        return True
+    email = (account.email or "").strip().lower()
+    return bool(email) and email in get_settings().admin_emails
+
+
 async def _alert_admin_reset_request(account_id: uuid.UUID) -> None:
     """管理者アカウントへの再設定要求を運営へ知らせる（本文は種別とマスク済み ID のみ）。"""
     await alerts.send_alert(
@@ -280,11 +299,11 @@ async def process_reset_request(account_type: str, email: str) -> None:
                 )
                 return
             account_id = account.id
-            if isinstance(account, User) and account.role == "admin":
+            if _is_admin_or_listed_admin(account):
                 await session.rollback()
                 logger.warning(
-                    "password_reset: 管理者アカウントは自己再設定の対象外のため送信しません"
-                    "（type=%s account_id=%s）",
+                    "password_reset: 管理者（ADMIN_EMAILS 該当を含む）アカウントは自己再設定の"
+                    "対象外のため送信しません（type=%s account_id=%s）",
                     account_type,
                     account_id,
                 )
@@ -367,7 +386,7 @@ async def apply_new_password(
         or account.deleted_at is not None
         or account.is_suspended
         or account.password_hash is None
-        or (isinstance(account, User) and account.role == "admin")
+        or _is_admin_or_listed_admin(account)
     ):
         return None
 

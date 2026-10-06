@@ -629,6 +629,40 @@ async def test_admin_account_is_excluded_and_ops_alert_has_no_secrets(db_session
     assert _USER_EMAIL not in title + body
 
 
+async def test_listed_admin_email_with_user_role_is_excluded(db_session, sent_mail, monkeypatch):
+    """ADMIN_EMAILS に載っているが role="user" のアカウントも対象外（security review L-8）。"""
+    from app.config import get_settings
+
+    user = await _create_user(db_session)
+    user_id = user.id
+    monkeypatch.setattr(get_settings(), "admin_emails_raw", f"  {_USER_EMAIL.upper()} ,ops@example.com")
+    alert_mock = AsyncMock(return_value=True)
+    monkeypatch.setattr(password_reset_service.alerts, "send_alert", alert_mock)
+    app = _create_test_app(db_session)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        res = await _request(client, _USER_EMAIL)
+    assert res.status_code == 202
+    assert sent_mail.await_count == 0
+    assert await _rows(db_session) == []
+    alert_mock.assert_awaited_once()
+    title, body = alert_mock.await_args.args[:2]
+    assert str(user_id) not in body
+    assert _USER_EMAIL not in title + body
+
+
+async def test_token_cannot_be_used_after_email_is_listed_as_admin(db_session, sent_mail, monkeypatch):
+    from app.config import get_settings
+
+    await _create_user(db_session)
+    app = _create_test_app(db_session)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        await _request(client, _USER_EMAIL)
+        raw_token, _ = _token_from_mail(sent_mail)
+        monkeypatch.setattr(get_settings(), "admin_emails_raw", _USER_EMAIL)
+        res = await _confirm(client, raw_token)
+    assert res.status_code == 400
+
+
 async def test_admin_cannot_use_token_issued_before_becoming_admin(db_session, sent_mail):
     user = await _create_user(db_session)
     user_id = user.id
