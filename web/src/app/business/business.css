@@ -648,7 +648,7 @@
      版面（375−18×2=339px）を越えていた。折り返しを許し、幅は版面に収める。 */
   white-space: normal; max-width: 100%; line-height: 1.5; padding-inline: 20px; text-align: center;
 }
-/* r5 #27: 精算ブロック内にも同じ行き先を1本置く（口座を出さずに案件を見る道）。 */
+/* r5 #27: 精算ブロック内にも同じ行き先を1本置く（口座を出さずにアカウントを作る道。閲覧は審査の通過後＝M-2）。 */
 .business-page .biz-bank-alt {
   font-family: var(--ui);
   font-size: 13px;
