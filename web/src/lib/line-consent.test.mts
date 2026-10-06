@@ -14,8 +14,11 @@ import {
   buildLineTermsConsentCookie,
   canStartLineAuth,
   clearLineTermsConsentCookie,
+  isSecureRequest,
   lineConsentHint,
   lineExchangeConsentFields,
+  lineTermsConsentCookieName,
+  lineTermsConsentCookiePath,
 } from "./line-consent.ts";
 
 describe("canStartLineAuth（N-2・N-9: LINE ボタンは明示の同意後だけ押せる）", () => {
@@ -74,13 +77,32 @@ describe("同意の Cookie（3周目の法務監査: 同意を LINE 交換のリ
     const secure = buildLineTermsConsentCookie(true);
     assert.equal(
       secure,
-      `${LINE_TERMS_CONSENT_COOKIE}=${USER_TERMS_VERSION}; Path=/api/auth; Max-Age=${LINE_TERMS_CONSENT_MAX_AGE_SECONDS}; SameSite=Lax; Secure`,
+      `__Host-${LINE_TERMS_CONSENT_COOKIE}=${USER_TERMS_VERSION}; Path=/; Max-Age=${LINE_TERMS_CONSENT_MAX_AGE_SECONDS}; SameSite=Lax; Secure`,
+    );
+    assert.equal(
+      buildLineTermsConsentCookie(false),
+      `${LINE_TERMS_CONSENT_COOKIE}=${USER_TERMS_VERSION}; Path=/api/auth; Max-Age=${LINE_TERMS_CONSENT_MAX_AGE_SECONDS}; SameSite=Lax`,
     );
     assert.doesNotMatch(buildLineTermsConsentCookie(false), /Secure/);
     assert.ok(LINE_TERMS_CONSENT_MAX_AGE_SECONDS > 0 && LINE_TERMS_CONSENT_MAX_AGE_SECONDS <= 3600);
   });
   it("消すときは同じ Path で Max-Age=0", () => {
     assert.equal(clearLineTermsConsentCookie(), `${LINE_TERMS_CONSENT_COOKIE}=; Path=/api/auth; Max-Age=0; SameSite=Lax`);
+    assert.equal(clearLineTermsConsentCookie(true), `__Host-${LINE_TERMS_CONSENT_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax; Secure`);
+  });
+  it("名前と Path は https で __Host-・Path=/、http で従来名・/api/auth", () => {
+    assert.equal(lineTermsConsentCookieName(true), "__Host-kdz_line_terms");
+    assert.equal(lineTermsConsentCookieName(false), "kdz_line_terms");
+    assert.equal(lineTermsConsentCookiePath(true), "/");
+    assert.equal(lineTermsConsentCookiePath(false), "/api/auth");
+  });
+  it("isSecureRequest: x-forwarded-proto を優先し、無ければ AUTH_URL で決める", () => {
+    assert.equal(isSecureRequest("https", undefined), true);
+    assert.equal(isSecureRequest("https,http", "http://localhost:3000"), true);
+    assert.equal(isSecureRequest("http", "https://example.com"), false);
+    assert.equal(isSecureRequest(null, "https://example.com"), true);
+    assert.equal(isSecureRequest(undefined, "http://localhost:3000"), false);
+    assert.equal(isSecureRequest(undefined, undefined), false);
   });
 });
 
@@ -133,7 +155,8 @@ describe("配線: 同意をサーバーへ送る", () => {
   it("auth.ts: LINE 交換の本文に同意の項目を載せ、Cookie から読む", () => {
     assert.match(authTs, /line_access_token: lineAccessToken, \.\.\.consent/);
     assert.match(authTs, /const consent = await readLineTermsConsent\(\);/);
-    assert.match(authTs, /lineExchangeConsentFields\(store\.get\(LINE_TERMS_CONSENT_COOKIE\)\?\.value\)/);
+    assert.match(authTs, /lineExchangeConsentFields\(store\.get\(cookieName\)\?\.value\)/);
+    assert.match(authTs, /lineTermsConsentCookieName\(secure\)/);
   });
   it("auth.ts: 同意なしの新規作成の拒否は /login?reason=terms_required へ戻す", () => {
     assert.match(authTs, /result\.code === TERMS_AGREEMENT_REQUIRED_CODE\) return `\/login\?reason=\$\{LINE_TERMS_REQUIRED_REASON\}`/);

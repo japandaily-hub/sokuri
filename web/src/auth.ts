@@ -33,7 +33,9 @@ import { cookies, headers } from "next/headers";
 import { serverBackendApiBase } from "@/lib/backend-api-base";
 import { clientIpRelayHeaders, type HeaderReader } from "@/lib/client-ip-relay";
 import {
-  LINE_TERMS_CONSENT_COOKIE,
+  isSecureRequest,
+  lineTermsConsentCookieName,
+  lineTermsConsentCookiePath,
   LINE_TERMS_REQUIRED_REASON,
   TERMS_AGREEMENT_REQUIRED_CODE,
   lineExchangeConsentFields,
@@ -201,9 +203,13 @@ async function readIncomingRequestHeaders(): Promise<HeaderReader | null> {
 async function readLineTermsConsent(): Promise<LineExchangeConsentFields> {
   try {
     const store = await cookies();
-    const consent = lineExchangeConsentFields(store.get(LINE_TERMS_CONSENT_COOKIE)?.value);
+    // https では `__Host-` 付きの名前だけを読む（http 経由・兄弟サブドメインから書かれた従来名は信用しない。security L-1）。
+    const incoming = await readIncomingRequestHeaders();
+    const secure = isSecureRequest(incoming?.get("x-forwarded-proto"), process.env.AUTH_URL ?? process.env.NEXTAUTH_URL);
+    const cookieName = lineTermsConsentCookieName(secure);
+    const consent = lineExchangeConsentFields(store.get(cookieName)?.value);
     try {
-      store.delete({ name: LINE_TERMS_CONSENT_COOKIE, path: "/api/auth" });
+      store.delete({ name: cookieName, path: lineTermsConsentCookiePath(secure) });
     } catch {
       /* 書き込めない文脈（読み取り専用）では Max-Age=600 で自然に消えるのに任せる */
     }

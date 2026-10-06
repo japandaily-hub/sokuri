@@ -51,7 +51,9 @@ export function lineConsentHint(state: LineAuthGateState): string | null {
 // signIn コールバックが行い、ボタンを押した画面の状態は届かない。そこでボタンを押した時点
 // （同意済みのときだけ押せる）で、短命の Cookie に「同意した規約の版数」を置き、コールバックで
 // 読んで交換のリクエストに `agreed_terms: true`・`terms_version` として載せる。
-// - Path=/api/auth: コールバックにだけ送る（他の画面の要求には載せない）。
+// - http（ローカル）: Path=/api/auth でコールバックにだけ送る（他の画面の要求には載せない）。
+//   https: `__Host-kdz_line_terms`（Secure・Path=/・Domain 無し）。`__Host-` は Path=/ が必須のため全要求に載るが、
+//   中身は版数の日付だけで、10分で消え、コールバックが読んだ直後に消す（security L-1）。
 // - SameSite=Lax: LINE からのトップレベルの GET 遷移では送られる。Max-Age=600（10分）で自然に消える。
 // - 中身は版数（日付）だけで個人情報を含まない。利用者自身が書き換え得るが、同意は本人の意思表示
 //   そのもので、他サイトからは当サイトの Cookie を書けない（*.vercel.app は Public Suffix List 登録済み）。
@@ -65,8 +67,36 @@ export function lineConsentHint(state: LineAuthGateState): string | null {
  */
 export const USER_TERMS_VERSION = "2026-10-06";
 
-/** 同意の版数を運ぶ Cookie の名前。 */
+/**
+ * 同意の版数を運ぶ Cookie の名前（http＝ローカル開発の従来名）。
+ * https では `__Host-` 接頭辞付き（{@link lineTermsConsentCookieName}）。`__Host-` の Cookie は
+ * Secure・Path=/・Domain 無しが必須で、兄弟サブドメインや http 経由の上書き（Cookie tossing）を受け付けない（security L-1）。
+ */
 export const LINE_TERMS_CONSENT_COOKIE = "kdz_line_terms";
+
+/** https のときの Cookie 名（`__Host-` 接頭辞）。 */
+export const LINE_TERMS_CONSENT_COOKIE_SECURE = `__Host-${LINE_TERMS_CONSENT_COOKIE}`;
+
+/** 配信が https かどうかで Cookie 名を決める。 */
+export function lineTermsConsentCookieName(secure: boolean): string {
+  return secure ? LINE_TERMS_CONSENT_COOKIE_SECURE : LINE_TERMS_CONSENT_COOKIE;
+}
+
+/** Cookie の Path。`__Host-` は Path=/ が必須。http（ローカル）は従来どおり NextAuth のルートだけ。 */
+export function lineTermsConsentCookiePath(secure: boolean): string {
+  return secure ? "/" : LINE_TERMS_CONSENT_COOKIE_PATH;
+}
+
+/**
+ * サーバー側で「受信したリクエストは https か」を判定する（auth.ts 用）。
+ * リバースプロキシ配下では x-forwarded-proto の先頭の値、無ければ AUTH_URL の接頭辞で決める。
+ */
+export function isSecureRequest(forwardedProto: string | null | undefined, authUrl: string | null | undefined): boolean {
+  if (typeof forwardedProto === "string" && forwardedProto.trim() !== "") {
+    return forwardedProto.split(",")[0].trim().toLowerCase() === "https";
+  }
+  return typeof authUrl === "string" && authUrl.trim().toLowerCase().startsWith("https://");
+}
 
 /** Cookie の有効期間（秒）。LINE の認可画面（友だち追加の確認を含む）を往復する間だけ持てばよい。 */
 export const LINE_TERMS_CONSENT_MAX_AGE_SECONDS = 600;
@@ -82,8 +112,8 @@ const TERMS_VERSION_RE = /^\d{4}-\d{2}-\d{2}$/;
  */
 export function buildLineTermsConsentCookie(secure: boolean): string {
   const attrs = [
-    `${LINE_TERMS_CONSENT_COOKIE}=${USER_TERMS_VERSION}`,
-    `Path=${LINE_TERMS_CONSENT_COOKIE_PATH}`,
+    `${lineTermsConsentCookieName(secure)}=${USER_TERMS_VERSION}`,
+    `Path=${lineTermsConsentCookiePath(secure)}`,
     `Max-Age=${LINE_TERMS_CONSENT_MAX_AGE_SECONDS}`,
     "SameSite=Lax",
   ];
@@ -91,9 +121,10 @@ export function buildLineTermsConsentCookie(secure: boolean): string {
   return attrs.join("; ");
 }
 
-/** 使い終わった Cookie を消すときの文字列（同じ Path で Max-Age=0）。 */
-export function clearLineTermsConsentCookie(): string {
-  return `${LINE_TERMS_CONSENT_COOKIE}=; Path=${LINE_TERMS_CONSENT_COOKIE_PATH}; Max-Age=0; SameSite=Lax`;
+/** 使い終わった Cookie を消すときの文字列（同じ名前・同じ Path で Max-Age=0）。 */
+export function clearLineTermsConsentCookie(secure: boolean = false): string {
+  const base = `${lineTermsConsentCookieName(secure)}=; Path=${lineTermsConsentCookiePath(secure)}; Max-Age=0; SameSite=Lax`;
+  return secure ? `${base}; Secure` : base;
 }
 
 /** LINE 交換のリクエスト本文に足す同意の項目。 */
