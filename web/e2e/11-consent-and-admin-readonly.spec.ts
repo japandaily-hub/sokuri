@@ -89,11 +89,11 @@ test.describe("運営の代理閲覧は読み取り専用", () => {
     await expect(page.getByRole("button", { name: /で確定$/ })).toHaveCount(0);
   });
 
-  test("業者のチャット: 入力欄が出ず、読み取り専用の案内が出る", async ({ page }) => {
+  test("業者のチャット: 運営は /operator/* に入れず /forbidden へ戻される（業者の画面を運営が操作できない）", async ({ page }) => {
     const txn = await ensureLiveTransaction(api, sellerToken, vendor);
     await loginAsUser(page, ACCOUNTS.admin, `/operator/chat/${txn.id}`);
 
-    await expect(page.getByTestId("chat-read-only")).toBeVisible({ timeout: 30_000 });
+    await page.waitForURL(/\/forbidden/, { timeout: 30_000 });
     await expect(page.getByLabel("メッセージを入力")).toHaveCount(0);
   });
 });
