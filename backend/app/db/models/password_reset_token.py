@@ -5,10 +5,11 @@
 
 - ``account_type`` は "user"（users）/ "operator"（operators）。依頼者・業者の2表を指すため
   外部キーは張らない（アカウントは論理削除のみで物理削除されないため、宙に浮く行は生じない）。
-- ``used_at`` は「使用済み」または「新しい要求・確定によって無効化された」時刻。NULL の行だけが
-  有効候補で、さらに ``expires_at`` が未来のものだけが使える。
-- 同一アカウントの行は要求のたびに使用済み・期限切れを削除し、未使用の旧トークンを無効化する
-  ため、1アカウントあたり高々2行（無効化済み1行＋最新1行）に保たれる。
+- ``used_at`` は「使用済み」または「確定・パスワード変更・停止・退会・並存上限超過によって
+  無効化された」時刻。NULL の行だけが有効候補で、さらに ``expires_at`` が未来のものだけが使える。
+- 同一アカウントの有効な未使用トークンは最大3本まで並存する。``created_at`` は直近2分・
+  直近24時間の発行回数の集計に使うため、使用済み・期限切れの行は24時間より古いものだけを
+  削除する（発行は24時間に5件までのため、1アカウントあたり高々5行）。
 """
 
 from __future__ import annotations
@@ -30,8 +31,8 @@ class PasswordResetToken(Base):
     __tablename__ = "password_reset_tokens"
     __table_args__ = (
         CheckConstraint("account_type IN ('user', 'operator')", name="account_type"),
-        # 新しい要求時の旧トークン無効化・確定時の他トークン無効化（いずれもアカウント単位の
-        # UPDATE / DELETE）で使う。token_hash はユニーク制約の索引で引く。
+        # 発行回数の集計・並存上限の判定・無効化・掃除（いずれもアカウント単位の
+        # SELECT / UPDATE / DELETE）で使う。token_hash はユニーク制約の索引で引く。
         Index("ix_password_reset_tokens_account", "account_type", "account_id"),
     )
 

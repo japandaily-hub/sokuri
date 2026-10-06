@@ -94,6 +94,7 @@ from app.schemas_katadzuke import (
 )
 from app.services import alerts, notify, notify_dispatch
 from app.services.case_lock import lock_transaction_rows
+from app.services.password_reset import invalidate_reset_tokens
 from app.services.reminders import run_reminders
 from app.services.review_stats import recalc_operator_review_stats
 
@@ -483,6 +484,12 @@ async def suspend_operator(
         # 境界を進めても失効するのは停止前・停止と競合したログインのトークンだけ）。
         # NULL へ戻すことはしない（戻すと停止前のトークンが復活するため）。
         operator.sessions_revoked_at = datetime.now(timezone.utc)
+    if body.suspended:
+        # 停止前に発行された再設定リンクで、停止解除後にパスワードを差し替えられないよう
+        # 未使用の再設定トークンを無効化する（security review L-1）。
+        await invalidate_reset_tokens(
+            session, "operator", operator.id, datetime.now(timezone.utc)
+        )
     await session.commit()
     await session.refresh(operator)
     if prev_suspended and not body.suspended:
@@ -1275,6 +1282,9 @@ async def suspend_user(
         # 記録する（suspend_operator と同じ方針。停止中の再送と実際の解除でも現在時刻へ
         # 進め、NULL へ戻すことはしない）。
         target.sessions_revoked_at = now
+    if body.suspended:
+        # 未使用の再設定トークンを無効化する（suspend_operator と同じ・security review L-1）。
+        await invalidate_reset_tokens(session, "user", target.id, now)
     await session.commit()
     await session.refresh(target)
     if prev_suspended and not body.suspended:

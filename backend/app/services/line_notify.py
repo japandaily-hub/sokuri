@@ -108,6 +108,15 @@ async def push_bank_account_changed(line_user_id: str, action: str) -> bool:
     )
 
 
+async def push_password_changed(line_user_id: str) -> bool:
+    """パスワード再設定の完了通知（本人宛・security review M-2。個人情報・新パスワードは含めない）。"""
+    return await _push(
+        line_user_id,
+        "【カタヅケ】パスワード再設定の手続きにより、お客様のアカウントのパスワードが変更されました。"
+        "心当たりがない場合は、至急カタヅケまでお問い合わせください。",
+    )
+
+
 async def push_bid_lost(line_user_id: str, case_id: str, prefecture: str, city: str, purpose: str) -> bool:
     """落札通知（落選業者宛）。案件を特定できるよう地域・利用目的とリンクを本文に含める（M7対応）。"""
     settings = get_settings()

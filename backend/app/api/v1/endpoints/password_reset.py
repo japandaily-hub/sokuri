@@ -4,6 +4,8 @@
   メール送信は応答後のバックグラウンド処理（``services.password_reset.process_reset_request``）。
 - ``POST /auth/password-reset/confirm``: 1回限りトークンで新しいパスワードを設定し、
   既存のログインを失効させる。失敗（無効・期限切れ・使用済み・種別違い）は一律の 400。
+  成功時は本人へ「パスワードが変更されました」を LINE（連携済みなら）とメールの両方で
+  応答後に送る（security review M-2。送信の失敗で確定を失敗させない）。
 
 どちらも JSON 以外の本文はカウントより前に 415 で止め（``require_json_body``。第三者の
 ページから訪問者の IP の枠を使い切らせない＝CSRF 的な悪用の防止）、IP 軸の全リクエスト
@@ -29,6 +31,7 @@ from app.schemas_katadzuke import (
     PasswordResetConfirmResponse,
     PasswordResetRequest,
 )
+from app.services import notify_dispatch
 from app.services import password_reset as password_reset_service
 
 logger = logging.getLogger(__name__)
@@ -83,6 +86,7 @@ async def request_password_reset(
 )
 async def confirm_password_reset(
     body: PasswordResetConfirmRequest,
+    background: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     _json_only: None = Depends(require_json_body),
     _rl: object = Depends(RateLimitGuard("password_reset_confirm")),
@@ -98,10 +102,10 @@ async def confirm_password_reset(
         )
         raise _INVALID_RESET_TOKEN()
 
-    applied = await password_reset_service.apply_new_password(
+    notice_target = await password_reset_service.apply_new_password(
         session, body.account_type, account_id, body.new_password, now
     )
-    if not applied:
+    if notice_target is None:
         # トークンは使用済みのまま確定させる（退会・停止したアカウントの再試行を止める）。
         await session.commit()
         logger.warning(
@@ -117,6 +121,12 @@ async def confirm_password_reset(
         "password_reset: パスワードを再設定し、既存のログインを失効させました（type=%s account_id=%s）",
         body.account_type,
         account_id,
+    )
+    # 完了通知（commit 後・応答後。dispatch 側で例外を握るため確定の成否に影響しない）。
+    background.add_task(
+        notify_dispatch.dispatch_password_changed,
+        notice_target.line_user_id,
+        notice_target.email,
     )
     return PasswordResetConfirmResponse(
         detail="パスワードを再設定しました。新しいパスワードでログインしてください。"

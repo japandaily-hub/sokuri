@@ -161,6 +161,21 @@ async def dispatch_bank_account_changed(
 
 
 @_best_effort
+async def dispatch_password_changed(line_user_id: str | None, email: str | None) -> None:
+    """パスワード再設定の完了通知（本人宛・security review M-2）。
+
+    ``dispatch_bank_account_changed`` と同じく、不正な再設定の早期検知が目的のため
+    フォールバックではなく **LINE Push とメールの両方** に送る（LINE 専用の仮メール・
+    退会トムストンは ``is_placeholder_email`` でメール側を飛ばす）。お知らせメールの
+    受信設定（オプトアウト）には従わない（セキュリティ上の通知のため）。
+    """
+    if line_user_id:
+        await line_notify.push_password_changed(line_user_id)
+    if email and not notify.is_placeholder_email(email):
+        await notify.send_password_changed(email)
+
+
+@_best_effort
 async def dispatch_bid_lost(
     line_user_id: str | None, email: str, case_id: str, prefecture: str, city: str, purpose: str
 ) -> None:
@@ -426,6 +441,7 @@ async def dispatch_message_received(
     新着が届かなかった）。メールの本文はメッセージ本文・個人情報を含まず「新着があります」
     ＋ログインリンクだけ。LINE とメールは同じ台帳で間引くため、メール経路でも
     同一取引・同一宛先へは5分に1通を超えない。
+
 
     デバウンスの制約（既知の限界）:
       台帳はプロセスメモリ上の dict であり、**単一プロセス内でのみ**有効。

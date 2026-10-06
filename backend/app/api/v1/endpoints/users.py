@@ -58,6 +58,7 @@ from app.schemas_katadzuke import (
 )
 from app.services import notify, notify_dispatch
 from app.services.case_lock import lock_case_row
+from app.services.password_reset import invalidate_reset_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -465,6 +466,9 @@ async def change_my_password(
 
     user.password_hash = hash_password(body.new_password)
     user.password_changed_at = datetime.now(timezone.utc)
+    # 変更前に発行された再設定リンクで、変更後のパスワードを差し替えられないようにする
+    # （security review L-1）。
+    await invalidate_reset_tokens(session, "user", user.id, user.password_changed_at)
     await session.commit()
     await session.refresh(user)
 
@@ -804,6 +808,9 @@ async def _delete_and_anonymize_user(
     user.bank_account_enc = None
     user.bank_account_updated_at = None
     user.deleted_at = datetime.now(timezone.utc)
+    # 退会後に再設定リンクが残らないようにする（security review L-1。確定側も退会済みを
+    # 拒否するが多層防御）。
+    await invalidate_reset_tokens(session, "user", user.id, user.deleted_at)
 
     # 本人確認書類: 行・審査ステータス（承認/却下履歴）は業者側の記録と同様に
     # 保持するが、画像本体（機微PII）のみ Core の UPDATE で除去する。

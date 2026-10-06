@@ -2,7 +2,9 @@
 
 - 要求は登録の有無にかかわらず同じ 202・同じ本文。案内メールは対象アカウントがある時だけ送る
   （退会・停止中・LINE 専用・内部用アドレスには送らない）。
-- トークンは DB にハッシュだけを保存し、30分で期限切れ・1回限り・新しい要求で旧トークン無効。
+- トークンは DB にハッシュだけを保存し、30分で期限切れ・1回限り。未使用トークンは最大3本まで
+  並存し、確定で他の未使用トークンを無効化する。発行（送信）は直近2分に1回・24時間に5回まで。
+- 管理者は自己再設定の対象外（送らず運営アラート）。確定後は LINE とメールで完了通知。
 - 確定で既存のログイン（JWT）が失効する（依頼者・業者）。
 - レート制限（要求: IP 軸・アカウント軸、確定: IP 軸）。
 - メールの件名・本文に個人情報を入れない。ログに平文のトークン・メールアドレスを出さない。
@@ -45,7 +47,7 @@ _USER_EMAIL = "reset-user@example.com"
 _OPERATOR_EMAIL = "reset-operator@example.co.jp"
 _OLD_PASSWORD = "old-password-123"
 _NEW_PASSWORD = "new-password-456"
-_TOKEN_IN_LINK_RE = re.compile(r"/password-reset/confirm\?token=([A-Za-z0-9_-]+)&amp;type=(user|operator)")
+_TOKEN_IN_LINK_RE = re.compile(r"/password-reset/confirm#token=([A-Za-z0-9_-]+)&amp;type=(user|operator)")
 
 
 def _create_test_app(session: AsyncSession, limiter: RateLimiter | None = None) -> FastAPI:
@@ -138,6 +140,14 @@ async def _confirm(client: AsyncClient, token: str, account_type: str = "user", 
 async def _rows(db_session: AsyncSession) -> list[PasswordResetToken]:
     db_session.expire_all()
     return list((await db_session.scalars(select(PasswordResetToken))).all())
+
+
+async def _age_rows(db_session: AsyncSession, delta: timedelta) -> None:
+    """発行済みの行の発行時刻・期限を過去へずらす（直近2分・24時間の判定を時間経過なしで試す）。"""
+    for row in await _rows(db_session):
+        row.created_at = row.created_at - delta
+        row.expires_at = row.expires_at - delta
+    await db_session.commit()
 
 
 # ──────────────────────────── 要求: 同一応答・送信の有無 ────────────────────────────
@@ -357,25 +367,69 @@ async def test_confirm_validates_password_and_token_format_before_lookup(db_sess
     assert {short_pw.status_code, long_pw.status_code, bad_token.status_code, short_token.status_code} == {422}
 
 
-async def test_new_request_invalidates_previous_token(db_session, sent_mail):
+async def test_tokens_coexist_up_to_three_and_confirm_invalidates_the_rest(db_session, sent_mail):
+    """新しい要求で旧トークンを無効化しない（第三者の連打で本人のリンクを潰せない）。
+
+    有効な未使用トークンは最大3本で、4本目の発行で最古だけが無効になる。確定に成功したら
+    残りの未使用トークンはすべて無効になる（security review M-1）。
+    """
+    await _create_user(db_session)
+    app = _create_test_app(db_session)
+    tokens: list[str] = []
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        for index in range(4):
+            await _request(client, _USER_EMAIL)
+            tokens.append(_token_from_mail(sent_mail, index)[0])
+            await _age_rows(db_session, timedelta(minutes=3))
+        active_hashes = {r.token_hash for r in await _rows(db_session) if r.used_at is None}
+        oldest = await _confirm(client, tokens[0])
+        second = await _confirm(client, tokens[1])
+        third_after = await _confirm(client, tokens[2])
+        fourth_after = await _confirm(client, tokens[3])
+    assert len(set(tokens)) == 4
+    assert len(active_hashes) == 3
+    assert hashlib.sha256(tokens[0].encode()).hexdigest() not in active_hashes
+    assert oldest.status_code == 400
+    assert second.status_code == 200
+    assert third_after.status_code == 400
+    assert fourth_after.status_code == 400
+    assert all(r.used_at is not None for r in await _rows(db_session))
+
+
+async def test_second_request_within_two_minutes_sends_nothing(db_session, sent_mail):
     await _create_user(db_session)
     app = _create_test_app(db_session)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        first = await _request(client, _USER_EMAIL)
+        second = await _request(client, _USER_EMAIL)
+        first_token, _ = _token_from_mail(sent_mail)
+        still_valid = await _confirm(client, first_token)
+    assert first.status_code == second.status_code == 202
+    assert first.json() == second.json()
+    assert sent_mail.await_args_list[0].args[1] == "【カタヅケ】パスワード再設定のご案内"
+    reset_mails = [c for c in sent_mail.await_args_list if c.args[1] == "【カタヅケ】パスワード再設定のご案内"]
+    assert len(reset_mails) == 1
+    assert still_valid.status_code == 200
+
+
+async def test_issue_cap_is_five_per_24_hours_and_old_rows_are_cleaned_after_window(db_session, sent_mail):
+    await _create_user(db_session)
+    app = _create_test_app(db_session)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        statuses = []
+        for _ in range(7):
+            statuses.append((await _request(client, _USER_EMAIL)).status_code)
+            await _age_rows(db_session, timedelta(minutes=3))
+        capped_mail_count = sent_mail.await_count
+        capped_rows = len(await _rows(db_session))
+        # 24時間を過ぎた行は集計から外れ、使用済み・期限切れの行は掃除される。
+        await _age_rows(db_session, timedelta(hours=24))
         await _request(client, _USER_EMAIL)
-        first_token, _ = _token_from_mail(sent_mail, 0)
-        await _request(client, _USER_EMAIL)
-        second_token, _ = _token_from_mail(sent_mail, 1)
-        await _request(client, _USER_EMAIL)
-        third_token, _ = _token_from_mail(sent_mail, 2)
-        old = await _confirm(client, first_token)
-        older = await _confirm(client, second_token)
-        latest = await _confirm(client, third_token)
-    assert len({first_token, second_token, third_token}) == 3
-    assert old.status_code == 400
-    assert older.status_code == 400
-    assert latest.status_code == 200
-    # 使用済み・無効化済みの行は次の要求で削除されるため、行数は増え続けない。
-    assert len(await _rows(db_session)) <= 2
+    assert statuses == [202] * 7
+    assert capped_mail_count == 5
+    assert capped_rows == 5
+    assert sent_mail.await_count == 6
+    assert len(await _rows(db_session)) == 1
 
 
 async def test_confirm_rejects_account_deleted_after_issue_and_consumes_token(db_session, sent_mail):
@@ -473,7 +527,9 @@ async def test_request_account_axis_is_per_email_and_type_and_same_for_unknown(d
     assert existing == [202, 202, 429]
     assert unknown == existing  # 登録の有無で 429 の出方が変わらない
     assert other_type.status_code == 202
-    assert sent_mail.await_count == 2
+    # 依頼者として受け付けた2回のうち、実際に送るのは1通（直近2分以内の再送は DB 基準で
+    # 止める・security review M-1）。業者として登録の無いアドレスには送らない。
+    assert sent_mail.await_count == 1
 
 
 async def test_confirm_ip_axis_counts_every_attempt(db_session, sent_mail):
@@ -547,3 +603,165 @@ def test_reset_token_hash_is_sha256_hex():
     raw = "x" * 43
     assert password_reset_service.hash_reset_token(raw) == hashlib.sha256(raw.encode()).hexdigest()
     assert len(password_reset_service.hash_reset_token(str(uuid.uuid4()))) == 64
+
+
+# ──────────────────────────── 管理者は対象外（security review M-2） ────────────────────────────
+
+
+async def test_admin_account_is_excluded_and_ops_alert_has_no_secrets(db_session, sent_mail, monkeypatch):
+    admin = await _create_user(db_session, role="admin")
+    admin_id = admin.id
+    alert_mock = AsyncMock(return_value=True)
+    monkeypatch.setattr(password_reset_service.alerts, "send_alert", alert_mock)
+    app = _create_test_app(db_session)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        admin_res = await _request(client, _USER_EMAIL)
+        unknown_res = await _request(client, "nobody-admin@example.com")
+    assert admin_res.status_code == unknown_res.status_code == 202
+    assert admin_res.json() == unknown_res.json()
+    assert sent_mail.await_count == 0
+    assert await _rows(db_session) == []
+    alert_mock.assert_awaited_once()
+    title, body = alert_mock.await_args.args[:2]
+    assert "管理者" in title
+    assert str(admin_id)[:8] in body
+    assert str(admin_id) not in body  # マスク済み ID のみ
+    assert _USER_EMAIL not in title + body
+
+
+async def test_admin_cannot_use_token_issued_before_becoming_admin(db_session, sent_mail):
+    user = await _create_user(db_session)
+    user_id = user.id
+    app = _create_test_app(db_session)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        await _request(client, _USER_EMAIL)
+        raw_token, _ = _token_from_mail(sent_mail)
+        await db_session.execute(update(User).where(User.id == user_id).values(role="admin"))
+        await db_session.commit()
+        res = await _confirm(client, raw_token)
+    assert res.status_code == 400
+    db_session.expire_all()
+    refreshed = await db_session.get(User, user_id)
+    assert verify_password(_OLD_PASSWORD, refreshed.password_hash)
+
+
+# ──────────────────────────── 確定後の完了通知（security review M-2） ────────────────────────────
+
+
+async def test_confirm_notifies_password_change_via_both_line_and_mail(db_session, sent_mail, monkeypatch):
+    from app.services import notify_dispatch
+
+    await _create_user(db_session, line_user_id="U-reset-notice")
+    push_mock = AsyncMock(return_value=True)
+    monkeypatch.setattr(notify_dispatch.line_notify, "push_password_changed", push_mock)
+    app = _create_test_app(db_session)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        await _request(client, _USER_EMAIL)
+        raw_token, _ = _token_from_mail(sent_mail)
+        res = await _confirm(client, raw_token)
+    assert res.status_code == 200
+    push_mock.assert_awaited_once_with("U-reset-notice")
+    to_email, subject, html = sent_mail.await_args_list[-1].args
+    assert to_email == _USER_EMAIL
+    assert subject == "【カタヅケ】パスワードが変更されました"
+    assert "心当たりがない場合" in html
+    assert "お問い合わせ" in html
+    for secret in (_NEW_PASSWORD, _USER_EMAIL, "太郎", raw_token):
+        assert secret not in html
+
+
+async def test_operator_confirm_notice_goes_to_contact_email_and_failures_do_not_break_confirm(
+    db_session, monkeypatch
+):
+    from app.services import notify_dispatch
+
+    send_mock = AsyncMock(return_value=True)
+    monkeypatch.setattr(notify, "_send", send_mock)
+    await _create_operator(db_session, line_user_id="U-op-notice")
+    monkeypatch.setattr(
+        notify_dispatch.line_notify,
+        "push_password_changed",
+        AsyncMock(side_effect=RuntimeError("line down")),
+    )
+    app = _create_test_app(db_session)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        await _request(client, _OPERATOR_EMAIL, account_type="operator")
+        raw_token, _ = _token_from_mail(send_mock)
+        res = await _confirm(client, raw_token, account_type="operator")
+    # LINE の送信が例外でも確定は成功する（通知はベストエフォート）。
+    assert res.status_code == 200
+
+
+async def test_line_only_placeholder_mail_is_skipped_but_line_is_sent(monkeypatch):
+    from app.services import notify_dispatch
+
+    push_mock = AsyncMock(return_value=True)
+    send_mock = AsyncMock(return_value=True)
+    monkeypatch.setattr(notify_dispatch.line_notify, "push_password_changed", push_mock)
+    monkeypatch.setattr(notify, "_send", send_mock)
+    await notify_dispatch.dispatch_password_changed("U-line", "line_U-line@line.katazuke.internal")
+    push_mock.assert_awaited_once_with("U-line")
+    send_mock.assert_not_awaited()
+
+
+# ──────────────────────────── 未使用トークンの一括無効化（security review L-1） ────────────────────────────
+
+
+async def test_password_change_invalidates_unused_reset_tokens(db_session, sent_mail):
+    user = await _create_user(db_session)
+    jwt = create_access_token(user.id, "user", user.role)
+    app = _create_test_app(db_session)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        await _request(client, _USER_EMAIL)
+        raw_token, _ = _token_from_mail(sent_mail)
+        changed = await client.put(
+            "/api/v1/users/me/password",
+            json={"current_password": _OLD_PASSWORD, "new_password": "changed-pass-321"},
+            headers={**_PUBLIC_IP, "Authorization": f"Bearer {jwt}"},
+        )
+        res = await _confirm(client, raw_token)
+    assert changed.status_code == 200, changed.text
+    assert res.status_code == 400
+    assert all(r.used_at is not None for r in await _rows(db_session))
+
+
+@pytest.mark.parametrize("account_type", ["user", "operator"])
+async def test_suspension_invalidates_unused_reset_tokens(db_session, sent_mail, account_type):
+    admin = User(
+        email="reset-admin@katadzuke.jp", password_hash=hash_password("adminpass123"), name="管理者", role="admin"
+    )
+    db_session.add(admin)
+    await db_session.commit()
+    admin_jwt = create_access_token(admin.id, "user", "admin")
+    if account_type == "user":
+        target = await _create_user(db_session)
+        email, url = _USER_EMAIL, f"/api/v1/admin/users/{target.id}/suspend"
+    else:
+        target = await _create_operator(db_session)
+        email, url = _OPERATOR_EMAIL, f"/api/v1/admin/operators/{target.id}/suspend"
+    headers = {"Authorization": f"Bearer {admin_jwt}"}
+    app = _create_test_app(db_session)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        await _request(client, email, account_type=account_type)
+        raw_token, _ = _token_from_mail(sent_mail)
+        suspended = await client.patch(url, json={"suspended": True}, headers=headers)
+        unsuspended = await client.patch(url, json={"suspended": False}, headers=headers)
+        res = await _confirm(client, raw_token, account_type=account_type)
+    assert suspended.status_code == unsuspended.status_code == 200
+    assert res.status_code == 400
+
+
+async def test_invalidate_reset_tokens_only_touches_the_given_account(db_session, sent_mail):
+    user_id = (await _create_user(db_session)).id
+    other_id = (await _create_user(db_session, email="other-reset@example.com")).id
+    app = _create_test_app(db_session)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        await _request(client, _USER_EMAIL)
+        await _request(client, "other-reset@example.com")
+    await password_reset_service.invalidate_reset_tokens(
+        db_session, "user", user_id, datetime.now(timezone.utc)
+    )
+    await db_session.commit()
+    by_account = {r.account_id: r.used_at for r in await _rows(db_session)}
+    assert by_account[user_id] is not None
+    assert by_account[other_id] is None

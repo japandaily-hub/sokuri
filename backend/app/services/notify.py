@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import html
 import logging
+from datetime import date, datetime, timezone
 from urllib.parse import quote
 
 import httpx
@@ -28,6 +29,27 @@ _BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/email"
 _BREVO_SEND_FAILED_KEY = "notify_brevo_send_failed"
 # BREVO_API_KEY 未設定スキップの運営アラートを、プロセス内で最初の1回だけ発火するためのフラグ。
 _brevo_missing_key_alerted = False
+#: 日次の送信数の警告を出す到達点（Brevo 無料枠 300通/日の消費の把握・security review M-1）。
+#: 数はプロセス内の概数（再起動・複数台では分かれる）。日付の区切りは UTC
+#: （Brevo 側の日次枠の切り替わり時刻は [要確認]）。
+_DAILY_SEND_WARN_AT: frozenset[int] = frozenset({150, 200, 250, 290})
+_daily_send_date: date | None = None
+_daily_send_count = 0
+
+
+def _record_daily_send() -> None:
+    """送信成功を日次で数え、到達点で総量だけを警告ログに出す（宛先・件名は出さない）。"""
+    global _daily_send_date, _daily_send_count
+    today = datetime.now(timezone.utc).date()
+    if _daily_send_date != today:
+        _daily_send_date = today
+        _daily_send_count = 0
+    _daily_send_count += 1
+    if _daily_send_count in _DAILY_SEND_WARN_AT:
+        logger.warning(
+            "notify: 本日（UTC）のメール送信数が %d 通に達しました（Brevo 無料枠 300通/日・プロセス内の概数）",
+            _daily_send_count,
+        )
 
 
 def reset_brevo_missing_key_alert_state_for_tests() -> None:
@@ -133,6 +155,7 @@ async def _send_raw(to_email: str, subject: str, html: str) -> str | None:
             message_id = res.json().get("messageId")
         except Exception:  # noqa: BLE001 -- 本文が JSON でない/空でも送信自体は成功
             message_id = None
+        _record_daily_send()
         # 送信失敗の warning を出していた場合は「復旧」を1回送る（is_active で先に判定し、
         # 通常時に毎送信で Task を作らない）。
         if alerts.is_active(_BREVO_SEND_FAILED_KEY):
@@ -781,10 +804,16 @@ async def send_password_reset(
     「心当たりがない場合は無視してください」だけを載せる。``raw_token`` は平文の
     1回限りトークンで、ここ以外（ログ・アラート・DB）には出さない（本関数もログしない。
     送信失敗時の ``_send_raw`` のログは宛先をマスクし、本文を載せない）。
+
+    トークンは URL のクエリではなくフラグメント（``#token=...&type=...``）に載せる
+    （security review M-3: フラグメントはサーバーへ送られないため、web 側のアクセスログ・
+    Referer・プロキシのログにトークンが残らない）。
     """
     settings = get_settings()
-    query = f"token={quote(raw_token, safe='')}&type={quote(account_type, safe='')}"
-    url = html.escape(f"{settings.frontend_base_url}/password-reset/confirm?{query}", quote=True)
+    fragment = f"token={quote(raw_token, safe='')}&type={quote(account_type, safe='')}"
+    url = html.escape(
+        f"{settings.frontend_base_url}/password-reset/confirm#{fragment}", quote=True
+    )
     return await _send(
         to_email,
         "【カタヅケ】パスワード再設定のご案内",
@@ -795,5 +824,22 @@ async def send_password_reset(
             f'<p><a href="{url}">新しいパスワードを設定する</a></p>'
             "<p>このメールに心当たりがない場合は、何もせずに無視してください"
             "（パスワードは変更されません）。</p>"
+        ),
+    )
+
+
+async def send_password_changed(to_email: str) -> bool:
+    """パスワード再設定の完了通知（本人宛・security review M-2）。
+
+    不正な再設定の早期検知が目的。件名・本文には氏名・メールアドレス・新しいパスワード等を
+    入れず、「変更されたこと」と問い合わせ先だけを載せる。
+    """
+    return await _send(
+        to_email,
+        "【カタヅケ】パスワードが変更されました",
+        _wrap(
+            "<p>お客様のアカウントのパスワードが、パスワード再設定の手続きにより変更されました。</p>"
+            "<p>心当たりがない場合は、お手数ですが至急カタヅケまでお問い合わせください"
+            "（お問い合わせ: katazuke.info@gmail.com）。</p>"
         ),
     )

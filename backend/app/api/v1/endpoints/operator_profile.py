@@ -53,6 +53,7 @@ from app.schemas_katadzuke import (
 from app.services.case_lock import lock_operator_row
 from app.services.message_guard import contains_contact_info
 from app.services.operator_pii_erasure import erase_operator_personal_data
+from app.services.password_reset import invalidate_reset_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -512,6 +513,8 @@ async def _delete_and_anonymize_operator(session: AsyncSession, operator: Operat
     operator.password_hash = None
     operator.line_user_id = None
     operator.deleted_at = datetime.now(timezone.utc)
+    # 退会後に再設定リンクが残らないようにする（security review L-1）。
+    await invalidate_reset_tokens(session, "operator", operator.id, operator.deleted_at)
 
     # rollback は Session 内の全 ORM インスタンスを expire するため、except 節で
     # operator.id へ触ると遅延ロード（SELECT）が走り、非同期では MissingGreenlet に
