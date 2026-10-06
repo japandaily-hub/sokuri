@@ -1,5 +1,5 @@
 /**
- * (2) 依頼者ログイン → マイページ → 案件詳細で入札を選定（確認モーダル）→ 成約表示。
+ * (2) 依頼者ログイン → マイページ → 案件詳細で入札を選定（確認モーダル）→ 業者決定の表示。
  *
  * 選定の確認は window.confirm ではなく共通 ConfirmModal（role="dialog"）である点が
  * 回帰しやすいので、ダイアログの出現・確定・成約パネル表示までを通しで見る。
@@ -32,7 +32,7 @@ test("依頼者が入札を選定すると成約パネルが出る", async ({ pa
 
   // マイページのサマリーが描画されている（集計カード）。
   await expect(page.getByText("入札受付中").first()).toBeVisible();
-  await expect(page.locator("text=成約済み >> visible=true").first()).toBeVisible();
+  await expect(page.locator("text=業者決定済み >> visible=true").first()).toBeVisible();
 
   // 対象案件のカードから詳細へ。カードは <Link href="/cases/{id}"> なので href で引く。
   const card = page.locator(`a[href="/cases/${caseId}"]`).first();
@@ -51,11 +51,11 @@ test("依頼者が入札を選定すると成約パネルが出る", async ({ pa
   // window.confirm ではなく ConfirmModal であること。
   await confirmModal(page, /この業者に決定しますか？/, "決定する");
 
-  // 成約パネル（成約: 〇〇）と、チャット・日程調整の導線が出る。
+  // 決定パネル（業者が決まりました: 〇〇）と、チャット・日程調整の導線が出る。
   // チャットは別ページへのリンクではなく、この画面内に開いた状態で埋め込まれる
   // （r-chat-inline・d9b4c06 以降）。開閉ボタンは開いている間「チャットを閉じる」
   // （未読があると「（未読N）」が続くため前方一致）で、入力欄まで描画されることを見る。
-  await expect(page.getByRole("heading", { name: /^成約: / })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("heading", { name: /^業者が決まりました: / })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("button", { name: /^チャットを閉じる/, expanded: true })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "メッセージを入力", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "訪問日程を調整する" })).toBeVisible();

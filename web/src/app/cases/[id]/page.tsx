@@ -9,11 +9,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Icon, Spinner } from "@/components/Icon";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import { ChatPanel } from "@/components/kdz/ChatPanel";
 import { ConfirmModal } from "@/components/kdz/ConfirmModal";
 import { formatVisitSchedule } from "@/lib/categories";
+import { jstTodayIso } from "@/lib/visit-slots";
+import { buildHousingAttributes, isCaseIdFormat, isCompletionBeforeVisit } from "@/lib/case-detail-view";
 import { formatPurposeLabel } from "@/lib/case-labels";
 import {
   Card,
@@ -29,6 +32,7 @@ import {
   CANCELLED_BY_LABEL,
   CASE_ITEM_CONDITION_LABEL,
   CASE_STATUS_LABEL,
+  KdzApiError,
   REDUCTION_STATUS_LABEL,
   TXN_STATUS_LABEL,
   addCaseItemPhoto,
@@ -64,6 +68,9 @@ const EDITABLE_CASE_STATUSES = new Set(["draft", "open"]);
 /** 出品取り下げを許可する案件ステータス（backend の cancel_case と同条件）。 */
 const CANCELLABLE_CASE_STATUSES = new Set(["open", "bidding"]);
 
+/** 確認ダイアログの「閉じる」ボタンの語。実行ボタン（「キャンセルする」等）と紛れないよう「キャンセル」は使わない。 */
+const CONFIRM_DISMISS_LABEL = "やめる";
+
 /** window.confirm の代わりに表示する ConfirmModal の内容（r8-fix-frontend）。
  *  r10-M8 是正: 取り下げ・キャンセルの理由入力は window.prompt をやめ、withReason/reasonRequired で
  *  ConfirmModal に統合する（onConfirm が入力済みの理由を受け取る）。 */
@@ -83,12 +90,19 @@ export default function UserCaseDetailPage() {
   const search = useSearchParams();
   const caseId = params.id;
   const { token, loading } = useToken();
+  const { data: sessionData } = useSession();
+  /** 運営が依頼者の画面を開いているか（代理での誤操作を避けるため帯で明示する）。 */
+  const isAdminViewing = sessionData?.role === "admin";
 
   const [caseData, setCaseData] = useState<CaseOut | null>(null);
   const [bids, setBids] = useState<BidOut[]>([]);
   const [txn, setTxn] = useState<TransactionDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** 案件の取得に失敗したときの HTTP ステータス（404=存在しない と 通信失敗等 を区別して表示するため）。 */
+  const [loadErrorStatus, setLoadErrorStatus] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+  // /cases/abc 等の形式違いは API を叩かず専用表示にする。
+  const isCaseIdValid = isCaseIdFormat(caseId);
   /** AI解析ポーリングが打ち切り時間（backend の遅延回収窓=10分）に達したかどうか。 */
   const [aiPollTimedOut, setAiPollTimedOut] = useState(false);
   const [confirmState, setConfirmState] = useState<ConfirmState>(null);
@@ -96,7 +110,7 @@ export default function UserCaseDetailPage() {
    *  「業者を選ぶ→そのままチャットで会話開始」を完結させる。r-chat-inline 対応）。 */
   const [chatOpen, setChatOpen] = useState(true);
 
-  // ===== 商品の編集/削除・写真の追加/削除 =====
+  // ===== 品物の編集/削除・写真の追加/削除 =====
   // busyOps は進行中の操作キー集合。キー形式は "item:{itemId}:save" / "item:{itemId}:delete" /
   // "item:{itemId}:upload" / "photo:{photoId}:delete"。Set にすることで、ある商品カードの操作中でも
   // 別の商品カードのボタンは disabled にならない（商品単位の排他制御。カード内の disabled 表示と
@@ -175,8 +189,8 @@ export default function UserCaseDetailPage() {
   function resetEditItemToAi(item: CaseItemOut) {
     if (!token || isItemBusy(item.id)) return;
     setConfirmState({
-      title: "AIの推定値に戻しますか？",
-      message: "状態・説明の編集内容を破棄して、AIの推定値に戻しますか？",
+      title: "自動で付けた内容に戻しますか？",
+      message: "状態・説明を編集した内容を破棄して、写真から自動で付けた内容に戻しますか？",
       confirmLabel: "リセットする",
       onConfirm: () => {
         setConfirmState(null);
@@ -213,7 +227,7 @@ export default function UserCaseDetailPage() {
   function handleDeleteItem(item: CaseItemOut) {
     if (!token || isItemBusy(item.id)) return;
     setConfirmState({
-      title: "商品を削除しますか？",
+      title: "品物を削除しますか？",
       message: "紐づく写真もすべて削除されます。この操作は元に戻せません。",
       confirmLabel: "削除する",
       danger: true,
@@ -234,7 +248,7 @@ export default function UserCaseDetailPage() {
       if (editingItemId === item.id) setEditingItemId(null);
       await reload();
     } catch (e) {
-      setError(toDisplayMessage(e, "商品の削除に失敗しました"));
+      setError(toDisplayMessage(e, "品物の削除に失敗しました"));
     } finally {
       endOp(key);
     }
@@ -313,7 +327,7 @@ export default function UserCaseDetailPage() {
   }
 
   const reload = useCallback(async () => {
-    if (!token) return;
+    if (!token || !isCaseIdValid) return;
     try {
       const c = await getCase(caseId, token);
       setCaseData(c);
@@ -324,9 +338,10 @@ export default function UserCaseDetailPage() {
         setTxn(await getTransaction(selected.transaction_id, token));
       }
     } catch (e) {
+      setLoadErrorStatus(e instanceof KdzApiError ? e.status : 0);
       setError(toDisplayMessage(e, "取得に失敗しました"));
     }
-  }, [caseId, token]);
+  }, [caseId, token, isCaseIdValid]);
 
   useEffect(() => {
     void reload();
@@ -387,6 +402,20 @@ export default function UserCaseDetailPage() {
     }
   }
 
+  if (!isCaseIdValid) {
+    return (
+      <>
+        <AppHeader />
+        <div className="container-aw max-w-3xl space-y-4 py-10">
+          <Notice tone="error">このページのアドレスが正しくありません。一覧から開き直してください。</Notice>
+          <Link href="/cases" className={btnPrimary}>
+            マイ案件一覧へ
+          </Link>
+        </div>
+      </>
+    );
+  }
+
   if (loading || (!caseData && !error)) {
     return (
       <>
@@ -402,8 +431,33 @@ export default function UserCaseDetailPage() {
     return (
       <>
         <AppHeader />
-        <div className="container-aw max-w-3xl py-10">
-          <Notice tone="error">{error ?? "案件が見つかりません。"}</Notice>
+        <div className="container-aw max-w-3xl space-y-4 py-10">
+          <Notice tone="error">
+            {loadErrorStatus === 404
+              ? "この案件は見つかりませんでした。削除されたか、アドレスが違う可能性があります。"
+              : (error ?? "案件が見つかりません。")}
+          </Notice>
+          <div className="flex flex-wrap gap-2">
+            {loadErrorStatus !== 404 ? (
+              <button
+                type="button"
+                className={btnPrimary}
+                onClick={() => {
+                  setError(null);
+                  setLoadErrorStatus(null);
+                  void reload();
+                }}
+              >
+                再読み込み
+              </button>
+            ) : null}
+            <Link href="/cases" className={btnSecondary}>
+              マイ案件一覧へ
+            </Link>
+            <Link href="/mypage" className={btnSecondary}>
+              マイページへ
+            </Link>
+          </div>
         </div>
       </>
     );
@@ -418,6 +472,12 @@ export default function UserCaseDetailPage() {
   // r10 M2 是正: 業者側にしか出ていなかった申請上限・残り回数を依頼者側にも表示する。
   const reductionQuota = txn ? getReductionQuota(txn) : null;
   const myReview = txn?.reviews.find((r) => r.reviewer_type === "user");
+  // 未入力の項目は出さない（生のダッシュや「EVなし」の断定表示をしない）。
+  const housingAttributes = buildHousingAttributes(caseData);
+  // 入札は金額の高い順に並べる（同額は元の順＝先着）。
+  const sortedActiveBids = [...activeBids].sort((a, b) => b.amount - a.amount);
+  // 訪問予定日より前（または日程未定）に完了確定しようとしていないか（日本時間の今日と比較）。
+  const completionBeforeVisit = txn != null && isCompletionBeforeVisit(txn.visit_date, jstTodayIso());
 
   return (
     <>
@@ -426,6 +486,11 @@ export default function UserCaseDetailPage() {
       {search.get("created") ? (
         <Notice tone="success">
           出品を受け付けました。業者から入札が届くと、LINE連携済みの方はLINEで、未連携の方はメールでお知らせします。
+        </Notice>
+      ) : null}
+      {isAdminViewing ? (
+        <Notice tone="info">
+          運営として、依頼者の画面を表示しています。ここでの操作は依頼者の取引に反映され、当事者に通知される場合があります。必要なときだけ操作してください。
         </Notice>
       ) : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
@@ -439,11 +504,9 @@ export default function UserCaseDetailPage() {
               {caseData.prefecture} {caseData.city}
               {caseData.address_detail ? ` ${caseData.address_detail}` : ""}
             </p>
-            <p className="mt-0.5 text-xs text-slate-400">
-              {caseData.housing_type ?? "—"} / {caseData.floor_plan ?? "—"} /{" "}
-              {caseData.floor_number != null ? `${caseData.floor_number}階` : "—"} / EV
-              {caseData.has_elevator == null ? "—" : caseData.has_elevator ? "あり" : "なし"}
-            </p>
+            {housingAttributes.length > 0 ? (
+              <p className="mt-0.5 text-xs text-slate-400">{housingAttributes.join(" / ")}</p>
+            ) : null}
           </div>
           <StatusBadge value={caseData.status} label={CASE_STATUS_LABEL[caseData.status]} />
         </div>
@@ -505,7 +568,7 @@ export default function UserCaseDetailPage() {
                 <div className="mt-2 space-y-3 rounded-none border border-slate-200 bg-slate-50 p-4">
                   {editError ? <p className="text-xs font-semibold text-red-600">{editError}</p> : null}
                   <div>
-                    <label className="mb-1 block text-xs font-semibold text-slate-500">商品名</label>
+                    <label className="mb-1 block text-xs font-semibold text-slate-500">品物名</label>
                     <input
                       type="text"
                       maxLength={40}
@@ -554,7 +617,7 @@ export default function UserCaseDetailPage() {
                       onClick={cancelEditItem}
                       className={btnSecondary}
                     >
-                      キャンセル
+                      編集をやめる
                     </button>
                     {hasAiFallback ? (
                       <button
@@ -563,7 +626,7 @@ export default function UserCaseDetailPage() {
                         onClick={() => resetEditItemToAi(item)}
                         className="inline-flex items-center text-sm font-semibold text-slate-500 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        {isResettingItem ? "リセット中…" : "AI推定に戻す"}
+                        {isResettingItem ? "リセット中…" : "自動で付けた内容に戻す"}
                       </button>
                     ) : null}
                   </div>
@@ -617,7 +680,7 @@ export default function UserCaseDetailPage() {
                     onClick={() => handleDeleteItem(item)}
                     className={btnDanger}
                   >
-                    {isDeletingItem ? "削除中…" : "商品を削除"}
+                    {isDeletingItem ? "削除中…" : "品物を削除"}
                   </button>
                 </div>
               ) : null}
@@ -637,7 +700,7 @@ export default function UserCaseDetailPage() {
         {caseData.ai_status === "pending" && aiPollTimedOut ? (
           <div className="mt-4 flex flex-wrap items-center gap-3 rounded-none bg-slate-50 p-4" role="status">
             <p className="text-sm leading-relaxed text-slate-600">
-              解析に時間がかかっています。ページを再読み込みしてください。
+              説明の作成に時間がかかっています。ページを再読み込みしてください。
             </p>
             <button type="button" onClick={() => window.location.reload()} className={btnSecondary}>
               再読み込み
@@ -647,19 +710,19 @@ export default function UserCaseDetailPage() {
           <div className="mt-4 flex items-center gap-2 rounded-none bg-slate-50 p-4" role="status">
             <Spinner className="h-4 w-4 text-brand-600" />
             <p className="text-sm leading-relaxed text-slate-600">
-              AI が写真を解析中です（通常1〜2分）。この画面は自動で更新されます。
+              写真をもとに品物の説明を作っています（通常1〜2分）。この画面は自動で更新されます。
             </p>
           </div>
         ) : caseData.ai_status === "failed" ? (
           <div className="mt-4 rounded-none bg-slate-50 p-4">
             <p className="text-sm leading-relaxed text-slate-600">
-              AI 要約を作成できませんでした。写真と入力内容で入札を受け付けます。
+              品物の説明を自動で作れませんでした。写真と入力内容で入札を受け付けます。
             </p>
           </div>
         ) : caseData.ai_summary ? (
           <div className="mt-4 rounded-none bg-slate-50 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-              AI 要約（業者に提示されます）
+              品物の説明（業者に表示されます）
             </p>
             <p className="mt-1.5 text-sm leading-relaxed text-slate-700">
               {caseData.ai_summary}
@@ -678,7 +741,7 @@ export default function UserCaseDetailPage() {
             </p>
           ) : (
             <ul className="mt-4 space-y-3">
-              {activeBids.map((b) => (
+              {sortedActiveBids.map((b) => (
                 <li
                   key={b.id}
                   className="flex flex-wrap items-center justify-between gap-3 rounded-none border border-slate-200 p-4"
@@ -749,7 +812,7 @@ export default function UserCaseDetailPage() {
                       onClick={() =>
                         setConfirmState({
                           title: "この業者に決定しますか？",
-                          message: `${b.operator?.company_name ?? "この業者"}（${formatYen(b.amount)}）に決定しますか？決定後、業者へ住所詳細が開示されます。`,
+                          message: `${b.operator?.company_name ?? "この業者"}（${formatYen(b.amount)}）に決定しますか？決定すると、他の業者の入札はすべて無効になり、元に戻せません。業者に伝わるのは住所と連絡用のメールアドレスだけです（氏名・電話番号は伝わりません）。決定後も、取引のキャンセルはできます（理由は業者に共有されます）。`,
                           confirmLabel: "決定する",
                           onConfirm: () => {
                             setConfirmState(null);
@@ -775,12 +838,12 @@ export default function UserCaseDetailPage() {
                   if (!token) return;
                   setConfirmState({
                     title: "出品を取り下げますか？",
-                    message: "出品を取り下げますか？付いている入札はすべて無効になり、元に戻せません。",
+                    message: "付いている入札はすべて無効になり、元に戻せません。理由の入力は任意です。",
                     confirmLabel: "取り下げる",
                     danger: true,
                     withReason: true,
-                    reasonRequired: true,
-                    reasonLabel: "取り下げ理由",
+                    reasonRequired: false,
+                    reasonLabel: "取り下げの理由（任意）",
                     onConfirm: (reason) => {
                       setConfirmState(null);
                       void act(() => cancelCase(caseId, reason, token));
@@ -792,7 +855,7 @@ export default function UserCaseDetailPage() {
                 出品を取り下げる
               </button>
               <p className="mt-2 text-xs text-slate-400">
-                ※ 業者決定後の取消は取引画面の「キャンセル」から行えます。
+                ※ 業者を決めた後の取り消しは、取引の画面の一番下にある「この取引をキャンセルする」から行えます。
               </p>
             </>
           ) : null}
@@ -805,10 +868,10 @@ export default function UserCaseDetailPage() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="font-normal text-slate-900">
-                成約: {txn.operator?.company_name ?? "業者"}
+                業者が決まりました: {txn.operator?.company_name ?? "業者"}
               </h2>
               <p className="mt-1 text-sm text-slate-500">
-                成約金額 {formatYen(txn.initial_amount)}
+                決定した金額 {formatYen(txn.initial_amount)}
                 {txn.final_amount != null && txn.final_amount !== txn.initial_amount
                   ? ` → 確定額 ${formatYen(txn.final_amount)}`
                   : ""}
@@ -901,7 +964,7 @@ export default function UserCaseDetailPage() {
               （成約後・キャンセル前のみ意味を持つため active な状態でのみ表示）。 */}
           {reductionQuota && (txn.status === "pending" || txn.status === "visiting") ? (
             <p className="mt-4 text-xs text-slate-500">
-              業者の申請は1つの取引につき{reductionQuota.limit}回まで
+              業者からの減額の申請は、1つの取引につき{reductionQuota.limit}回までです
               {reductionQuota.remaining !== null ? `（残り${reductionQuota.remaining}回）` : ""}
             </p>
           ) : null}
@@ -984,55 +1047,35 @@ export default function UserCaseDetailPage() {
             </div>
           )}
 
-          {/* 完了・キャンセル */}
-          {(txn.status === "pending" || txn.status === "visiting") && (
+          {/* 作業完了の確定（取り消し不能）。取引のキャンセルは押し間違いを避けるため、
+              このボタンから離して画面下部の弱いリンクにする（下の「取引のキャンセル」参照）。 */}
+          {(txn.status === "pending" || txn.status === "visiting") && !txn.operator_deleted ? (
             <div className="mt-4 flex flex-wrap gap-2">
-              {/* r8-fix-frontend5 対応: 業者退会時は完了確定に進めないため非表示にし、
-                  キャンセルボタンのみ残す。 */}
-              {!txn.operator_deleted ? (
-                <button
-                  type="button"
-                  disabled={busy || Boolean(pendingReduction)}
-                  onClick={() =>
-                    setConfirmState({
-                      title: "作業完了を確定しますか？",
-                      message: "確定後は評価を投稿できます。",
-                      confirmLabel: "確定する",
-                      onConfirm: () => {
-                        setConfirmState(null);
-                        void act(() => completeTransaction(txn.id, token!));
-                      },
-                    })
-                  }
-                  className={btnPrimary}
-                >
-                  作業完了を確定する
-                </button>
-              ) : null}
               <button
                 type="button"
-                disabled={busy}
-                onClick={() => {
+                disabled={busy || Boolean(pendingReduction)}
+                onClick={() =>
                   setConfirmState({
-                    title: "キャンセルしますか？",
-                    message: "案件は終了し、この操作は元に戻せません。理由は業者に共有されます。",
-                    confirmLabel: "キャンセルする",
-                    danger: true,
-                    withReason: true,
-                    reasonRequired: true,
-                    reasonLabel: "キャンセル理由",
-                    onConfirm: (reason) => {
+                    title: completionBeforeVisit
+                      ? "まだ訪問日の前です。作業完了を確定しますか？"
+                      : "作業完了を確定しますか？",
+                    message: completionBeforeVisit
+                      ? `${txn.visit_date ? `訪問予定は${formatVisitSchedule(txn.visit_date, txn.visit_time_slot)}です。` : "訪問日がまだ決まっていません。"}作業がまだ終わっていない場合は押さないでください。確定すると取引は完了になり、業者とのチャットも送れなくなります。この操作は元に戻せません。`
+                      : "確定すると取引は完了になり、業者とのチャットも送れなくなります。この操作は元に戻せません。確定後は評価を投稿できます。",
+                    confirmLabel: "確定する",
+                    danger: completionBeforeVisit,
+                    onConfirm: () => {
                       setConfirmState(null);
-                      void act(() => cancelTransaction(txn.id, reason, token!));
+                      void act(() => completeTransaction(txn.id, token!));
                     },
-                  });
-                }}
-                className={btnDanger}
+                  })
+                }
+                className={btnPrimary}
               >
-                キャンセル
+                作業完了を確定する
               </button>
             </div>
-          )}
+          ) : null}
           {pendingReduction ? (
             <p className="mt-2 text-xs text-slate-400">
               ※ 減額申請への回答後に完了確定できます。
@@ -1079,6 +1122,34 @@ export default function UserCaseDetailPage() {
                 />
               </div>
             ))}
+
+          {/* 取引のキャンセル（取り消し不能）。作業完了ボタンと並べず、画面下部の弱いリンクにする。 */}
+          {txn.status === "pending" || txn.status === "visiting" ? (
+            <div className="mt-10 border-t border-slate-200 pt-4">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setConfirmState({
+                    title: "この取引をキャンセルしますか？",
+                    message: "案件は終了し、この操作は元に戻せません。理由は業者に共有されます。",
+                    confirmLabel: "取引をキャンセルする",
+                    danger: true,
+                    withReason: true,
+                    reasonRequired: true,
+                    reasonLabel: "キャンセルの理由（業者に共有されます）",
+                    onConfirm: (reason) => {
+                      setConfirmState(null);
+                      void act(() => cancelTransaction(txn.id, reason, token!));
+                    },
+                  });
+                }}
+                className="text-sm text-slate-500 underline underline-offset-2 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                この取引をキャンセルする
+              </button>
+            </div>
+          ) : null}
         </Card>
       )}
 
@@ -1096,6 +1167,7 @@ export default function UserCaseDetailPage() {
         reasonRequired={confirmState.reasonRequired}
         reasonLabel={confirmState.reasonLabel}
         busy={busy}
+        cancelLabel={CONFIRM_DISMISS_LABEL}
         onCancel={() => setConfirmState(null)}
         onConfirm={confirmState.onConfirm}
       />
