@@ -37,3 +37,13 @@ test("一覧の首位文言: 2社以上の首位は同額の可能性を添え�
   assert.equal(topBidderLabel(false, 3), "他社が上回り中");
   assert.equal(topBidderLabel(undefined, 3), null);
 });
+
+test("初回入札の確認モーダルの桁表示: 境界と不正値", () => {
+  assert.equal(formatBidAmountWithUnit(9_999), "¥9,999");
+  assert.equal(formatBidAmountWithUnit(10_000), "¥10,000（1万円）");
+  assert.equal(formatBidAmountWithUnit(0), "¥0");
+  assert.equal(formatBidAmountWithUnit(100_010_000), "¥100,010,000（1億1万円）");
+  assert.equal(formatBidAmountWithUnit(1_234_567), "¥1,234,567（123万4,567円）");
+  // 桁の打ち間違い（5 万と 50 万）が読みで区別できる
+  assert.notEqual(formatBidAmountWithUnit(50_000), formatBidAmountWithUnit(500_000));
+});

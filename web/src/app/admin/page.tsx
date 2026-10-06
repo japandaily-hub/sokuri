@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Spinner } from "@/components/Icon";
+import { isTypedNameMatch } from "@/lib/confirm-input";
 import { formatAdminDate } from "@/lib/admin-datetime";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import {
@@ -368,7 +369,7 @@ export default function AdminPage() {
   async function confirmDelete(op: OperatorOut, typedName: string | null) {
     if (!token || busy) return;
     // M-3: 取り消せない操作なので、社名の入力一致（取り違え防止）を求める。
-    if ((typedName ?? "").trim() !== op.company_name.trim()) {
+    if (!isTypedNameMatch(typedName, op.company_name)) {
       setDeleteModalError("入力した社名が一致しません。削除する業者の社名をそのまま入力してください。");
       return;
     }

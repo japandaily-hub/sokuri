@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Spinner } from "@/components/Icon";
 import { AppHeader } from "@/components/kdz/AppHeader";
+import { resolveListViewState } from "@/lib/list-state";
 import { formatJstDateLong } from "@/lib/datetime";
 import { formatPurposeLabel } from "@/lib/case-labels";
 import {
@@ -40,7 +41,8 @@ export default function MyCasesPage() {
     load();
   }, [load]);
 
-  if (loading || (!cases && !error)) {
+  const viewState = resolveListViewState({ pending: loading, failed: Boolean(error), items: cases });
+  if (viewState === "loading") {
     return (
       <>
         <AppHeader />
@@ -63,7 +65,7 @@ export default function MyCasesPage() {
         </a>
       }
     >
-      {error ? (
+      {viewState === "failed" ? (
         <div className="space-y-3">
           <Notice tone="error">{error}</Notice>
           {/* 取得に失敗したときは「案件がありません」と区別し、再読み込みの導線を出す。 */}
@@ -72,7 +74,7 @@ export default function MyCasesPage() {
           </button>
         </div>
       ) : null}
-      {!error && cases && cases.length === 0 ? (
+      {viewState === "empty" ? (
         <Card className="text-center">
           <p className="text-sm text-slate-500">まだ案件がありません。</p>
           <a href="/create" className={`${btnPrimary} mt-4`}>

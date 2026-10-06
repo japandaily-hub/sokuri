@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { isReasonMissing } from "@/lib/confirm-input";
 import { Notice, btnDanger, btnPrimary, btnSecondary, inputBase } from "@/components/kdz/Ui";
 
 /** dialog 内でフォーカス移動可能な要素（disabled は除く）を集める共通セレクタ。 */
@@ -57,7 +58,7 @@ export function ConfirmModal({
 }) {
   const [reason, setReason] = useState("");
   const [password, setPassword] = useState("");
-  const reasonMissing = withReason && reasonRequired && reason.trim() === "";
+  const reasonMissing = isReasonMissing(withReason, reasonRequired, reason);
   const passwordMissing = withPassword && password === "";
   /** 理由欄の上限。管理系エンドポイントの理由フィールドは概ね max_length=500（backend
    *  schemas_katadzuke.py）のため、超過して 422 になるより先にクライアント側で防ぐ。 */

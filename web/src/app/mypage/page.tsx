@@ -25,6 +25,7 @@ import { Spinner } from "@/components/Icon";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import { Ic } from "@/components/kdz/Icons";
 import { Notice } from "@/components/kdz/Notice";
+import { resolveListViewState } from "@/lib/list-state";
 import { formatJstDateLong } from "@/lib/datetime";
 import { caseItemsLabel, formatPurposeLabel } from "@/lib/case-labels";
 import { formatVisitSchedule } from "@/lib/categories";
@@ -423,7 +424,7 @@ function MyPageContent() {
     { key: "done", label: "決定済み・終了", count: doneLots.length, gray: true },
   ];
 
-  const isLoading = loading || (!cases && !casesFailed);
+  const isLoading = resolveListViewState({ pending: loading, failed: casesFailed, items: cases }) === "loading";
   const sessionExpired = !loading && !token;
 
   if (sessionExpired) {
