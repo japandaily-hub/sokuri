@@ -2757,7 +2757,7 @@ async def test_propose_schedule_notify_debounced_within_5_minutes(
         )
         assert r.status_code == 201, r.text
     # 依頼者の line_user_id（未連携なので None）・email・txn_id の順で完全一致。
-    dispatch_mock.assert_called_once_with(None, user_email, txn_id)
+    dispatch_mock.assert_called_once_with(None, user_email, txn_id, True)
 
     with patch(
         "app.api.v1.endpoints.transactions.notify_dispatch.dispatch_schedule_proposed",

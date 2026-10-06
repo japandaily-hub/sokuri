@@ -552,13 +552,12 @@ async def test_non_party_rate_limited_independently_and_owner_bucket_untouched(
         assert await _count_kind(db_session, uuid.UUID(txn_id), "text") == 1
 
 
-async def test_admin_message_counts_toward_user_party_but_rate_limited_on_admin_account(
+async def test_admin_message_is_rejected_and_does_not_count_toward_user_party(
     db_session: AsyncSession,
 ):
-    """管理者は _assert_party で "user" 側の当事者として通る既存仕様の固定化。
-    件数は sender_type 単位のため、管理者の発言は依頼者側（sender_type="user"）の
-    text 件数に入る。一方レート制限のアカウント軸キーは管理者自身のアカウント
-    （actor.id）になるため、依頼者本人のバケットとは独立している。
+    """運営（所有者ではない管理者）の代理発言は 403 で拒否する（pdca admin H-2）。
+    かつては管理者の発言が sender_type="user" として保存され、業者に依頼者名義で見えていた。
+    拒否された発言は依頼者側の text 件数に入らず、依頼者本人は通常どおり送れる。
     """
     test_app = create_test_app(db_session)
     limiter = _rate_limiter_for_tests(message_send_max=2)
@@ -574,22 +573,14 @@ async def test_admin_message_counts_toward_user_party_but_rate_limited_on_admin_
         )
         _, txn_id = await _create_transaction(client, user_token, op_token)
 
-        for _ in range(2):
-            r = await client.post(
-                f"/api/v1/transactions/{txn_id}/messages",
-                json={"body": "運営からの発言"},
-                headers=_auth(admin_token),
-            )
-            assert r.status_code == 201, r.text
-
-        r_blocked = await client.post(
+        r_admin = await client.post(
             f"/api/v1/transactions/{txn_id}/messages",
-            json={"body": "3件目の運営発言"},
+            json={"body": "運営からの発言"},
             headers=_auth(admin_token),
         )
-        assert r_blocked.status_code == 429
+        assert r_admin.status_code == 403
+        assert r_admin.json()["detail"] == "運営はチャットを代理で送信できません。"
 
-        # 依頼者本人のバケットは消費されていないため、まだ送信できる。
         r_user = await client.post(
             f"/api/v1/transactions/{txn_id}/messages",
             json={"body": "依頼者本人の発言"},
@@ -597,9 +588,8 @@ async def test_admin_message_counts_toward_user_party_but_rate_limited_on_admin_
         )
         assert r_user.status_code == 201, r_user.text
 
-        # 管理者の発言2件 + 依頼者本人の発言1件 = sender_type="user" の text は3件。
         assert (
-            await _count_text_by_sender(db_session, uuid.UUID(txn_id), sender_type="user") == 3
+            await _count_text_by_sender(db_session, uuid.UUID(txn_id), sender_type="user") == 1
         )
 
 
