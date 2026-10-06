@@ -8,7 +8,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
-import { signupUser, toDisplayMessage, clearRedirectLoopStorage } from "@/lib/katadzuke-api";
+import { signupUser, toDisplayMessage, clearRedirectLoopStorage, KdzApiError } from "@/lib/katadzuke-api";
 import { Ic } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
 import { PasswordField, LineAuthButton, TrustRow } from "@/components/kdz/auth";
@@ -57,6 +57,8 @@ export default function SignupPage() {
   const [errs, setErrs] = useState<Record<string, string>>({});
   const [authErr, setAuthErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /** 登録済みメールだった（確認画面で 409 を受けたとき、入力欄の近くでログイン導線を出すため）。 */
+  const [emailTaken, setEmailTaken] = useState(false);
 
   function setErr(k: string, v: string | null) {
     setErrs((prev) => {
@@ -100,7 +102,14 @@ export default function SignupPage() {
         clearRedirectLoopStorage();
         goTo(4);
       } catch (err) {
-        setAuthErr(toDisplayMessage(err, "登録に失敗しました。"));
+        if (err instanceof KdzApiError && err.status === 409) {
+          // 最終確認画面ではなく、原因であるメール欄のある最初のステップへ戻して案内する。
+          setEmailTaken(true);
+          setErr("email", "このメールアドレスは既に登録されています。");
+          goTo(1);
+        } else {
+          setAuthErr(toDisplayMessage(err, "登録に失敗しました。"));
+        }
       } finally {
         setBusy(false);
       }
@@ -180,12 +189,21 @@ export default function SignupPage() {
               <div className="form-card">
                 <div className={`field${errs.email ? " has-error" : ""}`}>
                   <label htmlFor="inp-email">メールアドレス<span className="req">必須</span></label>
-                  <input type="email" id="inp-email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="example@email.com" autoComplete="email" inputMode="email" />
-                  {errs.email && <div className="field-error">{errs.email}</div>}
+                  <input type="email" id="inp-email" value={email} onChange={(e) => { setEmail(e.target.value); if (emailTaken) { setEmailTaken(false); setErr("email", null); } }} placeholder="example@email.com" autoComplete="email" inputMode="email" aria-invalid={Boolean(errs.email)} />
+                  {errs.email && <div className="field-error" role="alert">{errs.email}</div>}
+                  {emailTaken && (
+                    <div className="field-error">
+                      すでに登録済みです。<Link href="/login" style={{ textDecoration: "underline", fontWeight: 600 }}>ログインはこちら</Link>
+                      （パスワードを忘れた場合は<Link href="/contact" style={{ textDecoration: "underline" }}>お問い合わせ</Link>ください）
+                    </div>
+                  )}
                 </div>
                 <div className={`field${errs.pw ? " has-error" : ""}`}>
                   <label htmlFor="inp-pw">パスワード<span className="req">必須</span></label>
                   <PasswordField id="inp-pw" value={password} onChange={setPassword} placeholder="8文字以上" autoComplete="new-password" minLength={8} />
+                  <p id="pw-rule" style={{ fontSize: 12, color: "var(--body-soft)", lineHeight: 1.7, margin: "6px 0 0" }}>
+                    8文字以上で入力してください（128文字まで）。英字と数字、記号を混ぜると、より安全です。
+                  </p>
                   <PwStrength value={password} />
                   {errs.pw && <div className="field-error">{errs.pw}</div>}
                 </div>
@@ -268,7 +286,7 @@ export default function SignupPage() {
               <div className="done-circle"><Ic name="check-circle" /></div>
               <h1>登録が完了しました</h1>
               <p>カタヅケへようこそ。<br />さっそく不用品を撮って、<br />業者からの入札を受け取りましょう。</p>
-              <p style={{ fontSize: 12.5, color: "var(--body-soft)" }}>対応エリアは東京・千葉・埼玉・神奈川です。</p>
+              <p style={{ fontSize: 12.5, color: "var(--body-soft)" }}>対応エリアは東京都・千葉県・埼玉県・神奈川県です。</p>
               <div className="done-actions">
                 <Link href="/create" className="btn btn-primary btn-lg">
                   さっそく出品してみる<Ic name="arrow" />
