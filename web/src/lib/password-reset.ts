@@ -33,6 +33,20 @@ export function parseResetToken(search: string | null | undefined): ParsedResetL
   return RESET_TOKEN_PATTERN.test(token) ? { status: "ready", token, accountType } : { status: "missing", accountType };
 }
 
+/**
+ * 再設定リンクを location から取り出す。メールのリンクは `#token=...&type=...`（フラグメント。サーバー・
+ * 外部のログに送られない）形式。旧形式の `?token=...` も当面は受ける（フラグメントを優先）。
+ * `search` は `location.search`、`hash` は `location.hash`（先頭の `#` は付いていても外してもよい）。
+ */
+export function parseResetLink(search: string | null | undefined, hash: string | null | undefined): ParsedResetLink {
+  const fromHash = parseResetToken((hash ?? "").replace(/^#/, ""));
+  if (fromHash.status === "ready") return fromHash;
+  const fromSearch = parseResetToken(search);
+  if (fromSearch.status === "ready") return fromSearch;
+  // どちらにも token が無い: 種別だけはフラグメント側（あれば）を優先して返す。
+  return new URLSearchParams((hash ?? "").replace(/^#/, "")).has("type") ? fromHash : fromSearch;
+}
+
 /** 利用者へ見せられない（内部事情・英語のまま）エラーのときの既定の案内。 */
 export const RESET_DEFAULT_ERROR_MESSAGE = "ただいま処理できません。時間をおいてお試しください。";
 

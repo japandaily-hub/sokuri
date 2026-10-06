@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  parseResetLink,
   RESET_DEFAULT_ERROR_MESSAGE,
   parseResetToken,
   resolveResetErrorMessage,
@@ -60,3 +61,40 @@ describe("resolveResetErrorMessage", () => {
     assert.equal(resolveResetErrorMessage(400, null), RESET_DEFAULT_ERROR_MESSAGE);
   });
 });
+
+// ── フラグメント形式のリンク（security review M-3: token をサーバー・外部ログに送らない） ──
+
+const GOOD_TOKEN = "A".repeat(43);
+
+it("parseResetLink: フラグメントの token と種別を読む", () => {
+  assert.deepEqual(parseResetLink("", `#token=${GOOD_TOKEN}&type=operator`), {
+    status: "ready",
+    token: GOOD_TOKEN,
+    accountType: "operator",
+  });
+});
+
+it("parseResetLink: 先頭の # が無くても読める", () => {
+  assert.equal(parseResetLink("", `token=${GOOD_TOKEN}`).status, "ready");
+});
+
+it("parseResetLink: 旧形式のクエリも受ける（フラグメントが無いとき）", () => {
+  assert.deepEqual(parseResetLink(`?token=${GOOD_TOKEN}&type=user`, ""), {
+    status: "ready",
+    token: GOOD_TOKEN,
+    accountType: "user",
+  });
+});
+
+it("parseResetLink: 両方にあればフラグメントを優先", () => {
+  const other = "B".repeat(43);
+  const r = parseResetLink(`?token=${other}`, `#token=${GOOD_TOKEN}`);
+  assert.equal(r.status === "ready" && r.token, GOOD_TOKEN);
+});
+
+it("parseResetLink: どちらにも無い・不正形式は missing", () => {
+  assert.equal(parseResetLink("", "").status, "missing");
+  assert.equal(parseResetLink("", "#token=short").status, "missing");
+  assert.equal(parseResetLink("?token=" + "!".repeat(40), "").status, "missing");
+});
+

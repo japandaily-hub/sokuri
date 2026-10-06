@@ -10,7 +10,7 @@ import Link from "next/link";
 import { KdzLogo } from "@/components/kdz/Logo";
 import { Field, PasswordField } from "@/components/kdz/auth";
 import { KdzApiError } from "@/lib/katadzuke-api";
-import { parseResetToken, type ParsedResetLink, type ResetAccountType } from "@/lib/password-reset";
+import { parseResetLink, type ParsedResetLink, type ResetAccountType } from "@/lib/password-reset";
 import { RESET_PASSWORD_MAX_LENGTH, RESET_PASSWORD_MIN_LENGTH, confirmPasswordReset } from "../reset-api";
 import "../password-reset.css";
 
@@ -52,7 +52,7 @@ export default function PasswordResetConfirmPage() {
   useEffect(() => {
     if (parsedLinkRef.current === null) {
       // useSearchParams ではなく location から1回だけ読む（読んだ直後に URL から token を消すため）。
-      parsedLinkRef.current = parseResetToken(window.location.search);
+      parsedLinkRef.current = parseResetLink(window.location.search, window.location.hash);
       window.history.replaceState(window.history.state, "", CONFIRM_PATH);
     }
     const parsed = parsedLinkRef.current;
