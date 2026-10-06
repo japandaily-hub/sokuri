@@ -166,7 +166,7 @@ A（現行: ラジオ＋1ボタン）          B（推奨: 候補ごとのボタ
 
 - backend 新規: `tests/test_schedule_structured.py`（propose の形・範囲・日本時間の境界・当日の終わった枠・重複・枠外・余分なキー・`{slots}` の 422／accept の正常系・IDOR 404・superseded（最大 seq で判定・v1 が混ざっても）・legacy・範囲外・expired（日付と当日の end）・業者 403・状態 409・管理者の confirmed_by／confirm の固定5種・管理者の note 422）、`tests/test_visit_schedule_unit.py`（曜日・うるう日・年末年始・UTC 14:59/15:00 境界・v1/v2 読み分け）、固定時間帯と `web/src/lib/visit-slots.ts` の一致テスト（波ダッシュ U+301C と U+FF5E のずれも検出）、ラベルの golden fixture。
 - backend 更新: test_katadzuke_api.py・test_account_api.py・test_r10_backend_fixes.py・test_txn_state_integrity.py・test_r8_abnormal_guards.py の slots／"10:00-12:00" を新形式・固定値へ。
-- PostgreSQL: CI の pg-concurrency（`backend/scripts/pg_concurrency_check.py`）に S9（propose と accept の競合で結果が一方に決まる・accept の二重押しで 200 と 409・可能なら運営の強制終了と accept の競合）。`meta ->> 'seq'` の集計も実 PG で通る。
+- PostgreSQL: CI の pg-concurrency（`backend/scripts/pg_concurrency_check.py`）に S11（propose と accept の競合で結果が一方に決まる・accept の二重押しで 200 と 409・可能なら運営の強制終了と accept の競合）。`meta ->> 'seq'` の集計も実 PG で通る。
 - web（node --test）: visit-slots.test.mts 更新、categories.test.mts。
 - E2E: 03＝業者の操作は同じ・依頼者は候補ボタン→確認モーダル→両者に確定の帯。04＝/schedule 経路のまま（当日の終わった枠を選ばないよう時間帯を確認）。E2E と build は実装者が流し、レビュー担当には走らせない。
 

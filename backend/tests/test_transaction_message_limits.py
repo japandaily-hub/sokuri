@@ -682,3 +682,70 @@ class TestChatAndScheduleRateLimitSettings:
         monkeypatch.setenv(env_name, "45")
         settings = Settings(_env_file=None)
         assert getattr(settings, attr) == 45
+
+
+@pytest.mark.asyncio
+async def test_schedule_confirm_shares_the_accept_rate_limit_bucket(db_session: AsyncSession):
+    """confirm（/schedule）も「日程の確定」の枠（アカウント軸）を共有して 429 になる（security review L-1）。
+
+    検証エラーの連打で自分の取引の行ロックを取り続け、業者の propose や cancel を待たせられないようにする。
+    """
+    test_app = create_test_app(db_session)
+    limiter = _rate_limiter_for_tests(schedule_propose_max=5, schedule_accept_max=1)
+    test_app.dependency_overrides[get_rate_limiter] = lambda: limiter
+
+    async with AsyncClient(
+        transport=ASGITransport(app=test_app), base_url="http://test"
+    ) as client:
+        admin_token = await _make_admin(client, db_session)
+        user_token = await _signup_user(client, "rl_confirm_user@example.com")
+        op_token, _ = await _verified_operator(
+            client, db_session, admin_token, "rl_confirm_op@example.com"
+        )
+        _, txn_id = await _create_transaction(client, user_token, op_token)
+        visit_day = (date.today() + timedelta(days=7)).isoformat()
+        bad = {"visit_date": visit_day, "visit_time_slot": "固定5種に無い文字列"}
+
+        r_first = await client.post(
+            f"/api/v1/transactions/{txn_id}/schedule/confirm", json=bad, headers=_auth(user_token)
+        )
+        assert r_first.status_code == 422, r_first.text  # 検証エラーも数える
+        r_second = await client.post(
+            f"/api/v1/transactions/{txn_id}/schedule/confirm", json=bad, headers=_auth(user_token)
+        )
+        assert r_second.status_code == 429, r_second.text
+
+
+@pytest.mark.asyncio
+async def test_schedule_ten_candidates_and_last_index_boundary(db_session: AsyncSession):
+    """境界: ちょうど 10 件の提示は 201、その末尾（candidate_index=9）の accept は 200（上限側の取り違え検知）。"""
+    test_app = create_test_app(db_session)
+    async with AsyncClient(
+        transport=ASGITransport(app=test_app), base_url="http://test"
+    ) as client:
+        admin_token = await _make_admin(client, db_session)
+        user_token = await _signup_user(client, "boundary_user@example.com")
+        op_token, _ = await _verified_operator(
+            client, db_session, admin_token, "boundary_op@example.com"
+        )
+        _, txn_id = await _create_transaction(client, user_token, op_token)
+        candidates = [
+            {
+                "date": (date.today() + timedelta(days=7 + i)).isoformat(),
+                "start": "09:00",
+                "end": "12:00",
+            }
+            for i in range(10)
+        ]
+        r_propose = await client.post(
+            f"/api/v1/transactions/{txn_id}/schedule/propose",
+            json={"candidates": candidates},
+            headers=_auth(op_token),
+        )
+        assert r_propose.status_code == 201, r_propose.text
+        r_accept = await client.post(
+            f"/api/v1/transactions/{txn_id}/schedule/proposals/{r_propose.json()['id']}/accept",
+            json={"candidate_index": 9},
+            headers=_auth(user_token),
+        )
+        assert r_accept.status_code == 200, r_accept.text

@@ -1327,9 +1327,15 @@ async def confirm_schedule(
     transaction_id: uuid.UUID,
     body: ScheduleConfirmRequest,
     background: BackgroundTasks,
+    request: Request,
     actor: Actor = Depends(get_current_actor),
     session: AsyncSession = Depends(get_session),
+    _rl: object = Depends(RateLimitGuard("schedule_accept")),
 ) -> TransactionOut:
+    # 検証エラーの連打で自分の取引の行ロックを取り続け、業者の propose や cancel を待たせるのを防ぐ
+    # （security review L-1）。accept と同じ「日程の確定」の枠を共有する（アカウント軸のみ）。
+    request.state.rate_limit.hit_account(_rate_limit_account_key(actor))
+
     # 認可（当事者性）はロック取得より前に確認する（r6-verify-fix M1）。
     await _assert_party_before_lock(session, transaction_id, actor)
     # complete / cancel との競合で「キャンセル済みなのに visiting へ戻る」等の
