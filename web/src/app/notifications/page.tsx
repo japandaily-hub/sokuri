@@ -52,6 +52,15 @@ import {
   type UserProfile,
   type NotificationSettings,
 } from "@/lib/katadzuke-api";
+import {
+  READ_STORAGE_KEY,
+  addReadSignatures,
+  decideListView,
+  deriveRows,
+  parseReadSignatures,
+  partialFailureMessage,
+  type NotificationSource,
+} from "@/lib/notifications-view";
 import "./notifications.css";
 
 /* ── アイコン（デザインHTMLの symbol を inline 化） ── */
@@ -97,6 +106,8 @@ function ArrowIcon() {
 
 type SummaryRow = {
   key: string;
+  /** 既読判定の署名（対象と件数が変わると変わる）。 */
+  signature: string;
   icon: NotifIconName;
   iconTone: "blue" | "green" | "warn";
   title: string;
@@ -124,20 +135,51 @@ function NotificationsContent() {
   const [mailBusy, setMailBusy] = useState(false);
   const [mailNotice, setMailNotice] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /* 取得に失敗した取得元（部分失敗の明示と再読み込みの出し分けに使う）。 */
+  const [failedSources, setFailedSources] = useState<NotificationSource[]>([]);
+  /* 既読にした通知の署名（S-5）。端末の localStorage にだけ残す。 */
+  const [readSignatures, setReadSignatures] = useState<string[]>([]);
+
+  useEffect(() => {
+    try {
+      setReadSignatures(parseReadSignatures(window.localStorage.getItem(READ_STORAGE_KEY)));
+    } catch {
+      // localStorage が使えない環境（プライベートモード等）では既読を残さないだけ。
+    }
+  }, []);
+
+  const markRead = useCallback((signatures: string[]) => {
+    setReadSignatures((prev) => {
+      const next = addReadSignatures(prev, signatures);
+      try {
+        window.localStorage.setItem(READ_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // 保存できなくても画面内の既読表示は続ける。
+      }
+      return next;
+    });
+  }, []);
 
   const reload = useCallback(async () => {
     if (!token) return;
     setError(null);
+    const failed: NotificationSource[] = [];
     try {
       setCases(await listMyCases(token));
     } catch (e) {
+      failed.push("cases");
+      // 再読み込みで成功した場合に古い一覧を残さない。
+      setCases(null);
       setError(toDisplayMessage(e, "案件の取得に失敗しました"));
     }
     try {
       setTransactions(await listTransactions(token, { limit: LIST_MAX_LIMIT, offset: 0 }));
     } catch (e) {
+      failed.push("transactions");
+      setTransactions(null);
       setError((prev) => prev ?? toDisplayMessage(e, "取引の取得に失敗しました"));
     }
+    setFailedSources(failed);
     try {
       setProfile(await getMyProfile(token));
     } catch (e) {
@@ -287,53 +329,46 @@ function NotificationsContent() {
     }
   }
 
-  const biddingCases = (cases ?? []).filter(
-    (c) => c.bid_count > 0 && c.status !== "closed" && c.status !== "cancelled",
-  );
-  const negotiatingTxns = (transactions ?? []).filter(
-    (t) => t.status === "pending" || t.status === "visiting",
-  );
-  const reviewWaitingTxns = (transactions ?? []).filter(
-    (t) => t.status === "completed" && !t.has_review,
-  );
-
-  const rows: SummaryRow[] = [];
-  if (biddingCases.length > 0) {
-    rows.push({
-      key: "bidding",
-      icon: "bid",
-      iconTone: "blue",
-      title: "入札が届いている案件",
-      text: `${biddingCases.length}件の案件に業者からの入札が届いています。内容をご確認ください。`,
-      badgeLabel: "入札",
-      href: "/cases",
-    });
-  }
-  if (negotiatingTxns.length > 0) {
-    rows.push({
-      key: "negotiating",
-      icon: "chat",
-      iconTone: "green",
-      title: "進行中の取引",
-      text: `${negotiatingTxns.length}件の取引が訪問日調整・訪問予定として進行中です。`,
-      badgeLabel: "進行中",
-      href: negotiatingTxns.length === 1 ? `/cases/${negotiatingTxns[0].case_id}` : "/cases",
-    });
-  }
-  if (reviewWaitingTxns.length > 0) {
-    rows.push({
-      key: "review",
-      icon: "star",
-      iconTone: "warn",
-      title: "評価待ちの取引",
-      text: `${reviewWaitingTxns.length}件の取引が完了しています。業者の評価にご協力ください。`,
-      badgeLabel: "評価待ち",
-      href:
-        reviewWaitingTxns.length === 1
-          ? `/review?transaction_id=${reviewWaitingTxns[0].id}`
-          : "/mypage",
-    });
-  }
+  const derived = deriveRows(cases, transactions);
+  const rows: SummaryRow[] = derived.map((d) => {
+    switch (d.key) {
+      case "bidding":
+        return {
+          key: d.key,
+          signature: d.signature,
+          icon: "bid",
+          iconTone: "blue",
+          title: "入札が届いている案件",
+          text: `${d.count}件の案件に業者からの入札が届いています。内容をご確認ください。`,
+          badgeLabel: "入札",
+          href: "/cases",
+        };
+      case "negotiating":
+        return {
+          key: d.key,
+          signature: d.signature,
+          icon: "chat",
+          iconTone: "green",
+          title: "進行中の取引",
+          text: `${d.count}件の取引が訪問日調整・訪問予定として進行中です。`,
+          badgeLabel: "進行中",
+          href: d.singleCaseId ? `/cases/${d.singleCaseId}` : "/cases",
+        };
+      default:
+        return {
+          key: d.key,
+          signature: d.signature,
+          icon: "star",
+          iconTone: "warn",
+          title: "評価待ちの取引",
+          text: `${d.count}件の取引が完了しています。業者の評価にご協力ください。`,
+          badgeLabel: "評価待ち",
+          href: d.singleTransactionId ? `/review?transaction_id=${d.singleTransactionId}` : "/mypage",
+        };
+    }
+  });
+  const listView = decideListView(rows.length, failedSources);
+  const unreadRows = rows.filter((r) => !readSignatures.includes(r.signature));
 
   const isLoading = loading || (!cases && !transactions && !profile && !error);
   const sessionExpired = (!loading && !token) || reauthSessionExpired;
@@ -439,16 +474,47 @@ function NotificationsContent() {
 
           {error ? <Notice tone="danger">{error}</Notice> : null}
 
+          {/* 部分失敗（案件か取引のどちらかだけ取れなかった）: 欠けた分があることを明示し、再読み込みを出す */}
+          {!sessionExpired && !isLoading && listView.kind === "rows" && listView.partialFailure ? (
+            <Notice tone="danger">
+              {partialFailureMessage(listView.missingLabels)}
+              <button
+                type="button"
+                className="btn-notif-setting"
+                style={{ marginLeft: 8 }}
+                onClick={() => void reload()}
+              >
+                再読み込み
+              </button>
+            </Notice>
+          ) : null}
+
           {sessionExpired ? null : isLoading ? (
             <div className="flex min-h-[30vh] items-center justify-center">
               <Spinner className="h-6 w-6 text-brand-600" />
             </div>
           ) : (
             <div id="notif-list">
-              {rows.length > 0 ? (
+              {listView.kind === "rows" ? (
                 <div className="notif-group">
-                  {rows.map((row) => (
-                    <Link key={row.key} href={row.href} className="notif-card unread">
+                  {unreadRows.length > 0 ? (
+                    <button
+                      type="button"
+                      className="btn-notif-setting"
+                      onClick={() => markRead(unreadRows.map((r) => r.signature))}
+                    >
+                      すべて既読にする
+                    </button>
+                  ) : null}
+                  {rows.map((row) => {
+                    const isRead = readSignatures.includes(row.signature);
+                    return (
+                    <Link
+                      key={row.key}
+                      href={row.href}
+                      className={`notif-card${isRead ? "" : " unread"}`}
+                      onClick={() => markRead([row.signature])}
+                    >
                       <div className="notif-card-inner">
                         <div className={`notif-icon ${row.iconTone}`}>
                           <NotifIcon name={row.icon} />
@@ -457,7 +523,7 @@ function NotificationsContent() {
                           <div className="notif-title">{row.title}</div>
                           <div className="notif-text">{row.text}</div>
                           <div className="notif-meta">
-                            <span className={`notif-badge ${row.iconTone}`}>{row.badgeLabel}</span>
+                            <span className={`notif-badge ${row.iconTone}`}>{isRead ? "既読" : "新着"}・{row.badgeLabel}</span>
                           </div>
                         </div>
                         <div className="notif-arrow">
@@ -465,9 +531,10 @@ function NotificationsContent() {
                         </div>
                       </div>
                     </Link>
-                  ))}
+                    );
+                  })}
                 </div>
-              ) : error ? (
+              ) : listView.kind === "error" ? (
                 // 取得に失敗したときに「新しいお知らせはありません」を出すと、届いている入札を見落とす。
                 // 空状態は出さず、再読み込みだけを出す（マイページ・案件一覧と同じ方式）。
                 <div className="notif-empty" role="alert">
