@@ -52,6 +52,7 @@ from app.schemas_katadzuke import (
 )
 from app.services.case_lock import lock_operator_row
 from app.services.message_guard import contains_contact_info
+from app.services.operator_pii_erasure import erase_operator_personal_data
 
 logger = logging.getLogger(__name__)
 
@@ -501,12 +502,11 @@ async def _delete_and_anonymize_operator(session: AsyncSession, operator: Operat
         await session.rollback()
         raise _OPERATOR_DELETE_ACTIVE_TRANSACTION()
 
-    profile = await session.get(OperatorProfile, operator.id)
-    if profile is not None:
-        profile.is_public = False
-        profile.show_message = False
-        # 自由文（自己紹介）は退会後に公開経路へ残さない。
-        profile.intro_message = None
+    # 個人情報の消去（許可証画像・許可番号・会社名・事前申込・プロフィール）。墓標化の前に
+    # 元のメールで事前申込を特定するため、先に呼ぶ。冪等（再実行しても同じ状態）。
+    await erase_operator_personal_data(
+        session, operator, operator.contact_email, operator.invite_code
+    )
 
     operator.contact_email = f"deleted-{operator.id}@deleted.katazuke.internal"
     operator.password_hash = None
