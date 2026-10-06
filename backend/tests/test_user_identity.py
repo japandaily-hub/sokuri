@@ -130,7 +130,7 @@ IDENTITY_URL = "/api/v1/users/me/identity-documents"
 
 class TestBackRequirementMatrix:
     @pytest.mark.parametrize(
-        "doc_type", ["drivers_license", "residence_card", "health_insurance_card"]
+        "doc_type", ["drivers_license", "residence_card"]
     )
     async def test_back_required_missing_returns_422(self, client: AsyncClient, doc_type: str):
         token = await _adult_user(client, f"back_missing_{doc_type}@example.com")
@@ -140,7 +140,7 @@ class TestBackRequirementMatrix:
         assert r.status_code == 422, r.text
 
     @pytest.mark.parametrize(
-        "doc_type", ["drivers_license", "residence_card", "health_insurance_card"]
+        "doc_type", ["drivers_license", "residence_card"]
     )
     async def test_back_required_provided_returns_200(self, client: AsyncClient, doc_type: str):
         token = await _adult_user(client, f"back_ok_{doc_type}@example.com")
@@ -149,6 +149,53 @@ class TestBackRequirementMatrix:
         )
         assert r.status_code == 200, r.text
         assert r.json()["has_back"] is True
+
+    @pytest.mark.parametrize("with_back", [True, False])
+    async def test_health_insurance_card_rejected_on_new_submission(
+        self, client: AsyncClient, db_session: AsyncSession, with_back: bool
+    ):
+        """C-2: 健康保険証は新規提出で 422（理由つき）。行は作られない。"""
+        token = await _adult_user(client, f"hic_new_{with_back}@example.com")
+        r = await client.post(
+            IDENTITY_URL,
+            files=_files("health_insurance_card", with_back=with_back),
+            headers=_auth(token),
+        )
+        assert r.status_code == 422, r.text
+        assert "健康保険証は本人確認書類として受け付けられません" in r.text
+        assert await db_session.scalar(select(UserIdentityDocument.id).limit(1)) is None
+
+    async def test_legacy_health_insurance_record_still_readable_and_reviewable(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """既に提出済みの健康保険証の記録は、状態取得・審査（承認）とも壊れない。"""
+        admin_token = await _make_admin(client, db_session, "hic_legacy_admin@katadzuke.jp")
+        token = await _adult_user(client, "hic_legacy_user@example.com")
+        user = await db_session.scalar(
+            select(User).where(User.email == "hic_legacy_user@example.com")
+        )
+        document = UserIdentityDocument(
+            user_id=user.id,
+            doc_type="health_insurance_card",
+            front_image_data=_PNG_BYTES,
+            front_image_content_type="image/png",
+            back_image_data=_PNG_BYTES,
+            back_image_content_type="image/png",
+            status="pending",
+            submitted_at=datetime.now(timezone.utc),
+        )
+        db_session.add(document)
+        await db_session.flush()
+
+        r = await client.get("/api/v1/users/me/identity", headers=_auth(token))
+        assert r.status_code == 200, r.text
+        assert r.json()["doc_type"] == "health_insurance_card"
+
+        r = await client.patch(
+            f"/api/v1/admin/identity-documents/{document.id}/approve",
+            headers=_auth(admin_token),
+        )
+        assert r.status_code == 200, r.text
 
     @pytest.mark.parametrize("doc_type", ["my_number_card", "passport"])
     async def test_back_discarded_for_my_number_and_passport(
@@ -382,7 +429,7 @@ class TestAdminReview:
         admin_token = await _make_admin(client, db_session, "identity_admin4@katadzuke.jp")
         token = await _adult_user(client, "admin_flow_user2@example.com")
         r1 = await client.post(
-            IDENTITY_URL, files=_files("health_insurance_card"), headers=_auth(token)
+            IDENTITY_URL, files=_files("drivers_license"), headers=_auth(token)
         )
         document_id = r1.json()["document_id"]
 

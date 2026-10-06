@@ -39,6 +39,11 @@ DOC_TYPES = (
     DOC_TYPE_RESIDENCE_CARD,
     DOC_TYPE_HEALTH_INSURANCE_CARD,
 )
+# 新規提出で受け付ける書類種別。健康保険証は健康保険法第194条の2（保険者番号等の取得制限）の
+# 観点から本人確認書類として受け付けない。DOC_TYPES（DB の CHECK 制約と一致）には既存の
+# 提出済み記録の読み取り・審査のために残す。
+DOC_TYPES_REJECTED_ON_SUBMIT = (DOC_TYPE_HEALTH_INSURANCE_CARD,)
+SUBMITTABLE_DOC_TYPES = tuple(t for t in DOC_TYPES if t not in DOC_TYPES_REJECTED_ON_SUBMIT)
 # 裏面必須の書類種別（表裏で記載内容が異なる書類）。
 DOC_TYPES_REQUIRING_BACK = (
     DOC_TYPE_DRIVERS_LICENSE,

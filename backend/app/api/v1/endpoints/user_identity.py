@@ -41,9 +41,10 @@ from app.db.models.user import (
     User,
 )
 from app.db.models.user_identity_document import (
-    DOC_TYPES,
     DOC_TYPES_DISCARDING_BACK,
+    DOC_TYPES_REJECTED_ON_SUBMIT,
     DOC_TYPES_REQUIRING_BACK,
+    SUBMITTABLE_DOC_TYPES,
     DOCUMENT_STATUS_PENDING,
     UserIdentityDocument,
 )
@@ -82,6 +83,13 @@ _NO_FRONT_FILE = http_exception_factory(
 _INVALID_DOC_TYPE = http_exception_factory(
     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
     detail="書類の種類の指定が正しくありません。",
+)
+_DOC_TYPE_NOT_ACCEPTED = http_exception_factory(
+    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+    detail=(
+        "健康保険証は本人確認書類として受け付けられません。"
+        "運転免許証・マイナンバーカード（表面のみ）・パスポート等をご利用ください。"
+    ),
 )
 _BACK_REQUIRED = http_exception_factory(
     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -201,7 +209,14 @@ async def submit_identity_document(
     form = await request.form(max_part_size=MAX_UPLOAD_BYTES)
 
     doc_type = form.get("doc_type")
-    if not isinstance(doc_type, str) or doc_type not in DOC_TYPES:
+    if isinstance(doc_type, str) and doc_type in DOC_TYPES_REJECTED_ON_SUBMIT:
+        logger.warning(
+            "user_identity: 受付対象外の書類種別の提出を拒否 - user_id=%s doc_type=%s",
+            user.id,
+            doc_type,
+        )
+        raise _DOC_TYPE_NOT_ACCEPTED()
+    if not isinstance(doc_type, str) or doc_type not in SUBMITTABLE_DOC_TYPES:
         raise _INVALID_DOC_TYPE()
 
     front = form.get("front")

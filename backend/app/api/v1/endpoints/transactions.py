@@ -71,6 +71,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# キャンセル理由が未入力のときに保存・表示する固定文言（M-7: 理由は任意）。
+_NO_CANCEL_REASON_TEXT = "理由の記載なし"
+
 # 終了済み（cancelled / completed）取引への書き込みを拒否する共通の 409（r8-H3）。
 # web はキャンセル通知メールのリンクからこの取引のチャット画面に着地しうるため、
 # 機械可読な code と、そのまま表示できる日本語 message の両方を返す契約にする
@@ -743,11 +746,14 @@ async def request_completion(
 )
 async def cancel_transaction(
     transaction_id: uuid.UUID,
-    body: TransactionCancelRequest,
     background: BackgroundTasks,
+    body: TransactionCancelRequest | None = None,
     actor: Actor = Depends(get_current_actor),
     session: AsyncSession = Depends(get_session),
 ) -> TransactionOut:
+    # 理由は任意（M-7）。本文なし・null・空白のみは「理由の記載なし」と保存し、相手方の表示も同じ文言にする。
+    raw_reason = body.reason if body is not None else None
+    cancel_reason = (raw_reason or "").strip() or _NO_CANCEL_REASON_TEXT
     # 認可（当事者性）はロック取得より前に確認する（r6-verify-fix M1）。
     await _assert_party_before_lock(session, transaction_id, actor)
     # complete との同時実行・二重送信を直列化する（r6-backend M-1 / M-2）。
@@ -783,7 +789,7 @@ async def cancel_transaction(
             case_id=txn.case_id,
             transaction_id=txn.id,
             cancelled_by=party,
-            reason=body.reason,
+            reason=cancel_reason,
         )
     )
     if party == "operator":

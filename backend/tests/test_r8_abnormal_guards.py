@@ -281,6 +281,29 @@ async def test_cancellation_visible_to_both_parties_and_admin(
     assert item["cancelled_by"] == "operator"
 
 
+@pytest.mark.parametrize(
+    "payload", [None, {}, {"reason": None}, {"reason": ""}, {"reason": "   "}]
+)
+async def test_transaction_cancel_reason_is_optional(
+    client: AsyncClient, db_session: AsyncSession, payload
+):
+    """M-7: キャンセル理由は任意。本文なし・空でも成功し「理由の記載なし」を保存・表示する。"""
+    admin_token = await _make_admin(client, db_session)
+    user_token, _ = await _signup_user(client)
+    op_token, _ = await _verified_operator(client, admin_token, "m7op@example.com")
+    _, txn_id = await _create_transaction(client, user_token, op_token)
+
+    kwargs = {} if payload is None else {"json": payload}
+    r = await client.post(
+        f"/api/v1/transactions/{txn_id}/cancel", headers=_auth(op_token), **kwargs
+    )
+    assert r.status_code == 200, r.text
+
+    for token in (user_token, op_token):
+        r = await client.get(f"/api/v1/transactions/{txn_id}", headers=_auth(token))
+        assert r.json()["cancellation"]["reason"] == "理由の記載なし"
+
+
 async def test_cancellation_is_null_while_active(
     client: AsyncClient, db_session: AsyncSession
 ):
