@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
+import { clearAllUserLocalState } from "@/lib/user-local-state";
 import { Ic } from "@/components/kdz/Icons";
 import { AppHeader } from "@/components/kdz/AppHeader";
 
@@ -24,6 +25,7 @@ function ForbiddenBody() {
   const [signOutBusy, setSignOutBusy] = useState(false);
   async function onSignOut() {
     setSignOutBusy(true);
+    clearAllUserLocalState();
     await signOut({ callbackUrl: "/" });
   }
 

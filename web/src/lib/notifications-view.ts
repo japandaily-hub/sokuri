@@ -6,7 +6,12 @@
  *   再読み込みを出す（N-3）。
  * - 既読の概念（S-5）は端末の localStorage に「既読にした通知の署名」を残すだけで表す。
  *   署名には対象の案件ID・入札数を含めるため、入札が増えたときは新着として再び出る。
+ *   保存するのは署名の SHA-256 先頭16文字だけ（署名は件数に比例して長くなり、以前は500字超で
+ *   読み戻し時に捨てられて既読が効かなかった）。キーには利用者のハッシュを含める
+ *   （lib/user-local-state.ts。ログアウト時に消す。security L-5・L-6）。
  */
+
+import { shortSha256 } from "./user-local-state.ts";
 
 export type NotificationSource = "cases" | "transactions";
 
@@ -44,7 +49,13 @@ export function partialFailureMessage(missingLabels: readonly string[]): string 
 }
 
 /** 既読の署名を保存する localStorage のキー。 */
-export const READ_STORAGE_KEY = "kdz.notifications.read.v1";
+export const READ_STORAGE_KEY = "kdz.notifications.read.v2";
+
+/** 既読署名の保存用ダイジェスト（SHA-256 の先頭16文字）。長さが署名の件数に依存しない。 */
+export const readSignatureDigest: (signature: string) => Promise<string> = shortSha256;
+
+/** 保存済みダイジェスト1件の最大長（読み戻し時の安全弁）。 */
+const READ_DIGEST_MAX_LENGTH = 64;
 /** 保存する既読署名の上限（古いものから捨てる）。 */
 export const READ_MAX_ENTRIES = 100;
 
@@ -54,7 +65,7 @@ export function parseReadSignatures(raw: string | null): string[] {
   try {
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((v): v is string => typeof v === "string" && v.length > 0 && v.length <= 500);
+    return parsed.filter((v): v is string => typeof v === "string" && v.length > 0 && v.length <= READ_DIGEST_MAX_LENGTH);
   } catch {
     return [];
   }

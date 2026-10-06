@@ -6,6 +6,7 @@
  */
 
 import { signOut } from "next-auth/react";
+import { clearAllUserLocalState } from "./user-local-state";
 import { isProtectedRoutePath } from "./protected-routes";
 import { prepareDisplayText } from "./text-guard";
 import type { VisitTimeSlotValue } from "./visit-slots";
@@ -852,6 +853,8 @@ async function handleSessionExpired(
 
   if (isRedirectLooping()) return SESSION_EXPIRED_STUCK_MESSAGE;
 
+  // 失効したセッションの利用者の下書き・既読を端末に残さない（security L-5・L-6）。
+  clearAllUserLocalState();
   try {
     await signOut({ redirect: false });
   } catch {

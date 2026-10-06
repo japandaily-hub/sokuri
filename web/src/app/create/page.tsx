@@ -11,12 +11,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { Ic, type IcName } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
 import { useToken } from "@/components/kdz/Ui";
 import { createCase, uploadCasePhoto, toDisplayMessage, createTimeoutSignal, KdzApiError, KdzNetworkError } from "@/lib/katadzuke-api";
 import { CASE_PURPOSES } from "@/lib/case-labels";
+import { userScopedStorageKey } from "@/lib/user-local-state";
 import {
   CREATE_DRAFT_STORAGE_KEY,
   isDefaultDraft,
@@ -145,11 +147,40 @@ export default function CreateCasePage() {
   // M-8: 入力の下書きを sessionStorage に保存・復元する（テキスト入力だけ。写真・番地・連絡先・同意は対象外）。
   // 復元は初回表示後に1度だけ行い（SSR との不一致を避ける）、復元が済むまでは保存しない
   // （既定値で下書きを上書きしないため）。storage が使えない環境（プライベートモード等）では黙って無効。
+  // キーには利用者のハッシュを含める（共用端末で別の人の下書きを出さない。ログアウト時に消す。security L-5・L-6）。
+  const { data: sessionData, status: sessionStatus } = useSession();
+  const draftIdentifier = sessionData?.user?.email ?? null;
+  const [draftKey, setDraftKey] = useState<string | null>(null);
   const [draftReady, setDraftReady] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
   useEffect(() => {
+    if (sessionStatus === "loading") return;
+    let cancelled = false;
+    userScopedStorageKey(CREATE_DRAFT_STORAGE_KEY, draftIdentifier)
+      .then((key) => {
+        if (cancelled) return;
+        setDraftKey(key);
+        setDraftReady(false);
+        restoreDraft(key);
+      })
+      .catch((hashError) => {
+        if (cancelled) return;
+        console.warn("[create] 下書きのキーを作れませんでした", hashError);
+        setDraftKey(null);
+        setDraftReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // restoreDraft は set* だけを使う（依存に含めると毎回再実行される）。
+  }, [sessionStatus, draftIdentifier]);
+  function restoreDraft(key: string | null) {
+    if (key === null) {
+      setDraftReady(true);
+      return;
+    }
     try {
-      const restored = parseCreateDraft(window.sessionStorage.getItem(CREATE_DRAFT_STORAGE_KEY), DRAFT_CHOICES);
+      const restored = parseCreateDraft(window.sessionStorage.getItem(key), DRAFT_CHOICES);
       if (restored && !isDefaultDraft(restored, DRAFT_DEFAULTS)) {
         setPurpose(restored.purpose);
         setPrefecture(restored.prefecture);
@@ -164,20 +195,20 @@ export default function CreateCasePage() {
       console.warn("[create] 下書きを読み込めませんでした", storageError);
     }
     setDraftReady(true);
-  }, []);
+  }
   useEffect(() => {
-    if (!draftReady) return;
+    if (!draftReady || draftKey === null) return;
     try {
       const draft: CreateDraft = { purpose, prefecture, city, housingType, floorPlan, floorNumber, hasElevator };
       if (isDefaultDraft(draft, DRAFT_DEFAULTS)) {
-        window.sessionStorage.removeItem(CREATE_DRAFT_STORAGE_KEY);
+        window.sessionStorage.removeItem(draftKey);
       } else {
-        window.sessionStorage.setItem(CREATE_DRAFT_STORAGE_KEY, serializeCreateDraft(draft));
+        window.sessionStorage.setItem(draftKey, serializeCreateDraft(draft));
       }
     } catch (storageError) {
       console.warn("[create] 下書きを保存できませんでした", storageError);
     }
-  }, [draftReady, purpose, prefecture, city, housingType, floorPlan, floorNumber, hasElevator]);
+  }, [draftReady, draftKey, purpose, prefecture, city, housingType, floorPlan, floorNumber, hasElevator]);
 
   // r10-review M5 是正: 403 を一律セッション切れ扱いすると account_suspended（利用停止）の
   // ケースが誤案内になるため、専用フラグで案内文を出し分ける。
@@ -551,7 +582,7 @@ export default function CreateCasePage() {
       allowLeaveRef.current = true;
       // 送信が済んだ入力は下書きとして残さない（次の新規出品に前回の内容を出さない）。
       try {
-        window.sessionStorage.removeItem(CREATE_DRAFT_STORAGE_KEY);
+        if (draftKey !== null) window.sessionStorage.removeItem(draftKey);
       } catch {
         /* storage 不可でも遷移は続ける */
       }

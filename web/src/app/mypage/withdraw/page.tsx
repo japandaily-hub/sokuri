@@ -22,6 +22,7 @@ import "./withdraw.css";
 
 import { useCallback, useEffect, useState } from "react";
 import { signOut } from "next-auth/react";
+import { clearAllUserLocalState } from "@/lib/user-local-state";
 import Link from "next/link";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import { Notice } from "@/components/kdz/Notice";
@@ -133,6 +134,7 @@ export default function WithdrawPage() {
     try {
       await deleteMyAccount({ password: hasPassword ? password : undefined, confirm: true }, token);
       // 旧セッションを即時失効させる（ページ遷移はしない。完了パネルはローカル state で表示する）。
+      clearAllUserLocalState();
       await signOut({ redirect: false });
       setDone(true);
     } catch (e) {

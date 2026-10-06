@@ -7,6 +7,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { getSession, signIn, signOut, useSession } from "next-auth/react";
+import { clearAllUserLocalState } from "@/lib/user-local-state";
 import { AuthBar, Field, PasswordField, LineConsentAuth, TrustRow } from "@/components/kdz/auth";
 import { Reveal } from "@/components/kdz/interactions";
 import { safeInternalPath } from "@/lib/safe-path";
@@ -127,6 +128,7 @@ function LoginForm() {
   const [signOutBusy, setSignOutBusy] = useState(false);
   async function onSignOutToUserLogin() {
     setSignOutBusy(true);
+    clearAllUserLocalState();
     await signOut({ callbackUrl: "/login" });
   }
 

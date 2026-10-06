@@ -9,7 +9,11 @@
  * 読み戻すときは sessionStorage の値を信用せず、選択肢は許可リスト照合・自由入力は長さと制御文字を検査する。
  */
 
-export const CREATE_DRAFT_STORAGE_KEY = "kdz:create-draft:v1";
+/**
+ * 保存キーの基底。実際のキーは利用者のハッシュを付けた `{基底}:{hash}`（lib/user-local-state.ts の
+ * userScopedStorageKey）。ログアウト時に接頭辞 "kdz:create-draft:" で全部消す（security L-5・L-6）。
+ */
+export const CREATE_DRAFT_STORAGE_KEY = "kdz:create-draft:v2";
 export const CREATE_DRAFT_VERSION = 1;
 /** 市区町村の上限（create の maxLength と一致）。 */
 export const CREATE_DRAFT_CITY_MAX = 64;

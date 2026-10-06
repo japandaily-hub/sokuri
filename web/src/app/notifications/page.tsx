@@ -30,11 +30,13 @@
 import { useCallback, useEffect, useRef, useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Spinner } from "@/components/Icon";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import { Notice } from "@/components/kdz/Notice";
 import { Field, PasswordField } from "@/components/kdz/auth";
 import { useToken } from "@/components/kdz/Ui";
+import { userScopedStorageKey } from "@/lib/user-local-state";
 import {
   listMyCases,
   listTransactions,
@@ -54,6 +56,7 @@ import {
 } from "@/lib/katadzuke-api";
 import {
   READ_STORAGE_KEY,
+  readSignatureDigest,
   addReadSignatures,
   decideListView,
   deriveRows,
@@ -137,28 +140,55 @@ function NotificationsContent() {
   const [error, setError] = useState<string | null>(null);
   /* 取得に失敗した取得元（部分失敗の明示と再読み込みの出し分けに使う）。 */
   const [failedSources, setFailedSources] = useState<NotificationSource[]>([]);
-  /* 既読にした通知の署名（S-5）。端末の localStorage にだけ残す。 */
+  /* 既読にした通知の署名のダイジェスト（S-5）。端末の localStorage にだけ残す。
+     キーに利用者のハッシュを含め、ログアウト時に消す（security L-5・L-6）。 */
+  const { data: sessionData, status: sessionStatus } = useSession();
+  const readIdentifier = sessionData?.user?.email ?? null;
+  const [readStorageKey, setReadStorageKey] = useState<string | null>(null);
   const [readSignatures, setReadSignatures] = useState<string[]>([]);
+  /* 通知の署名 → 保存用ダイジェスト。 */
+  const [digestBySignature, setDigestBySignature] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    try {
-      setReadSignatures(parseReadSignatures(window.localStorage.getItem(READ_STORAGE_KEY)));
-    } catch {
-      // localStorage が使えない環境（プライベートモード等）では既読を残さないだけ。
-    }
-  }, []);
+    if (sessionStatus === "loading") return;
+    let cancelled = false;
+    userScopedStorageKey(READ_STORAGE_KEY, readIdentifier)
+      .then((key) => {
+        if (cancelled) return;
+        setReadStorageKey(key);
+        try {
+          setReadSignatures(key ? parseReadSignatures(window.localStorage.getItem(key)) : []);
+        } catch {
+          // localStorage が使えない環境（プライベートモード等）では既読を残さないだけ。
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setReadStorageKey(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionStatus, readIdentifier]);
 
-  const markRead = useCallback((signatures: string[]) => {
-    setReadSignatures((prev) => {
-      const next = addReadSignatures(prev, signatures);
+  const markRead = useCallback(
+    async (signatures: string[]) => {
       try {
-        window.localStorage.setItem(READ_STORAGE_KEY, JSON.stringify(next));
+        const digests = await Promise.all(signatures.map((signature) => readSignatureDigest(signature)));
+        setReadSignatures((prev) => {
+          const next = addReadSignatures(prev, digests);
+          try {
+            if (readStorageKey) window.localStorage.setItem(readStorageKey, JSON.stringify(next));
+          } catch {
+            // 保存できなくても画面内の既読表示は続ける。
+          }
+          return next;
+        });
       } catch {
-        // 保存できなくても画面内の既読表示は続ける。
+        // ダイジェストを作れない環境（Web Crypto 無し）では既読にしない。
       }
-      return next;
-    });
-  }, []);
+    },
+    [readStorageKey],
+  );
 
   const reload = useCallback(async () => {
     if (!token) return;
@@ -368,7 +398,27 @@ function NotificationsContent() {
     }
   });
   const listView = decideListView(rows.length, failedSources);
-  const unreadRows = rows.filter((r) => !readSignatures.includes(r.signature));
+  const isRowRead = (signature: string) => {
+    const digest = digestBySignature[signature];
+    return digest !== undefined && readSignatures.includes(digest);
+  };
+  const unreadRows = rows.filter((r) => !isRowRead(r.signature));
+  // 行の署名ごとのダイジェストを（非同期に）用意する。
+  const rowSignatureKey = rows.map((r) => r.signature).join("\n");
+  useEffect(() => {
+    let cancelled = false;
+    const signatures = rowSignatureKey === "" ? [] : rowSignatureKey.split("\n");
+    Promise.all(signatures.map(async (signature) => [signature, await readSignatureDigest(signature)] as const))
+      .then((pairs) => {
+        if (!cancelled) setDigestBySignature(Object.fromEntries(pairs));
+      })
+      .catch(() => {
+        if (!cancelled) setDigestBySignature({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [rowSignatureKey]);
 
   const isLoading = loading || (!cases && !transactions && !profile && !error);
   const sessionExpired = (!loading && !token) || reauthSessionExpired;
@@ -501,19 +551,19 @@ function NotificationsContent() {
                     <button
                       type="button"
                       className="btn-notif-setting"
-                      onClick={() => markRead(unreadRows.map((r) => r.signature))}
+                      onClick={() => void markRead(unreadRows.map((r) => r.signature))}
                     >
                       すべて既読にする
                     </button>
                   ) : null}
                   {rows.map((row) => {
-                    const isRead = readSignatures.includes(row.signature);
+                    const isRead = isRowRead(row.signature);
                     return (
                     <Link
                       key={row.key}
                       href={row.href}
                       className={`notif-card${isRead ? "" : " unread"}`}
-                      onClick={() => markRead([row.signature])}
+                      onClick={() => void markRead([row.signature])}
                     >
                       <div className="notif-card-inner">
                         <div className={`notif-icon ${row.iconTone}`}>
