@@ -1305,3 +1305,29 @@ def test_schedule_fixed_time_slots_matches_frontend_time_slots():
     （2026-09-25 セキュリティレビュー Low 対応）。
     """
     assert SCHEDULE_FIXED_TIME_SLOTS == _read_frontend_time_slot_values()
+
+
+def test_visit_date_is_judged_in_jst(monkeypatch):
+    """訪問日の「本日以降」「1年以内」は JST の暦で判定する（UTC の date.today() だと JST 0:00〜9:00 に昨日が通る）。"""
+    import app.schemas_katadzuke as schemas
+    from app.schemas_katadzuke import ScheduleConfirmRequest
+
+    monkeypatch.setattr(schemas, "_jst_today", lambda: date(2026, 10, 6))
+    slot = "9:00〜12:00"
+    ScheduleConfirmRequest(visit_date=date(2026, 10, 6), visit_time_slot=slot)  # 当日は可
+    ScheduleConfirmRequest(visit_date=date(2027, 10, 6), visit_time_slot=slot)  # +365 日は可
+    for bad in (date(2026, 10, 5), date(2027, 10, 7)):
+        try:
+            ScheduleConfirmRequest(visit_date=bad, visit_time_slot=slot)
+        except ValueError:
+            continue
+        raise AssertionError(f"{bad} が通ってしまった")
+
+
+def test_jst_today_is_a_jst_calendar_date():
+    from datetime import datetime, timedelta, timezone
+
+    from app.schemas_katadzuke import _jst_today
+
+    jst_now = datetime.now(timezone(timedelta(hours=9))).date()
+    assert abs((_jst_today() - jst_now).days) <= 1  # 呼び出しの瞬間に日付が変わっても高々1日

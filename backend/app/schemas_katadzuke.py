@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 import unicodedata
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Annotated, Literal, get_args
 
 from pydantic import (
@@ -1520,6 +1520,16 @@ class ScheduleProposeRequest(BaseModel):
         return v
 
 
+_JST = timezone(timedelta(hours=9))
+
+
+def _jst_today() -> date:
+    """日本時間の「今日」。訪問日の「本日以降」は JST の暦で判定する（transactions._today_jst と同じ定義。
+    サーバー（Render）は UTC なので ``date.today()`` だと JST 0:00〜9:00 に「昨日」が通り、
+    完了確定の依頼がすぐ可能になる。循環 import を避けるためここに持つ）。"""
+    return datetime.now(_JST).date()
+
+
 class ScheduleConfirmRequest(BaseModel):
     visit_date: date
     visit_time_slot: str = Field(min_length=1, max_length=VISIT_TIME_SLOT_MAX_LENGTH)
@@ -1528,7 +1538,7 @@ class ScheduleConfirmRequest(BaseModel):
     @field_validator("visit_date")
     @classmethod
     def _validate_visit_date(cls, v: date) -> date:
-        today = date.today()
+        today = _jst_today()
         if v < today:
             raise ValueError("訪問日は本日以降を指定してください。")
         if v > today + timedelta(days=365):
