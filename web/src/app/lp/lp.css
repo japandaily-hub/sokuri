@@ -378,12 +378,14 @@ html.js-rv .lp-page .lp-ribbon__star { transition: opacity 0.8s var(--ease-expo-
   height: 1px;
   background: #fff;
 }
+/* seller L-5: 表記を「MENU / OPEN」から「メニュー / 開く」に変えたため、欧文書体（--en）と
+   広い字間をやめ、和文 UI 書体で詰める */
 .lp-page .lp-header__menu-label {
-  font-family: var(--en);
-  font-weight: 600;
+  font-family: var(--ui);
+  font-weight: 500;
   font-size: 13px;
   line-height: 1.45;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.06em;
   text-align: center;
 }
 .lp-page .lp-header__menu-label span {
@@ -748,6 +750,43 @@ html.js-rv .lp-page .lp-ribbon__star { transition: opacity 0.8s var(--ease-expo-
 }
 .lp-page .lp-slider__toggle .ic {
   font-size: 14px;
+}
+/* M-12: タッチ端末ではタップ領域を 44×44px 確保する。見た目の点（10px）は ::before で描き、
+   ボタン本体は透明の 44px 四方にする（PC のマウス操作では従来の寸法のまま）。
+   操作列の位置（.lp-slider__ctrl の right）は後段の幅別の規則に任せる。 */
+@media (pointer: coarse) {
+  .lp-page .lp-slider__dots {
+    gap: 0;
+  }
+  .lp-page .lp-slider__dot,
+  .lp-page .lp-slider__dot.is-active {
+    position: relative;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+  .lp-page .lp-slider__dot::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    box-sizing: border-box;
+    width: 10px;
+    height: 10px;
+    transform: translate(-50%, -50%);
+    border: 1px solid rgba(255, 255, 255, 0.92);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+  }
+  .lp-page .lp-slider__dot.is-active::before {
+    background: var(--primary);
+  }
+  .lp-page .lp-slider__toggle {
+    width: 44px;
+    height: 44px;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .lp-page .lp-slider__slide {
@@ -1642,6 +1681,15 @@ html.js-rv .lp-page .lp-ribbon__star { transition: opacity 0.8s var(--ease-expo-
 .lp-page .lp-footer__nav a:hover {
   color: var(--primary);
 }
+/* M-12: タッチ端末ではフッターのリンクの高さを 44px 確保する（行間 13px を高さに振り替える） */
+@media (pointer: coarse) {
+  .lp-page .lp-footer__nav ul {
+    gap: 0;
+  }
+  .lp-page .lp-footer__nav a {
+    min-height: 44px;
+  }
+}
 .lp-page .lp-footer__copy {
   position: relative;
   z-index: 1;
@@ -1689,7 +1737,7 @@ html.js-rv .lp-page .lp-ribbon__star { transition: opacity 0.8s var(--ease-expo-
   }
   .lp-page .lp-header__menu-label {
     font-size: 10px;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.04em;
   }
   /* r2 A-2: SP は既存サイトの Dock と同じ「画面下の全幅バー」。右下の塊が本文（#biz の
      本文 11,400px²・#cases の h2 7,295px² 等）を覆っていた問題を、面で分離して解消する。 */
