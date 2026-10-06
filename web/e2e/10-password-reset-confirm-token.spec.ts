@@ -24,7 +24,7 @@ test.describe("パスワード再設定の確定画面 token の 3 態", () => {
     await page.goto(`${CONFIRM_URL}?token=${VALID_TOKEN}&type=user`, { waitUntil: "domcontentloaded" });
 
     // Strict Mode の 2 回目の effect の後でも、「使えません」ではなく入力欄が出ている。
-    await expect(page.getByText("新しいパスワードの設定")).toBeVisible();
+    await expect(page.locator(".reset-panel-title").filter({ hasText: "新しいパスワードの設定" })).toBeVisible();
     await expect(page.getByText("このリンクは使えません")).toHaveCount(0);
     expect(page.url()).not.toContain("token=");
 
