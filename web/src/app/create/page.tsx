@@ -3,9 +3,9 @@
 /**
  * 案件作成フロー（4 STEP・新デザイン）。
  * STEP1 写真 → STEP2 利用目的 → STEP3 住居情報 → STEP4 確認送信。
- * STEP1 は「商品ごとに撮影→アルバムとして確定→次の商品を追加」を繰り返す albums フローと、
+ * STEP1 は「品物ごとに撮影→アルバムとして確定→次の品物を追加」を繰り返す albums フローと、
  * 従来通りの「まとめて撮る」フラット撮影（loose）の 2 系統を list/shoot のモード遷移で提供する。
- * バックエンド契約: POST /cases に items（商品アルバム, 任意）と photos（フラット, 必須）を両方送る。
+ * バックエンド契約: POST /cases に items（品物アルバム, 任意）と photos（フラット, 必須）を両方送る。
  * 既存の配線を完全維持: useToken / uploadCasePhoto ループ / createCase → /cases/{id}?created=1。
  */
 
@@ -28,9 +28,9 @@ const FLOOR_PLANS = ["1R/1K", "1DK/1LDK", "2K/2DK", "2LDK", "3LDK", "4LDK以上"
 
 /** 案件全体の写真上限（items 内 + loose 合計、バックエンド契約に合わせる）。 */
 const CASE_PHOTO_LIMIT = 150;
-/** 商品1点あたりの写真上限。 */
+/** 品物1点あたりの写真上限。 */
 const ITEM_PHOTO_LIMIT = 12;
-/** 商品数の上限。 */
+/** 品物数の上限。 */
 const ITEM_LIMIT = 30;
 
 /** 撮影のコツ（表示のみ）。撮影完了の前提となる確認レ点は `${itemId}:confirm` キーで checkedHints に持つ（APIには送らない）。 */
@@ -99,7 +99,7 @@ export default function CreateCasePage() {
 
   const [step, setStep] = useState(0);
 
-  // STEP1: 商品ごとのアルバム（items）+ まとめ撮影（loose）
+  // STEP1: 品物ごとのアルバム（items）+ まとめ撮影（loose）
   const [mode, setMode] = useState<Step1Mode>({ kind: "list" });
   const [items, setItems] = useState<DraftItem[]>([]);
   const [loosePhotos, setLoosePhotos] = useState<DraftPhoto[]>([]);
@@ -140,6 +140,8 @@ export default function CreateCasePage() {
   const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
   /** true の間はブラウザバックのガードを素通しする（確認モーダルで「離れる」を選んだ直後）。 */
   const allowLeaveRef = useRef(false);
+  /** アプリ内リンクのクリックで離脱確認を開いた場合の遷移先（無ければマイページ）。 */
+  const pendingLeaveHrefRef = useRef<string | null>(null);
   /** 履歴に番兵エントリを積んだかどうか（写真が0→1枚になった最初の1回だけ積む）。 */
   const guardArmedRef = useRef(false);
 
@@ -206,8 +208,33 @@ export default function CreateCasePage() {
     }
   }, [totalPhotoCount]);
 
+  // アプリ内リンク（ロゴ・フッター等）での離脱は beforeunload/popstate では捕捉できず、
+  // 撮影済みの写真と入力が黙って消えるため、リンククリックを捕捉して同じ確認モーダルを挟む。
+  useEffect(() => {
+    function handleLinkClick(e: MouseEvent) {
+      if (allowLeaveRef.current || e.defaultPrevented) return;
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const currentPhotoCount =
+        itemsRef.current.reduce((sum, it) => sum + it.photos.length, 0) + loosePhotosRef.current.length;
+      if (currentPhotoCount === 0) return;
+      const anchor = (e.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!anchor || (anchor.target && anchor.target !== "_self") || anchor.hasAttribute("download")) return;
+      const url = new URL(anchor.href, window.location.href);
+      // 同一オリジンかつ別ページ（ハッシュのみの移動は対象外）のときだけ確認する。
+      if (url.origin !== window.location.origin) return;
+      if (url.pathname === window.location.pathname && url.search === window.location.search) return;
+      e.preventDefault();
+      e.stopPropagation();
+      pendingLeaveHrefRef.current = `${url.pathname}${url.search}${url.hash}`;
+      setLeaveConfirmOpen(true);
+    }
+    document.addEventListener("click", handleLinkClick, true);
+    return () => document.removeEventListener("click", handleLinkClick, true);
+  }, []);
+
   /** 離脱確認モーダル「入力を続ける」（安全側のデフォルト）。 */
   function cancelLeave() {
+    pendingLeaveHrefRef.current = null;
     setLeaveConfirmOpen(false);
   }
 
@@ -224,7 +251,9 @@ export default function CreateCasePage() {
   function confirmLeave() {
     allowLeaveRef.current = true;
     setLeaveConfirmOpen(false);
-    router.push("/mypage");
+    const destination = pendingLeaveHrefRef.current ?? "/mypage";
+    pendingLeaveHrefRef.current = null;
+    router.push(destination);
   }
 
   const currentItemIndex = mode.kind === "shoot" ? items.findIndex((it) => it.id === mode.itemId) : -1;
@@ -253,7 +282,7 @@ export default function CreateCasePage() {
     setItems((prev) => prev.map((it) => (it.id === itemId ? { ...it, name } : it)));
   }
 
-  /** shoot モードを離れる（一覧へ戻る/完了どちらも同じ後始末）。写真0枚のまま離脱した商品は自動で消す。 */
+  /** shoot モードを離れる（一覧へ戻る/完了どちらも同じ後始末）。写真0枚のまま離脱した品物は自動で消す。 */
   function exitShoot() {
     if (mode.kind === "shoot") {
       const id = mode.itemId;
@@ -262,7 +291,7 @@ export default function CreateCasePage() {
     setMode({ kind: "list" });
   }
 
-  /** shoot モード内の「この商品を削除」（写真の有無に関わらず商品ごと削除）。 */
+  /** shoot モード内の「この品物を削除」（写真の有無に関わらず品物ごと削除）。 */
   function deleteCurrentItem() {
     if (mode.kind !== "shoot") return;
     deleteItem(mode.itemId);
@@ -292,7 +321,7 @@ export default function CreateCasePage() {
       });
     });
     if (dropped) {
-      setError(`上限（商品${ITEM_PHOTO_LIMIT}枚・案件合計${CASE_PHOTO_LIMIT}枚）のため、一部の写真は追加されませんでした。`);
+      setError(`上限（品物${ITEM_PHOTO_LIMIT}枚・案件合計${CASE_PHOTO_LIMIT}枚）のため、一部の写真は追加されませんでした。`);
     }
   }
 
@@ -387,7 +416,7 @@ export default function CreateCasePage() {
         const photoPayloads: { storage_key: string; sort_order: number }[] = [];
         for (let j = 0; j < item.photos.length; j++) {
           const photo = item.photos[j];
-          setProgress(`商品 ${i + 1}/${items.length} の写真をアップロード中… (${j + 1}/${item.photos.length})`);
+          setProgress(`品物 ${i + 1}/${items.length} の写真をアップロード中… (${j + 1}/${item.photos.length})`);
           let key = photo.uploadedKey;
           if (!key) {
             // r10 M9: 401/403 で signOut・画面遷移されると撮影済み写真・入力内容が失われるため、
@@ -545,15 +574,21 @@ export default function CreateCasePage() {
           {/* STEP 1: 写真（list モード） */}
           {step === 0 && mode.kind === "list" && (
             <div>
-              <h2 className="step-title">片付けたい商品を撮影</h2>
+              <h2 className="step-title">片付けたい品物を撮影</h2>
               <p className="step-desc">
-                商品を1点ずつ撮影し、撮った商品をまとめて1つのアルバムにします。業者はこのアルバム全体に買取総額で入札するので、商品ごとに写真がそろっているほど正確な見積もりにつながります（商品最大{ITEM_LIMIT}点・案件合計最大{CASE_PHOTO_LIMIT}枚）。
+                品物を1点ずつ撮影し、撮った品物をまとめて1つのアルバムにします。業者はこのアルバム全体に買取総額で入札するので、品物ごとに写真がそろっているほど正確な見積もりにつながります（品物最大{ITEM_LIMIT}点・案件合計最大{CASE_PHOTO_LIMIT}枚）。
               </p>
+              <div className="hint-banner" role="note">
+                <Ic name="pin" className="hint-ic" />
+                <span>
+                  出品できるのは、{PREFECTURES.join("・")}の{PREFECTURES.length}都県にある品物だけです。ほかの地域では今のところ出品できませんので、写真を撮る前にご確認ください。
+                </span>
+              </div>
 
               {isEmptyStep1 ? (
                 <button type="button" className="item-empty-cta" onClick={addNewItem}>
                   <span className="pd-ic"><Ic name="camera" /></span>
-                  <span className="pd-title">＋ 最初の商品を撮影する</span>
+                  <span className="pd-title">＋ 最初の品物を撮影する</span>
                 </button>
               ) : (
                 <>
@@ -570,7 +605,7 @@ export default function CreateCasePage() {
                             )}
                           </div>
                           <div className="item-card-info">
-                            <p className="item-card-name">{it.name.trim() || `商品 ${idx + 1}`}</p>
+                            <p className="item-card-name">{it.name.trim() || `品物 ${idx + 1}`}</p>
                             <p className="item-card-count">{it.photos.length} 枚</p>
                           </div>
                           <div className="item-card-actions">
@@ -589,13 +624,13 @@ export default function CreateCasePage() {
                       onClick={addNewItem}
                       disabled={items.length >= ITEM_LIMIT || totalPhotoCount >= CASE_PHOTO_LIMIT}
                     >
-                      <Ic name="camera" />＋ 商品を追加
+                      <Ic name="camera" />＋ 品物を追加
                     </button>
                   </div>
 
                   {looseVisible && (
                     <div className="form-card">
-                      <p className="loose-section-title">まとめ撮影（商品を分けない写真）</p>
+                      <p className="loose-section-title">まとめ撮影（品物を分けない写真）</p>
                       <label className="photo-drop">
                         <span className="pd-ic"><Ic name="camera" /></span>
                         <span className="pd-title">写真を撮影・選択</span>
@@ -627,17 +662,17 @@ export default function CreateCasePage() {
                 </>
               )}
 
-              {/* 撮影の案内と査定のコツ（文言は /photo-guide と同じ根拠に揃える） */}
+              {/* 撮影の案内と入札のコツ（文言は /photo-guide と同じ根拠に揃える） */}
               <section className="shoot-guide" aria-labelledby="shoot-guide-title">
                 <h3 id="shoot-guide-title" className="sg-title">撮影の流れ</h3>
                 <ol className="sg-flow">
-                  <li><span className="sg-n">1</span><span>「最初の商品を撮影する」を押し、1つの商品を数枚撮る（全体 → 気になる部分のアップ → ロゴ・型番）</span></li>
-                  <li><span className="sg-n">2</span><span>「＋ 商品を追加」で次の商品も同じように撮る。撮った商品はすべて1つのアルバム（まとめ）に入ります</span></li>
-                  <li><span className="sg-n">3</span><span>全部そろったら「次へ」。業者は商品1点ずつではなく、このアルバム全体に買取総額で入札します</span></li>
+                  <li><span className="sg-n">1</span><span>「最初の品物を撮影する」を押し、1つの品物を数枚撮る（全体 → 気になる部分のアップ → ロゴ・型番）</span></li>
+                  <li><span className="sg-n">2</span><span>「＋ 品物を追加」で次の品物も同じように撮る。撮った品物はすべて1つのアルバム（まとめ）に入ります</span></li>
+                  <li><span className="sg-n">3</span><span>全部そろったら「次へ」。業者は品物1点ずつではなく、このアルバム全体に買取総額で入札します</span></li>
                 </ol>
-                <h3 className="sg-title">査定額が上がる5つのコツ</h3>
+                <h3 className="sg-title">入札額が上がる5つのコツ</h3>
                 <ul className="sg-tips">
-                  <li><b>明るい場所で撮る</b><span>窓際や照明の下で。フラッシュより自然光のほうがきれいに映り、業者が状態を判断しやすくなります。</span></li>
+                  <li><b>明るい場所で撮る</b><span>窓際や照明の下で。フラッシュより自然光のほうがきれいに写り、業者が状態を判断しやすくなります。</span></li>
                   <li><b>全体と細部の両方を</b><span>引きの全体写真＋気になる部分のアップ。この組み合わせが最も評価されます。</span></li>
                   <li><b>ロゴ・型番・タグは接写</b><span>メーカーロゴや型番シールが読めると、業者が価格を調べやすく高い入札につながります。</span></li>
                   <li><b>傷・汚れは隠さず撮る</b><span>状態が正確に伝わるほど業者は安心して入札でき、引き取り時のトラブルも防げます。</span></li>
@@ -652,21 +687,21 @@ export default function CreateCasePage() {
             </div>
           )}
 
-          {/* STEP 1: 写真（shoot モード = 商品ごとの撮影） */}
+          {/* STEP 1: 写真（shoot モード = 品物ごとの撮影） */}
           {step === 0 && mode.kind === "shoot" && currentItem && (
             <div>
               <button type="button" className="step1-back-link" onClick={exitShoot}>
-                <Ic name="arrow" style={{ transform: "rotate(180deg)" }} />← 一覧へ戻る
+                <Ic name="arrow" style={{ transform: "rotate(180deg)" }} />一覧へ戻る
               </button>
-              <h2 className="step-title">商品 {currentItemIndex + 1} の写真</h2>
-              <p className="step-desc">全方位・傷や汚れのアップを含めて撮影してください。</p>
+              <h2 className="step-title">品物 {currentItemIndex + 1} の写真</h2>
+              <p className="step-desc">全方位・傷や汚れのアップを含めて撮影してください。写真は JPEG・PNG・WebP 形式に対応しています（iPhone で選べない場合は、設定の「カメラ」→「フォーマット」を「互換性優先」にしてください）。</p>
               <p className="shoot-hint">
                 <b>撮る順番:</b> ①明るい場所で全体 → ②傷・汚れのアップ → ③ロゴ・型番・タグ → ④付属品（箱・リモコン・充電器）。家電は電源が入った状態も1枚。
               </p>
               <div className="form-card">
                 <div className="field">
                   <label htmlFor="itemName">
-                    商品名<span className="opt">任意</span>
+                    品物名<span className="opt">任意</span>
                   </label>
                   <input
                     id="itemName"
@@ -727,20 +762,20 @@ export default function CreateCasePage() {
                     <Link href="/photo-guide" className="pqh-more" target="_blank" rel="noopener noreferrer">
                       撮影のコツを詳しく見る<Ic name="arrow" />
                     </Link>
-                    {/* 撮影完了の前提となる確認（レ点なしでは「この商品の撮影を完了」を押せない） */}
+                    {/* 撮影完了の前提となる確認（レ点なしでは「この品物の撮影を完了」を押せない） */}
                     <label className="pqh-confirm">
                       <input
                         type="checkbox"
                         checked={checkedHints.has(`${currentItem.id}:confirm`)}
                         onChange={() => toggleHint(currentItem.id, "confirm")}
                       />
-                      <span>商品の状態が正確に確認できる写真を撮影しました</span>
+                      <span>品物の状態が正確に確認できる写真を撮影しました</span>
                     </label>
                   </div>
                 </div>
 
                 <button type="button" className="item-delete-link" onClick={deleteCurrentItem}>
-                  この商品を削除
+                  この品物を削除
                 </button>
               </div>
             </div>
@@ -783,12 +818,12 @@ export default function CreateCasePage() {
                   </div>
                   <div className="field">
                     <label>市区町村<span className="req">必須</span></label>
-                    <input type="text" value={city} onChange={(e) => setCity(e.target.value)} placeholder="世田谷区" />
+                    <input type="text" maxLength={64} value={city} onChange={(e) => setCity(e.target.value)} placeholder="世田谷区" />
                   </div>
                 </div>
                 <div className="field">
                   <label>番地・建物名・部屋番号<span className="opt">任意・業者決定後に開示</span></label>
-                  <input type="text" value={addressDetail} onChange={(e) => setAddressDetail(e.target.value)} placeholder="桜丘1-2-3 メゾン桜 101号室" />
+                  <input type="text" maxLength={200} value={addressDetail} onChange={(e) => setAddressDetail(e.target.value)} placeholder="桜丘1-2-3 メゾン桜 101号室" />
                 </div>
                 <div className="field-row">
                   <div className="field">
@@ -829,29 +864,30 @@ export default function CreateCasePage() {
           {step === 3 && (
             <div>
               <h2 className="step-title">内容を確認</h2>
-              <p className="step-desc">この内容で出品します。送信するとAIが写真を解析して案件化し、登録業者へ公開されます。</p>
+              <p className="step-desc">この内容で出品します。送信すると、写真をもとに品物の説明が自動で作られ、登録業者へ公開されます。</p>
               <div className="form-card">
                 {[
                   [
-                    "商品・写真",
-                    totalItemCount > 0 ? `商品 ${totalItemCount} 点 / 写真 ${totalPhotoCount} 枚` : `写真 ${totalPhotoCount} 枚`,
+                    "品物・写真",
+                    totalItemCount > 0 ? `品物 ${totalItemCount} 点 / 写真 ${totalPhotoCount} 枚` : `写真 ${totalPhotoCount} 枚`,
                   ],
                   ["利用目的", purpose],
                   ["エリア", `${prefecture} ${city}`],
                   ["番地・建物名・部屋番号", addressDetail || "（未入力・任意）"],
                   ["住居", `${housingType} / ${floorPlan}`],
-                  ["階数・EV", `${floorNumber ? `${floorNumber}階` : "—"} / EV${hasElevator ? "あり" : "なし"}`],
+                  ["階数", floorNumber ? `${floorNumber}階` : "（未入力）"],
+                  ["エレベーター", hasElevator ? "あり" : "（チェックなし）"],
                 ].map(([k, v]) => (
                   <div key={k} className="confirm-row"><span className="lbl">{k}</span><span className="val">{v}</span></div>
                 ))}
               </div>
               {items.length > 0 && (
                 <div className="form-card">
-                  <p className="confirm-item-list-title">商品一覧</p>
+                  <p className="confirm-item-list-title">品物一覧</p>
                   <ul className="confirm-item-list">
                     {items.map((it, idx) => (
                       <li key={it.id}>
-                        {it.name.trim() || `商品 ${idx + 1}`}
+                        {it.name.trim() || `品物 ${idx + 1}`}
                         <span className="confirm-item-list-count">{it.photos.length}枚</span>
                       </li>
                     ))}
@@ -860,11 +896,11 @@ export default function CreateCasePage() {
               )}
               <div className="hint-banner">
                 <Ic name="lock" className="hint-ic" />
-                <span>住所詳細・連絡先は業者決定まで開示されません。査定に回るのは写真・品目・利用目的・地域（都道府県・市区町村）・住居情報などの出品内容のみです。</span>
+                <span>住所詳細・連絡先は業者決定まで開示されません。業者に見えるのは写真・品目・利用目的・地域（都道府県・市区町村）・住居情報などの出品内容のみです。</span>
               </div>
               <div className="hint-banner">
                 <Ic name="clock" className="hint-ic" />
-                <span>送信後、AIによる写真の解析は案件詳細画面で進みます（通常1〜2分）。この画面での待ち時間はありません。</span>
+                <span>送信後、写真をもとにした説明づくりは案件の画面で進みます（通常1〜2分）。この画面での待ち時間はありません。</span>
               </div>
               {submitting && (
                 <div className="hint-banner" role="status">
@@ -887,9 +923,9 @@ export default function CreateCasePage() {
                 className="btn-flow-next"
                 onClick={exitShoot}
                 disabled={!currentItem || currentItem.photos.length === 0 || !checkedHints.has(`${currentItem.id}:confirm`)}
-                title={currentItem && currentItem.photos.length > 0 && !checkedHints.has(`${currentItem.id}:confirm`) ? "「商品の状態が正確に確認できる写真を撮影しました」にチェックを入れてください" : undefined}
+                title={currentItem && currentItem.photos.length > 0 && !checkedHints.has(`${currentItem.id}:confirm`) ? "「品物の状態が正確に確認できる写真を撮影しました」にチェックを入れてください" : undefined}
               >
-                この商品の撮影を完了<Ic name="arrow" />
+                この品物の撮影を完了<Ic name="arrow" />
               </button>
               {currentItem && currentItem.photos.length === 0 ? (
                 <p className="field-error" style={{ margin: 0 }} role="status">
@@ -950,7 +986,7 @@ export default function CreateCasePage() {
           <div className="leave-modal" role="dialog" aria-modal="true" aria-label="ページを離れる確認">
             <h3>入力中の内容が失われます</h3>
             <p>
-              撮影した写真・商品情報はまだ送信されていません。このままページを離れると、入力内容がすべて失われます。
+              撮影した写真・品物情報はまだ送信されていません。このままページを離れると、入力内容がすべて失われます。
             </p>
             <div className="leave-modal-actions">
               <button type="button" className="btn-flow-back" onClick={confirmLeave}>

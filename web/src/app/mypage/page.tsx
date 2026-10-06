@@ -217,7 +217,7 @@ function LotCard({
             </span>
             <span className="lot-meta-item">
               <Ic name="clock" />
-              {new Date(c.created_at).toLocaleDateString("ja-JP")}出品
+              {new Date(c.created_at).toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" })}に出品
             </span>
             {visitInfo ? (
               <span className="lot-meta-item">
@@ -295,12 +295,17 @@ function MyPageContent() {
   const [transactions, setTransactions] = useState<TransactionListItem[] | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** 出品一覧の取得に失敗した（0件と区別するための専用フラグ。true の間は集計・空状態を出さない）。 */
+  const [casesFailed, setCasesFailed] = useState(false);
 
   const reload = useCallback(async () => {
     if (!token) return;
+    setError(null);
+    setCasesFailed(false);
     try {
       setCases(await listMyCases(token));
     } catch (e) {
+      setCasesFailed(true);
       setError(toDisplayMessage(e, "案件の取得に失敗しました"));
     }
     try {
@@ -414,10 +419,10 @@ function MyPageContent() {
   const tabs: { key: TabKey; label: string; count: number; gray?: boolean }[] = [
     { key: "all", label: "すべて", count: (cases ?? []).length },
     { key: "active", label: "進行中", count: activeLots.length },
-    { key: "done", label: "成約・終了", count: doneLots.length, gray: true },
+    { key: "done", label: "決定済み・終了", count: doneLots.length, gray: true },
   ];
 
-  const isLoading = loading || (!cases && !error);
+  const isLoading = loading || (!cases && !casesFailed);
   const sessionExpired = !loading && !token;
 
   if (sessionExpired) {
@@ -447,12 +452,47 @@ function MyPageContent() {
     );
   }
 
+  // 出品一覧が取れていない状態で「0件・まだ出品がありません」を出すと、出品が消えたと誤解し
+  // 二重出品に誘導してしまう。集計・空状態は出さず、再読み込み導線だけを出す。
+  if (casesFailed) {
+    return (
+      <div className="mypage-page">
+        <AppHeader />
+        <main id="main" className="my-wrap">
+          <div role="alert" className="empty-state">
+            <h3>出品の一覧を読み込めませんでした</h3>
+            <p>
+              {error ?? "通信に失敗しました。"}
+              出品が消えたわけではありません。電波状況をご確認のうえ、もう一度お試しください。
+            </p>
+            <button type="button" className="btn btn-primary btn-lg" onClick={() => void reload()}>
+              再読み込み
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  const transactionsReady = transactions !== null;
+
   return (
     <div className="mypage-page">
       <AppHeader />
 
       <main id="main" className="my-wrap">
-        {error ? <Notice tone="danger">{error}</Notice> : null}
+        {error ? (
+          <Notice tone="danger">
+            {error}
+            <button
+              type="button"
+              onClick={() => void reload()}
+              style={{ marginLeft: 8, fontWeight: 600, textDecoration: "underline", background: "none", border: 0, cursor: "pointer", color: "inherit" }}
+            >
+              再読み込み
+            </button>
+          </Notice>
+        ) : null}
 
         {/* ユーザーカード */}
         <div className="user-card">
@@ -470,14 +510,14 @@ function MyPageContent() {
             </div>
             <div className="stat-item">
               <div className="stat-num">
-                {completedTxns.length}
-                <span>件</span>
+                {transactionsReady ? completedTxns.length : "－"}
+                <span>{transactionsReady ? "件" : ""}</span>
               </div>
-              <div className="stat-lbl">成約済み</div>
+              <div className="stat-lbl">業者決定済み</div>
             </div>
             <div className="stat-item">
-              <div className="stat-num">{formatYen(totalAmount)}</div>
-              <div className="stat-lbl">総買取額</div>
+              <div className="stat-num">{transactionsReady ? formatYen(totalAmount) : "－"}</div>
+              <div className="stat-lbl">買取額の合計</div>
             </div>
           </div>
         </div>
@@ -495,18 +535,18 @@ function MyPageContent() {
           <Link href="/mypage?tab=done" className="sum-card" style={{ textDecoration: "none" }}>
             <div className="sum-label">訪問調整中</div>
             <div className="sum-val">
-              {negotiatingCount}
-              <span>件</span>
+              {transactionsReady ? negotiatingCount : "－"}
+              <span>{transactionsReady ? "件" : ""}</span>
             </div>
-            <div className="sum-sub">訪問日調整中を含む</div>
+            <div className="sum-sub">訪問日の調整中を含む</div>
           </Link>
           <Link href="/mypage?tab=done" className="sum-card" style={{ textDecoration: "none" }}>
-            <div className="sum-label">成約済み</div>
+            <div className="sum-label">業者決定済み</div>
             <div className="sum-val">
-              {completedTxns.length}
-              <span>件</span>
+              {transactionsReady ? completedTxns.length : "－"}
+              <span>{transactionsReady ? "件" : ""}</span>
             </div>
-            <div className="sum-sub">総買取額 {formatYen(totalAmount)}</div>
+            <div className="sum-sub">買取額の合計 {transactionsReady ? formatYen(totalAmount) : "－"}</div>
           </Link>
           <div className="sum-card">
             <div className="sum-label">次の出品</div>
@@ -622,7 +662,7 @@ function MyPageContent() {
           </div>
         ) : null}
 
-        {/* 成約済み */}
+        {/* 業者決定済み・終了 */}
         {tab === "done" ? (
           <div className="lot-list">
             {sortedDoneLots.length ? (
@@ -637,7 +677,7 @@ function MyPageContent() {
                 />
               ))
             ) : (
-              <EmptyState title="成約済みの出品はありません" />
+              <EmptyState title="業者決定済みの出品はありません" />
             )}
           </div>
         ) : null}

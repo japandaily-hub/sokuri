@@ -2680,7 +2680,7 @@ export function toAlbums(c: { items?: CaseItemOut[]; photos: CasePhoto[] }): Cas
 
   const albums: CaseAlbum[] = items.map((item, i) => ({
     id: item.id,
-    title: (item.name?.trim() || item.ai_detected_name?.trim() || `商品 ${i + 1}`),
+    title: (item.name?.trim() || item.ai_detected_name?.trim() || `品物 ${i + 1}`),
     aiDetectedName: item.ai_detected_name,
     aiCondition: item.ai_condition,
     aiSummary: item.ai_summary,

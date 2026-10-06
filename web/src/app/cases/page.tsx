@@ -2,7 +2,7 @@
 
 /** ユーザー: 自分の案件一覧。 */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Spinner } from "@/components/Icon";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import { formatPurposeLabel } from "@/lib/case-labels";
@@ -27,12 +27,17 @@ export default function MyCasesPage() {
   const [cases, setCases] = useState<CaseOut[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     if (!token) return;
+    setError(null);
     listMyCases(token)
       .then(setCases)
       .catch((e) => setError(toDisplayMessage(e, "取得に失敗しました")));
   }, [token]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   if (loading || (!cases && !error)) {
     return (
@@ -57,8 +62,16 @@ export default function MyCasesPage() {
         </a>
       }
     >
-      {error ? <Notice tone="error">{error}</Notice> : null}
-      {cases && cases.length === 0 ? (
+      {error ? (
+        <div className="space-y-3">
+          <Notice tone="error">{error}</Notice>
+          {/* 取得に失敗したときは「案件がありません」と区別し、再読み込みの導線を出す。 */}
+          <button type="button" className={btnPrimary} onClick={load}>
+            再読み込み
+          </button>
+        </div>
+      ) : null}
+      {!error && cases && cases.length === 0 ? (
         <Card className="text-center">
           <p className="text-sm text-slate-500">まだ案件がありません。</p>
           <a href="/create" className={`${btnPrimary} mt-4`}>
@@ -88,7 +101,7 @@ export default function MyCasesPage() {
                       {c.prefecture} {c.city} / {c.floor_plan ?? "間取り未設定"}
                     </p>
                     <p className="mt-1 text-xs text-slate-400">
-                      {new Date(c.created_at).toLocaleDateString("ja-JP")}
+                      {new Date(c.created_at).toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" })}
                     </p>
                   </div>
                 </div>
@@ -97,7 +110,7 @@ export default function MyCasesPage() {
               <p className="mt-3 text-sm font-semibold text-brand-700">
                 入札 {c.bid_count} 件
                 {c.item_count != null && c.item_count > 0
-                  ? ` ・ 商品 ${c.item_count} 点・写真 ${c.photo_count ?? c.photos.length} 枚`
+                  ? ` ・ 品物 ${c.item_count} 点・写真 ${c.photo_count ?? c.photos.length} 枚`
                   : c.photo_count != null
                     ? ` ・ 写真 ${c.photo_count} 枚`
                     : ""}

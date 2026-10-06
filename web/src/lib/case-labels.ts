@@ -48,7 +48,7 @@ export function caseItemsLabel(c: Pick<CaseMasked, "items" | "item_count">): str
     .map((it) => (it.name ?? it.ai_detected_name ?? "").trim())
     .filter((n) => n.length > 0);
   const total = Math.max(c.item_count ?? 0, items.length);
-  if (names.length === 0) return total > 0 ? `商品 ${total} 点` : null;
+  if (names.length === 0) return total > 0 ? `品物 ${total} 点` : null;
   const head = names.slice(0, 2).join("、");
   const rest = Math.max(0, total - Math.min(2, names.length));
   return rest > 0 ? `${head} ほか${rest}点` : head;

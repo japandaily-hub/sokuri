@@ -82,6 +82,9 @@ const ICON_LINE = (
   </svg>
 );
 
+/** 出品の対応エリアに含まれる residence_area トークン（4都県）。 */
+const SUPPORTED_AREA_IDS: ReadonlySet<string> = new Set(["tokyo", "kanagawa", "saitama", "chiba"]);
+
 export default function ProfileEditPage() {
   const { data: sessionData, update } = useSession();
   const { token, loading: tokenLoading } = useToken();
@@ -385,6 +388,11 @@ export default function ProfileEditPage() {
   // body 側の residence_area を無視する仕様に合わせ、チップは読み取り専用にする。
   const prefectureSaved = !!address?.prefecture;
 
+  // 出品の対応エリアは4都県のみ。対応外の府県（大阪・愛知・福岡）は選択肢に並べず、
+  // 「その他の地域」にまとめる。ただし保存済みの値が対応外なら、現在の選択が見えるよう残す。
+  const visibleAreas = RESIDENCE_AREAS.filter((a) => SUPPORTED_AREA_IDS.has(a.id) || a.id === "other" || a.id === area);
+  const areaLabel = (a: { id: string; label: string }) => (a.id === "other" ? "その他の地域（対応エリア外）" : a.label);
+
   const displayName =
     [profile?.family_name, profile?.given_name].filter(Boolean).join(" ") ||
     sessionData?.user?.name ||
@@ -614,11 +622,14 @@ export default function ProfileEditPage() {
             {ICON_PIN}
             住所・連絡先
           </div>
+          <p className="field-hint" style={{ margin: "0 0 10px" }}>
+            住所の登録は任意です。出品には必須ではありません。なりすましや不正な出品を防ぐため、また運営による本人確認のために使います。登録する場合は、郵便番号から番地までをすべて入力してください。
+          </p>
           <div className="form-card">
             {addressLoadError ? <div className="pw-change-error">{addressLoadError}</div> : null}
             <div className={`field${postalErr ? " has-error" : ""}`}>
               <label htmlFor="inp-postal">
-                郵便番号<span className="req">必須</span>
+                郵便番号<span className="opt">住所を登録するときは入力</span>
               </label>
               <input
                 type="text"
@@ -642,7 +653,7 @@ export default function ProfileEditPage() {
             </div>
             <div className={`field${prefErr ? " has-error" : ""}`}>
               <label htmlFor="inp-prefecture">
-                都道府県<span className="req">必須</span>
+                都道府県<span className="opt">住所を登録するときは入力</span>
               </label>
               <select
                 id="inp-prefecture"
@@ -661,12 +672,12 @@ export default function ProfileEditPage() {
               </select>
               {prefErr ? <div className="field-error">{prefErr}</div> : null}
               <p className="field-hint">
-                ※ 出品（訪問買取）の対応エリアは東京都・千葉県・埼玉県・神奈川県です。
+                ※ 出品（訪問買取）の対応エリアは東京都・千葉県・埼玉県・神奈川県の4都県です。ほかの地域の住所も登録はできます。
               </p>
             </div>
             <div className={`field${cityErr ? " has-error" : ""}`}>
               <label htmlFor="inp-city">
-                市区町村<span className="req">必須</span>
+                市区町村<span className="opt">住所を登録するときは入力</span>
               </label>
               <input
                 type="text"
@@ -682,7 +693,7 @@ export default function ProfileEditPage() {
             </div>
             <div className={`field${line1Err ? " has-error" : ""}`}>
               <label htmlFor="inp-address1">
-                番地<span className="req">必須</span>
+                番地<span className="opt">住所を登録するときは入力</span>
               </label>
               <input
                 type="text"
@@ -746,14 +757,14 @@ export default function ProfileEditPage() {
             {prefectureSaved ? (
               <>
                 <div className="area-grid">
-                  {RESIDENCE_AREAS.map((a) => (
+                  {visibleAreas.map((a) => (
                     <span
                       key={a.id}
                       className={`area-chip${area === a.id ? " selected" : ""}`}
                       aria-current={area === a.id ? "true" : undefined}
                       style={{ cursor: "default", opacity: area === a.id ? 1 : 0.45 }}
                     >
-                      {a.label}
+                      {areaLabel(a)}
                     </span>
                   ))}
                 </div>
@@ -763,7 +774,7 @@ export default function ProfileEditPage() {
               </>
             ) : (
               <div className="area-grid">
-                {RESIDENCE_AREAS.map((a) => (
+                {visibleAreas.map((a) => (
                   <button
                     key={a.id}
                     type="button"
@@ -771,7 +782,7 @@ export default function ProfileEditPage() {
                     aria-pressed={area === a.id}
                     onClick={() => selectArea(a.id)}
                   >
-                    {a.label}
+                    {areaLabel(a)}
                   </button>
                 ))}
               </div>
