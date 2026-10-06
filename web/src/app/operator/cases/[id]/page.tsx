@@ -22,10 +22,9 @@ import { ConfirmModal } from "@/components/kdz/ConfirmModal";
 import { Ic } from "@/components/kdz/Icons";
 import { useToken } from "@/components/kdz/Ui";
 import { formatPurposeLabel } from "@/lib/case-labels";
+import { MESSAGE_MAX_CHARS, countChars } from "@/lib/char-count";
 import {
-  BID_MESSAGE_MAX_CHARS,
   classifyBidPosition,
-  countCodePoints,
   formatBidAmountWithUnit,
   isBidMessageWithinLimit,
 } from "@/lib/bid-input";
@@ -58,20 +57,20 @@ const BID_MIN = 1000;
 const BID_MAX = 100_000_000;
 const BID_STEP = 1000;
 const BID_RANGE_HINT = "入札額は1,000円〜1億円の範囲で1,000円単位で入力してください";
-/** メッセージが上限（BID_MESSAGE_MAX_CHARS）を超えたときの文言（backend の 422 を待たず先に案内する）。 */
-const BID_MESSAGE_TOO_LONG_HINT = `メッセージは${BID_MESSAGE_MAX_CHARS.toLocaleString("ja-JP")}文字以内で入力してください`;
+/** メッセージが上限（MESSAGE_MAX_CHARS）を超えたときの文言（backend の 422 を待たず先に案内する）。 */
+const BID_MESSAGE_TOO_LONG_HINT = `メッセージは${MESSAGE_MAX_CHARS.toLocaleString("ja-JP")}文字以内で入力してください`;
 
 /** 「0/2000」形式の文字数カウンタ（超過時は警告色・読み上げ対象）。 */
 function MessageCounter({ id, value }: { id: string; value: string }) {
-  const count = countCodePoints(value);
-  const over = count > BID_MESSAGE_MAX_CHARS;
+  const count = countChars(value);
+  const over = count > MESSAGE_MAX_CHARS;
   return (
     <p
       id={id}
       aria-live={over ? "polite" : "off"}
       style={{ fontSize: 12, marginTop: 4, textAlign: "right", color: over ? "var(--danger)" : "var(--body-soft)" }}
     >
-      {count.toLocaleString("ja-JP")}/{BID_MESSAGE_MAX_CHARS.toLocaleString("ja-JP")}
+      {count.toLocaleString("ja-JP")}/{MESSAGE_MAX_CHARS.toLocaleString("ja-JP")}
     </p>
   );
 }
@@ -607,7 +606,7 @@ export default function OperatorCaseDetailPage() {
                   value={raiseMessage}
                   onChange={(e) => setRaiseMessage(e.target.value)}
                   rows={3}
-                  maxLength={BID_MESSAGE_MAX_CHARS}
+                  maxLength={MESSAGE_MAX_CHARS}
                   aria-describedby="raiseMessageCount"
                   placeholder="金額を見直しました。ぜひご検討ください。"
                 />
@@ -696,7 +695,7 @@ export default function OperatorCaseDetailPage() {
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   rows={3}
-                  maxLength={BID_MESSAGE_MAX_CHARS}
+                  maxLength={MESSAGE_MAX_CHARS}
                   aria-describedby="bidMessageCount"
                   placeholder="搬出経路の確認のため、当日は2名で伺います。"
                 />

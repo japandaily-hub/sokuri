@@ -75,6 +75,32 @@ export function formatJstDateTime(value: string | null | undefined): string {
   });
 }
 
+/** 日本時間の日付＋時刻（秒つき。例「2026/10/6 11:34:18」）。運営画面の監査・活動表示用。解釈できなければ空文字。 */
+export function formatJstDateTimeSeconds(value: string | null | undefined): string {
+  return formatWith(value, {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  });
+}
+
+/**
+ * 日本時間（Asia/Tokyo）での「年-月」キー（例 "2026-10"）。月次集計の境界を端末の時刻帯に依らず JST で揃える。
+ * 解釈できなければ null。
+ */
+export function jstYearMonthKey(value: string | Date | null | undefined): string | null {
+  const date = value instanceof Date ? value : parseApiDateTime(value);
+  if (!date || Number.isNaN(date.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: JST_TIME_ZONE, year: "numeric", month: "2-digit" }).formatToParts(date);
+  const year = parts.find((p) => p.type === "year")?.value;
+  const month = parts.find((p) => p.type === "month")?.value;
+  return year && month ? `${year}-${month}` : null;
+}
+
 /** 日本時間の月日＋時刻（例「10/6 11:34」）。入札の更新時刻など年を省く表示用。 */
 export function formatJstMonthDayTime(value: string | null | undefined): string {
   return formatWith(value, { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });

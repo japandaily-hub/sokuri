@@ -5,11 +5,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { MESSAGE_MAX_LENGTH, countMessageChars, isImeComposingKey, messageLengthState } from "./message-length.ts";
+import { MESSAGE_MAX_CHARS, countChars } from "./char-count.ts";
+import { isImeComposingKey, messageLengthState } from "./message-length.ts";
 
 describe("messageLengthState", () => {
   it("上限は backend と同じ 2000", () => {
-    assert.equal(MESSAGE_MAX_LENGTH, 2000);
+    assert.equal(MESSAGE_MAX_CHARS, 2000);
   });
   it("ちょうど 2000 字は送れる・2001 字は超過", () => {
     assert.equal(messageLengthState("あ".repeat(2000)).over, false);
@@ -25,7 +26,7 @@ describe("messageLengthState", () => {
   });
   it("絵文字（サロゲートペア）は 1 字と数える", () => {
     const emoji = String.fromCodePoint(0x1f600);
-    assert.equal(countMessageChars(emoji + emoji), 2);
+    assert.equal(countChars(emoji + emoji), 2);
     assert.equal(messageLengthState(emoji.repeat(2000)).over, false);
   });
   it("カウンタ表示", () => {

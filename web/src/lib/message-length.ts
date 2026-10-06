@@ -1,20 +1,9 @@
 /**
- * メッセージ本文（チャット・入札メッセージ）の文字数上限と数え方の共通部品。
- *
- * backend の上限（schemas_katadzuke.py: MessageCreateRequest.body / 入札 message は
- * max_length=2000。Pydantic は Unicode コードポイント数で数える）と値・数え方を一致させる。
- * `String#length`（UTF-16 コード単位）だと絵文字などのサロゲートペアが 2 と数えられ、
- * サーバーより早く弾いてしまうため、コードポイントで数える。
- * backend の上限を変えるときはここも変えること。
+ * チャット本文の入力中の文字数状態と IME 判定の共通部品。
+ * 上限（MESSAGE_MAX_CHARS）と数え方（countChars）は char-count.ts が唯一の定義（backend の max_length と一致）。
  */
 
-/** メッセージ本文の上限文字数（backend の max_length と一致）。 */
-export const MESSAGE_MAX_LENGTH = 2000;
-
-/** 文字数をコードポイント単位で数える。 */
-export function countMessageChars(text: string): number {
-  return Array.from(text).length;
-}
+import { MESSAGE_MAX_CHARS, countChars } from "./char-count.ts";
 
 export interface MessageLengthState {
   /** 前後の空白を除いた文字数（サーバーへ送る本文の文字数）。 */
@@ -31,10 +20,10 @@ export interface MessageLengthState {
 
 /**
  * 入力中の本文の文字数状態を返す。送信する本文は trim 済みなので、数えるのも trim 後。
- * @param max 上限（既定は MESSAGE_MAX_LENGTH）
+ * @param max 上限（既定は MESSAGE_MAX_CHARS）
  */
-export function messageLengthState(text: string, max: number = MESSAGE_MAX_LENGTH): MessageLengthState {
-  const count = countMessageChars(text.trim());
+export function messageLengthState(text: string, max: number = MESSAGE_MAX_CHARS): MessageLengthState {
+  const count = countChars(text, { trim: true });
   const excess = Math.max(0, count - max);
   const maxLabel = max.toLocaleString("ja-JP");
   return {

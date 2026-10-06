@@ -20,6 +20,8 @@
  * ソースに混入するため）。
  */
 
+import { countChars } from "./char-count.ts";
+
 /**
  * 表示用自由記述欄で拒否する UTF-16 コード単位の範囲（両端含む・昇順）。
  * backend の DISALLOWED_DISPLAY_CHAR_RANGES と同じ集合:
@@ -171,32 +173,6 @@ export function sanitizeDisplayText(text: string): string {
   return parts.join("");
 }
 
-/**
- * 文字列のコードポイント数を数える（UTF-16 コード単位数＝String#length ではなく、
- * Python の len() と一致する単位）。正しいサロゲートペアは1文字として数え、孤立
- * サロゲートはそれ自体を1文字として数える（Python の str に孤立サロゲートが
- * 入っている場合も len() は1として数えるため、挙動が一致する）。
- */
-export function countCodePoints(text: string): number {
-  const length = text.length;
-  let count = 0;
-  let i = 0;
-  while (i < length) {
-    const code = text.charCodeAt(i);
-    if (code >= HIGH_SURROGATE_MIN && code <= HIGH_SURROGATE_MAX && i + 1 < length) {
-      const next = text.charCodeAt(i + 1);
-      if (next >= LOW_SURROGATE_MIN && next <= LOW_SURROGATE_MAX) {
-        i += 2;
-        count += 1;
-        continue;
-      }
-    }
-    i += 1;
-    count += 1;
-  }
-  return count;
-}
-
 /** prepareDisplayText の判定結果。 */
 export type PreparedDisplayText =
   | { ok: true; value: string }
@@ -243,7 +219,7 @@ export function prepareDisplayText(
     return { ok: false, reason: "only_disallowed" };
   }
   const minLength = opts?.minLength;
-  if (minLength != null && countCodePoints(trimmedSanitized) < minLength) {
+  if (minLength != null && countChars(trimmedSanitized) < minLength) {
     return { ok: false, reason: "too_short", minLength };
   }
   return { ok: true, value: sanitized };

@@ -1,19 +1,14 @@
 /**
  * 業者の入札入力まわりの純関数（案件詳細・ダッシュボードのカード入札で共有）。
- * 他モジュールを import しない。backend の message は Pydantic max_length=2000（コードポイント数）。
+ * 文字数の数え方と上限（backend の message は Pydantic max_length=2000・コードポイント数）は
+ * char-count.ts が唯一の定義。入札メッセージは生の値をそのまま送るので trim せずに数える。
  */
 
-/** 入札メッセージ（初回・引き上げ共通）の上限文字数。backend schemas の message max_length と同値。 */
-export const BID_MESSAGE_MAX_CHARS = 2000;
-
-/** Unicode コードポイント数（Pydantic max_length と同じ数え方。絵文字などのサロゲートペアを1と数える）。 */
-export function countCodePoints(value: string): number {
-  return Array.from(value).length;
-}
+import { MESSAGE_MAX_CHARS, countChars } from "./char-count.ts";
 
 /** 入札メッセージが上限を超えていないか。 */
 export function isBidMessageWithinLimit(value: string): boolean {
-  return countCodePoints(value) <= BID_MESSAGE_MAX_CHARS;
+  return countChars(value) <= MESSAGE_MAX_CHARS;
 }
 
 /**

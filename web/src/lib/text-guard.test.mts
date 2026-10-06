@@ -22,9 +22,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import { countChars } from "./char-count.ts";
 import {
   DISALLOWED_DISPLAY_CHAR_RANGES,
-  countCodePoints,
   prepareDisplayText,
   sanitizeDisplayText,
 } from "./text-guard.ts";
@@ -276,28 +276,6 @@ describe("sanitizeDisplayText: 冪等性", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// countCodePoints
-// ---------------------------------------------------------------------------
-
-describe("countCodePoints", () => {
-  it("サロゲートペアは1文字として数える（Pythonのlen()と一致させるため）", () => {
-    assert.equal(countCodePoints(String.fromCodePoint(0x1f600)), 1);
-    assert.equal(countCodePoints(String.fromCodePoint(0x1f600).repeat(3)), 3);
-  });
-
-  it("孤立サロゲートもそれ自体を1文字として数える", () => {
-    assert.equal(countCodePoints(String.fromCharCode(0xd800)), 1);
-  });
-
-  it("日本語は1文字ずつ数える", () => {
-    assert.equal(countCodePoints("こんにちは"), 5);
-  });
-
-  it("空文字は0", () => {
-    assert.equal(countCodePoints(""), 0);
-  });
-});
 
 // ---------------------------------------------------------------------------
 // prepareDisplayText
@@ -330,7 +308,7 @@ describe("prepareDisplayText", () => {
     const emoji = String.fromCodePoint(0x1f600);
     const input = emoji.repeat(5);
     assert.equal(input.length, 10); // サロゲートペア×5 = UTF-16コード単位10個
-    assert.equal(countCodePoints(input), 5);
+    assert.equal(countChars(input), 5);
     const result = prepareDisplayText(input, { minLength: 10 });
     assert.deepEqual(result, { ok: false, reason: "too_short", minLength: 10 });
   });
@@ -399,7 +377,7 @@ describe("prepareDisplayText", () => {
         const result = prepareDisplayText(sample, { minLength: 10 });
         if (result.ok) {
           assert.ok(
-            countCodePoints(result.value) >= 10,
+            countChars(result.value) >= 10,
             `okなのにvalueのコードポイント数が10未満: ${JSON.stringify(result.value)}`,
           );
         }

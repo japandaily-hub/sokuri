@@ -1,19 +1,18 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import { MESSAGE_MAX_CHARS, countChars } from "./char-count.ts";
 import {
-  BID_MESSAGE_MAX_CHARS,
   classifyBidPosition,
-  countCodePoints,
   formatBidAmountWithUnit,
   isBidMessageWithinLimit,
 } from "./bid-input.ts";
 
 test("コードポイントで数える（絵文字は1）", () => {
-  assert.equal(countCodePoints("あいう"), 3);
-  assert.equal(countCodePoints("😀"), 1);
-  assert.equal(isBidMessageWithinLimit("あ".repeat(BID_MESSAGE_MAX_CHARS)), true);
-  assert.equal(isBidMessageWithinLimit("あ".repeat(BID_MESSAGE_MAX_CHARS + 1)), false);
+  assert.equal(countChars("あいう"), 3);
+  assert.equal(countChars("😀"), 1);
+  assert.equal(isBidMessageWithinLimit("あ".repeat(MESSAGE_MAX_CHARS)), true);
+  assert.equal(isBidMessageWithinLimit("あ".repeat(MESSAGE_MAX_CHARS + 1)), false);
 });
 
 test("金額は千円区切り＋万・億の読みを併記する", () => {

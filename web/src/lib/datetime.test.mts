@@ -58,3 +58,19 @@ describe("日本時間の整形", () => {
     assert.equal(formatJstDate(undefined), "");
   });
 });
+
+import { formatJstDateTimeSeconds, jstYearMonthKey } from "./datetime.ts";
+
+describe("formatJstDateTimeSeconds / jstYearMonthKey", () => {
+  it("秒つきで日本時間にする", () => {
+    assert.equal(formatJstDateTimeSeconds("2026-10-06T02:34:18"), "2026/10/6 11:34:18");
+    assert.equal(formatJstDateTimeSeconds("garbage"), "");
+  });
+  it("JST の月境界で年月キーを返す（UTC 月末 15:00 以降は翌月）", () => {
+    assert.equal(jstYearMonthKey("2026-09-30T14:59:59Z"), "2026-09");
+    assert.equal(jstYearMonthKey("2026-09-30T15:00:00Z"), "2026-10");
+    assert.equal(jstYearMonthKey("2026-12-31T15:00:00"), "2027-01");
+    assert.equal(jstYearMonthKey(null), null);
+    assert.equal(jstYearMonthKey("garbage"), null);
+  });
+});
