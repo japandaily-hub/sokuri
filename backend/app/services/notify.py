@@ -752,3 +752,30 @@ async def send_schedule_proposed(to_email: str, transaction_id: str) -> bool:
             f'<p><a href="{url}">候補日を確認する</a></p>'
         ),
     )
+
+
+async def send_password_reset(
+    to_email: str, account_type: str, raw_token: str, expires_minutes: int
+) -> bool:
+    """パスワード再設定の案内（本人宛・services/password_reset.py からのみ呼ぶ）。
+
+    件名・本文には氏名・メールアドレス等の個人情報を入れず、再設定リンクと有効期限・
+    「心当たりがない場合は無視してください」だけを載せる。``raw_token`` は平文の
+    1回限りトークンで、ここ以外（ログ・アラート・DB）には出さない（本関数もログしない。
+    送信失敗時の ``_send_raw`` のログは宛先をマスクし、本文を載せない）。
+    """
+    settings = get_settings()
+    query = f"token={quote(raw_token, safe='')}&type={quote(account_type, safe='')}"
+    url = html.escape(f"{settings.frontend_base_url}/password-reset/confirm?{query}", quote=True)
+    return await _send(
+        to_email,
+        "【カタヅケ】パスワード再設定のご案内",
+        _wrap(
+            "<p>パスワード再設定の手続きを受け付けました。</p>"
+            "<p>下のリンクから新しいパスワードを設定してください。"
+            f"リンクの有効期限は{expires_minutes}分で、1回だけ使えます。</p>"
+            f'<p><a href="{url}">新しいパスワードを設定する</a></p>'
+            "<p>このメールに心当たりがない場合は、何もせずに無視してください"
+            "（パスワードは変更されません）。</p>"
+        ),
+    )

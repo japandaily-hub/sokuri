@@ -262,6 +262,8 @@ _SCOPE_MESSAGES: dict[str, str] = {
     "message_send": "メッセージの送信が集中しています。しばらく時間をおいて再度お試しください。",
     "schedule_propose": "日程候補の提示が集中しています。しばらく時間をおいて再度お試しください。",
     "schedule_accept": "日程の確定が集中しています。しばらく時間をおいて再度お試しください。",
+    "password_reset_request": "パスワード再設定の手続きが集中しています。しばらく時間をおいて再度お試しください。",
+    "password_reset_confirm": "パスワード再設定の試行回数が上限に達しました。しばらく時間をおいて再度お試しください。",
 }
 
 
@@ -732,6 +734,21 @@ def _scope_spec(scope: str, config: RateLimitConfig) -> _ScopeSpec:
         # 成功・失敗を問わずハンドラ冒頭の hit_account で毎回数える。
         return _ScopeSpec(
             ip_rule=None, account_rule=config.schedule_accept_account, count_all=False
+        )
+    if scope == "password_reset_request":
+        # パスワード再設定の要求（無認証）: IP 軸は全リクエストカウント（count_all）。
+        # アカウント軸は本文のメールが判明した後にハンドラが hit_account で毎回数える
+        # （case_create と同じ方式。識別子は "user:"/"operator:" で名前空間分離する）。
+        return _ScopeSpec(
+            ip_rule=config.password_reset_request_ip,
+            account_rule=config.password_reset_request_account,
+            count_all=True,
+        )
+    if scope == "password_reset_confirm":
+        # パスワード再設定の確定（無認証）: トークンからしかアカウントが分からず、
+        # 無効なトークンにはアカウントが無いため IP 軸のみ・全リクエストカウント。
+        return _ScopeSpec(
+            ip_rule=config.password_reset_confirm_ip, account_rule=None, count_all=True
         )
     raise ValueError(f"未知の rate limit scope です: {scope!r}")
 
