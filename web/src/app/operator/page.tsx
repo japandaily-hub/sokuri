@@ -820,9 +820,9 @@ export default function OperatorDashboardPage() {
             </div>
             <div className="sum-card">
               {/* r10 M2 是正: 「今月の成約」は隣の「交渉中」と母集団が重なり読み手を混乱させたため、
-                  落札（成約が成立した時点）を数える指標であることを見出しで明示する。
-                  r10-review M3 是正: 「今月の落札」は他画面の「成約」表記と揺れて紛らわしいため、
-                  集計基準（落札日基準・キャンセル除く）を見出しに明記する。 */}
+                  成約が成立した時点を数える指標であることを見出しで明示する。
+                  r10-review M3 是正: 用語を「成約」に統一したため、
+                  集計基準（成約日基準・キャンセル除く）を見出しに明記する。 */}
               <div className="sum-label">今月の成約</div>
               <div className="sum-val">
                 {thisMonthActive.length}
@@ -1077,7 +1077,7 @@ export default function OperatorDashboardPage() {
           ) : null}
           <p className="modal-warn">
             <Ic name="shield" />
-            提示した金額を大きく下回る減額は、査定現場でのユーザーの合意が必要です。
+            提示した金額を大きく下回る減額は、現物確認の場でのユーザーの合意が必要です。
           </p>
           <div className="modal-actions">
             <button type="button" className="btn-modal-cancel" onClick={() => setModalLotId(null)}>

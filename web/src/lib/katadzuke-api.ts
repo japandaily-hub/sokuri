@@ -2720,7 +2720,7 @@ export const CASE_STATUS_LABEL: Record<CaseStatus, string> = {
  */
 export const BID_STATUS_LABEL: Record<BidStatus, string> = {
   pending: "選定待ち",
-  selected: "落札",
+  selected: "成約",
   rejected: "未選定",
   withdrawn: "取り下げ済み",
 };

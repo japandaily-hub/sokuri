@@ -8,8 +8,8 @@
  * 誤検知になるため、行コメント・ブロックコメントの行は除いてから照合する。
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative, sep } from "node:path";
 import { describe, it } from "node:test";
 
 const APP_DIR = join(process.cwd(), "src", "app");
@@ -112,4 +112,85 @@ describe("必須の表記がある", () => {
     assert.ok(body.includes("/icon.png"));
     assert.equal(body.includes("/icon.svg"), false);
   });
+});
+
+/* ------------------------------------------------------------------------------------------
+ * 用語統一（QA L3）: 利用者に見える文言に「落札・商品・回収」を戻さない。
+ * 「落札」→「成約」、「商品」→「品物」、「回収」→「引き取り」。業者の画面では依頼者を「お客様」と呼ばない。
+ * ------------------------------------------------------------------------------------------ */
+
+const SRC_DIR = join(process.cwd(), "src");
+
+/** 走査対象。ディレクトリは配下の .ts/.tsx を再帰で集める（テストファイルは除く）。 */
+const TERMINOLOGY_TARGETS = [
+  "lib/katadzuke-api.ts",
+  "components/kdz/DisclosureNotice.tsx",
+  "app/operator",
+  "app/password-reset",
+  "app/signup",
+  "app/mypage",
+] as const;
+
+/** 業者向けの画面（依頼者を「お客様」と呼ばない対象）。 */
+const VENDOR_FACING_PREFIXES = ["app/operator/", "components/kdz/DisclosureNotice.tsx"] as const;
+
+const TERMINOLOGY_BANNED: ReadonlyArray<readonly [string, string]> = [
+  ["落札", "成約に統一（オークションの落札と取り違えられ、古物競りあっせん業の論点にも触れる）"],
+  ["商品", "品物に統一（利用者は売り手ではなく、品物を引き取ってもらう側）"],
+  ["回収", "引き取りに統一（廃棄物の収集運搬と取り違えられる）"],
+];
+
+/**
+ * 意図的な残し（ファイル（src からの相対パス）→ 許可する語と理由）。
+ * 追加するときは必ず理由を書き、法務・運営の確認が要るものは確認済みの旨を残す。
+ */
+const ALLOWED_LEFTOVERS: Readonly<Record<string, ReadonlyArray<readonly [string, string]>>> = {};
+
+function collectSourceFiles(relPath: string): string[] {
+  const abs = join(SRC_DIR, relPath);
+  if (statSync(abs).isFile()) return [relPath];
+  const out: string[] = [];
+  for (const entry of readdirSync(abs)) {
+    const child = join(relPath, entry);
+    const childAbs = join(SRC_DIR, child);
+    if (statSync(childAbs).isDirectory()) {
+      out.push(...collectSourceFiles(child));
+    } else if (/\.(ts|tsx)$/.test(entry) && !/\.test\./.test(entry)) {
+      out.push(child);
+    }
+  }
+  return out;
+}
+
+function sourceWithoutComments(relPath: string): string {
+  return readFileSync(join(SRC_DIR, relPath), "utf8")
+    .split(/\r?\n/)
+    .filter((line) => !/^\s*(\/\/|\*|\/\*|\{\/\*)/.test(line))
+    .join("\n");
+}
+
+describe("用語統一: 落札・商品・回収・（業者画面の）お客様を使わない", () => {
+  const files = TERMINOLOGY_TARGETS.flatMap(collectSourceFiles);
+
+  it("走査対象が空でない（パス変更で検査が空振りしない）", () => {
+    assert.ok(files.length > 20, `files=${files.length}`);
+    assert.ok(files.some((f) => f.split(sep).join("/") === "lib/katadzuke-api.ts"));
+    assert.ok(files.some((f) => f.split(sep).join("/").startsWith("app/operator/")));
+  });
+
+  for (const file of files) {
+    const key = relative(SRC_DIR, join(SRC_DIR, file)).split(sep).join("/");
+    const body = sourceWithoutComments(file);
+    const allowed = new Set((ALLOWED_LEFTOVERS[key] ?? []).map(([word]) => word));
+    const banned = [...TERMINOLOGY_BANNED];
+    if (VENDOR_FACING_PREFIXES.some((prefix) => key.startsWith(prefix))) {
+      banned.push(["お客様", "業者の画面では依頼者と呼ぶ（業者向け規約 TermsTabs は法務確認が要るためここでは対象外）"]);
+    }
+    for (const [word, reason] of banned) {
+      if (allowed.has(word)) continue;
+      it(`${key}: 「${word}」を含まない（${reason}）`, () => {
+        assert.equal(body.includes(word), false);
+      });
+    }
+  }
 });

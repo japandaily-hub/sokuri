@@ -457,7 +457,7 @@ export default function OperatorCaseDetailPage() {
             <div className="op-alert success" role="status">
               {/* r10 M5 是正: 業者アカウントに LINE 連携は無い（LINE通知は依頼者側の機能）。
                   実際の通知経路は登録メールアドレスのみ。 */}
-              入札を受け付けました。お客様が業者を選ぶまでお待ちください（結果は登録メールアドレスにお知らせします）。
+              入札を受け付けました。依頼者が業者を選ぶまでお待ちください（結果は登録メールアドレスにお知らせします）。
             </div>
           ) : null}
           {topBidAmount != null || bidderCount > 0 ? (
@@ -479,7 +479,7 @@ export default function OperatorCaseDetailPage() {
                       <>
                         <span className="status-chip negotiating">他社と同額で並んでいます</span>
                         <p style={{ fontSize: 12, color: "var(--body-soft)", marginTop: 6, lineHeight: 1.8 }}>
-                          同額の場合に優先される仕組みはなく、業者はお客様が選びます。上回りたい場合は金額を引き上げてください。
+                          同額の場合に優先される仕組みはなく、業者は依頼者が選びます。上回りたい場合は金額を引き上げてください。
                         </p>
                       </>
                     ) : isTopBidder === true ? (
@@ -599,7 +599,7 @@ export default function OperatorCaseDetailPage() {
               </div>
               <div className="field">
                 <label htmlFor="raiseMessage">
-                  メッセージ <span className="opt">任意・お客様に表示されます</span>
+                  メッセージ <span className="opt">任意・依頼者に表示されます</span>
                 </label>
                 <textarea
                   id="raiseMessage"
@@ -659,7 +659,7 @@ export default function OperatorCaseDetailPage() {
                 入札する
               </h2>
               <p style={{ fontSize: 13, color: "var(--body-soft)", marginBottom: 18, lineHeight: 1.8 }}>
-                買取額と回収費用を踏まえた「お客様への提示額」を入力してください。金額は成約が決まるまで何度でも引き上げられます（下げることはできません）。他社の入札額は匿名で表示されます（社名・コメントは非開示）。
+                買取額と引き取り費用を踏まえた「依頼者への提示額」を入力してください。金額は成約が決まるまで何度でも引き上げられます（下げることはできません）。他社の入札額は匿名で表示されます（社名・コメントは非開示）。
               </p>
               <div className="field">
                 <label htmlFor="bidAmount">
@@ -688,7 +688,7 @@ export default function OperatorCaseDetailPage() {
               </div>
               <div className="field">
                 <label htmlFor="bidMessage">
-                  メッセージ <span className="opt">任意・お客様に表示されます</span>
+                  メッセージ <span className="opt">任意・依頼者に表示されます</span>
                 </label>
                 <textarea
                   id="bidMessage"

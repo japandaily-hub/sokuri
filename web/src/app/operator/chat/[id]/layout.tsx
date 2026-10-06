@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 /** /operator/chat/[id] はクライアントコンポーネントのため、タブ名・説明はこのレイアウトで担保する。 */
 export const metadata: Metadata = {
   title: "取引チャット",
-  description: "成約したお客様とのやり取り。",
+  description: "成約した依頼者とのやり取り。",
   robots: { index: false, follow: false },
 };
 

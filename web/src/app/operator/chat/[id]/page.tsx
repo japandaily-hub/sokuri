@@ -524,7 +524,7 @@ export default function OperatorChatPage() {
           {sideLoading ? (
             <div style={{ padding: 14, fontSize: 12.5, color: "var(--body-soft)" }}>読み込み中…</div>
           ) : transactions.length === 0 ? (
-            <div style={{ padding: 14, fontSize: 12.5, color: "var(--body-soft)" }}>落札済みの案件はありません</div>
+            <div style={{ padding: 14, fontSize: 12.5, color: "var(--body-soft)" }}>成約済みの案件はありません</div>
           ) : (
             transactions.map((t) => (
               <button
@@ -567,7 +567,7 @@ export default function OperatorChatPage() {
               <div className="chat-peer-header">
                 <div className="peer-avatar">{peerInitial}</div>
                 <div className="peer-info">
-                  <div className="peer-name">お客様</div>
+                  <div className="peer-name">依頼者</div>
                   <div className="peer-sub">
                     {detail?.case?.prefecture} {detail?.case?.city}　{caseIdShort}
                   </div>
@@ -628,7 +628,7 @@ export default function OperatorChatPage() {
                   <div className="ch-empty">
                     まだメッセージはありません。
                     <br />
-                    まずは「引き取り日程を提案」からお客様に候補日を送りましょう。
+                    まずは「引き取り日程を提案」から依頼者に候補日を送りましょう。
                     {!isVisiting ? (
                       <button type="button" className="ch-empty-action" onClick={toggleScheduleCard}>
                         <CalendarIc />

@@ -888,15 +888,17 @@ export default function BusinessPage() {
                     入力は3ステップ（必須14項目）。送信後3営業日以内にご連絡します。審査の通過後に入札できるようになります。
                   </p>
                   {/* R4 r4 #23: 重い申込フォームだけが入口に見えていた。/operator/signup は招待コード
-                      なしでもアカウントを作成でき、案件の閲覧まで進める（入札は審査の通過後。
-                      lib/katadzuke-api.ts OPERATOR_CASE_VIEW_STATUSES の仕様）。役割差を1行添えて
-                      軽い入口を併置する。 */}
+                      なしでもアカウントを作成できるため、軽い入口を併置する。
+                      M-2（法務・表記レビュー）: 以前は「アカウントだけ作って案件を見る」と書いていたが、
+                      案件の閲覧は審査の通過後（vendor_status が active/limited）に限られ、作成直後の
+                      pending では 403 approval_required になる（lib/katadzuke-api.ts
+                      OPERATOR_CASE_VIEW_STATUSES・backend api/deps.py と対称）。閲覧できるとは書かない。 */}
                   {/* r5 #13: 退避路が説明の文中の小さなテキストリンクで、重さを感じた業者が
                       気付かなかった。説明の外・フォーム開始位置の直前に .btn-ghost で置く。 */}
                   <div className="biz-form-alt">
-                    <p>案件を先に見たい方は、アカウントだけ作ることもできます（入札は審査の通過後）。</p>
+                    <p>先にアカウントを作成することもできます。アカウント作成後、許可証の提出と審査を経て閲覧・入札できます。</p>
                     <Link href="/operator/signup" className="btn btn-ghost btn-swipe">
-                      まずアカウントだけ作って案件を見る
+                      先にアカウントを作成する
                     </Link>
                   </div>
                   <div className="biz-form-group">
@@ -1129,13 +1131,14 @@ export default function BusinessPage() {
                     </p>
                     <p className="biz-bank-note">※ お申し込み内容の確認と、精算に関する連絡（返金が生じた場合の振込先を含む）にのみ使用します。</p>
                     {/* r5 #27: 口座5項目は API 契約（submitOperatorApplication の bank_account）が
-                        必須のため任意化できない。代わりに、口座を出さずに案件を見る道を
+                        必須のため任意化できない。代わりに、口座を出さずにアカウントを作る道を
                         このブロックと同じ視野に置く（#13 の退避路と同じ行き先）。
-                        「審査通過後に登録できます」は現在の実装で確認できないため書かない。 */}
+                        「審査通過後に登録できます」は現在の実装で確認できないため書かない。
+                        M-2: 案件の閲覧も審査の通過後のため「案件を見る」とは書かない。 */}
                     <p className="biz-bank-alt">
                       口座の登録が難しい場合は、
-                      <Link href="/operator/signup">アカウントだけ作って案件を見る</Link>
-                      こともできます（入札は審査の通過後）。
+                      <Link href="/operator/signup">先にアカウントを作成する</Link>
+                      こともできます（アカウント作成後、許可証の提出と審査を経て閲覧・入札できます）。
                     </p>
 
                     <div className="field-row">

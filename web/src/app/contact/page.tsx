@@ -324,38 +324,27 @@ function ContactPageContent() {
                   </div>
                 )}
 
+                {/* M-3: 送信していないフリガナ・電話番号の入力欄は削除した。POST /contact が受け取るのは
+                    お名前・メールアドレス・種別・内容だけ（submitContactMessage）で、/privacy 第2条の
+                    「お問い合わせ情報」もこの4項目だけを書いている。欄を足すときは送信と両方を直すこと。 */}
                 <form onSubmit={onSubmit} noValidate>
-                  <div className="field-row">
-                    <div className="field">
-                      <label htmlFor="name">
-                        お名前<span className="req">必須</span>
-                      </label>
-                      {/* ラウンド4 指摘（Med）: 和文のプレースホルダは同じ色（4 欄とも
-                          --body-soft の1値）でも欧文より濃く見え、「すでに入力済みの値」と
-                          誤読される。入力値ではないことが文字で分かるよう「例）」を前置する。 */}
-                      <input
-                        type="text"
-                        id="name"
-                        name="name"
-                        placeholder="例）山田 花子"
-                        autoComplete="name"
-                        className={errors.name ? "has-error" : undefined}
-                        onInput={() => clearError("name")}
-                      />
-                      {errors.name ? <p className="field-error">{errors.name}</p> : null}
-                    </div>
-                    <div className="field">
-                      <label htmlFor="kana">
-                        フリガナ<span className="opt">任意</span>
-                      </label>
-                      <input
-                        type="text"
-                        id="kana"
-                        name="kana"
-                        placeholder="例）ヤマダ ハナコ"
-                        autoComplete="off"
-                      />
-                    </div>
+                  <div className="field">
+                    <label htmlFor="name">
+                      お名前<span className="req">必須</span>
+                    </label>
+                    {/* ラウンド4 指摘（Med）: 和文のプレースホルダは同じ色（4 欄とも
+                        --body-soft の1値）でも欧文より濃く見え、「すでに入力済みの値」と
+                        誤読される。入力値ではないことが文字で分かるよう「例）」を前置する。 */}
+                    <input
+                      type="text"
+                      id="name"
+                      name="name"
+                      placeholder="例）山田 花子"
+                      autoComplete="name"
+                      className={errors.name ? "has-error" : undefined}
+                      onInput={() => clearError("name")}
+                    />
+                    {errors.name ? <p className="field-error">{errors.name}</p> : null}
                   </div>
 
                   <div className="field">
@@ -373,27 +362,6 @@ function ContactPageContent() {
                       onInput={() => clearError("email")}
                     />
                     {errors.email ? <p className="field-error">{errors.email}</p> : null}
-                  </div>
-
-                  <div className="field">
-                    <label htmlFor="phone">
-                      電話番号<span className="opt">任意</span>
-                    </label>
-                    <input
-                      type="tel"
-                      id="phone"
-                      name="phone"
-                      placeholder="例）090-0000-0000"
-                      aria-describedby="phone-hint"
-                      autoComplete="tel"
-                    />
-                    {/* R6 指摘 15: 「任意」バッジだけでは、営業電話を警戒する読者に
-                        「なぜ電話番号を聞くのか」が読めず入力をためらわせていた。
-                        返信の経路（メール）と、電話を使う場合を1行で言い切る。
-                        フォームの返信はメール原則（/legal の運営者情報・上の .form-owner と同旨）。 */}
-                    <div className="field-hint" id="phone-hint">
-                      ご返信はメールでお送りします。電話番号は、内容の確認が必要な場合に運営からご連絡するときだけ使用します。
-                    </div>
                   </div>
 
                   <div className="field">

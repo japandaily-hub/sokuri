@@ -73,7 +73,7 @@ const CATEGORIES: { id: string; name: string; icon: IcName }[] = [
 type ToggleKey = "showMessage" | "acceptUnsellable";
 const TOGGLES: { key: ToggleKey; title: string; desc: string }[] = [
   { key: "showMessage", title: "業者メッセージを公開する", desc: "自己紹介メッセージをプロフィール上部に表示します。" },
-  { key: "acceptUnsellable", title: "値のつかない物もまとめて引き取る", desc: "「まとめて回収可」のバッジが付与され、一括出品の案件で選ばれやすくなります。" },
+  { key: "acceptUnsellable", title: "値のつかない物もまとめて引き取る", desc: "「まとめて引き取り可」のバッジが付与され、一括出品の案件で選ばれやすくなります。" },
 ];
 
 /* ---- 編集可能項目のみのフォーム状態（審査確定項目は含めない） ---- */
@@ -446,7 +446,7 @@ export default function OperatorProfilePage() {
                       onChange={(e) => patch("message", e.target.value)}
                       placeholder="得意分野や引き取りの方針、ユーザーへの一言などを記入してください。"
                     />
-                    <p className="field-hint">プロフィール上部に表示されます。査定金額の根拠を丁寧に説明する姿勢などを書くと選ばれやすくなります。</p>
+                    <p className="field-hint">プロフィール上部に表示されます。入札金額の根拠を丁寧に説明する姿勢などを書くと選ばれやすくなります。</p>
                   </div>
                 </div>
               </div>
