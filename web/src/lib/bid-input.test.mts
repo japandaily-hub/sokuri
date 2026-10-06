@@ -30,3 +30,11 @@ test("同額は tied、上回られは behind、単独首位は top", () => {
   assert.equal(classifyBidPosition(50000, 50000, [40000]), "top");
   assert.equal(classifyBidPosition(50000, null, []), null);
 });
+
+test("一覧の首位文言: 2社以上の首位は同額の可能性を添える", async () => {
+  const { topBidderLabel } = await import("./bid-input.ts");
+  assert.equal(topBidderLabel(true, 1), "自社が最高額");
+  assert.equal(topBidderLabel(true, 2), "自社が最高額（同額の可能性あり）");
+  assert.equal(topBidderLabel(false, 3), "他社が上回り中");
+  assert.equal(topBidderLabel(undefined, 3), null);
+});

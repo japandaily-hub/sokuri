@@ -22,7 +22,13 @@ export function isBidMessageWithinLimit(value: string): boolean {
  */
 export function formatBidAmountWithUnit(amount: number): string {
   const grouped = `¥${amount.toLocaleString("ja-JP")}`;
-  if (!Number.isFinite(amount) || amount < 10_000) return grouped;
+  const reading = formatYenReading(amount);
+  return reading ? `${grouped}（${reading}）` : grouped;
+}
+
+/** 1万円以上の金額の万・億単位の読み（例: 123000 → "12万3,000円"）。1万円未満・不正値は空文字。 */
+export function formatYenReading(amount: number): string {
+  if (!Number.isFinite(amount) || amount < 10_000) return "";
   const oku = Math.floor(amount / 100_000_000);
   const man = Math.floor((amount % 100_000_000) / 10_000);
   const rest = amount % 10_000;
@@ -30,7 +36,7 @@ export function formatBidAmountWithUnit(amount: number): string {
   if (oku > 0) reading += `${oku}億`;
   if (man > 0) reading += `${man}万`;
   if (rest > 0) reading += rest.toLocaleString("ja-JP");
-  return `${grouped}（${reading}円）`;
+  return `${reading}円`;
 }
 
 /**
@@ -52,4 +58,15 @@ export function classifyBidPosition(
   if (myAmount < topAmount) return "behind";
   if (otherAmounts.some((a) => a === myAmount)) return "tied";
   return "top";
+}
+
+/**
+ * 案件一覧のカード用に、自社の首位状況を短い文言にする。
+ * 一覧には他社の個別金額が無く、同額で並んでいるかを断定できない。2社以上が入札していて
+ * 自社が首位のときは「同額の可能性あり」と添え、「勝っている」と読み違えないようにする（V-03）。
+ */
+export function topBidderLabel(isTopBidder: boolean | null | undefined, bidCount: number): string | null {
+  if (isTopBidder == null) return null;
+  if (!isTopBidder) return "他社が上回り中";
+  return bidCount >= 2 ? "自社が最高額（同額の可能性あり）" : "自社が最高額";
 }

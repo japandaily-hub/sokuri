@@ -49,6 +49,7 @@ import {
   type TransactionListItem,
 } from "@/lib/katadzuke-api";
 import { caseItemsLabel, formatPurposeLabel } from "@/lib/case-labels";
+import { formatYenReading, topBidderLabel } from "@/lib/bid-input";
 
 /** 入札額の許容範囲・刻み（バックエンド le=100_000_000 と一致させる）。 */
 const BID_MIN = 1000;
@@ -212,7 +213,7 @@ function LotCard({
   // 承認前の業者は案件写真が403になりうる（決定1）。壊れた画像アイコンを出さず空表示にする。
   const [photoErr, setPhotoErr] = useState(false);
 
-  const statusTag = lot.status === "won" ? <span className="lot-tag green">落札</span> : null;
+  const statusTag = lot.status === "won" ? <span className="lot-tag green">成約</span> : null;
 
   return (
     <div className={`lot-card${lot.status === "won" ? " winning" : ""}`}>
@@ -270,7 +271,7 @@ function LotCard({
             <div className="lot-meta" style={{ marginTop: 4 }}>
               <span className={`status-chip ${lot.isTopBidder ? "live" : "negotiating"}`}>
                 最高額 ¥{yen(lot.topBidAmount)}
-                {lot.myBid ? (lot.isTopBidder ? "・自社が最高額" : "・他社が上回り中") : ""}
+                {lot.myBid && topBidderLabel(lot.isTopBidder, lot.bidCount) ? `・${topBidderLabel(lot.isTopBidder, lot.bidCount)}` : ""}
               </span>
             </div>
           ) : lot.topBidAmount === null && lot.bidCount === 0 ? (
@@ -382,7 +383,7 @@ function LotCompactRow({ lot, changed }: { lot: Lot; changed: boolean }) {
             </span>
           ) : null}
           <span className="lot-compact-items">{lot.itemsLabel}</span>
-          {lot.status === "won" ? <span className="lot-tag green">落札</span> : null}
+          {lot.status === "won" ? <span className="lot-tag green">成約</span> : null}
         </div>
         <div className="lot-compact-meta">
           <span>
@@ -406,7 +407,7 @@ function LotCompactRow({ lot, changed }: { lot: Lot; changed: boolean }) {
         {lot.myBid ? (
           <span className="lot-compact-mybid">
             自社 <strong>¥{yen(lot.myBid)}</strong>
-            {lot.isTopBidder != null ? (lot.isTopBidder ? "・自社が最高額" : "・他社が上回り中") : ""}
+            {topBidderLabel(lot.isTopBidder, lot.bidCount) ? `・${topBidderLabel(lot.isTopBidder, lot.bidCount)}` : ""}
           </span>
         ) : null}
       </div>
@@ -827,7 +828,7 @@ export default function OperatorDashboardPage() {
                 <span>件</span>
               </div>
               <div className="sum-sub">
-                落札日基準・キャンセル除く・うち完了{thisMonthDoneCount}件・成約額 ¥{yen(thisMonthAmount)}（完了分のみ）
+                成約日基準・キャンセル除く・うち完了{thisMonthDoneCount}件・成約額は完了後に確定（現時点 ¥{yen(thisMonthAmount)}）
               </div>
             </div>
             <div className="sum-card">
@@ -1068,6 +1069,11 @@ export default function OperatorDashboardPage() {
             ¥{modalAmount ? yen(modalAmount) : "—"}
             <span>円</span>
           </div>
+          {modalAmount && formatYenReading(modalAmount) ? (
+            <p className="modal-sub" data-testid="bid-modal-reading">
+              （{formatYenReading(modalAmount)}）
+            </p>
+          ) : null}
           <p className="modal-warn">
             <Ic name="shield" />
             提示した金額を大きく下回る減額は、査定現場でのユーザーの合意が必要です。
