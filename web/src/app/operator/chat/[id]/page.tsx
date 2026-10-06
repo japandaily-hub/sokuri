@@ -28,6 +28,9 @@ import { useToken } from "@/components/kdz/Ui";
 import { ChatSystemNotice } from "@/components/kdz/ChatSystemNotice";
 import { stripControlChars } from "@/lib/categories";
 import { isSystemNotice } from "@/lib/chat-system-notice";
+import { formatJstDateSeparator, formatJstDateTime, formatJstTime } from "@/lib/datetime";
+import { isImeComposingKey, messageLengthState } from "@/lib/message-length";
+import { MessageLengthCounter } from "@/components/kdz/MessageLengthCounter";
 import {
   CANCELLED_BY_LABEL,
   TXN_STATUS_LABEL,
@@ -80,16 +83,9 @@ function CalendarIc({ className }: { className?: string }) {
 
 const POLL_INTERVAL_MS = 5000;
 
-function formatTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
-}
-function formatDateSep(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("ja-JP", { month: "long", day: "numeric", weekday: "short" });
-}
+// 時刻・日付区切りは lib/datetime.ts（時差情報のない API 日時は UTC として解釈し、日本時間で表示。V-02）。
+const formatTime = formatJstTime;
+const formatDateSep = formatJstDateSeparator;
 function yen(n: number): string {
   return `¥${n.toLocaleString()}`;
 }
@@ -318,6 +314,8 @@ export default function OperatorChatPage() {
   async function handleSend() {
     const text = draft.trim();
     if (!text || !token || !transactionId || sending) return;
+    // 上限超過は送信前に止める（理由は入力欄の下のカウンタに出ている。V-05）。
+    if (messageLengthState(text).over) return;
     setSending(true);
     try {
       const sent = await sendMessage(transactionId, text, token);
@@ -466,6 +464,8 @@ export default function OperatorChatPage() {
     );
   }
 
+  // 入力中の本文の文字数状態（上限超過なら送信ボタンを無効化し、カウンタに理由を出す）。
+  const draftLength = messageLengthState(draft);
   const peerInitial = "客";
   const caseIdShort = detail?.case_id ? detail.case_id.slice(0, 8).toUpperCase() : "";
   const statusLabel = detail ? TXN_STATUS_LABEL[detail.status] : "";
@@ -604,7 +604,7 @@ export default function OperatorChatPage() {
                   role="status"
                 >
                   キャンセル: {CANCELLED_BY_LABEL[detail.cancellation.cancelled_by]}による（
-                  {new Date(detail.cancellation.cancelled_at).toLocaleString("ja-JP")}）
+                  {formatJstDateTime(detail.cancellation.cancelled_at)}）
                   <br />
                   {detail.cancellation.reason ? `理由: ${detail.cancellation.reason}` : "理由の記載なし"}
                 </div>
@@ -623,6 +623,12 @@ export default function OperatorChatPage() {
                     まだメッセージはありません。
                     <br />
                     まずは「引き取り日程を提案」からお客様に候補日を送りましょう。
+                    {!isVisiting ? (
+                      <button type="button" className="ch-empty-action" onClick={toggleScheduleCard}>
+                        <CalendarIc />
+                        引き取り日程を提案
+                      </button>
+                    ) : null}
                   </div>
                 ) : null}
                 {messages.map((m, i) => {
@@ -816,12 +822,11 @@ export default function OperatorChatPage() {
                     <button
                       type="button"
                       className="tool-btn"
-                      title="日程を提案"
-                      aria-label="日程を提案"
                       onClick={toggleScheduleCard}
                       disabled={isVisiting}
                     >
                       <CalendarIc />
+                      <span className="tool-btn-label">引き取り日程を提案</span>
                     </button>
                   </div>
                   <input
@@ -831,12 +836,15 @@ export default function OperatorChatPage() {
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
+                      // 日本語入力の変換確定の Enter では送信しない（seller H-1）。Enter 送信自体は維持。
+                      if (e.key === "Enter" && !e.shiftKey && !isImeComposingKey(e)) {
                         e.preventDefault();
                         void handleSend();
                       }
                     }}
                     aria-label="メッセージを入力"
+                    aria-describedby={`chat-length-${transactionId}`}
+                    aria-invalid={draftLength.over || undefined}
                     disabled={sending}
                   />
                   <button
@@ -844,7 +852,7 @@ export default function OperatorChatPage() {
                     className={`btn-send${sending ? " is-sending" : ""}`}
                     aria-label={sending ? "送信中…" : "送信"}
                     aria-busy={sending}
-                    disabled={!draft.trim() || sending}
+                    disabled={!draft.trim() || sending || draftLength.over}
                     onClick={() => void handleSend()}
                   >
                     <svg viewBox="0 0 24 24" aria-hidden="true" className={sending ? "spinning" : undefined}>
@@ -852,6 +860,7 @@ export default function OperatorChatPage() {
                       <path d="M22 2L15 22l-4-9-9-4 20-7z" />
                     </svg>
                   </button>
+                  <MessageLengthCounter id={`chat-length-${transactionId}`} text={draft} />
                 </div>
               )}
             </>
