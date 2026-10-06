@@ -719,6 +719,27 @@ export default function OperatorProfilePage() {
               </div>
             </section>
 
+            {/* V-10: 通知の届き先と、申込時に預かった口座情報の扱い（画面からの確認・変更手段が無いため、問い合わせ導線を明示する） */}
+            <section className="prof-card flush">
+              <div className="prof-card-body">
+                <div className="fee-note">
+                  <span className="fee-note-ic">
+                    <Ic name="chat" />
+                  </span>
+                  <div>
+                    <h4>通知とお預かりしている情報</h4>
+                    <p>
+                      入札結果・取引のお知らせは、ご登録のメールアドレスにお送りします（通知先の変更は
+                      <Link href="/contact">お問い合わせ</Link>
+                      から承ります）。お申し込み時に振込先口座をご登録いただいた場合、その確認・変更・削除も
+                      <Link href="/contact">お問い合わせ</Link>
+                      から承ります。
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </section>
+
             {/* 手数料の案内 */}
             <section className="prof-card flush">
               <div className="prof-card-body">

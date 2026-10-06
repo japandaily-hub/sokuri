@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * 業者: 落札管理（/operator/transactions/[id]）。
+ * 業者: 取引管理（/operator/transactions/[id]）。
  *
  * デザインレビュー対応:
  *  - B-1: 旧 Tailwind/slate 実装を廃し、katazuke トークン・部品
@@ -167,7 +167,18 @@ export default function OperatorTransactionPage() {
       <div className="case-detail-page">
         <OperatorHeader active="transactions" />
         <div className="op-wrap narrow">
-          <div className="op-alert error">{error ?? "取引情報が見つかりません。"}</div>
+          <div className="op-alert error" role="alert">{error ?? "取引情報が見つかりません。"}</div>
+          {/* V-07: 他社の取引・権限のない取引を開いた場合も、操作部品は出さず戻る導線だけを示す。 */}
+          <p style={{ fontSize: 13.5, color: "var(--body-soft)", lineHeight: 1.8, marginTop: 12 }}>
+            お探しの取引が開けませんでした。ご自身の取引は、取引一覧から開いてください。
+          </p>
+          <Link
+            href="/operator/transactions"
+            className="btn btn-primary"
+            style={{ marginTop: 8, display: "inline-flex" }}
+          >
+            取引一覧へ戻る
+          </Link>
         </div>
       </div>
     );

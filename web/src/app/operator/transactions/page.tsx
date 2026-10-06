@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * 業者: 落札案件の一覧（落札管理の入口）（/operator/transactions）。
+ * 業者: 成約案件の一覧（取引管理の入口）（/operator/transactions）。
  *
  * デザインレビュー B-1 対応: 旧 Tailwind/slate 実装（PageShell/Card/StatusBadge）を廃し、
  * katazuke トークンへ統一。OperatorHeader を追加しナビ不能だった問題も解消。
