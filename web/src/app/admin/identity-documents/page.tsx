@@ -34,7 +34,7 @@ import {
   toDisplayMessage,
   KdzApiError,
   IDENTITY_STATUS_LABEL,
-  IDENTITY_DOC_TYPES,
+  IDENTITY_DOC_LABELS,
   type AdminIdentityDocument,
   type AdminIdentityDocumentListResponse,
   type AdminIdentityStatusFilter,
@@ -52,7 +52,7 @@ const STATUS_OPTIONS: { value: AdminIdentityStatusFilter; label: string }[] = [
 const IMAGE_GONE_MESSAGE = "画像は削除されています（退会済み）";
 
 function docTypeLabel(id: string): string {
-  return IDENTITY_DOC_TYPES.find((d) => d.id === id)?.label ?? id;
+  return IDENTITY_DOC_LABELS[id as keyof typeof IDENTITY_DOC_LABELS] ?? id;
 }
 
 export default function AdminIdentityDocumentsPage() {

@@ -1290,7 +1290,8 @@ export const IDENTITY_STATUS_LABEL: Record<IdentityStatus, string> = {
   rejected: "却下",
 };
 
-/** 提出フォームの書類種別 select 選択肢（裏面要否・注記を含む）。この配列が唯一の情報源。 */
+/** 提出フォームの書類種別 select 選択肢（裏面要否・注記を含む）。この配列が唯一の情報源。
+ *  健康保険証は新規提出を受け付けない（健康保険法 第194条の2。backend も 422 で拒否する）。 */
 export const IDENTITY_DOC_TYPES: {
   id: IdentityDocType;
   label: string;
@@ -1306,13 +1307,16 @@ export const IDENTITY_DOC_TYPES: {
   },
   { id: "passport", label: "パスポート", backRequired: false },
   { id: "residence_card", label: "在留カード", backRequired: true },
-  {
-    id: "health_insurance_card",
-    label: "健康保険証",
-    backRequired: true,
-    note: "健康保険証は、保険者番号・記号・番号を黒塗りしてから提出してください（隠す前の画像は不要です）。住所記載がない場合、承認できないことがあります。",
-  },
 ];
+
+/** 提出済みの記録の表示用ラベル（健康保険証は新規提出を受け付けないが、過去の記録は残るため表示で使う）。 */
+export const IDENTITY_DOC_LABELS: Record<IdentityDocType, string> = {
+  drivers_license: "運転免許証",
+  my_number_card: "マイナンバーカード",
+  passport: "パスポート",
+  residence_card: "在留カード",
+  health_insurance_card: "健康保険証（新規の提出は受け付けていません）",
+};
 
 export interface IdentityOut {
   status: IdentityStatus;
