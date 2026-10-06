@@ -3,6 +3,22 @@
 更新: 2026-10-02（Claude・パスワード照合の回数制限を同時送信で超えられる問題 M-3 の修正＝ブランチ claude/sleepy-nash-0dc3ec・**未 push**（IPv6 3段化 7bbce51 の上）。直前: IPv6 のレート制限を /64・/56・/48 の3段で数える修正＝1d14e6f）
 
 ## 現在フェーズ
+- **2026-10-06 ペルソナ壁打ち PDCA の修正を統合（Claude・ブランチ pdca/integ・未 push）**: ペルソナ壁打ち監査の修正と QA レビュー指摘（M1〜M3・L1〜L7）への対応を 1 本に統合。
+  - **バックエンド**:
+    - マイグレーション 0047（`password_reset_tokens`）とパスワード再設定（依頼者・業者）の導入。**2 段反映**: マイグレーションだけを先に push（`dffccf5` 相当）→ `/readyz` で head 一致を確認 → backend → web の順（列・表を読むコードより先に表を作る。start.sh は alembic 失敗でも起動し /health はスキーマを見ないため）。
+    - 運営（admin）によるチャットの代理送信は backend が 403 で拒否（最終防衛）。web は `ChatPanel` の `readOnly`／`disabledReason` と業者チャットで入力欄を出さない。
+    - API の日時を `Z` つき（UTC 明示）で返す変更。
+    - メール通知: `dispatch_message_received` に email を追加（opt-in・同一取引は 5 分に 1 通）。
+    - 口座の全桁表示（運営）は運営アラートを送る。
+    - `GET /admin/activity`（一部の操作のみ記録。網羅的な監査ログではない）。
+  - **web**:
+    - `top-classic` を `/` へ転送。
+    - 日時・文字数の共通部品: `lib/datetime.ts`（JST 整形・`jstYearMonthKey`）を唯一の実装にし、`lib/admin-datetime.ts` は空値「—」だけを足す薄いラッパー。文字数は `lib/char-count.ts`（`countChars`・`MESSAGE_MAX_CHARS`=2000）に統合。端末の時刻帯に依る `toLocale*String` は撤去（運営の「今月」は JST の月境界）。
+    - 運営の代理閲覧の帯（`/operator`・`/create` を含む。MutationObserver による DOM 属性の後付けは廃止）。スマホの運営一覧のカード表示。
+    - チャットの差分取得: `lib/chat-cursor.ts`（`after`＝カーソル−5 秒・id 重複排除・カーソルは取得分の最大 `created_at` のみで進める）。パスワード再設定の確定画面は token を ref に保持（Strict Mode 対策）し、日本語でない・404/5xx の detail は既定文言に落とす（`lib/password-reset.ts`）。
+    - 用語統一（落札→成約・業者画面の「お客様」→依頼者・回収→引き取り）と表記ガード（`public-copy-guard.test.mts`）の拡張。
+    - `tsconfig.json` に `allowImportingTsExtensions` を追加（`node --test` で読む純関数の lib が `./x.ts` と相互参照するため。noEmit のみ）。
+  - **残課題**: ①03-chat-unread の競合の恒久策＝`(created_at, id)` の複合カーソル（現状は 5 秒の重なり窓＋id 重複排除で緩和） ②監査ログテーブル（`/admin/activity` は一部の操作のみ） ③運営判断: V-04 手数料の表示、C-1 古物競りあっせん（入札の最高額・順位表示の届出要否は弁護士確認）、業者規約第 4 条の版数（`CURRENT_OPERATOR_TERMS_VERSION`）。④未着手の用語: `PhotoGuide.tsx`（商品・査定）と `case_items.py` のエラー文言（商品）、`TermsTabs.tsx` の「査定」「落札」（業者向け規約は法務確認）、backend の通知文の「お客様」（本人宛て）。
 - **2026-10-02 認証もレート制限も無い旧査定 API の撤去（Claude・8e0b4ab＋修正・ローカルコミットのみ・未 push）**: POST /estimate・GET /assessments/{id}・POST /assessments/{id}/defects（旧 AssetWise）を削除。根拠: web の呼び出し元なし（lib/api.ts は未 import）・Render ログ 7 日（09-20〜09-27）で 0 件（陽性対照 /admin/jobs 毎日 8〜9 件）・所有者列が無く認証だけでは他人の行に書ける。ユーザー決定は「撤去」「/analyze は残す」。web の lib/api.ts も削除。DB テーブル（items・assessments・recommendations・defect_evidences）・モデル・services/routing・affiliate・seed は**残置**（DROP は別途マイグレーションの段階反映で判断。その前に本番 3 表の件数・created_at 範囲・defect_evidences.description の最大長を読み取り専用で確認＝ログ保持 7 日より前の悪用の痕跡）。再発防止: backend/tests/test_write_routes_protected.py＝全書き込みルートに必須認証か「IP 軸で全件数える RateLimitGuard」を要求（例外は理由付き許可リスト: operator-applications・login 2 本）。変更前コードで /estimate・/defects を検出して落ちること、contact のガードを外すと落ちることを確認。**検証**: 全件 pytest 1462 passed、tsc（src・e2e）・eslint 0・node --test 155。security／QA レビュー Critical/High 0（M-1 スコープを見る判定・M-2 許可リスト理由・L-1 claims 除外・L-2 mount 検査・dependencies 陽性対照を反映）。**未対応・要判断**: 本番 /docs・/openapi.json の非公開化（L-5）／GET・/admin 配下への検査拡張（L-3/L-4）／/analyze の撤去（web 呼び出し元なし・Gemini 枠を使う）／operator-applications の XFF 偽装は cb98349 の合流待ち。**push 後の確認**: /health commit・本番 POST /api/v1/estimate が 404・/openapi.json に /estimate・/assessments が無い。別セッション（login 同時送信バイパス）とは rate_limit 系ファイルを編集しない・RateLimitGuard('login') を残す点を確認済み。
 - **2026-09-27〜10-02 パスワード照合の回数制限を同時送信で超えられる問題（セキュリティレビュー M-3・既存）を塞ぐ（Claude・ブランチ claude/sleepy-nash-0dc3ec の 41cb166＋レビュー反映＝7bbce51〔IPv6 3段〕の直後・未 push＝本番未反映）**: user_login／operator_login は「ガードが IP 軸を peek → `check_account`（peek）→ await で DB 照会 → 照合 → `record_failure`」の順で、peek と記録の間の await の間に同時送信（single-packet attack 等）がそろって peek を通り、1 つの窓でアカウント軸（5）・IP 軸（20。IPv6 は各段）の上限を超えて照合できた。
   - **修正**:
