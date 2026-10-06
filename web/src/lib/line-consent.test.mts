@@ -147,6 +147,11 @@ describe("配線: 同意をサーバーへ送る", () => {
   it("signup: メール登録は agreed_terms: true と版数を送る", () => {
     assert.match(signup, /agreed_terms: true,\s*terms_version: USER_TERMS_VERSION/);
   });
+  it("signup: 登録済みメールはパスワード再設定へ案内し、問い合わせへは誘導しない・文を重ねない", () => {
+    assert.match(signup, /<Link href="\/password-reset"/);
+    assert.doesNotMatch(signup, /忘れた場合は<Link href="\/contact"/);
+    assert.match(signup, /errs\.email && !emailTaken &&/);
+  });
   it("login: reason=terms_required の案内を出す", () => {
     assert.match(login, /params\.get\("reason"\) === LINE_TERMS_REQUIRED_REASON/);
     assert.match(login, /\{LINE_TERMS_REQUIRED_MESSAGE\}/);

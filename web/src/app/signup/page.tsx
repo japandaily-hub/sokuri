@@ -201,11 +201,14 @@ export default function SignupPage() {
                 <div className={`field${errs.email ? " has-error" : ""}`}>
                   <label htmlFor="inp-email">メールアドレス<span className="req">必須</span></label>
                   <input type="email" id="inp-email" value={email} onChange={(e) => { setEmail(e.target.value); if (emailTaken) { setEmailTaken(false); setErr("email", null); } }} placeholder="example@email.com" autoComplete="email" inputMode="email" aria-invalid={Boolean(errs.email)} />
-                  {errs.email && <div className="field-error" role="alert">{errs.email}</div>}
+                  {/* N-2（3周目監査・中）: 登録済みのときは「既に登録されています」を1行だけ出し（従来は
+                      errs.email と下の案内で同じ趣旨が2行重なっていた）、問い合わせではなく実装済みの
+                      パスワード再設定（/password-reset。依頼者向け）へ案内する。 */}
+                  {errs.email && !emailTaken && <div className="field-error" role="alert">{errs.email}</div>}
                   {emailTaken && (
-                    <div className="field-error">
-                      すでに登録済みです。<Link href="/login" style={{ textDecoration: "underline", fontWeight: 600 }}>ログインはこちら</Link>
-                      （パスワードを忘れた場合は<Link href="/contact" style={{ textDecoration: "underline" }}>お問い合わせ</Link>ください）
+                    <div className="field-error" role="alert">
+                      このメールアドレスは既に登録されています。<Link href="/login" style={{ textDecoration: "underline", fontWeight: 600 }}>ログインはこちら</Link>
+                      （パスワードを忘れた場合は<Link href="/password-reset" style={{ textDecoration: "underline" }}>パスワードの再設定</Link>へ）
                     </div>
                   )}
                 </div>
