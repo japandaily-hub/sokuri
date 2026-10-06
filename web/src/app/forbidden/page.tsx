@@ -17,6 +17,10 @@ import { ForbiddenContent } from "./ForbiddenContent";
  */
 export const metadata = {
   title: "アクセス権限がありません",
+  description: "このページを表示する権限がありません。",
+  // L-1: 権限不足の案内は検索に載せない（HTTP ステータスは 200 のまま。403 を返すには
+  // middleware 側の変更が要るため、ここでは noindex で検索結果への掲載だけを止める）。
+  robots: { index: false, follow: false },
 };
 
 export default function Forbidden() {

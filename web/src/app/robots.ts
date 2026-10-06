@@ -6,8 +6,8 @@ import type { MetadataRoute } from "next";
  *
  * - 中間ページ (/analyzing, /condition, /result) は sessionStorage 依存のため
  *   直接アクセス時に意味あるコンテンツが無い → クロール禁止。
- * - /top-classic は 2026-09-18 本採用で退避した旧トップ。重複コンテンツ回避のため
- *   ページ側 metadata.robots（noindex）に加えてここでも明示的にクロール禁止にする。
+ * - /top-classic（旧トップ）は 2026-10-06 から "/" へ転送する（M-13）。転送を検索エンジンが
+ *   読めるよう、クロール禁止の対象から外した。
  */
 const SITE_URL = "https://sokuri.vercel.app";
 
@@ -17,7 +17,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/analyzing", "/condition", "/result", "/top-classic"],
+        disallow: ["/analyzing", "/condition", "/result"],
       },
     ],
     sitemap: `${SITE_URL}/sitemap.xml`,
