@@ -955,6 +955,7 @@ export default function UserCaseDetailPage() {
                   variant="embedded"
                   className="mt-3"
                   onDetailChange={setTxn}
+                  readOnly={isAdminViewing}
                 />
               ) : null}
             </div>

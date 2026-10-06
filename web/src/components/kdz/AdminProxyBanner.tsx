@@ -1,22 +1,16 @@
 "use client";
 
-import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { shouldDisableChatInput, shouldShowProxyBanner } from "@/lib/admin-proxy";
 
-/** チャット入力欄（ChatPanel の .input-area）。ChatPanel 本体は別担当の所有のため、DOM 側から無効化する。 */
-const CHAT_INPUT_SELECTOR = ".chat-main .input-area";
-const DISABLED_TITLE = "運営は代理で送信できません";
-
 /**
  * 運営（role=admin）が依頼者・業者向け画面を開いているときに、画面上部へ出す「代理閲覧中」の帯。
  * 共通レイアウト（app/layout.tsx）に 1 行で差し込む。運営以外・/admin 配下・公開ページでは何も描かない。
  *
- * チャット系画面では、運営の送信が依頼者名義として保存されてしまう（backend 側は別途是正予定）ため、
- * 送信欄を無効化（inert）して「運営は代理で送信できません」と示す。ChatPanel は非改変のまま、
- * MutationObserver で描画後の入力欄に属性を付ける（admin 以外ではこの処理自体を走らせない）。
+ * チャット系画面では、運営の送信欄を使えなくする処理は ChatPanel／業者チャットの `readOnly`（呼び出し側が
+ * 運営ロールを判定して渡す）が担う。ここは帯の文言だけを出す（DOM 属性の後付けはしない。backend の 403 は最終防衛）。
  */
 export function AdminProxyBanner() {
   const pathname = usePathname();
@@ -24,29 +18,6 @@ export function AdminProxyBanner() {
   const role = session?.role;
   const visible = shouldShowProxyBanner(pathname, role);
   const disableChat = shouldDisableChatInput(pathname, role);
-
-  useEffect(() => {
-    if (!disableChat) return;
-    const lock = () => {
-      document.querySelectorAll<HTMLElement>(CHAT_INPUT_SELECTOR).forEach((el) => {
-        if (el.hasAttribute("inert")) return;
-        el.setAttribute("inert", "");
-        el.setAttribute("title", DISABLED_TITLE);
-        el.style.opacity = "0.45";
-      });
-    };
-    lock();
-    const observer = new MutationObserver(lock);
-    observer.observe(document.body, { childList: true, subtree: true });
-    return () => {
-      observer.disconnect();
-      document.querySelectorAll<HTMLElement>(CHAT_INPUT_SELECTOR).forEach((el) => {
-        el.removeAttribute("inert");
-        el.removeAttribute("title");
-        el.style.opacity = "";
-      });
-    };
-  }, [disableChat]);
 
   if (!visible) return null;
   return (

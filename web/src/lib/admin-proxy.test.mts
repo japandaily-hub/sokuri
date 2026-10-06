@@ -12,6 +12,9 @@ describe("shouldShowProxyBanner", () => {
     assert.equal(shouldShowProxyBanner("/cases/abc", "admin"), true);
     assert.equal(shouldShowProxyBanner("/chat/123", "admin"), true);
     assert.equal(shouldShowProxyBanner("/mypage", "admin"), true);
+    assert.equal(shouldShowProxyBanner("/operator", "admin"), true);
+    assert.equal(shouldShowProxyBanner("/operator/cases/1", "admin"), true);
+    assert.equal(shouldShowProxyBanner("/create", "admin"), true);
   });
   it("運営以外・/admin・公開ページでは出さない", () => {
     assert.equal(shouldShowProxyBanner("/cases/abc", "user"), false);
@@ -19,6 +22,9 @@ describe("shouldShowProxyBanner", () => {
     assert.equal(shouldShowProxyBanner("/admin/users", "admin"), false);
     assert.equal(shouldShowProxyBanner("/", "admin"), false);
     assert.equal(shouldShowProxyBanner("/casesfoo", "admin"), false);
+    assert.equal(shouldShowProxyBanner("/operator/login", "admin"), false);
+    assert.equal(shouldShowProxyBanner("/operatorfoo", "admin"), false);
+    assert.equal(shouldShowProxyBanner("/operator", "operator"), false);
     assert.equal(shouldShowProxyBanner(null, "admin"), false);
     assert.equal(shouldShowProxyBanner("/cases", undefined), false);
   });
@@ -28,6 +34,8 @@ describe("shouldDisableChatInput", () => {
   it("運営がチャット系画面にいるときだけ入力を無効にする", () => {
     assert.equal(shouldDisableChatInput("/chat/1", "admin"), true);
     assert.equal(shouldDisableChatInput("/cases/1", "admin"), true);
+    assert.equal(shouldDisableChatInput("/operator/chat/1", "admin"), true);
+    assert.equal(shouldDisableChatInput("/operator/cases/1", "admin"), false);
     assert.equal(shouldDisableChatInput("/mypage", "admin"), false);
     assert.equal(shouldDisableChatInput("/chat/1", "user"), false);
   });

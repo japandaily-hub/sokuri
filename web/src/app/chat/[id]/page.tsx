@@ -17,6 +17,7 @@ import "./chat.css";
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { Ic } from "@/components/kdz/Icons";
 import { ChatPanel } from "@/components/kdz/ChatPanel";
@@ -36,6 +37,7 @@ export default function ChatPage() {
   const transactionId = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const router = useRouter();
   const { token } = useToken();
+  const { data: sessionData } = useSession();
 
   /* ---- サイドバー: 自分の成約案件一覧 ---- */
   const [transactions, setTransactions] = useState<TransactionListItem[]>([]);
@@ -135,7 +137,12 @@ export default function ChatPage() {
           )}
         </nav>
 
-        <ChatPanel transactionId={transactionId} variant="standalone" onDetailChange={setDetail} />
+        <ChatPanel
+          transactionId={transactionId}
+          variant="standalone"
+          onDetailChange={setDetail}
+          readOnly={sessionData?.role === "admin"}
+        />
       </div>
 
       {sideToast ? (

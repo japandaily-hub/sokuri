@@ -29,6 +29,7 @@ import { ScheduleConfirmedBand } from "@/components/kdz/ScheduleConfirmedBand";
 import { useToken } from "@/components/kdz/Ui";
 import { ChatSystemNotice } from "@/components/kdz/ChatSystemNotice";
 import { stripControlChars } from "@/lib/categories";
+import { advanceCursor, appendNewMessages, cursorToAfterParam } from "@/lib/chat-cursor";
 import { isSystemNotice } from "@/lib/chat-system-notice";
 import { formatJstDateSeparator, formatJstDateTime, formatJstTime } from "@/lib/datetime";
 import { isImeComposingKey, messageLengthState } from "@/lib/message-length";
@@ -91,6 +92,13 @@ export interface ChatPanelProps {
   onDetailChange?: (detail: TransactionDetail) => void;
   /** embedded 時、外枠 div に追加するクラス（余白調整等）。 */
   className?: string;
+  /**
+   * 送信欄を使えなくする（運営の代理閲覧など）。運営ロールの判定は呼び出し側で行う。
+   * backend が 403 で拒否するのは最終防衛として維持される。
+   */
+  readOnly?: boolean;
+  /** readOnly のときに送信欄の代わりに出す理由（既定「運営は代理で送信できません」）。 */
+  disabledReason?: string;
 }
 
 /**
@@ -103,6 +111,8 @@ export function ChatPanel({
   variant = "standalone",
   onDetailChange,
   className,
+  readOnly = false,
+  disabledReason = "運営は代理で送信できません",
 }: ChatPanelProps) {
   const { token, loading: tokenLoading } = useToken();
 
@@ -161,17 +171,15 @@ export function ChatPanel({
     async (initial: boolean) => {
       if (!token || !transactionId) return;
       try {
-        const after = initial ? undefined : lastFetchedAtRef.current;
+        // after は保持カーソルの 5 秒手前（同秒・自分の送信との前後による取りこぼしを避ける。QA M2）。
+        // 重なって返った分は id で重複排除する。
+        const after = initial ? undefined : cursorToAfterParam(lastFetchedAtRef.current);
         const batch = await listMessages(transactionId, token, after);
         if (batch.length > 0) {
-          lastFetchedAtRef.current = batch[batch.length - 1].created_at;
+          // カーソルは「取得したメッセージの最大 created_at」だけで進める（自分の送信では進めない）。
+          lastFetchedAtRef.current = advanceCursor(initial ? undefined : lastFetchedAtRef.current, batch);
           // 確定後・409 後の全件取り直しとポーリングの差分取得が重なっても、同じメッセージを二重に並べない。
-          setMessages((prev) => {
-            if (initial) return batch;
-            const knownIds = new Set(prev.map((m) => m.id));
-            const fresh = batch.filter((m) => !knownIds.has(m.id));
-            return fresh.length > 0 ? [...prev, ...fresh] : prev;
-          });
+          setMessages((prev) => (initial ? batch : [...appendNewMessages(prev, batch)]));
           // 日程調整ページ・運営の代理など別の経路で日程が確定した場合も、候補の確定ボタンが
           // 押せるまま残らないよう取引を取り直す（初回の全件取得は reloadDetail の effect が別に取る）。
           if (!initial && batch.some((m) => m.kind === "schedule_confirmed")) {
@@ -233,14 +241,14 @@ export function ChatPanel({
 
   async function handleSend() {
     const text = draft.trim();
-    if (!text || !token || !transactionId || sending) return;
+    if (readOnly || !text || !token || !transactionId || sending) return;
     // 上限超過は送信前に止める（理由は入力欄の下のカウンタに出ている。V-05）。
     if (messageLengthState(text).over) return;
     setSending(true);
     try {
       const sent = await sendMessage(transactionId, text, token);
-      setMessages((prev) => [...prev, sent]);
-      lastFetchedAtRef.current = sent.created_at;
+      // 楽観的に一覧へ足すだけ。差分取得のカーソルは進めない（相手の発言の取りこぼし防止。QA M2）。
+      setMessages((prev) => [...appendNewMessages(prev, [sent])]);
       setDraft("");
     } catch (e) {
       showToast(toDisplayMessage(e, "メッセージの送信に失敗しました"));
@@ -588,6 +596,15 @@ export function ChatPanel({
           ) : isClosed ? (
             <div className="input-area" style={{ color: "var(--body-soft)", fontSize: 13, padding: "12px 20px" }}>
               この取引は終了しています
+            </div>
+          ) : readOnly ? (
+            <div
+              className="input-area"
+              role="note"
+              data-testid="chat-read-only"
+              style={{ color: "var(--body-soft)", fontSize: 13, padding: "12px 20px" }}
+            >
+              {disabledReason}
             </div>
           ) : (
             <div className="input-area">

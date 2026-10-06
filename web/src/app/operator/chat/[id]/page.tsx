@@ -19,7 +19,7 @@ import "./chat.css";
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { signOut } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Ic } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
@@ -27,6 +27,7 @@ import { ScheduleConfirmedBand } from "@/components/kdz/ScheduleConfirmedBand";
 import { useToken } from "@/components/kdz/Ui";
 import { ChatSystemNotice } from "@/components/kdz/ChatSystemNotice";
 import { stripControlChars } from "@/lib/categories";
+import { advanceCursor, appendNewMessages, cursorToAfterParam } from "@/lib/chat-cursor";
 import { isSystemNotice } from "@/lib/chat-system-notice";
 import { formatJstDateSeparator, formatJstDateTime, formatJstTime } from "@/lib/datetime";
 import { isImeComposingKey, messageLengthState } from "@/lib/message-length";
@@ -149,6 +150,9 @@ export default function OperatorChatPage() {
   const transactionId = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const router = useRouter();
   const { token, loading: tokenLoading } = useToken();
+  const { data: sessionData } = useSession();
+  /** 運営が業者の画面を代理で開いているか（送信欄を使えなくする。backend の 403 は最終防衛）。 */
+  const isAdminViewing = sessionData?.role === "admin";
 
   /* ---- サイドバー: 交渉中の案件一覧（業者向け listTransactions） ---- */
   const [transactions, setTransactions] = useState<TransactionListItem[]>([]);
@@ -234,11 +238,14 @@ export default function OperatorChatPage() {
     async (initial: boolean) => {
       if (!token || !transactionId) return;
       try {
-        const after = initial ? undefined : lastFetchedAtRef.current;
+        // after は保持カーソルの 5 秒手前（同秒・自分の送信との前後による取りこぼしを避ける。QA M2）。
+        // 重なって返った分は id で重複排除する。
+        const after = initial ? undefined : cursorToAfterParam(lastFetchedAtRef.current);
         const batch = await listMessages(transactionId, token, after);
         if (batch.length > 0) {
-          lastFetchedAtRef.current = batch[batch.length - 1].created_at;
-          setMessages((prev) => (initial ? batch : [...prev, ...batch]));
+          // カーソルは「取得したメッセージの最大 created_at」だけで進める（自分の送信・提示では進めない）。
+          lastFetchedAtRef.current = advanceCursor(initial ? undefined : lastFetchedAtRef.current, batch);
+          setMessages((prev) => (initial ? batch : [...appendNewMessages(prev, batch)]));
           // detail（txn.status/visit_date）が画面を開いた時点のまま止まっていると、
           // 依頼者が日程確定・完了確定した直後も pending/visiting 判定が古いままになり、
           // 候補日の提示可否や完了確定ボタンの押せない条件が実情とズレる。
@@ -313,14 +320,14 @@ export default function OperatorChatPage() {
 
   async function handleSend() {
     const text = draft.trim();
-    if (!text || !token || !transactionId || sending) return;
+    if (isAdminViewing || !text || !token || !transactionId || sending) return;
     // 上限超過は送信前に止める（理由は入力欄の下のカウンタに出ている。V-05）。
     if (messageLengthState(text).over) return;
     setSending(true);
     try {
       const sent = await sendMessage(transactionId, text, token);
-      setMessages((prev) => [...prev, sent]);
-      lastFetchedAtRef.current = sent.created_at;
+      // 楽観的に一覧へ足すだけ。差分取得のカーソルは進めない（QA M2）。
+      setMessages((prev) => [...appendNewMessages(prev, [sent])]);
       setDraft("");
     } catch (e) {
       showToast(toDisplayMessage(e, "メッセージの送信に失敗しました"));
@@ -415,8 +422,7 @@ export default function OperatorChatPage() {
     setProposing(true);
     try {
       const msg = await proposeSchedule(transactionId, uniqueCandidates, token);
-      setMessages((prev) => [...prev, msg]);
-      lastFetchedAtRef.current = msg.created_at;
+      setMessages((prev) => [...appendNewMessages(prev, [msg])]);
       setScheduleVisible(false);
       setSlots([emptySlotDraft()]);
       setProposeOutdated(false);
@@ -815,6 +821,15 @@ export default function OperatorChatPage() {
               {isClosed ? (
                 <div className="input-area" style={{ color: "var(--body-soft)", fontSize: 13, padding: "12px 20px" }}>
                   この取引は終了しています
+                </div>
+              ) : isAdminViewing ? (
+                <div
+                  className="input-area"
+                  role="note"
+                  data-testid="chat-read-only"
+                  style={{ color: "var(--body-soft)", fontSize: 13, padding: "12px 20px" }}
+                >
+                  運営は代理で送信できません
                 </div>
               ) : (
                 <div className="input-area">

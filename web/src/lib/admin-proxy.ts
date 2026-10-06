@@ -16,10 +16,16 @@ export const PROXY_VIEW_PREFIXES = [
   "/schedule",
   "/review",
   "/result",
+  // 運営が業者・依頼者の画面を見ているときは必ず帯を出す（QA L4）。
+  "/operator",
+  "/create",
 ] as const;
 
+/** 上の接頭辞配下でも帯を出さない認証画面（業者のログイン・登録などは代理閲覧ではない）。 */
+export const PROXY_VIEW_EXCLUDED_PREFIXES = ["/operator/login", "/operator/signup"] as const;
+
 /** 運営が代理で送信できない（入力欄を無効にする）チャット系の画面。 */
-export const PROXY_CHAT_PREFIXES = ["/chat", "/cases"] as const;
+export const PROXY_CHAT_PREFIXES = ["/chat", "/cases", "/operator/chat"] as const;
 
 function matchesPrefix(pathname: string, prefixes: readonly string[]): boolean {
   return prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
@@ -28,6 +34,7 @@ function matchesPrefix(pathname: string, prefixes: readonly string[]): boolean {
 /** 代理閲覧の帯を出すか。role が "admin" で、依頼者・業者向けの画面のときだけ true。 */
 export function shouldShowProxyBanner(pathname: string | null | undefined, role: string | null | undefined): boolean {
   if (role !== "admin" || !pathname) return false;
+  if (matchesPrefix(pathname, PROXY_VIEW_EXCLUDED_PREFIXES)) return false;
   return matchesPrefix(pathname, PROXY_VIEW_PREFIXES);
 }
 
