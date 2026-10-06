@@ -137,7 +137,7 @@ async def push_reduction_requested(line_user_id: str, case_id: str, amount: int)
     url = f"{settings.frontend_base_url}/cases/{case_id}"
     return await _push(
         line_user_id,
-        f"【カタヅケ】落札業者から {amount:,} 円への減額のご相談が届いています。\n{url}",
+        f"【カタヅケ】成約した業者から {amount:,} 円への減額のご相談が届いています。\n{url}",
     )
 
 
@@ -375,7 +375,7 @@ async def push_completion_requested(line_user_id: str, case_id: str) -> bool:
     url = f"{settings.frontend_base_url}/cases/{case_id}"
     return await _push(
         line_user_id,
-        "【カタヅケ】落札業者から作業完了の確定のお願いが届いています。"
+        "【カタヅケ】成約した業者から作業完了の確定のお願いが届いています。"
         "引き取りが済んでいれば「作業完了を確定する」を押してください。\n"
         f"{url}",
     )
@@ -406,7 +406,7 @@ async def push_schedule_proposed(line_user_id: str, transaction_id: str) -> bool
     url = f"{settings.frontend_base_url}/chat/{transaction_id}"
     return await _push(
         line_user_id,
-        "【カタヅケ】落札業者から訪問日程の候補が届きました。"
+        "【カタヅケ】成約した業者から訪問日程の候補が届きました。"
         "ご都合のよい候補を選ぶと日程が確定します。\n"
         f"{url}",
     )

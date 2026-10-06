@@ -110,7 +110,7 @@ def _get_item_or_404(case: Case, item_id: uuid.UUID) -> CaseItem:
     for item in case.items:
         if item.id == item_id:
             return item
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="商品が見つかりません。")
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="品物が見つかりません。")
 
 
 def _get_photo_or_404(case: Case, photo_id: uuid.UUID) -> CasePhoto:
@@ -303,7 +303,7 @@ async def add_case_item_photo(
     if len(item.photos) >= MAX_PHOTOS_PER_ITEM:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"商品1点あたりの写真枚数が上限（{MAX_PHOTOS_PER_ITEM}枚）に達しています。",
+            detail=f"品物1点あたりの写真枚数が上限（{MAX_PHOTOS_PER_ITEM}枚）に達しています。",
         )
     if len(case.photos) >= MAX_PHOTOS_PER_CASE:
         raise HTTPException(

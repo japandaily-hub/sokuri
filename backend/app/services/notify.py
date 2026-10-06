@@ -293,11 +293,11 @@ async def send_bid_selected(to_email: str, transaction_id: str, amount: int) -> 
     url = f"{settings.frontend_base_url}/operator/transactions/{transaction_id}"
     return await _send(
         to_email,
-        "【カタヅケ】入札が落札されました",
+        "【カタヅケ】入札が選ばれ、成約しました",
         _wrap(
             f"<p>あなたの入札（<strong>{amount:,} 円</strong>）が選ばれました。</p>"
             "<p>住所詳細が開示されています。訪問日の調整を進めてください。</p>"
-            f'<p><a href="{url}">落札案件の詳細を確認する</a></p>'
+            f'<p><a href="{url}">成約した案件の詳細を確認する</a></p>'
         ),
     )
 
@@ -476,7 +476,7 @@ async def send_reduction_requested(to_email: str, case_id: str, amount: int) -> 
         to_email,
         "【カタヅケ】減額のご相談が届いています",
         _wrap(
-            f"<p>落札業者から <strong>{amount:,} 円</strong> への減額のご相談が届いています。</p>"
+            f"<p>成約した業者から <strong>{amount:,} 円</strong> への減額のご相談が届いています。</p>"
             f'<p><a href="{url}">内容を確認して回答する</a></p>'
         ),
     )
@@ -734,7 +734,7 @@ async def send_completion_requested(to_email: str, case_id: str) -> bool:
         to_email,
         "【カタヅケ】作業完了の確定をお願いします",
         _wrap(
-            "<p>落札業者から作業完了の確定のお願いが届いています。</p>"
+            "<p>成約した業者から作業完了の確定のお願いが届いています。</p>"
             "<p>引き取りが済んでいれば確定してください。"
             "まだの場合は、業者とチャットでご確認ください。</p>"
             f'<p><a href="{url}">内容を確認して確定する</a></p>'
@@ -770,7 +770,7 @@ async def send_schedule_proposed(to_email: str, transaction_id: str) -> bool:
         to_email,
         "【カタヅケ】訪問日程の候補が届きました",
         _wrap(
-            "<p>落札業者から訪問日程の候補が届きました。</p>"
+            "<p>成約した業者から訪問日程の候補が届きました。</p>"
             "<p>ご都合のよい候補を選ぶと日程が確定します。</p>"
             f'<p><a href="{url}">候補日を確認する</a></p>'
         ),

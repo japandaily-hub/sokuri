@@ -649,7 +649,7 @@ async def request_completion(
     if party != "operator":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="完了確定の依頼は落札業者のみ行えます。",
+            detail="完了確定の依頼は成約した業者のみ行えます。",
         )
     # 終了済み取引への依頼を拒否する（r8-H3 と同じ方針。_assert_txn_open を再利用）。
     _assert_txn_open(txn)
@@ -1217,7 +1217,7 @@ async def propose_schedule(
     if party != "operator":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="日程候補の提示は落札業者のみ行えます。",
+            detail="日程候補の提示は成約した業者のみ行えます。",
         )
     # 終了済み取引への候補提示を拒否する（r8-H3）。confirm_schedule 側は既に
     # status=="pending" のみ許可しているため、往路（提示）だけが穴になっていた。

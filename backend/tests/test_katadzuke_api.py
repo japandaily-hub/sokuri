@@ -2373,7 +2373,7 @@ async def test_request_completion_rejects_user(client: AsyncClient, db_session: 
         f"/api/v1/transactions/{txn_id}/complete/request", headers=_auth(user_token)
     )
     assert r.status_code == 403, r.text
-    assert r.json()["detail"] == "完了確定の依頼は落札業者のみ行えます。"
+    assert r.json()["detail"] == "完了確定の依頼は成約した業者のみ行えます。"
 
 
 async def test_request_completion_rejects_before_visiting(
