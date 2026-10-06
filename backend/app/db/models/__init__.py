@@ -40,6 +40,7 @@ from app.db.models.transaction import Cancellation, ReductionRequest, Review, Tr
 from app.db.models.user import User
 from app.db.models.user_identity_document import UserIdentityDocument
 from app.db.models.invite import Invite
+from app.db.models.password_reset_token import PasswordResetToken
 
 __all__ = [
     "Base",
@@ -75,4 +76,5 @@ __all__ = [
     "User",
     "UserIdentityDocument",
     "Invite",
+    "PasswordResetToken",
 ]
