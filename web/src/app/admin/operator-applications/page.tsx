@@ -88,6 +88,8 @@ export default function AdminOperatorApplicationsPage() {
     null,
   );
   const [bankRevealLoading, setBankRevealLoading] = useState(false);
+  /** M-1: 全桁表示前の確認ダイアログ。 */
+  const [revealConfirmOpen, setRevealConfirmOpen] = useState(false);
   const [bankRevealError, setBankRevealError] = useState<string | null>(null);
 
   const [rejectTarget, setRejectTarget] = useState<OperatorApplicationOut | null>(null);
@@ -136,6 +138,7 @@ export default function AdminOperatorApplicationsPage() {
   }
 
   function closeDetail() {
+    setRevealConfirmOpen(false);
     setSelected(null);
     setBankReveal(null);
     setBankRevealError(null);
@@ -148,7 +151,9 @@ export default function AdminOperatorApplicationsPage() {
     try {
       const result = await adminRevealOperatorApplicationBankAccount(selected.id, token);
       setBankReveal(result);
+      setRevealConfirmOpen(false);
     } catch (e) {
+      // M-1: 確認ダイアログの中に出す（閉じると見落とすため）。
       setBankRevealError(toDisplayMessage(e, "口座情報の取得に失敗しました"));
     } finally {
       setBankRevealLoading(false);
@@ -436,16 +441,19 @@ export default function AdminOperatorApplicationsPage() {
                   {!bankReveal ? (
                     <button
                       type="button"
-                      onClick={() => void revealBankAccount()}
+                      onClick={() => {
+                        setBankRevealError(null);
+                        setRevealConfirmOpen(true);
+                      }}
                       disabled={bankRevealLoading}
                       className={`${btnSecondary} mt-2`}
                     >
-                      {bankRevealLoading ? "取得中…" : "口座情報を全桁表示"}
+                      口座情報を全桁表示
                     </button>
                   ) : null}
-                  {bankRevealError ? (
-                    <p className="mt-1 text-xs text-red-600">{bankRevealError}</p>
-                  ) : null}
+                  <p className="mt-1 text-xs text-slate-500">
+                    全桁表示は操作として記録されます（誰がいつ開いたかが残ります）。承認・却下の判断には通常不要です。
+                  </p>
                 </div>
               ) : (
                 <p className="mt-2 text-sm text-slate-500">口座情報は登録されていません。</p>
@@ -488,10 +496,25 @@ export default function AdminOperatorApplicationsPage() {
         </div>
       ) : null}
 
+      {revealConfirmOpen && selected ? (
+        <ConfirmModal
+          title="口座情報を全桁表示します"
+          message="口座番号・口座名義の全桁が画面に表示され、この閲覧は操作記録に残ります。承認・却下の判断（古物商許可の確認など）には通常必要ありません。必要な場合だけ表示してください。"
+          confirmLabel="記録されることを理解して表示する"
+          error={bankRevealError}
+          busy={bankRevealLoading}
+          onCancel={() => {
+            setBankRevealError(null);
+            setRevealConfirmOpen(false);
+          }}
+          onConfirm={() => void revealBankAccount()}
+        />
+      ) : null}
+
       {approveTarget ? (
         <ConfirmModal
           title={`${approveTarget.company_name}を承認します`}
-          message="承認すると招待コードが発行され、申込者へ承認メールが送信されます。よろしいですか？"
+          message="承認すると招待コードが発行され、申込者へ承認メールが送信されます。古物商許可証の確認は、業者が登録して許可証画像を提出した後に、管理画面トップの「業者アカウント」で別途行います（この承認は許可証の確認を兼ねません）。よろしいですか？"
           confirmLabel="承認する"
           error={approveModalError}
           busy={busy}

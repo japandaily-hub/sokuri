@@ -701,6 +701,9 @@ export default function AdminPage() {
           </div>
           {/* r10 O-M4 是正: pending には「申し込んだが許可証未提出で運営が着手できない」業者が
               混ざるため、pending だけでは実際に審査できる件数が読めなかった。内訳を併記する。 */}
+          <p className="mt-2 text-xs text-slate-500">
+            流れ: 事前申込を承認（招待コード発行）→ 業者が登録し許可証画像を提出 → ここで画像を確認して「承認する」。許可証は未確認のまま入札させないでください。
+          </p>
           {c ? (
             <p className="mt-2 text-xs text-slate-500">
               未承認 {c.pending}件（うち許可証提出済み {c.pending_with_license}件＝いま審査に着手できる件数）
