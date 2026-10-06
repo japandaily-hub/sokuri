@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import hmac
 import logging
+import re
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -192,23 +193,53 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await engine.dispose()
 
 
-#: 長さ超過を日本語の文字列 detail で返す対象欄（loc の末尾 → 画面上の呼び名）。
-_TOO_LONG_FIELD_LABELS = {
+#: 長さ超過を日本語の文字列 detail で返す対象欄（エンドポイントのパス × 欄名 → 画面上の呼び名）。
+#: 同じ欄名でも画面ごとに呼び名と上限が違う（QA L-2: 以前は ``message`` 欄すべてを
+#: 「入札メッセージ」と呼び、お問い合わせ（4,000字）や事前申込の備考にも出ていた）。
+#: パスは ``/api/v1`` を除いた部分で fullmatch する。上限値は常に ``ctx.max_length``
+#: （スキーマ定義が単一の出所）から取るので、ここには呼び名だけを持つ。
+_TOO_LONG_FIELD_LABELS_BY_PATH: tuple[tuple[re.Pattern[str], str, str], ...] = (
+    # 入札（POST /cases/{id}/bids）・自分の入札の更新（PATCH /cases/{id}/bids/me 等）。
+    (re.compile(r"/cases/[^/]+/bids(?:/[^/]+)?"), "message", "入札メッセージ"),
+    # 業者の事前申込（web /business の「ご質問・備考」欄）。
+    (re.compile(r"/operator-applications"), "message", "ご質問・備考"),
+    # お問い合わせ（web /contact の「お問い合わせ内容」欄・4,000字）。
+    (re.compile(r"/contact"), "message", "お問い合わせ内容"),
+    (re.compile(r"/transactions/[^/]+/messages"), "body", "メッセージ"),
+    (re.compile(r"/(?:cases|transactions)/[^/]+/cancel"), "reason", "キャンセルの理由"),
+    (re.compile(r"/transactions/[^/]+/reduction"), "reason", "減額の理由"),
+)
+#: パスに対応が無いときの呼び名。``message`` は画面ごとに意味が違うため既定を持たない
+#: （該当しなければ従来の配列形式の detail で返す）。
+_TOO_LONG_FIELD_DEFAULT_LABELS = {
     "body": "メッセージ",
-    "message": "入札メッセージ",
     "reason": "理由",
 }
+_API_PREFIX = "/api/v1"
 
 
-def _too_long_message(error: dict) -> str | None:
+def _too_long_field_label(path: str, field: object) -> str | None:
+    """パスと欄名から画面上の呼び名を返す（対応が無ければ None）。"""
+    if not isinstance(field, str):
+        return None
+    relative = path[len(_API_PREFIX):] if path.startswith(_API_PREFIX) else path
+    relative = relative.rstrip("/") or "/"
+    for pattern, field_name, label in _TOO_LONG_FIELD_LABELS_BY_PATH:
+        if field_name == field and pattern.fullmatch(relative):
+            return label
+    return _TOO_LONG_FIELD_DEFAULT_LABELS.get(field)
+
+
+def _too_long_message(error: dict, path: str = "") -> str | None:
     """Pydantic の ``string_too_long`` エラーを日本語の1文にする（対象外の欄・種別は None）。
 
     上限値は ``ctx.max_length``（スキーマ定義が単一の出所）。送信値そのものは載せない。
+    呼び名は ``path``（リクエストのパス）と欄名で決める（_TOO_LONG_FIELD_LABELS_BY_PATH）。
     """
     if error.get("type") != "string_too_long":
         return None
     loc = error.get("loc") or ()
-    label = _TOO_LONG_FIELD_LABELS.get(loc[-1]) if loc else None
+    label = _too_long_field_label(path, loc[-1]) if loc else None
     max_length = (error.get("ctx") or {}).get("max_length")
     if label is None or not isinstance(max_length, int):
         return None
@@ -391,7 +422,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # 長すぎる自由記述（チャット・入札メッセージ・理由）は、画面がそのまま表示できる
         # 日本語の文字列 detail で返す（pdca vendor V-05。配列形式の detail は画面で
         # 「送信に失敗しました」という汎用文言になり、何を直すべきか分からなかった）。
-        too_long_messages = [_too_long_message(err) for err in raw_errors]
+        too_long_messages = [_too_long_message(err, request.url.path) for err in raw_errors]
         if raw_errors and all(message is not None for message in too_long_messages):
             return JSONResponse(
                 status_code=422, content={"detail": " ".join(dict.fromkeys(too_long_messages))}  # type: ignore[arg-type]
