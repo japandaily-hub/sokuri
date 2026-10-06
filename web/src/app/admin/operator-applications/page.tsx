@@ -266,7 +266,7 @@ export default function AdminOperatorApplicationsPage() {
           </div>
 
           <div className="mt-4 overflow-x-auto" tabIndex={0} role="region" aria-label="事前申込一覧">
-            <table className="w-full min-w-[720px] text-sm">
+            <table className="admin-cards w-full min-w-[720px] text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
                   <th className="pb-2 pr-4">ID</th>
@@ -282,20 +282,20 @@ export default function AdminOperatorApplicationsPage() {
               <tbody className="divide-y divide-slate-100">
                 {data?.items.map((a) => (
                   <tr key={a.id}>
-                    <td className="py-2 pr-4">
+                    <td data-label="ID" className="py-2 pr-4">
                       <CopyableId id={a.id} />
                     </td>
-                    <td className="py-2 pr-4 text-slate-700">{a.company_name}</td>
-                    <td className="py-2 pr-4 text-slate-700">{a.contact_name}</td>
-                    <td className="py-2 pr-4 text-slate-700">{a.contact_email}</td>
-                    <td className="py-2 pr-4 text-slate-700">{a.license_number}</td>
-                    <td className="py-2 pr-4 whitespace-nowrap text-slate-500">
+                    <td data-label="会社名" className="py-2 pr-4 text-slate-700">{a.company_name}</td>
+                    <td data-label="担当者" className="py-2 pr-4 text-slate-700">{a.contact_name}</td>
+                    <td data-label="メール" className="py-2 pr-4 text-slate-700">{a.contact_email}</td>
+                    <td data-label="許可番号" className="py-2 pr-4 text-slate-700">{a.license_number}</td>
+                    <td data-label="申込日時" className="py-2 pr-4 whitespace-nowrap text-slate-500">
                       {formatAdminDateTime(a.created_at)}
                     </td>
-                    <td className="py-2 pr-4">
+                    <td data-label="状態" className="py-2 pr-4">
                       <StatusBadge value={STATUS_BADGE_VALUE[a.status]} label={STATUS_LABEL[a.status]} />
                     </td>
-                    <td className="py-2 text-right">
+                    <td data-label="" className="py-2 text-right">
                       <button type="button" onClick={() => openDetail(a)} className={btnSecondary}>
                         詳細を確認
                       </button>

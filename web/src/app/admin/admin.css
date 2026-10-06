@@ -1,0 +1,61 @@
+/*
+ * 運営画面の一覧表（table.admin-cards）のスマホ表示（ペルソナ監査 H-4）。
+ * 従来は min-w-[960px] の横スクロール表で、375px では「状態」「操作ボタン」が画面外に隠れ、
+ * スクロールできる合図も無かった。md（768px）未満では 1 行 = 1 枚のカードに組み替え、
+ * 各セルの data-label を見出しとして左に出す（data-label="" のセルは見出しなしの操作欄）。
+ */
+@media (max-width: 767px) {
+  table.admin-cards {
+    min-width: 0 !important;
+  }
+  table.admin-cards thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  table.admin-cards,
+  table.admin-cards tbody,
+  table.admin-cards tr,
+  table.admin-cards td {
+    display: block;
+    width: 100%;
+  }
+  table.admin-cards tr {
+    border: 1px solid #e2e8f0;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+  }
+  table.admin-cards td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 0 !important;
+    text-align: left !important;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    white-space: normal !important;
+  }
+  table.admin-cards td[data-label]:not([data-label=""])::before {
+    content: attr(data-label);
+    flex: none;
+    width: 5.5em;
+    font-size: 12px;
+    color: #64748b;
+  }
+  /* 見出しなし（操作欄）のセルは、ボタンを折り返して全部見える位置に出す */
+  table.admin-cards td[data-label=""] {
+    display: block;
+    margin-top: 6px;
+    padding-top: 8px !important;
+    border-top: 1px solid #e2e8f0;
+  }
+  table.admin-cards td[data-label=""] > div,
+  table.admin-cards td[data-label=""] > .flex {
+    justify-content: flex-start !important;
+    flex-wrap: wrap;
+  }
+}

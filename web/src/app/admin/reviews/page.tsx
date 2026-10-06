@@ -299,7 +299,7 @@ function AdminReviewsContent() {
           </div>
 
           <div className="mt-4 overflow-x-auto" tabIndex={0} role="region" aria-label="口コミ一覧">
-            <table className="w-full min-w-[960px] text-sm">
+            <table className="admin-cards w-full min-w-[960px] text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
                   <th className="pb-2 pr-4">投稿日時</th>
@@ -315,17 +315,17 @@ function AdminReviewsContent() {
               <tbody className="divide-y divide-slate-100">
                 {data?.items.map((r) => (
                   <tr key={r.id} className="align-top">
-                    <td className="py-2 pr-4 whitespace-nowrap text-slate-500">
+                    <td data-label="投稿日時" className="py-2 pr-4 whitespace-nowrap text-slate-500">
                       {formatAdminDateTime(r.created_at)}
                     </td>
-                    <td className="py-2 pr-4 whitespace-nowrap text-slate-700">
+                    <td data-label="向き" className="py-2 pr-4 whitespace-nowrap text-slate-700">
                       {r.reviewer_type === "user" ? "依頼者→業者" : "業者→依頼者"}
                     </td>
-                    <td className="py-2 pr-4 whitespace-nowrap text-slate-700">{REVIEW_VERDICT_LABEL[r.verdict]}</td>
-                    <td className="py-2 pr-4 max-w-md whitespace-pre-wrap break-words text-slate-700">
+                    <td data-label="評価" className="py-2 pr-4 whitespace-nowrap text-slate-700">{REVIEW_VERDICT_LABEL[r.verdict]}</td>
+                    <td data-label="口コミ" className="py-2 pr-4 max-w-md whitespace-pre-wrap break-words text-slate-700">
                       {r.comment ?? "（コメントなし）"}
                     </td>
-                    <td className="py-2 pr-4 text-slate-700">
+                    <td data-label="業者" className="py-2 pr-4 text-slate-700">
                       {r.operator_id ? (
                         <button
                           type="button"
@@ -338,7 +338,7 @@ function AdminReviewsContent() {
                         (r.company_name ?? "—")
                       )}
                     </td>
-                    <td className="py-2 pr-4">
+                    <td data-label="ID" className="py-2 pr-4">
                       <div className="flex items-center gap-1 text-xs text-slate-400">
                         <span>取引</span>
                         <CopyableId id={r.transaction_id} />
@@ -348,7 +348,7 @@ function AdminReviewsContent() {
                         <CopyableId id={r.id} />
                       </div>
                     </td>
-                    <td className="py-2 pr-4">
+                    <td data-label="状態" className="py-2 pr-4">
                       {r.hidden_at ? (
                         <div>
                           <StatusBadge value="cancelled" label="削除済み" />
@@ -365,7 +365,7 @@ function AdminReviewsContent() {
                         <StatusBadge value="completed" label="表示中" />
                       )}
                     </td>
-                    <td className="py-2 text-right whitespace-nowrap">
+                    <td data-label="" className="py-2 text-right whitespace-nowrap">
                       {r.hidden_at ? (
                         <button
                           type="button"

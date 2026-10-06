@@ -138,7 +138,7 @@ export default function AdminContactsPage() {
           </div>
 
           <div className="mt-4 overflow-x-auto" tabIndex={0} role="region" aria-label="お問い合わせ一覧">
-            <table className="w-full min-w-[720px] text-sm">
+            <table className="admin-cards w-full min-w-[720px] text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
                   <th className="pb-2 pr-4">受信日時</th>
@@ -158,23 +158,23 @@ export default function AdminContactsPage() {
                   const reportedReviewId = extractReviewIdFromMessage(m.message);
                   return (
                     <tr key={m.id} className="align-top">
-                      <td className="py-2 pr-4 whitespace-nowrap text-slate-500">
+                      <td data-label="受信日時" className="py-2 pr-4 whitespace-nowrap text-slate-500">
                         {formatAdminDateTime(m.created_at)}
                       </td>
-                      <td className="py-2 pr-4 break-words text-slate-700">{m.name}</td>
-                      <td className="py-2 pr-4 break-all text-slate-700">{m.email}</td>
-                      <td className="py-2 pr-4 break-words text-slate-700">{m.category}</td>
-                      <td className="py-2 pr-4 max-w-md whitespace-pre-wrap break-words text-slate-700">
+                      <td data-label="お名前" className="py-2 pr-4 break-words text-slate-700">{m.name}</td>
+                      <td data-label="メール" className="py-2 pr-4 break-all text-slate-700">{m.email}</td>
+                      <td data-label="種別" className="py-2 pr-4 break-words text-slate-700">{m.category}</td>
+                      <td data-label="本文" className="py-2 pr-4 max-w-md whitespace-pre-wrap break-words text-slate-700">
                         {m.message}
                       </td>
-                      <td className="py-2 pr-4">
+                      <td data-label="状態" className="py-2 pr-4">
                         {m.handled_at ? (
                           <StatusBadge value="completed" label="対応済み" />
                         ) : (
                           <StatusBadge value="pending" label="未対応" />
                         )}
                       </td>
-                      <td className="py-2 text-right">
+                      <td data-label="" className="py-2 text-right">
                         <div className="flex flex-col items-end gap-1.5">
                           {m.handled_at ? (
                             <p className="whitespace-nowrap text-xs text-slate-500">
