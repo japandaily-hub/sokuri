@@ -29,7 +29,7 @@ import { ScheduleConfirmedBand } from "@/components/kdz/ScheduleConfirmedBand";
 import { useToken } from "@/components/kdz/Ui";
 import { ChatSystemNotice } from "@/components/kdz/ChatSystemNotice";
 import { stripControlChars } from "@/lib/categories";
-import { advanceCursor, appendNewMessages, cursorToAfterParam } from "@/lib/chat-cursor";
+import { advanceCursor, appendNewMessages, cursorToAfterParam, shouldApplyFetchResult } from "@/lib/chat-cursor";
 import { isSystemNotice } from "@/lib/chat-system-notice";
 import { formatJstDateSeparator, formatJstDateTime, formatJstTime } from "@/lib/datetime";
 import { isImeComposingKey, messageLengthState } from "@/lib/message-length";
@@ -134,6 +134,12 @@ export function ChatPanel({
   }, [draft]);
   const [sending, setSending] = useState(false);
   const lastFetchedAtRef = useRef<string | undefined>(undefined);
+  // 今表示している取引の ID。遅れて返った別取引の応答を捨てる判定に使う（security M-2）。
+  // 描画中に書き換えると並行レンダリングで不整合になるため effect で更新する（取得 effect より先に宣言する）。
+  const activeTransactionIdRef = useRef<string | undefined>(transactionId);
+  useEffect(() => {
+    activeTransactionIdRef.current = transactionId;
+  }, [transactionId]);
 
   /* ---- 日程確定操作の状態（日程構造化 DESIGN §13.4: 候補ごとのボタン＋確認モーダル） ---- */
   const [acceptTarget, setAcceptTarget] = useState<AcceptTarget | null>(null);
@@ -159,10 +165,13 @@ export function ChatPanel({
     if (!token || !transactionId) return;
     try {
       const d = await getTransaction(transactionId, token);
+      // 取引を切り替えた後に遅れて返った別取引の詳細は捨てる（security M-2）。
+      if (activeTransactionIdRef.current !== transactionId) return;
       setDetail(d);
       setDetailError(null);
       onDetailChange?.(d);
     } catch (e) {
+      if (activeTransactionIdRef.current !== transactionId) return;
       setDetailError(toDisplayMessage(e, "成約情報の取得に失敗しました"));
     }
     // onDetailChange は呼び出し元の再レンダーのたびに新しい関数参照になり得るため、
@@ -176,13 +185,22 @@ export function ChatPanel({
 
   /* ---- メッセージ取得（初回全件 + ポーリング差分） ---- */
   const fetchMessages = useCallback(
-    async (initial: boolean) => {
+    async (initial: boolean, signal?: AbortSignal) => {
       if (!token || !transactionId) return;
+      // 呼び出し時点の取引を保持し、反映前に「今も同じ取引か・中止されていないか」を確かめる（security M-2）。
+      const requestedTransactionId = transactionId;
+      const canApply = () =>
+        shouldApplyFetchResult({
+          requestedTransactionId,
+          currentTransactionId: activeTransactionIdRef.current,
+          cancelled: signal?.aborted === true,
+        });
       try {
         // after は保持カーソルの 5 秒手前（同秒・自分の送信との前後による取りこぼしを避ける。QA M2）。
         // 重なって返った分は id で重複排除する。
         const after = initial ? undefined : cursorToAfterParam(lastFetchedAtRef.current);
-        const batch = await listMessages(transactionId, token, after);
+        const batch = await listMessages(transactionId, token, after, signal);
+        if (!canApply()) return;
         if (batch.length > 0) {
           // カーソルは「取得したメッセージの最大 created_at」だけで進める（自分の送信では進めない）。
           lastFetchedAtRef.current = advanceCursor(initial ? undefined : lastFetchedAtRef.current, batch);
@@ -198,6 +216,7 @@ export function ChatPanel({
         }
         setMessagesError(null);
       } catch (e) {
+        if (!canApply()) return;
         setMessagesError(toDisplayMessage(e, "メッセージの取得に失敗しました"));
       }
     },
@@ -205,9 +224,13 @@ export function ChatPanel({
   );
 
   useEffect(() => {
+    // 取引の切替でカーソルと一覧をリセットし、前の取引の取得は中止する（security M-2）。
     lastFetchedAtRef.current = undefined;
     setMessages([]);
-    void fetchMessages(true);
+    setMessagesError(null);
+    const controller = new AbortController();
+    void fetchMessages(true, controller.signal);
+    return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transactionId, token]);
 
@@ -215,16 +238,23 @@ export function ChatPanel({
   useEffect(() => {
     if (!token || !transactionId) return;
     let timer: number | undefined;
+    // cleanup（取引の切替・画面を離れる）で true にし、await の後は schedule も反映もしない（security M-2）。
+    let cancelled = false;
+    const controller = new AbortController();
     function schedule() {
       timer = window.setTimeout(async () => {
+        if (cancelled) return;
         if (!document.hidden) {
-          await fetchMessages(false);
+          await fetchMessages(false, controller.signal);
         }
+        if (cancelled) return;
         schedule();
       }, POLL_INTERVAL_MS);
     }
     schedule();
     return () => {
+      cancelled = true;
+      controller.abort();
       if (timer !== undefined) window.clearTimeout(timer);
     };
   }, [token, transactionId, fetchMessages]);
@@ -289,7 +319,7 @@ export function ChatPanel({
    * それ以外（通信失敗・5xx・429 等）はモーダル内にエラーを出し、そのまま再試行できるようにする。
    */
   async function handleAccept() {
-    if (!acceptTarget || !token || !transactionId || accepting) return;
+    if (readOnly || !acceptTarget || !token || !transactionId || accepting) return;
     setAccepting(true);
     setAcceptError(null);
     try {
@@ -322,9 +352,12 @@ export function ChatPanel({
   // r8-fix-frontend5 対応: 落札業者が退会済みの場合、送信・日程確定に進めないよう無効化する。
   const operatorDeleted = detail?.operator_deleted === true;
   // 候補から確定できるのは pending（訪問日調整中）の取引だけ（backend も pending 以外は 409）。
-  const canAcceptSchedule = detail?.status === "pending" && !operatorDeleted;
+  // 運営の代理閲覧（readOnly）では確定ボタンも確認モーダルも出さない（日程の確定は依頼者本人だけ。security L-7）。
+  const canAcceptSchedule = detail?.status === "pending" && !operatorDeleted && !readOnly;
   // 確定できない状態のときに最新の候補カードへ出す理由（旧: 確定ボタンの文言）。
-  const scheduleClosedNote = operatorDeleted
+  const scheduleClosedNote = readOnly
+    ? "日程の確定は依頼者本人だけが行えます"
+    : operatorDeleted
     ? "業者退会のため確定できません"
     : isClosed && detail
       ? `この取引は終了しています（${TXN_STATUS_LABEL[detail.status]}）`
@@ -669,7 +702,7 @@ export function ChatPanel({
           {toast}
         </div>
       ) : null}
-      {acceptTarget
+      {acceptTarget && !readOnly
         ? createPortal(
             <ConfirmModal
               title="訪問日程を確定しますか？"

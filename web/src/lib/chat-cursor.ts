@@ -72,3 +72,18 @@ export function appendNewMessages<T extends { id: string }>(prev: readonly T[], 
   }
   return fresh.length > 0 ? [...prev, ...fresh] : prev;
 }
+
+/**
+ * 取得結果を画面へ反映してよいか（security M-2）。
+ * 取引の切替・画面離脱（cancelled）や、要求した取引が今の取引と違う場合は破棄する
+ * （遅れて返った別取引のメッセージを一覧へ混ぜない・離脱後に schedule や setState をしない）。
+ */
+export function shouldApplyFetchResult(params: {
+  requestedTransactionId: string | undefined;
+  currentTransactionId: string | undefined;
+  cancelled: boolean;
+}): boolean {
+  if (params.cancelled) return false;
+  if (!params.requestedTransactionId) return false;
+  return params.requestedTransactionId === params.currentTransactionId;
+}

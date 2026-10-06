@@ -492,7 +492,7 @@ export default function UserCaseDetailPage() {
       ) : null}
       {isAdminViewing ? (
         <Notice tone="info">
-          運営として、依頼者の画面を表示しています。ここでの操作は依頼者の取引に反映され、当事者に通知される場合があります。必要なときだけ操作してください。
+          運営として、依頼者の画面を表示しています。ここでの操作は依頼者の取引に反映され、当事者に通知される場合があります。必要なときだけ操作してください。ただし、減額の承認・却下と日程の確定は依頼者本人だけが行えます。
         </Notice>
       ) : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
@@ -1011,45 +1011,52 @@ export default function UserCaseDetailPage() {
               <p className="mt-2 rounded-none bg-white/70 p-3 text-sm leading-relaxed text-slate-700">
                 理由: {pendingReduction.reason}
               </p>
-              <div className="mt-3 flex gap-2">
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() =>
-                    setConfirmState({
-                      title: "減額を承認しますか？",
-                      message: "確定額が更新されます。",
-                      confirmLabel: "承認する",
-                      onConfirm: () => {
-                        setConfirmState(null);
-                        void act(() => decideReduction(txn.id, pendingReduction.id, "approve", token!));
-                      },
-                    })
-                  }
-                  className={btnPrimary}
-                >
-                  承認する
-                </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() =>
-                    setConfirmState({
-                      title: "減額申請を却下しますか？",
-                      message: "この操作は元に戻せません。",
-                      confirmLabel: "却下する",
-                      danger: true,
-                      onConfirm: () => {
-                        setConfirmState(null);
-                        void act(() => decideReduction(txn.id, pendingReduction.id, "reject", token!));
-                      },
-                    })
-                  }
-                  className={btnSecondary}
-                >
-                  却下する
-                </button>
-              </div>
+              {/* 減額の承認・却下は依頼者本人だけ（運営の代理閲覧では backend が 403 にするため出さない。security M-1）。 */}
+              {isAdminViewing ? (
+                <p className="mt-3 text-xs text-amber-900" data-testid="reduction-admin-note">
+                  減額の承認・却下は依頼者本人だけが行えます（運営は代理で判断できません）。
+                </p>
+              ) : (
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() =>
+                      setConfirmState({
+                        title: "減額を承認しますか？",
+                        message: "確定額が更新されます。",
+                        confirmLabel: "承認する",
+                        onConfirm: () => {
+                          setConfirmState(null);
+                          void act(() => decideReduction(txn.id, pendingReduction.id, "approve", token!));
+                        },
+                      })
+                    }
+                    className={btnPrimary}
+                  >
+                    承認する
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() =>
+                      setConfirmState({
+                        title: "減額申請を却下しますか？",
+                        message: "この操作は元に戻せません。",
+                        confirmLabel: "却下する",
+                        danger: true,
+                        onConfirm: () => {
+                          setConfirmState(null);
+                          void act(() => decideReduction(txn.id, pendingReduction.id, "reject", token!));
+                        },
+                      })
+                    }
+                    className={btnSecondary}
+                  >
+                    却下する
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

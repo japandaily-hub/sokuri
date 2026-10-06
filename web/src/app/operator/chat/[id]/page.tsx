@@ -27,7 +27,7 @@ import { ScheduleConfirmedBand } from "@/components/kdz/ScheduleConfirmedBand";
 import { useToken } from "@/components/kdz/Ui";
 import { ChatSystemNotice } from "@/components/kdz/ChatSystemNotice";
 import { stripControlChars } from "@/lib/categories";
-import { advanceCursor, appendNewMessages, cursorToAfterParam } from "@/lib/chat-cursor";
+import { advanceCursor, appendNewMessages, cursorToAfterParam, shouldApplyFetchResult } from "@/lib/chat-cursor";
 import { isSystemNotice } from "@/lib/chat-system-notice";
 import { formatJstDate, formatJstDateSeparator, formatJstDateTime, formatJstTime } from "@/lib/datetime";
 import { isImeComposingKey, messageLengthState } from "@/lib/message-length";
@@ -168,6 +168,12 @@ export default function OperatorChatPage() {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const lastFetchedAtRef = useRef<string | undefined>(undefined);
+  // 今表示している取引の ID。遅れて返った別取引の応答を捨てる判定に使う（security M-2）。
+  // 描画中に書き換えると並行レンダリングで不整合になるため effect で更新する（取得 effect より先に宣言する）。
+  const activeTransactionIdRef = useRef<string | undefined>(transactionId);
+  useEffect(() => {
+    activeTransactionIdRef.current = transactionId;
+  }, [transactionId]);
 
   /* ---- 日程提案カード（候補日の編集 + 送信） ---- */
   const [slots, setSlots] = useState<SlotDraft[]>(() => [emptySlotDraft()]);
@@ -222,9 +228,12 @@ export default function OperatorChatPage() {
     if (!token || !transactionId) return;
     try {
       const d = await getTransaction(transactionId, token);
+      // 取引を切り替えた後に遅れて返った別取引の詳細は捨てる（security M-2）。
+      if (activeTransactionIdRef.current !== transactionId) return;
       setDetail(d);
       setDetailError(null);
     } catch (e) {
+      if (activeTransactionIdRef.current !== transactionId) return;
       setDetailError(toDisplayMessage(e, "成約情報の取得に失敗しました"));
     }
   }, [token, transactionId]);
@@ -235,13 +244,22 @@ export default function OperatorChatPage() {
 
   /* ---- メッセージ取得（初回全件 + ポーリング差分） ---- */
   const fetchMessages = useCallback(
-    async (initial: boolean) => {
+    async (initial: boolean, signal?: AbortSignal) => {
       if (!token || !transactionId) return;
+      // 呼び出し時点の取引を保持し、反映前に「今も同じ取引か・中止されていないか」を確かめる（security M-2）。
+      const requestedTransactionId = transactionId;
+      const canApply = () =>
+        shouldApplyFetchResult({
+          requestedTransactionId,
+          currentTransactionId: activeTransactionIdRef.current,
+          cancelled: signal?.aborted === true,
+        });
       try {
         // after は保持カーソルの 5 秒手前（同秒・自分の送信との前後による取りこぼしを避ける。QA M2）。
         // 重なって返った分は id で重複排除する。
         const after = initial ? undefined : cursorToAfterParam(lastFetchedAtRef.current);
-        const batch = await listMessages(transactionId, token, after);
+        const batch = await listMessages(transactionId, token, after, signal);
+        if (!canApply()) return;
         if (batch.length > 0) {
           // カーソルは「取得したメッセージの最大 created_at」だけで進める（自分の送信・提示では進めない）。
           lastFetchedAtRef.current = advanceCursor(initial ? undefined : lastFetchedAtRef.current, batch);
@@ -259,6 +277,7 @@ export default function OperatorChatPage() {
         }
         setMessagesError(null);
       } catch (e) {
+        if (!canApply()) return;
         setMessagesError(toDisplayMessage(e, "メッセージの取得に失敗しました"));
       }
     },
@@ -266,9 +285,13 @@ export default function OperatorChatPage() {
   );
 
   useEffect(() => {
+    // 取引の切替でカーソルと一覧をリセットし、前の取引の取得は中止する（security M-2）。
     lastFetchedAtRef.current = undefined;
     setMessages([]);
-    void fetchMessages(true);
+    setMessagesError(null);
+    const controller = new AbortController();
+    void fetchMessages(true, controller.signal);
+    return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transactionId, token]);
 
@@ -276,16 +299,23 @@ export default function OperatorChatPage() {
   useEffect(() => {
     if (!token || !transactionId) return;
     let timer: number | undefined;
+    // cleanup（取引の切替・画面を離れる）で true にし、await の後は schedule も反映もしない（security M-2）。
+    let cancelled = false;
+    const controller = new AbortController();
     function schedule() {
       timer = window.setTimeout(async () => {
+        if (cancelled) return;
         if (!document.hidden) {
-          await fetchMessages(false);
+          await fetchMessages(false, controller.signal);
         }
+        if (cancelled) return;
         schedule();
       }, POLL_INTERVAL_MS);
     }
     schedule();
     return () => {
+      cancelled = true;
+      controller.abort();
       if (timer !== undefined) window.clearTimeout(timer);
     };
   }, [token, transactionId, fetchMessages]);

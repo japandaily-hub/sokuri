@@ -1,7 +1,7 @@
 /** chat-cursor の境界テスト（同秒・重なり窓・自分の送信・空応答）。 */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { advanceCursor, appendNewMessages, cursorToAfterParam, latestCreatedAt } from "./chat-cursor.ts";
+import { advanceCursor, appendNewMessages, cursorToAfterParam, latestCreatedAt, shouldApplyFetchResult } from "./chat-cursor.ts";
 
 const m = (id: string, created_at: string) => ({ id, created_at });
 
@@ -65,5 +65,21 @@ describe("appendNewMessages", () => {
     assert.equal(appendNewMessages(prev, []), prev);
     assert.equal(appendNewMessages(prev, [m("a", "x")]), prev);
     assert.equal(appendNewMessages([], [m("z", "x"), m("z", "x")]).length, 1);
+  });
+});
+
+describe("shouldApplyFetchResult（取引切替・離脱後の応答の破棄）", () => {
+  it("同じ取引で未キャンセルなら反映する", () => {
+    assert.equal(shouldApplyFetchResult({ requestedTransactionId: "t1", currentTransactionId: "t1", cancelled: false }), true);
+  });
+  it("キャンセル済みなら破棄する", () => {
+    assert.equal(shouldApplyFetchResult({ requestedTransactionId: "t1", currentTransactionId: "t1", cancelled: true }), false);
+  });
+  it("要求した取引と今の取引が違えば破棄する", () => {
+    assert.equal(shouldApplyFetchResult({ requestedTransactionId: "t1", currentTransactionId: "t2", cancelled: false }), false);
+  });
+  it("取引 ID が無ければ破棄する", () => {
+    assert.equal(shouldApplyFetchResult({ requestedTransactionId: undefined, currentTransactionId: undefined, cancelled: false }), false);
+    assert.equal(shouldApplyFetchResult({ requestedTransactionId: "", currentTransactionId: "", cancelled: false }), false);
   });
 });

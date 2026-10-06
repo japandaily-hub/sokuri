@@ -411,9 +411,11 @@ export function listMessages(
   transactionId: string,
   token: string,
   after?: string,
+  /** 取引の切替・画面離脱で古い要求を中止する（別の取引のメッセージを混ぜない）。 */
+  signal?: AbortSignal,
 ): Promise<MessageOut[]> {
   const query = after ? `?after=${encodeURIComponent(after)}` : "";
-  return request(`/transactions/${encodeURIComponent(transactionId)}/messages${query}`, { token });
+  return request(`/transactions/${encodeURIComponent(transactionId)}/messages${query}`, { token, signal });
 }
 
 export function sendMessage(
