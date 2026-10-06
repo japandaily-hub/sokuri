@@ -43,6 +43,14 @@ export function withReviewReportPrefix(reviewId: string, message: string): strin
 }
 
 /**
+ * 未対応のお問い合わせ本文の一覧から、口コミの報告（先頭行が件名行の問い合わせ）の件数を数える。
+ * 運営ダッシュボードの「今日の未対応」用（backend に種別・フラグが無いため本文の先頭行で判定する）。
+ */
+export function countReviewReports(messages: readonly string[]): number {
+  return messages.filter((message) => extractReviewIdFromMessage(message) !== null).length;
+}
+
+/**
  * withReviewReportPrefix の逆変換。本文の先頭行が完全一致のときだけ口コミ ID を返す
  * （/admin/contacts の「該当の口コミを開く」導線）。先頭行以外に同じ文言が現れても無視する。
  */

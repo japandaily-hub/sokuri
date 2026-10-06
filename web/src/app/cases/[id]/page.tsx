@@ -1065,9 +1065,9 @@ export default function UserCaseDetailPage() {
                     title: completionBeforeVisit
                       ? "まだ訪問日の前です。作業完了を確定しますか？"
                       : "作業完了を確定しますか？",
-                    message: completionBeforeVisit
+                    message: (isAdminViewing ? "運営として、依頼者に代わって確定します。" : "") + (completionBeforeVisit
                       ? `${txn.visit_date ? `訪問予定は${formatVisitSchedule(txn.visit_date, txn.visit_time_slot)}です。` : "訪問日がまだ決まっていません。"}作業がまだ終わっていない場合は押さないでください。確定すると取引は完了になり、業者とのチャットも送れなくなります。この操作は元に戻せません。`
-                      : "確定すると取引は完了になり、業者とのチャットも送れなくなります。この操作は元に戻せません。確定後は評価を投稿できます。",
+                      : "確定すると取引は完了になり、業者とのチャットも送れなくなります。この操作は元に戻せません。確定後は評価を投稿できます。"),
                     confirmLabel: "確定する",
                     danger: completionBeforeVisit,
                     onConfirm: () => {

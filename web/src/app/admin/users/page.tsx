@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Spinner } from "@/components/Icon";
 import { formatAdminDateTime } from "@/lib/admin-datetime";
+import { isTypedNameMatch } from "@/lib/confirm-input";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import { Card, Notice, PageShell, StatusBadge, btnDanger, btnPrimary, btnSecondary, inputBase, useToken } from "@/components/kdz/Ui";
 import { AdminPagination } from "../_components/AdminPagination";
@@ -112,8 +113,13 @@ export default function AdminUsersPage() {
     }
   }
 
-  async function confirmDelete() {
+  async function confirmDelete(typedEmail: string | null) {
     if (!deleteTarget || !token || busy) return;
+    // 取り消せない操作なので、メールアドレスの入力一致（取り違え防止）を求める。業者の削除と同じ強さ。
+    if (!isTypedNameMatch(typedEmail, deleteTarget.email)) {
+      setDeleteModalError("入力したメールアドレスが一致しません。削除するユーザーのメールアドレスをそのまま入力してください。");
+      return;
+    }
     setBusy(true);
     setDeleteModalError(null);
     setNotice(null);
@@ -265,7 +271,7 @@ export default function AdminUsersPage() {
                       {isDeleted ? (
                         <StatusBadge value="cancelled" label="退会済み" />
                       ) : u.role === "admin" ? (
-                        <StatusBadge value="approved" label="admin" />
+                        <StatusBadge value="approved" label="運営" />
                       ) : u.is_suspended ? (
                         <StatusBadge value="cancelled" label="停止中" />
                       ) : (
@@ -416,13 +422,16 @@ export default function AdminUsersPage() {
           message="削除すると、このユーザーは匿名化されログイン・案件作成ができなくなります。取引・メッセージ・レビューは業者側の記録として保持されますが、この操作は取り消せません。よろしいですか？"
           confirmLabel="削除する"
           danger
+          withReason
+          reasonRequired
+          reasonLabel={`確認のため、削除するユーザーのメールアドレス「${deleteTarget.email}」をそのまま入力してください`}
           error={deleteModalError}
           busy={busy}
           onCancel={() => {
             setDeleteModalError(null);
             setDeleteTarget(null);
           }}
-          onConfirm={() => void confirmDelete()}
+          onConfirm={(typedEmail) => void confirmDelete(typedEmail)}
         />
       ) : null}
     </div>

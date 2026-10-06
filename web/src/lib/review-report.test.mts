@@ -12,6 +12,7 @@ import { describe, it } from "node:test";
 import {
   buildReviewReportMessagePrefix,
   buildReviewReportSubject,
+  countReviewReports,
   extractReviewIdFromMessage,
   parseReviewReportSubject,
   withReviewReportPrefix,
@@ -71,5 +72,21 @@ describe("buildReviewReportMessagePrefix / withReviewReportPrefix / extractRevie
   it("件名行が無い・形式が崩れている場合は null", () => {
     assert.equal(extractReviewIdFromMessage("いつもお世話になっております。"), null);
     assert.equal(extractReviewIdFromMessage("報告する口コミ: not-a-uuid\n本文"), null);
+  });
+});
+
+describe("countReviewReports", () => {
+  it("先頭行が件名行の問い合わせだけを数える", () => {
+    assert.equal(
+      countReviewReports([
+        withReviewReportPrefix(SAMPLE_ID, "内容"),
+        "通常の問い合わせです",
+        `前置き
+${withReviewReportPrefix(SAMPLE_ID, "")}`,
+        withReviewReportPrefix(SAMPLE_ID, ""),
+      ]),
+      2,
+    );
+    assert.equal(countReviewReports([]), 0);
   });
 });

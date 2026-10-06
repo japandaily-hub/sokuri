@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Spinner } from "@/components/Icon";
 import { isTypedNameMatch } from "@/lib/confirm-input";
+import { countReviewReports } from "@/lib/review-report";
 import { formatAdminDate } from "@/lib/admin-datetime";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import {
@@ -45,6 +46,9 @@ import {
   type InviteOut,
   type OperatorOut,
 } from "@/lib/katadzuke-api";
+
+/** 「今日の未対応」の口コミ報告の内数を数えるために読む、未対応お問い合わせの先頭件数。 */
+const CONTACT_SCAN_LIMIT = 100;
 
 const VENDOR_STATUS_LABEL: Record<string, { label: string; badgeValue: string }> = {
   active: { label: "稼働中", badgeValue: "completed" },
@@ -101,6 +105,9 @@ export default function AdminPage() {
   /** 未対応のお問い合わせ件数（r10 O-M6）。handled=false&limit=1 の total を使う。 */
   const [unhandledContacts, setUnhandledContacts] = useState<number | null>(null);
   const [unhandledContactsError, setUnhandledContactsError] = useState<string | null>(null);
+  /** 未対応のお問い合わせのうち口コミの報告の件数（先頭 CONTACT_SCAN_LIMIT 件の本文で判定）。 */
+  const [unhandledReviewReports, setUnhandledReviewReports] = useState<number | null>(null);
+  const [reviewReportsTruncated, setReviewReportsTruncated] = useState(false);
 
   const [suspendTarget, setSuspendTarget] = useState<OperatorOut | null>(null);
   // r5-fix-frontend M-2: 失敗時にモーダルを閉じず、ConfirmModal の error prop へ表示する
@@ -189,7 +196,8 @@ export default function AdminPage() {
           adminListOperatorApplications({ status: "received", limit: 1, offset: 0 }, token),
           // r10 O-M1 / O-M6: 件数バッジ専用の最小取得（limit=1）。本文は各専用画面で読む。
           listIdentityDocumentsAdmin({ status: "pending", limit: 1, offset: 0 }, token),
-          adminListContacts({ handled: false, limit: 1, offset: 0 }, token),
+          // 件数（total）に加え、口コミの報告の内数を数えるため本文を先頭 CONTACT_SCAN_LIMIT 件まで読む。
+          adminListContacts({ handled: false, limit: CONTACT_SCAN_LIMIT, offset: 0 }, token),
         ]);
 
       if (invResult.status === "fulfilled") {
@@ -234,6 +242,8 @@ export default function AdminPage() {
 
       if (contactsResult.status === "fulfilled") {
         setUnhandledContacts(contactsResult.value.total);
+        setUnhandledReviewReports(countReviewReports(contactsResult.value.items.map((m) => m.message)));
+        setReviewReportsTruncated(contactsResult.value.total > contactsResult.value.items.length);
         setUnhandledContactsError(null);
       } else {
         setUnhandledContactsError(
@@ -445,10 +455,11 @@ export default function AdminPage() {
   ];
 
   /** M-5: 運営が最初に見る「今日の未対応」。件数は各バッジと同じ取得結果を使う。 */
-  const todoItems: { label: string; count: number | null; error: boolean; href: string }[] = [
+  const todoItems: { label: string; count: number | null; error: boolean; href: string; atLeast?: boolean }[] = [
     { label: "事前申込（未審査）", count: pendingApplications, error: Boolean(pendingApplicationsError), href: "/admin/operator-applications" },
     { label: "本人確認書類（審査待ち）", count: pendingIdentityDocs, error: Boolean(pendingIdentityDocsError), href: "/admin/identity-documents" },
     { label: "お問い合わせ（未対応）", count: unhandledContacts, error: Boolean(unhandledContactsError), href: "/admin/contacts" },
+    { label: "口コミの報告（未対応）", count: unhandledReviewReports, error: Boolean(unhandledContactsError), href: "/admin/contacts", atLeast: reviewReportsTruncated },
     { label: "許可証の確認待ちの業者", count: c ? c.pending_with_license : null, error: Boolean(operatorListError), href: "#operator-accounts" },
   ];
 
@@ -535,7 +546,7 @@ export default function AdminPage() {
         <h2 id="admin-todo-heading" className="text-sm font-semibold text-kdz-ink">
           今日の未対応
         </h2>
-        <ul className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-4">
+        <ul className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-5">
           {todoItems.map((item) => {
             const hasTodo = item.count !== null && item.count > 0;
             return (
@@ -548,7 +559,7 @@ export default function AdminPage() {
                 >
                   <span className="block text-xs">{item.label}</span>
                   <span className="mt-1 block text-2xl font-semibold">
-                    {item.error ? "取得失敗" : item.count === null ? "…" : `${item.count}件`}
+                    {item.error ? "取得失敗" : item.count === null ? "…" : `${item.count}件${item.atLeast ? "以上" : ""}`}
                   </span>
                 </Link>
               </li>
@@ -856,7 +867,9 @@ export default function AdminPage() {
             </div>
           ) : null}
           {cellDensity && cellDensity.length > 0 ? (
-            <div className="mt-4 overflow-x-auto" tabIndex={0} role="region" aria-label="セル密度一覧">
+            <>
+            <p className="mt-3 text-xs text-slate-500 sm:hidden">表は横にスクロールできます（← →）。</p>
+            <div className="mt-1 overflow-x-auto sm:mt-4" tabIndex={0} role="region" aria-label="セル密度一覧（横にスクロールできます）">
               <table className="w-full min-w-[720px] text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
@@ -897,6 +910,7 @@ export default function AdminPage() {
                 </tbody>
               </table>
             </div>
+            </>
           ) : cellDensity && cellDensity.length === 0 ? (
             <p className="mt-4 text-sm text-slate-500">直近30日に案件はありません。</p>
           ) : cellDensityError ? null : (
