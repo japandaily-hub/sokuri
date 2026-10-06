@@ -30,6 +30,9 @@ import { useToken } from "@/components/kdz/Ui";
 import { ChatSystemNotice } from "@/components/kdz/ChatSystemNotice";
 import { stripControlChars } from "@/lib/categories";
 import { isSystemNotice } from "@/lib/chat-system-notice";
+import { formatJstDateSeparator, formatJstDateTime, formatJstTime } from "@/lib/datetime";
+import { isImeComposingKey, messageLengthState } from "@/lib/message-length";
+import { MessageLengthCounter } from "@/components/kdz/MessageLengthCounter";
 import {
   acceptScheduleCandidate,
   CANCELLED_BY_LABEL,
@@ -53,16 +56,9 @@ import {
 
 const POLL_INTERVAL_MS = 5000;
 
-function formatTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
-}
-function formatDateSep(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("ja-JP", { month: "long", day: "numeric", weekday: "short" });
-}
+// 時刻・日付区切りは lib/datetime.ts（時差情報のない API 日時は UTC として解釈し、日本時間で表示）。
+const formatTime = formatJstTime;
+const formatDateSep = formatJstDateSeparator;
 
 /* ---- カレンダー線画（スプライト未収録のため inline。絵文字は使わない） ---- */
 function CalendarIc({ className }: { className?: string }) {
@@ -238,6 +234,8 @@ export function ChatPanel({
   async function handleSend() {
     const text = draft.trim();
     if (!text || !token || !transactionId || sending) return;
+    // 上限超過は送信前に止める（理由は入力欄の下のカウンタに出ている。V-05）。
+    if (messageLengthState(text).over) return;
     setSending(true);
     try {
       const sent = await sendMessage(transactionId, text, token);
@@ -298,6 +296,8 @@ export function ChatPanel({
     }
   }
 
+  // 入力中の本文の文字数状態（上限超過なら送信ボタンを無効化し、カウンタに理由を出す）。
+  const draftLength = messageLengthState(draft);
   const biz = detail?.operator ?? null;
   const bizInitial = biz?.company_name?.charAt(0) ?? "業";
   // r8-fix-frontend2 H3 是正: キャンセル済み・完了済みの取引ではチャットの続行操作
@@ -480,7 +480,7 @@ export function ChatPanel({
                     キャンセル: {CANCELLED_BY_LABEL[detail.cancellation.cancelled_by]}による
                   </p>
                   <p style={{ marginTop: 4, fontSize: 12, color: "var(--body-soft)" }}>
-                    {new Date(detail.cancellation.cancelled_at).toLocaleString("ja-JP")}
+                    {formatJstDateTime(detail.cancellation.cancelled_at)}
                   </p>
                   {detail.cancellation.reason ? (
                     <p style={{ marginTop: 4, wordBreak: "break-word" }}>理由: {detail.cancellation.reason}</p>
@@ -598,19 +598,22 @@ export function ChatPanel({
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
+                  // 日本語入力の変換確定の Enter では送信しない（seller H-1）。Enter 送信自体は維持。
+                  if (e.key === "Enter" && !e.shiftKey && !isImeComposingKey(e)) {
                     e.preventDefault();
                     void handleSend();
                   }
                 }}
                 aria-label="メッセージを入力"
+                aria-describedby={`chat-length-${transactionId}`}
+                aria-invalid={draftLength.over || undefined}
                 disabled={sending}
               />
               <button
                 type="button"
                 className="btn-send"
                 aria-label="送信"
-                disabled={!draft.trim() || sending}
+                disabled={!draft.trim() || sending || draftLength.over}
                 onClick={() => void handleSend()}
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -618,6 +621,7 @@ export function ChatPanel({
                   <path d="M22 2L15 22l-4-9-9-4 20-7z" />
                 </svg>
               </button>
+              <MessageLengthCounter id={`chat-length-${transactionId}`} text={draft} />
             </div>
           )}
         </>

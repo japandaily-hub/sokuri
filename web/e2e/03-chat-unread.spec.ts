@@ -61,7 +61,7 @@ test("依頼者の送信が業者側で未読になり、業者の候補日提�
 
   // ---- 業者: 別 context で未読を確認 ----
   // browser.newContext() ではなく newE2EContext()。375px 幅では左下の next dev 用
-  // インジケーターが入力欄左端の「日程を提案」に重なるため、それを消したコンテキストで開く。
+  // インジケーターが入力欄上の「引き取り日程を提案」に重なるため、それを消したコンテキストで開く。
   const vendorContext: BrowserContext = await newE2EContext(browser);
   const vendorPage: Page = await vendorContext.newPage();
   try {
@@ -80,7 +80,7 @@ test("依頼者の送信が業者側で未読になり、業者の候補日提�
     await expect(vendorPage.getByText(reply)).toBeVisible({ timeout: 30_000 });
 
     // ---- 業者: 候補日提案 ----
-    await vendorPage.getByRole("button", { name: "日程を提案", exact: true }).click();
+    await vendorPage.getByRole("button", { name: "引き取り日程を提案", exact: true }).click();
     await expect(vendorPage.getByText("引き取り候補日を提案する")).toBeVisible();
 
     // 送信前に「提示した候補日」リスト全体（複数メッセージぶんの ul をまとめて対象にする）の中で
