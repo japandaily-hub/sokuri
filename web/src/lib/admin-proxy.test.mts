@@ -11,7 +11,8 @@ describe("shouldShowProxyBanner", () => {
   it("運営が依頼者・業者向けの画面を開いたときだけ出す", () => {
     assert.equal(shouldShowProxyBanner("/cases/abc", "admin"), true);
     assert.equal(shouldShowProxyBanner("/chat/123", "admin"), true);
-    assert.equal(shouldShowProxyBanner("/mypage", "admin"), true);
+    assert.equal(shouldShowProxyBanner("/mypage", "admin"), false);
+    assert.equal(shouldShowProxyBanner("/notifications", "admin"), false);
     assert.equal(shouldShowProxyBanner("/operator", "admin"), true);
     assert.equal(shouldShowProxyBanner("/operator/cases/1", "admin"), true);
     assert.equal(shouldShowProxyBanner("/create", "admin"), true);

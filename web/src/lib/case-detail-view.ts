@@ -27,6 +27,23 @@ export function buildHousingAttributes(input: {
 }
 
 /**
+ * 案件の説明（ai_summary）のうち、画面に出す価値があるものだけを返す（それ以外は null）。
+ * AI が説明を作れなかったときの定型（backend の build_fallback_summary:
+ * 「利用目的: …。住居: …（…）。写真 N 枚。詳細は写真を確認してください。」）は、利用目的・住居・
+ * 写真枚数という他の欄と重複する事実の羅列で、「詳細は写真を確認してください」は説明の代わりに
+ * ならない。説明と呼べる内容が無いので何も出さない（M-4）。空・空白だけも null。
+ */
+const FALLBACK_SUMMARY_PATTERN = /^利用目的:[^。]*。(住居:[^。]*。)?写真 \d+ 枚。詳細は写真を確認してください。$/;
+
+export function meaningfulCaseSummary(summary: string | null | undefined): string | null {
+  if (summary == null) return null;
+  const text = summary.trim();
+  if (text === "") return null;
+  if (FALLBACK_SUMMARY_PATTERN.test(text)) return null;
+  return text;
+}
+
+/**
  * 作業完了の確定が「訪問予定日より前」または「訪問日が未定」か。
  * visitDate・todayJst はどちらも "YYYY-MM-DD"（日本時間の今日）。ISO 日付は文字列比較で大小が付く。
  * 形式が不正な訪問日は安全側（警告を出す側）に倒す。

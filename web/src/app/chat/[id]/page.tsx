@@ -40,6 +40,8 @@ export default function ChatPage() {
   const { token } = useToken();
   const { data: sessionData } = useSession();
 
+  const isAdminViewing = sessionData?.role === "admin";
+
   /* ---- サイドバー: 自分の成約案件一覧 ---- */
   const [transactions, setTransactions] = useState<TransactionListItem[]>([]);
   const [sideLoading, setSideLoading] = useState(true);
@@ -53,6 +55,11 @@ export default function ChatPage() {
   /* ---- サイドバー: 成約一覧取得 ---- */
   useEffect(() => {
     if (!token) return;
+    // 運営の代理閲覧では運営「自身」の成約一覧（常に空）を出さない（運営監査 N-4(b)）。
+    if (isAdminViewing) {
+      setSideLoading(false);
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
@@ -67,7 +74,7 @@ export default function ChatPage() {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, isAdminViewing]);
 
   useEffect(() => {
     if (!sideToast) return;
@@ -112,6 +119,10 @@ export default function ChatPage() {
           <div className="biz-sidebar-head">成約案件</div>
           {sideLoading ? (
             <div style={{ padding: 14, fontSize: 12.5, color: "var(--body-soft)" }}>読み込み中…</div>
+          ) : isAdminViewing ? (
+            <div style={{ padding: 14, fontSize: 12.5, color: "var(--body-soft)", lineHeight: 1.6 }}>
+              運営として、この取引だけを表示しています
+            </div>
           ) : transactions.length === 0 ? (
             <div style={{ padding: 14, fontSize: 12.5, color: "var(--body-soft)" }}>成約済みの案件はありません</div>
           ) : (
@@ -142,7 +153,7 @@ export default function ChatPage() {
           transactionId={transactionId}
           variant="standalone"
           onDetailChange={setDetail}
-          readOnly={sessionData?.role === "admin"}
+          readOnly={isAdminViewing}
         />
       </div>
 

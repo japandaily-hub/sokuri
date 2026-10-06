@@ -8,9 +8,7 @@
 export const PROXY_VIEW_PREFIXES = [
   "/cases",
   "/chat",
-  "/mypage",
   "/applications",
-  "/notifications",
   "/business",
   "/vendors",
   "/schedule",
@@ -20,6 +18,11 @@ export const PROXY_VIEW_PREFIXES = [
   "/operator",
   "/create",
 ] as const;
+
+/**
+ * 帯の対象外にした /mypage・/notifications は、運営「自身」のアカウントの画面（依頼者のものではない）。
+ * 代理閲覧の帯を出すと「誰の画面か」が分からなくなるため出さない（運営監査 N-4(a)）。
+ */
 
 /** 上の接頭辞配下でも帯を出さない認証画面（業者のログイン・登録などは代理閲覧ではない）。 */
 export const PROXY_VIEW_EXCLUDED_PREFIXES = ["/operator/login", "/operator/signup"] as const;

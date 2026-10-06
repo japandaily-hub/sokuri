@@ -413,11 +413,16 @@
   display: flex;
   flex-wrap: wrap; /* 文字数カウンタを入力行の下に出す */
   gap: 10px;
-  align-items: center;
+  align-items: flex-end;
   flex-shrink: 0;
 }
 .chat-page .msg-input {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0; /* 狭い画面でも送信ボタンを入力欄の右に保つ（折り返さない） */
+  resize: none;
+  max-height: 140px;
+  line-height: 1.5;
+  overflow-y: auto;
   background: var(--pale-2);
   border: 1.5px solid var(--line);
   border-radius: 0;

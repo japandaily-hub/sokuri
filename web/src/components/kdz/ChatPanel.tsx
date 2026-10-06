@@ -124,6 +124,14 @@ export function ChatPanel({
   const [messages, setMessages] = useState<MessageOut[]>([]);
   const [messagesError, setMessagesError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const draftRef = useRef<HTMLTextAreaElement | null>(null);
+  // 入力欄の高さを内容に合わせる（上限は chat.css の max-height。超えた分は欄内スクロール）。
+  useEffect(() => {
+    const el = draftRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [draft]);
   const [sending, setSending] = useState(false);
   const lastFetchedAtRef = useRef<string | undefined>(undefined);
 
@@ -501,7 +509,7 @@ export function ChatPanel({
           ) : (
             <div className="line-banner">
               <span className="line-dot" aria-hidden="true" />
-              新着メッセージの通知は、LINE連携済みの方にLINEでお知らせします（メールでの新着通知はありません）。返信はこのページで行えます。
+              新着メッセージは、LINE連携済みの方はLINE、未連携の方はメールでお知らせします（受信設定に従い、同じ取引は5分に1通まで。読むまでは再送しません）。返信はこのページで行えます。
             </div>
           )}
 
@@ -608,8 +616,9 @@ export function ChatPanel({
             </div>
           ) : (
             <div className="input-area">
-              <input
-                type="text"
+              <textarea
+                ref={draftRef}
+                rows={1}
                 className="msg-input"
                 placeholder="メッセージを入力…"
                 value={draft}

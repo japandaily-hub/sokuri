@@ -27,8 +27,8 @@ export function AdminProxyBanner() {
       data-testid="admin-proxy-banner"
     >
       <strong className="font-semibold">運営が代理で閲覧中です。</strong>
-      この画面は依頼者・業者の画面そのままで、確定・変更などの操作は当事者に反映されます。
-      {disableChat ? "チャットは運営として送信できないため、入力欄を無効にしています。" : null}{" "}
+      この画面は依頼者・業者の画面そのままで、完了の確定などの操作は当事者に反映されます（取引のキャンセルや評価の投稿は運営からはできません）。
+      {disableChat ? "チャットは運営として送信できないため、入力欄は表示していません。" : null}{" "}
       <Link href="/admin" className="underline">
         運営画面へ戻る
       </Link>

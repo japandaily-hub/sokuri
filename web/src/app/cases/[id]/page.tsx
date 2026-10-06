@@ -17,7 +17,7 @@ import { ConfirmModal } from "@/components/kdz/ConfirmModal";
 import { formatJstDateTime } from "@/lib/datetime";
 import { formatVisitSchedule } from "@/lib/categories";
 import { jstTodayIso } from "@/lib/visit-slots";
-import { buildHousingAttributes, isCaseIdFormat, isCompletionBeforeVisit } from "@/lib/case-detail-view";
+import { buildHousingAttributes, isCaseIdFormat, isCompletionBeforeVisit, meaningfulCaseSummary } from "@/lib/case-detail-view";
 import { formatPurposeLabel } from "@/lib/case-labels";
 import {
   Card,
@@ -484,7 +484,8 @@ export default function UserCaseDetailPage() {
     <>
     <AppHeader />
     <div className="container-aw max-w-3xl space-y-6 py-10">
-      {search.get("created") ? (
+      {/* 取り下げ済みの案件に「受け付けました」を残すと矛盾するため、受付中の案件だけに出す。 */}
+      {search.get("created") && caseData.status !== "cancelled" ? (
         <Notice tone="success">
           出品を受け付けました。業者から入札が届くと、LINE連携済みの方はLINEで、未連携の方はメールでお知らせします。
         </Notice>
@@ -509,7 +510,10 @@ export default function UserCaseDetailPage() {
               <p className="mt-0.5 text-xs text-slate-400">{housingAttributes.join(" / ")}</p>
             ) : null}
           </div>
-          <StatusBadge value={caseData.status} label={CASE_STATUS_LABEL[caseData.status]} />
+          <StatusBadge
+            value={caseData.status}
+            label={caseData.status === "cancelled" && !txn ? "取り下げ済み" : CASE_STATUS_LABEL[caseData.status]}
+          />
         </div>
         {caseData.status === "cancelled" ? (
           <div className="mt-3 w-full rounded-none border border-slate-200 bg-slate-50 p-3 text-sm leading-relaxed text-slate-600" role="status">
@@ -549,8 +553,8 @@ export default function UserCaseDetailPage() {
                       ) : null}
                     </div>
                   ) : null}
-                  {album.description ? (
-                    <p className="mt-0.5 text-xs leading-relaxed text-slate-500">{album.description}</p>
+                  {meaningfulCaseSummary(album.description) ? (
+                    <p className="mt-0.5 text-xs leading-relaxed text-slate-500">{meaningfulCaseSummary(album.description)}</p>
                   ) : null}
                 </div>
                 {item && canEditCase && !isEditing ? (
@@ -720,13 +724,13 @@ export default function UserCaseDetailPage() {
               品物の説明を自動で作れませんでした。写真と入力内容で入札を受け付けます。
             </p>
           </div>
-        ) : caseData.ai_summary ? (
+        ) : meaningfulCaseSummary(caseData.ai_summary) ? (
           <div className="mt-4 rounded-none bg-slate-50 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
               品物の説明（業者に表示されます）
             </p>
             <p className="mt-1.5 text-sm leading-relaxed text-slate-700">
-              {caseData.ai_summary}
+              {meaningfulCaseSummary(caseData.ai_summary)}
             </p>
           </div>
         ) : null}
@@ -1102,7 +1106,8 @@ export default function UserCaseDetailPage() {
                   </Link>
                 </div>
               </div>
-            ) : (
+            ) : isAdminViewing ? null : (
+              // 評価は案件の所有者だけが投稿できる（運営の代理閲覧では backend が 403 にするため出さない）。
               <div className="mt-4 rounded-none border border-slate-200 p-4">
                 <p className="font-normal text-slate-900">業者を評価する</p>
                 <ReviewComposer
@@ -1126,7 +1131,8 @@ export default function UserCaseDetailPage() {
             ))}
 
           {/* 取引のキャンセル（取り消し不能）。作業完了ボタンと並べず、画面下部の弱いリンクにする。 */}
-          {txn.status === "pending" || txn.status === "visiting" ? (
+          {/* 運営の代理閲覧では出さない（backend は運営名義のキャンセルを 403 にする。運営の強制終了は /admin/transactions）。 */}
+          {(txn.status === "pending" || txn.status === "visiting") && !isAdminViewing ? (
             <div className="mt-10 border-t border-slate-200 pt-4">
               <button
                 type="button"
@@ -1134,12 +1140,12 @@ export default function UserCaseDetailPage() {
                 onClick={() => {
                   setConfirmState({
                     title: "この取引をキャンセルしますか？",
-                    message: "案件は終了し、この操作は元に戻せません。理由は業者に共有されます。",
+                    message: "案件は終了し、この操作は元に戻せません。理由を書いた場合は業者に共有されます（書かなくても取り消せます）。",
                     confirmLabel: "取引をキャンセルする",
                     danger: true,
                     withReason: true,
-                    reasonRequired: true,
-                    reasonLabel: "キャンセルの理由（業者に共有されます）",
+                    reasonRequired: false,
+                    reasonLabel: "キャンセルの理由（任意・書いた場合は業者に共有されます）",
                     onConfirm: (reason) => {
                       setConfirmState(null);
                       void act(() => cancelTransaction(txn.id, reason, token!));

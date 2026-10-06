@@ -127,6 +127,7 @@ function NotificationsContent() {
 
   const reload = useCallback(async () => {
     if (!token) return;
+    setError(null);
     try {
       setCases(await listMyCases(token));
     } catch (e) {
@@ -181,7 +182,7 @@ function NotificationsContent() {
     const linked = searchParams.get("linked");
     const err = searchParams.get("error");
     if (linked === "1") {
-      setLineNotice({ tone: "success", text: "LINE連携が完了しました。今後は入札の通知はメールの代わりにLINEへ届きます。チャットの新着通知はLINE連携中のみ届きます（連携を解除するとチャット通知は届きません）。" });
+      setLineNotice({ tone: "success", text: "LINE連携が完了しました。今後は入札とチャットの新着の通知がメールの代わりにLINEへ届きます。" });
       // r3 再レビュー3回目 是正: LINE連携成功（=認証が正常往復した）経路でもループ検知の
       // 発火履歴をリセットする。
       clearRedirectLoopStorage();
@@ -353,7 +354,7 @@ function NotificationsContent() {
                     <>
                       <strong>LINE連携済み</strong>
                       <br />
-                      入札の通知はメールの代わりにLINEへ届きます。チャットの新着通知はLINE連携中のみ届きます（連携を解除するとチャット通知は届きません）。
+                      入札とチャットの新着の通知は、メールの代わりにLINEへ届きます。
                     </>
                   ) : (
                     <>
@@ -466,6 +467,16 @@ function NotificationsContent() {
                     </Link>
                   ))}
                 </div>
+              ) : error ? (
+                // 取得に失敗したときに「新しいお知らせはありません」を出すと、届いている入札を見落とす。
+                // 空状態は出さず、再読み込みだけを出す（マイページ・案件一覧と同じ方式）。
+                <div className="notif-empty" role="alert">
+                  <h3>お知らせを読み込めませんでした</h3>
+                  <p>お知らせが無くなったわけではありません。電波状況をご確認のうえ、もう一度お試しください。</p>
+                  <button type="button" className="btn btn-primary btn-lg" onClick={() => void reload()}>
+                    再読み込み
+                  </button>
+                </div>
               ) : (
                 <div className="notif-empty">
                   <div className="notif-empty-ic">
@@ -492,7 +503,7 @@ function NotificationsContent() {
             <p className="modal-sub">
               {modal === "link"
                 ? "本人確認のため、現在のパスワードを入力してください。"
-                : "解除すると、入札の通知はメールに戻り、チャットの新着通知は届かなくなります。本人確認のため、現在のパスワードを入力してください。"}
+                : "解除すると、入札とチャットの新着の通知はメールに戻ります。本人確認のため、現在のパスワードを入力してください。"}
             </p>
             <form onSubmit={(e) => void onConfirmModal(e)}>
               <Field label="現在のパスワード" htmlFor="line-modal-pw" error={pwErr}>

@@ -36,6 +36,8 @@
   font-size: 13px;
   font-weight: 400;
   color: var(--body-soft);
+  white-space: nowrap; /* 狭い画面でラベルを1文字ずつ縦に折り返さない */
+  flex-shrink: 0;
 }
 .schedule-page .sch-step.done { color: var(--green); }
 .schedule-page .sch-step.active { color: var(--blue); }
@@ -250,12 +252,13 @@
 
 .schedule-page .cal-legend {
   display: flex;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 6px 16px;
   padding: 0 16px 14px;
   font-size: 12px;
   color: var(--body-soft);
 }
-.schedule-page .cal-legend span { display: flex; align-items: center; gap: 5px; }
+.schedule-page .cal-legend span { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
 .schedule-page .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 
 /* 時間帯選択 */
@@ -445,4 +448,8 @@
   .schedule-page .time-slots { grid-template-columns: repeat(2, 1fr); }
   .schedule-page .sch-back-chat { position: static; margin-top: 10px; }
   .schedule-page .sch-progress-inner { flex-direction: column; gap: 8px; }
+}
+@media (max-width: 480px) {
+  .schedule-page .sch-step { font-size: 12px; gap: 5px; }
+  .schedule-page .step-sep { width: 14px; }
 }

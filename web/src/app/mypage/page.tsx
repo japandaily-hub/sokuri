@@ -564,7 +564,7 @@ function MyPageContent() {
         {/* LINE通知誘導（通知トグル群の代替・1行） */}
         <div className="user-card" style={{ marginBottom: 20, padding: "14px 20px" }}>
           <div className="user-card-info" style={{ fontSize: 13, color: "var(--body-soft)" }}>
-            入札の通知は、LINE連携済みの方はLINEで、未連携の方はメールでお知らせします。チャットの新着通知はLINE連携済みの方のみに届きます。
+            入札とチャットの新着は、LINE連携済みの方はLINE、未連携の方はメールでお知らせします（同じ取引のチャットは5分に1通まで。読むまでは再送しません）。
             <Link href="/notifications" style={{ marginLeft: 6, fontWeight: 600 }}>
               通知設定を見る →
             </Link>

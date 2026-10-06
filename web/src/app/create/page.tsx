@@ -17,6 +17,13 @@ import { KdzLogo } from "@/components/kdz/Logo";
 import { useToken } from "@/components/kdz/Ui";
 import { createCase, uploadCasePhoto, toDisplayMessage, createTimeoutSignal, KdzApiError, KdzNetworkError } from "@/lib/katadzuke-api";
 import { CASE_PURPOSES } from "@/lib/case-labels";
+import {
+  CREATE_DRAFT_STORAGE_KEY,
+  isDefaultDraft,
+  parseCreateDraft,
+  serializeCreateDraft,
+  type CreateDraft,
+} from "@/lib/create-draft";
 import "./create.css";
 
 const STEPS = ["写真", "利用目的", "住居情報", "確認"] as const;
@@ -39,6 +46,23 @@ const HINT_ITEMS: { key: string; icon: IcName; label: string }[] = [
   { key: "damage", icon: "zoom", label: "傷・汚れ・色あせ・凹みも隠さずアップで撮る" },
   { key: "tag", icon: "tag", label: "メーカーロゴ・型番シール・タグもアップで撮る" },
 ];
+
+/** 下書き復元の許可リスト（保存値の照合用）と、何も入力していない状態の既定値。 */
+const DRAFT_CHOICES = {
+  purposes: PURPOSES,
+  prefectures: PREFECTURES,
+  housingTypes: HOUSING_TYPES,
+  floorPlans: FLOOR_PLANS,
+} as const;
+const DRAFT_DEFAULTS: CreateDraft = {
+  purpose: PURPOSES[0],
+  prefecture: PREFECTURES[0],
+  city: "",
+  housingType: HOUSING_TYPES[1],
+  floorPlan: FLOOR_PLANS[3],
+  floorNumber: "",
+  hasElevator: false,
+};
 
 type DraftPhoto = { id: string; file: File; previewUrl: string; uploadedKey?: string };
 
@@ -117,6 +141,44 @@ export default function CreateCasePage() {
   const [floorNumber, setFloorNumber] = useState<string>("");
   const [hasElevator, setHasElevator] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // M-8: 入力の下書きを sessionStorage に保存・復元する（テキスト入力だけ。写真・番地・連絡先・同意は対象外）。
+  // 復元は初回表示後に1度だけ行い（SSR との不一致を避ける）、復元が済むまでは保存しない
+  // （既定値で下書きを上書きしないため）。storage が使えない環境（プライベートモード等）では黙って無効。
+  const [draftReady, setDraftReady] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(false);
+  useEffect(() => {
+    try {
+      const restored = parseCreateDraft(window.sessionStorage.getItem(CREATE_DRAFT_STORAGE_KEY), DRAFT_CHOICES);
+      if (restored && !isDefaultDraft(restored, DRAFT_DEFAULTS)) {
+        setPurpose(restored.purpose);
+        setPrefecture(restored.prefecture);
+        setCity(restored.city);
+        setHousingType(restored.housingType);
+        setFloorPlan(restored.floorPlan);
+        setFloorNumber(restored.floorNumber);
+        setHasElevator(restored.hasElevator);
+        setDraftRestored(true);
+      }
+    } catch (storageError) {
+      console.warn("[create] 下書きを読み込めませんでした", storageError);
+    }
+    setDraftReady(true);
+  }, []);
+  useEffect(() => {
+    if (!draftReady) return;
+    try {
+      const draft: CreateDraft = { purpose, prefecture, city, housingType, floorPlan, floorNumber, hasElevator };
+      if (isDefaultDraft(draft, DRAFT_DEFAULTS)) {
+        window.sessionStorage.removeItem(CREATE_DRAFT_STORAGE_KEY);
+      } else {
+        window.sessionStorage.setItem(CREATE_DRAFT_STORAGE_KEY, serializeCreateDraft(draft));
+      }
+    } catch (storageError) {
+      console.warn("[create] 下書きを保存できませんでした", storageError);
+    }
+  }, [draftReady, purpose, prefecture, city, housingType, floorPlan, floorNumber, hasElevator]);
+
   // r10-review M5 是正: 403 を一律セッション切れ扱いすると account_suspended（利用停止）の
   // ケースが誤案内になるため、専用フラグで案内文を出し分ける。
   const [accountSuspended, setAccountSuspended] = useState(false);
@@ -458,7 +520,8 @@ export default function CreateCasePage() {
         housing_type: housingType,
         floor_plan: floorPlan,
         floor_number: floorNumber === "" ? null : Number(floorNumber),
-        has_elevator: hasElevator,
+        // 未チェックは「なし」ではなく未回答として送る（業者が見積もりの前提を誤らないよう断定しない）。
+        has_elevator: hasElevator ? true : null,
         items: itemPayloads.length > 0 ? itemPayloads : undefined,
         photos: loosePayloads,
       };
@@ -483,6 +546,12 @@ export default function CreateCasePage() {
       idempotencyKeyRef.current = null;
       lastSubmitSignatureRef.current = null;
       allowLeaveRef.current = true;
+      // 送信が済んだ入力は下書きとして残さない（次の新規出品に前回の内容を出さない）。
+      try {
+        window.sessionStorage.removeItem(CREATE_DRAFT_STORAGE_KEY);
+      } catch {
+        /* storage 不可でも遷移は続ける */
+      }
       router.push(`/cases/${created.id}?created=1`);
     } catch (err) {
       const isTimeout =
@@ -559,6 +628,16 @@ export default function CreateCasePage() {
                 <Link href="/contact" style={{ marginLeft: 4, textDecoration: "underline" }}>
                   お問い合わせはこちら
                 </Link>
+              </span>
+            </div>
+          ) : null}
+          {draftRestored ? (
+            <div
+              role="status"
+              style={{ marginBottom: 16, padding: "10px 14px", border: "1px solid var(--line)", background: "var(--pale-2)", fontSize: 13, lineHeight: 1.7, color: "var(--body)" }}
+            >
+              <span>
+                前回の入力内容（利用目的・エリア・住居情報）を復元しました。写真は保存できないため、選び直してください。番地・建物名は復元していないので、確認画面の前に入力し直してください。
               </span>
             </div>
           ) : null}
@@ -852,7 +931,7 @@ export default function CreateCasePage() {
                     <label>エレベーター</label>
                     <div className="check-row">
                       <input type="checkbox" id="ev" checked={hasElevator} onChange={(e) => setHasElevator(e.target.checked)} />
-                      <label htmlFor="ev">エレベーターあり</label>
+                      <label htmlFor="ev">エレベーターあり（なし・わからない場合はチェック不要）</label>
                     </div>
                   </div>
                 </div>
