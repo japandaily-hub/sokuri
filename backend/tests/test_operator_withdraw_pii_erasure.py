@@ -6,6 +6,8 @@
 - 取引・メッセージ・入札履歴は残り、依頼者の取引画面には「退会済み業者」と出る。
 - 進行中の取引があれば退会は 409 で、何も消えない。
 - 消去は冪等（直接再実行しても壊れない）。
+- 事前申込・招待は本人に紐づくもの（operator_id・本人が使った招待コード）だけを消す。
+  同じメールアドレスの他人の申込・同じメール宛ての限定招待は消さない（security review High）。
 - 退会後、他の業者・依頼者の画面（公開プロフィール・一覧・運営の申込一覧）に元の個人情報が出ない。
 """
 
@@ -65,11 +67,12 @@ async def client(db_session: AsyncSession) -> AsyncIterator[AsyncClient]:
 async def _seed_application(db_session: AsyncSession, op_id: str) -> uuid.UUID:
     application = OperatorApplication(
         status="approved",
+        operator_id=uuid.UUID(op_id),  # 本人に紐づく申込（招待コードでの登録時に書き戻される）
         company_name=_COMPANY,
         representative_name="山田太郎",
         registered_address="東京都世田谷区桜丘9-9-9",
         contact_name="山田太郎",
-        contact_email=_OP_EMAIL.upper(),  # 大文字小文字違いでも特定できること
+        contact_email=_OP_EMAIL,
         contact_phone="090-1234-5678",
         license_number=_LICENSE_NO,
         invoice_number="T1234567890123",
@@ -244,8 +247,8 @@ async def test_erasure_is_idempotent(client: AsyncClient, db_session: AsyncSessi
 
     op = await db_session.get(Operator, uuid.UUID(op_id))
     # 墓標化済みのメールで直接再実行しても例外にならず、状態が変わらない。
-    await erase_operator_personal_data(db_session, op, op.contact_email, op.invite_code)
-    await erase_operator_personal_data(db_session, op, op.contact_email, op.invite_code)
+    await erase_operator_personal_data(db_session, op, op.invite_code)
+    await erase_operator_personal_data(db_session, op, op.invite_code)
     await db_session.commit()
     db_session.expire_all()
     application = await db_session.get(OperatorApplication, app_id)
@@ -262,3 +265,121 @@ async def test_admin_forced_deletion_also_erases(client: AsyncClient, db_session
     assert await _license_blob(db_session, op_id) is None
     application = await db_session.get(OperatorApplication, app_id)
     assert application.bank_account_enc is None and application.representative_name == ""
+
+
+def _victim_application(**overrides) -> OperatorApplication:
+    """業者本人とは無関係な、同じメールアドレスでの事前申込（他人のもの）。"""
+    values = dict(
+        status="pending",
+        company_name="別人の会社",
+        representative_name="鈴木花子",
+        registered_address="大阪府大阪市北区1-1-1",
+        contact_name="鈴木花子",
+        contact_email=_OP_EMAIL.upper(),
+        contact_phone="080-9999-0000",
+        license_number="第111122223333号",
+        bank_account_enc=encrypt_json({"bank_name": "C銀行", "account_number": "7654321"}),
+        client_ip="198.51.100.9",
+    )
+    values.update(overrides)
+    return OperatorApplication(**values)
+
+
+def _assert_victim_untouched(application: OperatorApplication) -> None:
+    assert application.representative_name == "鈴木花子"
+    assert application.contact_email == _OP_EMAIL.upper()
+    assert application.contact_phone == "080-9999-0000"
+    assert application.license_number == "第111122223333号"
+    assert application.company_name == "別人の会社"
+    assert application.bank_account_enc is not None
+    assert application.client_ip == "198.51.100.9"
+
+
+async def test_withdraw_keeps_other_persons_application_and_invite_with_same_email(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """他人の申込中メールアドレスで業者登録→退会しても、その他人の申込と招待は消えない。"""
+    admin, op_token, op_id, own_app_id = await _prepare(client, db_session)
+    user_token, _ = await _signup_user(client)
+    _, txn_id = await _create_completed_transaction(client, user_token, op_token)
+
+    victim_pending = _victim_application()
+    # 承認済みで招待コード発行済み（まだ誰も登録していない）の他人の申込。
+    victim_approved = _victim_application(status="approved", invite_code="VICTIM-INV-1")
+    db_session.add_all([victim_pending, victim_approved])
+    # 同じメール宛ての限定招待（未使用）。email が NULL になると誰でも使える招待になる。
+    db_session.add(Invite(code="VICTIM-INV-1", email=_OP_EMAIL.upper()))
+    db_session.add(Invite(code="VICTIM-INV-2", email=_OP_EMAIL))
+    await db_session.commit()
+    victim_ids = [victim_pending.id, victim_approved.id]
+
+    assert (await _withdraw(client, op_token)).status_code == 204
+    db_session.expire_all()
+
+    for victim_id in victim_ids:
+        _assert_victim_untouched(await db_session.get(OperatorApplication, victim_id))
+    for code, email in (("VICTIM-INV-1", _OP_EMAIL.upper()), ("VICTIM-INV-2", _OP_EMAIL)):
+        invite = (
+            await db_session.execute(select(Invite).where(Invite.code == code))
+        ).scalar_one()
+        assert invite.email == email, code
+        assert invite.used_at is None and invite.operator_id is None
+
+    # 本人に紐づく申込・招待は消える。
+    own_app = await db_session.get(OperatorApplication, own_app_id)
+    assert own_app.representative_name == "" and own_app.bank_account_enc is None
+    own_invite = (
+        await db_session.execute(select(Invite).where(Invite.code == "ERASE-INV-1"))
+    ).scalar_one()
+    assert own_invite.email is None
+    # 取引記録は残る。
+    assert await db_session.get(Transaction, uuid.UUID(txn_id)) is not None
+
+    # 冪等: 再実行しても他人の行は変わらず、本人の行も空のまま。
+    op = await db_session.get(Operator, uuid.UUID(op_id))
+    await erase_operator_personal_data(db_session, op, op.invite_code)
+    await db_session.commit()
+    db_session.expire_all()
+    for victim_id in victim_ids:
+        _assert_victim_untouched(await db_session.get(OperatorApplication, victim_id))
+    own_app = await db_session.get(OperatorApplication, own_app_id)
+    assert own_app.contact_phone == ""
+
+
+async def test_withdraw_erases_application_linked_by_own_invite_code(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """本人が登録に使った招待コードに紐づく申込は、operator_id 未書き戻しでも消える。
+
+    ただし同じコードでも別の業者に紐づいた申込は消さない。
+    """
+    admin, op_token, op_id, _ = await _prepare(client, db_session)
+    other_token, other_id = await _verified_operator(
+        client, admin, "erase_other2@example.com", "別会社2"
+    )
+    op = await db_session.get(Operator, uuid.UUID(op_id))
+    op.invite_code = "OWN-INV-1"
+    own_by_code = _victim_application(
+        status="approved", invite_code="OWN-INV-1", contact_email="someone@example.com"
+    )
+    other_by_code = _victim_application(
+        status="approved", invite_code="OWN-INV-1", operator_id=uuid.UUID(other_id)
+    )
+    db_session.add_all([own_by_code, other_by_code])
+    db_session.add(
+        Invite(code="OWN-INV-1", email="someone@example.com", operator_id=None)
+    )
+    await db_session.commit()
+    own_id, other_app_id = own_by_code.id, other_by_code.id
+
+    assert (await _withdraw(client, op_token)).status_code == 204
+    db_session.expire_all()
+
+    own = await db_session.get(OperatorApplication, own_id)
+    assert own.representative_name == "" and own.contact_email == ""
+    assert own.bank_account_enc is None
+    _assert_victim_untouched(await db_session.get(OperatorApplication, other_app_id))
+    invite = (
+        await db_session.execute(select(Invite).where(Invite.code == "OWN-INV-1"))
+    ).scalar_one()
+    assert invite.email is None

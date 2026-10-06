@@ -503,11 +503,10 @@ async def _delete_and_anonymize_operator(session: AsyncSession, operator: Operat
         await session.rollback()
         raise _OPERATOR_DELETE_ACTIVE_TRANSACTION()
 
-    # 個人情報の消去（許可証画像・許可番号・会社名・事前申込・プロフィール）。墓標化の前に
-    # 元のメールで事前申込を特定するため、先に呼ぶ。冪等（再実行しても同じ状態）。
-    await erase_operator_personal_data(
-        session, operator, operator.contact_email, operator.invite_code
-    )
+    # 個人情報の消去（許可証画像・許可番号・会社名・事前申込・プロフィール）。事前申込・招待は
+    # 本人の operator_id と登録時に使った招待コードだけで特定する（メール一致は使わない）。
+    # 冪等（再実行しても同じ状態）。
+    await erase_operator_personal_data(session, operator, operator.invite_code)
 
     operator.contact_email = f"deleted-{operator.id}@deleted.katazuke.internal"
     operator.password_hash = None
