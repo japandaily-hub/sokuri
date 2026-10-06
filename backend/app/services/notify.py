@@ -30,26 +30,101 @@ _BREVO_SEND_FAILED_KEY = "notify_brevo_send_failed"
 # BREVO_API_KEY 未設定スキップの運営アラートを、プロセス内で最初の1回だけ発火するためのフラグ。
 _brevo_missing_key_alerted = False
 #: 日次の送信数の警告を出す到達点（Brevo 無料枠 300通/日の消費の把握・security review M-1）。
-#: 数はプロセス内の概数（再起動・複数台では分かれる）。日付の区切りは UTC
+#: 数は**プロセス内の概数**（再起動で 0 に戻り、複数台・複数ワーカーでは台ごとに分かれる。
+#: Brevo 側の実消費とは一致しない）。日付の区切りは UTC
 #: （Brevo 側の日次枠の切り替わり時刻は [要確認]）。
 _DAILY_SEND_WARN_AT: frozenset[int] = frozenset({150, 200, 250, 290})
+#: この通数に達した時点で運営アラートを出す（同じ日に1回・本文は件数だけ。QA M-4）。
+_DAILY_SEND_ALERT_AT = 250
+#: この通数を**超えたら**新着チャット通知メール（send_message_received）だけ送らない。
+#: 再設定・成約・キャンセルなど取引に必須のメールに枠を残すため。チャット本文は画面・LINE で
+#: 読めるので、メールが止まっても取引は止まらない。
+_DAILY_CHAT_MAIL_STOP_ABOVE = 280
+#: 日次アラートの key の接頭辞（日付を付けて日ごとに分ける。翌日に復旧通知で閉じる）。
+_DAILY_QUOTA_ALERT_KEY_PREFIX = "notify_brevo_daily_quota"
 _daily_send_date: date | None = None
 _daily_send_count = 0
+# 当日アラート・当日チャットメール停止ログを出したか（同じ日に1回に抑える）。
+_daily_quota_alerted_date: date | None = None
+_daily_chat_mail_stop_logged_date: date | None = None
+
+
+def _daily_quota_alert_key(day: date) -> str:
+    return f"{_DAILY_QUOTA_ALERT_KEY_PREFIX}_{day.isoformat()}"
+
+
+def _roll_daily_counter(today: date) -> None:
+    """日付が変わっていれば数え直す。前日にアラートを出していれば復旧通知で閉じる。"""
+    global _daily_send_date, _daily_send_count
+    if _daily_send_date == today:
+        return
+    previous = _daily_send_date
+    _daily_send_date = today
+    _daily_send_count = 0
+    if previous is not None and _daily_quota_alerted_date == previous:
+        previous_key = _daily_quota_alert_key(previous)
+        if alerts.is_active(previous_key):
+            alerts.fire_and_forget(
+                alerts.resolve_alert(
+                    previous_key,
+                    "メール送信数の日次枠が切り替わりました（Brevo）",
+                    "日付（UTC）が変わり、メール送信数を数え直しました。"
+                    "新着チャット通知メールの送信を再開します。",
+                )
+            )
 
 
 def _record_daily_send() -> None:
-    """送信成功を日次で数え、到達点で総量だけを警告ログに出す（宛先・件名は出さない）。"""
-    global _daily_send_date, _daily_send_count
+    """送信成功を日次で数え、到達点で総量だけを警告ログ・運営アラートに出す（宛先・件名は出さない）。"""
+    global _daily_send_count, _daily_quota_alerted_date
     today = datetime.now(timezone.utc).date()
-    if _daily_send_date != today:
-        _daily_send_date = today
-        _daily_send_count = 0
+    _roll_daily_counter(today)
     _daily_send_count += 1
     if _daily_send_count in _DAILY_SEND_WARN_AT:
         logger.warning(
             "notify: 本日（UTC）のメール送信数が %d 通に達しました（Brevo 無料枠 300通/日・プロセス内の概数）",
             _daily_send_count,
         )
+    if _daily_send_count >= _DAILY_SEND_ALERT_AT and _daily_quota_alerted_date != today:
+        _daily_quota_alerted_date = today
+        alerts.fire_and_forget(
+            alerts.send_alert(
+                "メール送信数が日次枠に近づいています（Brevo）",
+                f"本日（UTC）のメール送信数が {_daily_send_count} 通に達しました"
+                "（Brevo 無料枠 300通/日・プロセス内の概数）。"
+                f"{_DAILY_CHAT_MAIL_STOP_ABOVE} 通を超えると新着チャット通知メールだけ送信を止めます"
+                "（再設定・成約などのメールは止めません）。",
+                severity="warning",
+                key=_daily_quota_alert_key(today),
+            )
+        )
+
+
+def is_chat_mail_suppressed() -> bool:
+    """本日の送信数（概数）が上限を超え、新着チャット通知メールを止めるべきか。"""
+    global _daily_chat_mail_stop_logged_date
+    today = datetime.now(timezone.utc).date()
+    _roll_daily_counter(today)
+    if _daily_send_count <= _DAILY_CHAT_MAIL_STOP_ABOVE:
+        return False
+    if _daily_chat_mail_stop_logged_date != today:
+        _daily_chat_mail_stop_logged_date = today
+        logger.warning(
+            "notify: 本日（UTC）のメール送信数が %d 通を超えたため、新着チャット通知メールを止めます"
+            "（プロセス内の概数・他のメールは送信を続ける）",
+            _DAILY_CHAT_MAIL_STOP_ABOVE,
+        )
+    return True
+
+
+def reset_daily_send_state_for_tests() -> None:
+    """テスト専用: 日次の送信数とアラート・停止ログの記録を初期化する。"""
+    global _daily_send_date, _daily_send_count
+    global _daily_quota_alerted_date, _daily_chat_mail_stop_logged_date
+    _daily_send_date = None
+    _daily_send_count = 0
+    _daily_quota_alerted_date = None
+    _daily_chat_mail_stop_logged_date = None
 
 
 def reset_brevo_missing_key_alert_state_for_tests() -> None:
@@ -781,7 +856,12 @@ async def send_message_received(
     to_email: str, transaction_id: str, recipient_party: str = "user"
 ) -> bool:
     """新着チャットの通知（依頼者宛・pdca seller 高#5）。メッセージ本文・氏名などの
-    差し込み値は一切載せず、「新着があります」とログイン先のリンクだけを送る。"""
+    差し込み値は一切載せず、「新着があります」とログイン先のリンクだけを送る。
+
+    本日の送信数（プロセス内の概数）が _DAILY_CHAT_MAIL_STOP_ABOVE を超えたら送らない
+    （Brevo 無料枠を重要メールに残す。QA M-4）。"""
+    if is_chat_mail_suppressed():
+        return False
     settings = get_settings()
     url = f"{settings.frontend_base_url}/chat/{transaction_id}"
     return await _send(

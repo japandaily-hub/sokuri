@@ -50,6 +50,20 @@ import app.db.models.invite
 import app.db.models.password_reset_token
 configure_mappers()
 
+@pytest.fixture(autouse=True)
+def _reset_daily_mail_counter():
+    """メール送信数の日次カウンタ（プロセス内のグローバル）をテストごとに初期化する。
+
+    数がテスト間で積み上がると、280 通超えで新着チャット通知メールが止まり（QA M-4）、
+    無関係なテストが実行順によって落ちるため。
+    """
+    from app.services import notify
+
+    notify.reset_daily_send_state_for_tests()
+    yield
+    notify.reset_daily_send_state_for_tests()
+
+
 @pytest.fixture
 async def db_engine():
     engine = create_async_engine(
