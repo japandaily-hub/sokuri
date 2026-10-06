@@ -43,10 +43,19 @@ test("依頼者が入札を選定すると成約パネルが出る", async ({ pa
   // 入札一覧が出ていること。
   await expect(page.getByRole("heading", { name: /入札一覧/ })).toBeVisible();
 
-  // 対象入札の「この業者に決める」を押す（入札が複数あるため行を絞り込む）。
-  const selectButtons = page.getByRole("button", { name: "この業者に決める" });
-  await expect(selectButtons.first()).toBeVisible();
-  await selectButtons.first().click();
+  // 対象入札（業者A＝ensureOpenCaseWithBid が返した入札）の行の「この業者に決める」を押す。
+  // 一覧は金額の高い順に並ぶため（シードの案件1は業者B 45,000 円が業者A 30,000 円より上）、
+  // 先頭を押すと業者B に決まり、業者A が当事者である前提の 03/04 が別業者の取引を掴んでしまう。
+  const beforeSelect = await api.getCase(caseId, sellerToken);
+  const vendorCompanyName = beforeSelect.bids.find((b) => b.id === bidId)?.operator?.company_name;
+  expect(vendorCompanyName, "対象入札の業者名が取得できること").toBeTruthy();
+  const selectButton = page
+    .getByRole("listitem")
+    .filter({ has: page.getByRole("button", { name: "この業者に決める" }) })
+    .filter({ hasText: vendorCompanyName! })
+    .getByRole("button", { name: "この業者に決める" });
+  await expect(selectButton).toHaveCount(1);
+  await selectButton.click();
 
   // window.confirm ではなく ConfirmModal であること。
   await confirmModal(page, /この業者に決定しますか？/, "決定する");
@@ -60,12 +69,11 @@ test("依頼者が入札を選定すると成約パネルが出る", async ({ pa
   await expect(page.getByRole("textbox", { name: "メッセージを入力", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "訪問日程を調整する" })).toBeVisible();
 
-  // API 側でも「どの入札が選ばれたか」が確定し、取引が生成されている
-  // （画面表示だけの偽陽性を防ぐ）。案件に複数入札があり得るため、押下したのが
-  // ensureOpenCaseWithBid の返した入札とは限らない点に依存しない検証にしている。
+  // API 側でも、押した業者A の入札が選ばれ、取引が生成されている（画面表示だけの偽陽性を防ぐ）。
   const detail = await api.getCase(caseId, sellerToken);
-  expect(detail.bids.map((b) => b.id)).toContain(bidId);
-  expect(detail.bids.filter((b) => b.status === "selected")).toHaveLength(1);
+  const selected = detail.bids.filter((b) => b.status === "selected");
+  expect(selected).toHaveLength(1);
+  expect(selected[0].id).toBe(bidId);
   const txns = await api.listTransactions(sellerToken);
   expect(txns.some((t) => t.case_id === caseId)).toBe(true);
 });

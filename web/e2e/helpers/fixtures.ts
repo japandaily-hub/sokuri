@@ -45,15 +45,25 @@ export async function ensureOpenCaseWithBid(
   return { caseId: created.id, bidId: bid.id };
 }
 
-/** 進行中（pending / visiting）の取引を1件用意する。無ければ入札→選定で作る。 */
+/**
+ * 指定業者が当事者の取引 ID の集合。依頼者の取引一覧には他社（シードの業者B など）と成約した
+ * 取引も混ざるため、それを再利用すると業者側の操作が 403・未読が業者側に出ない、といった
+ * 前提崩れになる。依頼者の一覧はこの集合で絞り込んでから使う。
+ */
+async function listVendorTransactionIds(api: Api, vendor: OperatorSession): Promise<Set<string>> {
+  return new Set((await api.listTransactions(vendor.token)).map((t) => t.id));
+}
+
+/** 指定業者が当事者で進行中（pending / visiting）の取引を1件用意する。無ければ入札→選定で作る。 */
 export async function ensureLiveTransaction(
   api: Api,
   sellerToken: string,
   vendor: OperatorSession,
   opts: { withoutPendingReduction?: boolean } = {},
 ): Promise<TransactionSummary> {
+  const vendorTxnIds = await listVendorTransactionIds(api, vendor);
   const live = (await api.listTransactions(sellerToken)).filter(
-    (t) => t.status === "pending" || t.status === "visiting",
+    (t) => (t.status === "pending" || t.status === "visiting") && vendorTxnIds.has(t.id),
   );
   for (const t of live) {
     if (!opts.withoutPendingReduction) return t;
@@ -65,14 +75,15 @@ export async function ensureLiveTransaction(
   return api.selectBid(caseId, bidId, sellerToken);
 }
 
-/** 訪問日程が未確定（pending かつ visit_date null）の取引を1件用意する。 */
+/** 指定業者が当事者で訪問日程が未確定（pending かつ visit_date null）の取引を1件用意する。 */
 export async function ensureUnscheduledTransaction(
   api: Api,
   sellerToken: string,
   vendor: OperatorSession,
 ): Promise<TransactionSummary> {
+  const vendorTxnIds = await listVendorTransactionIds(api, vendor);
   const candidates = (await api.listTransactions(sellerToken)).filter(
-    (t) => t.status === "pending" && t.visit_date == null,
+    (t) => t.status === "pending" && t.visit_date == null && vendorTxnIds.has(t.id),
   );
   for (const t of candidates) {
     const detail = await api.getTransaction(t.id, sellerToken);
