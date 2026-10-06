@@ -5,21 +5,15 @@
  *  すぐに消す（共有・画面の写り込み・戻る操作での再表示を防ぐ）。Referrer を送らない・検索に載せない指定は
  *  layout.tsx のメタデータで行う。成功後はログインへ案内する（自動ログインはしない）。 */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { KdzLogo } from "@/components/kdz/Logo";
 import { Field, PasswordField } from "@/components/kdz/auth";
 import { KdzApiError } from "@/lib/katadzuke-api";
-import {
-  RESET_PASSWORD_MAX_LENGTH,
-  RESET_PASSWORD_MIN_LENGTH,
-  confirmPasswordReset,
-  toResetAccountType,
-  type ResetAccountType,
-} from "../reset-api";
+import { parseResetToken, type ParsedResetLink, type ResetAccountType } from "@/lib/password-reset";
+import { RESET_PASSWORD_MAX_LENGTH, RESET_PASSWORD_MIN_LENGTH, confirmPasswordReset } from "../reset-api";
 import "../password-reset.css";
 
-const TOKEN_RE = /^[A-Za-z0-9_-]{32,128}$/;
 const CONFIRM_PATH = "/password-reset/confirm";
 
 type LinkState =
@@ -51,13 +45,22 @@ export default function PasswordResetConfirmPage() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
 
+  // 読み取り結果を保持する。開発モード（reactStrictMode）では effect が 2 回走り、2 回目は URL から
+  // token が消えているため、読み直すと「このリンクは使えません」になる（QA M1）。ref は 2 回目も残る。
+  const parsedLinkRef = useRef<ParsedResetLink | null>(null);
+
   useEffect(() => {
-    // useSearchParams ではなく location から1回だけ読む（読んだ直後に URL から token を消すため）。
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get("token") ?? "";
-    const accountType = toResetAccountType(params.get("type"));
-    window.history.replaceState(window.history.state, "", CONFIRM_PATH);
-    setLink(TOKEN_RE.test(token) ? { status: "ready", token, accountType } : { status: "missing" });
+    if (parsedLinkRef.current === null) {
+      // useSearchParams ではなく location から1回だけ読む（読んだ直後に URL から token を消すため）。
+      parsedLinkRef.current = parseResetToken(window.location.search);
+      window.history.replaceState(window.history.state, "", CONFIRM_PATH);
+    }
+    const parsed = parsedLinkRef.current;
+    setLink(
+      parsed.status === "ready"
+        ? { status: "ready", token: parsed.token, accountType: parsed.accountType }
+        : { status: "missing" },
+    );
   }, []);
 
   const accountType = link.status === "ready" ? link.accountType : "user";

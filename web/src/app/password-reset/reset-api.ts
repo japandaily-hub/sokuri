@@ -2,23 +2,24 @@
  *
  *  ログイン前の画面から呼ぶため Authorization を付けず、401 のセッション失効処理
  *  （katadzuke-api の request()）も通さない。エラーは既存の KdzApiError / KdzNetworkError に揃え、
- *  backend の detail（文字列、または {code, message}）をそのまま利用者向けの文言として使う。 */
+ *  backend の detail（文字列、または {code, message}）は、日本語の 4xx のときだけ利用者向けの文言として使う。 */
 
 import { KdzApiError, KdzNetworkError, apiBase, createTimeoutSignal } from "@/lib/katadzuke-api";
+import {
+  RESET_DEFAULT_ERROR_MESSAGE,
+  resolveResetErrorMessage,
+  toResetAccountType,
+  type ResetAccountType,
+} from "@/lib/password-reset";
 
-/** 再設定の対象アカウントの種別（backend の account_type と同じ値）。 */
-export type ResetAccountType = "user" | "operator";
+export { toResetAccountType };
+export type { ResetAccountType };
 
 /** 新しいパスワードの要件（backend の PasswordResetConfirmRequest・登録・変更と同じ 8〜128 文字）。 */
 export const RESET_PASSWORD_MIN_LENGTH = 8;
 export const RESET_PASSWORD_MAX_LENGTH = 128;
 
 const REQUEST_TIMEOUT_MS = 15_000;
-
-/** クエリ等から受け取った値を種別へ絞り込む。不明な値は依頼者（user）として扱う。 */
-export function toResetAccountType(value: string | null | undefined): ResetAccountType {
-  return value === "operator" ? "operator" : "user";
-}
 
 async function postJson<T>(path: string, payload: Record<string, string>): Promise<T> {
   let res: Response;
@@ -35,7 +36,7 @@ async function postJson<T>(path: string, payload: Record<string, string>): Promi
     throw new KdzNetworkError(e);
   }
   if (!res.ok) {
-    let message = "時間をおいて再度お試しください。";
+    let message = RESET_DEFAULT_ERROR_MESSAGE;
     let code: string | undefined;
     try {
       const body = (await res.json()) as { detail?: unknown };
@@ -49,7 +50,8 @@ async function postJson<T>(path: string, payload: Record<string, string>): Promi
     } catch {
       /* JSON でない応答は既定の文言のまま */
     }
-    throw new KdzApiError(res.status, message, code);
+    // 404／5xx・日本語を含まない detail（"Not Found" 等）は利用者へそのまま見せず既定の文言にする（QA M3）。
+    throw new KdzApiError(res.status, resolveResetErrorMessage(res.status, message), code);
   }
   try {
     return (await res.json()) as T;
