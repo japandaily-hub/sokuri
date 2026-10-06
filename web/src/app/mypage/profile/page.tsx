@@ -810,7 +810,7 @@ export default function ProfileEditPage() {
               <span className="link-card-ic">{ICON_BANK}</span>
               <span className="link-card-body">
                 <strong>振込口座</strong>
-                <span>買取代金のお受け取りに使う口座（業者へ自動で開示はされません）</span>
+                <span>お振込を希望される場合に業者へお伝えする振込先の口座（業者へ自動で開示はされません）</span>
               </span>
               <StatusBadge
                 value={profile.has_bank_account ? "approved" : "unverified"}
