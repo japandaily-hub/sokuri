@@ -14,7 +14,6 @@ import "../operator-shared.css";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Spinner } from "@/components/Icon";
 import { OperatorHeader } from "@/components/kdz/OperatorHeader";
 import { ApprovalPendingNotice } from "@/components/kdz/ApprovalPendingNotice";
 import { Ic } from "@/components/kdz/Icons";
@@ -33,11 +32,12 @@ import {
   type CaseMasked,
 } from "@/lib/katadzuke-api";
 import { caseItemsLabel, formatPurposeLabel } from "@/lib/case-labels";
+import { topBidderLabel } from "@/lib/bid-input";
 
 /** ステータス+自社入札状況 → チップ表示のマッピング。 */
 function statusChipInfo(c: CaseMasked): { label: string; cls: string } {
   if (c.my_bid) {
-    if (c.my_bid.status === "selected") return { label: "落札", cls: "bidding" };
+    if (c.my_bid.status === "selected") return { label: "成約", cls: "bidding" };
     if (c.my_bid.status === "rejected") return { label: "非選定", cls: "done" };
     if (c.my_bid.status === "withdrawn") return { label: "取り下げ済み", cls: "done" };
     return { label: "入札済み", cls: "negotiating" };
@@ -103,7 +103,7 @@ function LotCard({ c }: { c: CaseMasked }) {
             {c.item_count != null && c.item_count > 0 ? (
               <span className="lot-meta-item">
                 <Ic name="box" />
-                商品 {c.item_count} 点
+                品物 {c.item_count} 点
               </span>
             ) : null}
           </div>
@@ -121,7 +121,7 @@ function LotCard({ c }: { c: CaseMasked }) {
               <span className="status-chip negotiating">最高額 {formatYen(c.top_bid_amount)}</span>
               {c.my_bid ? (
                 <span className={`status-chip ${c.is_top_bidder ? "live" : "warn"}`}>
-                  {c.is_top_bidder ? "自社が最高額" : "他社が上回り中"}
+                  {topBidderLabel(c.is_top_bidder, c.bid_count) ?? "他社が上回り中"}
                 </span>
               ) : null}
             </div>
@@ -205,6 +205,10 @@ export default function OperatorCasesPage() {
     approvalRequired ||
     (!statusLoading && vendorStatus !== "unknown" && !OPERATOR_CASE_VIEW_STATUSES.includes(vendorStatus));
 
+  // 審査状態が確定するまで（profile 取得中）は、一覧・空状態・絞り込みを出さずスケルトンを出す。
+  // 先に「入札可能な案件はありません」等を出すと、承認待ち業者に誤った案内になるため（V-13）。
+  const resolving = loading || (!approvalRequired && statusLoading) || (!cases && !error);
+
   // 絞り込み（クライアント側）: 都道府県 / 未入札のみ。件数が増えた時に目的の案件へ辿り着きやすくする。
   const [prefFilter, setPrefFilter] = useState<string>("all");
   const [onlyUnbid, setOnlyUnbid] = useState(false);
@@ -238,7 +242,13 @@ export default function OperatorCasesPage() {
             </Link>
           </div>
 
-          {awaitingApproval ? (
+          {resolving && !error ? (
+            <div className="op-skeleton" role="status" aria-busy="true" aria-label="案件一覧を読み込み中">
+              <div className="op-skeleton-row" />
+              <div className="op-skeleton-row" />
+              <div className="op-skeleton-row" />
+            </div>
+          ) : awaitingApproval ? (
             // 決定1: 審査中（pending/rejected）業者は一覧の代わりにこの案内のみを大きく表示する。
             <ApprovalPendingNotice hasLicenseImage={hasLicense} vendorStatus={vendorStatus} />
           ) : (
@@ -271,11 +281,7 @@ export default function OperatorCasesPage() {
                 </p>
               ) : null}
 
-              {loading || (!cases && !error) ? (
-                <div style={{ display: "flex", justifyContent: "center", padding: "60px 0" }}>
-                  <Spinner className="h-6 w-6 text-brand-600" />
-                </div>
-              ) : cases && cases.length === 0 ? (
+              {cases && cases.length === 0 ? (
                 <div className="empty-state">
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M4 7h16M4 12h16M4 17h10" />

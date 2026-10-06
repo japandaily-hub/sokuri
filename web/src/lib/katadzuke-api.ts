@@ -1308,7 +1308,7 @@ export const IDENTITY_DOC_TYPES: {
     id: "health_insurance_card",
     label: "健康保険証",
     backRequired: true,
-    note: "住所記載がない場合、承認できないことがあります。",
+    note: "健康保険証は、保険者番号・記号・番号を黒塗りしてから提出してください（隠す前の画像は不要です）。住所記載がない場合、承認できないことがあります。",
   },
 ];
 

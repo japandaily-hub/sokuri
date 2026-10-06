@@ -22,6 +22,13 @@ import { ConfirmModal } from "@/components/kdz/ConfirmModal";
 import { Ic } from "@/components/kdz/Icons";
 import { useToken } from "@/components/kdz/Ui";
 import { formatPurposeLabel } from "@/lib/case-labels";
+import {
+  BID_MESSAGE_MAX_CHARS,
+  classifyBidPosition,
+  countCodePoints,
+  formatBidAmountWithUnit,
+  isBidMessageWithinLimit,
+} from "@/lib/bid-input";
 import { DisclosureNotice } from "@/components/kdz/DisclosureNotice";
 import {
   BID_STATUS_LABEL,
@@ -51,6 +58,23 @@ const BID_MIN = 1000;
 const BID_MAX = 100_000_000;
 const BID_STEP = 1000;
 const BID_RANGE_HINT = "入札額は1,000円〜1億円の範囲で1,000円単位で入力してください";
+/** メッセージが上限（BID_MESSAGE_MAX_CHARS）を超えたときの文言（backend の 422 を待たず先に案内する）。 */
+const BID_MESSAGE_TOO_LONG_HINT = `メッセージは${BID_MESSAGE_MAX_CHARS.toLocaleString("ja-JP")}文字以内で入力してください`;
+
+/** 「0/2000」形式の文字数カウンタ（超過時は警告色・読み上げ対象）。 */
+function MessageCounter({ id, value }: { id: string; value: string }) {
+  const count = countCodePoints(value);
+  const over = count > BID_MESSAGE_MAX_CHARS;
+  return (
+    <p
+      id={id}
+      aria-live={over ? "polite" : "off"}
+      style={{ fontSize: 12, marginTop: 4, textAlign: "right", color: over ? "var(--danger)" : "var(--body-soft)" }}
+    >
+      {count.toLocaleString("ja-JP")}/{BID_MESSAGE_MAX_CHARS.toLocaleString("ja-JP")}
+    </p>
+  );
+}
 
 /** 自社入札ステータスのチップCSSクラス（operator-shared.css の .status-chip バリアント）。 */
 const BID_STATUS_CHIP_CLASS: Record<BidStatus, string> = {
@@ -96,6 +120,8 @@ export default function OperatorCaseDetailPage() {
   const [raiseMessagePrefilledFor, setRaiseMessagePrefilledFor] = useState<string | null>(null);
   /** ConfirmModal 表示中の引き上げ先金額（null の間は非表示）。 */
   const [raiseConfirmAmount, setRaiseConfirmAmount] = useState<number | null>(null);
+  /** 初回入札の最終確認モーダル表示中の金額（null の間は非表示。V-01: 取り消せない操作なので桁を再提示する）。 */
+  const [bidConfirmAmount, setBidConfirmAmount] = useState<number | null>(null);
 
   const reload = useCallback(async () => {
     if (!token) return;
@@ -142,7 +168,8 @@ export default function OperatorCaseDetailPage() {
     }
   }, [caseData?.my_bid, raiseMessagePrefilledFor]);
 
-  async function submitBid(e: React.FormEvent) {
+  /** 初回入札の入力を検証し、問題なければ最終確認モーダルを開く（送信は confirmBid）。 */
+  function submitBid(e: React.FormEvent) {
     e.preventDefault();
     if (!token || busy) return;
     const value = Number(amount);
@@ -156,13 +183,25 @@ export default function OperatorCaseDetailPage() {
       setError(BID_RANGE_HINT);
       return;
     }
+    if (!isBidMessageWithinLimit(message)) {
+      setError(BID_MESSAGE_TOO_LONG_HINT);
+      return;
+    }
+    setError(null);
+    setBidConfirmAmount(value);
+  }
+
+  async function confirmBid() {
+    if (!token || busy || bidConfirmAmount == null) return;
     setBusy(true);
     setError(null);
     try {
-      await createBid(caseId, { amount: value, message: message.trim() || undefined }, token);
+      await createBid(caseId, { amount: bidConfirmAmount, message: message.trim() || undefined }, token);
+      setBidConfirmAmount(null);
       setBidDone(true);
       await reload();
     } catch (err) {
+      setBidConfirmAmount(null);
       setError(toDisplayMessage(err, "入札に失敗しました"));
       // 409（他社落札・出品取り下げ等で入札を受け付けられない状態）の場合、フォームに
       // 古い案件状態が残ったままだと再送信を誘発する。案件データを再取得し、
@@ -192,6 +231,10 @@ export default function OperatorCaseDetailPage() {
       value % BID_STEP !== 0
     ) {
       setRaiseError(BID_RANGE_HINT);
+      return;
+    }
+    if (!isBidMessageWithinLimit(raiseMessage)) {
+      setRaiseError(BID_MESSAGE_TOO_LONG_HINT);
       return;
     }
     if (value <= current) {
@@ -297,13 +340,24 @@ export default function OperatorCaseDetailPage() {
   // （backend 未対応）の場合のみ my_bid.amount >= topBidAmount にフォールバックする。
   // 配列先頭要素の id 一致による判定は、同額時に自社が首位でも false になり
   // 「あと¥0で首位」と誤表示する不具合があったため廃止。
-  const isTopBidder = !bidsUsableForTop || !caseData.my_bid
+  const isTopBidderFlag = !bidsUsableForTop || !caseData.my_bid
     ? null
     : caseData.is_top_bidder !== undefined
       ? caseData.is_top_bidder
       : topBidAmount != null
         ? caseData.my_bid.amount >= topBidAmount
         : null;
+  // 同額で並んでいる場合は「最高額です」と言い切らない（V-03）。同額時の優先順位は決まっておらず、
+  // 業者を選ぶのはお客様のため、「並んでいます」と表示して引き上げを検討できるようにする。
+  const bidPosition = caseData.my_bid
+    ? classifyBidPosition(
+        caseData.my_bid.amount,
+        topBidAmount,
+        otherBids.map((b) => b.amount),
+      )
+    : null;
+  const isTied = isTopBidderFlag === true && bidPosition === "tied";
+  const isTopBidder = isTied ? false : isTopBidderFlag;
   const gapAmount =
     caseData.my_bid && topBidAmount != null && topBidAmount > caseData.my_bid.amount
       ? topBidAmount - caseData.my_bid.amount
@@ -339,7 +393,7 @@ export default function OperatorCaseDetailPage() {
             <div className="listing-info">
               <div className="listing-title">{formatPurposeLabel(caseData.purpose)}</div>
               <div className="listing-meta">
-                {caseData.prefecture} {caseData.city}（詳細住所は落札後に開示）
+                {caseData.prefecture} {caseData.city}（詳細住所は成約後に開示）
               </div>
               <div className="listing-meta">
                 {caseData.housing_type ?? "—"} / {caseData.floor_plan ?? "—"} /{" "}
@@ -422,7 +476,14 @@ export default function OperatorCaseDetailPage() {
                     （{bidderCount}社）
                   </p>
                   {caseData.my_bid ? (
-                    isTopBidder === true ? (
+                    isTied ? (
+                      <>
+                        <span className="status-chip negotiating">他社と同額で並んでいます</span>
+                        <p style={{ fontSize: 12, color: "var(--body-soft)", marginTop: 6, lineHeight: 1.8 }}>
+                          同額の場合に優先される仕組みはなく、業者はお客様が選びます。上回りたい場合は金額を引き上げてください。
+                        </p>
+                      </>
+                    ) : isTopBidder === true ? (
                       <span className="status-chip live">自社が最高額です</span>
                     ) : isTopBidder === false ? (
                       <span className="status-chip negotiating">
@@ -436,7 +497,6 @@ export default function OperatorCaseDetailPage() {
                         <li key={b.id}>
                           他社 ¥{formatYen(b.amount).replace("円", "")}
                           {b.revision_count > 0 ? `（引き上げ ${b.revision_count} 回）` : ""}
-                          ・更新 {new Date(b.updated_at).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                         </li>
                       ))}
                     </ul>
@@ -505,7 +565,9 @@ export default function OperatorCaseDetailPage() {
                 入札額を引き上げる
                 {isTopBidder === false && gapAmount != null
                   ? `（あと¥${formatYen(gapAmount).replace("円", "")}で最高額に並びます）`
-                  : ""}
+                  : isTied
+                    ? "（他社と同額です。上回るには引き上げてください）"
+                    : ""}
               </h2>
               <p style={{ fontSize: 13, color: "var(--body-soft)", marginBottom: 18, lineHeight: 1.8 }}>
                 現在の入札額は<strong>¥{formatYen(caseData.my_bid.amount).replace("円", "")}</strong>です。金額は成約が決まるまで何度でも引き上げられます（下げることはできません）。他社の入札額は匿名で表示されます（社名・コメントは非開示）。
@@ -545,8 +607,11 @@ export default function OperatorCaseDetailPage() {
                   value={raiseMessage}
                   onChange={(e) => setRaiseMessage(e.target.value)}
                   rows={3}
+                  maxLength={BID_MESSAGE_MAX_CHARS}
+                  aria-describedby="raiseMessageCount"
                   placeholder="金額を見直しました。ぜひご検討ください。"
                 />
+                <MessageCounter id="raiseMessageCount" value={raiseMessage} />
               </div>
               <button type="submit" disabled={raiseBusy} className="btn btn-primary btn-block">
                 {raiseBusy ? "送信中…" : "この金額に引き上げる"}
@@ -560,12 +625,26 @@ export default function OperatorCaseDetailPage() {
           {raiseConfirmAmount != null && caseData.my_bid ? (
             <ConfirmModal
               title="入札額を引き上げますか？"
-              message={`¥${formatYen(caseData.my_bid.amount).replace("円", "")} → ¥${formatYen(raiseConfirmAmount).replace("円", "")} に引き上げます。この操作は取り消せません。`}
+              emphasis={formatBidAmountWithUnit(raiseConfirmAmount)}
+              message={`¥${formatYen(caseData.my_bid.amount).replace("円", "")} → ¥${formatYen(raiseConfirmAmount).replace("円", "")} に引き上げます。この操作は取り消せません（下げることもできません）。`}
               confirmLabel="引き上げる"
               busy={raiseBusy}
               error={raiseError}
               onCancel={() => setRaiseConfirmAmount(null)}
               onConfirm={() => void confirmRaise()}
+            />
+          ) : null}
+
+          {bidConfirmAmount != null ? (
+            <ConfirmModal
+              title="この金額で入札しますか？"
+              emphasis={formatBidAmountWithUnit(bidConfirmAmount)}
+              message="入札後は取り消し・金額を下げることができません（引き上げのみ可能です）。桁や単位に間違いがないかご確認ください。"
+              confirmLabel="この金額で入札する"
+              busy={busy}
+              error={error}
+              onCancel={() => setBidConfirmAmount(null)}
+              onConfirm={() => void confirmBid()}
             />
           ) : null}
 
@@ -598,15 +677,13 @@ export default function OperatorCaseDetailPage() {
                     step={BID_STEP}
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
-                    placeholder="50000"
+                    placeholder="例）50000"
                     aria-describedby="bidAmountHint"
                   />
                 </div>
                 {/* r10 M1 是正: ダッシュボードの入札フォームにだけあった手数料注記・範囲ヒントを
                     詳細画面にも同文言で置く（同じ操作なのに条件の説明が片方に無かった）。 */}
                 <p id="bidAmountHint" style={{ fontSize: 12, color: "var(--body-soft)", marginTop: 6, lineHeight: 1.8 }}>
-                  他社の入札額は匿名で表示されます（社名・コメントは非開示）
-                  <br />
                   <span style={{ fontSize: 11.5 }}>{BID_RANGE_HINT}</span>
                 </p>
               </div>
@@ -619,8 +696,11 @@ export default function OperatorCaseDetailPage() {
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   rows={3}
+                  maxLength={BID_MESSAGE_MAX_CHARS}
+                  aria-describedby="bidMessageCount"
                   placeholder="搬出経路の確認のため、当日は2名で伺います。"
                 />
+                <MessageCounter id="bidMessageCount" value={message} />
               </div>
               <button type="submit" disabled={busy} className="btn btn-primary btn-block">
                 {busy ? "送信中…" : "この金額で入札する"}

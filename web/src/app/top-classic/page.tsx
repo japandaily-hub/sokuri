@@ -526,7 +526,7 @@ export default function HomePage() {
                       対応エリアは .assure 帯・/vendors と同じ 4 都県、審査の運用は /business
                       （審査制）と /vendors の空状態文（「運営が承認した業者のみを掲載します」）の
                       再掲で、新しい約束・期間・効果は足していない。 */}
-                  <div className="ti-body"><h3>登録事業者のみ</h3><p>査定に参加するのは登録された買取事業者だけ。古物営業に必要な古物商許可を、登録時・取引前に確認します。対応エリアは東京・千葉・埼玉・神奈川で、審査を通過した業者から順に参加します。</p></div>
+                  <div className="ti-body"><h3>登録事業者のみ</h3><p>査定に参加するのは登録された買取事業者だけ。古物営業に必要な古物商許可を、登録時に許可証の画像と番号で確認します。対応エリアは東京・千葉・埼玉・神奈川で、審査を通過した業者から順に参加します。</p></div>
                 </article>
                 <article className="trust-item">
                   <span className="ti-ic"><Ic name="lock" /></span>

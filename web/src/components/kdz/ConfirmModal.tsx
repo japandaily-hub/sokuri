@@ -19,6 +19,7 @@ const FOCUSABLE_SELECTOR =
 export function ConfirmModal({
   title,
   message,
+  emphasis,
   confirmLabel,
   cancelLabel = "キャンセル",
   danger = false,
@@ -34,6 +35,8 @@ export function ConfirmModal({
 }: {
   title: string;
   message: string;
+  /** 金額など、取り違えを防ぎたい値を大きく示す任意行（入札の最終確認で桁を見せる用途）。 */
+  emphasis?: string;
   confirmLabel: string;
   cancelLabel?: string;
   /** true の場合、確定ボタンを btnDanger（停止・却下・キャンセルなど不可逆寄りの操作向け）にする。 */
@@ -135,6 +138,11 @@ export function ConfirmModal({
         <h2 id="kdzConfirmModalTitle" className="font-normal text-slate-900">
           {title}
         </h2>
+        {emphasis ? (
+          <p className="mt-3 text-2xl font-semibold tabular-nums text-slate-900" data-testid="confirm-emphasis">
+            {emphasis}
+          </p>
+        ) : null}
         <p className="mt-2 text-sm leading-relaxed text-slate-600">{message}</p>
         {error ? (
           <div className="mt-3">

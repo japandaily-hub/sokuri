@@ -481,3 +481,14 @@
 
 /* 品目要約（案件IDの代わりに出す見出し補助）。ID用の小さな等幅風スタイルを上書きする */
 .lot-id.lot-items { font-size: 13px; letter-spacing: 0; color: var(--ink); font-weight: 600; text-transform: none; }
+
+/* 読み込み中のプレースホルダ（確定前に誤った案内・空状態を出さないため。V-13） */
+.op-skeleton { display: grid; gap: 12px; }
+.op-skeleton-row {
+  height: 96px;
+  background: linear-gradient(90deg, #eceae4 25%, #f6f4ef 50%, #eceae4 75%);
+  background-size: 200% 100%;
+  animation: op-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes op-skeleton-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .op-skeleton-row { animation: none; } }
