@@ -7,8 +7,8 @@ test_0046 と同じ理由（alembic の env.py が内部で ``asyncio.run()`` �
   account_type の CHECK）・アカウント単位の索引がそろうこと。
 - ユニーク制約・CHECK 制約が実際に効くこと（同じハッシュの2行目・未知の種別は拒否）。
 - downgrade で表が消え（既存表には触れない）、往復（再 upgrade）でも同じ形に戻ること。
-- head が 0047 の単独チェーンで 0046 に正しく連鎖し、リビジョン ID が 32 文字以内
-  （head の固定は最新リビジョンのテストである本ファイルが持つ）。
+- 0047 が 0046 に正しく連鎖し、リビジョン ID が 32 文字以内（head の固定は
+  最新リビジョンのテスト test_0048_users_terms_agreement_migration.py へ移設）。
 - PostgreSQL でだけ lock_timeout を短くすること。
 """
 
@@ -148,12 +148,16 @@ def test_0047_creates_table_with_constraints_and_round_trips(tmp_path, monkeypat
         get_settings.cache_clear()
 
 
-def test_0047_is_the_single_head_chained_from_0046():
-    """0047 が単独の head として 0046 に正しく連鎖していること（分岐の防止）。"""
+def test_0047_is_chained_from_0046_on_a_single_head():
+    """0047 が 0046 に正しく連鎖し、履歴が単一の head に収束していること（分岐の防止）。
+
+    head そのものの固定は最新リビジョンのテスト（現在は test_0048_users_terms_agreement_migration.py）
+    が持つ（test_0046 と同じ作法）。
+    """
     from alembic.script import ScriptDirectory
 
     script = ScriptDirectory.from_config(_alembic_config())
-    assert script.get_heads() == [_REVISION]
+    assert len(script.get_heads()) == 1
     rev = script.get_revision(_REVISION)
     assert rev.down_revision == _DOWN_REVISION
     # 過去の alembic_version VARCHAR(32) 全断障害の再発防止ガード。

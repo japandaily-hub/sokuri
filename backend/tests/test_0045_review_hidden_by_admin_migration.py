@@ -298,7 +298,7 @@ def test_0045_waits_for_locks_at_most_3s_only_on_postgresql(monkeypatch):
 def test_0045_is_chained_from_0044_on_a_single_head():
     """0045 が 0044 → 0043 → 0042 に正しく連鎖し、履歴が単一の head に収束していること（分岐の防止）。
 
-    head そのものの固定は最新リビジョンのテスト（現在は test_0047_password_reset_tokens_migration.py）
+    head そのものの固定は最新リビジョンのテスト（現在は test_0048_users_terms_agreement_migration.py）
     が持つ（test_0041・test_0042 と同じ作法）。
     """
     from alembic.script import ScriptDirectory

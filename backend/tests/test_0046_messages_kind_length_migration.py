@@ -10,7 +10,7 @@ test_0043 と同じ理由（alembic の env.py が内部で ``asyncio.run()`` �
   SQLite は型を強制しないため、ここでは型情報の変化そのものを主な検証対象にする）。
 - downgrade は no-op（値・スキーマとも変わらない）。
 - 0046 が 0045 に正しく連鎖し、リビジョン ID が 32 文字以内（head の固定は
-  最新リビジョンのテスト test_0047_password_reset_tokens_migration.py へ移設）。
+  最新リビジョンのテスト test_0048_users_terms_agreement_migration.py へ移設）。
 """
 
 from __future__ import annotations
@@ -165,7 +165,7 @@ def test_0046_widens_kind_to_varchar32_and_preserves_existing_rows(tmp_path, mon
 def test_0046_is_chained_from_0045_on_a_single_head():
     """0046 が 0045 に正しく連鎖し、履歴が単一の head に収束していること（分岐の防止）。
 
-    head そのものの固定は最新リビジョンのテスト（現在は test_0047_password_reset_tokens_migration.py）
+    head そのものの固定は最新リビジョンのテスト（現在は test_0048_users_terms_agreement_migration.py）
     が持つ（test_0045 と同じ作法）。
     """
     from alembic.script import ScriptDirectory
