@@ -422,9 +422,12 @@ export default function AdminUsersPage() {
           message="削除すると、このユーザーは匿名化されログイン・案件作成ができなくなります。取引・メッセージ・レビューは業者側の記録として保持されますが、この操作は取り消せません。よろしいですか？"
           confirmLabel="削除する"
           danger
-          withReason
-          reasonRequired
-          reasonLabel={`確認のため、削除するユーザーのメールアドレス「${deleteTarget.email}」をそのまま入力してください`}
+          typedMatch={{
+            expected: deleteTarget.email,
+            inputLabel: `確認のため、削除するユーザーのメールアドレス「${deleteTarget.email}」をそのまま入力してください`,
+            placeholder: "メールアドレスを入力",
+            mismatchHint: "メールアドレスが一致していません",
+          }}
           error={deleteModalError}
           busy={busy}
           onCancel={() => {

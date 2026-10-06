@@ -763,11 +763,18 @@ export default function AdminPage() {
                     </p>
                     <div className="mt-1 flex gap-1.5">
                       {isDeleted ? <StatusBadge value="cancelled" label="退会済み" /> : null}
-                      <StatusBadge
-                        value={statusInfo.badgeValue as "completed" | "pending" | "rejected" | "unverified"}
-                        label={statusInfo.label}
-                      />
-                      {op.is_suspended ? <StatusBadge value="cancelled" label="停止中" /> : null}
+                      {/* R3-06: 停止中かつ未承認は「未承認／停止中」の2つ並びにせず、停止中を主表示にした1語にする */}
+                      {op.is_suspended && op.vendor_status === "pending" ? (
+                        <StatusBadge value="cancelled" label="停止中（未承認）" />
+                      ) : (
+                        <>
+                          <StatusBadge
+                            value={statusInfo.badgeValue as "completed" | "pending" | "rejected" | "unverified"}
+                            label={statusInfo.label}
+                          />
+                          {op.is_suspended ? <StatusBadge value="cancelled" label="停止中" /> : null}
+                        </>
+                      )}
                       <StatusBadge
                         value={op.has_license_image ? "completed" : "pending"}
                         label={op.has_license_image ? "許可証: 提出済み" : "許可証: 未提出"}
@@ -1017,9 +1024,12 @@ export default function AdminPage() {
           message="削除すると、この業者は匿名化されログイン・入札ができなくなります。取引・レビュー・キャンセル記録はユーザー側の記録として保持されますが、この操作は取り消せません。よろしいですか？"
           confirmLabel="削除する"
           danger
-          withReason
-          reasonRequired
-          reasonLabel={`確認のため、削除する業者の社名「${deleteTarget.company_name}」をそのまま入力してください`}
+          typedMatch={{
+            expected: deleteTarget.company_name,
+            inputLabel: `確認のため、削除する業者の社名「${deleteTarget.company_name}」をそのまま入力してください`,
+            placeholder: "社名を入力",
+            mismatchHint: "社名が一致していません",
+          }}
           error={deleteModalError}
           busy={busy}
           onCancel={closeDeleteModal}

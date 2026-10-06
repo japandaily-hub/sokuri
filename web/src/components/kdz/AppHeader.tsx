@@ -35,7 +35,7 @@ export function AppHeader({ showBell = true }: { showBell?: boolean } = {}) {
           ) : null}
           <Link
             href="/mypage"
-            className="text-[14px] font-semibold text-kdz-ink transition-colors hover:text-kdz-blue"
+            className="inline-flex min-h-[44px] items-center px-1 text-[14px] font-semibold text-kdz-ink transition-colors hover:text-kdz-blue"
           >
             マイページ
           </Link>

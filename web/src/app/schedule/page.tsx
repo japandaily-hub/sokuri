@@ -14,8 +14,6 @@ import {
   confirmSchedule,
   getTransaction,
   listMessages,
-  listTransactions,
-  LIST_MAX_LIMIT,
   toDisplayMessage,
   type MessageOut,
   type TransactionDetail,
@@ -31,8 +29,8 @@ import {
 
 /* ============================================================
    訪問日程調整ページ（カタヅケ）
-   ?transaction_id= で対象成約を指定。未指定時は自分の成約一覧から
-   「訪問日調整中（pending）」の最初の1件を自動選択する。
+   ?transaction_id= で対象成約を指定する。未指定のときは、別の取引の日程画面を
+   勝手に開かない（取り違え防止・S-4）ため、取引の一覧（/cases）へ誘導する。
    カレンダー選択 + 時間帯選択（固定5種）で confirmSchedule を実送信する。
    業者の最新の提示（チャットの schedule_proposal・meta v2）の候補日を
    優先候補としてハイライトするが、無くても任意の未来日を選べる
@@ -75,39 +73,12 @@ function SchedulePageInner() {
   const requestedTxnId = searchParams.get("transaction_id");
   const { token, loading: tokenLoading } = useToken();
 
-  const [transactionId, setTransactionId] = useState<string | null>(requestedTxnId);
+  const transactionId = requestedTxnId;
   const [detail, setDetail] = useState<TransactionDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   /** 業者の最新の提示（v2）の候補日（"YYYY-MM-DD"）。ハイライト専用。 */
   const [proposedDates, setProposedDates] = useState<string[]>([]);
-
-  /* ---- transaction_id 未指定時: pending状態の取引を自動選択 ---- */
-  useEffect(() => {
-    if (!token || requestedTxnId) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const list = await listTransactions(token, { limit: LIST_MAX_LIMIT, offset: 0 });
-        const pending = list.find((t) => t.status === "pending");
-        if (!cancelled) {
-          if (pending) setTransactionId(pending.id);
-          else {
-            setLoadError("日程調整が必要な成約が見つかりません。");
-            setLoading(false);
-          }
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setLoadError(toDisplayMessage(e, "成約情報の取得に失敗しました"));
-          setLoading(false);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [token, requestedTxnId]);
 
   /* ---- 成約詳細 + 業者提示済み候補日（チャットの schedule_proposal から抽出） ---- */
   const load = useCallback(async () => {
@@ -285,6 +256,23 @@ function SchedulePageInner() {
   const vendorName = detail?.operator?.company_name ?? "業者";
   const vendorInitial = vendorName.charAt(0) || "業";
   const vendorAmount = detail?.final_amount ?? detail?.initial_amount ?? 0;
+
+  if (!tokenLoading && !requestedTxnId) {
+    return (
+      <div className="schedule-page">
+        <AppHeader />
+        <div style={{ padding: 60, textAlign: "center", color: "var(--body-soft)", lineHeight: 1.8 }}>
+          <p>どの取引の日程を調整するかが指定されていません。</p>
+          <p>取引の一覧から対象の取引を開き、「訪問日程を調整する」を押してください。</p>
+          <p style={{ marginTop: 16 }}>
+            <Link href="/cases" className="btn btn-primary">
+              取引の一覧へ
+            </Link>
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (tokenLoading || (loading && !loadError)) {
     return (

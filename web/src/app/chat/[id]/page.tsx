@@ -28,7 +28,6 @@ import {
   LIST_MAX_LIMIT,
   listTransactions,
   toDisplayMessage,
-  type TransactionDetail,
   type TransactionListItem,
 } from "@/lib/katadzuke-api";
 
@@ -47,7 +46,6 @@ export default function ChatPage() {
   const [sideLoading, setSideLoading] = useState(true);
 
   /* ---- 成約詳細（申込ID表示用。本体の取得は ChatPanel が担う） ---- */
-  const [detail, setDetail] = useState<TransactionDetail | null>(null);
 
   /* ---- サイドバー用トースト ---- */
   const [sideToast, setSideToast] = useState<string | null>(null);
@@ -87,8 +85,6 @@ export default function ChatPage() {
     router.push(`/chat/${id}`);
   }
 
-  const appId = detail?.id ? detail.id.slice(0, 8).toUpperCase() : "";
-
   if (!transactionId) return null;
 
   return (
@@ -103,7 +99,6 @@ export default function ChatPage() {
         </Link>
         <span className="ch-divider" aria-hidden="true" />
         <span className="ch-title">交渉チャット</span>
-        {appId ? <span className="ch-id">{appId}</span> : null}
         <Link href="/notifications" className="ch-bell" aria-label="通知・お知らせ">
           <svg className="ic" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -152,7 +147,6 @@ export default function ChatPage() {
         <ChatPanel
           transactionId={transactionId}
           variant="standalone"
-          onDetailChange={setDetail}
           readOnly={isAdminViewing}
         />
       </div>

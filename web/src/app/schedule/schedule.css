@@ -450,6 +450,9 @@
   .schedule-page .sch-progress-inner { flex-direction: column; gap: 8px; }
 }
 @media (max-width: 480px) {
-  .schedule-page .sch-step { font-size: 12px; gap: 5px; }
-  .schedule-page .step-sep { width: 14px; }
+  /* L-4: 375px でステップ4「訪問・完了」が右端で切れないよう、文字・丸・区切りを詰める */
+  .schedule-page .sch-step { font-size: 11px; gap: 4px; }
+  .schedule-page .step-num { width: 20px; height: 20px; font-size: 11px; }
+  .schedule-page .step-sep { width: 8px; }
+  .schedule-page .sch-steps { max-width: 100%; }
 }

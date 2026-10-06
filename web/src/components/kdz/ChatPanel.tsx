@@ -445,12 +445,15 @@ export function ChatPanel({
                 ) : null}
               </div>
             </div>
-            <div className="peer-bid-chip">
-              <div className="peer-bid-label">成約金額</div>
-              <div className="peer-bid-amount">
-                ¥{(detail?.final_amount ?? detail?.initial_amount ?? 0).toLocaleString()}
+            {/* S-3: embedded（案件詳細内）では直上の成約パネルが「決定した金額」を出しているため重複させない */}
+            {variant === "embedded" ? null : (
+              <div className="peer-bid-chip">
+                <div className="peer-bid-label">成約金額</div>
+                <div className="peer-bid-amount">
+                  ¥{(detail?.final_amount ?? detail?.initial_amount ?? 0).toLocaleString()}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* r8-fix-frontend2 H3 是正: キャンセル済み・完了済みの取引では、通常のLINE通知
@@ -509,7 +512,7 @@ export function ChatPanel({
           ) : (
             <div className="line-banner">
               <span className="line-dot" aria-hidden="true" />
-              新着メッセージは、LINE連携済みの方はLINE、未連携の方はメールでお知らせします（受信設定に従い、同じ取引は5分に1通まで。読むまでは再送しません）。返信はこのページで行えます。
+              新着メッセージは、LINE連携済みの方はLINE、未連携の方はメールでお知らせします（受信設定に従い、同じ取引は5分に1通まで。読むまでは再送しません）。{readOnly ? "" : "返信はこのページで行えます。"}
             </div>
           )}
 

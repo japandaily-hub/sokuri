@@ -469,6 +469,8 @@ export default function CreateCasePage() {
     setSubmitting(true);
     setError(null);
     setAccountSuspended(false);
+    // S-1: 失敗した段階（写真の送信 or 出品内容の送信）を文言に反映するための印。
+    let submitPhase: "upload" | "submit" = "upload";
     try {
       const itemPayloads: { name?: string; sort_order: number; photos: { storage_key: string; sort_order: number }[] }[] = [];
 
@@ -511,6 +513,7 @@ export default function CreateCasePage() {
         loosePayloads.push({ storage_key: key, sort_order: i });
       }
 
+      submitPhase = "submit";
       setProgress("送信しています…");
       const casePayload = {
         purpose,
@@ -574,7 +577,9 @@ export default function CreateCasePage() {
             ? "送信に時間がかかっています。しばらくしてからマイページをご確認ください。同じ内容で再送信しても重複登録されません"
             : isSessionExpired
               ? "セッションの有効期限が切れました。再度ログインしてください（写真と入力内容はこの画面に残ります。別のタブでログインし直してから、もう一度送信してください）"
-              : toDisplayMessage(err, "送信に失敗しました。もう一度お試しください。"),
+              : submitPhase === "upload"
+                ? "写真の送信に失敗しました。入力内容と選んだ写真はこの画面に残っています。通信状況をご確認のうえ、もう一度お試しください。繰り返し失敗する場合は、写真が JPEG・PNG・WebP 形式か、1枚のサイズが大きすぎないかをご確認ください。出品はまだ完了していません。"
+                : toDisplayMessage(err, "送信に失敗しました。通信状況をご確認のうえ、もう一度お試しください。"),
       );
       setSubmitting(false);
       setProgress("");
@@ -631,7 +636,7 @@ export default function CreateCasePage() {
               </span>
             </div>
           ) : null}
-          {draftRestored ? (
+          {draftRestored && step < 3 ? (
             <div
               role="status"
               style={{ marginBottom: 16, padding: "10px 14px", border: "1px solid var(--line)", background: "var(--pale-2)", fontSize: 13, lineHeight: 1.7, color: "var(--body)" }}

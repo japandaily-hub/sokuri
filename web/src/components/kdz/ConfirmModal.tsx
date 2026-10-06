@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { isReasonMissing } from "@/lib/confirm-input";
+import { isReasonMissing, isTypedNameMatch } from "@/lib/confirm-input";
 import { Notice, btnDanger, btnPrimary, btnSecondary, inputBase } from "@/components/kdz/Ui";
 
 /** dialog 内でフォーカス移動可能な要素（disabled は除く）を集める共通セレクタ。 */
@@ -29,6 +29,7 @@ export function ConfirmModal({
   reasonRequired = false,
   withPassword = false,
   passwordLabel = "パスワード",
+  typedMatch,
   error = null,
   busy = false,
   onCancel,
@@ -50,6 +51,11 @@ export function ConfirmModal({
   /** true の場合、パスワード欄を表示し、入力が空だと確定ボタンを disabled にする（不可逆操作の再認証用。r8-review H-4）。 */
   withPassword?: boolean;
   passwordLabel?: string;
+  /**
+   * 指定すると、取り違え防止のため expected（メールアドレス・社名）をそのまま入力させる1行欄を出し、
+   * 一致するまで確定ボタンを disabled にする（理由欄は出さない。R3-02）。入力値は onConfirm の第1引数に渡る。
+   */
+  typedMatch?: { expected: string; inputLabel: string; placeholder?: string; mismatchHint?: string };
   /** 操作失敗時のエラーメッセージ。渡された場合、モーダル内にも表示する。 */
   error?: string | null;
   busy?: boolean;
@@ -58,7 +64,8 @@ export function ConfirmModal({
 }) {
   const [reason, setReason] = useState("");
   const [password, setPassword] = useState("");
-  const reasonMissing = isReasonMissing(withReason, reasonRequired, reason);
+  const reasonMissing = isReasonMissing(withReason && !typedMatch, reasonRequired, reason);
+  const typedMismatch = typedMatch ? !isTypedNameMatch(reason, typedMatch.expected) : false;
   const passwordMissing = withPassword && password === "";
   /** 理由欄の上限。管理系エンドポイントの理由フィールドは概ね max_length=500（backend
    *  schemas_katadzuke.py）のため、超過して 422 になるより先にクライアント側で防ぐ。 */
@@ -67,8 +74,8 @@ export function ConfirmModal({
   const PASSWORD_MAX_LENGTH = 128;
 
   function submit() {
-    if (busy || reasonMissing || passwordMissing) return;
-    onConfirm(withReason ? reason.trim() || null : null, withPassword ? password : undefined);
+    if (busy || reasonMissing || passwordMissing || typedMismatch) return;
+    onConfirm(withReason || typedMatch ? reason.trim() || null : null, withPassword ? password : undefined);
   }
 
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -150,7 +157,34 @@ export function ConfirmModal({
             <Notice tone="error">{error}</Notice>
           </div>
         ) : null}
-        {withReason ? (
+        {typedMatch ? (
+          <div className="mt-3">
+            <label className="text-xs text-slate-500" htmlFor="kdzConfirmModalTyped">
+              {typedMatch.inputLabel}
+            </label>
+            <input
+              id="kdzConfirmModalTyped"
+              type="text"
+              autoComplete="off"
+              spellCheck={false}
+              maxLength={REASON_MAX_LENGTH}
+              className={`${inputBase} mt-1`}
+              placeholder={typedMatch.placeholder}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  submit();
+                }
+              }}
+            />
+            {typedMismatch && reason.trim() !== "" ? (
+              <p className="mt-1 text-xs text-kdz-danger">{typedMatch.mismatchHint ?? "入力が一致していません"}</p>
+            ) : null}
+          </div>
+        ) : null}
+        {withReason && !typedMatch ? (
           <div className="mt-3">
             <label className="text-xs text-slate-500" htmlFor="kdzConfirmModalReason">
               {reasonLabel}
@@ -205,7 +239,7 @@ export function ConfirmModal({
             type="button"
             className={danger ? btnDanger : btnPrimary}
             onClick={submit}
-            disabled={busy || reasonMissing || passwordMissing}
+            disabled={busy || reasonMissing || passwordMissing || typedMismatch}
           >
             {confirmLabel}
           </button>

@@ -141,8 +141,13 @@ function sortCasesByUpdate(list: CaseOut[], seenMap: CaseSeenMap): CaseOut[] {
   return [...updated, ...rest];
 }
 
-function statusChipInfo(c: CaseOut): { label: string; cls: string } {
-  if (c.status === "cancelled") return { label: "キャンセル", cls: "done" };
+/**
+ * hasTransaction: 取引が紐づくか（取引一覧が未取得なら undefined）。
+ * 取引の無い cancelled は出品者による取り下げ（案件詳細の「取り下げ済み」と同じ語）、
+ * 取引のある cancelled は成約後のキャンセル。
+ */
+function statusChipInfo(c: CaseOut, hasTransaction?: boolean): { label: string; cls: string } {
+  if (c.status === "cancelled") return { label: hasTransaction === false ? "取り下げ済み" : "キャンセル", cls: "done" };
   if (c.status === "closed") return { label: "業者決定済み", cls: "negotiating" };
   if (c.status === "bidding") return { label: "入札あり", cls: "live" };
   if (c.status === "open") return { label: "入札受付中", cls: "live" };
@@ -160,6 +165,7 @@ function LotCard({
   unreadCount,
   visitInfo,
   hasUpdate,
+  hasTransaction,
   userKey,
 }: {
   c: CaseOut;
@@ -167,10 +173,12 @@ function LotCard({
   visitInfo?: string;
   /** 前回見た時点から状態が変化した案件か（新着入札・ステータス変化）。r-mypage-update 対応。 */
   hasUpdate?: boolean;
+  /** 紐づく取引があるか（取引一覧が未取得なら undefined）。取り下げ済みとキャンセルの出し分けに使う。 */
+  hasTransaction?: boolean;
   /** 「更新あり」状態の保存先をユーザーごとに分離するためのキー(セッションのメールアドレス)。 */
   userKey: string;
 }) {
-  const { label, cls } = statusChipInfo(c);
+  const { label, cls } = statusChipInfo(c, hasTransaction);
   const isDone = c.status === "closed" || c.status === "cancelled";
   return (
     <Link
@@ -395,6 +403,11 @@ function MyPageContent() {
   const sortedDoneLots = useMemo(
     () => sortCasesByUpdate(doneLots, caseSeenMap),
     [doneLots, caseSeenMap],
+  );
+  /** 取引が紐づく案件ID（取引一覧が未取得の間は null）。 */
+  const caseIdsWithTransaction = useMemo(
+    () => (transactions ? new Set(transactions.map((t) => t.case_id)) : null),
+    [transactions],
   );
   /** 案件ID → 紐づく取引の未読チャット件数（r6-flow M-3 対応）。 */
   const unreadByCaseId = useMemo(() => {
@@ -635,6 +648,7 @@ function MyPageContent() {
                   unreadCount={unreadByCaseId.get(c.id)}
                   visitInfo={visitInfoByCaseId.get(c.id)}
                   hasUpdate={caseHasUpdate(c, caseSeenMap)}
+                  hasTransaction={caseIdsWithTransaction ? caseIdsWithTransaction.has(c.id) : undefined}
                   userKey={userKey}
                 />
               ))
@@ -655,6 +669,7 @@ function MyPageContent() {
                   unreadCount={unreadByCaseId.get(c.id)}
                   visitInfo={visitInfoByCaseId.get(c.id)}
                   hasUpdate={caseHasUpdate(c, caseSeenMap)}
+                  hasTransaction={caseIdsWithTransaction ? caseIdsWithTransaction.has(c.id) : undefined}
                   userKey={userKey}
                 />
               ))
@@ -675,6 +690,7 @@ function MyPageContent() {
                   unreadCount={unreadByCaseId.get(c.id)}
                   visitInfo={visitInfoByCaseId.get(c.id)}
                   hasUpdate={caseHasUpdate(c, caseSeenMap)}
+                  hasTransaction={caseIdsWithTransaction ? caseIdsWithTransaction.has(c.id) : undefined}
                   userKey={userKey}
                 />
               ))

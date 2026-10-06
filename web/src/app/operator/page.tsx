@@ -320,7 +320,7 @@ function LotCard({
                     setDraft(e.target.value);
                     if (validationError) setValidationError(null);
                   }}
-                  aria-label={`${lot.id} の入札金額`}
+                  aria-label={`${lot.itemsLabel} の入札金額`}
                 />
               </div>
               <button
@@ -486,6 +486,15 @@ export default function OperatorDashboardPage() {
 
   // 入札確認モーダル
   const [modalLotId, setModalLotId] = useState<string | null>(null);
+  // R3-05: 入札確認モーダルを Esc で閉じる（案件詳細の引き上げモーダルと挙動をそろえる）。
+  useEffect(() => {
+    if (!modalLotId) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setModalLotId(null);
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [modalLotId]);
   const [modalAmount, setModalAmount] = useState<number>(0);
   const [bidBusy, setBidBusy] = useState(false);
 
