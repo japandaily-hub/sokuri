@@ -143,6 +143,12 @@ export function lineExchangeConsentFields(cookieValue: unknown): LineExchangeCon
 /** backend が「新規作成に同意が必要」で拒否したときの detail.code（auth.py の TERMS_AGREEMENT_REQUIRED_CODE）。 */
 export const TERMS_AGREEMENT_REQUIRED_CODE = "terms_agreement_required";
 
+/** 画面が送った規約の版数が現行と食い違うときの 409 の detail.code（auth.py の TERMS_VERSION_OUTDATED_CODE）。登録済みメールの 409 と取り違えない。 */
+export const TERMS_VERSION_OUTDATED_CODE = "terms_version_outdated";
+
+/** 規約が更新されたときの案内（再読み込みで新しい版の画面に変わる）。 */
+export const TERMS_VERSION_OUTDATED_MESSAGE = "利用規約が更新されています。ページを再読み込みして、もう一度お試しください。";
+
 /** 同意なしで LINE の新規登録が拒否されたときに /login へ付ける reason の値と、画面に出す案内。 */
 export const LINE_TERMS_REQUIRED_REASON = "terms_required";
 export const LINE_TERMS_REQUIRED_MESSAGE =

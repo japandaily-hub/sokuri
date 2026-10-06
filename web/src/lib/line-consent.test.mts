@@ -10,6 +10,8 @@ import {
   LINE_TERMS_REQUIRED_MESSAGE,
   LINE_TERMS_REQUIRED_REASON,
   TERMS_AGREEMENT_REQUIRED_CODE,
+  TERMS_VERSION_OUTDATED_CODE,
+  TERMS_VERSION_OUTDATED_MESSAGE,
   USER_TERMS_VERSION,
   buildLineTermsConsentCookie,
   canStartLineAuth,
@@ -159,7 +161,7 @@ describe("配線: 同意をサーバーへ送る", () => {
     assert.match(authTs, /lineTermsConsentCookieName\(secure\)/);
   });
   it("auth.ts: 同意なしの新規作成の拒否は /login?reason=terms_required へ戻す", () => {
-    assert.match(authTs, /result\.code === TERMS_AGREEMENT_REQUIRED_CODE\) return `\/login\?reason=\$\{LINE_TERMS_REQUIRED_REASON\}`/);
+    assert.match(authTs, /result\.code === TERMS_AGREEMENT_REQUIRED_CODE \|\| result\.code === TERMS_VERSION_OUTDATED_CODE\) return `\/login\?reason=\$\{LINE_TERMS_REQUIRED_REASON\}`/);
   });
   it("LineConsentAuth: 同意の判定を通った後でだけ Cookie を置いて signIn する", () => {
     const i = authTsx.indexOf("if (!canStartLineAuth({ agreed, busy })) return;");
@@ -178,5 +180,24 @@ describe("配線: 同意をサーバーへ送る", () => {
   it("login: reason=terms_required の案内を出す", () => {
     assert.match(login, /params\.get\("reason"\) === LINE_TERMS_REQUIRED_REASON/);
     assert.match(login, /\{LINE_TERMS_REQUIRED_MESSAGE\}/);
+  });
+});
+
+describe("規約の版数が古いときの 409（登録済みメールの 409 と取り違えない）", () => {
+  it("backend の code と文言", () => {
+    assert.equal(TERMS_VERSION_OUTDATED_CODE, "terms_version_outdated");
+    assert.match(TERMS_VERSION_OUTDATED_MESSAGE, /再読み込み/);
+  });
+
+  it("signup: 版数の食い違いの 409 は登録済みメールの案内にしない（コードで先に分岐）", () => {
+    const src = readFileSync(new URL("../app/signup/page.tsx", import.meta.url), "utf8");
+    const iOutdated = src.indexOf("TERMS_VERSION_OUTDATED_CODE)");
+    const iTaken = src.indexOf("err.status === 409");
+    assert.ok(iOutdated > 0 && iTaken > 0 && iOutdated < iTaken);
+  });
+
+  it("auth.ts: LINE 交換の版数の食い違いも /login?reason=terms_required へ戻す", () => {
+    const src = readFileSync(new URL("../auth.ts", import.meta.url), "utf8");
+    assert.match(src, /TERMS_VERSION_OUTDATED_CODE/);
   });
 });

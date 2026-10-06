@@ -38,6 +38,7 @@ import {
   lineTermsConsentCookiePath,
   LINE_TERMS_REQUIRED_REASON,
   TERMS_AGREEMENT_REQUIRED_CODE,
+  TERMS_VERSION_OUTDATED_CODE,
   lineExchangeConsentFields,
   type LineExchangeConsentFields,
 } from "@/lib/line-consent";
@@ -317,7 +318,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (result.code === "account_suspended") return "/login?reason=suspended";
         // 未登録の LINE アカウントで同意が届かなかった（Cookie の期限切れ・ブロック等）。
         // 同意のチェックへ案内する（login/page.tsx が reason を読んで文言を出す）。
-        if (result.code === TERMS_AGREEMENT_REQUIRED_CODE) return `/login?reason=${LINE_TERMS_REQUIRED_REASON}`;
+        if (result.code === TERMS_AGREEMENT_REQUIRED_CODE || result.code === TERMS_VERSION_OUTDATED_CODE) return `/login?reason=${LINE_TERMS_REQUIRED_REASON}`;
         return false;
       }
       const { data } = result;

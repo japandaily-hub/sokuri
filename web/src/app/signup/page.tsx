@@ -12,7 +12,7 @@ import { signupUser, toDisplayMessage, clearRedirectLoopStorage, KdzApiError } f
 import { Ic } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
 import { PasswordField, LineConsentAuth, TrustRow } from "@/components/kdz/auth";
-import { USER_TERMS_VERSION } from "@/lib/line-consent";
+import { TERMS_VERSION_OUTDATED_CODE, TERMS_VERSION_OUTDATED_MESSAGE, USER_TERMS_VERSION } from "@/lib/line-consent";
 import { Reveal } from "@/components/kdz/interactions";
 import "./signup.css";
 
@@ -111,7 +111,10 @@ export default function SignupPage() {
         clearRedirectLoopStorage();
         goTo(4);
       } catch (err) {
-        if (err instanceof KdzApiError && err.status === 409) {
+        if (err instanceof KdzApiError && err.code === TERMS_VERSION_OUTDATED_CODE) {
+          // 規約が更新された（画面が古い）。登録済みメールの 409 とは別の案内にする。
+          setAuthErr(TERMS_VERSION_OUTDATED_MESSAGE);
+        } else if (err instanceof KdzApiError && err.status === 409) {
           // 最終確認画面ではなく、原因であるメール欄のある最初のステップへ戻して案内する。
           setEmailTaken(true);
           setErr("email", "このメールアドレスは既に登録されています。");
