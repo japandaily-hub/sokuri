@@ -273,7 +273,7 @@ export default function SignupPage() {
               <div className="form-card">
                 <div className="confirm-row"><span className="lbl">メールアドレス</span><span className="val">{email}</span></div>
                 <div className="confirm-row"><span className="lbl">お名前</span><span className="val">{name}</span></div>
-                <div className="confirm-row"><span className="lbl">登録費用</span><span className="val" style={{ color: "var(--green)" }}>完全無料</span></div>
+                <div className="confirm-row"><span className="lbl">登録費用</span><span className="val" style={{ color: "var(--green)" }}>カタヅケの利用料は無料</span></div>
               </div>
 
               <div className="form-card" style={{ padding: "18px 24px" }}>

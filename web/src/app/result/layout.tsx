@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 
 /**
- * /result は査定結果の表示画面。assessment_id 付きでのアクセスを想定。
+ * /result は入札結果の表示画面。assessment_id 付きでのアクセスを想定。
  * 個別結果は SEO 対象外のため noindex。
  */
 export const metadata: Metadata = {
-  title: "査定結果",
+  title: "入札結果",
   robots: { index: false, follow: false },
 };
 

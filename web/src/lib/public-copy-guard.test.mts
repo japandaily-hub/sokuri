@@ -242,3 +242,83 @@ describe("用語統一: 落札・商品・回収・（業者画面の）お客�
     }
   }
 });
+
+/* ------------------------------------------------------------------------------------------
+ * 運営判断の表記（QA L-5）: 公開ページ・利用者の画面に「手数料」「8%」「査定」を載せない。
+ * - 手数料・8%: 料率は運営判断で未公開（公開ページに載せない方針）。
+ * - 査定: 現物の査定は成約後に業者が行う。サービス自体が「査定」するかのような表現にしない
+ *   （AI が出すのは写真からの品物の読み取りと目安であり、査定額ではない）。
+ * 走査対象は公開ページに加え、利用者が見る画面（cases・chat・create・admin・schedule・components/kdz）。
+ * ------------------------------------------------------------------------------------------ */
+
+const POLICY_TARGETS = [
+  ...PUBLIC_FILES.map((file) => `app/${file}`),
+  "app/cases",
+  "app/chat",
+  "app/create",
+  "app/admin",
+  "app/schedule",
+  "components/kdz",
+] as const;
+
+/** 禁止語（表示名・判定の正規表現・理由）。「8%」は 98%・78% などの CSS の数値に当たらないよう直前が数字・小数点・引用符・ハイフンのもの（CSS の top: "8%" や -8%）は除く。 */
+const POLICY_BANNED: ReadonlyArray<readonly [string, RegExp, string]> = [
+  ["手数料", /手数料/, "運営判断: 料率は公開ページに載せない"],
+  ["8%", /(?<![\d.'"-])[8８]\s?[%％]/, "運営判断: 料率は公開ページに載せない"],
+  ["査定", /査定/, "現物の査定は成約後に業者が行う。サービスが査定するかのように書かない"],
+];
+
+/** 複数行のコメント（{/* … *\/} を含む）と行コメントの行を除いた本文。 */
+function sourceWithoutAllComments(relPath: string): string {
+  return readFileSync(join(SRC_DIR, relPath), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split(/\r?\n/)
+    .filter((line) => !/^\s*\/\//.test(line))
+    .join("\n");
+}
+
+/**
+ * 意図した残し（src からの相対パス → 許可する語と理由）。追加するときは必ず理由を書く。
+ */
+const POLICY_ALLOWED: Readonly<Record<string, ReadonlyArray<readonly [string, string]>>> = {
+  "app/terms/TermsTabs.tsx": [
+    ["手数料", "規約本文（第6条「利用料金（手数料を含みます）」）は版数・再同意が絡む運営の判断事項。規約改定と同時に直す"],
+    ["査定", "業者向け規約本文（入札額は誠実な査定に基づく）は同上。規約改定と同時に直す"],
+  ],
+  "app/faq/page.tsx": [
+    ["査定", "意図した残し: 「一括査定にありがちな〜」は他社サービスとの対比で、本サービスが査定するとは言っていない"],
+  ],
+};
+
+describe("運営判断の表記: 手数料・8%・査定を公開ページ・利用者の画面に載せない", () => {
+  it("許可リストの語は実際にそのファイルに残っている（不要になった許可を放置しない）", () => {
+    for (const [key, entries] of Object.entries(POLICY_ALLOWED)) {
+      const body = sourceWithoutAllComments(key.replace(/^app\//, "app/"));
+      for (const [word] of entries) {
+        const pattern = POLICY_BANNED.find(([name]) => name === word)?.[1];
+        assert.ok(pattern?.test(body), `${key}: 「${word}」は残っていない`);
+      }
+    }
+  });
+
+  const files = [...new Set(POLICY_TARGETS.flatMap(collectSourceFiles))];
+
+  it("走査対象が空でない（パス変更で検査が空振りしない）", () => {
+    assert.ok(files.length > 30, `files=${files.length}`);
+    for (const dir of ["app/cases/", "app/chat/", "app/create/", "app/admin/", "app/schedule/", "components/kdz/"]) {
+      assert.ok(files.some((f) => f.split(sep).join("/").startsWith(dir)), dir);
+    }
+  });
+
+  for (const file of files) {
+    const key = file.split(sep).join("/");
+    const body = sourceWithoutAllComments(file);
+    const allowed = new Set((POLICY_ALLOWED[key] ?? []).map(([word]) => word));
+    for (const [word, pattern, reason] of POLICY_BANNED) {
+      if (allowed.has(word)) continue;
+      it(`${key}: 「${word}」を含まない（${reason}）`, () => {
+        assert.equal(pattern.test(body), false);
+      });
+    }
+  }
+});

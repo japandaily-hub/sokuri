@@ -12,6 +12,8 @@
  * 機能ロジック（createReduction・cancelTransaction・createReview）は保持。
  */
 
+import { MessageLengthCounter } from "@/components/kdz/MessageLengthCounter";
+import { messageLengthState } from "@/lib/message-length";
 import "../../operator-shared.css";
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -65,6 +67,7 @@ export default function OperatorTransactionPage() {
   const [reason, setReason] = useState("");
   const [modal, setModal] = useState<ModalState>(null);
   const [cancelReason, setCancelReason] = useState("");
+  const cancelReasonLength = messageLengthState(cancelReason);
   // 2026-09-26 ボタン化: 完了確定の依頼に成功したことをこの画面滞在中だけ示す（再読込・別取引への
   // 遷移でリセットされる。サーバー側の永続状態は completion_request_count 等で判定する）。
   const [completionRequested, setCompletionRequested] = useState(false);
@@ -598,11 +601,12 @@ export default function OperatorTransactionPage() {
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
               rows={3}
-              maxLength={2000}
+              aria-describedby="cancelReasonCount"
+              aria-invalid={cancelReasonLength.over || undefined}
             />
-            <p className="modal-textarea-hint">
-              個人情報や誹謗中傷は記載しないでください（残り{2000 - cancelReason.length}文字）
-            </p>
+            <p className="modal-textarea-hint">個人情報や誹謗中傷は記載しないでください</p>
+            {/* 上限と数え方は char-count（絵文字などを2文字と数えない。backend の max_length と一致） */}
+            <MessageLengthCounter id="cancelReasonCount" text={cancelReason} />
             <div className="modal-actions">
               <button type="button" className="btn-modal-cancel" onClick={closeModal} disabled={busy}>
                 戻る
@@ -610,7 +614,7 @@ export default function OperatorTransactionPage() {
               <button
                 type="button"
                 className="btn-modal-confirm danger"
-                disabled={busy || !cancelReason.trim()}
+                disabled={busy || !cancelReason.trim() || cancelReasonLength.over}
                 onClick={() =>
                   act(async () => {
                     await cancelTransaction(txn.id, cancelReason.trim(), token!);
