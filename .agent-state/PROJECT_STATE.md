@@ -1,11 +1,18 @@
 # PROJECT_STATE — カタヅケ（ソクウリ）
 
-更新: 2026-10-02（Claude・パスワード照合の回数制限を同時送信で超えられる問題 M-3 の修正＝ブランチ claude/sleepy-nash-0dc3ec・**未 push**（IPv6 3段化 7bbce51 の上）。直前: IPv6 のレート制限を /64・/56・/48 の3段で数える修正＝1d14e6f）
+更新: 2026-10-06（Claude・ペルソナ壁打ち PDCA 統合ブランチ pdca/integ の最終レビュー反映＝未 push。反映順は下の「現在フェーズ」先頭の5段）。直前: 2026-10-02（Claude・パスワード照合の回数制限を同時送信で超えられる問題 M-3 の修正＝ブランチ claude/sleepy-nash-0dc3ec・**未 push**（IPv6 3段化 7bbce51 の上）。直前: IPv6 のレート制限を /64・/56・/48 の3段で数える修正＝1d14e6f）
 
 ## 現在フェーズ
 - **2026-10-06 ペルソナ壁打ち PDCA の修正を統合（Claude・ブランチ pdca/integ・未 push）**: ペルソナ壁打ち監査の修正と QA レビュー指摘（M1〜M3・L1〜L7）への対応を 1 本に統合。
   - **バックエンド**:
-    - マイグレーション 0047（`password_reset_tokens`）とパスワード再設定（依頼者・業者）の導入。**2 段反映**: マイグレーションだけを先に push（`dffccf5` 相当）→ `/readyz` で head 一致を確認 → backend → web の順（列・表を読むコードより先に表を作る。start.sh は alembic 失敗でも起動し /health はスキーマを見ないため）。
+    - マイグレーション 0047（`password_reset_tokens`）・0048（`users.agreed_terms_version`＝VARCHAR(32)・`users.agreed_at`＝timestamptz。NULL 可・backfill なし・再同意は求めない）とパスワード再設定（依頼者・業者）の導入。
+    - **反映順（早送りの push を段階的に行う。QA H-1）**: 列・表を読み書きするコードより先にマイグレーションを出し、同意の必須化は最後にする。start.sh は alembic 失敗でも起動し /health はスキーマを見ないため、各段で `/readyz` と CI を確かめてから次へ進む。SHA は最終の統合後に決まるため、役割で書く。
+      1. **マイグレーション 0047 単独コミット**だけを main へ → `/readyz` の head が 0047 になるのを確認。
+      2. **再設定の backend ＋ web（再設定画面）**（0047 の表を読む）。
+      3. **マイグレーション 0048 単独コミット**だけを main へ → `/readyz` の head が 0048 になるのを確認。
+      4. **同意を送る web（signup／LINE。`agreed_terms: true`・`terms_version`）** → Vercel の反映（デプロイ成功＋ログ）を確認。
+      5. **最後に、同意必須化の backend**（`dd198c6` 相当）。**backend を先に出すと、旧 web からのメール登録・LINE 新規登録がすべて 422 になる**（旧 web は同意を送らないため）。
+      - 各段の前に、その時点のコミットで CI が通ることを確かめる（途中のコミットで落ちる並びなら、段の切り方を直す）。
     - 運営（admin）によるチャットの代理送信は backend が 403 で拒否（最終防衛）。web は `ChatPanel` の `readOnly`／`disabledReason` と業者チャットで入力欄を出さない。
     - API の日時を `Z` つき（UTC 明示）で返す変更。
     - メール通知: `dispatch_message_received` に email を追加（opt-in・同一取引は 5 分に 1 通）。
@@ -18,7 +25,15 @@
     - チャットの差分取得: `lib/chat-cursor.ts`（`after`＝カーソル−5 秒・id 重複排除・カーソルは取得分の最大 `created_at` のみで進める）。パスワード再設定の確定画面は token を ref に保持（Strict Mode 対策）し、日本語でない・404/5xx の detail は既定文言に落とす（`lib/password-reset.ts`）。
     - 用語統一（落札→成約・業者画面の「お客様」→依頼者・回収→引き取り）と表記ガード（`public-copy-guard.test.mts`）の拡張。
     - `tsconfig.json` に `allowImportingTsExtensions` を追加（`node --test` で読む純関数の lib が `./x.ts` と相互参照するため。noEmit のみ）。
-  - **残課題**: ①03-chat-unread の競合の恒久策＝`(created_at, id)` の複合カーソル（現状は 5 秒の重なり窓＋id 重複排除で緩和） ②監査ログテーブル（`/admin/activity` は一部の操作のみ） ③運営判断: V-04 手数料の表示、C-1 古物競りあっせん（入札の最高額・順位表示の届出要否は弁護士確認）、業者規約第 4 条の版数（`CURRENT_OPERATOR_TERMS_VERSION`）。④未着手の用語: `PhotoGuide.tsx`（商品・査定）と `case_items.py` のエラー文言（商品）、`TermsTabs.tsx` の「査定」「落札」（業者向け規約は法務確認）、backend の通知文の「お客様」（本人宛て）。
+  - **規約同意（0048・`agreed_terms`・Cookie）**: 依頼者の新規作成（メール登録・LINE の初回）は `agreed_terms: true` が必須（backend が版数 `CURRENT_USER_TERMS_VERSION` と日時を保存。既存ユーザーのログインでは見ない）。LINE は OAuth のコールバックに画面の状態が届かないため、ボタン押下時に短命 Cookie（10 分）で版数を運ぶ。**Cookie 名は https で `__Host-kdz_line_terms`（Secure・Path=/）、http（ローカル開発）で `kdz_line_terms`（Path=/api/auth）**（`lib/line-consent.ts`・`auth.ts` が読み書きを揃える）。
+  - **業者退会時の個人情報の削除**（`services/operator_pii_erasure.py`）: 許可証画像・許可番号・プロフィールの営業情報・本人に紐づく事前申込（氏名・住所・電話・口座等）と招待のメールを消す。取引・メッセージ・入札・口コミ・キャンセル記録は残す。メール一致では特定しない（本人の operator_id／使った招待コードだけ）。
+  - **健康保険証の新規受付停止**: 本人確認書類の提出選択肢から外し、backend も新規受付を止めた（C-2）。
+  - **通知の既読・/create の下書き**: `/notifications` の既読は署名の SHA-256 先頭16文字を localStorage に、`/create` の下書きは sessionStorage に保存。キーに利用者（メール）のハッシュを含め、**ログアウト・退会・セッション失効で消す**（`lib/user-local-state.ts`。security L-5・L-6）。
+  - **運営の代理閲覧**: 帯で明示。チャット入力欄・日程の確定ボタンと確認モーダル・減額の承認／却下は出さない（backend も 403。security M-1・L-7）。チャットのポーリングは取引の切替・画面離脱で止め、別取引の応答は捨てる（security M-2。`chat-cursor.ts` の `shouldApplyFetchResult`）。
+  - **用語統一**: 落札→成約、商品→品物、回収→引き取り、依頼者を業者画面で「お客様」と呼ばない。表記ガード `public-copy-guard.test.mts` は「手数料」「8%」「査定」も走査（公開ページ＋cases・chat・create・admin・schedule・components/kdz。許可は TermsTabs＝規約本文と FAQ の「一括査定」だけ・理由つき）。
+  - **運営判断の一覧（未決・コードでは決めていない）**: ①V-04 手数料・料率の公開（現方針＝公開ページに載せない）②C-1 古物競りあっせん（入札の最高額・順位表示の届出要否は弁護士確認。8% 課金開始前に必須）③業者規約第 4 条の版数（`CURRENT_OPERATOR_TERMS_VERSION`）と TermsTabs の「手数料」「査定」の文言 ④規約改定の再同意（既存ユーザーは NULL のまま・再同意を求めない方針でよいか）⑤管理者アカウントのパスワード再設定の手順（メールでは不可。docs/ops/admin-operations.md）⑥Brevo 無料枠（300 通/日）の上限と有料化の要否。
+  - **最終レビュー反映（2026-10-06・web）**: security M-1・M-2・L-1・L-5・L-6・L-7、QA M-2（E2E 追加＝**未実行**）・M-3（この記録）・L-3・L-4・L-5。E2E（`10-…`のフラグメント形式、`11-consent-and-admin-readonly`）は型チェックのみで未実行。
+  - **残課題**: ①03-chat-unread の競合の恒久策＝`(created_at, id)` の複合カーソル（現状は 5 秒の重なり窓＋id 重複排除で緩和） ②監査ログテーブル（`/admin/activity` は一部の操作のみ） ③運営判断: V-04 手数料の表示、C-1 古物競りあっせん（入札の最高額・順位表示の届出要否は弁護士確認）、業者規約第 4 条の版数（`CURRENT_OPERATOR_TERMS_VERSION`）。④未着手の用語: `TermsTabs.tsx` の「査定」「落札」（業者向け規約は法務確認）、backend の通知文の「お客様」（本人宛て）。
 - **2026-10-02 認証もレート制限も無い旧査定 API の撤去（Claude・8e0b4ab＋修正・ローカルコミットのみ・未 push）**: POST /estimate・GET /assessments/{id}・POST /assessments/{id}/defects（旧 AssetWise）を削除。根拠: web の呼び出し元なし（lib/api.ts は未 import）・Render ログ 7 日（09-20〜09-27）で 0 件（陽性対照 /admin/jobs 毎日 8〜9 件）・所有者列が無く認証だけでは他人の行に書ける。ユーザー決定は「撤去」「/analyze は残す」。web の lib/api.ts も削除。DB テーブル（items・assessments・recommendations・defect_evidences）・モデル・services/routing・affiliate・seed は**残置**（DROP は別途マイグレーションの段階反映で判断。その前に本番 3 表の件数・created_at 範囲・defect_evidences.description の最大長を読み取り専用で確認＝ログ保持 7 日より前の悪用の痕跡）。再発防止: backend/tests/test_write_routes_protected.py＝全書き込みルートに必須認証か「IP 軸で全件数える RateLimitGuard」を要求（例外は理由付き許可リスト: operator-applications・login 2 本）。変更前コードで /estimate・/defects を検出して落ちること、contact のガードを外すと落ちることを確認。**検証**: 全件 pytest 1462 passed、tsc（src・e2e）・eslint 0・node --test 155。security／QA レビュー Critical/High 0（M-1 スコープを見る判定・M-2 許可リスト理由・L-1 claims 除外・L-2 mount 検査・dependencies 陽性対照を反映）。**未対応・要判断**: 本番 /docs・/openapi.json の非公開化（L-5）／GET・/admin 配下への検査拡張（L-3/L-4）／/analyze の撤去（web 呼び出し元なし・Gemini 枠を使う）／operator-applications の XFF 偽装は cb98349 の合流待ち。**push 後の確認**: /health commit・本番 POST /api/v1/estimate が 404・/openapi.json に /estimate・/assessments が無い。別セッション（login 同時送信バイパス）とは rate_limit 系ファイルを編集しない・RateLimitGuard('login') を残す点を確認済み。
 - **2026-09-27〜10-02 パスワード照合の回数制限を同時送信で超えられる問題（セキュリティレビュー M-3・既存）を塞ぐ（Claude・ブランチ claude/sleepy-nash-0dc3ec の 41cb166＋レビュー反映＝7bbce51〔IPv6 3段〕の直後・未 push＝本番未反映）**: user_login／operator_login は「ガードが IP 軸を peek → `check_account`（peek）→ await で DB 照会 → 照合 → `record_failure`」の順で、peek と記録の間の await の間に同時送信（single-packet attack 等）がそろって peek を通り、1 つの窓でアカウント軸（5）・IP 軸（20。IPv6 は各段）の上限を超えて照合できた。
   - **修正**:
