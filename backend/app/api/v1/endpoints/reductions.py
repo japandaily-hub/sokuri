@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
@@ -17,6 +18,7 @@ from sqlalchemy.orm import selectinload
 from app.api.deps import get_current_operator, get_current_user
 from app.core.limits import MAX_REDUCTION_REQUESTS_PER_TRANSACTION
 from app.db.models.bid import Bid
+from app.db.models.case import Case
 from app.db.models.operator import Operator
 from app.db.models.transaction import ReductionRequest, Transaction
 from app.db.models.user import User
@@ -28,6 +30,8 @@ from app.schemas_katadzuke import (
 )
 from app.services import notify_dispatch
 from app.services.case_lock import lock_transaction_rows
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -167,6 +171,35 @@ async def create_reduction(
     return ReductionOut.model_validate(reduction)
 
 
+def _assert_reduction_decider(
+    case_user_id: uuid.UUID | None,
+    user: User,
+    transaction_id: uuid.UUID,
+    *,
+    found: bool,
+) -> None:
+    """減額の承認・却下ができるのは案件の依頼者本人だけ（運営の代理は 403）。"""
+    if not found:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="成約情報が見つかりません。"
+        )
+    if case_user_id is not None and case_user_id == user.id:
+        return
+    if user.role == "admin":
+        logger.warning(
+            "reductions: 運営による依頼者名義の減額回答を拒否 - transaction_id=%s admin_id=%s",
+            transaction_id,
+            user.id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="運営は依頼者に代わって減額の可否を決められません。依頼者本人が操作してください。",
+        )
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN, detail="この成約への権限がありません。"
+    )
+
+
 @router.patch(
     "/transactions/{transaction_id}/reduction/{reduction_id}",
     response_model=ReductionOut,
@@ -180,11 +213,29 @@ async def decide_reduction(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ReductionOut:
-    txn = await _get_txn(session, transaction_id)
-    if txn.case.user_id != user.id and user.role != "admin":
+    # 減額の可否は依頼者本人だけが決める（security review M-1）。運営（所有者でない管理者）が
+    # 依頼者名義で承認・却下すると、誰が決めたかが記録に残らず、業者には依頼者の決定として
+    # 通知されてしまう。取引キャンセルの代理拒否（transactions.cancel_transaction）と同じ方針。
+    #
+    # 認可はロック取得より前に軽量な照会で確かめる（無関係な第三者が他人の transaction_id を
+    # 送りつけて正規の complete/cancel を待たせるロック争奪を避ける。transactions の
+    # _assert_party_before_lock と同じ作法）。ロック後に読み直して再確認する。
+    case_user_id = await session.scalar(
+        select(Case.user_id)
+        .select_from(Transaction)
+        .join(Case, Transaction.case_id == Case.id)
+        .where(Transaction.id == transaction_id)
+    )
+    _assert_reduction_decider(case_user_id, user, transaction_id, found=case_user_id is not None)
+    # 承認・却下を complete / cancel / 減額申請と直列化する（Case → Transaction の行ロック）。
+    # ロック無しだと、complete が final_amount を確定した直後に承認が final_amount を
+    # 書き換えたり、同じ申請への承認と却下が後勝ちで食い違ったりしうる。
+    if await lock_transaction_rows(session, transaction_id) is None:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="この成約への権限がありません。"
+            status_code=status.HTTP_404_NOT_FOUND, detail="成約情報が見つかりません。"
         )
+    txn = await _get_txn(session, transaction_id)
+    _assert_reduction_decider(txn.case.user_id, user, transaction_id, found=True)
     # 完了・キャンセル済みの取引では回答を受け付けない。受け付けると
     # complete_transaction が確定させた final_amount が事後に書き換わる
     # （r6-flow ADD-2 / r6-backend M-3）。create_reduction と同じ条件式を使う。
