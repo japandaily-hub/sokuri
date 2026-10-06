@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Spinner } from "@/components/Icon";
+import { formatAdminDateTime } from "@/lib/admin-datetime";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import { Card, Notice, PageShell, StatusBadge, btnPrimary, btnSecondary, inputBase, useToken } from "@/components/kdz/Ui";
 import { AdminPagination } from "../_components/AdminPagination";
@@ -193,7 +194,7 @@ export default function AdminTransactionsPage() {
                       <StatusBadge value={t.status} label={TXN_STATUS_LABEL[t.status]} />
                     </td>
                     <td className="py-2 pr-4 whitespace-nowrap text-slate-500">
-                      {new Date(t.created_at).toLocaleString("ja-JP")}
+                      {formatAdminDateTime(t.created_at)}
                     </td>
                     <td className="py-2 pr-4 text-slate-700">{t.user_email ?? "—"}</td>
                     <td className="py-2 pr-4 text-slate-700">{t.company_name ?? "—"}</td>

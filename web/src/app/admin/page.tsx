@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Spinner } from "@/components/Icon";
+import { formatAdminDate } from "@/lib/admin-datetime";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import {
   Card,
@@ -567,7 +568,7 @@ export default function AdminPage() {
                     {inv.email ?? "宛先未指定"}
                     {inv.lot_name ? ` ・ lot: ${inv.lot_name}` : ""}
                     {" ・ "}
-                    {new Date(inv.created_at).toLocaleDateString("ja-JP")}
+                    {formatAdminDate(inv.created_at)}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">

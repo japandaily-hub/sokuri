@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Spinner } from "@/components/Icon";
+import { formatAdminDateTime } from "@/lib/admin-datetime";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import { Card, Notice, PageShell, StatusBadge, btnPrimary, btnSecondary, useToken } from "@/components/kdz/Ui";
 import { AdminPagination } from "../_components/AdminPagination";
@@ -158,7 +159,7 @@ export default function AdminContactsPage() {
                   return (
                     <tr key={m.id} className="align-top">
                       <td className="py-2 pr-4 whitespace-nowrap text-slate-500">
-                        {new Date(m.created_at).toLocaleString("ja-JP")}
+                        {formatAdminDateTime(m.created_at)}
                       </td>
                       <td className="py-2 pr-4 break-words text-slate-700">{m.name}</td>
                       <td className="py-2 pr-4 break-all text-slate-700">{m.email}</td>
@@ -177,7 +178,7 @@ export default function AdminContactsPage() {
                         <div className="flex flex-col items-end gap-1.5">
                           {m.handled_at ? (
                             <p className="whitespace-nowrap text-xs text-slate-500">
-                              {new Date(m.handled_at).toLocaleString("ja-JP")}
+                              {formatAdminDateTime(m.handled_at)}
                             </p>
                           ) : (
                             <button

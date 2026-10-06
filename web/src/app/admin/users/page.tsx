@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Spinner } from "@/components/Icon";
+import { formatAdminDateTime } from "@/lib/admin-datetime";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import { Card, Notice, PageShell, StatusBadge, btnDanger, btnPrimary, btnSecondary, inputBase, useToken } from "@/components/kdz/Ui";
 import { AdminPagination } from "../_components/AdminPagination";
@@ -257,7 +258,7 @@ export default function AdminUsersPage() {
                     <td className="py-2 pr-4 text-slate-700">{u.email}</td>
                     <td className="py-2 pr-4 text-slate-700">{u.display_name ?? "—"}</td>
                     <td className="py-2 pr-4 whitespace-nowrap text-slate-500">
-                      {new Date(u.created_at).toLocaleString("ja-JP")}
+                      {formatAdminDateTime(u.created_at)}
                     </td>
                     <td className="py-2 pr-4 text-right">{u.case_count}</td>
                     <td className="py-2 pr-4">

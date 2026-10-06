@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Spinner } from "@/components/Icon";
+import { formatAdminDateTime } from "@/lib/admin-datetime";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import {
   Card,
@@ -289,7 +290,7 @@ export default function AdminOperatorApplicationsPage() {
                     <td className="py-2 pr-4 text-slate-700">{a.contact_email}</td>
                     <td className="py-2 pr-4 text-slate-700">{a.license_number}</td>
                     <td className="py-2 pr-4 whitespace-nowrap text-slate-500">
-                      {new Date(a.created_at).toLocaleString("ja-JP")}
+                      {formatAdminDateTime(a.created_at)}
                     </td>
                     <td className="py-2 pr-4">
                       <StatusBadge value={STATUS_BADGE_VALUE[a.status]} label={STATUS_LABEL[a.status]} />
@@ -479,7 +480,7 @@ export default function AdminOperatorApplicationsPage() {
             ) : (
               <p className="mt-4 border-t border-slate-100 pt-4 text-xs text-slate-600">
                 審査済み（
-                {selected.reviewed_at ? new Date(selected.reviewed_at).toLocaleString("ja-JP") : "—"}
+                {formatAdminDateTime(selected.reviewed_at)}
                 ）のため操作できません。
               </p>
             )}

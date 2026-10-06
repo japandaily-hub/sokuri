@@ -24,6 +24,7 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Spinner } from "@/components/Icon";
+import { formatAdminDateTime } from "@/lib/admin-datetime";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import {
   Card,
@@ -315,7 +316,7 @@ function AdminReviewsContent() {
                 {data?.items.map((r) => (
                   <tr key={r.id} className="align-top">
                     <td className="py-2 pr-4 whitespace-nowrap text-slate-500">
-                      {new Date(r.created_at).toLocaleString("ja-JP")}
+                      {formatAdminDateTime(r.created_at)}
                     </td>
                     <td className="py-2 pr-4 whitespace-nowrap text-slate-700">
                       {r.reviewer_type === "user" ? "依頼者→業者" : "業者→依頼者"}
@@ -352,7 +353,7 @@ function AdminReviewsContent() {
                         <div>
                           <StatusBadge value="cancelled" label="削除済み" />
                           <p className="mt-1 whitespace-nowrap text-xs text-slate-500">
-                            {new Date(r.hidden_at).toLocaleString("ja-JP")}
+                            {formatAdminDateTime(r.hidden_at)}
                           </p>
                           {r.hidden_reason ? (
                             <p className="mt-1 max-w-[16rem] whitespace-pre-wrap break-words text-xs text-slate-500">

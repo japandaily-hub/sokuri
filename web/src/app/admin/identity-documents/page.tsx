@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Spinner } from "@/components/Icon";
+import { formatAdminDateTime } from "@/lib/admin-datetime";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import {
   Card,
@@ -295,7 +296,7 @@ export default function AdminIdentityDocumentsPage() {
                     <td className="py-2 pr-4 text-slate-700">{d.user_name ?? "—"}</td>
                     <td className="py-2 pr-4 text-slate-700">{docTypeLabel(d.doc_type)}</td>
                     <td className="py-2 pr-4 text-slate-500">
-                      {new Date(d.submitted_at).toLocaleString("ja-JP")}
+                      {formatAdminDateTime(d.submitted_at)}
                     </td>
                     <td className="py-2 pr-4">
                       <StatusBadge
@@ -355,7 +356,7 @@ export default function AdminIdentityDocumentsPage() {
               </button>
             </div>
             <p className="mt-1 text-xs text-slate-500">
-              {docTypeLabel(selected.doc_type)} ・ 提出: {new Date(selected.submitted_at).toLocaleString("ja-JP")}
+              {docTypeLabel(selected.doc_type)} ・ 提出: {formatAdminDateTime(selected.submitted_at)}
             </p>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">

@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Spinner } from "@/components/Icon";
+import { formatAdminDateTime } from "@/lib/admin-datetime";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import { Card, Notice, PageShell, StatusBadge, btnPrimary, btnSecondary, inputBase, useToken } from "@/components/kdz/Ui";
 import { AdminPagination } from "../_components/AdminPagination";
@@ -152,7 +153,7 @@ export default function AdminCasesPage() {
                       <StatusBadge value={c.status} label={CASE_STATUS_LABEL[c.status]} />
                     </td>
                     <td className="py-2 pr-4 whitespace-nowrap text-slate-500">
-                      {new Date(c.created_at).toLocaleString("ja-JP")}
+                      {formatAdminDateTime(c.created_at)}
                     </td>
                     <td className="py-2 pr-4 text-slate-700">{c.user_email ?? "—"}</td>
                     <td className="py-2 pr-4 text-slate-700">
