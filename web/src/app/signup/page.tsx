@@ -11,7 +11,7 @@ import { signIn } from "next-auth/react";
 import { signupUser, toDisplayMessage, clearRedirectLoopStorage, KdzApiError } from "@/lib/katadzuke-api";
 import { Ic } from "@/components/kdz/Icons";
 import { KdzLogo } from "@/components/kdz/Logo";
-import { PasswordField, LineAuthButton, TrustRow } from "@/components/kdz/auth";
+import { PasswordField, LineConsentAuth, TrustRow } from "@/components/kdz/auth";
 import { Reveal } from "@/components/kdz/interactions";
 import "./signup.css";
 
@@ -178,7 +178,9 @@ export default function SignupPage() {
                   ここの LINE ログイン（signIn("line")）と遷移が同じではないため。 */}
               <div className="signup-line-slot">
                 <p className="signup-line-note">お使いのLINEアカウントでそのまま登録できます。パスワードの設定は不要です。</p>
-                <LineAuthButton label="LINEアカウントで無料登録" callbackUrl="/create" />
+                {/* N-2（2周目監査・高）: LINE の経路にも、メール登録（手順3）と同じ必須の同意チェックを置き、
+                    同意するまでボタンを押せないようにする（判定は lib/line-consent.ts）。 */}
+                <LineConsentAuth label="LINEアカウントで無料登録" callbackUrl="/create" />
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18, color: "var(--body-soft)", fontSize: 12, fontWeight: 600, letterSpacing: ".04em" }}>
                 <div style={{ flex: 1, height: 1, background: "var(--line)" }} />

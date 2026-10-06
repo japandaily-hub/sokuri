@@ -7,7 +7,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { getSession, signIn, signOut, useSession } from "next-auth/react";
-import { AuthBar, Field, PasswordField, LineAuthButton, TrustRow } from "@/components/kdz/auth";
+import { AuthBar, Field, PasswordField, LineConsentAuth, TrustRow } from "@/components/kdz/auth";
 import { Reveal } from "@/components/kdz/interactions";
 import { safeInternalPath } from "@/lib/safe-path";
 import { USER_HOME_PATH, resolvePostLoginPath } from "@/lib/post-login-path";
@@ -221,17 +221,13 @@ function LoginForm() {
             ) : null}
 
             <p style={{ fontSize: 13, color: "var(--body-soft)", lineHeight: 1.75, textAlign: "center", marginBottom: 10 }}>
-              LINEで登録した方は、下のボタンからログインできます。
+              LINEで登録した方は、下のボタンからログインできます。はじめての方は、このボタンでそのまま登録されます。
             </p>
-            <LineAuthButton callbackUrl={callbackUrl} />
-            {/* 同意文は LINE ボタンと同一視野に置く（押す前に規約・ポリシーへ到達できる） */}
-            <p style={{ fontSize: 12.5, color: "var(--body-soft)", lineHeight: 1.75, textAlign: "center", marginTop: 10 }}>
-              続行すると
-              <Link href="/terms" style={{ color: "var(--primary)", textDecoration: "underline" }}>利用規約</Link>
-              ・
-              <Link href="/privacy" style={{ color: "var(--primary)", textDecoration: "underline" }}>プライバシーポリシー</Link>
-              に同意したものとみなします
-            </p>
+            {/* N-9（2周目監査・中）: LINE ログインは未登録の LINE アカウントならその場で新規登録を兼ねる
+                （src/auth.ts の line プロバイダ → backend /auth/line/exchange が依頼者を新規作成）。
+                既存ユーザー向けの「ログインすると同意」の一文では新規登録の同意として足りないため、
+                /signup と同じ必須の同意チェック方式にする（みなし同意はやめた）。 */}
+            <LineConsentAuth callbackUrl={callbackUrl} />
 
             <div className="auth-divider">メールアドレスで登録した方</div>
 

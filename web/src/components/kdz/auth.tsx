@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { signIn } from "next-auth/react";
+import { canStartLineAuth, lineConsentHint } from "@/lib/line-consent";
 import { KdzLogo } from "./Logo";
 
 /** 認証画面の上部バー（ロゴ + 右リンク）。 */
@@ -144,7 +145,75 @@ export function LineAuthButton({
   );
 }
 
-/** 信頼行（SSL / プライバシー / 無料）。認証4画面で共用する。
+/**
+ * 利用規約・プライバシーポリシーへの明示の同意（必須チェック）＋ LINE 認証ボタン。
+ *
+ * 2周目監査 N-2（/signup）・N-9（/login）: LINE ログインは未登録の LINE アカウントならその場で
+ * 依頼者アカウントを新規作成する（web/src/auth.ts の line プロバイダ → backend /auth/line/exchange）。
+ * /login の LINE ボタンも新規登録を兼ねるため、両画面とも「同意したものとみなします」のみなし同意をやめ、
+ * メール登録フォーム（/signup 手順3）と同じ必須チェックをボタンの上に置き、同意前はボタンを無効にする。
+ * 押せるかどうかの判定は lib/line-consent.ts の純関数（単体テストあり）に寄せ、ここは描画だけを持つ。
+ *
+ * 無効化したボタンには、理由（同意が必要なこと）を aria-describedby で結ぶ。
+ * ボタンの色（LINE のブランドカラー）は変えない（コントラストの扱いは運営判断の待ち・M-11）。
+ */
+export function LineConsentAuth({
+  label = "LINEで続ける",
+  callbackUrl,
+}: {
+  label?: string;
+  /** ログイン成功後の遷移先。呼び出し元の既存ログインフローの遷移先と揃えること。 */
+  callbackUrl: string;
+}) {
+  const [agreed, setAgreed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const baseId = useId();
+  const checkboxId = `${baseId}-line-agree`;
+  const hintId = `${baseId}-line-hint`;
+  const enabled = canStartLineAuth({ agreed, busy });
+  const hint = lineConsentHint({ agreed, busy });
+  return (
+    <div className="line-consent">
+      <div className="line-consent__agree">
+        <input
+          type="checkbox"
+          className="line-consent__cb"
+          id={checkboxId}
+          checked={agreed}
+          required
+          aria-required="true"
+          onChange={(e) => setAgreed(e.target.checked)}
+        />
+        <label htmlFor={checkboxId}>
+          <Link href="/terms">利用規約</Link>および<Link href="/privacy">プライバシーポリシー</Link>に同意します
+          <span className="req">必須</span>
+        </label>
+      </div>
+      <button
+        type="button"
+        className="btn-line-auth"
+        disabled={!enabled}
+        aria-describedby={hint ? hintId : undefined}
+        onClick={() => {
+          // disabled の取りこぼし（古いブラウザ・支援技術の操作）に備え、押下時にも判定し直す。
+          if (!canStartLineAuth({ agreed, busy })) return;
+          setBusy(true);
+          void signIn("line", { callbackUrl });
+        }}
+      >
+        {label}
+      </button>
+      {hint ? (
+        <p id={hintId} className="line-consent__hint">
+          {hint}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** 信頼行（暗号化通信 / プライバシー / 無料）。認証4画面で共用する。
+ *  N-15（2周目監査・低）: 「SSL暗号化通信」は実態（TLS）と合わないため「TLS（HTTPS）による暗号化通信」にした。
  *  QA M1 是正: 3項目めは「無料ログイン」だったが、無料なのはログインではなく登録・利用そのもの
  *  （BRIEF §2.5）。/login・/signup にあった同内容のローカル複製はこの共通部品に統合した。 */
 export function TrustRow() {
@@ -155,7 +224,7 @@ export function TrustRow() {
           <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z" />
           <path d="M9 12l2 2 4-4" />
         </svg>
-        SSL暗号化通信
+        TLS（HTTPS）による暗号化通信
       </div>
       <div className="trust-item">
         <svg viewBox="0 0 24 24">
