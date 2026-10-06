@@ -31,6 +31,7 @@ import {
   type BankAccountType,
   type UserProfile,
 } from "@/lib/katadzuke-api";
+import { formatJstDate } from "@/lib/datetime";
 import { useBankSuggestions, useBranchSuggestions } from "@/lib/bank-lookup";
 import "./bank-account.css";
 
@@ -445,7 +446,7 @@ export default function BankAccountPage() {
                 {account.updated_at ? (
                   <div>
                     <dt>更新日</dt>
-                    <dd>{new Date(account.updated_at).toLocaleDateString("ja-JP")}</dd>
+                    <dd>{formatJstDate(account.updated_at)}</dd>
                   </div>
                 ) : null}
               </dl>

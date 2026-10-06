@@ -15,6 +15,7 @@ import { Spinner } from "@/components/Icon";
 import { OperatorHeader } from "@/components/kdz/OperatorHeader";
 import { Ic } from "@/components/kdz/Icons";
 import { useToken } from "@/components/kdz/Ui";
+import { formatJstDate } from "@/lib/datetime";
 import { formatPurposeLabel } from "@/lib/case-labels";
 import { formatVisitSchedule } from "@/lib/categories";
 import {
@@ -110,7 +111,7 @@ export default function OperatorTransactionsPage() {
                       {t.final_amount != null && t.final_amount !== t.initial_amount
                         ? ` → 確定 ${formatYen(t.final_amount)}`
                         : ""}
-                      ・ {new Date(t.created_at).toLocaleDateString("ja-JP")}
+                      ・ {formatJstDate(t.created_at)}
                     </div>
                     {/* r10 H1 是正: 訪問確定日がチャットのスクロールバックにしか無く一覧から追えなかった。
                         r10 対応: 一覧の TransactionListItem に visit_time_slot が加わったため時間帯も併記する。 */}

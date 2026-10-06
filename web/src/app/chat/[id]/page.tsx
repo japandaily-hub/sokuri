@@ -13,6 +13,7 @@
  * このページは専用ヘッダーと成約案件サイドバーのみを担当する。
  */
 
+import { formatJstDate } from "@/lib/datetime";
 import "./chat.css";
 
 import Link from "next/link";
@@ -123,7 +124,7 @@ export default function ChatPage() {
                 aria-current={t.id === transactionId ? "true" : undefined}
               >
                 <div className="biz-meta">
-                  <span className="biz-time">{new Date(t.created_at).toLocaleDateString("ja-JP")}</span>
+                  <span className="biz-time">{formatJstDate(t.created_at)}</span>
                 </div>
                 <div className="biz-name">{t.company_name ?? "業者"}</div>
                 <div className="biz-preview">

@@ -25,6 +25,7 @@ import { Spinner } from "@/components/Icon";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import { Ic } from "@/components/kdz/Icons";
 import { Notice } from "@/components/kdz/Notice";
+import { formatJstDateLong } from "@/lib/datetime";
 import { caseItemsLabel, formatPurposeLabel } from "@/lib/case-labels";
 import { formatVisitSchedule } from "@/lib/categories";
 import { StatusBadge, useToken } from "@/components/kdz/Ui";
@@ -217,7 +218,7 @@ function LotCard({
             </span>
             <span className="lot-meta-item">
               <Ic name="clock" />
-              {new Date(c.created_at).toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" })}に出品
+              {formatJstDateLong(c.created_at)}に出品
             </span>
             {visitInfo ? (
               <span className="lot-meta-item">

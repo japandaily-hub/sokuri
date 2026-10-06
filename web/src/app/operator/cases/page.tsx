@@ -31,6 +31,7 @@ import {
   toDisplayMessage,
   type CaseMasked,
 } from "@/lib/katadzuke-api";
+import { formatJstDate } from "@/lib/datetime";
 import { caseItemsLabel, formatPurposeLabel } from "@/lib/case-labels";
 import { topBidderLabel } from "@/lib/bid-input";
 
@@ -98,7 +99,7 @@ function LotCard({ c }: { c: CaseMasked }) {
             </span>
             <span className="lot-meta-item">
               <Ic name="clock" />
-              {new Date(c.created_at).toLocaleDateString("ja-JP")}
+              {formatJstDate(c.created_at)}
             </span>
             {c.item_count != null && c.item_count > 0 ? (
               <span className="lot-meta-item">

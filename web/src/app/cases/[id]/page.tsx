@@ -14,6 +14,7 @@ import { Icon, Spinner } from "@/components/Icon";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import { ChatPanel } from "@/components/kdz/ChatPanel";
 import { ConfirmModal } from "@/components/kdz/ConfirmModal";
+import { formatJstDateTime } from "@/lib/datetime";
 import { formatVisitSchedule } from "@/lib/categories";
 import { jstTodayIso } from "@/lib/visit-slots";
 import { buildHousingAttributes, isCaseIdFormat, isCompletionBeforeVisit } from "@/lib/case-detail-view";
@@ -907,7 +908,7 @@ export default function UserCaseDetailPage() {
                 キャンセル: {CANCELLED_BY_LABEL[txn.cancellation.cancelled_by]}による
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                {new Date(txn.cancellation.cancelled_at).toLocaleString("ja-JP")}
+                {formatJstDateTime(txn.cancellation.cancelled_at)}
               </p>
               {txn.cancellation.reason ? (
                 <p className="mt-1 break-words">理由: {txn.cancellation.reason}</p>

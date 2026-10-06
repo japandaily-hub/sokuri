@@ -16,6 +16,7 @@
  * GET /users/me/identity-documents/{id}/file?side=（Blob。<img src> 直参照不可）。
  */
 
+import { formatJstDateTime } from "@/lib/datetime";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AppHeader } from "@/components/kdz/AppHeader";
@@ -311,7 +312,7 @@ export default function IdentityPage() {
               />
               {identity.submitted_at ? (
                 <span className="id-status-sub">
-                  提出日時: {new Date(identity.submitted_at).toLocaleString("ja-JP")}
+                  提出日時: {formatJstDateTime(identity.submitted_at)}
                 </span>
               ) : null}
             </div>

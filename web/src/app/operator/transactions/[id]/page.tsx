@@ -20,6 +20,7 @@ import Link from "next/link";
 import { Spinner } from "@/components/Icon";
 import { OperatorHeader } from "@/components/kdz/OperatorHeader";
 import { useToken } from "@/components/kdz/Ui";
+import { formatJstDateTime, parseApiDateTime } from "@/lib/datetime";
 import { formatPurposeLabel } from "@/lib/case-labels";
 import { formatVisitSchedule } from "@/lib/categories";
 import { DisclosureNotice } from "@/components/kdz/DisclosureNotice";
@@ -211,7 +212,7 @@ export default function OperatorTransactionPage() {
   const completionLimitReached =
     completionCount != null && completionLimit != null && completionCount >= completionLimit;
   const completionCooldownUntil =
-    completionAvailableAt != null && new Date(completionAvailableAt).getTime() > Date.now()
+    completionAvailableAt != null && (parseApiDateTime(completionAvailableAt)?.getTime() ?? 0) > Date.now()
       ? completionAvailableAt
       : null;
   const completionBlockedNote =
@@ -226,7 +227,7 @@ export default function OperatorTransactionPage() {
             : completionLimitReached
               ? `依頼できる回数（${completionLimit}回）に達しました。運営へお問い合わせください。`
               : completionCooldownUntil
-                ? `依頼済みです。次に依頼できるのは${new Date(completionCooldownUntil).toLocaleString("ja-JP", { dateStyle: "medium", timeStyle: "short" })}以降です。`
+                ? `依頼済みです。次に依頼できるのは${formatJstDateTime(completionCooldownUntil)}以降です。`
                 : null;
   const completionDisabled =
     busy ||
@@ -343,7 +344,7 @@ export default function OperatorTransactionPage() {
                 キャンセル: {CANCELLED_BY_LABEL[txn.cancellation.cancelled_by]}による
               </p>
               <p style={{ fontSize: 12, color: "var(--body-soft)", marginTop: 4 }}>
-                {new Date(txn.cancellation.cancelled_at).toLocaleString("ja-JP")}
+                {formatJstDateTime(txn.cancellation.cancelled_at)}
               </p>
               <p style={{ marginTop: 6, wordBreak: "break-word", overflowWrap: "anywhere" }}>
                 {txn.cancellation.reason ? `理由: ${txn.cancellation.reason}` : "理由の記載なし"}

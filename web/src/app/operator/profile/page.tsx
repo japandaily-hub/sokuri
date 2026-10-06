@@ -26,6 +26,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmModal } from "@/components/kdz/ConfirmModal";
 import { Ic, type IcName } from "@/components/kdz/Icons";
 import { OperatorHeader } from "@/components/kdz/OperatorHeader";
+import { formatJstDate } from "@/lib/datetime";
 import { vendorCategoryName } from "@/lib/categories";
 import { useToken } from "@/components/kdz/Ui";
 import {
@@ -572,7 +573,7 @@ export default function OperatorProfilePage() {
                     <span>
                       JPG / PNG / WEBP・10MBまで。
                       {profile.license_image_uploaded_at
-                        ? `アップロード済み（${new Date(profile.license_image_uploaded_at).toLocaleDateString("ja-JP")}）`
+                        ? `アップロード済み（${formatJstDate(profile.license_image_uploaded_at)}）`
                         : "未アップロードです。"}
                     </span>
                   </div>

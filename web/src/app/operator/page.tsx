@@ -48,6 +48,7 @@ import {
   type CaseMasked,
   type TransactionListItem,
 } from "@/lib/katadzuke-api";
+import { formatJstDate, jstYearMonthKey } from "@/lib/datetime";
 import { caseItemsLabel, formatPurposeLabel } from "@/lib/case-labels";
 import { formatYenReading, topBidderLabel } from "@/lib/bid-input";
 
@@ -718,8 +719,8 @@ export default function OperatorDashboardPage() {
     () =>
       (transactions ?? []).filter((t) => {
         if (t.status === "cancelled") return false;
-        const d = new Date(t.created_at);
-        return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+        // 「今月」は日本時間の月境界で数える（端末の時刻帯に依らない。QA L2）。
+        return jstYearMonthKey(t.created_at) === jstYearMonthKey(now);
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [transactions],
@@ -1023,7 +1024,7 @@ export default function OperatorDashboardPage() {
                       <div className="neg-lot">{formatPurposeLabel(t.purpose)}</div>
                       <div className="neg-preview">
                         {t.prefecture} {t.city}　成約日：
-                        {new Date(t.created_at).toLocaleDateString("ja-JP")}
+                        {formatJstDate(t.created_at)}
                       </div>
                     </div>
                     <div className="neg-right">

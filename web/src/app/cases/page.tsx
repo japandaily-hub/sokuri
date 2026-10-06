@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Spinner } from "@/components/Icon";
 import { AppHeader } from "@/components/kdz/AppHeader";
+import { formatJstDateLong } from "@/lib/datetime";
 import { formatPurposeLabel } from "@/lib/case-labels";
 import {
   Card,
@@ -101,7 +102,7 @@ export default function MyCasesPage() {
                       {c.prefecture} {c.city} / {c.floor_plan ?? "間取り未設定"}
                     </p>
                     <p className="mt-1 text-xs text-slate-400">
-                      {new Date(c.created_at).toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" })}
+                      {formatJstDateLong(c.created_at)}
                     </p>
                   </div>
                 </div>

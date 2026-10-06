@@ -74,3 +74,12 @@ describe("formatJstDateTimeSeconds / jstYearMonthKey", () => {
     assert.equal(jstYearMonthKey("garbage"), null);
   });
 });
+
+import { formatJstDateLong } from "./datetime.ts";
+
+describe("formatJstDateLong", () => {
+  it("UTC の 15 時以降は日本時間の翌日になる", () => {
+    assert.equal(formatJstDateLong("2026-10-05T15:30:00"), "2026年10月6日");
+    assert.equal(formatJstDateLong(""), "");
+  });
+});

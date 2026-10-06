@@ -8,6 +8,7 @@ import { useParams } from "next/navigation";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import { Spinner } from "@/components/Icon";
 import { Notice } from "@/components/kdz/Ui";
+import { formatJstDate } from "@/lib/datetime";
 import { vendorCategoryName } from "@/lib/categories";
 import {
   getVendorPublicProfile,
@@ -182,7 +183,7 @@ export default function VendorDetailPage() {
                           {REVIEW_VERDICT_LABEL[rv.verdict]}
                         </span>
                         {"　"}
-                        {new Date(rv.created_at).toLocaleDateString("ja-JP")}
+                        {formatJstDate(rv.created_at)}
                       </div>
                     </div>
                   </div>

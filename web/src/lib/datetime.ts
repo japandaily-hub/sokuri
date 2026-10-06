@@ -63,6 +63,11 @@ export function formatJstDate(value: string | null | undefined): string {
   return formatWith(value, { year: "numeric", month: "numeric", day: "numeric" });
 }
 
+/** 日本時間の日付（例「2026年10月6日」）。解釈できなければ空文字。 */
+export function formatJstDateLong(value: string | null | undefined): string {
+  return formatWith(value, { year: "numeric", month: "long", day: "numeric" });
+}
+
 /** 日本時間の日付＋時刻（例「2026/10/6 11:34」）。解釈できなければ空文字。 */
 export function formatJstDateTime(value: string | null | undefined): string {
   return formatWith(value, {
