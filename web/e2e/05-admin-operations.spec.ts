@@ -41,6 +41,8 @@ test("運営が事前申込を承認して招待コードを受け取り、お�
   // ---- 運営トップ: 各審査画面への導線とバッジ ----
   await loginAsUser(page, ACCOUNTS.admin, "/admin");
   await expect(page.getByRole("heading", { name: "管理画面" })).toBeVisible({ timeout: 30_000 });
+  // M-5: 冒頭に「今日の未対応」カード（人物写真の帯は撤去）。
+  await expect(page.getByRole("heading", { name: "今日の未対応" })).toBeVisible();
   const applicationsLink = page.getByRole("link", { name: /事前申込の審査へ/ });
   const contactsLink = page.getByRole("link", { name: /お問い合わせへ/ });
   await expect(applicationsLink).toBeVisible();

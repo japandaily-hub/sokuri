@@ -5,6 +5,7 @@ import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { Ic } from "@/components/kdz/Icons";
+import { AppHeader } from "@/components/kdz/AppHeader";
 
 /**
  * r3 再レビュー N-3 是正: middleware.ts がログイン済みだが accountType 不一致
@@ -41,7 +42,13 @@ function ForbiddenBody() {
     }
   }
 
+  // L-1: 共通ヘッダー（未ログイン表示）は SiteChrome で抑止している。ログイン済みの依頼者・運営には
+  // ログイン後用ヘッダーを出す（業者アカウントは /mypage が使えず行き止まりになるため出さない）。
+  const showAppHeader = Boolean(session) && session?.accountType !== "operator";
+
   return (
+    <>
+    {showAppHeader ? <AppHeader showBell={false} /> : null}
     <main id="main" className="nf-main">
       <div className="nf-card">
         <div className="nf-icon" aria-hidden="true">
@@ -71,6 +78,7 @@ function ForbiddenBody() {
         ) : null}
       </div>
     </main>
+    </>
   );
 }
 

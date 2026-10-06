@@ -32,6 +32,26 @@ import {
 } from "@/lib/katadzuke-api";
 import { extractReviewIdFromMessage } from "@/lib/review-report";
 
+/** M-4: backend の ContactCategory（/contact の select の value）を運営画面用の日本語にする。未知値は素通し。 */
+const CONTACT_CATEGORY_LABEL: Record<string, string> = {
+  service: "サービスについて",
+  pricing: "料金・費用について",
+  area: "対応エリアについて",
+  privacy: "個人情報の取り扱いについて",
+  trouble: "トラブル・クレーム",
+  partner: "業者登録・提携について",
+  press: "取材・メディア掲載",
+  other: "その他",
+};
+
+/** /contact は開示請求を category="other" に畳み、本文の先頭へこの接頭辞を付ける（contact/page.tsx の DISCLOSURE_PREFIX）。 */
+const DISCLOSURE_MESSAGE_PREFIX = "【事業者情報の開示請求】";
+
+function contactCategoryLabel(value: string, message: string): string {
+  if (value === "other" && message.startsWith(DISCLOSURE_MESSAGE_PREFIX)) return "事業者情報の開示請求";
+  return CONTACT_CATEGORY_LABEL[value] ?? value;
+}
+
 /** 絞り込みの値。API の handled（true/false/未指定）へ 1:1 で対応させる。 */
 type HandledFilter = "unhandled" | "handled" | "all";
 
@@ -163,7 +183,7 @@ export default function AdminContactsPage() {
                       </td>
                       <td data-label="お名前" className="py-2 pr-4 break-words text-slate-700">{m.name}</td>
                       <td data-label="メール" className="py-2 pr-4 break-all text-slate-700">{m.email}</td>
-                      <td data-label="種別" className="py-2 pr-4 break-words text-slate-700">{m.category}</td>
+                      <td data-label="種別" className="py-2 pr-4 break-words text-slate-700">{contactCategoryLabel(m.category, m.message)}</td>
                       <td data-label="本文" className="py-2 pr-4 max-w-md whitespace-pre-wrap break-words text-slate-700">
                         {m.message}
                       </td>

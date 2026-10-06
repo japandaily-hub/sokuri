@@ -283,6 +283,14 @@ function AdminReviewsContent() {
             />
             <StatusFilterBar options={REVIEWER_TYPE_OPTIONS} value={reviewerType} onChange={changeReviewerType} />
             <StatusFilterBar options={VERDICT_OPTIONS} value={verdict} onChange={changeVerdict} />
+            {/* M-6: 口コミの報告は「お問い合わせ」に届く（本文先頭に口コミ ID）。受信箱からここへ飛べる逆向きの入口。 */}
+            <p className="text-xs text-slate-500">
+              通報された口コミは、
+              <Link href="/admin/contacts" className="text-brand-600 underline">
+                お問い合わせ（未対応）
+              </Link>
+              の「該当の口コミを開く」から確認できます。
+            </p>
             {operatorId ? (
               <div className="flex items-center gap-2 text-xs text-slate-500">
                 <span>業者で絞込: {operatorLabel ?? operatorId}</span>
