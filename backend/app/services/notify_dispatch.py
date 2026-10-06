@@ -433,6 +433,7 @@ async def dispatch_message_received(
     *,
     email: str | None = None,
     email_notify_opt_in: bool = True,
+    unread_pending: bool = False,
 ) -> None:
     """新着チャットメッセージ通知（当事者宛）。LINE優先・同一宛先は5分に1通へ間引く。
 
@@ -442,6 +443,11 @@ async def dispatch_message_received(
     ＋ログインリンクだけ。LINE とメールは同じ台帳で間引くため、メール経路でも
     同一取引・同一宛先へは5分に1通を超えない。
 
+    ``unread_pending`` が True（呼び出し元が DB で判定: 受信者が未読のままの、24時間以内の
+    同じ送り手の発言が既にある）のときはメールを送らない（security review M-1: 5分の
+    間引きだけでは、相手が読まないまま発言を続けると1日に最大288通のメールになり、
+    送信枠の枯渇・メール爆撃になる。受信者が既読にするか24時間経つまで再送しない）。
+    LINE Push は無料のため、この条件では止めない。
 
     デバウンスの制約（既知の限界）:
       台帳はプロセスメモリ上の dict であり、**単一プロセス内でのみ**有効。
@@ -453,9 +459,15 @@ async def dispatch_message_received(
       チェック＆セットのアトミック性を確保している（順序を変えないこと）。
     """
     email_deliverable = bool(email) and not notify.is_placeholder_email(email)
-    email_allowed = email_deliverable and email_notify_opt_in
+    email_allowed = email_deliverable and email_notify_opt_in and not unread_pending
     if not line_user_id and not email_allowed:
-        if email_deliverable:
+        if email_deliverable and email_notify_opt_in:
+            logger.info(
+                "notify_dispatch: 受信者が未読の新着が既にあるためメールを再送しません - txn=%s - %s",
+                transaction_id,
+                "dispatch_message_received",
+            )
+        elif email_deliverable:
             logger.info(
                 "notify_dispatch: お知らせメール受信オプトアウトのためスキップ - txn=%s - %s",
                 transaction_id,

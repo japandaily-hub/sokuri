@@ -246,7 +246,12 @@ class TestMessageReceivedEmail:
             )
         assert r.status_code == 201, r.text
         dispatch_mock.assert_called_once_with(
-            None, txn_id, "user", email="mailep_user@example.com", email_notify_opt_in=False
+            None,
+            txn_id,
+            "user",
+            email="mailep_user@example.com",
+            email_notify_opt_in=False,
+            unread_pending=False,
         )
 
     async def test_endpoint_skips_email_for_deleted_or_suspended_owner(

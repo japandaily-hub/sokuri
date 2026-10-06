@@ -722,6 +722,7 @@ class TestEndpointDispatchWiring:
             "user",
             email="msgop_user@example.com",
             email_notify_opt_in=True,
+            unread_pending=False,
         )
 
     async def test_user_message_notifies_operator_only(
@@ -748,7 +749,12 @@ class TestEndpointDispatchWiring:
             )
         assert r.status_code == 201, r.text
         dispatch_mock.assert_called_once_with(
-            "U_op_msguser", txn_id, "operator", email=None, email_notify_opt_in=True
+            "U_op_msguser",
+            txn_id,
+            "operator",
+            email=None,
+            email_notify_opt_in=True,
+            unread_pending=False,
         )
 
     async def test_no_dispatch_when_recipient_not_linked(

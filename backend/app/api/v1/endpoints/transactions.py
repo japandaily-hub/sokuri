@@ -849,6 +849,43 @@ def _to_message_out(message: Message, party: str) -> MessageOut:
     return out
 
 
+#: 未読のままでも新着メールを再送してよくなるまでの時間（security review M-1）。
+_MESSAGE_EMAIL_RENOTIFY_AFTER = timedelta(hours=24)
+
+
+async def _recipient_has_unread_text(
+    session: AsyncSession, txn: Transaction, *, sender_party: str, now: datetime
+) -> bool:
+    """受信者が未読のままの、24時間以内の同じ送り手の通常発言（kind="text"）があるか。
+
+    通知時刻の永続列が無いため（マイグレーションを足さない）、「直近の同じ送り手の発言が
+    受信者の既読位置（user_last_read_at / operator_last_read_at）より後ろ」を「前回の新着
+    通知を受信者がまだ見ていない」とみなす。True のときは新着メールを再送しない。
+    ``ix_messages_transaction_id_created_at`` の先頭列で当該取引だけを走査する1クエリ。
+    """
+    last_sent_at = await session.scalar(
+        select(func.max(Message.created_at)).where(
+            Message.transaction_id == txn.id,
+            Message.kind == "text",
+            Message.sender_type == sender_party,
+        )
+    )
+    if last_sent_at is None:
+        return False
+    if last_sent_at.tzinfo is None:
+        last_sent_at = last_sent_at.replace(tzinfo=timezone.utc)
+    if now - last_sent_at >= _MESSAGE_EMAIL_RENOTIFY_AFTER:
+        return False
+    recipient_last_read_at = (
+        txn.user_last_read_at if sender_party == "operator" else txn.operator_last_read_at
+    )
+    if recipient_last_read_at is None:
+        return True
+    if recipient_last_read_at.tzinfo is None:
+        recipient_last_read_at = recipient_last_read_at.replace(tzinfo=timezone.utc)
+    return last_sent_at > recipient_last_read_at
+
+
 async def _count_messages(
     session: AsyncSession,
     txn_id: uuid.UUID,
@@ -966,6 +1003,16 @@ async def create_message(
             detail="この取引で送れるメッセージの上限に達しました。運営へお問い合わせください。",
         )
 
+    # 新着メールの再送抑止（security review M-1）: 受信者が未読のままの同じ送り手の発言が
+    # 24時間以内にあれば、今回はメールを送らない。メールの宛先になるのは依頼者だけ
+    # （業者宛は LINE のみ）のため、業者の発言のときだけ数える。新しい発言を session に
+    # 加える前に数える（autoflush で今回の発言が混ざらないように）。
+    recipient_unread_pending = False
+    if party == "operator":
+        recipient_unread_pending = await _recipient_has_unread_text(
+            session, txn, sender_party=party, now=datetime.now(timezone.utc)
+        )
+
     # sender_type はクライアント入力を受け取らず actor から自動判定する（なりすまし防止）。
     message = Message(
         transaction_id=txn.id,
@@ -1012,6 +1059,7 @@ async def create_message(
             recipient_party,
             email=recipient_email,
             email_notify_opt_in=recipient_email_opt_in,
+            unread_pending=recipient_unread_pending,
         )
     return _to_message_out(message, party)
 
