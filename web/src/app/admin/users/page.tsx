@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Spinner } from "@/components/Icon";
+import { formatAdminDateTime } from "@/lib/admin-datetime";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import { Card, Notice, PageShell, StatusBadge, btnDanger, btnPrimary, btnSecondary, inputBase, useToken } from "@/components/kdz/Ui";
 import { AdminPagination } from "../_components/AdminPagination";
@@ -232,7 +233,7 @@ export default function AdminUsersPage() {
           </div>
 
           <div className="mt-4 overflow-x-auto" tabIndex={0} role="region" aria-label="ユーザー一覧">
-            <table className="w-full min-w-[960px] text-sm">
+            <table className="admin-cards w-full min-w-[960px] text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
                   <th className="pb-2 pr-4">ID</th>
@@ -251,16 +252,16 @@ export default function AdminUsersPage() {
                   const isDeleted = Boolean(u.deleted_at);
                   return (
                   <tr key={u.id}>
-                    <td className="py-2 pr-4">
+                    <td data-label="ID" className="py-2 pr-4">
                       <CopyableId id={u.id} />
                     </td>
-                    <td className="py-2 pr-4 text-slate-700">{u.email}</td>
-                    <td className="py-2 pr-4 text-slate-700">{u.display_name ?? "—"}</td>
-                    <td className="py-2 pr-4 whitespace-nowrap text-slate-500">
-                      {new Date(u.created_at).toLocaleString("ja-JP")}
+                    <td data-label="メール" className="py-2 pr-4 text-slate-700">{u.email}</td>
+                    <td data-label="表示名" className="py-2 pr-4 text-slate-700">{u.display_name ?? "—"}</td>
+                    <td data-label="登録日時" className="py-2 pr-4 whitespace-nowrap text-slate-500">
+                      {formatAdminDateTime(u.created_at)}
                     </td>
-                    <td className="py-2 pr-4 text-right">{u.case_count}</td>
-                    <td className="py-2 pr-4">
+                    <td data-label="案件数" className="py-2 pr-4 text-right">{u.case_count}</td>
+                    <td data-label="状態" className="py-2 pr-4">
                       {isDeleted ? (
                         <StatusBadge value="cancelled" label="退会済み" />
                       ) : u.role === "admin" ? (
@@ -271,7 +272,7 @@ export default function AdminUsersPage() {
                         <StatusBadge value="completed" label="有効" />
                       )}
                     </td>
-                    <td className="py-2 text-right">
+                    <td data-label="" className="py-2 text-right">
                       {isDeleted ? (
                         <p className="text-xs text-slate-600">退会済みのため操作できません</p>
                       ) : (

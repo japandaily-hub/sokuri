@@ -2207,10 +2207,12 @@ export function adminSuspendOperator(
   operatorId: string,
   suspended: boolean,
   token: string,
+  /** 停止・解除の理由（社内記録用）。backend の OperatorSuspendRequest が受け取り・記録するまでは無視される。 */
+  reason?: string | null,
 ): Promise<OperatorOut> {
   return request(`/admin/operators/${encodeURIComponent(operatorId)}/suspend`, {
     method: "PATCH",
-    body: JSON.stringify({ suspended }),
+    body: JSON.stringify(reason ? { suspended, reason } : { suspended }),
     token,
   });
 }

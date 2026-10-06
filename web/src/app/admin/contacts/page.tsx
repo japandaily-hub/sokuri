@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Spinner } from "@/components/Icon";
+import { formatAdminDateTime } from "@/lib/admin-datetime";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import { Card, Notice, PageShell, StatusBadge, btnPrimary, btnSecondary, useToken } from "@/components/kdz/Ui";
 import { AdminPagination } from "../_components/AdminPagination";
@@ -30,6 +31,26 @@ import {
   type AdminContactMessage,
 } from "@/lib/katadzuke-api";
 import { extractReviewIdFromMessage } from "@/lib/review-report";
+
+/** M-4: backend の ContactCategory（/contact の select の value）を運営画面用の日本語にする。未知値は素通し。 */
+const CONTACT_CATEGORY_LABEL: Record<string, string> = {
+  service: "サービスについて",
+  pricing: "料金・費用について",
+  area: "対応エリアについて",
+  privacy: "個人情報の取り扱いについて",
+  trouble: "トラブル・クレーム",
+  partner: "業者登録・提携について",
+  press: "取材・メディア掲載",
+  other: "その他",
+};
+
+/** /contact は開示請求を category="other" に畳み、本文の先頭へこの接頭辞を付ける（contact/page.tsx の DISCLOSURE_PREFIX）。 */
+const DISCLOSURE_MESSAGE_PREFIX = "【事業者情報の開示請求】";
+
+function contactCategoryLabel(value: string, message: string): string {
+  if (value === "other" && message.startsWith(DISCLOSURE_MESSAGE_PREFIX)) return "事業者情報の開示請求";
+  return CONTACT_CATEGORY_LABEL[value] ?? value;
+}
 
 /** 絞り込みの値。API の handled（true/false/未指定）へ 1:1 で対応させる。 */
 type HandledFilter = "unhandled" | "handled" | "all";
@@ -137,7 +158,7 @@ export default function AdminContactsPage() {
           </div>
 
           <div className="mt-4 overflow-x-auto" tabIndex={0} role="region" aria-label="お問い合わせ一覧">
-            <table className="w-full min-w-[720px] text-sm">
+            <table className="admin-cards w-full min-w-[720px] text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
                   <th className="pb-2 pr-4">受信日時</th>
@@ -157,27 +178,27 @@ export default function AdminContactsPage() {
                   const reportedReviewId = extractReviewIdFromMessage(m.message);
                   return (
                     <tr key={m.id} className="align-top">
-                      <td className="py-2 pr-4 whitespace-nowrap text-slate-500">
-                        {new Date(m.created_at).toLocaleString("ja-JP")}
+                      <td data-label="受信日時" className="py-2 pr-4 whitespace-nowrap text-slate-500">
+                        {formatAdminDateTime(m.created_at)}
                       </td>
-                      <td className="py-2 pr-4 break-words text-slate-700">{m.name}</td>
-                      <td className="py-2 pr-4 break-all text-slate-700">{m.email}</td>
-                      <td className="py-2 pr-4 break-words text-slate-700">{m.category}</td>
-                      <td className="py-2 pr-4 max-w-md whitespace-pre-wrap break-words text-slate-700">
+                      <td data-label="お名前" className="py-2 pr-4 break-words text-slate-700">{m.name}</td>
+                      <td data-label="メール" className="py-2 pr-4 break-all text-slate-700">{m.email}</td>
+                      <td data-label="種別" className="py-2 pr-4 break-words text-slate-700">{contactCategoryLabel(m.category, m.message)}</td>
+                      <td data-label="本文" className="py-2 pr-4 max-w-md whitespace-pre-wrap break-words text-slate-700">
                         {m.message}
                       </td>
-                      <td className="py-2 pr-4">
+                      <td data-label="状態" className="py-2 pr-4">
                         {m.handled_at ? (
                           <StatusBadge value="completed" label="対応済み" />
                         ) : (
                           <StatusBadge value="pending" label="未対応" />
                         )}
                       </td>
-                      <td className="py-2 text-right">
+                      <td data-label="" className="py-2 text-right">
                         <div className="flex flex-col items-end gap-1.5">
                           {m.handled_at ? (
                             <p className="whitespace-nowrap text-xs text-slate-500">
-                              {new Date(m.handled_at).toLocaleString("ja-JP")}
+                              {formatAdminDateTime(m.handled_at)}
                             </p>
                           ) : (
                             <button

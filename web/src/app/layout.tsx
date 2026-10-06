@@ -5,6 +5,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 import { KdzIconSprite } from "@/components/kdz/Icons";
 import { SiteChrome } from "@/components/kdz/SiteChrome";
+import { AdminProxyBanner } from "@/components/kdz/AdminProxyBanner";
 import { BrokenImageGuard, ScrollProgress } from "@/components/kdz/interactions";
 
 /** 書体は next/font/google でビルド時に自己ホストする（外部オリジンへの実行時リクエストをゼロにし、
@@ -134,6 +135,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <BrokenImageGuard />
 
         <Providers>
+          {/* 運営が依頼者・業者の画面を開いているときだけ「代理閲覧中」の帯を出す（運営以外は何も描かない） */}
+          <AdminProxyBanner />
           <SiteChrome>{children}</SiteChrome>
         </Providers>
 

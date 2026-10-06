@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Spinner } from "@/components/Icon";
+import { formatAdminDate } from "@/lib/admin-datetime";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import {
   Card,
@@ -19,6 +20,7 @@ import {
 } from "@/components/kdz/Ui";
 import { AdminPagination } from "./_components/AdminPagination";
 import { ConfirmModal } from "./_components/ConfirmModal";
+import { CopyableId } from "./_components/CopyableId";
 import { formatPurposeLabel } from "@/lib/case-labels";
 import { StatusFilterBar } from "./_components/StatusFilterBar";
 import {
@@ -44,10 +46,10 @@ import {
 } from "@/lib/katadzuke-api";
 
 const VENDOR_STATUS_LABEL: Record<string, { label: string; badgeValue: string }> = {
-  active: { label: "active（フル稼働）", badgeValue: "completed" },
-  limited: { label: "limited（暫定稼働）", badgeValue: "pending" },
-  pending: { label: "pending（未承認）", badgeValue: "rejected" },
-  rejected: { label: "rejected（却下済み）", badgeValue: "unverified" },
+  active: { label: "稼働中", badgeValue: "completed" },
+  limited: { label: "暫定稼働", badgeValue: "pending" },
+  pending: { label: "未承認", badgeValue: "rejected" },
+  rejected: { label: "却下済み", badgeValue: "unverified" },
 };
 
 export default function AdminPage() {
@@ -344,13 +346,13 @@ export default function AdminPage() {
 
   // 停止／停止解除。停止中は業者の既存トークンが全て 403 になりログインも拒否される。
   // r4回帰是正: window.confirm ではなく ConfirmModal（自前ダイアログ）で確認する（依頼者一覧と同型）。
-  async function confirmSuspendChange(op: OperatorOut) {
+  async function confirmSuspendChange(op: OperatorOut, reason: string | null) {
     if (!token || busy) return;
     const next = !op.is_suspended;
     setBusy(true);
     setSuspendModalError(null);
     try {
-      await adminSuspendOperator(op.id, next, token);
+      await adminSuspendOperator(op.id, next, token, reason);
       closeSuspendModal();
       await reload();
     } catch (e) {
@@ -363,8 +365,13 @@ export default function AdminPage() {
   }
 
   // 業者アカウントの強制削除（匿名化）。本人退会と同じ処理を admin 権限で実行する。
-  async function confirmDelete(op: OperatorOut) {
+  async function confirmDelete(op: OperatorOut, typedName: string | null) {
     if (!token || busy) return;
+    // M-3: 取り消せない操作なので、社名の入力一致（取り違え防止）を求める。
+    if ((typedName ?? "").trim() !== op.company_name.trim()) {
+      setDeleteModalError("入力した社名が一致しません。削除する業者の社名をそのまま入力してください。");
+      return;
+    }
     setBusy(true);
     setDeleteModalError(null);
     try {
@@ -436,6 +443,14 @@ export default function AdminPage() {
     { value: "suspended", label: "停止中", count: c?.suspended },
   ];
 
+  /** M-5: 運営が最初に見る「今日の未対応」。件数は各バッジと同じ取得結果を使う。 */
+  const todoItems: { label: string; count: number | null; error: boolean; href: string }[] = [
+    { label: "事前申込（未審査）", count: pendingApplications, error: Boolean(pendingApplicationsError), href: "/admin/operator-applications" },
+    { label: "本人確認書類（審査待ち）", count: pendingIdentityDocs, error: Boolean(pendingIdentityDocsError), href: "/admin/identity-documents" },
+    { label: "お問い合わせ（未対応）", count: unhandledContacts, error: Boolean(unhandledContactsError), href: "/admin/contacts" },
+    { label: "許可証の確認待ちの業者", count: c ? c.pending_with_license : null, error: Boolean(operatorListError), href: "#operator-accounts" },
+  ];
+
   if (loading || !initialLoadDone) {
     return (
       <div className="admin-page">
@@ -450,25 +465,8 @@ export default function AdminPage() {
   return (
     <div className="admin-page">
       <AppHeader showBell={false} />
-      {/* 運営とひと目でわかるバナー（2026-09-14）。PageShell側に既にh1「管理画面」が
-          あるため、帯側は見出しを重ねずeyebrowラベルのみ載せる（h1重複防止）。 */}
-      <section className="hero-band hero-band--slim hero-band--face" aria-hidden="true">
-        {/* eslint-disable @next/next/no-img-element */}
-        <img
-          src="/img/v2/admin-hero.webp"
-          width={1920}
-          height={1088}
-          alt=""
-          loading="eager"
-          fetchPriority="high"
-          decoding="async"
-        />
-        {/* eslint-enable @next/next/no-img-element */}
-        <div className="hero-band__veil" aria-hidden="true" />
-        <div className="container hero-band__copy">
-          <span className="eyebrow">運営</span>
-        </div>
-      </section>
+      {/* M-5: 冒頭の人物写真帯（約240px・「運営」の文字が背景と同化）を撤去。
+          スマホの最初の画面に「今日の未対応」が出るよう、写真の代わりに件数カードを置く。 */}
       <PageShell
         title="管理画面"
         description="業者招待コードの発行・アカウント承認・セル密度を管理します。"
@@ -532,6 +530,32 @@ export default function AdminPage() {
         </div>
       ) : null}
 
+      <section aria-labelledby="admin-todo-heading" className="mb-6">
+        <h2 id="admin-todo-heading" className="text-sm font-semibold text-kdz-ink">
+          今日の未対応
+        </h2>
+        <ul className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-4">
+          {todoItems.map((item) => {
+            const hasTodo = item.count !== null && item.count > 0;
+            return (
+              <li key={item.label}>
+                <Link
+                  href={item.href}
+                  className={`block border p-3 ${
+                    hasTodo ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200 bg-white text-slate-600"
+                  }`}
+                >
+                  <span className="block text-xs">{item.label}</span>
+                  <span className="mt-1 block text-2xl font-semibold">
+                    {item.error ? "取得失敗" : item.count === null ? "…" : `${item.count}件`}
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+
       <div className="grid gap-6 lg:grid-cols-2">
         {/* 招待コード（単発） */}
         <Card>
@@ -567,7 +591,7 @@ export default function AdminPage() {
                     {inv.email ?? "宛先未指定"}
                     {inv.lot_name ? ` ・ lot: ${inv.lot_name}` : ""}
                     {" ・ "}
-                    {new Date(inv.created_at).toLocaleDateString("ja-JP")}
+                    {formatAdminDate(inv.created_at)}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
@@ -664,7 +688,7 @@ export default function AdminPage() {
       </div>
 
       {/* 業者承認 */}
-      <div className="mt-6">
+      <div className="mt-6" id="operator-accounts">
         <Card>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-normal text-slate-900">業者アカウント</h2>
@@ -677,9 +701,12 @@ export default function AdminPage() {
           </div>
           {/* r10 O-M4 是正: pending には「申し込んだが許可証未提出で運営が着手できない」業者が
               混ざるため、pending だけでは実際に審査できる件数が読めなかった。内訳を併記する。 */}
+          <p className="mt-2 text-xs text-slate-500">
+            流れ: 事前申込を承認（招待コード発行）→ 業者が登録し許可証画像を提出 → ここで画像を確認して「承認する」。許可証は未確認のまま入札させないでください。
+          </p>
           {c ? (
             <p className="mt-2 text-xs text-slate-500">
-              pending {c.pending}件（うち許可証提出済み {c.pending_with_license}件＝いま審査に着手できる件数）
+              未承認 {c.pending}件（うち許可証提出済み {c.pending_with_license}件＝いま審査に着手できる件数）
             </p>
           ) : null}
           <div className="mt-3 flex gap-2">
@@ -719,7 +746,7 @@ export default function AdminPage() {
                   <div>
                     <p className="text-sm font-semibold text-slate-900">{op.company_name}</p>
                     <p className="text-xs text-slate-600">
-                      {op.contact_email}
+                      <CopyableId id={op.id} /> ・ {op.contact_email}
                       {op.license_number ? ` ・ ${op.license_number}` : ""}
                     </p>
                     <div className="mt-1 flex gap-1.5">
@@ -779,14 +806,20 @@ export default function AdminPage() {
                       >
                         {op.is_suspended ? "停止を解除" : "停止する"}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => openDeleteModal(op)}
-                        disabled={busy}
-                        className={btnDanger}
-                      >
-                        削除する
-                      </button>
+                      {/* M-3: 取り消せない「削除」は停止と並べず、折りたたみの中へ離す。 */}
+                      <details className="basis-full">
+                        <summary className="cursor-pointer text-xs text-slate-500">その他の操作（取り消せません）</summary>
+                        <div className="mt-2">
+                          <button
+                            type="button"
+                            onClick={() => openDeleteModal(op)}
+                            disabled={busy}
+                            className={btnDanger}
+                          >
+                            この業者を削除する
+                          </button>
+                        </div>
+                      </details>
                     </div>
                   )}
                 </li>
@@ -933,10 +966,12 @@ export default function AdminPage() {
           }
           confirmLabel={suspendTarget.is_suspended ? "停止を解除する" : "停止する"}
           danger={!suspendTarget.is_suspended}
+          withReason
+          reasonLabel="理由（任意）"
           error={suspendModalError}
           busy={busy}
           onCancel={closeSuspendModal}
-          onConfirm={() => void confirmSuspendChange(suspendTarget)}
+          onConfirm={(reason) => void confirmSuspendChange(suspendTarget, reason)}
         />
       ) : null}
 
@@ -967,10 +1002,13 @@ export default function AdminPage() {
           message="削除すると、この業者は匿名化されログイン・入札ができなくなります。取引・レビュー・キャンセル記録はユーザー側の記録として保持されますが、この操作は取り消せません。よろしいですか？"
           confirmLabel="削除する"
           danger
+          withReason
+          reasonRequired
+          reasonLabel={`確認のため、削除する業者の社名「${deleteTarget.company_name}」をそのまま入力してください`}
           error={deleteModalError}
           busy={busy}
           onCancel={closeDeleteModal}
-          onConfirm={() => void confirmDelete(deleteTarget)}
+          onConfirm={(typedName) => void confirmDelete(deleteTarget, typedName)}
         />
       ) : null}
     </div>

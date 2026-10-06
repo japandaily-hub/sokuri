@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Spinner } from "@/components/Icon";
+import { formatAdminDateTime } from "@/lib/admin-datetime";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import {
   Card,
@@ -277,7 +278,7 @@ export default function AdminIdentityDocumentsPage() {
           </div>
 
           <div className="mt-4 overflow-x-auto" tabIndex={0} role="region" aria-label="本人確認書類一覧">
-            <table className="w-full min-w-[720px] text-sm">
+            <table className="admin-cards w-full min-w-[720px] text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
                   <th className="pb-2 pr-4">メール</th>
@@ -291,19 +292,19 @@ export default function AdminIdentityDocumentsPage() {
               <tbody className="divide-y divide-slate-100">
                 {docs?.map((d) => (
                   <tr key={d.id}>
-                    <td className="py-2 pr-4 text-slate-700">{d.user_email}</td>
-                    <td className="py-2 pr-4 text-slate-700">{d.user_name ?? "—"}</td>
-                    <td className="py-2 pr-4 text-slate-700">{docTypeLabel(d.doc_type)}</td>
-                    <td className="py-2 pr-4 text-slate-500">
-                      {new Date(d.submitted_at).toLocaleString("ja-JP")}
+                    <td data-label="メール" className="py-2 pr-4 text-slate-700">{d.user_email}</td>
+                    <td data-label="氏名" className="py-2 pr-4 text-slate-700">{d.user_name ?? "—"}</td>
+                    <td data-label="書類種別" className="py-2 pr-4 text-slate-700">{docTypeLabel(d.doc_type)}</td>
+                    <td data-label="提出日時" className="py-2 pr-4 text-slate-500">
+                      {formatAdminDateTime(d.submitted_at)}
                     </td>
-                    <td className="py-2 pr-4">
+                    <td data-label="状態" className="py-2 pr-4">
                       <StatusBadge
                         value={d.status === "approved" ? "approved" : d.status}
                         label={IDENTITY_STATUS_LABEL[d.status]}
                       />
                     </td>
-                    <td className="py-2 text-right">
+                    <td data-label="" className="py-2 text-right">
                       <button type="button" onClick={() => void openDetail(d)} className={btnSecondary}>
                         確認する
                       </button>
@@ -355,7 +356,7 @@ export default function AdminIdentityDocumentsPage() {
               </button>
             </div>
             <p className="mt-1 text-xs text-slate-500">
-              {docTypeLabel(selected.doc_type)} ・ 提出: {new Date(selected.submitted_at).toLocaleString("ja-JP")}
+              {docTypeLabel(selected.doc_type)} ・ 提出: {formatAdminDateTime(selected.submitted_at)}
             </p>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">

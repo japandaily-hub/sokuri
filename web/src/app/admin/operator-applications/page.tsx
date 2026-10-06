@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Spinner } from "@/components/Icon";
+import { formatAdminDateTime } from "@/lib/admin-datetime";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import {
   Card,
@@ -87,6 +88,8 @@ export default function AdminOperatorApplicationsPage() {
     null,
   );
   const [bankRevealLoading, setBankRevealLoading] = useState(false);
+  /** M-1: 全桁表示前の確認ダイアログ。 */
+  const [revealConfirmOpen, setRevealConfirmOpen] = useState(false);
   const [bankRevealError, setBankRevealError] = useState<string | null>(null);
 
   const [rejectTarget, setRejectTarget] = useState<OperatorApplicationOut | null>(null);
@@ -135,6 +138,7 @@ export default function AdminOperatorApplicationsPage() {
   }
 
   function closeDetail() {
+    setRevealConfirmOpen(false);
     setSelected(null);
     setBankReveal(null);
     setBankRevealError(null);
@@ -147,7 +151,9 @@ export default function AdminOperatorApplicationsPage() {
     try {
       const result = await adminRevealOperatorApplicationBankAccount(selected.id, token);
       setBankReveal(result);
+      setRevealConfirmOpen(false);
     } catch (e) {
+      // M-1: 確認ダイアログの中に出す（閉じると見落とすため）。
       setBankRevealError(toDisplayMessage(e, "口座情報の取得に失敗しました"));
     } finally {
       setBankRevealLoading(false);
@@ -265,7 +271,7 @@ export default function AdminOperatorApplicationsPage() {
           </div>
 
           <div className="mt-4 overflow-x-auto" tabIndex={0} role="region" aria-label="事前申込一覧">
-            <table className="w-full min-w-[720px] text-sm">
+            <table className="admin-cards w-full min-w-[720px] text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
                   <th className="pb-2 pr-4">ID</th>
@@ -281,20 +287,20 @@ export default function AdminOperatorApplicationsPage() {
               <tbody className="divide-y divide-slate-100">
                 {data?.items.map((a) => (
                   <tr key={a.id}>
-                    <td className="py-2 pr-4">
+                    <td data-label="ID" className="py-2 pr-4">
                       <CopyableId id={a.id} />
                     </td>
-                    <td className="py-2 pr-4 text-slate-700">{a.company_name}</td>
-                    <td className="py-2 pr-4 text-slate-700">{a.contact_name}</td>
-                    <td className="py-2 pr-4 text-slate-700">{a.contact_email}</td>
-                    <td className="py-2 pr-4 text-slate-700">{a.license_number}</td>
-                    <td className="py-2 pr-4 whitespace-nowrap text-slate-500">
-                      {new Date(a.created_at).toLocaleString("ja-JP")}
+                    <td data-label="会社名" className="py-2 pr-4 text-slate-700">{a.company_name}</td>
+                    <td data-label="担当者" className="py-2 pr-4 text-slate-700">{a.contact_name}</td>
+                    <td data-label="メール" className="py-2 pr-4 text-slate-700">{a.contact_email}</td>
+                    <td data-label="許可番号" className="py-2 pr-4 text-slate-700">{a.license_number}</td>
+                    <td data-label="申込日時" className="py-2 pr-4 whitespace-nowrap text-slate-500">
+                      {formatAdminDateTime(a.created_at)}
                     </td>
-                    <td className="py-2 pr-4">
+                    <td data-label="状態" className="py-2 pr-4">
                       <StatusBadge value={STATUS_BADGE_VALUE[a.status]} label={STATUS_LABEL[a.status]} />
                     </td>
-                    <td className="py-2 text-right">
+                    <td data-label="" className="py-2 text-right">
                       <button type="button" onClick={() => openDetail(a)} className={btnSecondary}>
                         詳細を確認
                       </button>
@@ -435,16 +441,19 @@ export default function AdminOperatorApplicationsPage() {
                   {!bankReveal ? (
                     <button
                       type="button"
-                      onClick={() => void revealBankAccount()}
+                      onClick={() => {
+                        setBankRevealError(null);
+                        setRevealConfirmOpen(true);
+                      }}
                       disabled={bankRevealLoading}
                       className={`${btnSecondary} mt-2`}
                     >
-                      {bankRevealLoading ? "取得中…" : "口座情報を全桁表示"}
+                      口座情報を全桁表示
                     </button>
                   ) : null}
-                  {bankRevealError ? (
-                    <p className="mt-1 text-xs text-red-600">{bankRevealError}</p>
-                  ) : null}
+                  <p className="mt-1 text-xs text-slate-500">
+                    全桁表示は操作として記録されます（誰がいつ開いたかが残ります）。承認・却下の判断には通常不要です。
+                  </p>
                 </div>
               ) : (
                 <p className="mt-2 text-sm text-slate-500">口座情報は登録されていません。</p>
@@ -479,7 +488,7 @@ export default function AdminOperatorApplicationsPage() {
             ) : (
               <p className="mt-4 border-t border-slate-100 pt-4 text-xs text-slate-600">
                 審査済み（
-                {selected.reviewed_at ? new Date(selected.reviewed_at).toLocaleString("ja-JP") : "—"}
+                {formatAdminDateTime(selected.reviewed_at)}
                 ）のため操作できません。
               </p>
             )}
@@ -487,10 +496,25 @@ export default function AdminOperatorApplicationsPage() {
         </div>
       ) : null}
 
+      {revealConfirmOpen && selected ? (
+        <ConfirmModal
+          title="口座情報を全桁表示します"
+          message="口座番号・口座名義の全桁が画面に表示され、この閲覧は操作記録に残ります。承認・却下の判断（古物商許可の確認など）には通常必要ありません。必要な場合だけ表示してください。"
+          confirmLabel="記録されることを理解して表示する"
+          error={bankRevealError}
+          busy={bankRevealLoading}
+          onCancel={() => {
+            setBankRevealError(null);
+            setRevealConfirmOpen(false);
+          }}
+          onConfirm={() => void revealBankAccount()}
+        />
+      ) : null}
+
       {approveTarget ? (
         <ConfirmModal
           title={`${approveTarget.company_name}を承認します`}
-          message="承認すると招待コードが発行され、申込者へ承認メールが送信されます。よろしいですか？"
+          message="承認すると招待コードが発行され、申込者へ承認メールが送信されます。古物商許可証の確認は、業者が登録して許可証画像を提出した後に、管理画面トップの「業者アカウント」で別途行います（この承認は許可証の確認を兼ねません）。よろしいですか？"
           confirmLabel="承認する"
           error={approveModalError}
           busy={busy}

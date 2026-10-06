@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Spinner } from "@/components/Icon";
+import { formatAdminDateTime } from "@/lib/admin-datetime";
 import { AppHeader } from "@/components/kdz/AppHeader";
 import { Card, Notice, PageShell, StatusBadge, btnPrimary, btnSecondary, inputBase, useToken } from "@/components/kdz/Ui";
 import { AdminPagination } from "../_components/AdminPagination";
@@ -169,7 +170,7 @@ export default function AdminTransactionsPage() {
           </div>
 
           <div className="mt-4 overflow-x-auto" tabIndex={0} role="region" aria-label="取引一覧">
-            <table className="w-full min-w-[960px] text-sm">
+            <table className="admin-cards w-full min-w-[960px] text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
                   <th className="pb-2 pr-4">ID</th>
@@ -186,23 +187,23 @@ export default function AdminTransactionsPage() {
               <tbody className="divide-y divide-slate-100">
                 {data?.items.map((t) => (
                   <tr key={t.id}>
-                    <td className="py-2 pr-4">
+                    <td data-label="ID" className="py-2 pr-4">
                       <CopyableId id={t.id} />
                     </td>
-                    <td className="py-2 pr-4">
+                    <td data-label="状態" className="py-2 pr-4">
                       <StatusBadge value={t.status} label={TXN_STATUS_LABEL[t.status]} />
                     </td>
-                    <td className="py-2 pr-4 whitespace-nowrap text-slate-500">
-                      {new Date(t.created_at).toLocaleString("ja-JP")}
+                    <td data-label="成約日時" className="py-2 pr-4 whitespace-nowrap text-slate-500">
+                      {formatAdminDateTime(t.created_at)}
                     </td>
-                    <td className="py-2 pr-4 text-slate-700">{t.user_email ?? "—"}</td>
-                    <td className="py-2 pr-4 text-slate-700">{t.company_name ?? "—"}</td>
-                    <td className="py-2 pr-4 text-right whitespace-nowrap">{formatYen(t.amount)}</td>
-                    <td className="py-2 pr-4 whitespace-nowrap text-slate-500">
+                    <td data-label="ユーザー" className="py-2 pr-4 text-slate-700">{t.user_email ?? "—"}</td>
+                    <td data-label="業者" className="py-2 pr-4 text-slate-700">{t.company_name ?? "—"}</td>
+                    <td data-label="金額" className="py-2 pr-4 text-right whitespace-nowrap">{formatYen(t.amount)}</td>
+                    <td data-label="訪問予定" className="py-2 pr-4 whitespace-nowrap text-slate-500">
                       {t.visit_date ? formatVisitSchedule(t.visit_date, null) : "—"}
                     </td>
-                    <td className="py-2 pr-4 text-slate-500">{cancelledByLabel(t.cancelled_by)}</td>
-                    <td className="py-2 text-right whitespace-nowrap">
+                    <td data-label="キャンセル元" className="py-2 pr-4 text-slate-500">{cancelledByLabel(t.cancelled_by)}</td>
+                    <td data-label="" className="py-2 text-right whitespace-nowrap">
                       <Link href={`/chat/${t.id}`} className={btnSecondary}>
                         ユーザー画面で開く
                       </Link>

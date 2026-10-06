@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import "./admin.css";
 
 /** /admin はクライアントコンポーネントのため、タブ名・noindex はこのレイアウトで担保する。 */
 export const metadata: Metadata = {
