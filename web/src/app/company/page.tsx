@@ -1,14 +1,15 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { Reveal, RevealLines } from "@/components/kdz/interactions";
+import { publicPageMetadata } from "@/lib/seo";
 import "./company.css";
 
-export const metadata = {
+export const metadata = publicPageMetadata({
+  path: "/company",
   title: "運営者情報",
   description:
     "カタヅケ（家まるごと・まとめて片付け買取プラットフォーム）の運営者情報・ミッションのご紹介です。",
-  alternates: { canonical: "/company" },
-};
+});
 
 /**
  * 運営者情報テーブル（デザインの .company-table）
@@ -55,9 +56,9 @@ const ASSURE: { h: string; p: string }[] = [
   { h: "登録業者のみ", p: "買取を行うのは登録業者です。その古物商許可は運営が確認します。" },
   {
     h: "連絡先は交渉成立後に開示",
-    p: "詳細な住所と連絡用のメールアドレスが渡るのは、交渉が成立した1社だけです。氏名・電話番号は業者に渡りません。",
+    p: "カタヅケのサービス上で業者に渡るのは、交渉が成立した1社への詳細な住所と連絡用のメールアドレスだけです。氏名・電話番号は渡りません。訪問時には、業者が法令に基づき本人確認をする場合があります。",
   },
-  { h: "出品・査定・お断りまで0円", p: "ユーザーの費用はかかりません。" },
+  { h: "出品からお断りまで0円", p: "ユーザーの費用はかかりません。" },
 ];
 
 /**
@@ -138,8 +139,8 @@ const VALUES: { img: string; w: number; title: string; body: string; fact: React
     img: "co-value-cycle",
     w: 520,
     title: "サーキュラーエコノミー",
-    body: "まだ使えるものを、廃棄ではなく再流通に回す仕組みをつくります。",
-    fact: "引き取られた品物は、古物商許可を受けた登録業者を通じて中古品として再流通します。",
+    body: "まだ使えるものが、廃棄ではなく再流通に回ることを目指します。",
+    fact: "品物を買い取るのは、古物商許可を受けた登録業者です。",
   },
 ];
 

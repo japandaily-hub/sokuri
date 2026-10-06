@@ -206,8 +206,8 @@ export function LpChrome() {
             <span />
           </span>
           <span className="lp-header__menu-label">
-            MENU
-            <span>{open ? "CLOSE" : "OPEN"}</span>
+            メニュー
+            <span>{open ? "閉じる" : "開く"}</span>
           </span>
         </button>
       </header>
@@ -218,7 +218,7 @@ export function LpChrome() {
           <span className="btn-line__tile" aria-hidden="true" />
           <span className="btn-line__body">
             <span className="btn-line__label">LINEではじめる</span>
-            <span className="btn-line__sub">出品・査定・お断りまで無料</span>
+            <span className="btn-line__sub">出品からお断りまで無料</span>
           </span>
           <Ic name="arrow" className="btn-line__arr" />
         </Link>

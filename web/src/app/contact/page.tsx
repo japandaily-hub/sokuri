@@ -62,6 +62,9 @@ function ContactPageContent() {
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  /* M-8: 送信をもって同意とみなす書き方をやめ、チェックで明示的に同意を得る。 */
+  const [privacyAgreed, setPrivacyAgreed] = useState(false);
+  const [privacyAgreeError, setPrivacyAgreeError] = useState("");
   /* インラインエラー文言。空文字列 = エラー無し（mypage/profile の seiErr 等と同じ運用）。 */
   const [errors, setErrors] = useState<Record<FieldId, string>>({
     name: "",
@@ -115,6 +118,12 @@ function ContactPageContent() {
         next[id] = "メールアドレスの形式が正しくありません";
         ok = false;
       }
+    }
+    if (!privacyAgreed) {
+      setPrivacyAgreeError("プライバシーポリシーへの同意にチェックを入れてください");
+      ok = false;
+    } else {
+      setPrivacyAgreeError("");
     }
     setErrors(next);
     if (!ok) return;
@@ -246,7 +255,7 @@ function ContactPageContent() {
                   人には「どちらを押せば返事が来るのか」が読めなかった。見出しは意味の
                   切れ目1つ（＝LINEは依頼の導線）に絞り、返信の経路は本文で言い切る。
                   ボタンの本数・href は増やさない（R4 4.: ページ内の LINE CTA を増やさない）。 */}
-              <strong>査定・出品のご依頼はLINEから</strong>
+              <strong>出品のご依頼はLINEから</strong>
               {/* ラウンド4 指摘（High）: リンク先は自社ログイン（/login?callbackUrl=/create）で
                   友だち追加は発生しない。R4 ブリーフが CTA から外した「友だち追加」の語が本文に
                   残っていたため差し替える。公式アカウント導線が実装されるまでこの語は使わない。 */}
@@ -437,6 +446,38 @@ function ContactPageContent() {
                     {errors.message ? <p className="field-error">{errors.message}</p> : null}
                   </div>
 
+                  <div className="field">
+                    <label
+                      htmlFor="privacy-agree"
+                      style={{ display: "flex", alignItems: "center", gap: 10, minHeight: 44, cursor: "pointer" }}
+                    >
+                      <input
+                        type="checkbox"
+                        id="privacy-agree"
+                        name="privacy-agree"
+                        checked={privacyAgreed}
+                        onChange={(e) => {
+                          setPrivacyAgreed(e.target.checked);
+                          if (e.target.checked) setPrivacyAgreeError("");
+                        }}
+                        aria-invalid={privacyAgreeError ? true : undefined}
+                        aria-describedby={privacyAgreeError ? "privacy-agree-error" : undefined}
+                        style={{ width: 20, height: 20, flexShrink: 0, margin: 0 }}
+                      />
+                      <span>
+                        <Link href="/privacy" target="_blank" rel="noopener noreferrer">
+                          プライバシーポリシー
+                        </Link>
+                        に同意します<span className="req">必須</span>
+                      </span>
+                    </label>
+                    {privacyAgreeError ? (
+                      <p className="field-error" id="privacy-agree-error">
+                        {privacyAgreeError}
+                      </p>
+                    ) : null}
+                  </div>
+
                   <div className="submit-area">
                     <button type="submit" className="btn-submit" disabled={sending}>
                       <svg
@@ -461,9 +502,9 @@ function ContactPageContent() {
                     <p className="note">
                       お送りいただいた内容には、通常3営業日以内にご返信します。
                       <br />
-                      ご送信をもって
+                      お送りいただいた個人情報は、
                       <Link href="/privacy">プライバシーポリシー</Link>
-                      に同意したものとみなします。
+                      に従い、お問い合わせへの回答のために利用します。
                     </p>
                   </div>
                 </form>

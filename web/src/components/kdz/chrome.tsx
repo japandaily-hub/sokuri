@@ -43,7 +43,7 @@ export function SiteFooter() {
             <h5>カタヅケについて</h5>
             <ul>
               <li><Link href="/#founder">運営者メッセージ</Link></li>
-              <li><Link href="/company">会社概要</Link></li>
+              <li><Link href="/company">運営者情報</Link></li>
               <li><Link href="/legal">特定商取引法に基づく表記</Link></li>
               <li><Link href="/privacy">プライバシーポリシー</Link></li>
               <li><Link href="/terms">利用規約</Link></li>

@@ -1,16 +1,17 @@
 /* eslint-disable @next/next/no-img-element */
 import type { Metadata } from "next";
 import Link from "next/link";
+import { publicPageMetadata } from "@/lib/seo";
 import "./photo-guide.css";
 import { Ic, type IcName } from "@/components/kdz/Icons";
 import { Reveal, RevealLines } from "@/components/kdz/interactions";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicPageMetadata({
+  path: "/photo-guide",
   title: "撮影ガイド",
   description:
     "カタヅケの撮影ガイド。上手に撮ると、業者が品物を判断しやすくなります。",
-  alternates: { canonical: "/photo-guide" },
-};
+});
 
 /** ヒーロー帯の直下に置くチェック行 */
 const MERITS = [
@@ -48,7 +49,7 @@ const STEPS: { h: string; p: string; tip: string }[] = [
   {
     h: "傷・汚れ・色あせ・へこみは隠さず撮る",
     p: "傷・汚れ・色あせ・色落ち・へこみなど、気になる部分は隠さずアップで撮りましょう。正直に伝えておくと、訪問時に金額が変わりにくくなります。",
-    tip: "傷があっても買い取ってもらえることが多いので安心してください",
+    tip: "傷や汚れも写しておくと、業者が状態を判断しやすくなります",
   },
   {
     h: "品目名を出品画面に入力する",
@@ -233,7 +234,7 @@ export default function PhotoGuidePage() {
               </figure>
             </div>
 
-            <p className="pg-note">※ 買取額は業者の現物査定で決まります</p>
+            <p className="pg-note">※ 買取額は、訪問時に業者が現物を確認して決まります</p>
           </div>
 
           {/* ============ 2. 撮影の手順 ============ */}
@@ -383,7 +384,7 @@ export default function PhotoGuidePage() {
           <p>
             1点ずつ撮って、まとめて出すだけ。1点ずつ売る手間も、しつこい営業電話もありません。
             <br />
-            出品・査定・お断りまで、ユーザーの費用は一切かかりません。
+            出品からお断りまで、ユーザーの費用は一切かかりません。
           </p>
           <div className="pg-cta-btns">
             {/* ヒーローと同一の 2 トーン構造。同じ文言のボタンが違う見た目で並ばないよう揃える。 */}
