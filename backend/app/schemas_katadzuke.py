@@ -292,6 +292,47 @@ class PasswordChangeResponse(BaseModel):
     access_token: str
 
 
+# ──────────────────────────── パスワード再設定（メール） ────────────────────────────
+
+PasswordResetAccountType = Literal["user", "operator"]
+
+
+class PasswordResetRequest(BaseModel):
+    """パスワード再設定の要求（POST /auth/password-reset/request）。
+
+    応答は登録の有無にかかわらず常に同じ 202（``PasswordResetAcceptedResponse``）。
+    未知フィールドは 422 で拒否する（送ったつもりの値が黙って捨てられるのを防ぐ）。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    email: EmailStr
+    account_type: PasswordResetAccountType
+
+
+class PasswordResetAcceptedResponse(BaseModel):
+    detail: str
+
+
+class PasswordResetConfirmRequest(BaseModel):
+    """パスワード再設定の確定（POST /auth/password-reset/confirm）。
+
+    ``token`` は ``secrets.token_urlsafe(32)``（43文字・URL安全な Base64 文字）を想定し、
+    形式外は照合の前に 422 にする（DB を引かない）。新パスワードの要件は登録・変更と同じ
+    8〜128文字（UserSignupRequest / PasswordChangeRequest と一致させる）。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    token: str = Field(min_length=32, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
+    account_type: PasswordResetAccountType
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class PasswordResetConfirmResponse(BaseModel):
+    detail: str
+
+
 class ReauthTokenRequest(BaseModel):
     current_password: str
 

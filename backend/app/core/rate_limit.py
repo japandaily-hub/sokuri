@@ -108,6 +108,18 @@ class RateLimitConfig:
     # 正規の利用では数回しか呼ばれない。環境変数は持たず、get_rate_limiter() でも上書きしない
     # （operator_application_ip と同じ扱い）。
     schedule_accept_account: RateLimitRule = RateLimitRule(10, 600)
+    # パスワード再設定の要求（POST /auth/password-reset/request・無認証）。IP 軸は全リクエスト
+    # カウント、アカウント軸（"user:"/"operator:" + 正規化メール）もハンドラ冒頭の
+    # hit_account で毎回数える（同じアドレス宛の案内メールの連打・送信枠の浪費を止める）。
+    # アカウント軸は実在しないアドレスでも同じ数え方なので、429 の有無から登録の有無は
+    # 分からない。環境変数は持たず、get_rate_limiter() でも上書きしない
+    # （operator_application_ip と同じ扱い）。
+    password_reset_request_ip: RateLimitRule = RateLimitRule(10, 3600)
+    password_reset_request_account: RateLimitRule = RateLimitRule(5, 3600)
+    # パスワード再設定の確定（POST /auth/password-reset/confirm・無認証）。トークンは
+    # 256bit で総当たりは成立しないが、確定の試行（scrypt のハッシュ計算を伴う）の連打を
+    # IP 軸の全リクエストカウントで止める。
+    password_reset_confirm_ip: RateLimitRule = RateLimitRule(20, 3600)
 
 
 class RateLimitStore(Protocol):

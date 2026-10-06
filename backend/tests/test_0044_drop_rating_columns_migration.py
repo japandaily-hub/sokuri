@@ -385,7 +385,7 @@ def test_0044_locks_reviews_then_operators_waiting_at_most_3s_only_on_postgresql
 def test_0044_is_chained_from_0043_on_a_single_head():
     """0044 が 0043 に正しく連鎖し、履歴が単一の head に収束していること（分岐の防止）。
 
-    head そのものの固定は最新リビジョンのテスト（現在は test_0046_messages_kind_length_migration.py）
+    head そのものの固定は最新リビジョンのテスト（現在は test_0047_password_reset_tokens_migration.py）
     が持つ（test_0041・test_0042 と同じ作法）。
     """
     from alembic.script import ScriptDirectory

@@ -9,8 +9,8 @@ test_0043 と同じ理由（alembic の env.py が内部で ``asyncio.run()`` �
 - 拡幅後は32文字までの新しい kind 値を書き込めること（旧列長16なら実害は無いが
   SQLite は型を強制しないため、ここでは型情報の変化そのものを主な検証対象にする）。
 - downgrade は no-op（値・スキーマとも変わらない）。
-- head が 0046 の単独チェーンで 0045 に正しく連鎖し、リビジョン ID が 32 文字以内
-  （head の固定は最新リビジョンのテストである本ファイルが持つ）。
+- 0046 が 0045 に正しく連鎖し、リビジョン ID が 32 文字以内（head の固定は
+  最新リビジョンのテスト test_0047_password_reset_tokens_migration.py へ移設）。
 """
 
 from __future__ import annotations
@@ -162,13 +162,17 @@ def test_0046_widens_kind_to_varchar32_and_preserves_existing_rows(tmp_path, mon
         get_settings.cache_clear()
 
 
-def test_0046_is_the_single_head_chained_from_0045():
-    """0046 が単独の head として 0045 に正しく連鎖していること（分岐の防止）。"""
+def test_0046_is_chained_from_0045_on_a_single_head():
+    """0046 が 0045 に正しく連鎖し、履歴が単一の head に収束していること（分岐の防止）。
+
+    head そのものの固定は最新リビジョンのテスト（現在は test_0047_password_reset_tokens_migration.py）
+    が持つ（test_0045 と同じ作法）。
+    """
     from alembic.script import ScriptDirectory
 
     cfg = _alembic_config()
     script = ScriptDirectory.from_config(cfg)
-    assert script.get_heads() == ["0046_messages_kind_length"]
+    assert len(script.get_heads()) == 1
     rev_0046 = script.get_revision("0046_messages_kind_length")
     assert rev_0046.down_revision == "0045_review_hidden_by_admin"
     # 過去の alembic_version VARCHAR(32) 全断障害の再発防止ガード。

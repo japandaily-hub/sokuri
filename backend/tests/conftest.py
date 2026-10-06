@@ -47,6 +47,7 @@ import app.db.models.transaction
 import app.db.models.user
 import app.db.models.user_identity_document
 import app.db.models.invite
+import app.db.models.password_reset_token
 configure_mappers()
 
 @pytest.fixture

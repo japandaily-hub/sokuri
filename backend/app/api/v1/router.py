@@ -22,6 +22,7 @@ from app.api.v1.endpoints.contact import router as contact_router
 from app.api.v1.endpoints.operator_applications import router as operator_applications_router
 from app.api.v1.endpoints.operator_license import router as operator_license_router
 from app.api.v1.endpoints.operator_profile import router as operator_profile_router
+from app.api.v1.endpoints.password_reset import router as password_reset_router
 from app.api.v1.endpoints.reductions import router as reductions_router
 from app.api.v1.endpoints.reviews import router as reviews_router
 from app.api.v1.endpoints.transactions import router as transactions_router
@@ -42,6 +43,7 @@ api_router.include_router(analyze_router, tags=["Analyze"])
 # api_router.include_router(albums_router, tags=["Albums"])
 # ── カタヅケ（クローズドβ） ──────────────────────────────────────
 api_router.include_router(auth_router, tags=["Auth"])
+api_router.include_router(password_reset_router, tags=["Auth"])
 api_router.include_router(contact_router, tags=["Contact"])
 api_router.include_router(operator_applications_router, tags=["OperatorApplications"])
 api_router.include_router(case_photos_router, tags=["Photos"])
