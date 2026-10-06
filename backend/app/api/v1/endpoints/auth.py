@@ -197,21 +197,39 @@ _TERMS_AGREEMENT_REQUIRED = http_exception_factory(
     },
 )
 
+# 画面が表示していた規約の版数が現行と食い違う（security review L-2）。古い版に同意した人を
+# 現行版に同意したと記録しないため 409 で止め、再読み込み（現行版の表示）へ案内する。
+# web は detail.code で判別する。
+TERMS_VERSION_OUTDATED_CODE = "terms_version_outdated"
+_TERMS_VERSION_OUTDATED = http_exception_factory(
+    status_code=status.HTTP_409_CONFLICT,
+    detail={
+        "code": TERMS_VERSION_OUTDATED_CODE,
+        "message": "利用規約が更新されています。ページを再読み込みしてください。",
+    },
+)
+
 
 def _require_user_terms_agreement(agreed_terms: bool, terms_version: str | None, *, via: str) -> None:
-    """依頼者アカウントの新規作成の前に、利用規約への同意を確認する（無ければ 422）。
+    """依頼者アカウントの新規作成の前に、利用規約への同意を確認する。
 
-    同意の判定は ``agreed_terms is True`` だけ（スキーマ側も strict で真偽値以外を拒否する）。
-    ``terms_version`` は画面が表示していた版数の参考値で、記録には使わない
-    （記録する版数はサーバーの ``CURRENT_USER_TERMS_VERSION``）。現行と食い違う場合は、古い画面の
-    残存を運用で見つけられるよう INFO に「食い違いがあった」ことだけを残す（値そのものは
-    利用者が自由に送れる文字列なのでログに出さない）。
+    - 同意の判定は ``agreed_terms is True`` だけ（スキーマ側も strict で真偽値以外を拒否する）。
+      無ければ 422 ``terms_agreement_required``。
+    - ``terms_version``（画面が表示していた版数）が送られ、現行の ``CURRENT_USER_TERMS_VERSION``
+      と食い違うときは 409 ``terms_version_outdated``（security review L-2。古い版への同意を
+      現行版への同意として記録しない）。値そのものは利用者が自由に送れる文字列なので
+      ログに出さない。
+    - ``terms_version`` が未送信（版数を送らない旧 web）のときは、従来どおり現行版への同意と
+      して記録して通す（旧 web との互換）。
+
+    記録する版数は常にサーバーの ``CURRENT_USER_TERMS_VERSION``（クライアントの値は使わない）。
     """
     if agreed_terms is not True:
         logger.info("auth/%s: 利用規約への同意が無い新規作成を拒否", via)
         raise _TERMS_AGREEMENT_REQUIRED()
     if terms_version is not None and terms_version != CURRENT_USER_TERMS_VERSION:
-        logger.info("auth/%s: 画面の規約の版数が現行と異なる（記録は現行の版数）", via)
+        logger.info("auth/%s: 画面の規約の版数が現行と異なるため新規作成を拒否（409）", via)
+        raise _TERMS_VERSION_OUTDATED()
 
 
 def _operator_signup_conflict(exc: IntegrityError) -> HTTPException | None:

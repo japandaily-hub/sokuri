@@ -5,6 +5,8 @@
 
 - POST /auth/signup: ``agreed_terms: true`` が無ければ 422（日本語の理由・code 付き）で、ユーザーを作らない。
   あれば現行の版数（サーバーの定数。クライアントの terms_version は信用しない）と日時を保存する。
+- terms_version が送られて現行と食い違うときは 409 terms_version_outdated（security review L-2）で、
+  ユーザーを作らない。未送信（旧 web）は現行版への同意として記録して通す。
 - POST /auth/line/exchange（Bearer なし）: 未登録の LINE アカウントからの新規作成だけ同意を必須にする。
   既存の LINE ユーザーのログインは同意なしで通る（後方互換）。新規作成時は版数と日時を保存する。
 - 真偽値以外（"true"・1）は同意とみなさない（strict）。
@@ -24,7 +26,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.endpoints.auth import TERMS_AGREEMENT_REQUIRED_CODE
+from app.api.v1.endpoints.auth import TERMS_AGREEMENT_REQUIRED_CODE, TERMS_VERSION_OUTDATED_CODE
 from app.db.models.user import User
 from app.schemas_katadzuke import CURRENT_USER_TERMS_VERSION
 from tests.test_line_integration import (  # noqa: F401（autouse フィクスチャの再利用）
@@ -110,7 +112,36 @@ async def test_signup_non_boolean_agreement_is_not_consent(client, db_session, v
     assert await _user_count(db_session) == 0
 
 
-async def test_signup_with_agreement_records_server_version_and_time(client, db_session, caplog):
+def _assert_terms_outdated(r: httpx.Response) -> None:
+    assert r.status_code == 409, r.text
+    detail = r.json()["detail"]
+    assert detail["code"] == TERMS_VERSION_OUTDATED_CODE
+    assert detail["message"] == "利用規約が更新されています。ページを再読み込みしてください。"
+
+
+@pytest.mark.parametrize(
+    "version_extra",
+    [{}, {"terms_version": None}, {"terms_version": CURRENT_USER_TERMS_VERSION}],
+    ids=["missing_old_web", "null", "current"],
+)
+async def test_signup_with_agreement_records_server_version_and_time(
+    client, db_session, caplog, version_extra
+):
+    caplog.set_level(logging.INFO)
+    r = await client.post(
+        "/api/v1/auth/signup",
+        json={"email": _PII_EMAIL, "password": "password123", "agreed_terms": True, **version_extra},
+    )
+    assert r.status_code == 201, r.text
+    user = await db_session.scalar(select(User).where(User.email == _PII_EMAIL))
+    assert user is not None
+    assert user.agreed_terms_version == CURRENT_USER_TERMS_VERSION
+    _assert_recent(user.agreed_at)
+    assert _PII_EMAIL not in caplog.text
+
+
+async def test_signup_with_outdated_terms_version_is_409(client, db_session, caplog):
+    """画面の版数が現行と食い違えば、現行版として記録せず 409（security review L-2）。"""
     caplog.set_level(logging.INFO)
     r = await client.post(
         "/api/v1/auth/signup",
@@ -118,15 +149,11 @@ async def test_signup_with_agreement_records_server_version_and_time(client, db_
             "email": _PII_EMAIL,
             "password": "password123",
             "agreed_terms": True,
-            # 画面の版数は参考値。食い違っても登録は通り、記録はサーバーの現行版数。
             "terms_version": "1999-01-01-forged",
         },
     )
-    assert r.status_code == 201, r.text
-    user = await db_session.scalar(select(User).where(User.email == _PII_EMAIL))
-    assert user is not None
-    assert user.agreed_terms_version == CURRENT_USER_TERMS_VERSION
-    _assert_recent(user.agreed_at)
+    _assert_terms_outdated(r)
+    assert await _user_count(db_session) == 0
     assert "1999-01-01-forged" not in caplog.text
     assert _PII_EMAIL not in caplog.text
 
@@ -208,3 +235,12 @@ async def test_line_relogin_after_consented_creation_keeps_original_record(clien
     await db_session.refresh(user)
     assert user.agreed_terms_version == CURRENT_USER_TERMS_VERSION
     assert user.agreed_at == recorded_at
+
+
+async def test_line_new_account_with_outdated_terms_version_is_409(client, db_session, caplog):
+    caplog.set_level(logging.INFO)
+    r = await _line_exchange(client, {"agreed_terms": True, "terms_version": "2000-01-01"})
+    _assert_terms_outdated(r)
+    assert await _user_count(db_session) == 0
+    assert _LINE_USER_ID not in caplog.text
+    assert "2000-01-01" not in caplog.text
