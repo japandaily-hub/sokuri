@@ -752,3 +752,21 @@ async def send_schedule_proposed(to_email: str, transaction_id: str) -> bool:
             f'<p><a href="{url}">候補日を確認する</a></p>'
         ),
     )
+
+
+async def send_message_received(
+    to_email: str, transaction_id: str, recipient_party: str = "user"
+) -> bool:
+    """新着チャットの通知（依頼者宛・pdca seller 高#5）。メッセージ本文・氏名などの
+    差し込み値は一切載せず、「新着があります」とログイン先のリンクだけを送る。"""
+    settings = get_settings()
+    url = f"{settings.frontend_base_url}/chat/{transaction_id}"
+    return await _send(
+        to_email,
+        "【カタヅケ】チャットに新着メッセージがあります",
+        _wrap(
+            "<p>やり取り中の取引に、新しいメッセージがあります。</p>"
+            "<p>内容はログインしてご確認ください。</p>"
+            f'<p><a href="{url}">チャットを開く</a></p>'
+        ),
+    )

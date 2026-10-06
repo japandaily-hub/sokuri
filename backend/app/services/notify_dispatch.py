@@ -415,11 +415,17 @@ async def dispatch_message_received(
     line_user_id: str | None,
     transaction_id: str,
     recipient_party: Literal["user", "operator"],
+    *,
+    email: str | None = None,
+    email_notify_opt_in: bool = True,
 ) -> None:
-    """新着チャットメッセージ通知（当事者宛）。LINEのみ・同一宛先は5分に1通へ間引く。
+    """新着チャットメッセージ通知（当事者宛）。LINE優先・同一宛先は5分に1通へ間引く。
 
-    メールでの新着メッセージ通知は既存に無く、メッセージ毎の高頻度配信は迷惑メール化
-    （およびSMTPレート消費）のリスクが高いため、意図的にフォールバックを設けない。
+    LINE 未連携／LINE 失敗時は、``email`` が実在アドレスで ``email_notify_opt_in`` が
+    True のときに限りメールへフォールバックする（pdca seller 高#5: メール登録者には
+    新着が届かなかった）。メールの本文はメッセージ本文・個人情報を含まず「新着があります」
+    ＋ログインリンクだけ。LINE とメールは同じ台帳で間引くため、メール経路でも
+    同一取引・同一宛先へは5分に1通を超えない。
 
     デバウンスの制約（既知の限界）:
       台帳はプロセスメモリ上の dict であり、**単一プロセス内でのみ**有効。
@@ -430,7 +436,15 @@ async def dispatch_message_received(
       イベントループ単一スレッド前提のため、判定と記録の間に await を挟まないことで
       チェック＆セットのアトミック性を確保している（順序を変えないこと）。
     """
-    if not line_user_id:
+    email_deliverable = bool(email) and not notify.is_placeholder_email(email)
+    email_allowed = email_deliverable and email_notify_opt_in
+    if not line_user_id and not email_allowed:
+        if email_deliverable:
+            logger.info(
+                "notify_dispatch: お知らせメール受信オプトアウトのためスキップ - txn=%s - %s",
+                transaction_id,
+                "dispatch_message_received",
+            )
         return
 
     key = (transaction_id, recipient_party)
@@ -448,7 +462,12 @@ async def dispatch_message_received(
     if len(_MESSAGE_PUSH_LAST_SENT) > _MESSAGE_PUSH_SWEEP_THRESHOLD:
         _sweep_message_push_ledger(now)
 
-    ok = await line_notify.push_message_received(line_user_id, transaction_id, recipient_party)
+    ok = False
+    if line_user_id:
+        ok = await line_notify.push_message_received(line_user_id, transaction_id, recipient_party)
+    if not ok and email_allowed:
+        assert email is not None
+        ok = await notify.send_message_received(email, transaction_id, recipient_party)
     if not ok:
         # 送れていない以上、5分間の抑止を効かせる理由がない（次のメッセージで再挑戦させる）。
         _MESSAGE_PUSH_LAST_SENT.pop(key, None)
@@ -484,13 +503,27 @@ async def dispatch_transaction_completed(
 
 @_best_effort
 async def dispatch_schedule_proposed(
-    line_user_id: str | None, email: str | None, transaction_id: str
+    line_user_id: str | None,
+    email: str | None,
+    transaction_id: str,
+    email_notify_opt_in: bool = True,
 ) -> None:
-    """訪問日程の候補提示通知（依頼者宛）。LINE優先・失敗/未連携時はメールにフォールバック。"""
+    """訪問日程の候補提示通知（依頼者宛）。LINE優先・失敗/未連携時はメールにフォールバック。
+
+    ``email_notify_opt_in``（既定 True）が False のユーザーには、メールフォールバック
+    のみをスキップする（LINE Push には影響しない。pdca seller 高#5 で受信設定を尊重）。
+    """
     if line_user_id:
         ok = await line_notify.push_schedule_proposed(line_user_id, transaction_id)
         if ok:
             return
     if not email or notify.is_placeholder_email(email):
+        return
+    if not email_notify_opt_in:
+        logger.info(
+            "notify_dispatch: お知らせメール受信オプトアウトのためスキップ - txn=%s - %s",
+            transaction_id,
+            "dispatch_schedule_proposed",
+        )
         return
     await notify.send_schedule_proposed(email, transaction_id)

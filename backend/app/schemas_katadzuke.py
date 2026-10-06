@@ -5,10 +5,11 @@ from __future__ import annotations
 import re
 import unicodedata
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Annotated, Literal, get_args
 
 from pydantic import (
+    AfterValidator,
     BaseModel,
     ConfigDict,
     EmailStr,
@@ -42,6 +43,22 @@ from app.services.visit_schedule import (
 )
 
 # ──────────────────────────── 認証 ────────────────────────────
+
+
+def _assume_utc_if_naive(value: datetime) -> datetime:
+    """時差情報なし（naive）の日時を UTC とみなして aware にする。
+
+    PostgreSQL（timezone=True の列）は常に aware を返すため本番では何もしない。
+    SQLite（テスト）は naive を返し、そのまま JSON にすると ``Z`` なしの文字列になり、
+    ブラウザがローカル時刻として解釈して約9時間ずれる（pdca admin H-1）。
+    """
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
+
+
+# 出力スキーマの日時フィールド用。aware な値は変更しない（JSON 化で ``Z`` / ``+00:00`` が付く）。
+UtcDatetime = Annotated[datetime, AfterValidator(_assume_utc_if_naive)]
 
 
 class UserSignupRequest(BaseModel):
@@ -115,12 +132,12 @@ class OperatorOut(BaseModel):
     company_name: str
     contact_email: str
     license_number: str | None
-    verified_at: datetime | None
+    verified_at: UtcDatetime | None
     vendor_status: str
     is_suspended: bool
-    created_at: datetime
+    created_at: UtcDatetime
     agreed_terms_version: str | None = None
-    agreed_at: datetime | None = None
+    agreed_at: UtcDatetime | None = None
     # 成約後キャンセルの累計回数（運営がキャンセル常習業者を検知する唯一の材料。
     # 従来は加算のみで読み出しが1件も無かった）。OperatorOut は admin 一覧と
     # 業者自身の応答にのみ用いる（公開系は OperatorPublic*Out）。r8-M1 対応。
@@ -170,7 +187,7 @@ class OperatorPublicOut(BaseModel):
 
     id: uuid.UUID
     company_name: str
-    verified_at: datetime | None
+    verified_at: UtcDatetime | None
     # 口コミは常時公開（2026-09-04 決定）。入札一覧で評価の件数と抜粋を出す。
     review_count: int = 0
     # 評価の内訳（よかった／伸びしろ。常に review_count = good_count + improve_count）。
@@ -252,7 +269,7 @@ class UserNotificationSettingsOut(BaseModel):
     """GET/PATCH /users/me/notification-settings 共通のレスポンス形。"""
 
     email_notify_opt_in: bool
-    email_notify_updated_at: datetime | None = None
+    email_notify_updated_at: UtcDatetime | None = None
 
 
 class UserNotificationSettingsUpdateRequest(BaseModel):
@@ -388,7 +405,7 @@ class UserBankAccountMaskedOut(BaseModel):
     account_type: str | None = None
     account_number_masked: str | None = None
     account_holder_kana: str | None = None
-    updated_at: datetime | None = None
+    updated_at: UtcDatetime | None = None
 
 
 class UserBankAccountUpdateRequest(BaseModel):
@@ -439,8 +456,8 @@ class UserIdentityStatusOut(BaseModel):
     status: str
     document_id: uuid.UUID | None = None
     doc_type: str | None = None
-    submitted_at: datetime | None = None
-    reviewed_at: datetime | None = None
+    submitted_at: UtcDatetime | None = None
+    reviewed_at: UtcDatetime | None = None
     reject_reason: str | None = None
     has_back: bool = False
 
@@ -452,8 +469,8 @@ class UserIdentityDocumentAdminOut(BaseModel):
     user_name: str | None
     doc_type: str
     status: str
-    submitted_at: datetime
-    reviewed_at: datetime | None
+    submitted_at: UtcDatetime
+    reviewed_at: UtcDatetime | None
     reject_reason: str | None
     has_back: bool
 
@@ -504,7 +521,7 @@ class PresignResponse(BaseModel):
 
 
 class OperatorLicenseImageUploadResponse(BaseModel):
-    uploaded_at: datetime
+    uploaded_at: UtcDatetime
 
 
 # ──────────────────────────── 案件 ────────────────────────────
@@ -758,7 +775,7 @@ class CaseOut(BaseModel):
     # 201 を返すため、フロントは "pending" の間 GET /cases/{id} をポーリングする
     # （"failed" でも案件は有効。ai_summary には作成時のフォールバック文が入る）。
     ai_status: str = "done"
-    created_at: datetime
+    created_at: UtcDatetime
     photos: list[CasePhotoOut] = []
     items: list[CaseItemOut] = []
     item_count: int = 0
@@ -779,7 +796,7 @@ class CaseMaskedOut(BaseModel):
     floor_number: int | None
     has_elevator: bool | None
     ai_summary: str | None
-    created_at: datetime
+    created_at: UtcDatetime
     photos: list[CasePhotoOut] = []
     items: list[CaseItemOut] = []
     item_count: int = 0
@@ -794,6 +811,11 @@ class CaseMaskedOut(BaseModel):
     top_bid_amount: int | None = None
     # 自社が現在の最高額以上か（自社入札が無ければ None。同額は自社を首位扱い）。
     is_top_bidder: bool | None = None
+    # 自社額が最高額で、かつ他社にも同額の入札がある（並んでいる）か。自社入札が無い・
+    # 最高額に届いていない場合は None／False。依頼者が業者を選ぶ方式のため自動の先着優先は
+    # 無く、「同額＝自社が勝っている」とは言えない（pdca vendor V-03）。画面は
+    # is_top_bidder が True でもこれが True なら「同額で並んでいます」と表示すること。
+    is_tied_for_top: bool | None = None
 
 
 # ──────────────────────────── 入札 ────────────────────────────
@@ -840,8 +862,8 @@ class BidOut(BaseModel):
     amount: int
     message: str | None
     status: str
-    created_at: datetime
-    updated_at: datetime
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
     operator: OperatorPublicOut | None = None
     transaction_id: uuid.UUID | None = None
     # 引き上げ回数（PATCH /cases/{case_id}/bids/me）。0=まだ引き上げていない。
@@ -941,7 +963,7 @@ class TransactionOut(BaseModel):
     visit_date: date | None
     visit_time_slot: str | None = None
     status: str
-    created_at: datetime
+    created_at: UtcDatetime
 
 
 class TransactionCancellationOut(BaseModel):
@@ -957,7 +979,7 @@ class TransactionCancellationOut(BaseModel):
     cancelled_by: Literal["user", "operator", "admin"]
     reason: str | None = None
     # Cancellation は TimestampMixin の created_at を持つ。API 契約名は cancelled_at。
-    cancelled_at: datetime = Field(validation_alias="created_at")
+    cancelled_at: UtcDatetime = Field(validation_alias="created_at")
 
 
 class TransactionDetailOut(TransactionOut):
@@ -985,7 +1007,7 @@ class TransactionDetailOut(TransactionOut):
     # 明けていれば None（今すぐ依頼できる）。
     completion_request_count: int = 0
     completion_request_limit: int = MAX_COMPLETION_REQUESTS_PER_TRANSACTION
-    completion_request_available_at: datetime | None = None
+    completion_request_available_at: UtcDatetime | None = None
     # 落札業者が利用停止中か（依頼者側にのみ意味がある。業者側は 403 の
     # detail.code=account_suspended で自身の停止を知れるため）。r6-flow H-2 対応。
     operator_suspended: bool = False
@@ -1025,7 +1047,7 @@ class TransactionListItem(BaseModel):
     visit_date: date | None
     # 訪問時間帯（例: "午前"）。日程確定前は None（一覧でも詳細と同じ契約にする。r10 fix）。
     visit_time_slot: str | None = None
-    created_at: datetime
+    created_at: UtcDatetime
     purpose: str
     prefecture: str
     city: str
@@ -1070,7 +1092,7 @@ class ReductionOut(BaseModel):
     requested_amount: int
     reason: str
     status: str
-    created_at: datetime
+    created_at: UtcDatetime
 
 
 # ──────────────────────────── レビュー ────────────────────────────
@@ -1108,11 +1130,11 @@ class ReviewOut(BaseModel):
     reviewer_type: str
     verdict: ReviewVerdict
     comment: str | None
-    created_at: datetime
+    created_at: UtcDatetime
     # 運営が非表示にした日時（公開プロフィール・集計から除外される）。
     # 削除の理由（hidden_reason）と実施者（hidden_by_admin_id）は意図して含めない（当事者に運営の
     # 判断内容・運営個人を開示しない。運営向けは AdminReviewListItem）。
-    hidden_at: datetime | None = None
+    hidden_at: UtcDatetime | None = None
 
 
 class ReviewHideRequest(BaseModel):
@@ -1158,7 +1180,7 @@ class PublicReviewOut(BaseModel):
     id: uuid.UUID
     verdict: ReviewVerdict
     comment: str | None
-    created_at: datetime
+    created_at: UtcDatetime
 
 
 # ──────────────────────────── 管理 ────────────────────────────
@@ -1174,10 +1196,10 @@ class InviteOut(BaseModel):
     id: uuid.UUID
     code: str
     email: str | None
-    used_at: datetime | None
+    used_at: UtcDatetime | None
     operator_id: uuid.UUID | None
     lot_name: str | None
-    created_at: datetime
+    created_at: UtcDatetime
 
 
 class InviteBulkCreateRequest(BaseModel):
@@ -1213,7 +1235,7 @@ class AdminCaseListItem(BaseModel):
 
     id: uuid.UUID
     status: str
-    created_at: datetime
+    created_at: UtcDatetime
     purpose: str
     prefecture: str
     city: str
@@ -1234,7 +1256,7 @@ class AdminTransactionListItem(BaseModel):
     id: uuid.UUID
     case_id: uuid.UUID
     status: str
-    created_at: datetime
+    created_at: UtcDatetime
     user_email: str | None = None
     company_name: str | None = None
     amount: int | None = None
@@ -1268,12 +1290,12 @@ class AdminUserListItem(BaseModel):
     display_name: str | None = None
     role: str
     is_suspended: bool
-    suspended_at: datetime | None = None
-    created_at: datetime
+    suspended_at: UtcDatetime | None = None
+    created_at: UtcDatetime
     case_count: int
     # 退会済み（匿名化済み）かどうかを web 側が判別できるように公開する（r10 fix）。
     # include_deleted=true で取得した行のうち、どれが退会済みかを一覧上で示すために必要。
-    deleted_at: datetime | None = None
+    deleted_at: UtcDatetime | None = None
 
 
 class AdminUserListResponse(BaseModel):
@@ -1291,7 +1313,7 @@ class UserSuspendRequest(BaseModel):
 class UserSuspendResponse(BaseModel):
     id: uuid.UUID
     is_suspended: bool
-    suspended_at: datetime | None = None
+    suspended_at: UtcDatetime | None = None
     open_case_count: int = Field(
         default=0,
         description=(
@@ -1384,12 +1406,12 @@ class OperatorApplicationOut(BaseModel):
     invoice_number: str | None
     bank_account: BankAccountMaskedOut | None
     agreed_terms_version: str | None
-    agreed_at: datetime | None
+    agreed_at: UtcDatetime | None
     reviewed_by: uuid.UUID | None
-    reviewed_at: datetime | None
+    reviewed_at: UtcDatetime | None
     reject_reason: str | None
     operator_id: uuid.UUID | None
-    created_at: datetime
+    created_at: UtcDatetime
 
 
 class OperatorApplicationListResponse(BaseModel):
@@ -1443,7 +1465,7 @@ class MessageOut(BaseModel):
     body: str
     kind: str
     meta: dict | None
-    created_at: datetime
+    created_at: UtcDatetime
     mine: bool = False
 
 
@@ -1595,7 +1617,7 @@ class OperatorProfileOut(BaseModel):
     operator_id: uuid.UUID
     company_name: str
     license_number: str | None
-    verified_at: datetime | None
+    verified_at: UtcDatetime | None
     vendor_status: str
     areas: list[str] = []
     categories: list[str] = []
@@ -1611,7 +1633,7 @@ class OperatorProfileOut(BaseModel):
     good_count: int = 0
     improve_count: int = 0
     # 許可証画像のアップロード有無・時刻（BLOB本体は含めない）。
-    license_image_uploaded_at: datetime | None = None
+    license_image_uploaded_at: UtcDatetime | None = None
 
 
 #: OperatorProfileUpdateRequest の表示用自由記述欄 → 項目名（field_validator 側で
@@ -1665,7 +1687,7 @@ class OperatorPublicProfileOut(BaseModel):
 
     operator_id: uuid.UUID
     company_name: str
-    verified_at: datetime | None
+    verified_at: UtcDatetime | None
     # 運営承認済み（vendor_status == "active"）。公開画面の「古物商許可済」バッジはこれを根拠にする
     # （verified_at は古い手動承認フィールドで、過去の招待コード即 active 登録の業者には付いていないため）。
     is_approved: bool = False
@@ -1807,8 +1829,8 @@ class AdminContactListItem(BaseModel):
     email: str
     category: str
     message: str
-    created_at: datetime
-    handled_at: datetime | None
+    created_at: UtcDatetime
+    handled_at: UtcDatetime | None
     handled_by_admin_id: uuid.UUID | None
 
 
@@ -1821,7 +1843,7 @@ class AdminContactHandleResponse(BaseModel):
     """PATCH /admin/contacts/{id}/handle の応答（対応済みの確定時刻のみ返す）。"""
 
     id: uuid.UUID
-    handled_at: datetime
+    handled_at: UtcDatetime
 
 
 class AdminReviewListItem(BaseModel):
@@ -1840,8 +1862,8 @@ class AdminReviewListItem(BaseModel):
     reviewer_type: str  # 'user'（依頼者→業者）| 'operator'（業者→依頼者）
     verdict: ReviewVerdict
     comment: str | None
-    created_at: datetime
-    hidden_at: datetime | None
+    created_at: UtcDatetime
+    hidden_at: UtcDatetime | None
     hidden_reason: str | None
     hidden_by_admin_id: uuid.UUID | None
     operator_id: uuid.UUID | None
@@ -1867,3 +1889,25 @@ class AdminReviewListResponse(BaseModel):
 # 前方参照の解決
 CaseMaskedOut.model_rebuild()
 TransactionDetailOut.model_rebuild()
+
+
+class AdminActivityItem(BaseModel):
+    """GET /admin/activity の1件（運営が行った操作の履歴・pdca admin H-5）。
+
+    個人情報は載せない（運営のメールはマスク・対象は種別と ID・理由などの自由記述は含めない）。
+    """
+
+    at: UtcDatetime
+    action: str
+    action_label: str
+    admin_id: uuid.UUID | None = None
+    admin_email_masked: str | None = None
+    target_type: str
+    target_id: uuid.UUID | None = None
+
+
+class AdminActivityResponse(BaseModel):
+    """``next_before`` を次回の ``before`` に渡すと続きを取れる（無ければ末尾）。"""
+
+    items: list[AdminActivityItem]
+    next_before: UtcDatetime | None = None

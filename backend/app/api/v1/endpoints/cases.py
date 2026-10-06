@@ -404,11 +404,18 @@ def _to_masked_out(case: Case, my_operator: Operator | None = None) -> CaseMaske
         # それを基準に「首位」と判定しない（表示用の my_bid 自体は取り下げ済みでも返す）。
         if my_bid is not None and my_bid.status != BID_STATUS_WITHDRAWN:
             out.is_top_bidder = my_bid.amount >= out.top_bid_amount
+            # 同額の他社入札が（開示対象の母集団に）あるか。自社の入札は operator_id で除く。
+            out.is_tied_for_top = out.is_top_bidder and any(
+                b.operator_id != my_operator.id and b.amount == my_bid.amount
+                for b in disclosable_bids
+            )
         else:
             out.is_top_bidder = None
+            out.is_tied_for_top = None
     else:
         out.top_bid_amount = None
         out.is_top_bidder = None
+        out.is_tied_for_top = None
     return out
 
 

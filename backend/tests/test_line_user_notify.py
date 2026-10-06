@@ -716,7 +716,13 @@ class TestEndpointDispatchWiring:
                 headers=_auth(op_token),
             )
         assert r.status_code == 201, r.text
-        dispatch_mock.assert_called_once_with("U_owner_msgop", txn_id, "user")
+        dispatch_mock.assert_called_once_with(
+            "U_owner_msgop",
+            txn_id,
+            "user",
+            email="msgop_user@example.com",
+            email_notify_opt_in=True,
+        )
 
     async def test_user_message_notifies_operator_only(
         self, client: AsyncClient, db_session: AsyncSession
@@ -741,12 +747,14 @@ class TestEndpointDispatchWiring:
                 headers=_auth(user_token),
             )
         assert r.status_code == 201, r.text
-        dispatch_mock.assert_called_once_with("U_op_msguser", txn_id, "operator")
+        dispatch_mock.assert_called_once_with(
+            "U_op_msguser", txn_id, "operator", email=None, email_notify_opt_in=True
+        )
 
     async def test_no_dispatch_when_recipient_not_linked(
         self, client: AsyncClient, db_session: AsyncSession
     ):
-        """受信者が LINE 未連携なら BackgroundTasks に積まない。"""
+        """受信者（業者）が LINE 未連携なら BackgroundTasks に積まない（業者にはメール通知が無い）。"""
         txn_id, user_token, _ = await self._setup_transaction(client, db_session, "msgnone")
 
         with patch(

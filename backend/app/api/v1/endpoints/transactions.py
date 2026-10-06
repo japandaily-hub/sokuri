@@ -908,6 +908,20 @@ async def create_message(
 
     txn = await _get_txn(session, transaction_id)
     party = _assert_party(txn, actor)
+    # 運営（所有者ではない管理者）の代理発言は拒否する（pdca admin H-2）。_assert_party は
+    # 管理者を "user" として通すため、そのまま保存すると業者に「依頼者本人の発言」として
+    # 見えてしまう（なりすまし）。確定・完了の代理実行は confirmed_by / completed_by で
+    # 記録されるため許可を残し、チャットだけを閲覧専用にする。
+    if party == "user" and _user_side_actor_role(txn, actor) == "admin":
+        logger.warning(
+            "messages: 運営による代理発言を拒否 - transaction_id=%s admin_id=%s",
+            txn.id,
+            actor.id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="運営はチャットを代理で送信できません。",
+        )
     # キャンセル済み・完了済みの取引には発言できない（r8-H3）。従来は 201 を返し、
     # 相手方に「終了済み案件への発言」が届き続けていた。
     _assert_txn_open(txn)
@@ -952,13 +966,21 @@ async def create_message(
     # （detached インスタンスの遅延ロードによる MissingGreenlet を避ける）。
     # txn.case / txn.bid.operator は _TXN_LOAD で eager load 済みだが、
     # case.user_id からの User は未ロードのため明示取得する（PK取得=1クエリ）。
+    recipient_email: str | None = None
+    recipient_email_opt_in = True
     if party == "operator":
         recipient_party: str = "user"
         recipient_line_user_id: str | None = None
         owner_id = txn.case.user_id
         if owner_id is not None:
             owner = await session.get(User, owner_id)
-            recipient_line_user_id = owner.line_user_id if owner is not None else None
+            if owner is not None:
+                recipient_line_user_id = owner.line_user_id
+                # メール通知（LINE 未連携の依頼者向け・pdca seller 高#5）。退会済み・停止中の
+                # 依頼者には送らない（退会済みは墓標メールでも is_placeholder_email が弾くが多層防御）。
+                if owner.deleted_at is None and not owner.is_suspended:
+                    recipient_email = owner.email
+                    recipient_email_opt_in = owner.email_notify_opt_in
     else:
         recipient_party = "operator"
         recipient_line_user_id = txn.bid.operator.line_user_id
@@ -967,12 +989,14 @@ async def create_message(
     await session.commit()
     await session.refresh(message)
 
-    if recipient_line_user_id:
+    if recipient_line_user_id or recipient_email:
         background.add_task(
             notify_dispatch.dispatch_message_received,
             recipient_line_user_id,
             txn_id_str,
             recipient_party,
+            email=recipient_email,
+            email_notify_opt_in=recipient_email_opt_in,
         )
     return _to_message_out(message, party)
 
@@ -989,6 +1013,11 @@ async def mark_messages_read(
 ) -> TransactionOut:
     txn = await _get_txn(session, transaction_id)
     party = _assert_party(txn, actor)
+
+    # 運営（所有者ではない管理者）の閲覧では既読にしない（pdca admin H-2）。依頼者本人が
+    # まだ読んでいない新着の未読バッジが、運営の確認で消えてしまうため。
+    if party == "user" and _user_side_actor_role(txn, actor) == "admin":
+        return TransactionOut.model_validate(txn)
 
     now = datetime.now(timezone.utc)
     if party == "user":
@@ -1206,12 +1235,14 @@ async def propose_schedule(
 
     owner_line_user_id: str | None = None
     owner_email: str | None = None
+    owner_email_opt_in = True
     should_dispatch = False
     if should_notify:
         owner = await _owner(session, txn)
         if owner is not None:
             owner_line_user_id = owner.line_user_id
-            owner_email = owner.email
+            owner_email = owner.email if owner.deleted_at is None else None
+            owner_email_opt_in = owner.email_notify_opt_in
             should_dispatch = True
     txn_id_str = str(txn.id)
 
@@ -1224,6 +1255,7 @@ async def propose_schedule(
             owner_line_user_id,
             owner_email,
             txn_id_str,
+            owner_email_opt_in,
         )
     return _to_message_out(message, party)
 

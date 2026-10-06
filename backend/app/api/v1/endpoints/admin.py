@@ -43,6 +43,8 @@ from app.db.models.user_identity_document import (
 )
 from app.db.session import get_session
 from app.schemas_katadzuke import (
+    AdminActivityItem,
+    AdminActivityResponse,
     AdminAuditEntry,
     AdminAuditResult,
     AdminCaseListItem,
@@ -1595,11 +1597,24 @@ async def reveal_operator_application_bank_account(
         ) from exc
 
     # 誰が・いつ・どの申込の口座情報を復号したかを監査可能な形で記録する。
-    logger.info(
+    # アプリログ（WARNING: 既定の uvicorn 設定でも落ちない水準）に加え、運営アラート
+    # （LINE/メール）へも1通出す（pdca admin M-1。DB に操作履歴の表が無く、ログの保持は
+    # 7日のため、後から「誰が見たか」を追える外部の記録を残す）。口座の値は一切載せない。
+    # 同じ運営×同じ申込は alerts のクールダウンで連続通知が間引かれる。
+    logger.warning(
         "admin: 口座情報を復号しました - application_id=%s admin_id=%s admin_email=%s",
         application.id,
         admin.id,
         mask_email(admin.email),
+    )
+    alerts.fire_and_forget(
+        alerts.send_alert(
+            "振込先口座の全桁が表示されました",
+            f"application_id={application.id}\nadmin_id={admin.id}\n"
+            f"admin_email={mask_email(admin.email)}",
+            severity="warning",
+            key=f"bank-reveal:{application.id}:{admin.id}",
+        )
     )
     return OperatorApplicationBankAccountRevealOut(
         bank_name=decrypted["bank_name"],
@@ -2438,3 +2453,134 @@ async def run_key_fingerprint_job(
     )
     return KeyFingerprintResult(configured=bool(key), sha256=digest)
 
+
+# ──────────────────────────── 運営の操作履歴 ────────────────────────────
+#
+# 専用の監査テーブルは無いため（マイグレーションを足さない方針）、運営の実行者が既存の列に
+# 残っている操作だけを横断して読む（強制キャンセル・口コミ削除・問い合わせ対応・事前申込の
+# 承認/却下・本人確認の承認/却下）。口座の全桁表示などログにしか残らない操作は含まれない。
+_ADMIN_ACTIVITY_MAX_LIMIT = 100
+_ADMIN_ACTIVITY_DEFAULT_LIMIT = 50
+
+
+def _as_utc(value: datetime) -> datetime:
+    """naive（SQLite）を UTC とみなす。本番（timezone=True）の aware はそのまま。"""
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+
+
+@router.get(
+    "/admin/activity",
+    response_model=AdminActivityResponse,
+    summary="運営の操作履歴（新しい順・before カーソルでページング・管理者専用）",
+)
+async def admin_list_activity(
+    limit: int = Query(default=_ADMIN_ACTIVITY_DEFAULT_LIMIT, ge=1, le=_ADMIN_ACTIVITY_MAX_LIMIT),
+    before: datetime | None = Query(
+        default=None, description="この時刻より前の履歴だけ返す（前回の next_before）。"
+    ),
+    admin: User = Depends(get_current_admin),
+    session: AsyncSession = Depends(get_session),
+) -> AdminActivityResponse:
+    """5種の実行者列から、それぞれ新しい順に ``limit`` 件ずつ取って時刻で併合する。
+
+    各クエリは ``before`` 条件＋``ORDER BY 時刻 DESC LIMIT limit`` の上限付き走査で、1リクエストの
+    読み取りは最大 5×limit 行（個人情報の列は読まない）。併合後の上位 ``limit`` 件を返し、
+    続きがあり得るときだけ ``next_before`` を返す。同一時刻の行が境界をまたぐと次ページで
+    取りこぼしうる（厳密な < 比較のため）が、時刻はマイクロ秒精度で実運用上は無視できる。
+    """
+    # (時刻, action, 表示名, 実行者ID, 対象種別, 対象ID)
+    rows: list[tuple[datetime, str, str, uuid.UUID | None, str, uuid.UUID | None]] = []
+    maybe_more = False
+
+    async def _collect(stmt: Select, time_column, build) -> None:  # noqa: ANN001
+        nonlocal maybe_more
+        if before is not None:
+            stmt = stmt.where(time_column < before)
+        fetched = (await session.execute(stmt.order_by(time_column.desc()).limit(limit))).all()
+        if len(fetched) >= limit:
+            maybe_more = True
+        rows.extend(build(row) for row in fetched)
+
+    await _collect(
+        select(
+            Cancellation.created_at, Cancellation.cancelled_by_admin_id, Cancellation.transaction_id
+        ).where(Cancellation.cancelled_by == "admin"),
+        Cancellation.created_at,
+        lambda r: (r[0], "transaction_force_cancel", "取引の強制終了", r[1], "transaction", r[2]),
+    )
+    await _collect(
+        select(Review.hidden_at, Review.hidden_by_admin_id, Review.id).where(
+            Review.hidden_at.is_not(None)
+        ),
+        Review.hidden_at,
+        lambda r: (r[0], "review_hide", "口コミの削除（非表示）", r[1], "review", r[2]),
+    )
+    await _collect(
+        select(
+            ContactMessage.handled_at, ContactMessage.handled_by_admin_id, ContactMessage.id
+        ).where(ContactMessage.handled_at.is_not(None)),
+        ContactMessage.handled_at,
+        lambda r: (r[0], "contact_handle", "問い合わせを対応済みにした", r[1], "contact", r[2]),
+    )
+    await _collect(
+        select(
+            OperatorApplication.reviewed_at,
+            OperatorApplication.reviewed_by,
+            OperatorApplication.id,
+            OperatorApplication.status,
+        ).where(OperatorApplication.reviewed_at.is_not(None)),
+        OperatorApplication.reviewed_at,
+        lambda r: (
+            r[0],
+            "operator_application_approve" if r[3] == "approved" else "operator_application_reject",
+            "業者の事前申込を承認" if r[3] == "approved" else "業者の事前申込を却下",
+            r[1],
+            "operator_application",
+            r[2],
+        ),
+    )
+    await _collect(
+        select(
+            UserIdentityDocument.reviewed_at,
+            UserIdentityDocument.reviewed_by,
+            UserIdentityDocument.id,
+            UserIdentityDocument.status,
+        ).where(UserIdentityDocument.reviewed_at.is_not(None)),
+        UserIdentityDocument.reviewed_at,
+        lambda r: (
+            r[0],
+            "identity_document_approve" if r[3] == "approved" else "identity_document_reject",
+            "本人確認書類を承認" if r[3] == "approved" else "本人確認書類を差し戻し",
+            r[1],
+            "identity_document",
+            r[2],
+        ),
+    )
+
+    rows.sort(key=lambda row: _as_utc(row[0]), reverse=True)
+    page = rows[:limit]
+
+    admin_ids = {row[3] for row in page if row[3] is not None}
+    emails: dict[uuid.UUID, str] = {}
+    if admin_ids:
+        emails = {
+            user_id: email
+            for user_id, email in (
+                await session.execute(select(User.id, User.email).where(User.id.in_(admin_ids)))
+            ).all()
+        }
+
+    items = [
+        AdminActivityItem(
+            at=_as_utc(at),
+            action=action,
+            action_label=label,
+            admin_id=admin_id,
+            admin_email_masked=mask_email(emails[admin_id]) if admin_id in emails else None,
+            target_type=target_type,
+            target_id=target_id,
+        )
+        for at, action, label, admin_id, target_type, target_id in page
+    ]
+    next_before = items[-1].at if items and (maybe_more or len(rows) > limit) else None
+    return AdminActivityResponse(items=items, next_before=next_before)

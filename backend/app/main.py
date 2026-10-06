@@ -192,6 +192,29 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await engine.dispose()
 
 
+#: 長さ超過を日本語の文字列 detail で返す対象欄（loc の末尾 → 画面上の呼び名）。
+_TOO_LONG_FIELD_LABELS = {
+    "body": "メッセージ",
+    "message": "入札メッセージ",
+    "reason": "理由",
+}
+
+
+def _too_long_message(error: dict) -> str | None:
+    """Pydantic の ``string_too_long`` エラーを日本語の1文にする（対象外の欄・種別は None）。
+
+    上限値は ``ctx.max_length``（スキーマ定義が単一の出所）。送信値そのものは載せない。
+    """
+    if error.get("type") != "string_too_long":
+        return None
+    loc = error.get("loc") or ()
+    label = _TOO_LONG_FIELD_LABELS.get(loc[-1]) if loc else None
+    max_length = (error.get("ctx") or {}).get("max_length")
+    if label is None or not isinstance(max_length, int):
+        return None
+    return f"{label}は{max_length:,}文字以内で入力してください。"
+
+
 def _config_readiness(settings: Settings) -> dict[str, bool]:
     """本番必須設定が「使える状態か」を bool だけで返す（/readyz 用・r6 H-4）。
 
@@ -364,9 +387,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ある場合しか参照しておらず、配列要素の個々のキー構成までは見ていない
         ため、この形状変更に互換性への影響は無い。
         """
+        raw_errors = exc.errors()
+        # 長すぎる自由記述（チャット・入札メッセージ・理由）は、画面がそのまま表示できる
+        # 日本語の文字列 detail で返す（pdca vendor V-05。配列形式の detail は画面で
+        # 「送信に失敗しました」という汎用文言になり、何を直すべきか分からなかった）。
+        too_long_messages = [_too_long_message(err) for err in raw_errors]
+        if raw_errors and all(message is not None for message in too_long_messages):
+            return JSONResponse(
+                status_code=422, content={"detail": " ".join(dict.fromkeys(too_long_messages))}  # type: ignore[arg-type]
+            )
         sanitized_errors = [
             {"type": err.get("type"), "loc": err.get("loc"), "msg": err.get("msg")}
-            for err in exc.errors()
+            for err in raw_errors
         ]
         return JSONResponse(status_code=422, content={"detail": sanitized_errors})
 
