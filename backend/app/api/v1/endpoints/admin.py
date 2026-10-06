@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
 from fastapi.responses import Response
 from sqlalchemy import Select, case, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
@@ -1585,9 +1585,15 @@ async def get_operator_application(
 )
 async def reveal_operator_application_bank_account(
     application_id: uuid.UUID,
+    response: Response,
     admin: User = Depends(get_current_admin),
     session: AsyncSession = Depends(get_session),
 ) -> OperatorApplicationBankAccountRevealOut:
+    # 口座の全桁をブラウザ・中継のキャッシュに残さない（security review L-6）。
+    # 成功応答（全桁を含む唯一の応答）に付く。HTTPException の応答は別に組み立てられる
+    # ため付かないが、エラー本文に口座の値は含まれない。
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
     application = await _get_application_or_404(session, application_id)
     if not application.bank_account_enc:
         raise HTTPException(

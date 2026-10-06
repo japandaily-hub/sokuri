@@ -754,6 +754,21 @@ async def cancel_transaction(
     await _lock_txn_rows(session, transaction_id)
     txn = await _get_txn(session, transaction_id)
     party = _assert_party(txn, actor)
+    # 運営（所有者ではない管理者）による依頼者名義のキャンセルは拒否する（security review
+    # L-5）。_assert_party は管理者を "user" として通すため、そのままでは cancelled_by="user"
+    # として記録され、入力した理由が依頼者本人の理由として相手方（業者）の取引詳細に
+    # 表示されてしまう。運営は cancelled_by="admin" を記録する強制終了
+    # （PATCH /admin/transactions/{id}/cancel）を使う。
+    if party == "user" and _user_side_actor_role(txn, actor) == "admin":
+        logger.warning(
+            "transactions: 運営による依頼者名義のキャンセルを拒否 - transaction_id=%s admin_id=%s",
+            txn.id,
+            actor.id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="運営はこの操作を代理で行えません。強制終了を使ってください。",
+        )
     if txn.status in ("completed", "cancelled"):
         # 冪等化ではなく409。既に cancelled の取引に2行目の Cancellation を積まず、
         # cancel_count も二重加算しない（ロック取得後の再判定なので確実に効く）。
