@@ -13,7 +13,12 @@ import { Reveal } from "@/components/kdz/interactions";
 import { safeInternalPath } from "@/lib/safe-path";
 import { USER_HOME_PATH, resolvePostLoginPath } from "@/lib/post-login-path";
 import { clearRedirectLoopStorage } from "@/lib/katadzuke-api";
-import { LINE_TERMS_REQUIRED_MESSAGE, LINE_TERMS_REQUIRED_REASON } from "@/lib/line-consent";
+import {
+  LINE_TERMS_OUTDATED_REASON,
+  LINE_TERMS_REQUIRED_MESSAGE,
+  LINE_TERMS_REQUIRED_REASON,
+  TERMS_VERSION_OUTDATED_MESSAGE,
+} from "@/lib/line-consent";
 import "./login.css";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -85,6 +90,8 @@ function LoginForm() {
   // 3周目の法務監査（中）: 未登録の LINE アカウントで同意が backend に届かなかった（同意の Cookie の
   // 期限切れ等）とき、auth.ts の signIn コールバックが ?reason=terms_required 付きでここへ戻す。
   const lineTermsRequired = params.get("reason") === LINE_TERMS_REQUIRED_REASON;
+  // 規約の版数が古い画面からの LINE 登録は backend が 409 で止める。再読み込みを案内する。
+  const lineTermsOutdated = params.get("reason") === LINE_TERMS_OUTDATED_REASON;
   const { data: session, status } = useSession();
   const accountType = session?.accountType;
   const role = session?.role;
@@ -233,6 +240,11 @@ function LoginForm() {
                 （src/auth.ts の line プロバイダ → backend /auth/line/exchange が依頼者を新規作成）。
                 既存ユーザー向けの「ログインすると同意」の一文では新規登録の同意として足りないため、
                 /signup と同じ必須の同意チェック方式にする（みなし同意はやめた）。 */}
+            {lineTermsOutdated ? (
+              <div className="auth-error" role="alert">
+                <span>{TERMS_VERSION_OUTDATED_MESSAGE}</span>
+              </div>
+            ) : null}
             {lineTermsRequired ? (
               <div className="auth-error" role="alert">
                 <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: "none", stroke: "var(--danger)", strokeWidth: 2, strokeLinecap: "round", flexShrink: 0 }}>

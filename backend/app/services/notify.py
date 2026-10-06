@@ -93,8 +93,10 @@ def _record_daily_send() -> None:
                 f"本日（UTC）のメール送信数が {_daily_send_count} 通に達しました"
                 "（Brevo 無料枠 300通/日・プロセス内の概数）。"
                 f"{_DAILY_CHAT_MAIL_STOP_ABOVE} 通を超えると新着チャット通知メールだけ送信を止めます"
-                "（再設定・成約などのメールは止めません）。",
-                severity="warning",
+                "（再設定・成約などのメールは止めません）。"
+                "これは事前の情報のお知らせです（障害ではないため復旧連絡は出ません）。"
+                "数はプロセス内の概数で、再起動すると 0 に戻ります。",
+                severity="info",
                 key=_daily_quota_alert_key(today),
             )
         )

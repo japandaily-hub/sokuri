@@ -40,12 +40,12 @@
 - 降格（/admin/users の「管理者を解除」）で一般ユーザーにしても、`ADMIN_EMAILS` に載っているアドレスはログイン時に管理者へ戻り、自己再設定の対象外のままになる。メール再設定を使いたいだけなら、この方法は使えない。
 
 ## 利用規約・プライバシーポリシーを改定したとき（版数を同日に揃える）
-改定の公開と**同じ日に、次の4か所を同じ日付（YYYY-MM-DD）へ上げる**（食い違っても登録は通り、記録はサーバーの版数。ただし backend は食い違いをログに残し、記録の意味が曖昧になる）。
+改定の公開と**同じ日に、次の4か所を同じ日付（YYYY-MM-DD）へ上げる**（backend は、画面が送った版数が現行と食い違うと **409 `terms_version_outdated`** で新規登録を止める。版数を送らない旧画面は現行版として記録して通す。食い違いをログに残し、記録の意味が曖昧になる）。
 1. backend `CURRENT_USER_TERMS_VERSION`（`backend/app/schemas_katadzuke.py`）＝依頼者の規約の版数。業者向けは `CURRENT_OPERATOR_TERMS_VERSION`（同ファイル。業者規約を改定したときだけ）。
 2. web `USER_TERMS_VERSION`（`web/src/lib/line-consent.ts`）＝画面が送る版数（メール登録・LINE）。
 3. `/terms`・`/privacy` の「最終改定」の日付（`web/src/app/terms/page.tsx`・`web/src/app/privacy/page.tsx`）。
 4. 規約本文（`web/src/app/terms/TermsTabs.tsx`）。公開ページの表記ガード（`public-copy-guard.test.mts`）が「手数料」「査定」を許可しているのは TermsTabs だけなので、本文を直すときに許可リストの要否も見直す。
-- **反映順**: backend と web を別々に出す場合、先に出した側が新しい版数、後の側が古い版数の間は食い違う（登録は通る）。版数だけの変更ならどちらが先でもよいが、同意の項目を**増やす**変更は web を先に出す（backend が必須にするのを最後にする。docs の PROJECT_STATE「反映順」と同じ考え方）。
+- **反映順**: 版数を変えるときは backend と web を**同じコミット（同じ push）**で出す。片方だけ先に出すと、出そろうまでの間、新規登録（メール・LINE）が 409 `terms_version_outdated` で止まる（画面は再読み込みを案内する）。
 - 既存ユーザーには再同意を求めない（`agreed_terms_version` は NULL のまま・新規作成時だけ記録）。再同意が必要な改定かは運営判断（弁護士確認）。
 
 ## メール送信量（Brevo 無料枠 300 通/日）の見方
@@ -125,3 +125,9 @@
 - **アラートの宛先**: メールは `ALERT_EMAILS`（GitHub Secrets・現在は katazuke.support@gmail.com と ko.13.hei@gmail.com）、LINE は運営用公式アカウント。GitHub の「Run failed」や UptimeRobot の Down/Up は ko.13.hei@gmail.com に直接届くため、**復旧通知が同じ受信箱に届くよう宛先を揃えておくこと**（INC-2026-09-11-3）。日次ジョブ ①-2 がズレを検知する。
 - **障害台帳と再発防止ガード**: `docs/ops/incidents.md`。障害対応は台帳への追記とガード化（drift 検査・通知の対ガード等）まで済んで完了。render.yaml と Render 実態のズレは `render-sync.yml`（push 後・毎週月曜）が検査する。
 - **止めたいとき**: Actions の Ops cron を Disable workflow。アプリ側の `OPS_JOB_TOKEN` を Render から消せば `X-Ops-Token` 経路そのものが閉じる。
+
+## 戻せる下限（ロールバック）
+マイグレーション 0047・0048 を本番に入れた後は、それより前のコード（0047 を知らない版・0048 を知らない版）へ戻すと、alembic が知らないリビジョンで失敗し `/readyz` が degraded になる。**戻せる下限は、0047 を入れた段のコミット（0047 まで）／0048 を入れた段のコミット（0048 まで）**。戻すときはコードだけを戻さず、`downgrade` の要否を先に検討する（0048 の downgrade は2列を消す）。
+
+## Brevo の日次の枠のお知らせ（情報）
+250 通に達すると運営へ「情報」のお知らせが1通出る（障害ではないので**復旧連絡は出ない**）。数はプロセス内の概数で、再起動すると 0 に戻る（その場合 280 通での新着チャットメールの停止も働きにくい）。正確な残量は Brevo の管理画面で確認する。

@@ -63,7 +63,7 @@ export function lineConsentHint(state: LineAuthGateState): string | null {
 /**
  * 依頼者向け利用規約・プライバシーポリシーの現行の版数（/terms・/privacy の「最終改定」の日付）。
  * backend の CURRENT_USER_TERMS_VERSION（app/schemas_katadzuke.py）と同じ値に揃える
- * （食い違っても登録は通り、記録はサーバーの版数。backend は食い違いを INFO に残す）。
+ * （食い違うと backend は 409 `terms_version_outdated` で新規登録を止める。版数を送らない旧画面は現行版として記録して通す）。
  */
 export const USER_TERMS_VERSION = "2026-10-06";
 
@@ -151,5 +151,8 @@ export const TERMS_VERSION_OUTDATED_MESSAGE = "利用規約が更新されてい
 
 /** 同意なしで LINE の新規登録が拒否されたときに /login へ付ける reason の値と、画面に出す案内。 */
 export const LINE_TERMS_REQUIRED_REASON = "terms_required";
+
+/** LINE 交換が規約の版数の食い違い（409）で拒否されたときに /login へ戻す理由。再読み込みを案内する。 */
+export const LINE_TERMS_OUTDATED_REASON = "terms_outdated";
 export const LINE_TERMS_REQUIRED_MESSAGE =
   "LINEで初めてご利用の方は、利用規約とプライバシーポリシーへの同意が必要です。同意のチェックを入れてから、もう一度LINEのボタンを押してください。";

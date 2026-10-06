@@ -44,7 +44,7 @@ async def test_alert_once_at_250_with_count_only():
         title, body = alert_mock.await_args.args
         assert "250 通" in body
         assert "@" not in title + body
-        assert alert_mock.await_args.kwargs["severity"] == "warning"
+        assert alert_mock.await_args.kwargs["severity"] == "info"  # 事前の情報。障害ではないので復旧連絡は対にしない
 
         for _ in range(60):  # 同じ日にこれ以上送ってもアラートは1回だけ
             notify._record_daily_send()

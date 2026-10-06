@@ -161,7 +161,7 @@ describe("配線: 同意をサーバーへ送る", () => {
     assert.match(authTs, /lineTermsConsentCookieName\(secure\)/);
   });
   it("auth.ts: 同意なしの新規作成の拒否は /login?reason=terms_required へ戻す", () => {
-    assert.match(authTs, /result\.code === TERMS_AGREEMENT_REQUIRED_CODE \|\| result\.code === TERMS_VERSION_OUTDATED_CODE\) return `\/login\?reason=\$\{LINE_TERMS_REQUIRED_REASON\}`/);
+    assert.match(authTs, /result\.code === TERMS_AGREEMENT_REQUIRED_CODE\) return `\/login\?reason=\$\{LINE_TERMS_REQUIRED_REASON\}`/);
   });
   it("LineConsentAuth: 同意の判定を通った後でだけ Cookie を置いて signIn する", () => {
     const i = authTsx.indexOf("if (!canStartLineAuth({ agreed, busy })) return;");
@@ -196,7 +196,7 @@ describe("規約の版数が古いときの 409（登録済みメールの 409 �
     assert.ok(iOutdated > 0 && iTaken > 0 && iOutdated < iTaken);
   });
 
-  it("auth.ts: LINE 交換の版数の食い違いも /login?reason=terms_required へ戻す", () => {
+  it("auth.ts: LINE 交換の版数の食い違いは /login?reason=terms_outdated（再読み込みの案内）へ戻す", () => {
     const src = readFileSync(new URL("../auth.ts", import.meta.url), "utf8");
     assert.match(src, /TERMS_VERSION_OUTDATED_CODE/);
   });
