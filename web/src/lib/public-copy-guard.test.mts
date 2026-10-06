@@ -32,6 +32,11 @@ const PUBLIC_FILES = [
   "vendors/page.tsx",
   "verify-email/page.tsx",
   "lp/_components/LpChrome.tsx",
+  "unsubscribe/page.tsx",
+  "login/page.tsx",
+  "signup/page.tsx",
+  "password-reset/page.tsx",
+  "password-reset/confirm/page.tsx",
 ] as const;
 
 /** コメント行（// ・ * ・ /* ・ {/* で始まる行）を除いた本文。 */
@@ -53,6 +58,7 @@ const BANNED: ReadonlyArray<readonly [string, string, readonly string[]?]> = [
   ["成約後に業者からご案内", "H-2/方針①: 代金の流れ（誰が案内するか）を断定しない"],
   // 利用規約の「利用をもって同意」は契約の成立の論点で別扱い（ここではお問い合わせだけを見る）
   ["同意したものとみなします", "M-8: お問い合わせはチェックで明示的に同意を得る", ["contact/page.tsx"]],
+  ["同意したものとみなします", "N-2/N-9: LINE の登録・ログインもチェックで明示的に同意を得る", ["login/page.tsx", "signup/page.tsx"]],
   ["値がつかない物も、まとめて", "H-8: 廃棄物の無許可収集を誘う恐れ"],
   ["値がつかない物まで引き取り", "H-8: 同上"],
   ["高くなりやすい", "M-2: 根拠を示せない効果表現"],
@@ -63,6 +69,23 @@ const BANNED: ReadonlyArray<readonly [string, string, readonly string[]?]> = [
   ["会社概要", "M-4: 個人事業のため「運営者情報」"],
   ["家具・家電等は対象外", "M-6: クーリング・オフの対象外物品を簡略化して断定しない"],
   ["「当社」", "M-4: 個人事業のため「運営者」"],
+  // N-1: 無料なのはカタヅケの利用料。業者との取引の費用（出張・運搬・処分）は業者ごとに異なる。
+  //      規約（TermsTabs）第6条の本文は版数・再同意が絡む運営の判断事項のため、ここでは対象外にする。
+  ["引き取りまで、すべて無料", "N-1: 業者との取引の費用まで無料と言い切らない"],
+  ["費用は、一切かかりません", "N-1: 同上"],
+  ["ユーザーの費用は一切かかりません", "N-1: 同上"],
+  // 規約の冒頭の「要点」（terms/page.tsx）は第6条の要約なので、第6条と同時に運営が改める（ここでは対象外）
+  [
+    "ユーザーの費用は0円",
+    "N-1: 同上（0円なのはカタヅケの利用料）",
+    ["page.tsx", "legal/page.tsx", "company/page.tsx", "examples/page.tsx", "photo-guide/page.tsx", "lp/_components/LpChrome.tsx"],
+  ],
+  ["どの段階でも無料", "N-1: 同上"],
+  ["LINE連携済みの方のみ", "N-3: チャット新着はメール登録者にもメールで届く（notify_dispatch）"],
+  ["法令上保存が必要な期間を除き", "N-5: 退会時に残す記録の理由は法令ではない（プライバシーポリシー第8条）"],
+  ["審査時に確認させていただきます", "N-6: 特商法の遵守を審査で確認する実装はない"],
+  ["チャットで調整します", "N-13: 日程は取引画面で業者が出す候補から選ぶ"],
+  ["SSL暗号化通信", "N-15: 実際は TLS"],
 ];
 
 describe("公開ページに禁止表現が残っていない", () => {
@@ -89,6 +112,8 @@ describe("必須の表記がある", () => {
       "login/layout.tsx",
       "signup/layout.tsx",
       "unsubscribe/layout.tsx",
+      "password-reset/layout.tsx",
+      "password-reset/confirm/layout.tsx",
     ]) {
       assert.match(codeWithoutComments(file), /robots:\s*\{\s*index:\s*false/, file);
     }
@@ -104,6 +129,29 @@ describe("必須の表記がある", () => {
   it("訪問時の本人確認の注記が、氏名・電話を渡さない旨と同じ場所にある（H-4）", () => {
     for (const file of ["page.tsx", "company/page.tsx", "privacy/page.tsx"]) {
       assert.ok(codeWithoutComments(file).includes("業者が法令に基づき本人確認をする場合があります"), file);
+    }
+  });
+
+  it("/password-reset/confirm は親の canonical を継承しない（N-12）", () => {
+    assert.match(codeWithoutComments("password-reset/confirm/layout.tsx"), /canonical:\s*null/);
+  });
+
+  it("スキップリンクの飛び先 #main と h1 がある（N-10・H-6）", () => {
+    for (const file of [
+      "verify-email/page.tsx",
+      "unsubscribe/page.tsx",
+      "password-reset/page.tsx",
+      "password-reset/confirm/page.tsx",
+    ]) {
+      const body = codeWithoutComments(file);
+      assert.match(body, /<main id="main"/, file);
+      assert.match(body, /<h1[\s>]/, file);
+    }
+  });
+
+  it("無料の表示の近くに、業者との取引の費用の注記がある（N-1）", () => {
+    for (const file of ["page.tsx", "legal/page.tsx", "company/page.tsx", "examples/page.tsx", "photo-guide/page.tsx"]) {
+      assert.ok(codeWithoutComments(file).includes("出張・運搬・処分"), file);
     }
   });
 

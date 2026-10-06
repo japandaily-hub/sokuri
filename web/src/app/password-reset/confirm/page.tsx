@@ -104,7 +104,7 @@ export default function PasswordResetConfirmPage() {
             <path d="M5 12.5l4.5 4.5L19 7.5" />
           </svg>
         </div>
-        <div className="reset-panel-title">パスワードを再設定しました</div>
+        <h1 className="reset-panel-title">パスワードを再設定しました</h1>
         <p className="reset-panel-sub">
           新しいパスワードでログインしてください。安全のため、ほかの端末のログイン状態は解除しています。
         </p>
@@ -116,7 +116,7 @@ export default function PasswordResetConfirmPage() {
   } else if (link.status === "missing" || linkInvalid) {
     body = (
       <div className="reset-card">
-        <div className="reset-panel-title">このリンクは使えません</div>
+        <h1 className="reset-panel-title">このリンクは使えません</h1>
         <p className="reset-panel-sub">
           {error ??
             "再設定のリンクが無効か、有効期限が切れています。お手数ですが、もう一度パスワード再設定の手続きをしてください。"}
@@ -132,7 +132,7 @@ export default function PasswordResetConfirmPage() {
   } else {
     body = (
       <div className="reset-card reset-wrap">
-        <div className="reset-panel-title">新しいパスワードの設定</div>
+        <h1 className="reset-panel-title">新しいパスワードの設定</h1>
         <p className="reset-panel-sub">
           {accountType === "operator" ? "業者アカウント" : "ご依頼の方のアカウント"}
           の新しいパスワードを入力してください。
@@ -182,11 +182,12 @@ export default function PasswordResetConfirmPage() {
   }
 
   return (
-    <div className="reset-page">
+    <main id="main" className="reset-page">
+      {/* N-10/H-6（2周目監査）: スキップリンク（#main）の飛び先と、ページの主題の h1 を持たせる。 */}
       <Link href="/" className="reset-logo" aria-label="カタヅケ トップへ">
         <KdzLogo size={22} />
       </Link>
       {body}
-    </div>
+    </main>
   );
 }

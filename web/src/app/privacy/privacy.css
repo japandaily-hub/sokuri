@@ -301,3 +301,13 @@
   /* 390px では 2 列だと「第7条　個人情報の開示・訂正・削除」が 3 行に折れる */
   .pp-toc__list { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* M-12（2周目監査・中）: 目次のリンクは行の高さ（約20〜21px）しかタップ領域がなかった。
+   タッチ端末だけ、各リンクを高さ 44px 以上の領域にする（文字サイズ・下線は変えない）。 */
+@media (pointer: coarse) {
+  .pp-toc__list a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+}

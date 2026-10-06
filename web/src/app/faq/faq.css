@@ -507,3 +507,32 @@
      （ラベルの文字だけで 6 カテゴリが 2 段に収まる。アイコンはサイドバー側に残る） */
   .faq-page .cat-chip .ic { display: none; }
 }
+
+/* N-11（2周目監査・中）: 320px 幅で「解決しない場合はお問い合わせください」のブロックが右へ約9px はみ出し、
+   横スクロールが出ていた。原因は共通 .btn の white-space:nowrap と左右 40px の padding
+   （「お問い合わせフォームへ」＋矢印の最小幅 ≒ 300px）。縦積み（859px 以下・align-items:flex-start）の
+   .faq-contact-info は fit-content で幅が決まるため、ボタンの最小幅に引きずられて h2 ごと親より広がっていた。
+   ・情報欄は親の幅いっぱい（align-self: stretch）に固定し、子の最小幅で広がらないようにする
+   ・ボタンは狭い幅では折り返しを許し、左右の余白を詰める
+   ・見出しは保険として、入り切らない語でも折り返す（overflow-wrap: anywhere）
+   実機での scrollWidth の実測は未実施（サーバー操作を伴うため。CSS の原因を読んで直した）。 */
+@media (max-width: 859px) {
+  .faq-page .faq-contact-info { align-self: stretch; width: 100%; }
+  .faq-page .faq-contact-info h2 { overflow-wrap: anywhere; }
+}
+@media (max-width: 400px) {
+  .faq-page .faq-contact .btn {
+    white-space: normal;
+    padding-inline: 16px;
+    line-height: 1.5;
+    text-align: center;
+  }
+}
+
+/* M-12（2周目監査・中）: 各節の「すべて開く」（約55×32px）も、タッチ端末だけタップ領域を 44px 以上にする。 */
+@media (pointer: coarse) {
+  .faq-page .faq-section-all {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}

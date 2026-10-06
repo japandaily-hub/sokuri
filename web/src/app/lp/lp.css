@@ -2524,3 +2524,17 @@ html.js-rv .lp-page .lp-ribbon__star { transition: opacity 0.8s var(--ease-expo-
   .lp-page .lp-ill:where(:nth-child(3n)) { animation-delay: -5.2s; }
   .lp-page :where(.lp-ill:nth-child(2n)) > [class*="lp-ill__img"] { animation-delay: -4.6s; }
 }
+
+/* M-12（2周目監査・中）: スマホ下部バーの「よくある質問」が 69×29px で、タッチの目安（44px）に届かなかった。
+   タッチ端末（pointer: coarse）の SP 幅だけ、見た目の文字サイズは変えずにタップ領域を 44px 以上に広げる。
+   上の SP 用の指定（padding: 6px 2px 等）より後ろに置いて上書きする。 */
+@media (max-width: 859px) and (pointer: coarse) {
+  .lp-page .lp-float-cta__alt {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0 8px;
+  }
+}

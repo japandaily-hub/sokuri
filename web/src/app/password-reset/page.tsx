@@ -65,7 +65,7 @@ function PasswordResetRequestForm() {
             <path d="M3 7l9 6 9-6" />
           </svg>
         </div>
-        <div className="reset-panel-title">メールをご確認ください</div>
+        <h1 className="reset-panel-title">メールをご確認ください</h1>
         <p className="reset-panel-sub">{SENT_MESSAGE}</p>
         <div className="reset-note">
           メールのリンクから30分以内に新しいパスワードを設定してください。リンクは1回だけ使えます。
@@ -80,7 +80,7 @@ function PasswordResetRequestForm() {
 
   return (
     <div className="reset-card reset-wrap">
-      <div className="reset-panel-title">パスワードの再設定</div>
+      <h1 className="reset-panel-title">パスワードの再設定</h1>
       <p className="reset-panel-sub">
         ご登録のメールアドレスを入力してください。新しいパスワードを設定するためのリンクをお送りします。
       </p>
@@ -144,13 +144,14 @@ function PasswordResetRequestForm() {
 
 export default function PasswordResetPage() {
   return (
-    <div className="reset-page">
+    <main id="main" className="reset-page">
+      {/* N-10/H-6（2周目監査）: スキップリンク（#main）の飛び先と、ページの主題の h1 を持たせる。 */}
       <Link href="/" className="reset-logo" aria-label="カタヅケ トップへ">
         <KdzLogo size={22} />
       </Link>
       <Suspense fallback={null}>
         <PasswordResetRequestForm />
       </Suspense>
-    </div>
+    </main>
   );
 }
