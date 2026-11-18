@@ -67,23 +67,16 @@ const config: Config = {
         ink: "#20242e",
         pale: "#eef3ff",
       },
+      /** 書体は katazuke.css の変数へ一本化（見本 v12: 丸ゴ見出し × 角ゴ本文 × Inter 数字） */
       fontFamily: {
-        /** 見出し・地の文は明朝（Noto Serif JP 先頭 = 全 OS で同じ明朝が出ること優先） */
-        head: ['"Noto Serif JP"', '"Hiragino Mincho ProN"', '"Hiragino Mincho Pro"', '"Yu Mincho"', "YuMincho", '"游明朝体"', "serif"],
-        sans: [
-          '"Noto Serif JP"',
-          '"Hiragino Mincho ProN"',
-          '"Hiragino Mincho Pro"',
-          '"Yu Mincho"',
-          "YuMincho",
-          '"游明朝体"',
-          "serif",
-        ],
-        /** 入力値・数値・小さな UI ラベル用ゴシック（誤読コストを下げる） */
-        ui: ['"Noto Sans JP"', '"Hiragino Kaku Gothic ProN"', '"Yu Gothic UI"', "sans-serif"],
-        /** 英字ラベル / 英字ディスプレイ */
-        en: ['"Montserrat"', "sans-serif"],
-        "en-display": ['"Libre Baskerville"', "serif"],
+        head: ["var(--head)"],
+        maru: ["var(--maru)"],
+        sans: ["var(--sans)"],
+        ui: ["var(--ui)"],
+        num: ["var(--num)"],
+        /** 旧名（廃止予定）。--en/--en-display は角ゴ・Inter の別名になった */
+        en: ["var(--en)"],
+        "en-display": ["var(--en-display)"],
       },
       /** 影ゼロの作法。立体感は使わず、ヘアラインと余白で区切る */
       boxShadow: {

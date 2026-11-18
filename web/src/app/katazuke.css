@@ -70,14 +70,17 @@
   --marker-draw:#c9dcff;
   --marker-h:.34em;
 
-  /* --- 書体：和文は明朝（Noto Serif JP 先頭＝Windows/Android で確実に明朝） --- */
-  --serif:var(--font-serif),"Noto Serif JP","Hiragino Mincho ProN","Hiragino Mincho Pro","Yu Mincho","YuMincho","游明朝体",serif;
-  --ui:var(--font-ui),"Noto Sans JP","Hiragino Kaku Gothic ProN","Yu Gothic UI",sans-serif;
-  --head:var(--serif);
-  --sans:var(--serif);
-  --num:var(--ui);       /* 数値はゴシック（誤読コストを下げる） */
-  --en:var(--font-en),"Montserrat",sans-serif;
-  --en-display:var(--font-en-display),"Libre Baskerville",serif;
+  /* --- 書体（見本 v12）：見出しは丸ゴ・本文は角ゴ・数字は Inter。変数は next/font（layout.tsx）が供給 --- */
+  --maru:var(--font-maru),"Hiragino Maru Gothic ProN",sans-serif;
+  --goth:var(--font-goth),"Hiragino Kaku Gothic ProN","Yu Gothic UI","Noto Sans JP",sans-serif;
+  --num:var(--font-num),"Inter",var(--font-goth),sans-serif;
+  --head:var(--maru);
+  --sans:var(--goth);
+  --ui:var(--goth);
+  /* 以下は旧名の別名（per-page CSS 互換のため残す。新規実装は使わない・順次 --head/--sans へ寄せて廃止） */
+  --serif:var(--goth);
+  --en:var(--goth);
+  --en-display:var(--num);
 
   /* --- 旧名エイリアス（39本の per-page CSS 互換） --- */
   --blue:var(--primary);
@@ -86,14 +89,17 @@
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;}
-/* 明朝 400 はサブピクセル描画を切ると字画が痩せるため antialiased を使わない */
+/* 見本 v12 の組版：17px・行送り1.85・字間0。角ゴなので antialiased を使う。
+   globals.css @layer base の "palt" は components レイヤーのこちらが normal で上書きする。 */
 body{font-family:var(--sans);color:var(--body);background:#fff;
-  font-size:16px;line-height:2;font-weight:400;letter-spacing:.03em;
-  text-rendering:optimizeLegibility;-webkit-font-smoothing:auto;-moz-osx-font-smoothing:auto;}
+  font-size:17px;line-height:1.85;font-weight:400;letter-spacing:0;
+  font-feature-settings:normal;
+  text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
 img{display:block;max-width:100%;}
 a{color:inherit;text-decoration:none;}
-h1,h2,h3,h4,h5{font-family:var(--head);color:var(--ink);font-weight:400;
-  line-height:1.6;letter-spacing:.04em;text-wrap:balance;}
+h1,h2,h3,h4,h5{font-family:var(--head);color:var(--ink);font-weight:700;
+  line-height:1.5;letter-spacing:.02em;text-wrap:balance;word-break:auto-phrase;}
+p,li{text-wrap:pretty;}
 strong{font-weight:600;color:var(--ink);}
 ::selection{background:rgba(82,126,82,.16);color:var(--ink);}
 /* :focus-visible は globals.css の @layer base に集約（重複定義を排除。挙動は同一） */

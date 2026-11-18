@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
-import { Noto_Serif_JP, Noto_Sans_JP, Montserrat, Libre_Baskerville } from "next/font/google";
+import { Zen_Maru_Gothic, Zen_Kaku_Gothic_New, Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { KdzIconSprite } from "@/components/kdz/Icons";
@@ -10,11 +10,12 @@ import { BrokenImageGuard, ScrollProgress } from "@/components/kdz/interactions"
 
 /** 書体は next/font/google でビルド時に自己ホストする（外部オリジンへの実行時リクエストをゼロにし、
  *  CSP/SRI 不在の攻撃面と訪問者IPの第三者送信を同時に消す）。CSS 側は katazuke.css の
- *  --serif / --ui / --en / --en-display がこれらの変数を先頭で参照する。 */
-const fontSerif = Noto_Serif_JP({ subsets: ["latin"], weight: ["400", "600"], display: "swap", variable: "--font-serif" });
-const fontUi = Noto_Sans_JP({ subsets: ["latin"], weight: ["400", "500"], display: "swap", variable: "--font-ui" });
-const fontEn = Montserrat({ subsets: ["latin"], weight: ["600"], display: "swap", variable: "--font-en" });
-const fontEnDisplay = Libre_Baskerville({ subsets: ["latin"], weight: ["400"], display: "swap", variable: "--font-en-display" });
+ *  --maru / --goth / --num がこれらの変数を先頭で参照する（見本 v12: 丸ゴ見出し × 角ゴ本文 × Inter 数字）。
+ *  preload:false … 日本語は subsets に latin しか指定できず、全ページ先頭で preload しても
+ *  和文グリフは載らない。使わないページで余計な preload を出さないために切る。 */
+const fontMaru = Zen_Maru_Gothic({ subsets: ["latin"], weight: ["500", "700"], display: "swap", variable: "--font-maru", preload: false });
+const fontGoth = Zen_Kaku_Gothic_New({ subsets: ["latin"], weight: ["400", "500", "700"], display: "swap", variable: "--font-goth", preload: false });
+const fontNum = Inter({ subsets: ["latin"], display: "swap", variable: "--font-num" });
 
 /**
  * 本番公開 URL。独自ドメイン取得後に差し替え。
@@ -114,13 +115,13 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     // suppressHydrationWarning: 上の script が hydration 前に <html> の class へ js-rv を足すため（属性差分の警告だけ抑止）
     <html
       lang="ja"
-      className={`${fontSerif.variable} ${fontUi.variable} ${fontEn.variable} ${fontEnDisplay.variable}`}
+      className={`${fontMaru.variable} ${fontGoth.variable} ${fontNum.variable}`}
       suppressHydrationWarning
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: JS_RV_SCRIPT }} />
       </head>
-      {/* antialiased は明朝 400 で字画が痩せるため付与しない（globals.css @layer base も auto） */}
+      {/* 書体は角ゴ（--goth）。antialiased の可否は globals.css @layer base と katazuke.css body に従う */}
       <body className="min-h-screen">
         {/* スキップリンク（WCAG 2.4.1） */}
         <a
