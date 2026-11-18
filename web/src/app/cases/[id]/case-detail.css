@@ -146,7 +146,7 @@
 .cd-item[hidden] { display: none; }
 .cd-item__row {
   display: grid;
-  grid-template-columns: 56px 1fr auto;
+  grid-template-columns: 1fr auto;
   gap: 14px;
   align-items: center;
 }

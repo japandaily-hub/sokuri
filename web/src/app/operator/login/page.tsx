@@ -5,7 +5,7 @@
  *
  * デザインレビュー B-3 対応: 旧 slate 系 AuthCard（components/AuthCard.tsx）を廃し、
  * ユーザー側 /login と同じ視覚言語（AuthBar/auth-card/Field/PasswordField、
- * katazuke-pages.css）に統一。BUYER タグでアカウント種別を明示する。
+ * katazuke-pages.css）に統一。「業者用」タグでアカウント種別を明示する。
  * signIn("operator-credentials") 自体のロジックは変更していない。
  * r4-fix-frontend2 M3: callbackUrl は /operator 配下のみ許可（それ以外は既定の /operator へ）し、
  * 同一アカウント種別（業者）でログイン中でも自動遷移せずバナー＋サインアウト導線を出すよう変更。

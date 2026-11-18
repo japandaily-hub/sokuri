@@ -652,7 +652,10 @@ export default function UserCaseDetailPage() {
                                   },
                                 })
                               }
-                              className={isTopBid ? btnPrimary : btnSecondary}
+                              className={
+                                // 塗りのボタンは「いちばん高い入札」の行。入札が1件だけならその1件。
+                                isTopBid || activeBids.length === 1 ? btnPrimary : btnSecondary
+                              }
                             >
                               この業者に決める
                             </button>
@@ -727,18 +730,12 @@ export default function UserCaseDetailPage() {
               const hasAiFallback = item != null && (item.ai_condition != null || item.ai_summary != null);
               // 折りたたみ中でも、編集中の品物は隠さない。
               const isFolded = albumIndex >= CD_ITEMS_PREVIEW && !itemsExpanded && !isEditing;
-              const thumb = album.photos[0];
               const summary = meaningfulCaseSummary(album.description);
 
               return (
                 <li key={album.id ?? "unassigned"} className="cd-item" hidden={isFolded}>
                   <div className="cd-item__row">
-                    <span className="cd-item__thumb">
-                      {thumb ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={photoSrc(thumb.url)} alt="" />
-                      ) : null}
-                    </span>
+                    {/* サムネイルは置かない: 写真は下の一覧で常に全件見せる（同じ写真を二重に出さない） */}
                     <span className="cd-item__name">{album.title ?? "写真"}</span>
                     {album.condition ? (
                       <span className="cd-item__cat">{CASE_ITEM_CONDITION_LABEL[album.condition] ?? album.condition}</span>

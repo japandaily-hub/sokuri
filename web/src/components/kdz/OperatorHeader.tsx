@@ -46,7 +46,7 @@ export function OperatorHeader({
       <div className="container op-header-inner">
         <Link href="/operator" className="op-brand" aria-label="カタヅケ 業者ダッシュボードへ">
           <KdzLogo size={20} />
-          <span className="op-brand-tag">BUYER</span>
+          <span className="op-brand-tag">業者用</span>
         </Link>
 
         <nav className={`op-nav${navOpen ? " open" : ""}`} aria-label="業者メニュー">
