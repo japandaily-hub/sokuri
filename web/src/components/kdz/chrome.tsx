@@ -12,7 +12,7 @@ export function SiteFooter() {
       <div className="container">
         <div className="footer-grid">
           <div>
-            {/* フッターは白地のため反転しない（ワードマークはそのままの緑＋墨） */}
+            {/* フッターは生成りの地のため反転しない（ワードマークは墨のまま） */}
             <Link href="/" className="logo footer-logo" aria-label="カタヅケ">
               <KdzLogo size={22} />
             </Link>

@@ -139,7 +139,9 @@
   margin-left: auto;
   text-align: right;
 }
-.schedule-page .biz-amount .label { font-size: 11px; color: var(--body-soft); font-weight: 600; }
+/* 共通 .label（katazuke.css・左に24pxの罫を引く見出し用）の罫と flex をここでは使わない */
+.schedule-page .biz-amount .label { display: block; font-size: 11px; color: var(--body-soft); font-weight: 600; }
+.schedule-page .biz-amount .label::before { display: none; }
 .schedule-page .biz-amount .amount {
   font-family: var(--head);
   font-size: 22px;

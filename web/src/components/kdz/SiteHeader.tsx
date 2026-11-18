@@ -70,7 +70,7 @@ export function SiteHeader({
           </nav>
           <Link
             href="/login"
-            className="hidden md:inline text-[14px] font-semibold text-kdz-ink transition-colors hover:text-kdz-blue"
+            className="hidden md:inline text-[15px] font-bold text-kdz-blue transition-colors hover:text-kdz-blued"
           >
             ログイン
           </Link>

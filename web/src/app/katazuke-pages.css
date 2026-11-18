@@ -5,14 +5,12 @@
    ============================================================ */
 
 /* ---------- 認証・フォーム共通（ログイン/新規登録/PWリセット等） ---------- */
-/* 認証画面: 人の森の作法＝白地に淡い若草の blob。カードは 1px ヘアラインで区切る（面は使わない） */
-.auth-page { background: var(--white); min-height: 100vh; position: relative; overflow: hidden; }
-.auth-page::before { content: ""; position: absolute; right: -18vw; top: -34vh; width: 62vw; height: 110vh; background: var(--pale);
-  border-radius: 42% 58% 55% 45% / 48% 42% 58% 52%; pointer-events: none; z-index: 0; }
+/* 認証画面（見本 v12）: 生成りの地に、--white の面のカードを 1px ヘアラインで置く。装飾の blob は描かない */
+.auth-page { background: var(--paper); min-height: 100vh; position: relative; overflow: hidden; }
 .auth-page > * { position: relative; z-index: 1; }
 
 .auth-bar {
-  background: var(--white);
+  background: var(--paper);
   border-bottom: 1px solid var(--line);
   padding: 0 24px;
   height: 68px;
@@ -20,26 +18,25 @@
   align-items: center;
   justify-content: space-between;
 }
-.auth-bar-link { font-size: 13px; color: var(--body-soft); transition: color .2s; }
+.auth-bar-link { font-size: 14px; color: var(--body-soft); transition: color .2s; }
 .auth-bar-link:hover { color: var(--primary); }
 
 .auth-wrap { max-width: 440px; margin: 0 auto; padding: 40px 20px 80px; }
 
 .auth-card {
   background: var(--white);
-  border-radius: 0;
+  border-radius: var(--radius);
   box-shadow: none;
   padding: 36px 32px 32px;
   border: 1px solid var(--line);
 }
 .auth-head { margin-bottom: 28px; }
-.auth-title { font-family: var(--head); font-size: 24px; font-weight: 400; color: var(--ink); line-height: 1.5; }
+.auth-title { font-family: var(--head); font-size: 24px; font-weight: 700; color: var(--ink); line-height: 1.5; }
 .auth-title::first-letter { color: var(--primary); }
 /* app 面の地の文は 15px / 1.75（2.0 だと1画面が伸びて送信ボタンが折り返し下に落ちる） */
 .auth-sub { font-size: 15px; color: var(--body-soft); line-height: 1.75; margin-top: 8px; }
 
-/* ラウンド5 指摘（7/14/27）: 角丸 99px のまま据え置く LINE ボタンが、角丸ゼロの版面の中で
-   前後に詰まって並ぶと「浮いた装飾」に見える。ボタン自体（.btn-line-auth）は触らず、
+/* ラウンド5 指摘（7/14/27）: LINE ボタンが前後に詰まって並ぶと「浮いた装飾」に見える。
    区切りの前後余白を 24px 以上取って「別の入口」として独立させる（幅は既に max-width:360px で抑制済み）。 */
 .auth-divider {
   display: flex; align-items: center; gap: 12px; margin: 28px 0 24px;
@@ -122,20 +119,19 @@
 .auth-switch a:hover { text-decoration: underline; }
 
 /* LINE ボタン（認証）
-   角丸 99px は据え置く（LINE ヤフー配布の公式ボタン画像／指定ロゴに差し替える前提で、公式ボタンに
-   近い外形を保っておく）。ただしこれ自体は公式ボタンではないので「公式仕様」とは称さない。
+   見本 v12 で角丸は共通の --radius に揃えた（旧: ピル形）。LINE ヤフー配布の公式ボタン画像／指定ロゴに
+   差し替える前提は変わらない。これ自体は公式ボタンではないので「公式仕様」とは称さない。
    R4 legal High 是正: 自作の吹き出しマーク（svg）はボタンから削除した（components/kdz/auth.tsx）。
    マークを再び出すときは公式素材を <img> で置くこと（path の自作・再描画はしない）。 */
 .btn-line-auth {
   width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;
-  /* #06c755 は LINE 公式ブランドカラー固定値（デザイン監査2026-09-15で確認済み。
-     トークン化はせず、hover含め意図的にこの2箇所で直書きを維持する）。 */
-  background: #06c755; color: var(--white); border: none; border-radius: 99px; padding: 16px 20px;
+  /* LINE 公式ブランドカラーは --line-green（#06c755）。白文字は AA 未満の「ブランドの例外」。 */
+  background: var(--line-green); color: #fff; border: none; border-radius: var(--radius); padding: 0 20px; min-height: 56px;
   max-width: 360px; margin-left: auto; margin-right: auto; /* 巨大ピルが版面の重心を支配しないよう幅を抑える（外形は公式ボタンに寄せるが、公式ボタンそのものではない） */
-  font-family: var(--head); font-size: 16px; font-weight: 600; letter-spacing: .08em; cursor: pointer;
-  box-shadow: none; transition: opacity .25s;
+  font-family: var(--goth); font-size: 17px; font-weight: 700; letter-spacing: 0; cursor: pointer;
+  box-shadow: none; transition: background-color .2s, opacity .25s;
 }
-.btn-line-auth:hover { background: #06c755; /* 同上: LINEブランド色を維持（hover時も色相を変えない） */ opacity: .8; }
+.btn-line-auth:hover { background: #05b34c; /* LINE ブランド色の濃淡（共通 .btn-line の hover と同じ） */ }
 .btn-line-auth:disabled { opacity: .7; cursor: default; }
 
 /* LINE ボタンの上の必須同意（N-2・N-9。components/kdz/auth.tsx の LineConsentAuth）。
@@ -180,7 +176,7 @@
   .auth-wrap { padding-top: 20px; padding-left: 14px; padding-right: 14px; }
   .auth-title { font-size: 21px; }
   .trust-row { gap: 10px; }
-  .btn-line-auth { font-size: 15px; padding: 14px 18px; }
+  .btn-line-auth { font-size: 16px; padding: 0 18px; }
 }
 
 /* ---------- フロー共通（新規登録 / 出品登録 で共有: flow-header / footer / form-card） ---------- */
