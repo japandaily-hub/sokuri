@@ -234,8 +234,10 @@
      最終行とバーの間が 9px しかなく、同意文がバーに触って見える（ラウンド2 実測）。 */
   .flow-wrap { padding: 18px 14px 104px; }
   .step-title { font-size: 18px; }
-  /* 375px で4段の名前が隣と接するため、狭い幅では語の途中で切らずに折り返す */
-  .fs-label { font-size: 15px; white-space: normal; word-break: keep-all; line-height: 1.35; }
+  /* 375px では1段が約60pxで「プロフィール」等が隣と接する。狭い幅では今の段の名前だけを出す
+     （番号の丸と線で全体の段数は見える）。 */
+  .fs-label { display: none; }
+  .flow-step.active .fs-label { display: block; font-size: 15px; white-space: nowrap; }
   .flow-header-inner { gap: 8px; padding: 10px 14px; }
   .btn-flow-next { padding: 12px 18px; font-size: 15px; }
   .form-card { padding: 18px 14px; }
