@@ -189,8 +189,8 @@ export function BrokenImageGuard() {
   useEffect(() => {
     const covered = (img: HTMLImageElement) =>
       img.getAttribute("alt") === "" || img.matches(FRAMED_IMG_SELECTOR);
-    // 証跡系の画像（古物商許可証・本人確認書類）は取得失敗を可視化したままにする（審査判断を誤らせない）
-    const EVIDENCE_PATH = /^\/(admin|mypage\/identity)(\/|$)/;
+    // 証跡系の画像（古物商許可証）は取得失敗を可視化したままにする（審査判断を誤らせない）
+    const EVIDENCE_PATH = /^\/admin(\/|$)/;
     const hide = (img: HTMLImageElement) => {
       if (EVIDENCE_PATH.test(window.location.pathname)) return;
       if (covered(img)) img.style.visibility = "hidden";

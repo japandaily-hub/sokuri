@@ -38,7 +38,6 @@ import {
   adminListOperators,
   adminSuspendOperator,
   adminVerifyOperator,
-  listIdentityDocumentsAdmin,
   toDisplayMessage,
   type AdminOperatorListResponse,
   type CellDensityRow,
@@ -99,9 +98,6 @@ export default function AdminPage() {
   const [pendingApplications, setPendingApplications] = useState<number | null>(null);
   const [pendingApplicationsError, setPendingApplicationsError] = useState<string | null>(null);
 
-  /** 本人確認書類の審査待ち件数（r10 O-M1）。counts.pending は絞り込みに依らない全体の内訳。 */
-  const [pendingIdentityDocs, setPendingIdentityDocs] = useState<number | null>(null);
-  const [pendingIdentityDocsError, setPendingIdentityDocsError] = useState<string | null>(null);
   /** 未対応のお問い合わせ件数（r10 O-M6）。handled=false&limit=1 の total を使う。 */
   const [unhandledContacts, setUnhandledContacts] = useState<number | null>(null);
   const [unhandledContactsError, setUnhandledContactsError] = useState<string | null>(null);
@@ -179,7 +175,7 @@ export default function AdminPage() {
     // 未処理のまま setInitialLoadDone(true) に到達しなくなる（/admin が永久スピナー）。
     // finally で必ず解除する。
     try {
-      const [invResult, opsResult, densityResult, appsResult, identityResult, contactsResult] =
+      const [invResult, opsResult, densityResult, appsResult, contactsResult] =
         await Promise.allSettled([
           adminListInvites({ limit: ADMIN_LIST_DEFAULT_LIMIT, offset: inviteOffset }, token),
           adminListOperators(
@@ -194,8 +190,6 @@ export default function AdminPage() {
           ),
           adminGetCellDensity(token),
           adminListOperatorApplications({ status: "received", limit: 1, offset: 0 }, token),
-          // r10 O-M1 / O-M6: 件数バッジ専用の最小取得（limit=1）。本文は各専用画面で読む。
-          listIdentityDocumentsAdmin({ status: "pending", limit: 1, offset: 0 }, token),
           // 件数（total）に加え、口コミの報告の内数を数えるため本文を先頭 CONTACT_SCAN_LIMIT 件まで読む。
           adminListContacts({ handled: false, limit: CONTACT_SCAN_LIMIT, offset: 0 }, token),
         ]);
@@ -227,16 +221,6 @@ export default function AdminPage() {
       } else {
         setPendingApplicationsError(
           toDisplayMessage(appsResult.reason, "事前申込件数の取得に失敗しました"),
-        );
-      }
-
-      if (identityResult.status === "fulfilled") {
-        // r10-review H1 是正: 旧応答形式（配列）等で counts が無い場合に備え optional chaining。
-        setPendingIdentityDocs(identityResult.value?.counts?.pending ?? null);
-        setPendingIdentityDocsError(null);
-      } else {
-        setPendingIdentityDocsError(
-          toDisplayMessage(identityResult.reason, "本人確認の審査待ち件数の取得に失敗しました"),
         );
       }
 
@@ -457,7 +441,6 @@ export default function AdminPage() {
   /** M-5: 運営が最初に見る「今日の未対応」。件数は各バッジと同じ取得結果を使う。 */
   const todoItems: { label: string; count: number | null; error: boolean; href: string; atLeast?: boolean }[] = [
     { label: "事前申込（未審査）", count: pendingApplications, error: Boolean(pendingApplicationsError), href: "/admin/operator-applications" },
-    { label: "本人確認書類（審査待ち）", count: pendingIdentityDocs, error: Boolean(pendingIdentityDocsError), href: "/admin/identity-documents" },
     { label: "お問い合わせ（未対応）", count: unhandledContacts, error: Boolean(unhandledContactsError), href: "/admin/contacts" },
     { label: "口コミの報告（未対応）", count: unhandledReviewReports, error: Boolean(unhandledContactsError), href: "/admin/contacts", atLeast: reviewReportsTruncated },
     { label: "許可証の確認待ちの業者", count: c ? c.pending_with_license : null, error: Boolean(operatorListError), href: "#operator-accounts" },
@@ -503,19 +486,6 @@ export default function AdminPage() {
             </Link>
             <Link href="/admin/users" className={btnSecondary}>
               ユーザー一覧へ
-            </Link>
-            {/* r10 O-M1 是正: 審査待ちの本人確認書類が /admin トップから見えず、
-                個別画面を開くまで滞留に気付けなかった。事前申込バッジと同型で出す。 */}
-            <Link href="/admin/identity-documents" className={btnSecondary}>
-              本人確認書類の審査へ
-              {pendingIdentityDocs !== null && pendingIdentityDocs > 0 ? (
-                <span className="ml-1.5 rounded-none bg-kdz-danger px-1.5 py-0.5 text-xs font-semibold text-white">
-                  {pendingIdentityDocs}
-                </span>
-              ) : null}
-              {pendingIdentityDocsError ? (
-                <span className="ml-1.5 text-xs font-normal text-kdz-danger">件数取得失敗</span>
-              ) : null}
             </Link>
             {/* r10 O-M6 是正: お問い合わせの受信箱への導線と未対応件数。 */}
             <Link href="/admin/contacts" className={btnSecondary}>

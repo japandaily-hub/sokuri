@@ -32,7 +32,6 @@ import {
   RESIDENCE_AREAS,
   PREFECTURES,
   OCCUPATIONS,
-  IDENTITY_STATUS_LABEL,
   type AddressOut,
   type UserProfile,
 } from "@/lib/katadzuke-api";
@@ -578,7 +577,6 @@ export default function ProfileEditPage() {
                     markDirty();
                   }}
                 />
-                <div className="field-hint">本人確認書類の提出に必要です</div>
               </div>
               <div className="field">
                 <label htmlFor="inp-occupation">
@@ -623,7 +621,7 @@ export default function ProfileEditPage() {
             住所・連絡先
           </div>
           <p className="field-hint" style={{ margin: "0 0 10px" }}>
-            住所の登録は任意です。出品には必須ではありません。なりすましや不正な出品を防ぐため、また運営による本人確認のために使います。登録する場合は、郵便番号から番地までをすべて入力してください。
+            住所の登録は任意です。出品には必須ではありません。なりすましや不正な出品を防ぐために使います。登録する場合は、郵便番号から番地までをすべて入力してください。
           </p>
           <div className="form-card">
             {addressLoadError ? <div className="pw-change-error">{addressLoadError}</div> : null}
@@ -789,23 +787,12 @@ export default function ProfileEditPage() {
             )}
           </div>
 
-          {/* 本人確認・振込口座・LINE連携への導線 */}
+          {/* 振込口座・LINE連携への導線 */}
           <div className="edit-section-title">
             {ICON_SHIELD}
             会員情報の入力状況
           </div>
           <div className="form-card link-card-list">
-            <Link href="/mypage/identity" className="link-card-row">
-              <span className="link-card-ic">{ICON_SHIELD}</span>
-              <span className="link-card-body">
-                <strong>本人確認</strong>
-                <span>ご本人確認のための書類提出（任意）</span>
-              </span>
-              <StatusBadge
-                value={profile.identity_status === "approved" ? "approved" : profile.identity_status}
-                label={IDENTITY_STATUS_LABEL[profile.identity_status]}
-              />
-            </Link>
             <Link href="/mypage/bank-account" className="link-card-row">
               <span className="link-card-ic">{ICON_BANK}</span>
               <span className="link-card-body">

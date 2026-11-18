@@ -38,7 +38,6 @@ import {
   listTransactions,
   photoSrc,
   toDisplayMessage,
-  IDENTITY_STATUS_LABEL,
   type CaseOut,
   type CaseStatus,
   type TransactionListItem,
@@ -592,17 +591,10 @@ function MyPageContent() {
           </div>
         </div>
 
-        {/* 会員情報の入力状況（本人確認/振込口座/LINE連携） */}
+        {/* 会員情報の入力状況（振込口座/LINE連携） */}
         {profile ? (
           <div className="member-status-card">
             <div className="member-status-title">会員情報の入力状況</div>
-            <Link href="/mypage/identity" className="member-status-row">
-              <span className="member-status-label">本人確認</span>
-              <StatusBadge
-                value={profile.identity_status === "approved" ? "approved" : profile.identity_status}
-                label={IDENTITY_STATUS_LABEL[profile.identity_status]}
-              />
-            </Link>
             <Link href="/mypage/bank-account" className="member-status-row">
               <span className="member-status-label">振込口座</span>
               <StatusBadge
