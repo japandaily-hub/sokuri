@@ -29,7 +29,7 @@ function pwScore(v: string): number {
 function PwStrength({ value }: { value: string }) {
   if (!value) return null;
   const score = pwScore(value);
-  const colors = ["var(--danger)", "#f0a030", "var(--primary)"];
+  const colors = ["var(--danger)", "var(--gold)", "var(--primary)"];
   const labels = ["弱い", "普通", "強い"];
   const idx = Math.min(Math.max(score - 1, 0), 2);
   return (

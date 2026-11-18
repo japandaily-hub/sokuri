@@ -76,7 +76,7 @@ export default function MyCasesPage() {
       ) : null}
       {viewState === "empty" ? (
         <Card className="text-center">
-          <p className="text-sm text-slate-500">まだ案件がありません。</p>
+          <p className="text-[15px] text-kdz-bodysoft">まだ案件がありません。</p>
           <a href="/create" className={`${btnPrimary} mt-4`}>
             最初の出品をする
           </a>
@@ -93,24 +93,24 @@ export default function MyCasesPage() {
                     <img
                       src={photoSrc(c.photos[0].url)}
                       alt=""
-                      className="h-16 w-16 shrink-0 rounded-none border border-slate-200 object-cover"
+                      className="h-16 w-16 shrink-0 rounded-none border border-kdz-line object-cover"
                     />
                   ) : (
-                    <div className="h-16 w-16 shrink-0 rounded-none bg-slate-100" />
+                    <div className="h-16 w-16 shrink-0 rounded-none bg-kdz-pale" />
                   )}
                   <div className="min-w-0">
-                    <p className="font-normal text-slate-900">{formatPurposeLabel(c.purpose)}</p>
-                    <p className="mt-0.5 text-xs text-slate-500">
+                    <p className="font-normal text-kdz-ink">{formatPurposeLabel(c.purpose)}</p>
+                    <p className="mt-0.5 text-[15px] text-kdz-bodysoft">
                       {c.prefecture} {c.city} / {c.floor_plan ?? "間取り未設定"}
                     </p>
-                    <p className="mt-1 text-xs text-slate-400">
+                    <p className="mt-1 text-[15px] text-kdz-bodysoft">
                       {formatJstDateLong(c.created_at)}
                     </p>
                   </div>
                 </div>
                 <StatusBadge value={c.status} label={CASE_STATUS_LABEL[c.status]} />
               </div>
-              <p className="mt-3 text-sm font-semibold text-brand-700">
+              <p className="mt-3 text-[15px] font-semibold text-brand-700 [font-variant-numeric:tabular-nums]">
                 入札 {c.bid_count} 件
                 {c.item_count != null && c.item_count > 0
                   ? ` ・ 品物 ${c.item_count} 点・写真 ${c.photo_count ?? c.photos.length} 枚`

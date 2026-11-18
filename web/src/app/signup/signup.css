@@ -2,30 +2,30 @@
    共通フォーム(.field / .pw-wrap)は katazuke-pages.css を使用。ここは固有のみ。 */
 
 .signup-page .area-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.signup-page .area-chip { border: 1.5px solid var(--line); border-radius: 0; padding: 10px 8px; text-align: center; cursor: pointer; font-family: var(--head); font-size: 13.5px; font-weight: 600; color: var(--ink); transition: border-color .2s, background .2s, color .2s; user-select: none; }
+.signup-page .area-chip { border: 1.5px solid var(--line); border-radius: var(--radius-s); padding: 10px 8px; text-align: center; cursor: pointer; font-family: var(--head); font-size: 15px; font-weight: 600; color: var(--ink); transition: border-color .2s, background .2s, color .2s; user-select: none; }
 .signup-page .area-chip:hover { border-color: var(--blue); color: var(--blue); }
-.signup-page .area-chip.selected { border-color: var(--blue); background: var(--blue); color: #fff; }
+.signup-page .area-chip.selected { border-color: var(--blue); background: var(--blue); color: var(--white); }
 
 .signup-page .role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .signup-page .role-card { border: 2px solid var(--line); border-radius: var(--radius-s); padding: 16px 14px; cursor: pointer; transition: border-color .2s, background .2s, box-shadow .2s; user-select: none; display: flex; flex-direction: column; gap: 6px; text-align: left; background: var(--white); }
 .signup-page .role-card:hover { border-color: var(--blue); background: var(--pale); }
-.signup-page .role-card.selected { border-color: var(--blue); background: var(--pale); box-shadow: 0 0 0 3px rgba(var(--primary-rgb),.12); }
-.signup-page .role-card .rc-ic { width: 40px; height: 40px; border-radius: 0; background: var(--pale); color: var(--blue); display: grid; place-items: center; }
-.signup-page .role-card.selected .rc-ic { background: var(--blue); color: #fff; }
+.signup-page .role-card.selected { border-color: var(--blue); background: var(--pale); box-shadow: none,.12); }
+.signup-page .role-card .rc-ic { width: 40px; height: 40px; border-radius: var(--radius); background: var(--pale); color: var(--blue); display: grid; place-items: center; }
+.signup-page .role-card.selected .rc-ic { background: var(--blue); color: var(--white); }
 .signup-page .role-card .rc-ic .ic { font-size: 22px; }
 .signup-page .role-card .rc-title { font-family: var(--head); font-size: 15px; font-weight: 600; color: var(--navy); }
-.signup-page .role-card .rc-sub { font-size: 12px; color: var(--body-soft); line-height: 1.6; }
+.signup-page .role-card .rc-sub { font-size: 15px; color: var(--body-soft); line-height: 1.6; }
 
-.signup-page .hint-banner { background: var(--pale); border-radius: var(--radius-s); padding: 14px 18px; margin-bottom: 18px; font-size: 13px; color: var(--body); display: flex; gap: 10px; align-items: flex-start; line-height: 1.75; }
+.signup-page .hint-banner { background: var(--pale); border-radius: var(--radius-s); padding: 14px 18px; margin-bottom: 18px; font-size: 15px; color: var(--body); display: flex; gap: 10px; align-items: flex-start; line-height: 1.75; }
 .signup-page .hint-banner .hint-ic { color: var(--blue); flex-shrink: 0; margin-top: 1px; }
-.signup-page .hint-banner.warn { background: #fff8f0; border: 1px solid #fed7aa; color: #9a3412; }
-.signup-page .hint-banner.warn .hint-ic { color: #9a3412; }
-.signup-page .hint-banner.warn a { color: #9a3412; text-decoration: underline; }
+.signup-page .hint-banner.warn { background: var(--warm); border: 1px solid var(--gold); color: var(--gold-text); }
+.signup-page .hint-banner.warn .hint-ic { color: var(--gold-text); }
+.signup-page .hint-banner.warn a { color: var(--gold-text); text-decoration: underline; }
 
 .signup-page .agree-row { display: flex; align-items: flex-start; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line-soft); margin-top: 4px; }
 .signup-page .agree-row:first-child { border-top: none; margin-top: 0; }
 .signup-page .agree-cb { width: 20px; height: 20px; flex-shrink: 0; accent-color: var(--blue); margin-top: 2px; cursor: pointer; }
-.signup-page .agree-row label { font-size: 13px; color: var(--body); line-height: 1.75; cursor: pointer; }
+.signup-page .agree-row label { font-size: 15px; color: var(--body); line-height: 1.75; cursor: pointer; }
 .signup-page .agree-row a { color: var(--blue); font-weight: 600; }
 
 .signup-page .done-screen { text-align: center; padding: 52px 20px; }
@@ -65,9 +65,9 @@
 
 /* フォーム直上の注記（登録＝業者への通知ではない、という実装事実） */
 .signup-page .signup-lead-note {
-  background: var(--white); border: 1px solid var(--line); border-radius: 0;
+  background: var(--white); border: 1px solid var(--line); border-radius: var(--radius);
   padding: 14px 16px; margin-bottom: 22px;
-  font-size: 13.5px; line-height: 1.85; color: var(--body);
+  font-size: 15px; line-height: 1.85; color: var(--body);
 }
 
 /* ステッパー: 現在地は --primary ベタの 28px 正方形、通過済みは --deep。
@@ -75,9 +75,9 @@
    コネクタ線（.flow-step+.flow-step::before{top:12px}）の位置は変えない。 */
 .signup-page .flow-step.active .fs-dot {
   width: 28px; height: 28px; margin: -2px 0; font-size: 12px;
-  background: var(--primary); border-color: var(--primary); color: #fff;
+  background: var(--primary); border-color: var(--primary); color: var(--white);
 }
-.signup-page .flow-step.done .fs-dot { background: var(--deep); border-color: var(--deep); color: #fff; }
+.signup-page .flow-step.done .fs-dot { background: var(--deep); border-color: var(--deep); color: var(--white); }
 .signup-page .flow-step.done + .flow-step::before { background: var(--deep); }
 
 /* 「次へ」はカード直下（固定フッター）で幅いっぱいに。戻るは内容幅のまま。
@@ -103,7 +103,7 @@
    揃えて中央寄せし、ピルと 1 つの塊として読ませる。 */
 .signup-page .signup-line-note {
   max-width: 360px; margin: 0 auto 8px; text-align: center;
-  font-family: var(--ui); font-size: 12px; line-height: 1.6; color: var(--body-soft);
+  font-family: var(--ui); font-size: 15px; line-height: 1.6; color: var(--body-soft);
 }
 
 /* R4 ラウンド4 指摘（9/15・部分採用）。
@@ -157,7 +157,7 @@
   margin: 18px 0 0;
   text-align: center;
   font-family: var(--ui);
-  font-size: 12px;
+  font-size: 15px;
   line-height: 1.7;
   color: var(--body-soft);
 }

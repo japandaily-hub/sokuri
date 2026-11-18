@@ -55,13 +55,13 @@
   justify-content: center;
   background: var(--white);
 }
-.schedule-page .sch-step.done .step-num { background: var(--green); border-color: var(--green); color: #fff; }
-.schedule-page .sch-step.active .step-num { background: var(--blue); border-color: var(--blue); color: #fff; }
+.schedule-page .sch-step.done .step-num { background: var(--green); border-color: var(--green); color: var(--white); }
+.schedule-page .sch-step.active .step-num { background: var(--blue); border-color: var(--blue); color: var(--white); }
 .schedule-page .step-num svg {
   width: 12px;
   height: 12px;
   fill: none;
-  stroke: #fff;
+  stroke: var(--white);
   stroke-width: 3;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -77,7 +77,7 @@
 .schedule-page .sch-back-chat {
   position: absolute;
   right: 0;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--blue);
   display: flex;
@@ -113,7 +113,7 @@
 .schedule-page .biz-avatar {
   width: 44px;
   height: 44px;
-  border-radius: 0;
+  border-radius: var(--radius);
   background: var(--ink);
   border: 1px solid var(--ink);
   display: flex;
@@ -127,7 +127,7 @@
 }
 .schedule-page .biz-name { font-size: 15px; font-weight: 400; color: var(--navy); }
 .schedule-page .biz-sub {
-  font-size: 12.5px;
+  font-size: 15px;
   color: var(--body-soft);
   margin-top: 3px;
   display: flex;
@@ -140,7 +140,7 @@
   text-align: right;
 }
 /* 共通 .label（katazuke.css・左に24pxの罫を引く見出し用）の罫と flex をここでは使わない */
-.schedule-page .biz-amount .label { display: block; font-size: 11px; color: var(--body-soft); font-weight: 600; }
+.schedule-page .biz-amount .label { display: block; font-size: 15px; color: var(--body-soft); font-weight: 600; }
 .schedule-page .biz-amount .label::before { display: none; }
 .schedule-page .biz-amount .amount {
   font-family: var(--head);
@@ -148,7 +148,7 @@
   font-weight: 600;
   color: var(--navy);
 }
-.schedule-page .biz-amount .amount span { font-size: 12px; color: var(--body-soft); }
+.schedule-page .biz-amount .amount span { font-size: 15px; color: var(--body-soft); }
 
 /* カレンダー */
 .schedule-page .cal-card {
@@ -199,13 +199,13 @@
 }
 .schedule-page .cal-dow {
   text-align: center;
-  font-size: 11.5px;
+  font-size: 15px;
   font-weight: 400;
   color: var(--body-soft);
   padding: 4px 0;
 }
-.schedule-page .cal-dow.sun { color: #ef4444; }
-.schedule-page .cal-dow.sat { color: #3b82f6; }
+.schedule-page .cal-dow.sun { color: var(--danger); }
+.schedule-page .cal-dow.sat { color: var(--primary); }
 
 .schedule-page .cal-grid {
   display: grid;
@@ -219,7 +219,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
   position: relative;
@@ -234,10 +234,10 @@
 .schedule-page .cal-day:hover:not(.disabled):not(.past) { background: var(--pale); }
 .schedule-page .cal-day.disabled,
 .schedule-page .cal-day.past { color: var(--line); cursor: default; pointer-events: none; }
-.schedule-page .cal-day.sun { color: #ef4444; }
-.schedule-page .cal-day.sat { color: #3b82f6; }
+.schedule-page .cal-day.sun { color: var(--danger); }
+.schedule-page .cal-day.sat { color: var(--primary); }
 .schedule-page .cal-day.today { font-weight: 600; color: var(--blue); }
-.schedule-page .cal-day.available { background: #f0fdf4; color: var(--green); font-weight: 600; }
+.schedule-page .cal-day.available { background: var(--mint); color: var(--green); font-weight: 600; }
 .schedule-page .cal-day.available::after {
   content: "";
   position: absolute;
@@ -249,7 +249,7 @@
   border-radius: 50%;
   background: var(--green);
 }
-.schedule-page .cal-day.selected { background: var(--blue); color: #fff; border-color: var(--blue-d); }
+.schedule-page .cal-day.selected { background: var(--blue); color: var(--white); border-color: var(--blue-d); }
 .schedule-page .cal-day.selected::after { background: var(--white); }
 
 .schedule-page .cal-legend {
@@ -257,7 +257,7 @@
   flex-wrap: wrap;
   gap: 6px 16px;
   padding: 0 16px 14px;
-  font-size: 12px;
+  font-size: 15px;
   color: var(--body-soft);
 }
 .schedule-page .cal-legend span { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
@@ -272,7 +272,7 @@
   margin-top: 16px;
 }
 .schedule-page .time-card-title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 400;
   color: var(--navy);
   margin-bottom: 14px;
@@ -292,7 +292,7 @@
   border: 1.5px solid var(--line);
   border-radius: var(--radius-s);
   text-align: center;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--ink);
   cursor: pointer;
@@ -301,9 +301,9 @@
   font-family: var(--sans);
 }
 .schedule-page .time-slot:hover:not(.disabled) { border-color: var(--blue); color: var(--blue); }
-.schedule-page .time-slot.selected { background: var(--blue); border-color: var(--blue); color: #fff; }
+.schedule-page .time-slot.selected { background: var(--blue); border-color: var(--blue); color: var(--white); }
 .schedule-page .time-slot.disabled { color: var(--line); cursor: default; background: var(--pale-2); }
-.schedule-page .time-slot .ts-label { font-size: 11px; color: inherit; opacity: .75; margin-top: 2px; }
+.schedule-page .time-slot .ts-label { font-size: 15px; color: inherit; opacity: .75; margin-top: 2px; }
 
 /* 備考 */
 .schedule-page .note-card {
@@ -314,7 +314,7 @@
   margin-top: 16px;
 }
 .schedule-page .note-card label {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 400;
   color: var(--navy);
   display: flex;
@@ -330,7 +330,7 @@
   padding: 12px 14px;
   border: 1.5px solid var(--line);
   border-radius: var(--radius-s);
-  font-size: 14px;
+  font-size: 15px;
   font-family: var(--sans);
   color: var(--ink);
   resize: vertical;
@@ -338,7 +338,7 @@
   line-height: 1.7;
 }
 .schedule-page .note-textarea:focus { border-color: var(--blue); }
-.schedule-page .note-hint { font-size: 12px; color: var(--body-soft); margin-top: 8px; }
+.schedule-page .note-hint { font-size: 15px; color: var(--body-soft); margin-top: 8px; }
 
 /* サイドパネル */
 .schedule-page .sch-side { display: flex; flex-direction: column; gap: 16px; }
@@ -352,7 +352,7 @@
   top: 96px;
 }
 .schedule-page .confirm-title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 400;
   color: var(--navy);
   margin-bottom: 16px;
@@ -365,7 +365,7 @@
 .schedule-page .confirm-row {
   display: flex;
   gap: 10px;
-  font-size: 13.5px;
+  font-size: 15px;
   padding: 10px 0;
   border-bottom: 1px solid var(--line-soft);
 }
@@ -380,12 +380,12 @@
   width: 100%;
   padding: 14px;
   background: var(--blue);
-  color: #fff;
+  color: var(--white);
   font-size: 15px;
   font-weight: 600;
   font-family: var(--head);
   border: none;
-  border-radius: 0;
+  border-radius: var(--radius);
   cursor: pointer;
   margin-top: 16px;
   transition: .2s;
@@ -401,10 +401,10 @@
 
 .schedule-page .notice-box {
   background: var(--pale);
-  border: 1px solid #c7d9ff;
+  border: 1px solid var(--line);
   border-radius: var(--radius-s);
   padding: 14px 16px;
-  font-size: 13px;
+  font-size: 15px;
   color: var(--blue);
   line-height: 1.7;
 }
@@ -415,14 +415,14 @@
   margin-right: 4px;
 }
 .schedule-page .notice-box a { color: inherit; text-decoration: underline; }
-.schedule-page .notice-box.warn { background: #fff8f0; border-color: #fed7aa; color: #9a3412; }
+.schedule-page .notice-box.warn { background: var(--warm); border-color: var(--gold); color: var(--gold-text); }
 
 /* 完了モーダル（独自演出。共通 .kdz-overlay とは別スコープ） */
 .schedule-page .sch-modal-icon {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: #d1fae5;
+  background: var(--mint);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -439,7 +439,7 @@
 }
 .schedule-page .sch-modal { text-align: center; }
 .schedule-page .sch-modal h2 { font-size: 20px; color: var(--navy); margin-bottom: 10px; }
-.schedule-page .sch-modal p { font-size: 14px; color: var(--body-soft); line-height: 1.8; margin-bottom: 24px; }
+.schedule-page .sch-modal p { font-size: 15px; color: var(--body-soft); line-height: 1.8; margin-bottom: 24px; }
 .schedule-page .sch-modal-btns { display: flex; flex-direction: column; gap: 10px; }
 
 /* レスポンシブ */

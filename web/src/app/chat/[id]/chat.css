@@ -38,7 +38,7 @@
 .chat-page .ch-back {
   width: 36px;
   height: 36px;
-  border-radius: 0;
+  border-radius: var(--radius);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -50,20 +50,20 @@
 .chat-page .ch-back .ic { width: 20px; height: 20px; transform: scaleX(-1); }
 .chat-page .ch-logo { display: flex; align-items: center; }
 .chat-page .ch-divider { width: 1px; height: 20px; background: var(--line); }
-.chat-page .ch-title { font-family: var(--head); font-size: 14.5px; font-weight: 400; color: var(--navy); }
+.chat-page .ch-title { font-family: var(--head); font-size: 15px; font-weight: 400; color: var(--navy); }
 .chat-page .ch-id {
   margin-left: auto;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--body-soft);
   background: var(--pale);
   padding: 4px 10px;
-  border-radius: 0;
+  border-radius: var(--radius);
 }
 .chat-page .ch-bell {
   width: 36px;
   height: 36px;
-  border-radius: 0;
+  border-radius: var(--radius);
   background: var(--pale);
   display: flex;
   align-items: center;
@@ -80,7 +80,7 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #e05c5c;
+  background: var(--danger);
 }
 
 /* メインレイアウト */
@@ -98,7 +98,7 @@
 }
 .chat-page .biz-sidebar-head {
   padding: 14px 14px 10px;
-  font-size: 11.5px;
+  font-size: 15px;
   font-weight: 400;
   color: var(--body-soft);
   letter-spacing: .06em;
@@ -125,7 +125,7 @@
   border-radius: 50%;
   background: var(--line);
   color: var(--body-soft);
-  font-size: 11px;
+  font-size: 15px;
   font-weight: 600;
   font-family: var(--head);
   display: flex;
@@ -133,12 +133,12 @@
   justify-content: center;
   flex-shrink: 0;
 }
-.chat-page .biz-rank.gold { background: #f0b429; color: #7a5700; }
+.chat-page .biz-rank.gold { background: var(--gold); color: var(--gold-text); }
 .chat-page .biz-rank.silver { background: var(--pale); color: var(--blue); }
 .chat-page .biz-rank.bronze { background: var(--pale-2); color: var(--body-soft); }
-.chat-page .biz-name { font-size: 13px; font-weight: 400; color: var(--ink); margin-bottom: 3px; line-height: 1.3; }
+.chat-page .biz-name { font-size: 15px; font-weight: 400; color: var(--ink); margin-bottom: 3px; line-height: 1.3; }
 .chat-page .biz-preview {
-  font-size: 11.5px;
+  font-size: 15px;
   color: var(--body-soft);
   white-space: nowrap;
   overflow: hidden;
@@ -146,8 +146,8 @@
   max-width: 140px;
 }
 .chat-page .biz-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-.chat-page .biz-time { font-size: 10.5px; color: var(--body-soft); }
-.chat-page .biz-bid { font-family: var(--ui); font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 600; color: var(--blue); display: block; margin-top: 2px; }
+.chat-page .biz-time { font-size: 15px; color: var(--body-soft); }
+.chat-page .biz-bid { font-family: var(--ui); font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 600; color: var(--blue); display: block; margin-top: 2px; }
 .chat-page .biz-unread {
   width: 8px;
   height: 8px;
@@ -174,7 +174,7 @@
 .chat-page .peer-avatar {
   width: 40px;
   height: 40px;
-  border-radius: 0;
+  border-radius: var(--radius);
   background: var(--ink);
   border: 1px solid var(--ink);
   color: var(--white);
@@ -188,9 +188,9 @@
 }
 .chat-page .peer-name-block { flex: 1; min-width: 0; }
 .chat-page .peer-name { font-size: 15px; font-weight: 400; color: var(--navy); font-family: var(--head); }
-.chat-page .peer-sub { font-size: 12px; color: var(--body-soft); margin-top: 2px; }
+.chat-page .peer-sub { font-size: 15px; color: var(--body-soft); margin-top: 2px; }
 .chat-page .peer-link {
-  font-size: 12px;
+  font-size: 15px;
   color: var(--blue);
   font-weight: 600;
   text-decoration: underline;
@@ -199,18 +199,18 @@
 .chat-page .peer-bid-chip {
   background: var(--pale);
   border: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: var(--radius-s);
   padding: 8px 14px;
   text-align: center;
   flex-shrink: 0;
 }
-.chat-page .peer-bid-label { font-size: 10px; font-weight: 400; color: var(--body-soft); letter-spacing: .06em; }
+.chat-page .peer-bid-label { font-size: 15px; font-weight: 400; color: var(--body-soft); letter-spacing: .06em; }
 .chat-page .peer-bid-amount { font-family: var(--ui); font-variant-numeric: tabular-nums; font-size: 18px; font-weight: 600; color: var(--navy); }
 
 /* アクションバー */
 .chat-page .action-bar {
-  background: #fff7e6;
-  border-bottom: 1px solid #f0d080;
+  background: var(--warm);
+  border-bottom: 1px solid var(--gold);
   padding: 10px 20px;
   display: flex;
   align-items: center;
@@ -219,16 +219,16 @@
 }
 .chat-page .action-bar-ic { display: flex; color: var(--gold); flex-shrink: 0; }
 .chat-page .action-bar-ic .ic { width: 18px; height: 18px; }
-.chat-page .action-bar-text { font-size: 13px; color: var(--ink); flex: 1; }
-.chat-page .action-bar-text strong { color: #7a5700; }
+.chat-page .action-bar-text { font-size: 15px; color: var(--ink); flex: 1; }
+.chat-page .action-bar-text strong { color: var(--gold-text); }
 .chat-page .btn-action {
   padding: 7px 16px;
-  border-radius: 0;
+  border-radius: var(--radius);
   border: none;
   background: var(--blue);
-  color: #fff;
+  color: var(--white);
   font-family: var(--head);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
@@ -238,14 +238,14 @@
 
 /* LINE通知バナー */
 .chat-page .line-banner {
-  background: #f0fff8;
-  border-bottom: 1px solid #a7f0cc;
+  background: var(--mint);
+  border-bottom: 1px solid var(--line);
   padding: 9px 20px;
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12.5px;
-  color: #1a6040;
+  font-size: 15px;
+  color: var(--green);
   flex-shrink: 0;
 }
 .chat-page .line-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line-green); flex-shrink: 0; }
@@ -266,23 +266,23 @@
 .chat-page .msg-avatar {
   width: 32px;
   height: 32px;
-  border-radius: 0;
+  border-radius: var(--radius);
   background: var(--ink);
   border: 1px solid var(--ink);
   color: var(--white);
   font-family: var(--head);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
-.chat-page .msg.me .msg-avatar { background: var(--deep); color: #fff; }
+.chat-page .msg.me .msg-avatar { background: var(--deep); color: var(--white); }
 .chat-page .bubble {
   max-width: 68%;
   padding: 12px 16px;
-  border-radius: 0;
+  border-radius: var(--radius);
   font-family: var(--ui);
   font-variant-numeric: tabular-nums;
   font-size: 15px;
@@ -298,16 +298,16 @@
 }
 .chat-page .msg.me .bubble {
   background: var(--blue);
-  color: #fff;
+  color: var(--white);
   border-bottom-right-radius: 4px;
 }
-.chat-page .msg-time { font-size: 10.5px; color: var(--body-soft); margin-bottom: 4px; white-space: nowrap; }
+.chat-page .msg-time { font-size: 15px; color: var(--body-soft); margin-bottom: 4px; white-space: nowrap; }
 .chat-page .msg.me .msg-time { text-align: right; }
 
 /* 日付区切り */
 .chat-page .date-sep {
   text-align: center;
-  font-size: 12px;
+  font-size: 15px;
   color: var(--body-soft);
   font-weight: 600;
   display: flex;
@@ -330,7 +330,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 400;
   color: var(--navy);
   margin-bottom: 12px;
@@ -343,12 +343,12 @@
 .chat-page .btn-schedule-cand {
   width: 100%;
   padding: 10px 12px;
-  border-radius: 0;
+  border-radius: var(--radius);
   border: none;
   background: var(--blue);
-  color: #fff;
+  color: var(--white);
   font-family: var(--head);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   line-height: 1.5;
   text-align: left;
@@ -359,21 +359,21 @@
 }
 .chat-page .btn-schedule-cand:hover:not(:disabled) { background: var(--blue-d); }
 .chat-page .btn-schedule-cand:disabled { background: var(--line); color: var(--body-soft); cursor: not-allowed; }
-.chat-page .schedule-cand-note { font-size: 11.5px; color: var(--body-soft); }
+.chat-page .schedule-cand-note { font-size: 15px; color: var(--body-soft); }
 /* 確定できない提示（置き換わった v2・pending 以外）・旧形式の提示は候補を文字だけで並べる。 */
 .chat-page .schedule-cand-texts {
   display: flex;
   flex-direction: column;
   gap: 4px;
   margin-bottom: 10px;
-  font-size: 13.5px;
+  font-size: 15px;
   color: var(--body);
   overflow-wrap: anywhere;
 }
 .chat-page .schedule-card.is-stale { border-color: var(--line); }
 .chat-page .schedule-card.is-stale .schedule-cand-texts { color: var(--body-soft); }
-.chat-page .schedule-card-note { margin: 0 0 6px; font-size: 12px; color: var(--body-soft); line-height: 1.6; }
-.chat-page .schedule-card-link { font-size: 12.5px; color: var(--blue); text-decoration: underline; overflow-wrap: anywhere; }
+.chat-page .schedule-card-note { margin: 0 0 6px; font-size: 15px; color: var(--body-soft); line-height: 1.6; }
+.chat-page .schedule-card-link { font-size: 15px; color: var(--blue); text-decoration: underline; overflow-wrap: anywhere; }
 /* 候補から確定できなかった理由（409 superseded / expired 等）。 */
 .chat-page .schedule-notice {
   margin: 8px 20px 0;
@@ -381,7 +381,7 @@
   border: 1px solid var(--blue);
   background: var(--pale);
   color: var(--navy);
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.6;
   overflow-wrap: anywhere;
   flex-shrink: 0;
@@ -394,9 +394,9 @@
   justify-content: center;
   gap: 4px 10px;
   padding: 10px 14px;
-  background: #f0fdf4;
+  background: var(--mint);
   border: 1px solid var(--green);
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.6;
   text-align: center;
   overflow-wrap: anywhere;
@@ -425,22 +425,22 @@
   overflow-y: auto;
   background: var(--pale-2);
   border: 1.5px solid var(--line);
-  border-radius: 0;
+  border-radius: var(--radius);
   padding: 10px 18px;
   font-family: var(--ui);
-  font-size: 14px;
+  font-size: 15px;
   color: var(--ink);
   transition: border-color .2s, background .2s;
 }
 .chat-page .msg-input:focus { border-color: var(--blue); background: var(--white); }
-.chat-page .msg-input::placeholder { color: #bcc3d4; }
+.chat-page .msg-input::placeholder { color: var(--body-soft); }
 .chat-page .btn-send {
   width: 40px;
   height: 40px;
   border-radius: 50%;
   border: none;
   background: var(--blue);
-  color: #fff;
+  color: var(--white);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -454,7 +454,7 @@
   width: 18px;
   height: 18px;
   fill: none;
-  stroke: #fff;
+  stroke: var(--white);
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
