@@ -33,14 +33,14 @@
   margin-bottom: 14px;
 }
 .unsub-page p {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--body-soft);
   line-height: 1.85;
   margin-top: 10px;
 }
 .unsub-page .unsub-footnote {
   margin-top: 24px;
-  font-size: 12.5px;
+  font-size: 15px;
   color: var(--body-soft);
 }
 .unsub-page .unsub-footnote a {

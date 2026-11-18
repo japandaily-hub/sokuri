@@ -92,7 +92,7 @@
   line-height: 1.3;
 }
 .confirm-sub {
-  font-size: 14.5px;
+  font-size: 15px;
   color: var(--body-soft);
   line-height: 1.85;
   margin-bottom: 28px;
@@ -102,10 +102,10 @@
   background: var(--pale);
   color: var(--blue);
   font-family: var(--head);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   padding: 8px 18px;
-  border-radius: 0;
+  border-radius: var(--radius);
   border: 1px solid rgba(var(--primary-rgb), .2);
   margin-bottom: 28px;
 }
@@ -113,7 +113,7 @@
 /* ── ステップ ── */
 .welcome-steps {
   background: var(--pale);
-  border-radius: 0;
+  border-radius: var(--radius);
   padding: 18px 20px;
   margin-bottom: 24px;
   text-align: left;
@@ -146,12 +146,12 @@
 .ws-body strong {
   display: block;
   font-family: var(--head);
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--navy);
 }
 .ws-body span {
-  font-size: 12.5px;
+  font-size: 15px;
   color: var(--body-soft);
   line-height: 1.7;
 }
@@ -165,7 +165,7 @@
 /* ── ボトムリンク ── */
 .confirm-bottom {
   margin-top: 20px;
-  font-size: 12.5px;
+  font-size: 15px;
   color: var(--body-soft);
   text-align: center;
   line-height: 2;
@@ -179,8 +179,8 @@
   .verify-page { padding: 20px 14px; }
   .confirm-card { padding: 36px 20px 28px; }
   .confirm-title { font-size: 20px; }
-  .confirm-sub { font-size: 13.5px; }
-  .confirm-email { font-size: 13px; padding: 7px 14px; }
+  .confirm-sub { font-size: 15px; }
+  .confirm-email { font-size: 15px; padding: 7px 14px; }
   .welcome-steps { padding: 14px 14px; }
   .ws-num { width: 22px; height: 22px; font-size: 11px; }
 }
