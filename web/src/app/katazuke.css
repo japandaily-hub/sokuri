@@ -1,59 +1,67 @@
 /* ============================================================
-   カタヅケ — メインスタイル（人の森整合テーマ / ブルー × 明朝 × 直角）
-   ブランド: #1447e0 / 家まるごと・まとめて片付け買取
+   カタヅケ — メインスタイル（見本 v12 / 藍 × 生成り × 丸ゴ・角ゴ × 角丸6px）
+   ブランド: 藍 #2e4a7d（見本 v12）/ 家まるごと・まとめて片付け買取
    正典: docs/design_hitonomori_alignment/SPEC-4-decisions.md §4.1 / §4.2
    NOTE: globals.css から `@import "./katazuke.css" layer(components)` で取り込み、
    components レイヤーに内包する。これにより Tailwind の utilities（mt-4等）が常に
    上書きでき、既存 Tailwind ページの余白も壊さない。.container は corePlugins で無効化済み。
    ============================================================ */
 :root{
-  /* --- 主色（ブルー） --- */
-  --primary:#1447e0;
-  --primary-rgb:20,71,224; /* rgba()で任意の不透明度を作る用（例: フォーカスリング rgba(var(--primary-rgb),.14)） */
-  --primary-d:#0f37b4;
-  --primary-l:#5f86ee;   /* 非文字コントラスト3:1以上（境界線・アイコン等の判読性を担保） */
-  --deep:#14235c;
-  --lime:#8fb4ff;        /* 英字キャプション・現在地（白ロゴ上の視認用） */
+  /* --- 主色（藍）：見本 v12 --- */
+  --primary:#2e4a7d;
+  --primary-rgb:46,74,125; /* rgba()で任意の不透明度を作る用（例: フォーカスリング rgba(var(--primary-rgb),.14)） */
+  --primary-d:#22385f;
+  --primary-l:#6b80a8;   /* 非文字コントラスト3:1以上（境界線・アイコン等の判読性を担保） */
+  --deep:#22385f;
+  --deep-rgb:34,56,95;   /* 濃い藍の面に重ねる半透明用（rgba(var(--deep-rgb),.5)） */
+  --lime:#c3cde0;        /* 濃い藍の面の上の淡いキャプション・現在地 */
 
-  /* --- 文字 --- */
-  --navy:#20242e;
-  --ink:#20242e;
-  --body:#454e59;
-  --body-soft:#56636e;   /* 白と 6.4:1、#eef1f6 と 5.3:1（WCAG AA・axe で実測）。小さい補助テキストはすべてこれ */
-  --head-gray:#959595;   /* 24px 以上の見出し専用（本文に流用しない） */
+  /* --- 文字（生成りの地の上で body 11:1・body-soft 7.9:1） --- */
+  --navy:#24221f;
+  --ink:#24221f;
+  --body:#37342f;
+  --body-soft:#4f4a43;   /* 補足文はすべてこれ。14px 未満の文字は作らない */
+  --head-gray:var(--body-soft);
 
-  /* --- 罫線・面 --- */
-  --line:#dce3ea;
-  --line-soft:#eef1f6;
-  --white:#fff;
-  --pale:#eef3ff;        /* フォームパネル・強調面 */
-  --pale-2:#f4f7fc;      /* セクション交互背景 */
-  --warm:#fdf5d9;
-  --mint:#daf4eb;
-  --sky:#e1f5fd;
-  --marker:#d7e6ff;      /* マーカー下線 */
+  /* --- 罫線・面（生成り） --- */
+  --line:#dcd3c4;
+  --line-strong:#a89d8a; /* 区切りを強く見せる罫・アイコンの線 */
+  --line-input:#8a7f6c;  /* 入力欄の枠（非文字 3:1 以上） */
+  --line-soft:#e9e2d5;
+  --white:#fffdf9;       /* カード・入力欄の面（地より一段明るい生成り） */
+  --paper:#f6f2ea;       /* ページの地 */
+  --paper-2:#ede6d9;     /* セクション交互背景 */
+  --pale:var(--paper-2); /* フォームパネル・強調面（旧名） */
+  --pale-2:var(--paper-2);
+  --indigo-tint:#e3e7ee; /* 藍の淡い面（選択中・現在地） */
+  --warm:#f3ead3;
+  --mint:#e4ebdf;
+  --sky:#e3e7ee;
+  --marker:#e3e7ee;      /* マーカー下線 */
 
   /* --- アクセント --- */
+  --accent:#b0492a;      /* 朱。いちばん高い入札額の数字だけに使う。業者側の画面では使わない */
+  --line-green:#06c755;  /* LINE ブランドの緑（AA 対象外の文書化例外。LINE ボタンの面だけ） */
   --apricot:#f3981d;
-  --green:#15803d;       /* 成功/完了などの意味色。主色（青）とは別系統に固定 */
+  --green:#166534;       /* 成功/完了などの意味色。主色（藍）とは別系統に固定 */
   --gold:#e5a323;
   --gold-text:#8a5b00; /* 淡い背景(--warm)上の文字用。--gold は 2:1 で AA 不足のためアイコン・装飾のみに使う */
-  --danger:#d70035;
-  --danger-rgb:215,0,53; /* rgba()で任意の不透明度を作る用（例: rgba(var(--danger-rgb),.06)） */
+  --danger:#a8202f;      /* 朱（--accent）と区別できる赤 */
+  --danger-rgb:168,32,47; /* rgba()で任意の不透明度を作る用（例: rgba(var(--danger-rgb),.06)） */
   /* デザイン監査(2026-09-15)是正: エラーバナー/破壊的操作ボタンの下地色が
      mypage/operator配下で rgba(215,0,53,.06〜.35) や #fff3f3/#ffc0c0/#e05c5c 等
      ばらばらに直書きされていたのを1つに正典化する。新規実装は必ずこれを使うこと。 */
   --danger-bg-soft:rgba(var(--danger-rgb),.06);
   --danger-border-soft:rgba(var(--danger-rgb),.35);
 
-  /* --- かたち：角丸ゼロ・影ゼロ。区切りはヘアラインと余白 --- */
-  --radius:0px;
-  --radius-s:0px;
+  /* --- かたち：角丸は 6px/4px・影ゼロ。区切りはヘアラインと余白 --- */
+  --radius:6px;
+  --radius-s:4px;
   --shadow-s:none;
   --shadow-m:none;
   --shadow-l:none;
   --glow:none;
-  --frame:1px solid #333;
+  --frame:none;          /* 旧: 額装フレーム。見本 v12 では枠を描かない */
   --ease:cubic-bezier(.22,.61,.36,1);
   --maxw:1140px;
   --maxw-text:760px;
@@ -67,7 +75,7 @@
   --rv-dur-slow:1.1s;
   --rv-stagger:80ms;
   --rv-shift:20px;
-  --marker-draw:#c9dcff;
+  --marker-draw:#e3e7ee;
   --marker-h:.34em;
 
   /* --- 書体（見本 v12）：見出しは丸ゴ・本文は角ゴ・数字は Inter。変数は next/font（layout.tsx）が供給 --- */
@@ -91,7 +99,7 @@
 html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;}
 /* 見本 v12 の組版：17px・行送り1.85・字間0。角ゴなので antialiased を使う。
    globals.css @layer base の "palt" は components レイヤーのこちらが normal で上書きする。 */
-body{font-family:var(--sans);color:var(--body);background:#fff;
+body{font-family:var(--sans);color:var(--body);background:var(--paper);
   font-size:17px;line-height:1.85;font-weight:400;letter-spacing:0;
   font-feature-settings:normal;
   text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
@@ -101,7 +109,7 @@ h1,h2,h3,h4,h5{font-family:var(--head);color:var(--ink);font-weight:700;
   line-height:1.5;letter-spacing:.02em;text-wrap:balance;word-break:auto-phrase;}
 p,li{text-wrap:pretty;}
 strong{font-weight:600;color:var(--ink);}
-::selection{background:rgba(82,126,82,.16);color:var(--ink);}
+::selection{background:rgba(var(--primary-rgb),.16);color:var(--ink);}
 /* :focus-visible は globals.css の @layer base に集約（重複定義を排除。挙動は同一） */
 /* --container-pad は .sp-bleed（katazuke-pages.css）が負マージンに使う。値は padding-inline と常に同一に保つ */
 .container{--container-pad:24px;width:100%;max-width:var(--maxw);margin-inline:auto;padding-inline:var(--container-pad);}
@@ -120,7 +128,7 @@ td .val,.confirm-row .val,.money,.fee-row .fv,.tabular-nums,[class*="tabular"]{
 
 /* ---------- 額装フレーム（人の森の「一枚の紙」の作法） ---------- */
 /* overflow は絶対に書かない。内側の position:sticky が全ページで死ぬため */
-.site-frame{margin:20px;border:var(--frame);min-height:calc(100dvh - 40px);}
+.site-frame{margin:0;border:var(--frame);min-height:calc(100dvh - 72px);}
 .site-frame + .site-frame{margin-top:0;}
 @media(max-width:859px){
   .site-frame{margin:0;border:0;min-height:0;}
