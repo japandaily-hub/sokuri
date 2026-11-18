@@ -50,7 +50,7 @@
 }
 .user-card-name {
   font-size: 18px;
-  font-weight: 400;
+  font-weight: 700;
   color: var(--navy);
   margin-bottom: 3px;
 }
@@ -164,7 +164,7 @@
 .member-status-title {
   font-family: var(--head);
   font-size: 15px;
-  font-weight: 400;
+  font-weight: 700;
   color: var(--body-soft);
   margin-bottom: 4px;
 }
@@ -576,7 +576,7 @@
 }
 .profile-section-title {
   font-size: 15px;
-  font-weight: 400;
+  font-weight: 700;
   letter-spacing: 0.06em;
   color: var(--body-soft);
   text-transform: uppercase;

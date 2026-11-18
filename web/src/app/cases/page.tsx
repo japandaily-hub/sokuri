@@ -99,7 +99,7 @@ export default function MyCasesPage() {
                     <div className="h-16 w-16 shrink-0 rounded-none bg-kdz-pale" />
                   )}
                   <div className="min-w-0">
-                    <p className="font-normal text-kdz-ink">{formatPurposeLabel(c.purpose)}</p>
+                    <p className="font-bold text-kdz-ink">{formatPurposeLabel(c.purpose)}</p>
                     <p className="mt-0.5 text-[15px] text-kdz-bodysoft">
                       {c.prefecture} {c.city} / {c.floor_plan ?? "間取り未設定"}
                     </p>

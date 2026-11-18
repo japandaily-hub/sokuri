@@ -57,7 +57,7 @@
   display: block;
   font-family: var(--head);
   font-size: 15px;
-  font-weight: 400;
+  font-weight: 700;
   color: var(--danger);
   margin-bottom: 4px;
 }
@@ -124,7 +124,7 @@
 .withdraw-page .form-card-title {
   font-family: var(--head);
   font-size: 15px;
-  font-weight: 400;
+  font-weight: 700;
   color: var(--navy);
   margin-bottom: 14px;
 }

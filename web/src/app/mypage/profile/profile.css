@@ -105,7 +105,7 @@
   display: block;
   font-family: var(--head);
   font-size: 15px;
-  font-weight: 400;
+  font-weight: 700;
   color: var(--navy);
 }
 .profile-page .avatar-info span {
@@ -205,7 +205,7 @@
 .profile-page .link-card-body strong {
   font-family: var(--head);
   font-size: 15px;
-  font-weight: 400;
+  font-weight: 700;
   color: var(--navy);
 }
 .profile-page .link-card-body span {
@@ -232,7 +232,7 @@
 }
 .profile-page .notify-row .notify-title {
   font-size: 15px;
-  font-weight: 400;
+  font-weight: 700;
   color: var(--navy);
 }
 .profile-page .notify-row .notify-desc {
@@ -296,7 +296,7 @@
 .profile-page .danger-zone .danger-title {
   font-family: var(--head);
   font-size: 15px;
-  font-weight: 400;
+  font-weight: 700;
   color: var(--danger);
   margin-bottom: 8px;
 }

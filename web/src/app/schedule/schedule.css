@@ -125,7 +125,7 @@
   font-weight: 600;
   color: var(--white);
 }
-.schedule-page .biz-name { font-size: 15px; font-weight: 400; color: var(--navy); }
+.schedule-page .biz-name { font-size: 15px; font-weight: 700; color: var(--navy); }
 .schedule-page .biz-sub {
   font-size: 15px;
   color: var(--body-soft);
@@ -164,7 +164,7 @@
   padding: 16px 20px 12px;
   border-bottom: 1px solid var(--line-soft);
 }
-.schedule-page .cal-month { font-family: var(--head); font-size: 17px; font-weight: 400; color: var(--navy); }
+.schedule-page .cal-month { font-family: var(--head); font-size: 17px; font-weight: 700; color: var(--navy); }
 .schedule-page .cal-nav { display: flex; gap: 4px; }
 .schedule-page .cal-nav-btn {
   width: 32px;
@@ -273,7 +273,7 @@
 }
 .schedule-page .time-card-title {
   font-size: 15px;
-  font-weight: 400;
+  font-weight: 700;
   color: var(--navy);
   margin-bottom: 14px;
   font-family: var(--head);
@@ -315,7 +315,7 @@
 }
 .schedule-page .note-card label {
   font-size: 15px;
-  font-weight: 400;
+  font-weight: 700;
   color: var(--navy);
   display: flex;
   align-items: center;
@@ -353,7 +353,7 @@
 }
 .schedule-page .confirm-title {
   font-size: 15px;
-  font-weight: 400;
+  font-weight: 700;
   color: var(--navy);
   margin-bottom: 16px;
   font-family: var(--head);

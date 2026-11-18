@@ -15,7 +15,7 @@
 .create-page .photo-drop:hover { border-color: var(--blue); background: var(--pale); }
 .create-page .photo-drop .pd-ic { width: 54px; height: 54px; border-radius: var(--radius); background: var(--pale); color: var(--blue); display: grid; place-items: center; }
 .create-page .photo-drop .pd-ic .ic { font-size: 27px; }
-.create-page .photo-drop .pd-title { font-family: var(--head); font-weight: 400; font-size: 15px; color: var(--navy); }
+.create-page .photo-drop .pd-title { font-family: var(--head); font-weight: 700; font-size: 15px; color: var(--navy); }
 .create-page .photo-drop .pd-sub { font-size: 15px; color: var(--body-soft); }
 
 .create-page .photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
@@ -43,7 +43,7 @@
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
   border: 2px dashed var(--line); border-radius: var(--radius); background: var(--pale-2);
   padding: 40px 20px; cursor: pointer; text-align: center; width: 100%;
-  font-family: var(--head); font-weight: 400; font-size: 15px; color: var(--navy);
+  font-family: var(--head); font-weight: 700; font-size: 15px; color: var(--navy);
   transition: border-color .2s, background .2s;
 }
 .create-page .item-empty-cta:hover { border-color: var(--blue); background: var(--pale); }
@@ -56,7 +56,7 @@
   border: 1px solid var(--line); border-radius: var(--radius);
 }
 .create-page .shoot-guide .sg-title {
-  font-family: var(--head); font-weight: 400; font-size: 16px; color: var(--ink);
+  font-family: var(--head); font-weight: 700; font-size: 16px; color: var(--ink);
   border-left: 2px solid var(--primary); padding-left: 10px; line-height: 1.4; margin: 0 0 12px;
 }
 .create-page .shoot-guide .sg-title + .sg-title { margin-top: 20px; }
@@ -64,7 +64,7 @@
 .create-page .sg-flow li { display: flex; align-items: flex-start; gap: 10px; font-size: 15px; color: var(--body); line-height: 1.7; }
 .create-page .sg-n {
   flex-shrink: 0; width: 22px; height: 22px; display: grid; place-items: center; margin-top: 1px;
-  font-family: var(--en-display); font-size: 15px; color: var(--white); background: var(--ink); border: 1px solid var(--ink);
+  font-family: var(--num); font-size: 15px; color: var(--white); background: var(--ink); border: 1px solid var(--ink);
 }
 .create-page .sg-tips { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .create-page .sg-tips li {
@@ -96,7 +96,7 @@
 .create-page .item-card-thumb img { width: 100%; height: 100%; object-fit: cover; }
 .create-page .item-card-thumb .ic { font-size: 22px; }
 .create-page .item-card-info { flex: 1; min-width: 0; }
-.create-page .item-card-name { font-family: var(--head); font-weight: 400; font-size: 15px; color: var(--navy); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.create-page .item-card-name { font-family: var(--head); font-weight: 700; font-size: 15px; color: var(--navy); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .create-page .item-card-count { font-size: 15px; color: var(--body-soft); margin-top: 2px; }
 .create-page .item-card-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .create-page .item-card-actions button {
@@ -119,7 +119,7 @@
   text-decoration: underline; cursor: pointer;
 }
 .create-page .btn-loose-toggle:hover { color: var(--blue); }
-.create-page .loose-section-title { font-family: var(--head); font-size: 15px; font-weight: 400; color: var(--navy); margin-bottom: 12px; }
+.create-page .loose-section-title { font-family: var(--head); font-size: 15px; font-weight: 700; color: var(--navy); margin-bottom: 12px; }
 
 /* STEP1 shoot モード: 商品ごとの撮影 */
 .create-page .step1-back-link {
@@ -150,7 +150,7 @@
 .create-page .pqh-confirm input[type="checkbox"] { width: 20px; height: 20px; margin-top: 1px; accent-color: var(--primary); cursor: pointer; flex-shrink: 0; }
 
 /* STEP4 確認: 商品一覧 */
-.create-page .confirm-item-list-title { font-family: var(--head); font-size: 15px; font-weight: 400; color: var(--navy); margin-bottom: 8px; }
+.create-page .confirm-item-list-title { font-family: var(--head); font-size: 15px; font-weight: 700; color: var(--navy); margin-bottom: 8px; }
 .create-page .confirm-item-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .create-page .confirm-item-list li { display: flex; justify-content: space-between; font-size: 15px; color: var(--body); padding: 6px 0; border-bottom: 1px solid var(--line-soft); }
 .create-page .confirm-item-list li:last-child { border-bottom: none; }
@@ -187,7 +187,7 @@
   max-width: 380px; width: 100%; padding: 24px 22px;
 }
 .create-page .leave-modal h3 {
-  font-family: var(--head); font-weight: 400; font-size: 17px; color: var(--navy); margin: 0 0 10px;
+  font-family: var(--head); font-weight: 700; font-size: 17px; color: var(--navy); margin: 0 0 10px;
 }
 .create-page .leave-modal p { font-size: 15px; color: var(--body-soft); line-height: 1.8; margin: 0 0 20px; }
 .create-page .leave-modal-actions { display: flex; gap: 10px; justify-content: flex-end; }

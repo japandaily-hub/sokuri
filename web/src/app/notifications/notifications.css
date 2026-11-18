@@ -16,7 +16,7 @@
   gap: 12px; margin-bottom: 16px;
 }
 .notif-page .notif-toolbar-title {
-  font-family: var(--head); font-size: 18px; font-weight: 400; color: var(--navy);
+  font-family: var(--head); font-size: 18px; font-weight: 700; color: var(--navy);
 }
 
 /* ── 通知カード ── */

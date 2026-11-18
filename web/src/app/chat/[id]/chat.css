@@ -50,7 +50,7 @@
 .chat-page .ch-back .ic { width: 20px; height: 20px; transform: scaleX(-1); }
 .chat-page .ch-logo { display: flex; align-items: center; }
 .chat-page .ch-divider { width: 1px; height: 20px; background: var(--line); }
-.chat-page .ch-title { font-family: var(--head); font-size: 15px; font-weight: 400; color: var(--navy); }
+.chat-page .ch-title { font-family: var(--head); font-size: 15px; font-weight: 700; color: var(--navy); }
 .chat-page .ch-id {
   margin-left: auto;
   font-size: 15px;
@@ -136,7 +136,7 @@
 .chat-page .biz-rank.gold { background: var(--gold); color: var(--gold-text); }
 .chat-page .biz-rank.silver { background: var(--pale); color: var(--blue); }
 .chat-page .biz-rank.bronze { background: var(--pale-2); color: var(--body-soft); }
-.chat-page .biz-name { font-size: 15px; font-weight: 400; color: var(--ink); margin-bottom: 3px; line-height: 1.3; }
+.chat-page .biz-name { font-size: 15px; font-weight: 700; color: var(--ink); margin-bottom: 3px; line-height: 1.3; }
 .chat-page .biz-preview {
   font-size: 15px;
   color: var(--body-soft);
@@ -187,7 +187,7 @@
   flex-shrink: 0;
 }
 .chat-page .peer-name-block { flex: 1; min-width: 0; }
-.chat-page .peer-name { font-size: 15px; font-weight: 400; color: var(--navy); font-family: var(--head); }
+.chat-page .peer-name { font-size: 15px; font-weight: 700; color: var(--navy); font-family: var(--head); }
 .chat-page .peer-sub { font-size: 15px; color: var(--body-soft); margin-top: 2px; }
 .chat-page .peer-link {
   font-size: 15px;
