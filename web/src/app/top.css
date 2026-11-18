@@ -73,7 +73,8 @@
 .tp-who table{width:100%;border-collapse:collapse;font-size:16px;min-width:520px;}
 .tp-who caption{text-align:left;padding:20px 24px 4px;font-weight:700;color:var(--ink);}
 .tp-who th,.tp-who td{padding:14px 24px;border-bottom:1px solid var(--line);text-align:left;}
-.tp-who thead th{font-size:14px;color:var(--body-soft);font-weight:500;}
+.tp-who thead th{font-size:15px;color:var(--body-soft);font-weight:500;}
+.tp-who__note{margin:0;padding:14px 24px 18px;border-top:1px solid var(--line);font-size:15px;line-height:1.7;color:var(--body);}
 .tp-who tbody th{font-weight:500;color:var(--ink);}
 .tp-who tbody tr:last-child th,.tp-who tbody tr:last-child td{border-bottom:0;}
 .tp-who td.tp-no{color:var(--body-soft);}
@@ -82,7 +83,8 @@
   .tp-who table{min-width:0;font-size:15px;}
   .tp-who th,.tp-who td{padding:12px 10px;}
   .tp-who caption{padding:16px 10px 4px;}
-  .tp-who thead th{font-size:14px;}
+  .tp-who thead th{font-size:15px;}
+  .tp-who__note{padding:12px 10px 16px;}
 }
 
 /* ---------- 使い方 ---------- */

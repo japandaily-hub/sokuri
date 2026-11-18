@@ -111,7 +111,7 @@ export default function HomePage() {
                     <source media="(max-width:900px)" srcSet="/img/lp/fee-empty-room.webp" />
                     <img
                       src="/img/lp/register-listing.webp"
-                      alt="スマートフォンで品物の写真を確認している手元"
+                      alt="片付けを進める部屋のイメージ"
                       width={1024}
                       height={1024}
                       fetchPriority="high"
@@ -195,7 +195,7 @@ export default function HomePage() {
             <li>
               <h3>連絡先は、選んだ1社にだけ</h3>
               <p>
-                あなたが1社を選んで交渉が成立したとき、はじめて住所と連絡用のメールアドレスがその1社に伝わります。お名前と電話番号は、どの業者にも渡りません。訪問時には、業者が法令に基づき本人確認をする場合があります。
+                あなたが1社を選んで交渉が成立したとき、はじめて住所とご登録のメールアドレスがその1社に伝わります（LINEだけで登録した方はメールが渡らず、LINEでの連絡のご案内になります）。お名前と電話番号は、どの業者にも渡りません。訪問時には、業者が法令に基づき本人確認をする場合があります。
               </p>
             </li>
             <li>
@@ -227,6 +227,7 @@ export default function HomePage() {
                 ))}
               </tbody>
             </table>
+            <p className="tp-who__note">チャットに書いた内容は、選んだ業者に届きます。</p>
           </div>
         </div>
       </section>
