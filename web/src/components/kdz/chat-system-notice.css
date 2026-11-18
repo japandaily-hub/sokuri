@@ -29,7 +29,7 @@
   align-items: center;
   gap: 6px;
   margin-bottom: 6px;
-  font-size: 12px;
+  font-size: 15px;
   line-height: 1.4;
   color: var(--body-soft);
 }
@@ -46,14 +46,14 @@
 
 .kdz-chat-notice__time {
   margin-left: auto;
-  font-size: 10.5px;
+  font-size: 15px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .kdz-chat-notice__body {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.7;
   font-variant-numeric: tabular-nums;
   white-space: pre-wrap;
@@ -74,14 +74,14 @@
 }
 
 .kdz-chat-notice__quote-heading {
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 600;
   line-height: 1.5;
   color: var(--body);
 }
 
 .kdz-chat-notice__quote-text {
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.6;
   color: var(--body);
   word-break: break-word;

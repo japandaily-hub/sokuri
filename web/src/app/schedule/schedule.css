@@ -33,7 +33,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 400;
   color: var(--body-soft);
   white-space: nowrap; /* 狭い画面でラベルを1文字ずつ縦に折り返さない */
@@ -453,7 +453,7 @@
 }
 @media (max-width: 480px) {
   /* L-4: 375px でステップ4「訪問・完了」が右端で切れないよう、文字・丸・区切りを詰める */
-  .schedule-page .sch-step { font-size: 11px; gap: 4px; }
+  .schedule-page .sch-step { font-size: 15px; gap: 4px; }
   .schedule-page .step-num { width: 20px; height: 20px; font-size: 11px; }
   .schedule-page .step-sep { width: 8px; }
   .schedule-page .sch-steps { max-width: 100%; }

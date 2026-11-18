@@ -28,7 +28,7 @@
   stroke-linecap: round; stroke-linejoin: round;
 }
 .review-page .done-title { font-family: var(--head); font-size: 22px; font-weight: 400; color: var(--navy); margin-bottom: 4px; }
-.review-page .done-sub { font-size: 13.5px; color: var(--body-soft); line-height: 1.8; }
+.review-page .done-sub { font-size: 15px; color: var(--body-soft); line-height: 1.8; }
 
 /* ── 取引サマリー ── */
 .review-page .txn-card {
@@ -36,13 +36,13 @@
   box-shadow: none; border: 1px solid var(--line-soft);
   padding: 20px; margin-bottom: 20px;
 }
-.review-page .txn-card-title { font-family: var(--head); font-size: 14px; font-weight: 400; color: var(--navy); margin-bottom: 14px; }
+.review-page .txn-card-title { font-family: var(--head); font-size: 15px; font-weight: 400; color: var(--navy); margin-bottom: 14px; }
 .review-page .txn-row {
   display: flex; justify-content: space-between; align-items: baseline;
-  font-size: 14px; padding: 9px 0; border-bottom: 1px solid var(--line-soft); gap: 12px;
+  font-size: 15px; padding: 9px 0; border-bottom: 1px solid var(--line-soft); gap: 12px;
 }
 .review-page .txn-row:last-child { border-bottom: none; }
-.review-page .txn-lbl { color: var(--body-soft); font-size: 13px; }
+.review-page .txn-lbl { color: var(--body-soft); font-size: 15px; }
 .review-page .txn-val { font-weight: 600; color: var(--ink); text-align: right; }
 .review-page .txn-amount { font-family: var(--ui); font-variant-numeric: tabular-nums; font-size: 26px; font-weight: 600; color: var(--green); }
 
@@ -53,7 +53,7 @@
   padding: 24px 20px; margin-bottom: 14px;
 }
 .review-page .rate-card-title { font-family: var(--head); font-size: 16px; font-weight: 400; color: var(--navy); margin-bottom: 4px; }
-.review-page .rate-card-sub { font-size: 13px; color: var(--body-soft); margin-bottom: 22px; line-height: 1.7; }
+.review-page .rate-card-sub { font-size: 15px; color: var(--body-soft); margin-bottom: 22px; line-height: 1.7; }
 
 /* 評価フォーム（評価選択・候補文チップ・コメント欄）は共通部品 ReviewComposer
    （components/kdz/review-composer.css）に統一したため、ここでの個別定義は削除した。 */
@@ -76,8 +76,8 @@
 }
 .review-page .publish-toggle input:checked + .toggle-slider { background: var(--green); }
 .review-page .publish-toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
-.review-page .publish-label { font-size: 13px; color: var(--body); line-height: 1.6; }
-.review-page .publish-label .publish-note { font-size: 11.5px; color: var(--body-soft); }
+.review-page .publish-label { font-size: 15px; color: var(--body); line-height: 1.6; }
+.review-page .publish-label .publish-note { font-size: 15px; color: var(--body-soft); }
 
 /* 次のアクション */
 .review-page .next-card {
@@ -85,7 +85,7 @@
   border: 1px solid rgba(var(--primary-rgb),.12); padding: 20px;
   margin-bottom: 14px;
 }
-.review-page .next-card-title { font-family: var(--head); font-size: 14px; font-weight: 400; color: var(--navy); margin-bottom: 14px; }
+.review-page .next-card-title { font-family: var(--head); font-size: 15px; font-weight: 400; color: var(--navy); margin-bottom: 14px; }
 .review-page .next-actions { display: flex; flex-direction: column; gap: 10px; }
 .review-page .next-action-btn {
   display: flex; align-items: center; gap: 12px;
@@ -98,8 +98,8 @@
   display: grid; place-items: center;
 }
 .review-page .next-action-ic svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.review-page .next-action-body strong { display: block; font-family: var(--head); font-size: 14px; font-weight: 400; color: var(--navy); }
-.review-page .next-action-body span { font-size: 12px; color: var(--body-soft); }
+.review-page .next-action-body strong { display: block; font-family: var(--head); font-size: 15px; font-weight: 400; color: var(--navy); }
+.review-page .next-action-body span { font-size: 15px; color: var(--body-soft); }
 .review-page .next-action-arr { margin-left: auto; color: var(--line); display: grid; place-items: center; }
 .review-page .next-action-arr svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
@@ -114,7 +114,7 @@
   stroke-linecap: round; stroke-linejoin: round;
 }
 .review-page .submitted-screen h2 { font-family: var(--head); font-size: 22px; color: var(--navy); margin-bottom: 10px; }
-.review-page .submitted-screen p { font-size: 14px; color: var(--body-soft); line-height: 1.82; margin-bottom: 28px; }
+.review-page .submitted-screen p { font-size: 15px; color: var(--body-soft); line-height: 1.82; margin-bottom: 28px; }
 
 @media (max-width: 480px) {
   .review-page .review-wrap { padding: 18px 14px 80px; }

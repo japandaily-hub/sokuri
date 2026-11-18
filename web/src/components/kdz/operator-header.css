@@ -26,7 +26,7 @@
   flex-shrink: 0;
 }
 .op-header .op-brand-tag {
-  font-size: 10.5px;
+  font-size: 15px;
   font-weight: 600;
   letter-spacing: .04em;
   color: var(--blue);
@@ -39,7 +39,7 @@
 .op-header .op-nav { display: flex; align-items: center; gap: 4px; margin-left: 8px; }
 .op-header .op-nav a {
   font-family: var(--head);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 400;
   letter-spacing: .12em;
   color: var(--body-soft);
@@ -55,7 +55,7 @@
 .op-header .op-nav-logout {
   display: none;
   font-family: var(--head);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 400;
   letter-spacing: .12em;
   color: var(--body-soft);
@@ -105,7 +105,7 @@
   flex-shrink: 0;
 }
 .op-header .op-user-name {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--ink);
   line-height: 1.3;
@@ -117,7 +117,7 @@
 }
 
 .op-header .op-logout {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--body-soft);
   background: none;
