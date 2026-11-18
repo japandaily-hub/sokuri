@@ -5,6 +5,7 @@
 更新: 2026-10-06（Claude・ペルソナ壁打ち PDCA 統合ブランチ pdca/integ の最終レビュー反映＝未 push。反映順は下の「現在フェーズ」先頭の5段）。直前: 2026-10-02（Claude・パスワード照合の回数制限を同時送信で超えられる問題 M-3 の修正＝ブランチ claude/sleepy-nash-0dc3ec・**未 push**（IPv6 3段化 7bbce51 の上）。直前: IPv6 のレート制限を /64・/56・/48 の3段で数える修正＝1d14e6f）
 
 ## 現在フェーズ
+- **2026-11-19 デザイン見本 v12 の全画面展開（Claude・ブランチ claude/design-v12-rollout）**: 見本 docs/design_v3_friendly/mockup.html（ペルソナ3人9.0点）を本番へ。藍 #2e4a7d×生成り #f6f2ea、Zen Maru Gothic 見出し／Zen Kaku Gothic New 本文／Inter 数字、角丸 6px、朱は「いちばん高い入札額」だけ。トップは作り直し（lp/_components・lp.css 削除、共通ヘッダー/フッターへ）、案件詳細は2列・進み具合4段（caseProgressStep）。計画と決定（Q1〜Q8: 査定不使用・利用料0円の書き方・古物商許可は「登録の審査で」・順位/差額は出さない・締切は出さない等）は .agent-state/design-v12-rollout/PLAN.md。検証: tsc・eslint・node --test・next build 成功、E2E 56 passed / 8 skipped / 0 failed（本番ビルドを 3100、使い捨て SQLite の API を 8000）、375/1280 の目視。security（Critical/High/Medium 0）・QA（High 2件を修正し再レビューで0）。**残課題**: メール表記の揺れ（法務ページ＝連絡用のメールアドレス／画面＝ご登録のメールアドレス）、LINE 白文字のコントラストはブランド例外のまま、「いちばん高い入札」表示と古物競りあっせん業の論点は実課金前に弁護士確認、admin は Tailwind 既定の slate を残置、OGP は色のみ（和文書体は未対応）、手元の next dev では Zen 書体の取得に失敗することがある（本番ビルドは同梱を確認済み）。
 - **2026-10-06 ペルソナ壁打ち PDCA の修正を統合（Claude・ブランチ pdca/integ・未 push）**: ペルソナ壁打ち監査の修正と QA レビュー指摘（M1〜M3・L1〜L7）への対応を 1 本に統合。
   - **バックエンド**:
     - マイグレーション 0047（`password_reset_tokens`）・0048（`users.agreed_terms_version`＝VARCHAR(32)・`users.agreed_at`＝timestamptz。NULL 可・backfill なし・再同意は求めない）とパスワード再設定（依頼者・業者）の導入。
