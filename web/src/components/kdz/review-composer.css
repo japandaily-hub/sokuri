@@ -175,7 +175,7 @@
   line-height: 1.75;
   transition: border-color .2s, box-shadow .2s;
 }
-.kdz-review-composer__textarea::placeholder { color: #bcc3d4; }
+.kdz-review-composer__textarea::placeholder { color: var(--body-soft); }
 .kdz-review-composer__textarea:focus {
   border-color: var(--blue);
   background: var(--white);

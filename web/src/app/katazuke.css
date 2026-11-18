@@ -515,7 +515,7 @@ html.js-rv .rv[data-d="3"]{transition-delay:.24s;}
 img[data-ph]{position:relative;}
 .ph-wrap{position:relative;}
 .imgph{position:absolute;inset:0;display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center;
-  background:repeating-linear-gradient(135deg,#f6f8f4 0 14px,#eff3ef 14px 28px);color:var(--body-soft);text-align:center;padding:14px;}
+  background:repeating-linear-gradient(135deg,var(--paper) 0 14px,var(--paper-2) 14px 28px);color:var(--body-soft);text-align:center;padding:14px;}
 .imgph .ic{font-size:30px;opacity:.7;}
 .imgph small{font-size:15px;font-weight:400;letter-spacing:.02em;line-height:1.6;}
 
@@ -562,3 +562,6 @@ img[data-ph]{position:relative;}
 }
 /* 安全弁（e2e 01 mobile 375px の横スクロール再発防止）: 480px 以下では長いラベルのゴーストボタンを折り返し可能にし、版面幅を越えさせない */
 @media (max-width:480px){ .btn.btn-ghost{white-space:normal;max-width:100%;line-height:1.4;} }
+/* スクロールバーの色（globals.css の直書き #cfd6cc は globals を触らない方針のため、ここで上書きする。globals の規則は @layer の外で、layer 内のこの規則より通常は強い。!important で layer の優先順を逆転させて勝たせる） */
+*{scrollbar-color:var(--line-strong) transparent !important;}
+*::-webkit-scrollbar-thumb{background-color:var(--line-strong) !important;}

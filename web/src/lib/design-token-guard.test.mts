@@ -31,6 +31,13 @@ const BANNED: ReadonlyArray<readonly [string, RegExp, string]> = [
   ["Libre Baskerville", /Libre Baskerville/, "旧英字ディスプレイ書体"],
   ["Noto_Serif_JP", /Noto_Serif_JP/, "旧明朝。和文は --maru（見出し）/ --goth（本文）"],
   ["Noto Serif", /Noto Serif/, "旧明朝。和文は --maru（見出し）/ --goth（本文）"],
+  ["#dc2626", /#dc2626/i, "旧赤。--danger を参照する"],
+  ["#bcc3d4", /#bcc3d4/i, "旧 placeholder の青灰。--body-soft を参照する"],
+  ["#f6f8f4", /#f6f8f4/i, "旧緑灰。--paper を参照する"],
+  ["#eff3ef", /#eff3ef/i, "旧緑灰。--paper-2 を参照する"],
+  ["#e8faf0", /#e8faf0/i, "旧ミント。--mint を参照する"],
+  ["#e4f7ed", /#e4f7ed/i, "旧ミント。--mint を参照する"],
+  ["#d0f0e0", /#d0f0e0/i, "旧ミント。--mint を参照する"],
   ["border-radius:99px", /border-radius:\s*99px/, "ピル形は廃止。角丸は --radius（6px）/ --radius-s（4px）"],
 ];
 

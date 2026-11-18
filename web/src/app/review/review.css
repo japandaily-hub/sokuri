@@ -13,7 +13,7 @@
 
 /* ── 完了バナー ── */
 .review-page .done-banner {
-  background: linear-gradient(135deg, #e4f7ed, #d0f0e0);
+  background: var(--mint);
   border: 1.5px solid rgba(31, 138, 91, .2); border-radius: var(--radius);
   padding: 24px 20px; text-align: center; margin-bottom: 24px;
   display: flex; flex-direction: column; align-items: center; gap: 12px;

@@ -211,7 +211,7 @@ export default function AdminTransactionsPage() {
                         <button
                           type="button"
                           className={`${btnSecondary} ml-2`}
-                          style={{ borderColor: "#dc2626", color: "#dc2626" }}
+                          style={{ borderColor: "var(--danger)", color: "var(--danger)" }}
                           onClick={() => {
                             setCancelModalError(null);
                             setCancelTarget(t);
