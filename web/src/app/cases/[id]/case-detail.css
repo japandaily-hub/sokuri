@@ -1,0 +1,271 @@
+/* ============================================================
+   依頼者の案件詳細（/cases/[id]）固有CSS。見本 v12「② 案件詳細」に合わせる。
+   接頭辞は cd-。共通トークン（katazuke.css :root）だけを参照し、色・寸法の直書きをしない。
+   範囲: パンくず・題目・進み具合・2列・品物・入札・押したあとの説明。
+   取引パネル・減額申請・評価・取り下げは構造を変えず、Tailwind の kdz-* で page.tsx に書く。
+   ============================================================ */
+
+.cd-wrap {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: clamp(20px, 4vw, 40px) var(--container-pad, 24px) clamp(56px, 8vw, 104px);
+}
+
+/* ---- パンくず・題目 ---- */
+.cd-crumb {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 .6em;
+  font-size: 15px;
+  color: var(--body-soft);
+  margin: 0 0 10px;
+}
+.cd-crumb a { color: var(--body-soft); text-decoration: underline; text-underline-offset: 3px; }
+.cd-crumb a:hover { color: var(--primary); }
+.cd-crumb [aria-current="page"] { color: var(--body-soft); }
+
+.cd-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+}
+.cd-title h1 {
+  margin: 0;
+  font-family: var(--maru);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--ink);
+}
+.cd-housing { margin: 4px 0 0; font-size: 15px; color: var(--body-soft); }
+.cd-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  font-size: 15px;
+  color: var(--body);
+}
+.cd-notice {
+  margin-top: 16px;
+  padding: 14px 16px;
+  font-size: 15px;
+  line-height: 1.8;
+  color: var(--body);
+  background: var(--paper-2);
+  border-radius: var(--radius);
+}
+
+/* ---- 進み具合（4段） ---- */
+.cd-stepper {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin: 12px 0 24px;
+  padding: 0;
+  list-style: none;
+}
+.cd-stepper__step {
+  position: relative;
+  padding-top: 24px;
+  font-size: 15px;
+  color: var(--body-soft);
+}
+.cd-stepper__step::before {
+  content: "";
+  position: absolute;
+  top: 6px;
+  left: 14px;
+  right: 0;
+  height: 2px;
+  background: var(--line);
+}
+.cd-stepper__step:last-child::before { display: none; }
+.cd-stepper__step::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 14px;
+  height: 14px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: var(--white);
+  border: 2px solid var(--line-strong);
+}
+.cd-stepper__step--done::before { background: var(--primary); }
+.cd-stepper__step--done::after { background: var(--primary); border-color: var(--primary); }
+.cd-stepper__step--now { color: var(--ink); font-weight: 700; }
+.cd-stepper__step--now::after { border-color: var(--primary); box-shadow: 0 0 0 4px var(--indigo-tint); }
+.cd-stepper__short { display: none; }
+@media (max-width: 560px) {
+  .cd-stepper__step { white-space: nowrap; }
+  .cd-stepper__full { display: none; }
+  .cd-stepper__short { display: inline; }
+}
+
+/* ---- 2列（左 4fr 品物 / 右 7fr 入札）。900px 以下は1列で入札を先に ---- */
+.cd-grid {
+  display: grid;
+  grid-template-columns: 4fr 7fr;
+  gap: 64px;
+  align-items: start;
+}
+.cd-grid--solo { grid-template-columns: minmax(0, 1fr); max-width: 760px; }
+.cd-items-col, .cd-bids-col { min-width: 0; }
+@media (max-width: 900px) {
+  .cd-grid { grid-template-columns: minmax(0, 1fr); gap: 48px; }
+  .cd-grid .cd-items-col { order: 2; }
+}
+
+.cd-h-sm {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0 0 4px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ink);
+  font-family: var(--goth);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--ink);
+}
+.cd-h-sm > span { font-weight: 400; font-size: 15px; color: var(--body-soft); }
+.cd-num { font-family: var(--num); }
+
+/* ---- 品物 ---- */
+.cd-items { list-style: none; margin: 0; padding: 0; }
+.cd-item { padding: 12px 0; border-bottom: 1px solid var(--line); }
+.cd-item[hidden] { display: none; }
+.cd-item__row {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  gap: 14px;
+  align-items: center;
+}
+.cd-item__thumb {
+  display: block;
+  width: 56px;
+  height: 56px;
+  overflow: hidden;
+  border-radius: var(--radius-s);
+  background: var(--paper-2);
+}
+.cd-item__thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.cd-item__name { min-width: 0; overflow-wrap: anywhere; color: var(--ink); }
+.cd-item__cat { font-size: 14px; color: var(--body-soft); white-space: nowrap; }
+.cd-item__desc { margin: 8px 0 0 70px; font-size: 15px; line-height: 1.7; color: var(--body-soft); }
+.cd-item__tools { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0 70px; }
+.cd-items-more {
+  display: block;
+  width: 100%;
+  padding: 14px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--primary);
+  text-align: center;
+  cursor: pointer;
+}
+.cd-items-more:hover { text-decoration: underline; text-underline-offset: 3px; }
+.cd-items-more:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* ---- 入札 ---- */
+.cd-bids { list-style: none; margin: 0; padding: 0; }
+.cd-bid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px 24px;
+  align-items: start;
+  padding: 26px 0;
+  border-bottom: 1px solid var(--line);
+}
+.cd-bid__who { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; }
+.cd-bid__name { font-size: 18px; font-weight: 700; color: var(--ink); overflow-wrap: anywhere; }
+.cd-bid__mark {
+  padding: 1px 8px;
+  border-radius: var(--radius-s);
+  background: var(--paper-2);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.cd-bid__facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 14px;
+  margin: 8px 0 0;
+  font-size: 16px;
+}
+.cd-bid__facts dt { color: var(--body-soft); }
+.cd-bid__facts dd { margin: 0; color: var(--body); min-width: 0; }
+.cd-bid__soft { margin-left: .4em; font-size: 15px; color: var(--body-soft); }
+.cd-bid__voice { display: block; margin-top: 2px; font-size: 15px; line-height: 1.7; color: var(--ink); overflow-wrap: anywhere; }
+.cd-bid__link {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.cd-bid__message { margin: 8px 0 0; max-width: 32em; font-size: 15px; line-height: 1.8; color: var(--body); overflow-wrap: anywhere; }
+.cd-bid__alert { margin: 8px 0 0; max-width: 32em; font-size: 15px; font-weight: 700; line-height: 1.7; color: var(--danger); }
+.cd-bid__price { text-align: right; }
+.cd-bid__price p { margin: 0; }
+.cd-bid__amount {
+  font-family: var(--num);
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -.01em;
+  color: var(--ink);
+  white-space: nowrap;
+}
+/* 朱はいちばん高い入札の数字だけ（入札が2件以上のとき） */
+.cd-bid--top .cd-bid__amount { color: var(--accent); }
+.cd-bid__basis { font-size: 15px; color: var(--body); }
+.cd-bid__revised {
+  display: inline-block;
+  margin-top: 6px !important;
+  padding: 1px 8px;
+  border-radius: var(--radius-s);
+  background: var(--paper-2);
+  font-size: 14px;
+  color: var(--body-soft);
+}
+.cd-bid__act { grid-column: 1 / -1; display: flex; justify-content: flex-end; }
+.cd-bid__act > button { min-height: 48px; font-size: 16px; padding-left: 24px; padding-right: 24px; }
+.cd-empty { margin: 16px 0 0; font-size: 16px; line-height: 1.8; color: var(--body-soft); }
+
+/* ---- 押したあとの説明・注記 ---- */
+.cd-after {
+  margin-top: 28px;
+  padding: 20px 24px;
+  border-radius: var(--radius);
+  background: var(--paper-2);
+}
+.cd-after h3 { margin: 0 0 6px; font-family: var(--goth); font-size: 16px; font-weight: 700; color: var(--ink); }
+.cd-after ol { margin: 0; padding-left: 1.3em; font-size: 16px; line-height: 1.8; color: var(--body); }
+.cd-after li + li { margin-top: 2px; }
+.cd-note { margin: 16px 0 0; font-size: 16px; line-height: 1.8; color: var(--body-soft); }
+
+/* ---- 下段（取引パネル等）は従来の幅（760px）に収める ---- */
+.cd-rest { max-width: var(--maxw-text); }
+
+@media (max-width: 560px) {
+  .cd-title h1 { font-size: 24px; }
+  .cd-bid { grid-template-columns: 1fr; padding: 22px 0; }
+  .cd-bid__price { text-align: left; }
+  .cd-bid__act > button { width: 100%; }
+  .cd-bid__facts { grid-template-columns: 5em 1fr; gap: 2px 8px; }
+  .cd-after { padding: 18px; }
+  .cd-item__desc, .cd-item__tools { margin-left: 0; }
+}

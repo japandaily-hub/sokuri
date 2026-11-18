@@ -40,8 +40,8 @@ test("依頼者が入札を選定すると成約パネルが出る", async ({ pa
   await card.click();
   await page.waitForURL(`**/cases/${caseId}`);
 
-  // 入札一覧が出ていること。
-  await expect(page.getByRole("heading", { name: /入札一覧/ })).toBeVisible();
+  // 届いた入札の一覧が出ていること。
+  await expect(page.getByRole("heading", { name: /届いた入札/ })).toBeVisible();
 
   // 対象入札（業者A＝ensureOpenCaseWithBid が返した入札）の行の「この業者に決める」を押す。
   // 一覧は金額の高い順に並ぶため（シードの案件1は業者B 45,000 円が業者A 30,000 円より上）、

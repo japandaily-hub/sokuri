@@ -2,6 +2,8 @@
  * 依頼者の案件詳細（/cases/[id]）で使う純関数。画面から切り出して単体テストできるようにしたもの。
  */
 
+import type { CaseStatus, TransactionStatus } from "./katadzuke-api.ts";
+
 /** 案件 ID（UUID）の形式。形式違いは API を叩かず専用表示にする。 */
 export const CASE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -52,4 +54,44 @@ export function isCompletionBeforeVisit(visitDate: string | null, todayJst: stri
   if (visitDate == null) return true;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(visitDate)) return true;
   return visitDate > todayJst;
+}
+
+/** 進み具合の4段（見本 v12 ② 案件詳細）。short は幅の狭い画面で使う短い名前（同じなら全幅と同じ）。 */
+export const CASE_PROGRESS_STEPS: ReadonlyArray<{ full: string; short: string }> = [
+  { full: "出品", short: "出品" },
+  { full: "業者を選ぶ", short: "業者選び" },
+  { full: "日程を決める", short: "日程" },
+  { full: "引き取り", short: "引き取り" },
+];
+
+/** 進み具合の「全部済み」を表す値（CASE_PROGRESS_STEPS.length）。 */
+export const CASE_PROGRESS_ALL_DONE = CASE_PROGRESS_STEPS.length;
+
+/**
+ * 進み具合のうち「いま」の段（0=出品 / 1=業者を選ぶ / 2=日程を決める / 3=引き取り）を返す。
+ * それより前は済み、後は未。4（CASE_PROGRESS_ALL_DONE）は全部済み。
+ * 取り下げ・キャンセル（案件・取引のどちらも）は流れから外れたので null（進み具合を出さない）。
+ * - 取引なし: draft=出品の途中 / open・bidding=業者を選ぶ / closed（取引が未取得）=日程を決める
+ * - 取引あり: 日程未確定（visit_date なし・visiting でない）=日程を決める / 日程確定=引き取り / 完了=全部済み
+ */
+export function caseProgressStep(
+  caseStatus: CaseStatus,
+  txn: { status: TransactionStatus; visit_date: string | null } | null,
+): number | null {
+  if (txn) {
+    if (txn.status === "cancelled") return null;
+    if (txn.status === "completed") return CASE_PROGRESS_ALL_DONE;
+    return txn.visit_date != null || txn.status === "visiting" ? 3 : 2;
+  }
+  switch (caseStatus) {
+    case "draft":
+      return 0;
+    case "open":
+    case "bidding":
+      return 1;
+    case "closed":
+      return 2;
+    case "cancelled":
+      return null;
+  }
 }

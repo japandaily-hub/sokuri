@@ -3,7 +3,7 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildHousingAttributes, isCaseIdFormat, isCompletionBeforeVisit, meaningfulCaseSummary } from "./case-detail-view.ts";
+import { CASE_PROGRESS_ALL_DONE, CASE_PROGRESS_STEPS, buildHousingAttributes, caseProgressStep, isCaseIdFormat, isCompletionBeforeVisit, meaningfulCaseSummary } from "./case-detail-view.ts";
 
 test("案件IDはUUID形式のみ受け付ける", () => {
   assert.equal(isCaseIdFormat("c1358ff2-7d6a-4c1e-9d3a-0123456789ab"), true);
@@ -52,4 +52,35 @@ test("案件の説明: 定型（詳細は写真を確認してください）・
     meaningfulCaseSummary("利用目的: 引っ越し。写真 2 枚。詳細は写真を確認してください。背面に傷があります。"),
     "利用目的: 引っ越し。写真 2 枚。詳細は写真を確認してください。背面に傷があります。",
   );
+});
+
+test("進み具合: 状態ごとの「いまの段」（取り下げ・キャンセルは出さない）", () => {
+  const cases: Array<[string, Parameters<typeof caseProgressStep>, number | null]> = [
+    ["下書き・取引なし", ["draft", null], 0],
+    ["入札受付中・取引なし", ["open", null], 1],
+    ["入札あり・取引なし", ["bidding", null], 1],
+    ["業者決定済み・取引が未取得", ["closed", null], 2],
+    ["取り下げ・取引なし", ["cancelled", null], null],
+    ["日程未確定（pending・日付なし）", ["closed", { status: "pending", visit_date: null }], 2],
+    ["日程確定（visiting）", ["closed", { status: "visiting", visit_date: "2026-12-01" }], 3],
+    ["日付だけ入っている pending", ["closed", { status: "pending", visit_date: "2026-12-01" }], 3],
+    ["完了", ["closed", { status: "completed", visit_date: "2026-12-01" }], CASE_PROGRESS_ALL_DONE],
+    ["成約後キャンセル（取引 cancelled・案件も cancelled）", ["cancelled", { status: "cancelled", visit_date: null }], null],
+    ["取引だけ cancelled", ["closed", { status: "cancelled", visit_date: null }], null],
+  ];
+  for (const [label, args, expected] of cases) {
+    assert.equal(caseProgressStep(...args), expected, label);
+  }
+});
+
+test("進み具合: 4段の名前（SP の短い名前を含む）", () => {
+  assert.deepEqual(
+    CASE_PROGRESS_STEPS.map((s) => s.full),
+    ["出品", "業者を選ぶ", "日程を決める", "引き取り"],
+  );
+  assert.deepEqual(
+    CASE_PROGRESS_STEPS.map((s) => s.short),
+    ["出品", "業者選び", "日程", "引き取り"],
+  );
+  assert.equal(CASE_PROGRESS_ALL_DONE, 4);
 });

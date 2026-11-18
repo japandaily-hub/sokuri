@@ -17,7 +17,8 @@ import { ConfirmModal } from "@/components/kdz/ConfirmModal";
 import { formatJstDateTime } from "@/lib/datetime";
 import { formatVisitSchedule } from "@/lib/categories";
 import { jstTodayIso } from "@/lib/visit-slots";
-import { buildHousingAttributes, isCaseIdFormat, isCompletionBeforeVisit, meaningfulCaseSummary } from "@/lib/case-detail-view";
+import "./case-detail.css";
+import { CASE_PROGRESS_STEPS, buildHousingAttributes, caseProgressStep, isCaseIdFormat, isCompletionBeforeVisit, meaningfulCaseSummary } from "@/lib/case-detail-view";
 import { formatPurposeLabel } from "@/lib/case-labels";
 import {
   Card,
@@ -72,6 +73,9 @@ const CANCELLABLE_CASE_STATUSES = new Set(["open", "bidding"]);
 /** 確認ダイアログの「閉じる」ボタンの語。実行ボタン（「キャンセルする」等）と紛れないよう「キャンセル」は使わない。 */
 const CONFIRM_DISMISS_LABEL = "やめる";
 
+/** 品物一覧で最初から見せる件数（見本 v12）。それ以降は「ほか N 点を見る」で開く。 */
+const CD_ITEMS_PREVIEW = 4;
+
 /** window.confirm の代わりに表示する ConfirmModal の内容（r8-fix-frontend）。
  *  r10-M8 是正: 取り下げ・キャンセルの理由入力は window.prompt をやめ、withReason/reasonRequired で
  *  ConfirmModal に統合する（onConfirm が入力済みの理由を受け取る）。 */
@@ -110,6 +114,8 @@ export default function UserCaseDetailPage() {
   /** 成約後チャットをこの画面内にインライン展開しているか（既定で開く=別ページ遷移なしで
    *  「業者を選ぶ→そのままチャットで会話開始」を完結させる。r-chat-inline 対応）。 */
   const [chatOpen, setChatOpen] = useState(true);
+  /** 品物一覧の「ほか N 点を見る」を開いているか。 */
+  const [itemsExpanded, setItemsExpanded] = useState(false);
 
   // ===== 品物の編集/削除・写真の追加/削除 =====
   // busyOps は進行中の操作キー集合。キー形式は "item:{itemId}:save" / "item:{itemId}:delete" /
@@ -480,10 +486,18 @@ export default function UserCaseDetailPage() {
   // 訪問予定日より前（または日程未定）に完了確定しようとしていないか（日本時間の今日と比較）。
   const completionBeforeVisit = txn != null && isCompletionBeforeVisit(txn.visit_date, jstTodayIso());
 
+  // 品物一覧（見本 v12: 4件まで見せ、残りは「ほか N 点を見る」で開く）。
+  const albums = toAlbums(caseData);
+  const itemCount = albums.filter((a) => a.id !== null).length || albums.length;
+  const hiddenAlbumCount = Math.max(0, albums.length - CD_ITEMS_PREVIEW);
+  /** 進み具合（取り下げ・キャンセルは null＝出さない）。 */
+  const progressStep = caseProgressStep(caseData.status, txn);
+  const showBids = !txn && caseData.status !== "cancelled";
+
   return (
     <>
     <AppHeader />
-    <div className="container-aw max-w-3xl space-y-6 py-10">
+    <div className="cd-wrap space-y-6">
       {/* 取り下げ済みの案件に「受け付けました」を残すと矛盾するため、受付中の案件だけに出す。 */}
       {search.get("created") && caseData.status !== "cancelled" ? (
         <Notice tone="success">
@@ -497,392 +511,455 @@ export default function UserCaseDetailPage() {
       ) : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
 
-      {/* ===== 案件情報 ===== */}
-      <Card>
-        <div className="flex items-start justify-between gap-3">
+      {/* ===== 題目（見本 v12 ② 案件詳細） ===== */}
+      <div>
+        <nav aria-label="パンくず" className="cd-crumb">
+          <Link href="/cases">マイ案件一覧</Link>
+          <span aria-hidden="true">／</span>
+          <span aria-current="page">{formatPurposeLabel(caseData.purpose)}</span>
+        </nav>
+        <div className="cd-title">
           <div>
-            <h1 className="text-xl font-normal text-slate-900">{formatPurposeLabel(caseData.purpose)}</h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <h1>{formatPurposeLabel(caseData.purpose)}</h1>
+            {housingAttributes.length > 0 ? <p className="cd-housing">{housingAttributes.join(" / ")}</p> : null}
+          </div>
+          <div className="cd-meta">
+            <span>
               {caseData.prefecture} {caseData.city}
               {caseData.address_detail ? ` ${caseData.address_detail}` : ""}
-            </p>
-            {housingAttributes.length > 0 ? (
-              <p className="mt-0.5 text-xs text-slate-400">{housingAttributes.join(" / ")}</p>
-            ) : null}
+            </span>
+            <StatusBadge
+              value={caseData.status}
+              label={caseData.status === "cancelled" && !txn ? "取り下げ済み" : CASE_STATUS_LABEL[caseData.status]}
+            />
           </div>
-          <StatusBadge
-            value={caseData.status}
-            label={caseData.status === "cancelled" && !txn ? "取り下げ済み" : CASE_STATUS_LABEL[caseData.status]}
-          />
         </div>
         {caseData.status === "cancelled" ? (
-          <div className="mt-3 w-full rounded-none border border-slate-200 bg-slate-50 p-3 text-sm leading-relaxed text-slate-600" role="status">
+          <div className="cd-notice" role="status">
             {/* r8-fix-frontend2 M2/ADD-1 是正: 成約後キャンセル（txn が存在）と
                 出品の取り下げ（txn が存在しない）で経緯が異なるため文言を分岐する。
                 従来は成約キャンセルにも「取り下げ済み」「入札を自動でお断り」という
-                事実に反する文言が出ていた。
-                r10-M1 是正: flex 行の子だった案内ブロックを行の外へ移し、375px で潰れないようにする。 */}
+                事実に反する文言が出ていた。 */}
             {txn
               ? "取引はキャンセルされました。必要であれば新しく出品してください。"
               : "この出品は取り下げ済みです。届いていた入札はすべて自動でお断りになりました。再度依頼する場合は「出品する」から新しく出品してください。"}
           </div>
         ) : null}
+      </div>
 
-        {toAlbums(caseData).map((album) => {
-          const item = album.id ? (caseData.items?.find((it) => it.id === album.id) ?? null) : null;
-          const isEditing = item != null && editingItemId === item.id;
-          const isSavingItem = item != null && busyOps.has(`item:${item.id}:save`);
-          const isResettingItem = item != null && busyOps.has(`item:${item.id}:reset`);
-          const isDeletingItem = item != null && busyOps.has(`item:${item.id}:delete`);
-          const isUploadingItem = item != null && busyOps.has(`item:${item.id}:upload`);
-          const itemAnyBusy = item != null && isItemBusy(item.id);
-          // AI推定値そのものが無ければ「AI推定に戻す」を出しても戻す先が無いため無効化する。
-          const hasAiFallback = item != null && (item.ai_condition != null || item.ai_summary != null);
+      {progressStep !== null ? (
+        <ol className="cd-stepper" aria-label="進み具合">
+          {CASE_PROGRESS_STEPS.map((step, index) => {
+            const state = index < progressStep ? "done" : index === progressStep ? "now" : "todo";
+            return (
+              <li key={step.full} className={`cd-stepper__step cd-stepper__step--${state}`} aria-current={state === "now" ? "step" : undefined}>
+                {step.short !== step.full ? (
+                  <>
+                    <span className="cd-stepper__full">{step.full}</span>
+                    <span className="cd-stepper__short" aria-hidden="true">{step.short}</span>
+                  </>
+                ) : (
+                  step.full
+                )}
+                {state === "done" ? <span className="sr-only">（済み）</span> : null}
+              </li>
+            );
+          })}
+        </ol>
+      ) : null}
 
-          return (
-            <div key={album.id ?? "unassigned"} className="mt-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  {album.title ? (
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-normal text-slate-900">{album.title}</p>
-                      {album.condition ? (
-                        <span className="rounded-none bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
-                          {CASE_ITEM_CONDITION_LABEL[album.condition] ?? album.condition}
-                        </span>
+      <div className={showBids ? "cd-grid" : "cd-grid cd-grid--solo"}>
+        {/* ===== 品物（左 4fr） ===== */}
+        <section className="cd-items-col" aria-labelledby="cd-items-heading">
+          <h2 className="cd-h-sm" id="cd-items-heading">
+            出品した品物
+            <span>
+              <span className="cd-num">{itemCount}</span>点
+            </span>
+          </h2>
+          <ul className="cd-items">
+            {albums.map((album, albumIndex) => {
+              const item = album.id ? (caseData.items?.find((it) => it.id === album.id) ?? null) : null;
+              const isEditing = item != null && editingItemId === item.id;
+              const isSavingItem = item != null && busyOps.has(`item:${item.id}:save`);
+              const isResettingItem = item != null && busyOps.has(`item:${item.id}:reset`);
+              const isDeletingItem = item != null && busyOps.has(`item:${item.id}:delete`);
+              const isUploadingItem = item != null && busyOps.has(`item:${item.id}:upload`);
+              const itemAnyBusy = item != null && isItemBusy(item.id);
+              // AI推定値そのものが無ければ「AI推定に戻す」を出しても戻す先が無いため無効化する。
+              const hasAiFallback = item != null && (item.ai_condition != null || item.ai_summary != null);
+              // 折りたたみ中でも、編集中の品物は隠さない。
+              const isFolded = albumIndex >= CD_ITEMS_PREVIEW && !itemsExpanded && !isEditing;
+              const thumb = album.photos[0];
+              const summary = meaningfulCaseSummary(album.description);
+
+              return (
+                <li key={album.id ?? "unassigned"} className="cd-item" hidden={isFolded}>
+                  <div className="cd-item__row">
+                    <span className="cd-item__thumb">
+                      {thumb ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={photoSrc(thumb.url)} alt="" />
                       ) : null}
+                    </span>
+                    <span className="cd-item__name">{album.title ?? "写真"}</span>
+                    {album.condition ? (
+                      <span className="cd-item__cat">{CASE_ITEM_CONDITION_LABEL[album.condition] ?? album.condition}</span>
+                    ) : null}
+                  </div>
+                  {summary ? <p className="cd-item__desc">{summary}</p> : null}
+
+                  {item && canEditCase ? (
+                    <div className="cd-item__tools">
+                      {!isEditing ? (
+                        <button
+                          type="button"
+                          disabled={itemAnyBusy}
+                          onClick={() => startEditItem(item)}
+                          className={btnSecondary}
+                        >
+                          編集
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        disabled={itemAnyBusy}
+                        onClick={() => triggerAddPhoto(item.id)}
+                        className={btnSecondary}
+                      >
+                        {isUploadingItem ? "アップロード中…" : "＋ 写真を追加"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={itemAnyBusy}
+                        onClick={() => handleDeleteItem(item)}
+                        className={btnDanger}
+                      >
+                        {isDeletingItem ? "削除中…" : "品物を削除"}
+                      </button>
                     </div>
                   ) : null}
-                  {meaningfulCaseSummary(album.description) ? (
-                    <p className="mt-0.5 text-xs leading-relaxed text-slate-500">{meaningfulCaseSummary(album.description)}</p>
-                  ) : null}
-                </div>
-                {item && canEditCase && !isEditing ? (
+
+          {isEditing && item ? (
+            <div className="mt-2 space-y-3 rounded-kdz border border-kdz-line bg-kdz-pale p-4">
+              {editError ? <p className="text-xs font-semibold text-kdz-danger">{editError}</p> : null}
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-kdz-bodysoft">品物名</label>
+                <input
+                  type="text"
+                  maxLength={40}
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="例: 洗濯機 / ソファ"
+                  className={inputBase}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-kdz-bodysoft">状態</label>
+                <select
+                  value={editCondition}
+                  onChange={(e) => setEditCondition(e.target.value)}
+                  className={inputBase}
+                >
+                  {Object.entries(CASE_ITEM_CONDITION_LABEL).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-kdz-bodysoft">説明</label>
+                <textarea
+                  value={editDescription}
+                  maxLength={500}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  rows={3}
+                  className={inputBase}
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={isSavingItem || isResettingItem}
+                  onClick={() => saveEditItem(item)}
+                  className={btnPrimary}
+                >
+                  {isSavingItem ? "保存中…" : "保存"}
+                </button>
+                <button
+                  type="button"
+                  disabled={isSavingItem || isResettingItem}
+                  onClick={cancelEditItem}
+                  className={btnSecondary}
+                >
+                  編集をやめる
+                </button>
+                {hasAiFallback ? (
                   <button
                     type="button"
-                    disabled={itemAnyBusy}
-                    onClick={() => startEditItem(item)}
-                    className={btnSecondary}
+                    disabled={isSavingItem || isResettingItem}
+                    onClick={() => resetEditItemToAi(item)}
+                    className="inline-flex items-center text-sm font-semibold text-kdz-bodysoft hover:underline disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    編集
+                    {isResettingItem ? "リセット中…" : "自動で付けた内容に戻す"}
                   </button>
                 ) : null}
               </div>
-
-              {isEditing && item ? (
-                <div className="mt-2 space-y-3 rounded-none border border-slate-200 bg-slate-50 p-4">
-                  {editError ? <p className="text-xs font-semibold text-red-600">{editError}</p> : null}
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold text-slate-500">品物名</label>
-                    <input
-                      type="text"
-                      maxLength={40}
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      placeholder="例: 洗濯機 / ソファ"
-                      className={inputBase}
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold text-slate-500">状態</label>
-                    <select
-                      value={editCondition}
-                      onChange={(e) => setEditCondition(e.target.value)}
-                      className={inputBase}
-                    >
-                      {Object.entries(CASE_ITEM_CONDITION_LABEL).map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold text-slate-500">説明</label>
-                    <textarea
-                      value={editDescription}
-                      maxLength={500}
-                      onChange={(e) => setEditDescription(e.target.value)}
-                      rows={3}
-                      className={inputBase}
-                    />
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      disabled={isSavingItem || isResettingItem}
-                      onClick={() => saveEditItem(item)}
-                      className={btnPrimary}
-                    >
-                      {isSavingItem ? "保存中…" : "保存"}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isSavingItem || isResettingItem}
-                      onClick={cancelEditItem}
-                      className={btnSecondary}
-                    >
-                      編集をやめる
-                    </button>
-                    {hasAiFallback ? (
-                      <button
-                        type="button"
-                        disabled={isSavingItem || isResettingItem}
-                        onClick={() => resetEditItemToAi(item)}
-                        className="inline-flex items-center text-sm font-semibold text-slate-500 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {isResettingItem ? "リセット中…" : "自動で付けた内容に戻す"}
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
-
-              <ul className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-5">
-                {album.photos.map((p) => {
-                  const isDeletingPhoto = busyOps.has(`photo:${p.id}:delete`);
-                  return (
-                    <li key={p.id} className="group relative">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={photoSrc(p.url)}
-                        alt=""
-                        className="aspect-square w-full rounded-none border border-slate-200 object-cover"
-                      />
-                      {canEditCase ? (
-                        <button
-                          type="button"
-                          aria-label="この写真を削除"
-                          disabled={isDeletingPhoto}
-                          onClick={() => handleDeletePhoto(p.id)}
-                          className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-slate-900/70 text-white opacity-0 transition-opacity focus:opacity-100 disabled:opacity-100 group-hover:opacity-100"
-                        >
-                          {isDeletingPhoto ? (
-                            <Spinner className="h-3 w-3" />
-                          ) : (
-                            <Icon name="close" className="h-3.5 w-3.5" strokeWidth={2.5} />
-                          )}
-                        </button>
-                      ) : null}
-                    </li>
-                  );
-                })}
-              </ul>
-
-              {item && canEditCase ? (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    disabled={itemAnyBusy}
-                    onClick={() => triggerAddPhoto(item.id)}
-                    className={btnSecondary}
-                  >
-                    {isUploadingItem ? "アップロード中…" : "＋ 写真を追加"}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={itemAnyBusy}
-                    onClick={() => handleDeleteItem(item)}
-                    className={btnDanger}
-                  >
-                    {isDeletingItem ? "削除中…" : "品物を削除"}
-                  </button>
-                </div>
-              ) : null}
             </div>
-          );
-        })}
+          ) : null}
 
-        <input
-          ref={addPhotoInputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          multiple
-          className="hidden"
-          onChange={handleAddPhotoFilesSelected}
-        />
-
-        {caseData.ai_status === "pending" && aiPollTimedOut ? (
-          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-none bg-slate-50 p-4" role="status">
-            <p className="text-sm leading-relaxed text-slate-600">
-              説明の作成に時間がかかっています。ページを再読み込みしてください。
-            </p>
-            <button type="button" onClick={() => window.location.reload()} className={btnSecondary}>
-              再読み込み
-            </button>
-          </div>
-        ) : caseData.ai_status === "pending" ? (
-          <div className="mt-4 flex items-center gap-2 rounded-none bg-slate-50 p-4" role="status">
-            <Spinner className="h-4 w-4 text-brand-600" />
-            <p className="text-sm leading-relaxed text-slate-600">
-              写真をもとに品物の説明を作っています（通常1〜2分）。この画面は自動で更新されます。
-            </p>
-          </div>
-        ) : caseData.ai_status === "failed" ? (
-          <div className="mt-4 rounded-none bg-slate-50 p-4">
-            <p className="text-sm leading-relaxed text-slate-600">
-              品物の説明を自動で作れませんでした。写真と入力内容で入札を受け付けます。
-            </p>
-          </div>
-        ) : meaningfulCaseSummary(caseData.ai_summary) ? (
-          <div className="mt-4 rounded-none bg-slate-50 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-              品物の説明（業者に表示されます）
-            </p>
-            <p className="mt-1.5 text-sm leading-relaxed text-slate-700">
-              {meaningfulCaseSummary(caseData.ai_summary)}
-            </p>
-          </div>
-        ) : null}
-      </Card>
-
-      {/* ===== 入札一覧 ===== */}
-      {!txn && caseData.status !== "cancelled" && (
-        <Card>
-          <h2 className="font-normal text-slate-900">入札一覧（{activeBids.length} 件）</h2>
-          {activeBids.length === 0 ? (
-            <p className="mt-3 text-sm text-slate-500">
-              まだ入札がありません。入札が届くと、LINE連携済みの方はLINEで、未連携の方はメールでお知らせします。
-            </p>
-          ) : (
-            <ul className="mt-4 space-y-3">
-              {sortedActiveBids.map((b) => (
-                <li
-                  key={b.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-none border border-slate-200 p-4"
-                >
-                  <div>
-                    <p className="font-normal text-slate-900">
-                      {b.operator?.company_name ?? "業者"}
-                      {b.operator != null && b.operator.review_count > 0 ? (
-                        <span className="ml-2 text-xs font-semibold text-slate-600">
-                          <span className="inline-block whitespace-nowrap">
-                            {formatVerdictCounts(b.operator.good_count, b.operator.improve_count)}
-                          </span>
-                          <span className="ml-1 font-normal text-slate-500">
-                            （口コミ{b.operator.review_count}件）
-                          </span>
-                        </span>
-                      ) : (
-                        <span className="ml-2 inline-block whitespace-nowrap text-xs text-slate-500">口コミはまだありません</span>
-                      )}
-                      {topBidAmount != null && b.amount === topBidAmount && activeBids.length > 1 ? (
-                        <span className="ml-2 rounded-none bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
-                          {topBidCount > 1 ? "同額で最高額" : "最高額"}
-                        </span>
-                      ) : null}
-                    </p>
-                    {b.operator ? (
-                      <Link
-                        href={`/vendors/${b.operator.id}`}
-                        className="mt-0.5 inline-block text-xs font-semibold text-brand-700 underline underline-offset-2"
-                      >
-                        業者のプロフィール・口コミを見る
-                      </Link>
-                    ) : null}
-                    {b.operator?.latest_review_comment ? (
-                      <p className="mt-1 max-w-md text-xs leading-relaxed text-slate-500">
-                        最新の口コミ: 「{b.operator.latest_review_comment}」
-                      </p>
-                    ) : null}
-                    <p className="mt-0.5 text-lg font-semibold text-brand-700 tabular-nums">
-                      {formatYen(b.amount)}
-                      {b.revision_count > 0 ? (
-                        <span className="ml-2 rounded-none bg-slate-100 px-2 py-0.5 text-xs font-normal text-slate-500 align-middle">
-                          更新あり（{b.revision_count}回）
-                        </span>
-                      ) : null}
-                    </p>
-                    {b.message ? (
-                      <p className="mt-1 max-w-md text-sm leading-relaxed text-slate-600">
-                        {b.message}
-                      </p>
-                    ) : null}
-                    {b.operator_suspended ? (
-                      <p className="mt-2 max-w-md text-xs font-semibold leading-relaxed text-red-600" role="alert">
-                        この業者は現在利用停止中です。運営（
-                        <Link href="/contact" className="underline">
-                          お問い合わせフォーム
-                        </Link>
-                        ）にお問い合わせください。
-                      </p>
-                    ) : null}
-                  </div>
-                  {/* 一覧は activeBids（pending のみ）だが、多層防御として描画直前にも再確認する。 */}
-                  {b.status === "pending" ? (
+                  {/* 写真の一覧・削除は編集中に開く（一覧は 56px のサムネイルに絞ったため）。 */}
+                  {isEditing || item == null ? (
+          <ul className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-5">
+            {album.photos.map((p) => {
+              const isDeletingPhoto = busyOps.has(`photo:${p.id}:delete`);
+              return (
+                <li key={p.id} className="group relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={photoSrc(p.url)}
+                    alt=""
+                    className="aspect-square w-full rounded-kdz border border-kdz-line object-cover"
+                  />
+                  {canEditCase ? (
                     <button
                       type="button"
-                      disabled={busy || b.operator_suspended}
-                      title={b.operator_suspended ? "この業者は現在利用停止中のため選択できません" : undefined}
-                      onClick={() =>
-                        setConfirmState({
-                          title: "この業者に決定しますか？",
-                          message: `${b.operator?.company_name ?? "この業者"}（${formatYen(b.amount)}）に決定しますか？決定すると、他の業者の入札はすべて無効になり、元に戻せません。業者に伝わるのは住所と連絡用のメールアドレスだけです（氏名・電話番号は伝わりません）。決定後も、取引のキャンセルはできます（理由は業者に共有されます）。`,
-                          confirmLabel: "決定する",
-                          onConfirm: () => {
-                            setConfirmState(null);
-                            void act(() => selectBid(caseId, b.id, token!));
-                          },
-                        })
-                      }
-                      className={btnPrimary}
+                      aria-label="この写真を削除"
+                      disabled={isDeletingPhoto}
+                      onClick={() => handleDeletePhoto(p.id)}
+                      className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(var(--deep-rgb),.85)] text-white opacity-0 transition-opacity focus:opacity-100 disabled:opacity-100 group-hover:opacity-100"
                     >
-                      この業者に決める
+                      {isDeletingPhoto ? (
+                        <Spinner className="h-3 w-3" />
+                      ) : (
+                        <Icon name="close" className="h-3.5 w-3.5" strokeWidth={2.5} />
+                      )}
                     </button>
                   ) : null}
                 </li>
-              ))}
-            </ul>
-          )}
-          {canCancelCase ? (
-            <>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => {
-                  if (!token) return;
-                  setConfirmState({
-                    title: "出品を取り下げますか？",
-                    message: "付いている入札はすべて無効になり、元に戻せません。理由の入力は任意です。",
-                    confirmLabel: "取り下げる",
-                    danger: true,
-                    withReason: true,
-                    reasonRequired: false,
-                    reasonLabel: "取り下げの理由（任意）",
-                    onConfirm: (reason) => {
-                      setConfirmState(null);
-                      void act(() => cancelCase(caseId, reason, token));
-                    },
-                  });
-                }}
-                className={`mt-4 ${btnDanger}`}
-              >
-                出品を取り下げる
-              </button>
-              <p className="mt-2 text-xs text-slate-400">
-                ※ 業者を決めた後の取り消しは、取引の画面の一番下にある「この取引をキャンセルする」から行えます。
-              </p>
-            </>
+              );
+            })}
+          </ul>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+          {hiddenAlbumCount > 0 ? (
+            <button
+              type="button"
+              className="cd-items-more"
+              aria-expanded={itemsExpanded}
+              onClick={() => setItemsExpanded((v) => !v)}
+            >
+              {itemsExpanded ? "閉じる" : `ほか ${hiddenAlbumCount} 点を見る`}
+            </button>
           ) : null}
-        </Card>
-      )}
 
+          <input
+            ref={addPhotoInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            multiple
+            className="hidden"
+            onChange={handleAddPhotoFilesSelected}
+          />
+
+      {caseData.ai_status === "pending" && aiPollTimedOut ? (
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-kdz bg-kdz-pale p-4" role="status">
+          <p className="text-sm leading-relaxed text-kdz-body">
+            説明の作成に時間がかかっています。ページを再読み込みしてください。
+          </p>
+          <button type="button" onClick={() => window.location.reload()} className={btnSecondary}>
+            再読み込み
+          </button>
+        </div>
+      ) : caseData.ai_status === "pending" ? (
+        <div className="mt-4 flex items-center gap-2 rounded-kdz bg-kdz-pale p-4" role="status">
+          <Spinner className="h-4 w-4 text-brand-600" />
+          <p className="text-sm leading-relaxed text-kdz-body">
+            写真をもとに品物の説明を作っています（通常1〜2分）。この画面は自動で更新されます。
+          </p>
+        </div>
+      ) : caseData.ai_status === "failed" ? (
+        <div className="mt-4 rounded-kdz bg-kdz-pale p-4">
+          <p className="text-sm leading-relaxed text-kdz-body">
+            品物の説明を自動で作れませんでした。写真と入力内容で入札を受け付けます。
+          </p>
+        </div>
+      ) : meaningfulCaseSummary(caseData.ai_summary) ? (
+        <div className="mt-4 rounded-kdz bg-kdz-pale p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-kdz-bodysoft">
+            品物の説明（業者に表示されます）
+          </p>
+          <p className="mt-1.5 text-sm leading-relaxed text-kdz-body">
+            {meaningfulCaseSummary(caseData.ai_summary)}
+          </p>
+        </div>
+      ) : null}
+        </section>
+
+        {/* ===== 届いた入札（右 7fr） ===== */}
+        {showBids && (
+          <section className="cd-bids-col" aria-labelledby="cd-bids-heading">
+            <h2 className="cd-h-sm" id="cd-bids-heading">
+              届いた入札
+              <span>
+                <span className="cd-num">{activeBids.length}</span>件・金額の高い順
+              </span>
+            </h2>
+            {activeBids.length === 0 ? (
+              <p className="cd-empty">
+                まだ入札がありません。入札が届くと、LINE連携済みの方はLINEで、未連携の方はメールでお知らせします。
+              </p>
+            ) : (
+              <>
+                <ol className="cd-bids">
+                  {sortedActiveBids.map((b) => {
+                    // 最高額の印は入札が2件以上のときだけ。同額が複数あれば全部に付ける。
+                    const isTopBid = topBidAmount != null && b.amount === topBidAmount && activeBids.length > 1;
+                    return (
+                      <li key={b.id} className={isTopBid ? "cd-bid cd-bid--top" : "cd-bid"}>
+                        <div className="cd-bid__main">
+                          <div className="cd-bid__who">
+                            <span className="cd-bid__name">{b.operator?.company_name ?? "業者"}</span>
+                            {isTopBid ? (
+                              <span className="cd-bid__mark">{topBidCount > 1 ? "同額でいちばん高い入札" : "いちばん高い入札"}</span>
+                            ) : null}
+                          </div>
+                          <dl className="cd-bid__facts">
+                            <dt>口コミ</dt>
+                            <dd>
+                              {b.operator != null && b.operator.review_count > 0 ? (
+                                <>
+                                  <span className="inline-block whitespace-nowrap">
+                                    {formatVerdictCounts(b.operator.good_count, b.operator.improve_count)}
+                                  </span>
+                                  <span className="cd-bid__soft">（口コミ{b.operator.review_count}件）</span>
+                                  {b.operator.latest_review_comment ? (
+                                    <span className="cd-bid__voice">最新の口コミ: 「{b.operator.latest_review_comment}」</span>
+                                  ) : null}
+                                </>
+                              ) : (
+                                "まだありません"
+                              )}
+                            </dd>
+                          </dl>
+                          {b.operator ? (
+                            <Link href={`/vendors/${b.operator.id}`} className="cd-bid__link">
+                              業者のプロフィール・口コミを見る
+                            </Link>
+                          ) : null}
+                          {b.message ? <p className="cd-bid__message">{b.message}</p> : null}
+                          {b.operator_suspended ? (
+                            <p className="cd-bid__alert" role="alert">
+                              この業者は現在利用停止中です。運営（
+                              <Link href="/contact" className="underline">
+                                お問い合わせフォーム
+                              </Link>
+                              ）にお問い合わせください。
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="cd-bid__price">
+                          <p className="cd-bid__amount">{formatYen(b.amount)}</p>
+                          <p className="cd-bid__basis">{itemCount > 0 ? `品物${itemCount}点の買取総額` : "買取総額"}</p>
+                          {b.revision_count > 0 ? (
+                            <p className="cd-bid__revised">更新あり（{b.revision_count}回）</p>
+                          ) : null}
+                        </div>
+                        {/* 一覧は activeBids（pending のみ）だが、多層防御として描画直前にも再確認する。 */}
+                        {b.status === "pending" ? (
+                          <div className="cd-bid__act">
+                            <button
+                              type="button"
+                              disabled={busy || b.operator_suspended}
+                              title={b.operator_suspended ? "この業者は現在利用停止中のため選択できません" : undefined}
+                              onClick={() =>
+                                setConfirmState({
+                                  title: "この業者に決定しますか？",
+                                  message: `${b.operator?.company_name ?? "この業者"}（${formatYen(b.amount)}）に決定しますか？決定すると、他の業者の入札はすべて無効になり、元に戻せません。業者に伝わるのは住所と連絡用のメールアドレスだけです（氏名・電話番号は伝わりません）。決定後も、取引のキャンセルはできます（理由は業者に共有されます）。`,
+                                  confirmLabel: "決定する",
+                                  onConfirm: () => {
+                                    setConfirmState(null);
+                                    void act(() => selectBid(caseId, b.id, token!));
+                                  },
+                                })
+                              }
+                              className={isTopBid ? btnPrimary : btnSecondary}
+                            >
+                              この業者に決める
+                            </button>
+                          </div>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ol>
+                <div className="cd-after">
+                  <h3>「この業者に決める」を押すと</h3>
+                  <ol>
+                    <li>確認の画面が出ます。ここではまだ決まりません。</li>
+                    <li>確認の画面で決めると、住所と連絡用のメールアドレスが、選んだ1社にだけ伝わります。</li>
+                    <li>ほかの業者には、カタヅケから自動でお断りの連絡が入ります。</li>
+                  </ol>
+                </div>
+                <p className="cd-note">最終的な買取額は、業者が当日に現物を見て決めます。</p>
+              </>
+            )}
+        {canCancelCase ? (
+          <>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                if (!token) return;
+                setConfirmState({
+                  title: "出品を取り下げますか？",
+                  message: "付いている入札はすべて無効になり、元に戻せません。理由の入力は任意です。",
+                  confirmLabel: "取り下げる",
+                  danger: true,
+                  withReason: true,
+                  reasonRequired: false,
+                  reasonLabel: "取り下げの理由（任意）",
+                  onConfirm: (reason) => {
+                    setConfirmState(null);
+                    void act(() => cancelCase(caseId, reason, token));
+                  },
+                });
+              }}
+              className={`mt-4 ${btnDanger}`}
+            >
+              出品を取り下げる
+            </button>
+            <p className="mt-2 text-xs text-kdz-bodysoft">
+              ※ 業者を決めた後の取り消しは、取引の画面の一番下にある「この取引をキャンセルする」から行えます。
+            </p>
+          </>
+        ) : null}
+          </section>
+        )}
+      </div>
+
+
+      <div className="cd-rest space-y-6">
       {/* ===== 成約パネル ===== */}
       {txn && (
         <Card>
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="font-normal text-slate-900">
+              <h2 className="font-normal text-kdz-ink">
                 業者が決まりました: {txn.operator?.company_name ?? "業者"}
               </h2>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm text-kdz-bodysoft">
                 決定した金額 {formatYen(txn.initial_amount)}
                 {txn.final_amount != null && txn.final_amount !== txn.initial_amount
                   ? ` → 確定額 ${formatYen(txn.final_amount)}`
                   : ""}
               </p>
               {txn.contact_email ? (
-                <p className="mt-0.5 text-xs text-slate-400">
+                <p className="mt-0.5 text-xs text-kdz-bodysoft">
                   業者連絡先: {txn.contact_email}
                 </p>
               ) : null}
@@ -891,11 +968,11 @@ export default function UserCaseDetailPage() {
           </div>
 
           {txn.operator_deleted ? (
-            <div className="mt-3 rounded-none border border-red-200 bg-red-50 p-3 text-sm leading-relaxed text-red-700" role="alert">
+            <div className="mt-3 rounded-kdz border border-[var(--danger-border-soft)] bg-[var(--danger-bg-soft)] p-3 text-sm leading-relaxed text-kdz-danger" role="alert">
               この業者は退会したため、この取引は進められません。キャンセルして新しく出品してください
             </div>
           ) : txn.operator_suspended ? (
-            <div className="mt-3 rounded-none border border-red-200 bg-red-50 p-3 text-sm leading-relaxed text-red-700" role="alert">
+            <div className="mt-3 rounded-kdz border border-[var(--danger-border-soft)] bg-[var(--danger-bg-soft)] p-3 text-sm leading-relaxed text-kdz-danger" role="alert">
               この業者は現在利用停止中です。運営（
               <Link href="/contact" className="underline">
                 お問い合わせフォーム
@@ -907,17 +984,17 @@ export default function UserCaseDetailPage() {
           {/* r8-fix-frontend2 H2 是正: キャンセルの理由が相手方に一切届かなかった問題への対応。
               誰が・なぜ・いつキャンセルしたかを表示する。 */}
           {txn.cancellation ? (
-            <div className="mt-3 rounded-none border border-slate-200 bg-slate-50 p-3 text-sm leading-relaxed text-slate-700" role="status">
-              <p className="font-semibold text-slate-900">
+            <div className="mt-3 rounded-kdz border border-kdz-line bg-kdz-pale p-3 text-sm leading-relaxed text-kdz-body" role="status">
+              <p className="font-semibold text-kdz-ink">
                 キャンセル: {CANCELLED_BY_LABEL[txn.cancellation.cancelled_by]}による
               </p>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-kdz-bodysoft">
                 {formatJstDateTime(txn.cancellation.cancelled_at)}
               </p>
               {txn.cancellation.reason ? (
                 <p className="mt-1 break-words">理由: {txn.cancellation.reason}</p>
               ) : (
-                <p className="mt-1 text-slate-400">理由の記載なし</p>
+                <p className="mt-1 text-kdz-bodysoft">理由の記載なし</p>
               )}
             </div>
           ) : null}
@@ -944,12 +1021,12 @@ export default function UserCaseDetailPage() {
                   </a>
                 ) : null}
                 {txn.visit_date ? (
-                  <p className="self-center text-sm font-semibold text-slate-600">
+                  <p className="self-center text-sm font-semibold text-kdz-body">
                     訪問予定: {formatVisitSchedule(txn.visit_date, txn.visit_time_slot)}
                   </p>
                 ) : null}
                 {txn.operator_suspended ? (
-                  <p className="w-full text-xs font-semibold text-red-600">
+                  <p className="w-full text-xs font-semibold text-kdz-danger">
                     ※ 業者が対応できないため、チャット送信・日程調整の返信が届かない場合があります。
                   </p>
                 ) : null}
@@ -969,7 +1046,7 @@ export default function UserCaseDetailPage() {
           {/* r10 M2 是正: 業者側にのみ表示されていた申請上限・残り回数を依頼者側にも明示する
               （成約後・キャンセル前のみ意味を持つため active な状態でのみ表示）。 */}
           {reductionQuota && (txn.status === "pending" || txn.status === "visiting") ? (
-            <p className="mt-4 text-xs text-slate-500">
+            <p className="mt-4 text-xs text-kdz-bodysoft">
               業者からの減額の申請は、1つの取引につき{reductionQuota.limit}回までです
               {reductionQuota.remaining !== null ? `（残り${reductionQuota.remaining}回）` : ""}
             </p>
@@ -980,20 +1057,20 @@ export default function UserCaseDetailPage() {
               REDUCTION_STATUS_LABEL（lib/katadzuke-api.ts）を使う。 */}
           {txn.reduction_requests.length > 0 && (
             <div className="mt-4">
-              <p className="text-sm font-normal text-slate-900">減額申請の履歴</p>
+              <p className="text-sm font-normal text-kdz-ink">減額申請の履歴</p>
               <ul className="mt-2 space-y-2">
                 {txn.reduction_requests.map((r) => (
                   <li
                     key={r.id}
-                    className="rounded-none border border-slate-200 p-3"
+                    className="rounded-kdz border border-kdz-line p-3"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-semibold text-slate-900">
+                      <span className="text-sm font-semibold text-kdz-ink">
                         {formatYen(r.original_amount)} → {formatYen(r.requested_amount)}
                       </span>
                       <StatusBadge value={r.status} label={REDUCTION_STATUS_LABEL[r.status]} />
                     </div>
-                    <p className="mt-1 text-xs leading-relaxed text-slate-600">理由: {r.reason}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-kdz-body">理由: {r.reason}</p>
                   </li>
                 ))}
               </ul>
@@ -1002,18 +1079,18 @@ export default function UserCaseDetailPage() {
 
           {/* 減額申請（承認待ち） */}
           {pendingReduction && (
-            <div className="mt-4 rounded-none border border-amber-200 bg-amber-50 p-4">
-              <p className="text-sm font-semibold text-amber-900">業者から減額申請が届いています</p>
-              <p className="mt-1 text-sm text-amber-800">
+            <div className="mt-4 rounded-kdz border border-[var(--gold)] bg-[var(--warm)] p-4">
+              <p className="text-sm font-semibold text-[var(--gold-text)]">業者から減額申請が届いています</p>
+              <p className="mt-1 text-sm text-[var(--gold-text)]">
                 {formatYen(pendingReduction.original_amount)} →{" "}
                 <strong>{formatYen(pendingReduction.requested_amount)}</strong>
               </p>
-              <p className="mt-2 rounded-none bg-white/70 p-3 text-sm leading-relaxed text-slate-700">
+              <p className="mt-2 rounded-kdz bg-[var(--white)] p-3 text-sm leading-relaxed text-kdz-body">
                 理由: {pendingReduction.reason}
               </p>
               {/* 減額の承認・却下は依頼者本人だけ（運営の代理閲覧では backend が 403 にするため出さない。security M-1）。 */}
               {isAdminViewing ? (
-                <p className="mt-3 text-xs text-amber-900" data-testid="reduction-admin-note">
+                <p className="mt-3 text-xs text-[var(--gold-text)]" data-testid="reduction-admin-note">
                   減額の承認・却下は依頼者本人だけが行えます（運営は代理で判断できません）。
                 </p>
               ) : (
@@ -1090,7 +1167,7 @@ export default function UserCaseDetailPage() {
             </div>
           ) : null}
           {pendingReduction ? (
-            <p className="mt-2 text-xs text-slate-400">
+            <p className="mt-2 text-xs text-kdz-bodysoft">
               ※ 減額申請への回答後に完了確定できます。
             </p>
           ) : null}
@@ -1115,8 +1192,8 @@ export default function UserCaseDetailPage() {
               </div>
             ) : isAdminViewing ? null : (
               // 評価は案件の所有者だけが投稿できる（運営の代理閲覧では backend が 403 にするため出さない）。
-              <div className="mt-4 rounded-none border border-slate-200 p-4">
-                <p className="font-normal text-slate-900">業者を評価する</p>
+              <div className="mt-4 rounded-kdz border border-kdz-line p-4">
+                <p className="font-normal text-kdz-ink">業者を評価する</p>
                 <ReviewComposer
                   direction="to_operator"
                   submitLabel="評価を投稿する"
@@ -1140,7 +1217,7 @@ export default function UserCaseDetailPage() {
           {/* 取引のキャンセル（取り消し不能）。作業完了ボタンと並べず、画面下部の弱いリンクにする。 */}
           {/* 運営の代理閲覧では出さない（backend は運営名義のキャンセルを 403 にする。運営の強制終了は /admin/transactions）。 */}
           {(txn.status === "pending" || txn.status === "visiting") && !isAdminViewing ? (
-            <div className="mt-10 border-t border-slate-200 pt-4">
+            <div className="mt-10 border-t border-kdz-line pt-4">
               <button
                 type="button"
                 disabled={busy}
@@ -1159,7 +1236,7 @@ export default function UserCaseDetailPage() {
                     },
                   });
                 }}
-                className="text-sm text-slate-500 underline underline-offset-2 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="text-sm text-kdz-bodysoft underline underline-offset-2 hover:text-kdz-body disabled:cursor-not-allowed disabled:opacity-50"
               >
                 この取引をキャンセルする
               </button>
@@ -1171,6 +1248,7 @@ export default function UserCaseDetailPage() {
       <Link href="/cases" className="inline-block text-sm font-semibold text-brand-700 hover:underline">
         ← マイ案件一覧へ
       </Link>
+      </div>
     </div>
     {confirmState ? (
       <ConfirmModal
