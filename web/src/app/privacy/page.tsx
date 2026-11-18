@@ -144,12 +144,12 @@ export default function PrivacyPage() {
           </ol>
         </nav>
 
-        <RevealLines as="h2" mark="under" id="pp-1" lines={["第1条　基本方針"]} />
+        <RevealLines as="h2" id="pp-1" lines={["第1条　基本方針"]} />
         <p>
           カタヅケ運営事務局（個人事業。以下「運営者」）は、ユーザーおよび登録業者（以下総称して「利用者」）の個人情報の保護を重要な責務と捉え、個人情報の保護に関する法律（以下「個人情報保護法」）その他の関連法令を遵守し、適切な取り扱いに努めます。
         </p>
 
-        <RevealLines as="h2" mark="under" id="pp-2" lines={["第2条　収集する情報"]} />
+        <RevealLines as="h2" id="pp-2" lines={["第2条　収集する情報"]} />
         <p>運営者は、サービス提供のため以下の情報を収集します。</p>
         {/* ラウンド5 指摘（16）: 口座情報の箱が先に目に入り、「業者にどこまで
             渡るのか」が 2 画面あと（第4条の注記）まで分からなかった。第4条・利用規約 第5条の
@@ -184,7 +184,7 @@ export default function PrivacyPage() {
           </tbody>
         </table>
 
-        <RevealLines as="h2" mark="under" id="pp-3" lines={["第3条　利用目的"]} />
+        <RevealLines as="h2" id="pp-3" lines={["第3条　利用目的"]} />
         <p>収集した個人情報は以下の目的で利用します。</p>
         <ul>
           <li>カタヅケサービスの提供・運営・改善</li>
@@ -204,7 +204,7 @@ export default function PrivacyPage() {
           <li>法令に基づく対応・開示</li>
         </ul>
 
-        <RevealLines as="h2" mark="under" id="pp-4" lines={["第4条　第三者への提供"]} />
+        <RevealLines as="h2" id="pp-4" lines={["第4条　第三者への提供"]} />
         <p>運営者は、以下の場合を除き、利用者の個人情報を第三者に提供しません。</p>
         <ul>
           <li>利用者本人の同意がある場合</li>
@@ -226,7 +226,6 @@ export default function PrivacyPage() {
             外国にある事業者の記載は弁護士の確認前の暫定表記。法令の効果（同意の要否等）は断定しない。 */}
         <RevealLines
           as="h2"
-          mark="under"
           id="pp-5"
           lines={["第5条　外部サービスの利用と外国にある事業者"]}
         />
@@ -266,7 +265,7 @@ export default function PrivacyPage() {
           上記のうち、日本以外の国にある事業者へは、個人情報が外国で保存・処理されます。提供先の国における個人情報の保護に関する制度や、提供先が講じている個人情報の保護のための措置についてお知りになりたい場合は、お問い合わせページからご連絡ください。本条の記載（外国にある事業者への提供の扱いを含みます）は、弁護士の確認前の暫定表記です。
         </div>
 
-        <RevealLines as="h2" mark="under" id="pp-6" lines={["第6条　安全管理措置"]} />
+        <RevealLines as="h2" id="pp-6" lines={["第6条　安全管理措置"]} />
         {/* C-4: 実装している措置だけを書く（していない「定期監査」「従業員教育」は書かない）。
             根拠: 通信＝https 配信／パスワード＝backend/app/core/security.py（scrypt）／
             口座＝backend/app/core/crypto.py（Fernet）／ログ＝backend/app/core/masking.py・app_logging.py／
@@ -281,12 +280,12 @@ export default function PrivacyPage() {
           <li>外部サービスの利用先と所在国を把握し、第5条に記載しています</li>
         </ul>
 
-        <RevealLines as="h2" mark="under" id="pp-7" lines={["第7条　Cookieの利用"]} />
+        <RevealLines as="h2" id="pp-7" lines={["第7条　Cookieの利用"]} />
         <p>
           運営者のウェブサイトはCookieを使用しています。Cookieはブラウザの設定から無効にできますが、一部機能が利用できなくなる場合があります。
         </p>
 
-        <RevealLines as="h2" mark="under" id="pp-8" lines={["第8条　個人情報の開示・訂正・削除"]} />
+        <RevealLines as="h2" id="pp-8" lines={["第8条　個人情報の開示・訂正・削除"]} />
         {/* L-5: 請求の窓口と本人確認の方法を書く。手数料は設定が無いため書かない。
             ログインした状態のフォーム送信は backend がアカウントに紐付ける（contact_messages.user_id）。 */}
         <p>
@@ -342,12 +341,12 @@ export default function PrivacyPage() {
           退会によらない削除のお申し出は、上記の窓口で承ります。
         </p>
 
-        <RevealLines as="h2" mark="under" id="pp-9" lines={["第9条　プライバシーポリシーの変更"]} />
+        <RevealLines as="h2" id="pp-9" lines={["第9条　プライバシーポリシーの変更"]} />
         <p>
           本ポリシーは、法令の改正やサービス変更に伴い改定することがあります。重要な変更については、ウェブサイト上でお知らせします。
         </p>
 
-        <RevealLines as="h2" mark="under" id="pp-10" lines={["第10条　お問い合わせ"]} />
+        <RevealLines as="h2" id="pp-10" lines={["第10条　お問い合わせ"]} />
         <p>
           本ポリシーに関するお問い合わせは、
           <Link href="/contact" className="contact-link">

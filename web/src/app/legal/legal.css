@@ -11,21 +11,21 @@
   padding: clamp(40px, 6vw, 80px) 24px clamp(64px, 8vw, 108px);
 }
 
-/* 帯直下の英字ラベル（/terms .legal-head__en と同じ構え） */
+/* 帯直下の英字ラベル。見本 v12：英字の小見出しは出さない（本文の文言は変えず、見た目だけ畳む） */
 .doc-eyebrow {
-  font-family: var(--en);
-  font-size: 11.5px;
+  display: none;
+  font-family: var(--goth);
+  font-size: 15px;
   font-weight: 600;
   letter-spacing: 0.18em;
   color: var(--primary);
-  text-transform: uppercase;
   margin-bottom: 16px;
 }
 
 .doc-title {
   font-family: var(--head);
   font-size: clamp(24px, 3.5vw, 36px);
-  font-weight: 400;
+  font-weight: 700;
   color: var(--navy);
   margin-bottom: 10px;
   letter-spacing: -0.01em;
@@ -33,7 +33,7 @@
 
 .doc-meta {
   font-family: var(--ui);
-  font-size: 12.5px;
+  font-size: 15px;
   letter-spacing: 0.02em;
   color: var(--body-soft);
   margin-bottom: 40px;
@@ -42,7 +42,7 @@
 }
 
 .doc-lead {
-  font-size: 14.5px;
+  font-size: 15px;
   color: var(--body-soft);
   line-height: 1.9;
   margin-bottom: 36px;
@@ -65,7 +65,7 @@
 }
 .doc-free__num {
   font-family: var(--head);
-  font-weight: 400;
+  font-weight: 700;
   font-size: clamp(44px, 9vw, 72px);
   line-height: 1;
   color: var(--primary);
@@ -73,13 +73,13 @@
 }
 .doc-free__lead {
   font-family: var(--head);
-  font-weight: 600;
+  font-weight: 700;
   font-size: clamp(17px, 2.2vw, 21px);
   color: var(--ink);
   line-height: 1.7;
 }
 .doc-free__sub {
-  font-size: 13.5px;
+  font-size: 15px;
   color: var(--body);
   line-height: 1.85;
   margin-top: 8px;
@@ -95,7 +95,7 @@
 }
 .doc-assure__list { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; }
 .doc-assure__list li {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--body);
   line-height: 1.9;
   padding-left: 14px;
@@ -104,7 +104,7 @@
 .doc-assure__list strong { color: var(--ink); font-weight: 600; }
 .doc-assure__list a,
 .doc-assure__more a { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; }
-.doc-assure__more { font-size: 13px; color: var(--body-soft); line-height: 1.85; margin-top: 16px; }
+.doc-assure__more { font-size: 15px; color: var(--body-soft); line-height: 1.85; margin-top: 16px; }
 
 /* 目次（ラウンド5 指摘 12）。/terms の .terms-toc・/privacy の .pp-toc と同じ構え。 */
 .doc-toc {
@@ -114,14 +114,14 @@
   margin-bottom: clamp(8px, 1vw, 12px);
 }
 .doc-toc__label {
-  font-family: var(--ui); font-size: 11.5px; font-weight: 600; letter-spacing: 0.08em;
+  font-family: var(--ui); font-size: 15px; font-weight: 600; letter-spacing: 0.08em;
   color: var(--body-soft); margin-bottom: 10px;
 }
 .doc-toc__list {
   list-style: none; padding: 0; margin: 0;
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 24px;
 }
-.doc-toc__list li { font-size: 13.5px; line-height: 1.7; }
+.doc-toc__list li { font-size: 15px; line-height: 1.7; }
 .doc-toc__list a { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; }
 
 /* テーブル */
@@ -129,7 +129,7 @@
   width: 100%;
   border-collapse: collapse;
   margin-bottom: 40px;
-  font-size: 14.5px;
+  font-size: 15px;
   /* ラウンド5 指摘（5）: th{width:200px} は auto レイアウトでは「提案値」にすぎず、
      4 つの表でラベル列の実幅が中身しだいにずれ（「クーリング・オフ（業者向け）」を含む表だけ
      広い）、節をまたぐと視線の折り返し位置が揃わなかった。固定レイアウトにして 4 表とも
@@ -145,7 +145,7 @@
   border-top: 1px solid var(--line-soft);
   font-weight: 600;
   color: var(--navy);
-  font-size: 14px;
+  font-size: 15px;
   white-space: nowrap;
 }
 .spec-table td {
@@ -177,7 +177,7 @@
   line-height: 1.75;
 }
 .spec-table td .note {
-  font-size: 13px;
+  font-size: 15px;
   color: var(--body-soft);
   margin-top: 6px;
 }
@@ -186,7 +186,7 @@
    囲み・地色は持たせない（帯 → 箱 → 表と囲みが続くのを避ける・正典「区切りは1px罫と余白」）。
    表の 1 行目（事業者名）と重複して見えないよう、本文色より一段薄い --body-soft に落とす。 */
 .doc-owner-line {
-  font-size: 13.5px;
+  font-size: 15px;
   color: var(--body-soft);
   line-height: 1.85;
   margin: 0 0 16px;
@@ -196,7 +196,7 @@
 .doc-section-title {
   font-family: var(--head);
   font-size: 19px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--navy);
   margin: clamp(48px, 6vw, 72px) 0 18px;
   padding-bottom: 12px;
@@ -211,13 +211,13 @@
   border: 1px solid var(--gold);
   border-radius: var(--radius-s);
   padding: 16px 18px;
-  font-size: 13.5px;
+  font-size: 15px;
   color: var(--ink);
   line-height: 1.8;
   margin-bottom: 28px;
 }
 .doc-warn strong {
-  color: #8a5b00; /* --gold(#e5a323) は淡い背景と 2.0:1 で不足。AA 4.5:1 以上の濃い琥珀 */
+  color: var(--gold-text); /* --gold(#e5a323) は淡い背景と 2.0:1 で不足。AA 4.5:1 以上の濃い琥珀 */
 }
 
 /* フッターナビ */
@@ -230,7 +230,7 @@
   border-top: 1px solid var(--line-soft);
 }
 .doc-nav a {
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--blue);
   text-decoration: underline;
@@ -251,12 +251,12 @@
   }
   .spec-table th {
     width: 118px;
-    font-size: 13px;
+    font-size: 15px;
     padding-right: 14px;
     white-space: normal; /* 130px 固定＋nowrap だと 390px で右側が食み出す */
   }
   .spec-table td {
-    font-size: 13.5px;
+    font-size: 15px;
   }
 }
 

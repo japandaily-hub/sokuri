@@ -112,7 +112,6 @@ export default function LegalPage() {
         {/* 運営者情報 */}
         <RevealLines
           as="h2"
-          mark="under"
           className="doc-section-title"
           id="lg-1"
           lines={["サービス運営者情報"]}
@@ -187,7 +186,6 @@ export default function LegalPage() {
         {/* サービス内容 */}
         <RevealLines
           as="h2"
-          mark="under"
           className="doc-section-title"
           id="lg-2"
           lines={["サービス内容・取引条件"]}
@@ -263,7 +261,6 @@ export default function LegalPage() {
         {/* 返品・キャンセル */}
         <RevealLines
           as="h2"
-          mark="under"
           className="doc-section-title"
           id="lg-3"
           lines={["返品・キャンセルについて"]}
@@ -320,7 +317,6 @@ export default function LegalPage() {
         {/* 個人情報 */}
         <RevealLines
           as="h2"
-          mark="under"
           className="doc-section-title"
           id="lg-4"
           lines={["個人情報の取り扱い"]}

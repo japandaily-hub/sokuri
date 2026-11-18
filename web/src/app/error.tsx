@@ -41,7 +41,7 @@ export default function Error({
           解決しない場合はトップへ戻ってからアクセスし直してください。
         </p>
         {error.digest ? (
-          <p style={{ fontSize: 11, fontFamily: "ui-monospace,Menlo,Consolas,monospace", color: "var(--body-soft)", marginBottom: 20 }}>
+          <p style={{ fontSize: 15, fontFamily: "ui-monospace,Menlo,Consolas,monospace", color: "var(--body-soft)", marginBottom: 20 }}>
             ref: {error.digest}
           </p>
         ) : null}

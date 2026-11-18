@@ -24,22 +24,22 @@
   margin-top: clamp(20px, 3vw, 30px);
 }
 .legal-head__en {
-  display: block; font-family: var(--en); font-weight: 600; font-size: 11.5px;
-  letter-spacing: .18em; text-transform: uppercase; color: var(--primary);
+  /* 見本 v12：英字の小見出しは出さない（本文の文言は変えず、見た目だけ畳む） */
+  display: none;
 }
 .legal-head h1 {
-  font-family: var(--head); font-weight: 400; color: var(--ink);
+  font-family: var(--head); font-weight: 700; color: var(--ink);
   font-size: clamp(24px, 3.5vw, 36px); margin-top: 12px;
 }
 .legal-head__meta {
-  font-family: var(--ui); font-size: 12.5px; color: var(--body-soft);
+  font-family: var(--ui); font-size: 15px; color: var(--body-soft);
   letter-spacing: .02em; margin-top: 12px; line-height: 1.8;
 }
 /* 業者利用規約への相互リンク（ラウンド4 指摘）。見出しブロックの罫（__inner::after）の
    内側に置き、日付メタと同じ小さな字面で 1 行だけ足す。囲みは持たせない（法務3ページの
    「罫と余白だけで区切る」構えを崩さないため）。 */
 .legal-head__cross {
-  font-size: 13.5px; color: var(--body); margin-top: 10px; line-height: 1.8;
+  font-size: 15px; color: var(--body); margin-top: 10px; line-height: 1.8;
 }
 .legal-head__cross a {
   font-weight: 600; color: var(--blue);
@@ -51,7 +51,7 @@
 .terms-points { padding: clamp(28px, 4vw, 44px) 0 clamp(28px, 4vw, 44px); }
 .terms-points__inner { max-width: 760px; margin: 0 auto; padding-inline: 24px; }
 .doc-section-title {
-  font-family: var(--head); font-weight: 600; font-size: 17px; color: var(--ink);
+  font-family: var(--head); font-weight: 700; font-size: 17px; color: var(--ink);
   padding-bottom: 12px; border-bottom: 1px solid var(--line); margin-bottom: 4px;
 }
 .terms-points__list { list-style: none; padding: 0; margin: 0; }
@@ -60,26 +60,26 @@
   align-items: baseline; padding: 16px 0; border-bottom: 1px solid var(--line-soft);
 }
 .terms-points__no {
-  font-family: var(--en-display); font-size: 18px; color: var(--primary); letter-spacing: .04em;
+  font-family: var(--num); font-size: 18px; color: var(--primary); letter-spacing: .04em;
 }
-.terms-points__body { font-size: 14.5px; color: var(--body); line-height: 1.9; }
+.terms-points__body { font-size: 15px; color: var(--body); line-height: 1.9; }
 .terms-points__body strong { display: block; color: var(--ink); font-weight: 600; }
 /* 根拠の条。ラウンド5 指摘（12）で本文に id が入り、ここが該当条へのリンクになった
    （span のままの灰色だと押せると分からない）。字面の大きさは据え置き。 */
 .terms-points__ref {
   display: block; width: fit-content;
-  font-family: var(--ui); font-size: 12px; color: var(--blue);
+  font-family: var(--ui); font-size: 15px; color: var(--blue);
   letter-spacing: .02em; margin-top: 6px;
   text-decoration: underline; text-underline-offset: 2px;
 }
 .terms-points__note {
-  font-size: 13px; color: var(--body-soft); line-height: 1.85; margin-top: 16px;
+  font-size: 15px; color: var(--body-soft); line-height: 1.85; margin-top: 16px;
 }
 .terms-points__note a { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; }
 
 .legal-tabs { display: flex; gap: 0; border-bottom: 2px solid var(--line); margin-bottom: 0; }
 .legal-tab {
-  padding: 14px 28px; font-size: 14px; font-weight: 600; color: var(--body-soft); cursor: pointer;
+  padding: 14px 28px; font-size: 15px; font-weight: 700; color: var(--body-soft); cursor: pointer;
   border-bottom: 3px solid transparent; margin-bottom: -2px; transition: color .2s;
   font-family: var(--head); background: none; border-top: none; border-left: none; border-right: none;
 }
@@ -115,19 +115,19 @@
   margin-bottom: clamp(28px, 3.5vw, 40px);
 }
 .terms-toc__label {
-  font-family: var(--ui); font-size: 11.5px; font-weight: 600; letter-spacing: .08em;
+  font-family: var(--ui); font-size: 15px; font-weight: 600; letter-spacing: .08em;
   color: var(--body-soft); margin-bottom: 10px;
 }
 .terms-toc__list {
   list-style: none; padding: 0; margin: 0;
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 24px;
 }
-.terms-toc__list li { font-size: 13.5px; line-height: 1.7; margin: 0; }
+.terms-toc__list li { font-size: 15px; line-height: 1.7; margin: 0; }
 .terms-toc__list a { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; }
 .legal-body h3 { font-size: 15px; color: var(--ink); margin: 20px 0 8px; }
-.legal-body p { font-size: 14.5px; color: var(--body); line-height: 1.9; margin-bottom: 12px; }
+.legal-body p { font-size: 15px; color: var(--body); line-height: 1.9; margin-bottom: 12px; }
 .legal-body ul, .legal-body ol { padding-left: 20px; margin-bottom: 14px; }
-.legal-body li { font-size: 14.5px; color: var(--body); line-height: 1.85; margin-bottom: 5px; }
+.legal-body li { font-size: 15px; color: var(--body); line-height: 1.85; margin-bottom: 5px; }
 /* 本文の補足注記。r3 レビュー: --warm/--gold は状態色であり、本文の補足に使うと
    青・濃紺で統一した面に暖色が1点だけ混じる（/legal 冒頭の補足は淡青＋青罫）。
    法務3ページで注記の地と罫を1種（淡青＋青の左罫）に揃える。
@@ -135,11 +135,11 @@
      状態色の本来の用法なのでそのまま。 */
 .legal-body .note {
   background: var(--pale-2); border-left: 3px solid var(--blue); padding: 14px 18px;
-  border-radius: 0; font-size: 13.5px; color: var(--body); margin: 20px 0; line-height: 1.8;
+  border-radius: 0; font-size: 15px; color: var(--body); margin: 20px 0; line-height: 1.8;
 }
 .legal-body .important {
-  background: #fff0f0; border-left: 3px solid var(--danger); padding: 14px 18px;
-  border-radius: 0; font-size: 13.5px; color: var(--body); margin: 20px 0; line-height: 1.8;
+  background: var(--danger-bg-soft); border-left: 3px solid var(--danger); padding: 14px 18px;
+  border-radius: 0; font-size: 15px; color: var(--body); margin: 20px 0; line-height: 1.8;
 }
 
 /* sticky。祖先（.site-frame / main / .legal-head / .terms-points）に overflow を書かない */
@@ -148,7 +148,7 @@
 
 .back-link {
   display: inline-flex; align-items: center; gap: 6px;
-  font-size: 13.5px; font-weight: 600; color: var(--blue); margin-bottom: 32px;
+  font-size: 15px; font-weight: 600; color: var(--blue); margin-bottom: 32px;
 }
 .back-link:hover { text-decoration: underline; }
 /* r1 レビュー: 戻り導線がタブ切替の直下・第1条の直前にあると、タブと本文の間に挟まって
@@ -163,7 +163,7 @@
 @media (max-width: 560px) {
   .legal-head__inner, .terms-points__inner { padding-inline: 18px; }
   .terms-points__list li { grid-template-columns: 34px minmax(0, 1fr); }
-  .legal-tab { padding: 13px 16px; font-size: 13.5px; }
+  .legal-tab { padding: 13px 16px; font-size: 15px; }
   /* 390px では 2 列だと「第5条　個人情報の開示タイミング」が 3 行に折れる */
   .terms-toc__list { grid-template-columns: minmax(0, 1fr); }
   /* タブ列が 45px 前後に縮むぶんだけ詰める（見出しがタブ列に隠れない最小値） */

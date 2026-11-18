@@ -23,15 +23,15 @@
   margin-top: clamp(20px, 3vw, 30px);
 }
 .legal-head__en {
-  display: block; font-family: var(--en); font-weight: 600; font-size: 11.5px;
-  letter-spacing: .18em; text-transform: uppercase; color: var(--primary);
+  /* 見本 v12：英字の小見出しは出さない（本文の文言は変えず、見た目だけ畳む） */
+  display: none;
 }
 .legal-head h1 {
-  font-family: var(--head); font-weight: 400; color: var(--ink);
+  font-family: var(--head); font-weight: 700; color: var(--ink);
   font-size: clamp(24px, 3.5vw, 36px); margin-top: 12px;
 }
 .legal-head__meta {
-  font-family: var(--ui); font-size: 12.5px; color: var(--body-soft);
+  font-family: var(--ui); font-size: 15px; color: var(--body-soft);
   letter-spacing: .02em; margin-top: 12px; line-height: 1.8;
 }
 
@@ -44,7 +44,7 @@
    terms.css の .legal-body h2（下罫 2px）と同居しても勝つよう .privacy-body で特異度を上げる。 */
 .legal-body.privacy-body h2 {
   font-family: var(--head);
-  font-weight: 600;
+  font-weight: 700;
   font-size: 22px;
   color: var(--navy);
   margin: clamp(40px, 5vw, 56px) 0 16px;
@@ -69,7 +69,7 @@
 }
 .pp-toc__label {
   font-family: var(--ui);
-  font-size: 11.5px;
+  font-size: 15px;
   font-weight: 600;
   letter-spacing: .08em;
   color: var(--body-soft);
@@ -83,7 +83,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px 24px;
 }
-.pp-toc__list li { font-size: 13.5px; line-height: 1.7; margin: 0; }
+.pp-toc__list li { font-size: 15px; line-height: 1.7; margin: 0; }
 .pp-toc__list a {
   color: var(--blue);
   text-decoration: underline;
@@ -93,7 +93,7 @@
 /* 第2条の冒頭の要約（ラウンド5 指摘 16）。第4条の注記（淡青＋青罫）と同じ見た目にすると
    同型の箱が 1 画面に 2 つ並ぶため、ここは囲みを持たない素の 1 段落にする。 */
 .legal-body.privacy-body .pp-lead {
-  font-size: 14.5px;
+  font-size: 15px;
   color: var(--body);
   line-height: 1.9;
   margin-bottom: 18px;
@@ -109,7 +109,7 @@
   width: fit-content;
   margin-top: 5px;
   font-family: var(--ui);
-  font-size: 11px;
+  font-size: 15px;
   font-weight: 600;
   letter-spacing: .04em;
   line-height: 1.6;
@@ -127,14 +127,14 @@
 }
 .legal-body h3 { font-size: 15px; color: var(--ink); margin: 22px 0 8px; }
 .legal-body p {
-  font-size: 14.5px;
+  font-size: 15px;
   color: var(--body);
   line-height: 1.9;
   margin-bottom: 14px;
 }
 .legal-body ul, .legal-body ol { padding-left: 20px; margin-bottom: 14px; }
 .legal-body li {
-  font-size: 14.5px;
+  font-size: 15px;
   color: var(--body);
   line-height: 1.85;
   margin-bottom: 6px;
@@ -145,7 +145,7 @@
   width: 100%;
   border-collapse: collapse;
   margin-bottom: 20px;
-  font-size: 14px;
+  font-size: 15px;
   /* r1 レビュー: auto レイアウトだと第3列に幅を持っていかれ、第1・2列が約 78px まで
      潰れて「アカウント/情報」「お問い合わせフォーム送/信時」のように語中で 2〜3 行に
      割れていた（9行中7行）。表の実幅は常に 760-48=712px（859px 以下はカード積みに
@@ -178,7 +178,7 @@
   text-align: left;
   font-family: var(--ui);
   font-weight: 600;
-  font-size: 12.5px;
+  font-size: 15px;
   letter-spacing: .04em;
   color: var(--ink);
   border: 0;
@@ -210,19 +210,19 @@
   border-left: 3px solid var(--blue);
   padding: 14px 18px;
   border-radius: 0;
-  font-size: 13.5px;
+  font-size: 15px;
   color: var(--body);
   margin: 20px 0;
   line-height: 1.8;
 }
 .legal-body .contact-link { color: var(--blue); text-decoration: underline; }
-.legal-body .footer-note { margin-top: 32px; color: var(--body-soft); font-size: 13px; }
+.legal-body .footer-note { margin-top: 32px; color: var(--body-soft); font-size: 15px; }
 
 .back-link {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--blue);
   margin-bottom: 32px;
@@ -269,7 +269,7 @@
   .legal-body.privacy-body td {
     padding: 0;
     border: 0;
-    font-size: 14px;
+    font-size: 15px;
   }
   .legal-body.privacy-body td + td {
     margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line-soft);
@@ -278,7 +278,7 @@
     content: attr(data-label);
     display: block;
     font-family: var(--ui);
-    font-size: 11.5px;
+    font-size: 15px;
     font-weight: 600;
     letter-spacing: .08em;
     color: var(--body-soft);

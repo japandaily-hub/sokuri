@@ -95,7 +95,6 @@ export default function TermsPage() {
         <div className="terms-points__inner">
           <RevealLines
             as="h2"
-            mark="under"
             className="doc-section-title"
             id="terms-points-title"
             lines={["ユーザーの方へ　この規約の要点"]}
