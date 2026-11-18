@@ -28,7 +28,7 @@
 .withdraw-page .warn-banner {
   background: var(--danger-bg-soft);
   border: 1.5px solid var(--danger-border-soft);
-  border-radius: 0;
+  border-radius: var(--radius);
   padding: 18px 20px;
   margin-bottom: 20px;
   display: flex;
@@ -38,7 +38,7 @@
 .withdraw-page .warn-ic {
   width: 36px;
   height: 36px;
-  border-radius: 0;
+  border-radius: var(--radius);
   background: var(--danger-bg-soft);
   flex-shrink: 0;
   display: grid;
@@ -62,7 +62,7 @@
   margin-bottom: 4px;
 }
 .withdraw-page .warn-body span {
-  font-size: 13px;
+  font-size: 15px;
   color: var(--danger);
   line-height: 1.75;
 }
@@ -86,7 +86,7 @@
 .withdraw-page .del-item-ic {
   width: 36px;
   height: 36px;
-  border-radius: 0;
+  border-radius: var(--radius);
   flex-shrink: 0;
   display: grid;
   place-items: center;
@@ -103,12 +103,12 @@
 }
 .withdraw-page .del-item-body strong {
   display: block;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 400;
   color: var(--navy);
 }
 .withdraw-page .del-item-body span {
-  font-size: 12.5px;
+  font-size: 15px;
   color: var(--body-soft);
 }
 
@@ -123,7 +123,7 @@
 }
 .withdraw-page .form-card-title {
   font-family: var(--head);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 400;
   color: var(--navy);
   margin-bottom: 14px;
@@ -135,7 +135,7 @@
 }
 .withdraw-page .field label {
   display: block;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 400;
   color: var(--ink);
   margin-bottom: 7px;
@@ -173,7 +173,7 @@
   cursor: pointer;
 }
 .withdraw-page .check-row label {
-  font-size: 13.5px;
+  font-size: 15px;
   color: var(--body);
   line-height: 1.7;
   cursor: pointer;
@@ -184,7 +184,7 @@
 .withdraw-page .btn-delete {
   width: 100%;
   padding: 15px;
-  border-radius: 0;
+  border-radius: var(--radius);
   border: 1.5px solid var(--danger);
   background: var(--danger-bg-soft);
   color: var(--danger);
@@ -200,7 +200,7 @@
 }
 .withdraw-page .btn-delete:hover:not(:disabled) {
   background: var(--danger);
-  color: #fff;
+  color: var(--white);
 }
 .withdraw-page .btn-delete:disabled {
   background: var(--line);
@@ -223,7 +223,7 @@
   margin-top: 16px;
 }
 .withdraw-page .del-cancel a {
-  font-size: 13px;
+  font-size: 15px;
   color: var(--body-soft);
 }
 
@@ -258,7 +258,7 @@
   margin-bottom: 10px;
 }
 .withdraw-page .done-sub {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--body-soft);
   line-height: 1.85;
   margin-bottom: 28px;
@@ -284,14 +284,14 @@
     height: 17px;
   }
   .withdraw-page .warn-body strong {
-    font-size: 14px;
+    font-size: 15px;
   }
   .withdraw-page .del-item {
     gap: 10px;
     padding: 12px 0;
   }
   .withdraw-page .btn-delete {
-    font-size: 14px;
+    font-size: 15px;
     padding: 14px;
   }
   .withdraw-page .done-screen {
@@ -307,9 +307,9 @@
 }
 @media (max-width: 360px) {
   .withdraw-page .check-row label {
-    font-size: 12.5px;
+    font-size: 15px;
   }
   .withdraw-page .del-item-body strong {
-    font-size: 13px;
+    font-size: 15px;
   }
 }

@@ -19,15 +19,15 @@
 }
 
 .bank-page .field label {
-  font-size: 13px;
+  font-size: 15px;
 }
 .bank-page .field input {
   font-size: 15px;
 }
 .bank-page .field label .req {
-  font-size: 10px;
+  font-size: 15px;
   font-weight: 600;
-  color: #fff;
+  color: var(--white);
   background: var(--blue);
   padding: 1px 6px;
   border-radius: 4px;
@@ -35,7 +35,7 @@
   vertical-align: middle;
 }
 .bank-page .field-hint {
-  font-size: 12px;
+  font-size: 15px;
   color: var(--body-soft);
   margin-top: 5px;
   line-height: 1.6;
@@ -61,12 +61,12 @@
   border-bottom: none;
 }
 .bank-page .bank-summary dt {
-  font-size: 12.5px;
+  font-size: 15px;
   color: var(--body-soft);
 }
 .bank-page .bank-summary dd {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--navy);
   font-weight: 600;
 }
@@ -81,7 +81,7 @@
 
 .bank-page .btn-bank-delete {
   flex: 1;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--danger);
   background: var(--white);
@@ -108,7 +108,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--ink);
   cursor: pointer;
 }
@@ -133,13 +133,13 @@
   background: var(--white);
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-s);
-  box-shadow: 0 8px 24px rgba(32, 36, 46, 0.12);
+  box-shadow: none;
   max-height: 240px;
   overflow-y: auto;
 }
 .bank-page .bank-autocomplete-option {
   padding: 9px 10px;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--navy);
   border-radius: var(--radius-s);
   cursor: pointer;

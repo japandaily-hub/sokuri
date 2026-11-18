@@ -13,7 +13,7 @@
 .bank-page .edit-section-title,
 .identity-page .edit-section-title {
   font-family: var(--head);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 400;
   color: var(--navy);
   margin-bottom: 12px;
@@ -45,12 +45,12 @@
 .profile-page .pw-change-error,
 .bank-page .pw-change-error,
 .identity-page .pw-change-error {
-  font-size: 12.5px;
+  font-size: 15px;
   color: var(--danger);
   margin-bottom: 10px;
   padding: 10px 14px;
   background: var(--danger-bg-soft);
-  border-radius: 0;
+  border-radius: var(--radius);
   border: 1px solid var(--danger-border-soft);
 }
 
@@ -67,7 +67,7 @@
 .identity-page .id-notice-box ul {
   margin: 0;
   padding-left: 18px;
-  font-size: 12.5px;
+  font-size: 15px;
   line-height: 1.9;
   color: var(--body-soft);
 }
@@ -75,7 +75,7 @@
 /* 「マイページ・設定にもどる」リンク（bank-account / identity） */
 .bank-page .id-back-link,
 .identity-page .id-back-link {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--blue);
   text-decoration: underline;

@@ -36,7 +36,7 @@
   height: 56px;
   border-radius: 50%;
   background: var(--deep);
-  color: #fff;
+  color: var(--white);
   font-family: var(--head);
   font-size: 22px;
   font-weight: 600;
@@ -55,7 +55,7 @@
   margin-bottom: 3px;
 }
 .user-card-meta {
-  font-size: 13px;
+  font-size: 15px;
   color: var(--body-soft);
   display: flex;
   gap: 16px;
@@ -92,12 +92,12 @@
   line-height: 1;
 }
 .stat-num span {
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--body-soft);
 }
 .stat-lbl {
-  font-size: 11.5px;
+  font-size: 15px;
   color: var(--body-soft);
   margin-top: 4px;
 }
@@ -120,7 +120,7 @@
   background: var(--pale);
 }
 .sum-label {
-  font-size: 11.5px;
+  font-size: 15px;
   font-weight: 400;
   color: var(--body-soft);
   margin-bottom: 8px;
@@ -134,13 +134,13 @@
   line-height: 1;
 }
 .sum-val span {
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--body-soft);
   margin-left: 2px;
 }
 .sum-sub {
-  font-size: 11px;
+  font-size: 15px;
   color: var(--body-soft);
   margin-top: 4px;
 }
@@ -163,7 +163,7 @@
 }
 .member-status-title {
   font-family: var(--head);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 400;
   color: var(--body-soft);
   margin-bottom: 4px;
@@ -185,7 +185,7 @@
   background: var(--pale-2);
 }
 .member-status-label {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--navy);
 }
 
@@ -201,7 +201,7 @@
 }
 .my-tab {
   padding: 12px 20px;
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 400;
   color: var(--body-soft);
   cursor: pointer;
@@ -235,14 +235,14 @@
   stroke-linejoin: round;
 }
 .tab-count {
-  font-size: 11px;
+  font-size: 15px;
   font-weight: 600;
   font-family: var(--ui);
   font-variant-numeric: tabular-nums;
   padding: 1px 7px;
-  border-radius: 0;
+  border-radius: var(--radius);
   background: var(--blue);
-  color: #fff;
+  color: var(--white);
 }
 .tab-count.gray {
   background: var(--line);
@@ -263,10 +263,10 @@
   transition: border-color 0.2s;
 }
 .lot-card:hover {
-  border-color: #b8c8f0;
+  border-color: var(--line);
 }
 .lot-card.bidding {
-  border-color: #86efac;
+  border-color: var(--line);
 }
 .lot-card.negotiating {
   border-color: var(--blue);
@@ -320,25 +320,25 @@
   flex-wrap: wrap;
 }
 .lot-id {
-  font-size: 11px;
+  font-size: 15px;
   font-weight: 400;
   color: var(--body-soft);
   letter-spacing: 0.06em;
 }
 .status-chip {
-  font-size: 11px;
+  font-size: 15px;
   font-weight: 600;
   font-family: var(--head);
   padding: 2px 9px;
-  border-radius: 0;
+  border-radius: var(--radius-s);
 }
 .status-chip.bidding {
-  background: #d1fae5;
+  background: var(--mint);
   color: var(--green);
 }
 .status-chip.live {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: var(--indigo-tint);
+  color: var(--primary);
 }
 .status-chip.negotiating {
   background: var(--pale);
@@ -349,13 +349,13 @@
   color: var(--body-soft);
 }
 .status-chip.ended {
-  background: #fee2e2;
-  color: #dc2626;
+  background: var(--danger-bg-soft);
+  color: var(--danger);
 }
 /* 未読メッセージ件数バッジ（成約済みカード。r6-flow M-3 対応） */
 .status-chip.unread {
   background: var(--blue);
-  color: #fff;
+  color: var(--white);
 }
 /* 更新ありインジケータ（新着入札・ステータス変化。r-mypage-update 対応）。
    mypage-blink は既存の .live-dot と共用（新規keyframes追加なし）。 */
@@ -377,11 +377,11 @@
   flex-wrap: wrap;
 }
 .lot-cat-chip {
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--ink);
   background: var(--pale-2);
-  border-radius: 0;
+  border-radius: var(--radius-s);
   padding: 2px 8px;
 }
 .lot-meta {
@@ -391,7 +391,7 @@
   margin-top: 2px;
 }
 .lot-meta-item {
-  font-size: 12.5px;
+  font-size: 15px;
   color: var(--body-soft);
   display: flex;
   align-items: center;
@@ -407,7 +407,7 @@
   stroke-linejoin: round;
 }
 .lot-timer {
-  font-size: 12.5px;
+  font-size: 15px;
   font-weight: 600;
 }
 .lot-timer.live {
@@ -420,7 +420,7 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #4ade80;
+  background: var(--green);
   animation: mypage-blink 1.4s infinite;
 }
 @keyframes mypage-blink {
@@ -452,7 +452,7 @@
   text-align: right;
 }
 .bid-info .bid-label {
-  font-size: 11px;
+  font-size: 15px;
   color: var(--body-soft);
   font-weight: 400;
   margin-bottom: 3px;
@@ -465,12 +465,12 @@
   color: var(--navy);
 }
 .bid-info .bid-amount span {
-  font-size: 12px;
+  font-size: 15px;
   color: var(--body-soft);
   font-weight: 600;
 }
 .bid-info .bid-count {
-  font-size: 12px;
+  font-size: 15px;
   color: var(--body-soft);
   margin-top: 2px;
 }
@@ -481,11 +481,11 @@
   width: 100%;
 }
 .btn-lot {
-  font-size: 12.5px;
+  font-size: 15px;
   font-weight: 600;
   font-family: var(--head);
   padding: 8px 12px;
-  border-radius: 0;
+  border-radius: var(--radius);
   border: none;
   cursor: pointer;
   transition: 0.2s;
@@ -499,7 +499,7 @@
 }
 .btn-lot.primary {
   background: var(--blue);
-  color: #fff;
+  color: var(--white);
 }
 .btn-lot.primary:hover {
   background: var(--blue-d);
@@ -514,7 +514,7 @@
   color: var(--blue);
 }
 .btn-lot.green {
-  background: #d1fae5;
+  background: var(--mint);
   color: var(--green);
 }
 .btn-lot.green svg {
@@ -554,7 +554,7 @@
   margin-bottom: 8px;
 }
 .empty-state p {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--body-soft);
   line-height: 1.8;
   margin-bottom: 20px;
@@ -575,7 +575,7 @@
   border-bottom: none;
 }
 .profile-section-title {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 400;
   letter-spacing: 0.06em;
   color: var(--body-soft);
@@ -586,7 +586,7 @@
   justify-content: space-between;
 }
 .profile-section-title .edit-link {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--blue);
   background: none;
@@ -602,7 +602,7 @@
   gap: 16px;
   padding: 10px 0;
   border-bottom: 1px solid var(--line-soft);
-  font-size: 14px;
+  font-size: 15px;
 }
 .profile-row:last-child {
   border-bottom: none;
@@ -624,7 +624,7 @@
   justify-content: space-between;
   padding: 12px 0;
   border-bottom: 1px solid var(--line-soft);
-  font-size: 14px;
+  font-size: 15px;
 }
 .notif-row:last-child {
   border-bottom: none;
@@ -634,14 +634,14 @@
   font-weight: 600;
 }
 .notif-row .notif-sub {
-  font-size: 12px;
+  font-size: 15px;
   color: var(--body-soft);
   margin-top: 2px;
 }
 .toggle {
   width: 44px;
   height: 24px;
-  border-radius: 0;
+  border-radius: var(--radius);
   background: var(--blue);
   position: relative;
   cursor: pointer;
@@ -676,13 +676,13 @@
   padding: 4px 0;
 }
 .profile-links a {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--blue);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 .profile-links a.danger {
-  color: #dc2626;
+  color: var(--danger);
 }
 
 /* レスポンシブ */
@@ -721,7 +721,7 @@
     font-size: 20px;
   }
   .sum-label {
-    font-size: 10.5px;
+    font-size: 15px;
   }
 }
 @media (max-width: 360px) {
@@ -735,4 +735,4 @@
 }
 
 /* 品目要約（案件IDの代わりの見出し補助） */
-.lot-id.lot-items { font-size: 13px; letter-spacing: 0; color: var(--ink); font-weight: 600; text-transform: none; }
+.lot-id.lot-items { font-size: 15px; letter-spacing: 0; color: var(--ink); font-weight: 600; text-transform: none; }
