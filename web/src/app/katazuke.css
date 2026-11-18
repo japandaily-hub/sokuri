@@ -284,37 +284,13 @@ section:has(> .vt){position:relative;}
   background:var(--primary);z-index:80;transition:width .1s;}
 @media(min-width:860px){.scroll-progress{display:none;}}
 
-/* ============================================================
-   HERO — 白地に若草の blob。写真は直角＋緑罫＋破線コネクタ
-   ============================================================ */
-.hero{position:relative;overflow:hidden;background:var(--white);
-  padding:clamp(40px,5vw,72px) 0 clamp(56px,7vw,96px);}
-.hero-blob{position:absolute;right:-12vw;top:-30vh;width:70vw;height:120vh;
-  background:var(--indigo-tint);border-radius:42% 58% 55% 45%/48% 42% 58% 52%;
-  z-index:0;pointer-events:none;}
-.hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(32px,5vw,64px);align-items:center;}
 /* コピー・写真は blob より前面に */
-.hero-copy,
-.hero-figure{position:relative;z-index:1;}
-.hero-eyebrow{display:inline-flex;align-items:center;gap:9px;background:var(--white);
-  border:1px solid var(--line);border-radius:0;padding:8px 16px 8px 12px;
-  font-size:13px;font-weight:400;color:var(--ink);}
-.hero-eyebrow .dot{width:8px;height:8px;border-radius:50%;background:var(--primary);}
-.hero h1{font-size:clamp(30px,4.6vw,50px);line-height:1.6;color:var(--ink);margin-top:20px;
-  font-weight:400;letter-spacing:.04em;}
-.hero h1::first-letter{color:var(--primary);}
-.hero h1 .hl{position:relative;white-space:nowrap;padding-inline:2px;}
-.hero h1 .hl::after{display:none;}
+
 .hero-sub{font-size:16px;color:var(--body);margin-top:22px;max-width:30em;line-height:2;}
 .hero-cta{display:flex;flex-wrap:wrap;gap:14px;margin-top:30px;}
-.hero-trust{display:flex;flex-wrap:wrap;gap:10px 22px;margin-top:26px;}
-.hero-trust li{list-style:none;display:flex;align-items:center;gap:9px;font-size:14px;color:var(--ink);}
-.hero-trust .tb{width:22px;height:22px;border-radius:0;border:0;
-  background:transparent;color:var(--primary);display:grid;place-items:center;flex:none;}
-.hero-trust .tb img{width:100%;height:100%;object-fit:cover;}
 
 /* ヒーロー写真：円形にしない（四隅の情報を落とさないため） */
-.hero-figure{position:relative;}
+
 .hero-photo{position:relative;border-radius:0;aspect-ratio:var(--hero-photo-ar,3/4);overflow:visible;
   background:var(--pale);border:0;box-shadow:none;}
 .hero-photo img{width:100%;height:100%;object-fit:cover;object-position:center 35%;}
@@ -327,11 +303,11 @@ section:has(> .vt){position:relative;}
    PC は枠と素材の AR が一致するため object-fit:cover のトリミングが起きず object-position は無効
    ＝ PC 用の --pos は書かない。859px 以下だけ 4:5 に詰めて上下を切るので、そこで初めて縦位置が効く。
    値は必ずクラスで渡す（インライン style のカスタムプロパティは使わない）。 */
-.hero-photo--2x3{--hero-photo-ar:2/3;}
+
 @media(max-width:859px){
-  .hero-photo--2x3{--hero-photo-ar:4/5;}
+
   .img-frame--2x3.img-frame--hero-person{aspect-ratio:4/5;--pos:50% 38%;}
-  .img-frame--2x3.img-frame--hero-biz{aspect-ratio:4/5;--pos:50% 42%;}
+
 }
 
 /* ============================================================
@@ -371,105 +347,30 @@ section:has(> .vt){position:relative;}
 /* 破線コネクタ */
 .hero-photo::after{content:"";position:absolute;top:50%;left:-46px;width:38px;
   border-top:1px dashed var(--ink);}
-.hero-badge{position:absolute;display:flex;align-items:center;gap:10px;background:var(--white);
-  border:1px solid var(--line);border-radius:0;padding:12px 15px;
-  font-size:13px;font-weight:400;color:var(--ink);}
-.hero-badge .bi{width:34px;height:34px;border-radius:0;display:grid;place-items:center;flex:none;color:#fff;}
-.hero-badge .bi .ic{font-size:18px;}
-.hero-badge small{display:block;font-size:11.5px;color:var(--body-soft);font-weight:400;}
-.hero-badge.b-live{bottom:18px;left:-16px;}
-.hero-badge.b-live .bi{background:var(--primary);}
-.hero-badge.b-bid{bottom:80px;right:-14px;}
-.hero-badge.b-bid .bi{background:var(--deep);}
-@media(max-width:340px){.hero-badge{display:none;}}
-
-/* 4ステップ帯: ヘアラインの箱 + 数字の番号 */
-.hero-how{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
-  background:var(--white);border:1px solid var(--line);border-radius:0;padding:14px 20px;
-  box-shadow:none;margin:22px 0 6px;}
-.hw-step{display:flex;align-items:center;gap:7px;font-family:var(--head);
-  font-size:13px;font-weight:400;color:var(--ink);}
-.hw-n{width:auto;height:auto;border-radius:0;background:none;color:var(--primary);
-  font-family:var(--en-display);font-size:14px;font-weight:400;display:grid;place-items:center;flex:none;
-  font-variant-numeric:tabular-nums;}
-.hw-ic{width:28px;height:28px;object-fit:cover;}
-.hw-arr{color:var(--primary);opacity:.42;font-size:15px;stroke-width:1.5;}
-@media(max-width:480px){.hw-arr{display:none;}.hero-how{gap:10px;}}
 
 /* 帯：信頼の根拠 — 白地に上下ヘアライン */
 .assure{background:var(--white);color:var(--ink);border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
 .assure .container{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;
   padding-block:28px;}
-.assure-item{display:flex;align-items:center;gap:12px;}
+
 /* 2026-09-16 ユーザー指摘: 装飾アイコン(クリック不可)が --primary(青=CTA専用色)の
    淡色アウトラインだと、①青いボタン・リンクと役割が紛らわしい ②同系統の箱がページ内で
    反復し無機質に見える。装飾アイコンは見出しと同じ --ink の塗り+白アイコンへ統一し、
    青は実際にクリックできる要素だけに残す(色の意味を一貫させる)。 */
-.assure-item .ai{width:56px;height:56px;border-radius:0;background:var(--ink);
-  border:1px solid var(--ink);display:grid;place-items:center;flex:none;color:var(--white);}
-.assure-item .ai img{width:100%;height:100%;object-fit:cover;}
-.assure-item b{display:block;font-family:var(--head);font-weight:600;font-size:15px;color:var(--ink);line-height:1.6;}
-.assure-item span{font-size:12px;color:var(--body-soft);}
+
 @media(max-width:860px){.assure .container{grid-template-columns:repeat(2,1fr);gap:16px 18px;}}
 /* スマホ幅（375px）では 2 列だと見出しが「登録事業者 / のみ」「連絡先は成 / 立後に開示」と
    語の途中で折れる（モバイル監査 2026-09-07）。1 列に落として横長カードにし、語を切らない。 */
 @media(max-width:520px){
   .assure .container{grid-template-columns:1fr;gap:12px;}
-  .assure-item .ai{width:48px;height:48px;flex:none;}
-  .assure-item b{font-size:14.5px;}
-}
 
-/* ============================================================
-   共感（悩み）— 枠も面も持たない。区切りは余白のみ
-   ============================================================ */
-.empathy{background:var(--white);}
-.emp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(28px,3.4vw,40px);}
-.emp-card{background:transparent;border:0;border-radius:0;box-shadow:none;overflow:hidden;}
-.emp-photo{aspect-ratio:4/3;background:var(--pale);overflow:hidden;}
-.emp-photo img{width:100%;height:100%;object-fit:cover;transition:opacity .3s var(--ease);}
-.emp-card:hover .emp-photo img{opacity:.85;}
-.emp-card:hover h3{color:var(--primary);}
-.emp-body{padding:18px 0 0;}
-.emp-body h3{font-size:20px;color:var(--ink);transition:color .25s;}
-.emp-body p{font-size:15px;color:var(--body);margin-top:9px;line-height:1.9;}
-.empathy .turn{text-align:center;margin-top:clamp(34px,4vw,52px);}
-.empathy .turn p{font-size:clamp(18px,2vw,22px);font-family:var(--head);font-weight:400;color:var(--ink);}
-.empathy .turn .accent{color:var(--primary);}
+  
+}
 
 /* ============================================================
    汎用カードグリッド見出し共通 / セクション交互背景
    ============================================================ */
 .bg-pale{background:var(--pale-2);}
-.bg-navy{background:var(--deep);}
-
-/* ============================================================
-   BUNDLE（まとめて出すほど有利）— 核
-   ============================================================ */
-.bundle .bundle-lead{display:grid;grid-template-columns:1fr 1fr;gap:clamp(30px,4vw,56px);align-items:center;margin-bottom:clamp(40px,5vw,64px);}
-.bundle-figure{position:relative;border-radius:0;overflow:hidden;aspect-ratio:5/4;background:var(--pale);box-shadow:none;}
-.bundle-figure img{width:100%;height:100%;object-fit:contain;}
-.bundle-copy .eyebrow{margin-bottom:14px;}
-.bundle-copy h2{font-size:clamp(25px,3.2vw,38px);color:var(--ink);}
-.bundle-copy h2::first-letter{color:var(--primary);}
-.bundle-copy .lead{font-size:16px;color:var(--body);margin-top:18px;line-height:2;}
-.bundle-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(28px,3.4vw,40px);align-items:stretch;}
-.bundle-c{position:relative;background:transparent;border:0;border-radius:0;
-  padding:28px 26px;box-shadow:none;}
-.bundle-c .bc-ic{width:72px;height:72px;border-radius:0;background:var(--ink);
-  border:1px solid var(--ink);color:var(--white);
-  display:grid;place-items:center;margin-bottom:16px;}
-.bundle-c .bc-ic img{width:100%;height:100%;object-fit:cover;}
-.bundle-c h3{font-size:19px;color:var(--ink);line-height:1.6;}
-.bundle-c p{font-size:15px;color:var(--body);line-height:1.9;margin-top:11px;}
-/* 強調1枚は枠色ではなく面＋左の緑縦バー（人の森「本社」小見出しの作法）。
-   アイコンは他の装飾アイコン(--ink)と揃えず --gold-text にして「ここがポイント」の
-   1枚だけを反復から際立たせる（2026-09-16）。 */
-.bundle-c.key{background:var(--pale);border-left:3px solid var(--gold-text);box-shadow:none;}
-.bundle-c.key .bc-ic{background:var(--gold-text);border-color:var(--gold-text);color:var(--white);}
-.bundle-c .bc-badge{position:absolute;top:0;left:0;background:var(--gold-text);color:#fff;
-  font-size:11.5px;font-weight:600;font-family:var(--head);padding:6px 13px;border-radius:0;
-  letter-spacing:.08em;box-shadow:none;}
-.bundle-note{font-size:13px;color:var(--body-soft);text-align:center;margin-top:26px;}
 
 /* ============================================================
    AUCTION（業者が競う仕組み）
@@ -478,164 +379,45 @@ section:has(> .vt){position:relative;}
 .auction .section-head h2{color:var(--ink);}
 .auction .section-head .sub{color:var(--body);}
 .auction .eyebrow{color:var(--primary);}
-.auc-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:clamp(32px,4vw,60px);align-items:center;}
+
 .auc-figure{border-radius:0;overflow:hidden;background:var(--pale);box-shadow:none;aspect-ratio:16/10;}
 .auc-figure img{width:100%;height:100%;object-fit:contain;}
-.auc-steps{list-style:none;display:flex;flex-direction:column;gap:18px;}
-.auc-steps li{display:flex;gap:16px;}
-.auc-steps .an{width:auto;min-width:30px;height:auto;border-radius:0;background:none;color:var(--primary);
-  font-family:var(--en-display);font-weight:400;font-size:22px;display:block;flex:none;
-  font-variant-numeric:tabular-nums;line-height:1.4;}
-.auc-steps h4{color:var(--ink);font-size:17px;}
-.auc-steps p{color:var(--body);font-size:15px;margin-top:5px;line-height:1.9;}
-.auc-note{margin-top:26px;font-size:13px;color:var(--body-soft);}
 
 /* ============================================================
    STEPS（使い方4ステップ）
    ============================================================ */
-.steps-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(28px,3.4vw,40px);}
+
 .step{position:relative;background:transparent;border:0;border-radius:0;
   overflow:hidden;box-shadow:none;}
 .step-photo{aspect-ratio:4/3;background:var(--pale);overflow:hidden;}
 .step-photo img{width:100%;height:100%;object-fit:cover;transition:opacity .3s var(--ease);}
 .step:hover .step-photo img{opacity:.85;}
 .step:hover h3{color:var(--primary);}
-.step-body{padding:18px 0 0;}
-.step-n{display:inline-flex;align-items:center;gap:8px;font-family:var(--en-display);font-weight:400;
-  font-size:13px;color:var(--primary);letter-spacing:.08em;}
-.step-n .num{width:auto;height:auto;border-radius:0;background:none;display:inline-block;font-size:22px;
-  font-family:var(--en-display);font-variant-numeric:tabular-nums;}
-/* DOM の数字は変えずに「01」の二桁表記にする */
-.step-n .num::before{content:"0";}
-.step-body h3{font-size:18px;margin-top:12px;color:var(--ink);transition:color .25s;}
-.step-body p{font-size:15px;color:var(--body);margin-top:8px;line-height:1.9;}
+
 /* ステップ写真（127×130 ≈ 1:1）は正方形コンテナで全体を表示 */
 #flow .step-photo { aspect-ratio: 1/1; }
 /* Trustイラスト（206×125 ≈ 16.5:10）はほぼ16/10で収まるためそのまま */
-/* Tipイラスト（216×118 ≈ 16:8.7）は横長なので4:3コンテナで縦はすべて表示 */
-@media(max-width:880px){.steps-grid{grid-template-columns:repeat(2,1fr);}}
-
 /* ============================================================
    HANDOVER / MEDIA SPLIT（汎用）
    ============================================================ */
 .media-split{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,4vw,60px);align-items:center;}
-.media-split.rev .media-figure{order:2;}
+
 .media-figure{border-radius:0;overflow:hidden;aspect-ratio:4/3;background:var(--pale);box-shadow:none;}
 .media-figure img{width:100%;height:100%;object-fit:cover;}
-.media-copy .eyebrow{margin-bottom:14px;}
-.media-copy h2{font-size:clamp(24px,3vw,34px);color:var(--ink);}
-.media-copy h2::first-letter{color:var(--primary);}
-.media-copy .sub{font-size:16px;color:var(--body);margin-top:16px;line-height:2;}
-.mlist{list-style:none;margin-top:22px;display:flex;flex-direction:column;gap:13px;}
-.mlist li{display:flex;gap:12px;font-size:15px;color:var(--ink);align-items:flex-start;}
-.mlist .ck{width:22px;height:22px;border-radius:0;border:0;
-  background:transparent;color:var(--primary);display:grid;place-items:center;flex:none;margin-top:3px;}
-.mlist .ck img{width:100%;height:100%;object-fit:cover;}
-
-/* ============================================================
-   利用シーン
-   ============================================================ */
-.scenes-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(28px,3.4vw,40px);}
-.scene-card{background:transparent;border:0;border-radius:0;overflow:hidden;box-shadow:none;}
-.scene-img{aspect-ratio:3/4;background:var(--pale);overflow:hidden;}
-.scene-img img{width:100%;height:100%;object-fit:cover;transition:opacity .3s var(--ease);}
-.scene-card:hover .scene-img img{opacity:.85;}
-.scene-card:hover h3{color:var(--primary);}
-.scene-body{padding:18px 0 0;}
-.scene-tag{display:inline-flex;align-items:center;gap:7px;font-family:var(--head);font-weight:400;
-  font-size:12px;letter-spacing:.06em;padding:4px 12px;border-radius:0;
-  color:var(--primary);background:var(--white);border:1px solid var(--primary);}
-.scene-tag .ic{font-size:14px;}
-.scene-body h3{font-size:18px;margin-top:12px;color:var(--ink);transition:color .25s;}
-.scene-body p{font-size:15px;color:var(--body);margin-top:8px;line-height:1.9;}
-@media(max-width:980px){.scenes-grid{grid-template-columns:repeat(2,1fr);}}
-
-/* ============================================================
-   TRUST（安心・信頼）
-   ============================================================ */
-.trust-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(28px,3.4vw,40px);}
-.trust-c{background:transparent;border:0;border-radius:0;overflow:hidden;box-shadow:none;}
-.tc-illus{aspect-ratio:16/10;background:var(--pale);overflow:hidden;display:grid;place-items:center;}
-.tc-illus img{width:100%;height:100%;object-fit:contain;padding:10px;transition:opacity .3s var(--ease);}
-.trust-c:hover .tc-illus img{opacity:.85;}
-.trust-c:hover h3{color:var(--primary);}
-.tc-body{padding:20px 0 0;}
-.tc-body h3{font-size:19px;color:var(--ink);margin-top:2px;transition:color .25s;}
-.tc-body p{font-size:15px;color:var(--body);margin-top:10px;line-height:1.9;}
-
-/* ============================================================
-   料金（透明性） — 「無料」はマーカーで強度を作る
-   ============================================================ */
-.fee-card{max-width:var(--maxw-text);margin-inline:auto;background:var(--white);border:1px solid var(--line);
-  border-radius:0;box-shadow:none;overflow:hidden;}
-.fee-head{background:var(--pale);padding:26px 30px;border-bottom:1px solid var(--line);text-align:center;}
-.fee-head h3{font-size:22px;color:var(--ink);}
-.fee-head p{font-size:14px;color:var(--body-soft);margin-top:6px;}
-.fee-rows{padding:10px 30px 26px;}
-.fee-row{display:flex;justify-content:space-between;align-items:center;gap:16px;
-  padding:17px 0;border-bottom:1px solid var(--line-soft);}
-.fee-row:last-child{border-bottom:none;}
-.fee-row .fl{font-size:15px;font-weight:600;color:var(--ink);}
-.fee-row .fl small{display:block;font-size:12px;font-weight:400;color:var(--body-soft);margin-top:3px;}
-.fee-row .fv{font-family:var(--ui);font-weight:600;font-size:20px;color:var(--primary);white-space:nowrap;
-  font-variant-numeric:tabular-nums;background:linear-gradient(transparent 68%,var(--marker) 68%);}
-.fee-row .fv.zero::after{content:"無料";}
 
 /* ---------- 業者向け導線バナー — 淡い緑面 + 上下ヘアライン ---------- */
-.biz-banner{background:var(--pale);border-top:1px solid var(--line);border-bottom:1px solid var(--line);
-  padding:clamp(48px,6vw,72px) 0;}
-.biz-banner-inner{display:flex;align-items:center;gap:clamp(24px,4vw,56px);flex-wrap:wrap;}
-.biz-banner-copy{flex:1;min-width:260px;}
-.biz-banner-copy .eyebrow{color:var(--primary);background:none;}
-.biz-banner-copy h2{font-size:clamp(22px,2.8vw,32px);color:var(--ink);margin-top:14px;line-height:1.6;}
-.biz-banner-copy h2::first-letter{color:var(--primary);}
-.biz-banner-copy p{font-size:15px;color:var(--body);margin-top:12px;line-height:1.9;}
-.biz-banner-tags{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;}
+
 .biz-tag{font-size:12.5px;font-weight:400;color:var(--primary);background:var(--white);
   border:1px solid var(--primary);border-radius:0;padding:5px 14px;}
-.biz-banner-cta{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:12px;}
+
 /* クラス名は据え置き。人の森整合版では緑地白文字の直角ボタン */
 .btn-white{background:var(--primary);color:#fff;box-shadow:none;}
-@media(max-width:640px){.biz-banner-inner{flex-direction:column;align-items:flex-start;}.biz-banner-cta{width:100%;}.biz-banner-cta .btn{width:100%;}}
 
 /* ============================================================
    対応カテゴリ — 枠は写真だけが持つ
    ============================================================ */
-.cats-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:16px;}
-.cat{background:transparent;border:0;border-radius:0;overflow:hidden;box-shadow:none;}
-.cat-img{aspect-ratio:1/1;background:var(--pale);border:1px solid var(--line);overflow:hidden;}
-.cat-img img{width:100%;height:100%;object-fit:contain;padding:0;transition:opacity .25s var(--ease);}
-.cat:hover .cat-img img{opacity:.85;}
-.cat:hover .cl{color:var(--primary);}
-.cat-body{padding:12px 2px 0;text-align:center;}
-.cat-body .cl{font-family:var(--head);font-weight:400;font-size:14px;color:var(--ink);line-height:1.6;transition:color .25s;}
-.cat-body .cs{font-size:11.5px;color:var(--body-soft);margin-top:3px;}
-@media(max-width:980px){.cats-grid{grid-template-columns:repeat(4,1fr);}}
-@media(max-width:560px){.cats-grid{grid-template-columns:repeat(3,1fr);gap:12px;}}
-.cats-note{display:flex;gap:16px;align-items:flex-start;max-width:var(--maxw-text);margin:clamp(30px,4vw,44px) auto 0;
-  background:var(--pale);border:1px solid var(--line);border-radius:0;padding:22px 26px;}
-.cats-note .cn-ic{width:56px;height:56px;border-radius:0;background:var(--ink);
-  border:1px solid var(--ink);color:var(--white);display:grid;place-items:center;flex:none;}
-.cats-note .cn-ic img{width:100%;height:100%;object-fit:cover;}
-.cats-note h4{font-size:17px;color:var(--ink);}
-.cats-note p{font-size:15px;color:var(--body);margin-top:7px;line-height:1.9;}
 
-/* ============================================================
-   運営者メッセージ
-   ============================================================ */
-.founder-grid{display:grid;grid-template-columns:.8fr 1.2fr;gap:clamp(30px,4vw,56px);align-items:center;}
-/* figcaption を内包するため円形マスクは文字を欠く。直角＋緑罫で作法を継承する */
-.founder-photo{border-radius:0;overflow:hidden;aspect-ratio:3/4;background:var(--pale);box-shadow:none;position:relative;}
-.founder-photo img{width:100%;height:100%;object-fit:cover;}
-.founder-photo figcaption{position:absolute;left:0;right:0;bottom:0;padding:18px 18px 14px;
-  background:linear-gradient(transparent,rgba(51,51,51,.82));color:#fff;font-family:var(--head);
-  font-weight:600;font-size:14px;}
-.founder-copy .eyebrow{margin-bottom:14px;}
-.founder-copy h2{font-size:clamp(22px,2.7vw,32px);color:var(--ink);}
-.founder-copy h2::first-letter{color:var(--primary);}
-.founder-copy p{font-size:16px;color:var(--body);margin-top:16px;line-height:2;}
-.founder-sign{margin-top:20px;font-family:var(--head);font-weight:600;color:var(--ink);font-size:15px;}
-.founder-sign span{display:block;font-size:12px;color:var(--body-soft);font-weight:400;margin-bottom:2px;}
+.cat{background:transparent;border:0;border-radius:0;overflow:hidden;box-shadow:none;}
 
 /* ============================================================
    FAQ — 上下ヘアラインで区切るリスト
@@ -660,25 +442,6 @@ section:has(> .vt){position:relative;}
 .faq-a-inner{padding:0 4px 22px 36px;font-size:15px;color:var(--body);line-height:1.9;}
 
 /* ============================================================
-   最終CTA — 白地に若草の blob。人の顔を主役に
-   ============================================================ */
-.final{background:var(--white);color:var(--ink);text-align:center;overflow:hidden;position:relative;
-  border-top:1px solid var(--line);}
-.final::before{content:"";position:absolute;left:-18vw;bottom:-40vh;width:60vw;height:100vh;
-  background:var(--indigo-tint);border-radius:48% 52% 45% 55%/52% 48% 52% 48%;z-index:0;pointer-events:none;}
-.final .container{position:relative;z-index:2;}
-.cta-staff{display:flex;justify-content:center;margin-bottom:22px;}
-.cta-staff img{width:60px;height:60px;border-radius:50%;object-fit:cover;border:2px solid #fff;
-  margin-left:-14px;box-shadow:none;background:var(--pale);}
-.cta-staff img:first-child{margin-left:0;}
-.final h2{color:var(--ink);font-size:clamp(26px,3.6vw,42px);}
-.final h2::first-letter{color:var(--primary);}
-.final p{font-size:16px;color:var(--body);margin-top:16px;max-width:34em;margin-inline:auto;line-height:2;}
-.final .final-cta{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-top:30px;}
-.final .btn-ghost{background:var(--white);color:var(--ink);border:1px solid var(--ink);}
-.final .final-note{margin-top:22px;font-size:13px;color:var(--body-soft);}
-
-/* ============================================================
    フッター — 白地・上ヘアライン（導線は不変）
    ============================================================ */
 .footer{background:var(--paper);color:var(--body-soft);border-top:1px solid var(--line);
@@ -688,8 +451,7 @@ section:has(> .vt){position:relative;}
    （1fr だけだと最小内容幅で列が膨らみロゴ列が潰れる）。860px 以下は 2 列のまま（下の @media）。 */
 .footer-grid{display:grid;grid-template-columns:1.4fr repeat(4,minmax(0,1fr));gap:clamp(22px,2.4vw,32px);}
 .footer-logo img{height:40px;filter:none;opacity:1;}
-.founder-logo{display:block;width:56px;margin-bottom:20px;}
-.final-logo{display:block;width:64px;margin:0 auto 24px;}
+
 .footer .about{margin-top:16px;line-height:1.9;max-width:30em;color:var(--body-soft);font-size:14px;}
 /* 列見出しは丸ゴ 700 の和文（英字の大文字ラベルはやめた） */
 .footer h5{color:var(--ink);font-family:var(--head);font-weight:700;
@@ -733,15 +495,6 @@ section:has(> .vt){position:relative;}
    中間インラインCTA
    ============================================================ */
 .section-cta{padding:0 0 clamp(28px,3.5vw,44px);}
-.scta-inner{display:flex;align-items:center;justify-content:space-between;gap:24px;
-  background:var(--pale);border:1px solid var(--line);border-radius:0;
-  padding:26px 36px;}
-.scta-text strong{display:block;font-family:var(--head);font-weight:600;
-  font-size:17px;color:var(--ink);}
-.scta-text span{display:block;font-size:13px;color:var(--body-soft);margin-top:4px;}
-@media(max-width:640px){
-  .scta-inner{flex-direction:column;text-align:center;padding:22px 20px;}
-}
 
 /* ============================================================
    スクロール演出 — フェードのみ（人の森は移動を伴わない）

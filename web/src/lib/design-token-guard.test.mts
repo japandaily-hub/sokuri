@@ -37,13 +37,11 @@ const BANNED: ReadonlyArray<readonly [string, RegExp, string]> = [
 /**
  * 除外（src からの相対パス。ディレクトリは配下すべて）。いずれも後続の作業で消える・作り直すため、
  * そのコミットで本リストからも外す（外し忘れても、対象が消えれば検査に影響しない）。
- *  - app/lp/                … 参照 LP の移植。トップ作り直し後に lp/_components・lp.css ごと削除する（C5）。
- *                             旧テーマの色・書体を多数含むため、ここで直すと削除予定のコードに手を入れることになる。
  *  - app/opengraph-image.tsx … OGP 画像（next/og）。CSS 変数が使えず色を直書きするうえ、
  *                             Satori 用の書体指定も絡むため、専用の作業（C11）で作り直す。
- * app/page.tsx（トップ）は C4 で作り直すが、現時点で旧値の直書きが 0 件のため除外しない。
+ * app/page.tsx・app/top.css（トップ）は作り直し済みで旧値が無いため除外しない。
  */
-const EXCLUDED: readonly string[] = ["app/lp/", "app/opengraph-image.tsx"];
+const EXCLUDED: readonly string[] = ["app/opengraph-image.tsx"];
 
 /** 検査対象の拡張子（テストファイル自身は旧値を文字列として含むため除く） */
 const TARGET_EXTENSIONS = [".css", ".tsx", ".ts"] as const;
@@ -84,8 +82,7 @@ describe("デザイントークンの旧値が残っていない", () => {
     assert.ok(TARGET_FILES.includes("app/layout.tsx"));
   });
 
-  it("除外は lp/ と opengraph-image.tsx だけで、その配下は走査に入らない", () => {
-    assert.equal(TARGET_FILES.some((f) => f.startsWith("app/lp/")), false);
+  it("除外は opengraph-image.tsx だけで、走査に入らない", () => {
     assert.equal(TARGET_FILES.includes("app/opengraph-image.tsx"), false);
   });
 

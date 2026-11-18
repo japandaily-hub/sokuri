@@ -31,7 +31,6 @@ const PUBLIC_FILES = [
   "business/page.tsx",
   "vendors/page.tsx",
   "verify-email/page.tsx",
-  "lp/_components/LpChrome.tsx",
   "unsubscribe/page.tsx",
   "login/page.tsx",
   "signup/page.tsx",
@@ -78,7 +77,7 @@ const BANNED: ReadonlyArray<readonly [string, string, readonly string[]?]> = [
   [
     "ユーザーの費用は0円",
     "N-1: 同上（0円なのはカタヅケの利用料）",
-    ["page.tsx", "legal/page.tsx", "company/page.tsx", "examples/page.tsx", "photo-guide/page.tsx", "lp/_components/LpChrome.tsx"],
+    ["page.tsx", "legal/page.tsx", "company/page.tsx", "examples/page.tsx", "photo-guide/page.tsx"],
   ],
   ["どの段階でも無料", "N-1: 同上"],
   ["LINE連携済みの方のみ", "N-3: チャット新着はメール登録者にもメールで届く（notify_dispatch）"],
