@@ -143,7 +143,6 @@ section:has(> .vt){position:relative;}
     writing-mode:vertical-rl;text-orientation:mixed;
     font-family:var(--head);font-size:34px;font-weight:400;line-height:1.35;
     letter-spacing:.12em;color:var(--ink);}
-  .vt::first-letter{color:var(--primary);}
   .vt .n{text-combine-upright:all;}
 }
 
@@ -152,22 +151,21 @@ section:has(> .vt){position:relative;}
 .hl{color:var(--primary);background:linear-gradient(transparent 70%,var(--marker) 70%);}
 
 /* ---------- ロゴ（和文のみのワードマーク。見本 v12 の .logo） ---------- */
-/* 英字（KATAZUKE）は撤去した。.kdz-wm-en は旧マークアップ（lp/ 等）が残る間だけ非表示にして互換を保つ */
+/* 英字（KATAZUKE）は撤去済み（和文のみのワードマーク） */
 .kdz-wm{display:inline-flex;flex-direction:column;line-height:1;color:var(--ink);}
 .kdz-wm-ja{font-family:var(--maru);font-weight:700;font-size:var(--wm,22px);letter-spacing:.12em;}
-.kdz-wm-en{display:none;}
 .kdz-wm.white{color:#fff;}
 
 /* ---------- 必須 / 任意バッジ（13px 未満は作らない） ---------- */
 .req{display:inline-block;background:var(--primary);color:#fff;padding:2px 10px;
-  font-family:var(--goth);font-size:13px;font-weight:700;line-height:1.5;
+  font-family:var(--goth);font-size:15px;font-weight:700;line-height:1.5;
   border-radius:var(--radius-s);vertical-align:middle;}
 .opt{display:inline-block;background:var(--body-soft);color:#fff;padding:2px 10px;
-  font-family:var(--goth);font-size:13px;font-weight:700;line-height:1.5;
+  font-family:var(--goth);font-size:15px;font-weight:700;line-height:1.5;
   border-radius:var(--radius-s);vertical-align:middle;}
 
 /* ---------- 見本 v12 の共通部品：.label / .link / .sec-head ---------- */
-.label{font-size:14px;font-weight:700;color:var(--primary);letter-spacing:.08em;display:flex;align-items:center;gap:12px;}
+.label{font-size:15px;font-weight:700;color:var(--primary);letter-spacing:.08em;display:flex;align-items:center;gap:12px;}
 .label::before{content:"";width:24px;height:1px;background:currentColor;}
 .link{color:var(--primary);font-weight:700;text-decoration:underline;text-underline-offset:5px;text-decoration-thickness:1px;}
 .link:hover{color:var(--primary-d);}
@@ -184,13 +182,12 @@ section:has(> .vt){position:relative;}
 .section{padding:clamp(60px,7.4vw,104px) 0;}
 .section.tight{padding:clamp(48px,6vw,80px) 0;}
 .eyebrow{display:inline-flex;align-items:center;gap:12px;font-family:var(--goth);
-  font-weight:700;font-size:14px;letter-spacing:.08em;color:var(--primary);
+  font-weight:700;font-size:15px;letter-spacing:.08em;color:var(--primary);
   background:none;border-radius:0;padding:0;}
 .eyebrow::before{content:"";display:block;width:24px;height:1px;background:currentColor;}
-.section-head{max-width:var(--maxw-text);margin:0 auto clamp(36px,4.5vw,56px);text-align:center;}
-.section-head .eyebrow{justify-content:center;}
-.section-head h2{font-size:clamp(24px,3vw,34px);margin-top:18px;color:var(--ink);line-height:1.5;}
-.section-head .sub{font-size:17px;color:var(--body);margin-top:16px;line-height:1.85;max-width:44em;margin-inline:auto;}
+.section-head{margin:0 0 clamp(36px,4.5vw,56px);text-align:left;}
+.section-head h2{font-size:clamp(28px,3.6vw,42px);margin-top:16px;color:var(--ink);line-height:1.5;max-width:28em;}
+.section-head .sub{font-size:17px;color:var(--body);margin-top:16px;line-height:1.85;max-width:30em;}
 
 /* ---------- ボタン（見本 v12：高さ56px・角丸 --radius・角ゴ700。hover は色だけを動かす） ---------- */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;
@@ -220,7 +217,7 @@ section:has(> .vt){position:relative;}
 .btn-line__body{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:3px;
   padding:10px clamp(20px,2.2vw,28px);min-width:0;flex:1 1 auto;text-align:center;}
 .btn-line__label{font-family:var(--goth);font-weight:700;font-size:17px;line-height:1.3;}
-.btn-line__sub{font-family:var(--goth);font-weight:500;font-size:14px;line-height:1.4;
+.btn-line__sub{font-family:var(--goth);font-weight:500;font-size:15px;line-height:1.4;
   color:rgba(255,255,255,.92);}
 @media (max-width:859px){
   /* 相方の .btn-out/.btn-ghost も同時に全幅にする（LINE だけ全幅で不揃いになるのを防ぐ） */
@@ -242,8 +239,8 @@ section:has(> .vt){position:relative;}
 /* R4 ラウンド4 指摘（17/12）: 濃色帯の上では白ベタの副ボタンが主ボタンより目立ち主従が逆転する
    （/photo-guide ヒーロー）。帯のコピー内だけ白枠の透過ボタンにして主従を戻す。
    白文字は veil 上で 6:1 以上、枠線 .72 は非テキスト 3:1 以上。 */
-.hero-band__copy .btn-ghost{background:transparent;color:#fff;border-color:rgba(255,255,255,.72);}
-.hero-band__copy .btn-ghost:hover{background:rgba(255,255,255,.16);color:#fff;}
+.hero-band__copy .btn-ghost{background:transparent;color:var(--white);border-color:rgba(255,255,255,.72);}
+.hero-band__copy .btn-ghost:hover{background:rgba(255,255,255,.16);color:var(--white);}
 .btn-lg{font-size:17px;min-height:60px;padding:0 36px;}
 .btn-block{width:100%;}
 
@@ -267,7 +264,7 @@ section:has(> .vt){position:relative;}
   .header .inner{gap:10px;height:60px;}
   .header .logo .kdz-wm{--wm:18px;}
   .app-actions{gap:8px;}
-  .app-actions a,.app-actions button{font-size:13px;}
+  .app-actions a,.app-actions button{font-size:15px;}
   .app-actions > a[aria-label]{width:36px;height:36px;}
 }
 .hamburger{display:none;margin-left:auto;width:44px;height:44px;border:1px solid var(--line);
@@ -445,14 +442,14 @@ section:has(> .vt){position:relative;}
    フッター — 白地・上ヘアライン（導線は不変）
    ============================================================ */
 .footer{background:var(--paper);color:var(--body-soft);border-top:1px solid var(--line);
-  padding:clamp(48px,6vw,72px) 0 36px;font-size:14px;}
+  padding:clamp(48px,6vw,72px) 0 36px;font-size:15px;}
 /* ラウンド5 指摘（1/2/3）: 「業者の方へ」列を新設したので 4 列 → 5 列（ロゴ列＋4ナビ列）。
    ナビ列は minmax(0,1fr) で等幅にし、「特定商取引法に基づく表記」等の長いラベルは列内で折り返す
    （1fr だけだと最小内容幅で列が膨らみロゴ列が潰れる）。860px 以下は 2 列のまま（下の @media）。 */
 .footer-grid{display:grid;grid-template-columns:1.4fr repeat(4,minmax(0,1fr));gap:clamp(22px,2.4vw,32px);}
 .footer-logo img{height:40px;filter:none;opacity:1;}
 
-.footer .about{margin-top:16px;line-height:1.9;max-width:30em;color:var(--body-soft);font-size:14px;}
+.footer .about{margin-top:16px;line-height:1.9;max-width:30em;color:var(--body-soft);font-size:15px;}
 /* 列見出しは丸ゴ 700 の和文（英字の大文字ラベルはやめた） */
 .footer h5{color:var(--ink);font-family:var(--head);font-weight:700;
   font-size:15px;letter-spacing:.04em;margin-bottom:14px;}
@@ -469,7 +466,7 @@ section:has(> .vt){position:relative;}
 .footer .about a,.footer .about a:link,.footer .about a:visited{color:var(--body-soft);}
 .footer-bottom{margin-top:40px;padding-top:24px;border-top:1px solid var(--line);
   display:flex;flex-wrap:wrap;gap:10px 24px;justify-content:center;text-align:center;
-  color:var(--body-soft);font-size:14px;}
+  color:var(--body-soft);font-size:15px;}
 @media(max-width:860px){.footer-grid{grid-template-columns:1fr 1fr;gap:28px;}}
 
 /* ============================================================
@@ -489,7 +486,7 @@ section:has(> .vt){position:relative;}
 .dock .btn.btn-line{flex:1 1 auto;min-width:0;min-height:48px;padding:0;}
 .dock .btn-line__body{padding:4px clamp(14px,2.2vw,20px);gap:1px;}
 .dock .btn-line__label{font-size:15px;line-height:1.3;}
-.dock .btn-line__sub{font-size:14px;line-height:1.3;}
+.dock .btn-line__sub{font-size:15px;line-height:1.3;}
 
 /* ============================================================
    中間インラインCTA
@@ -520,7 +517,7 @@ img[data-ph]{position:relative;}
 .imgph{position:absolute;inset:0;display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center;
   background:repeating-linear-gradient(135deg,#f6f8f4 0 14px,#eff3ef 14px 28px);color:var(--body-soft);text-align:center;padding:14px;}
 .imgph .ic{font-size:30px;opacity:.7;}
-.imgph small{font-size:11px;font-weight:400;letter-spacing:.02em;line-height:1.6;}
+.imgph small{font-size:15px;font-weight:400;letter-spacing:.02em;line-height:1.6;}
 
 /* ============================================================
    レスポンシブ

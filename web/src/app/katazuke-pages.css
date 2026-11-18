@@ -18,7 +18,7 @@
   align-items: center;
   justify-content: space-between;
 }
-.auth-bar-link { font-size: 14px; color: var(--body-soft); transition: color .2s; }
+.auth-bar-link { font-size: 15px; color: var(--body-soft); transition: color .2s; }
 .auth-bar-link:hover { color: var(--primary); }
 
 .auth-wrap { max-width: 440px; margin: 0 auto; padding: 40px 20px 80px; }
@@ -32,7 +32,6 @@
 }
 .auth-head { margin-bottom: 28px; }
 .auth-title { font-family: var(--head); font-size: 24px; font-weight: 700; color: var(--ink); line-height: 1.5; }
-.auth-title::first-letter { color: var(--primary); }
 /* app 面の地の文は 15px / 1.75（2.0 だと1画面が伸びて送信ボタンが折り返し下に落ちる） */
 .auth-sub { font-size: 15px; color: var(--body-soft); line-height: 1.75; margin-top: 8px; }
 
@@ -40,7 +39,7 @@
    区切りの前後余白を 24px 以上取って「別の入口」として独立させる（幅は既に max-width:360px で抑制済み）。 */
 .auth-divider {
   display: flex; align-items: center; gap: 12px; margin: 28px 0 24px;
-  color: var(--body-soft); font-size: 12px; letter-spacing: .08em;
+  color: var(--body-soft); font-size: 15px; letter-spacing: .08em;
 }
 .auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 
@@ -48,9 +47,9 @@
 .field { margin-bottom: 18px; }
 .field:last-child { margin-bottom: 0; }
 .field-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px; }
-.field label, .field .field-lbl { display: block; font-family: var(--head); font-size: 14px; font-weight: 600; color: var(--ink); margin-bottom: 7px; }
+.field label, .field .field-lbl { display: block; font-family: var(--head); font-size: 15px; font-weight: 600; color: var(--ink); margin-bottom: 7px; }
 .field-top label, .field-top .field-lbl { margin-bottom: 0; }
-.forget-link { font-size: 12px; color: var(--primary); cursor: pointer; background: none; border: none; }
+.forget-link { font-size: 15px; color: var(--primary); cursor: pointer; background: none; border: none; }
 .forget-link:hover { text-decoration: underline; }
 .field input, .field textarea, .field select {
   width: 100%; font-size: 15px; color: var(--ink);
@@ -62,7 +61,7 @@
   border-color: var(--primary); background: var(--white);
 }
 .field.has-error input, .field.has-error textarea { border-color: var(--danger); }
-.field-error { font-size: 12px; color: var(--danger); margin-top: 5px; }
+.field-error { font-size: 15px; color: var(--danger); margin-top: 5px; }
 
 /* パスワード表示切替 */
 .pw-wrap { position: relative; }
@@ -78,7 +77,7 @@
 /* エラーバナー */
 .auth-error {
   background: var(--white); border: 1px solid var(--danger); border-radius: 0;
-  padding: 11px 14px; font-size: 14px; color: var(--danger); margin-bottom: 18px;
+  padding: 11px 14px; font-size: 15px; color: var(--danger); margin-bottom: 18px;
   display: flex; align-items: center; gap: 8px; line-height: 1.6;
 }
 /* .auth-wrap は max-width:440px 固定のため、ビューポート幅に関わらずカード内は常に狭い。
@@ -96,7 +95,7 @@
    components/kdz/Ui.tsx の Notice（Tailwind版）を引き続き使用する（別レイヤーのため統合しない）。
    使い方: <div className="notice notice--danger">…</div>（または components/kdz/Notice.tsx の <Notice tone="danger">）。 */
 .notice {
-  border-radius: var(--radius-s); padding: 11px 14px; font-size: 14px;
+  border-radius: var(--radius-s); padding: 11px 14px; font-size: 15px;
   line-height: 1.6; margin-bottom: 18px; display: flex; align-items: flex-start; gap: 8px;
   border: 1px solid transparent;
 }
@@ -110,11 +109,11 @@
 
 /* 信頼行 */
 .trust-row { display: flex; gap: 18px; margin-top: 22px; justify-content: center; flex-wrap: wrap; }
-.trust-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--body-soft); }
+.trust-item { display: flex; align-items: center; gap: 5px; font-size: 15px; color: var(--body-soft); }
 .trust-item svg { width: 13px; height: 13px; fill: none; stroke: var(--primary); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 /* 新規登録/ログイン誘導 */
-.auth-switch { text-align: center; margin-top: 24px; font-size: 14px; color: var(--body-soft); line-height: 1.75; }
+.auth-switch { text-align: center; margin-top: 24px; font-size: 15px; color: var(--body-soft); line-height: 1.75; }
 .auth-switch a { color: var(--primary); font-weight: 600; }
 .auth-switch a:hover { text-decoration: underline; }
 
@@ -140,9 +139,9 @@
 .line-consent { max-width: 360px; margin-left: auto; margin-right: auto; }
 .line-consent__agree { display: flex; align-items: flex-start; gap: 12px; margin: 0 0 12px; }
 .line-consent__cb { width: 20px; height: 20px; flex-shrink: 0; accent-color: var(--blue); margin-top: 2px; cursor: pointer; }
-.line-consent__agree label { font-size: 13px; color: var(--body); line-height: 1.75; cursor: pointer; text-align: left; }
+.line-consent__agree label { font-size: 15px; color: var(--body); line-height: 1.75; cursor: pointer; text-align: left; }
 .line-consent__agree a { color: var(--blue); font-weight: 600; text-decoration: underline; }
-.line-consent__agree .req { margin-left: 6px; font-size: 11px; font-weight: 700; color: var(--danger); }
+.line-consent__agree .req { margin-left: 6px; font-size: 15px; font-weight: 700; color: var(--danger); }
 .line-consent .btn-line-auth:disabled { opacity: .45; }
 .line-consent__hint { margin: 8px 0 0; font-size: 12.5px; color: var(--body-soft); line-height: 1.7; text-align: center; }
 /* タッチ端末: チェックボックスの行全体を 44px 以上のタップ領域にする（M-12 と同じ基準） */
@@ -191,21 +190,20 @@
 .fs-dot { width: 24px; height: 24px; border-radius: 0; border: 1px solid var(--line); background: var(--white); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500; color: var(--body-soft); font-family: var(--ui); position: relative; z-index: 1; transition: background .3s, color .3s, border-color .3s; }
 .flow-step.done .fs-dot { background: var(--primary); border-color: var(--primary); color: var(--white); }
 .flow-step.active .fs-dot { background: var(--primary); border-color: var(--primary); color: var(--white); }
-.fs-label { font-size: 10px; color: var(--body-soft); white-space: nowrap; }
+.fs-label { font-size: 15px; color: var(--body-soft); white-space: nowrap; }
 .flow-step.active .fs-label { color: var(--primary); }
 .flow-step.done .fs-label { color: var(--ink); }
 
 .flow-wrap { max-width: 600px; margin: 0 auto; padding: 28px 20px 100px; }
 .step-title { font-family: var(--head); font-size: clamp(20px,3vw,26px); font-weight: 400; color: var(--ink); margin-bottom: 8px; line-height: 1.5; }
-.step-title::first-letter { color: var(--primary); }
 .step-desc { font-size: 15px; color: var(--body); line-height: 1.75; margin-bottom: 24px; }
 
 .form-card { background: var(--white); border: 1px solid var(--line); border-radius: 0; box-shadow: none; padding: 26px 24px; margin-bottom: 16px; }
 /* .field-top .req/.opt: Field コンポーネント（components/kdz/auth.tsx）の rightSlot に
    直接 .req/.opt バッジを渡すケース（label 文字列に埋め込めないため）。ラベル内埋め込み版
    （.field label .req/.opt）と見た目を統一する。値は katazuke.css の .req/.opt と同一。 */
-.field label .req, .field-top .req { font-family: var(--ui); font-size: 12px; font-weight: 500; color: var(--white); background: var(--primary); padding: 2px 10px; border-radius: 0; margin-left: 6px; vertical-align: middle; }
-.field label .opt, .field-top .opt { font-family: var(--ui); font-size: 12px; font-weight: 500; color: var(--white); background: #808080; padding: 2px 10px; border-radius: 0; margin-left: 6px; vertical-align: middle; }
+.field label .req, .field-top .req { font-family: var(--ui); font-size: 15px; font-weight: 500; color: var(--white); background: var(--primary); padding: 2px 10px; border-radius: 0; margin-left: 6px; vertical-align: middle; }
+.field label .opt, .field-top .opt { font-family: var(--ui); font-size: 15px; font-weight: 500; color: var(--white); background: #808080; padding: 2px 10px; border-radius: 0; margin-left: 6px; vertical-align: middle; }
 
 .select-wrap { position: relative; }
 .select-wrap::after { content: ""; position: absolute; right: 14px; top: 50%; transform: translateY(-50%); width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid var(--body-soft); pointer-events: none; }
@@ -214,7 +212,7 @@
 
 .pw-strength { margin-top: 8px; display: flex; gap: 5px; align-items: center; }
 .pw-strength-bar { flex: 1; height: 4px; border-radius: 0; background: var(--line); transition: background .3s; }
-.pw-strength-label { font-size: 11px; color: var(--body-soft); min-width: 36px; text-align: right; }
+.pw-strength-label { font-size: 15px; color: var(--body-soft); min-width: 36px; text-align: right; }
 
 .flow-footer { position: fixed; bottom: 0; left: 0; right: 0; z-index: 50; background: var(--white); border-top: 1px solid var(--line); box-shadow: none; }
 .flow-footer .inner { max-width: 600px; margin: 0 auto; padding: 14px 20px; display: flex; gap: 12px; justify-content: flex-end; align-items: center; }
@@ -226,9 +224,9 @@
 .btn-flow-next:disabled { background: var(--line-soft); color: var(--body-soft); box-shadow: none; cursor: not-allowed; opacity: 1; }
 
 /* 確認行は 14px / 1.6（行の対応が読めなくなるため行間を広げない） */
-.confirm-row { display: flex; justify-content: space-between; font-size: 14px; line-height: 1.6; padding: 12px 0; border-bottom: 1px solid var(--line-soft); align-items: baseline; gap: 16px; }
+.confirm-row { display: flex; justify-content: space-between; font-size: 15px; line-height: 1.6; padding: 12px 0; border-bottom: 1px solid var(--line-soft); align-items: baseline; gap: 16px; }
 .confirm-row:last-child { border-bottom: none; }
-.confirm-row .lbl { color: var(--body-soft); font-size: 13px; flex-shrink: 0; }
+.confirm-row .lbl { color: var(--body-soft); font-size: 15px; flex-shrink: 0; }
 .confirm-row .val { font-weight: 600; color: var(--ink); text-align: right; }
 
 @media (max-width: 480px) {
@@ -236,9 +234,9 @@
      最終行とバーの間が 9px しかなく、同意文がバーに触って見える（ラウンド2 実測）。 */
   .flow-wrap { padding: 18px 14px 104px; }
   .step-title { font-size: 18px; }
-  .fs-label { font-size: 9px; }
+  .fs-label { font-size: 15px; }
   .flow-header-inner { gap: 8px; padding: 10px 14px; }
-  .btn-flow-next { padding: 12px 18px; font-size: 14px; }
+  .btn-flow-next { padding: 12px 18px; font-size: 15px; }
   .form-card { padding: 18px 14px; }
   .confirm-row { flex-direction: column; gap: 2px; }
   .confirm-row .val { text-align: left; }
@@ -272,10 +270,10 @@
 .hero-band > img { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0;
   object-fit: cover; object-position: var(--band-pos, 50% 50%); color: transparent; font-size: 0; }
 .hero-band__veil { position: absolute; inset: 0; background: rgba(var(--deep-rgb),.65); pointer-events: none; }
-.hero-band__copy { position: relative; z-index: 1; color: #fff; font-family: var(--serif); }
-.hero-band__copy h1, .hero-band__copy h2, .hero-band__copy h3 { color: #fff; font-weight: 600; font-size: clamp(24px,3.4vw,40px); line-height: 1.5; }
+.hero-band__copy { position: relative; z-index: 1; color: var(--white); }
+.hero-band__copy h1, .hero-band__copy h2, .hero-band__copy h3 { color: var(--white); font-weight: 600; font-size: clamp(24px,3.4vw,40px); line-height: 1.5; }
 .hero-band__copy p { font-size: 16px; line-height: 1.9; margin-top: 12px; }
-.hero-band__copy a:not(.btn) { color: #fff; text-decoration: underline; text-underline-offset: .2em; }
+.hero-band__copy a:not(.btn) { color: var(--white); text-decoration: underline; text-underline-offset: .2em; }
 /* 高さ修飾子（PC）。--fixed は法務3ページ用の固定高（/terms の .tab-wrap{top:76px} に影響させない）
    R6 指摘 1/2/3/4/13/16/17/21（3視点・8件が同一指摘）: 160px では素材 lg-band の可視域が
    画像高の 19.8% しかなく、文具一式（縦 42〜63%）が入る縦位置が存在しない。
@@ -471,9 +469,9 @@
 .deep-band p { color: #fff; }
 .deep-band .eyebrow { color: var(--lime); }
 .deep-band .eyebrow::before { background: var(--lime); }
-/* 英字ラベル（TERMS / BUYER 等）。--en 600 uppercase、色は差し色 --lime */
-.deep-band__label { display: block; font-family: var(--en); font-weight: 600; font-size: 12px; letter-spacing: .16em;
-  text-transform: uppercase; color: var(--lime); margin-bottom: 14px; }
+/* 和文ラベル（.label 相当の 15px・角ゴ 700）。色は差し色 --lime */
+.deep-band__label { display: block; font-family: var(--goth); font-weight: 700; font-size: 15px; letter-spacing: .08em;
+  color: var(--lime); margin-bottom: 14px; }
 
 /* ---------- §1.4 .media-split — 画像＋テキスト2カラム（汎用） ----------
    画像側は必ず .img-frame で包む。列比は --ms-img / --ms-txt で上書き可（既定 48:52）。
@@ -505,7 +503,7 @@
 /* 画像未着時に品目名などを枠内へ出す保険。::before なので img より下に敷かれ、画像が届けば隠れる */
 .img-frame[data-label]::before { content: attr(data-label); position: absolute; inset: 0; display: flex;
   align-items: center; justify-content: center; padding: 8px 10px; text-align: center;
-  font-family: var(--ui); font-size: 12px; line-height: 1.6; color: var(--body-soft); }
+  font-family: var(--ui); font-size: 15px; line-height: 1.6; color: var(--body-soft); }
 .img-frame--1x1 { aspect-ratio: 1/1; }
 .img-frame--3x2 { aspect-ratio: 3/2; }
 .img-frame--2x3 { aspect-ratio: 2/3; }
@@ -560,7 +558,7 @@
 .auth-side::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 40%; pointer-events: none;
   background: linear-gradient(180deg, rgba(var(--deep-rgb),0), rgba(var(--deep-rgb),.75)); }
 .auth-side__line { position: absolute; left: 0; right: 0; bottom: var(--auth-side-pad-b, 0px); z-index: 1; margin: 0;
-  padding: 0 clamp(24px,4vw,48px) clamp(28px,4vw,48px); color: #fff; font-family: var(--serif); font-weight: 600;
+  padding: 0 clamp(24px,4vw,48px) clamp(28px,4vw,48px); color: var(--white); font-family: var(--head); font-weight: 600;
   font-size: clamp(24px,2.4vw,32px); line-height: 1.5; letter-spacing: .06em; text-wrap: balance; }
 /* 業者側は終端を .85 まで濃くし、業務用の入口を色で区別 */
 .operator-auth .auth-side::after { background: linear-gradient(180deg, rgba(var(--deep-rgb),0), rgba(var(--deep-rgb),.85)); }
@@ -694,8 +692,8 @@
    参考: 同じ地の --body(#454e59) = 約 6.7:1（AA 達成・AAA 未達）。
    .model-note は各カード群の直前（節見出しの下・カードより上）に必ず置く。
    ページ CSS は unlayered で本ファイルに常に勝つため、この2クラスをページ CSS で再定義しない。 */
-.model-chip { display: inline-block; font-family: var(--ui); font-size: 14px; font-weight: 600;
+.model-chip { display: inline-block; font-family: var(--ui); font-size: 15px; font-weight: 600;
   line-height: 1.5; letter-spacing: .02em; color: var(--ink); background: var(--marker);
   border: 0; border-radius: 0; padding: 6px 12px; }
-.model-note { font-family: var(--ui); font-size: 14px; line-height: 1.9; color: var(--body);
+.model-note { font-family: var(--ui); font-size: 15px; line-height: 1.9; color: var(--body);
   max-width: 56em; margin: 0 0 clamp(20px, 2.4vw, 32px); }

@@ -881,8 +881,3 @@
 /* 最終検査（legal）: ヒーローの人物写真に対する可視の打消し（/vendors .vd-photo-note と同じ12px） */
 .business-page .biz-photo-note { margin-top: 14px; font-family: var(--ui); font-size: 15px; line-height: 1.7; color: var(--body-soft); }
 
-/* ============ 見本 v12：節見出しは左揃え（共通 .section-head は中央寄せのため、このページだけ上書き） ============ */
-.business-page .section-head { margin-inline: 0; max-width: none; text-align: left; }
-.business-page .section-head .eyebrow { justify-content: flex-start; }
-.business-page .section-head h2 { max-width: 28em; }
-.business-page .section-head .sub { margin-inline: 0; }
