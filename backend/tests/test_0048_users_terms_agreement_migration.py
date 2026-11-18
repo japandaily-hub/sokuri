@@ -128,8 +128,8 @@ def test_0048_is_the_single_head_chained_from_0047():
     """0048 が単独の head として 0047 に正しく連鎖していること（分岐の防止）。"""
     from alembic.script import ScriptDirectory
 
+    # head の固定は最新リビジョンのテスト（test_0049）が持つ。ここでは連鎖だけを見る。
     script = ScriptDirectory.from_config(_alembic_config())
-    assert script.get_heads() == [_REVISION]
     rev = script.get_revision(_REVISION)
     assert rev.down_revision == _DOWN_REVISION
     # 過去の alembic_version VARCHAR(32) 全断障害の再発防止ガード。
