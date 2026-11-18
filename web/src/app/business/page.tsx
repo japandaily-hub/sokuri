@@ -637,7 +637,7 @@ export default function BusinessPage() {
           <div className="container">
             <div className="section-head">
               <span className="eyebrow">カタヅケの強み</span>
-              <RevealLines mark="under" lines={["カタヅケで仕入れる、3つの理由"]} />
+              <RevealLines lines={["カタヅケで仕入れる、3つの理由"]} />
               <p className="sub">家まるごとの一括出品だからこそ、1回の訪問でまとめて仕入れられるルートになります。</p>
             </div>
             <div className="biz-reason-grid">
@@ -802,7 +802,7 @@ export default function BusinessPage() {
           <div className="container">
             <div className="section-head">
               <span className="eyebrow">入札の流れ</span>
-              <RevealLines mark="under" lines={["入札から引き取りまでの流れ"]} />
+              <RevealLines lines={["入札から引き取りまでの流れ"]} />
               <p className="sub">登録後はシンプルな4ステップ。下見なし・一斉の営業電話なしで進められます。</p>
             </div>
             {/* r5 #15: 画像を外し、番号タイル＋見出し＋本文のヘアラインリストにする（手順なので ol）。 */}
@@ -1286,7 +1286,7 @@ export default function BusinessPage() {
                     <br />
                     アカウント作成後、古物商許可証の画像をご提出いただき、運営の承認後に入札できるようになります。
                   </p>
-                  <p style={{ fontSize: 13, lineHeight: 1.9, marginBottom: 10 }}>
+                  <p style={{ fontSize: 15, lineHeight: 1.9, marginBottom: 10 }}>
                     招待コードがお手元に届いている方は、こちらからアカウントを作成できます。
                   </p>
                   <Link href="/operator/signup" className="btn btn-ghost btn-lg btn-swipe" style={{ marginBottom: 10 }}>
