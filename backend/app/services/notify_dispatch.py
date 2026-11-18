@@ -130,18 +130,6 @@ async def dispatch_account_unsuspended(
     await notify.send_account_unsuspended(email, party)
 
 
-@_best_effort
-async def dispatch_identity_document_reviewed(
-    line_user_id: str | None, email: str | None, approved: bool, reason: str | None = None
-) -> None:
-    """本人確認書類の審査結果通知（依頼者宛・r6 H2）。LINE優先・失敗/未連携時はメール。"""
-    if line_user_id:
-        ok = await line_notify.push_identity_document_reviewed(line_user_id, approved, reason)
-        if ok:
-            return
-    if not email or notify.is_placeholder_email(email):
-        return
-    await notify.send_identity_document_reviewed(email, approved, reason)
 
 
 @_best_effort

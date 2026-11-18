@@ -348,25 +348,6 @@ async def push_account_unsuspended(
     )
 
 
-async def push_identity_document_reviewed(
-    line_user_id: str, approved: bool, reason: str | None = None
-) -> bool:
-    """本人確認書類の審査結果通知（依頼者宛・r6 H2）。"""
-    settings = get_settings()
-    url = f"{settings.frontend_base_url}/mypage/identity"
-    if approved:
-        return await _push(
-            line_user_id,
-            f"【カタヅケ】本人確認が完了しました。\n{url}",
-        )
-    # 却下理由は運営が入力する自由文＝通知文への差し込み。改行で偽の案内行を
-    # 作られないよう、他の差し込み値と同様に1行へ正規化する。
-    reason_line = f"理由: {_sanitize_inline(reason, max_length=80)}\n" if reason else ""
-    return await _push(
-        line_user_id,
-        "【カタヅケ】ご提出いただいた本人確認書類を受理できませんでした。\n"
-        f"{reason_line}お手数ですが再度ご提出ください。\n{url}",
-    )
 
 
 async def push_completion_requested(line_user_id: str, case_id: str) -> bool:

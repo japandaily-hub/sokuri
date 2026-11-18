@@ -29,10 +29,6 @@ from app.config import get_settings
 from app.core.security import hash_password
 from app.db.models.operator import Operator
 from app.db.models.user import User
-from app.db.models.user_identity_document import (
-    DOCUMENT_STATUS_PENDING,
-    UserIdentityDocument,
-)
 from app.db.session import get_session
 from app.services import alerts, line_notify, notify
 
@@ -331,62 +327,6 @@ async def test_user_unsuspend_notifies(
     assert r.status_code == 200, r.text
     dispatch_mock.assert_awaited_once()
     assert dispatch_mock.await_args.args[2] == "user"
-
-
-# ──────────────── H2: 本人確認書類の審査結果通知 ────────────────
-
-
-async def _make_identity_document(db_session: AsyncSession, user_id: uuid.UUID) -> uuid.UUID:
-    document = UserIdentityDocument(
-        user_id=user_id,
-        doc_type="drivers_license",
-        front_image_data=b"\x89PNG\r\n\x1a\n" + b"\x00" * 64,
-        front_image_content_type="image/png",
-        status=DOCUMENT_STATUS_PENDING,
-        submitted_at=datetime.now(timezone.utc),
-    )
-    db_session.add(document)
-    await db_session.commit()
-    return document.id
-
-
-async def test_identity_document_approve_and_reject_notify_user(
-    client: AsyncClient, db_session: AsyncSession, monkeypatch
-):
-    admin_token = await _make_admin(client, db_session)
-    await _signup_user(client, "identity_notify_user@example.com")
-    target = await db_session.scalar(
-        select(User).where(User.email == "identity_notify_user@example.com")
-    )
-    assert target is not None
-    dispatch_mock = AsyncMock()
-    monkeypatch.setattr(
-        "app.services.notify_dispatch.dispatch_identity_document_reviewed", dispatch_mock
-    )
-
-    approved_id = await _make_identity_document(db_session, target.id)
-    r = await client.patch(
-        f"/api/v1/admin/identity-documents/{approved_id}/approve",
-        headers=_auth(admin_token),
-    )
-    assert r.status_code == 200, r.text
-    dispatch_mock.assert_awaited_once()
-    args = dispatch_mock.await_args.args
-    assert args[1] == "identity_notify_user@example.com"
-    assert args[2] is True
-
-    dispatch_mock.reset_mock()
-    rejected_id = await _make_identity_document(db_session, target.id)
-    r = await client.patch(
-        f"/api/v1/admin/identity-documents/{rejected_id}/reject",
-        json={"reject_reason": "氏名が読み取れません"},
-        headers=_auth(admin_token),
-    )
-    assert r.status_code == 200, r.text
-    dispatch_mock.assert_awaited_once()
-    args = dispatch_mock.await_args.args
-    assert args[2] is False
-    assert args[3] == "氏名が読み取れません"
 
 
 # ──────────────── M-7: 事前申込 承認の行ロック ────────────────

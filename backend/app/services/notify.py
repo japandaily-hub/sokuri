@@ -507,26 +507,6 @@ async def send_operator_application_admin_alert(to_email: str, company_name: str
     )
 
 
-async def send_identity_submitted_admin_alert(to_email: str) -> bool:
-    """④' 依頼者の本人確認書類の新規提出通知（admin宛。r10 O-M1）。
-
-    提出者の氏名・メール・書類種別は**一切含めない**。宛先は運営だが、経路は
-    Brevo（第三者）を通り、件名・本文はメールボックス検索・転送で拡散しうるため、
-    本人確認という機微な文脈で PII を載せる利得が無い（管理画面で照合できる）。
-    ``send_operator_application_admin_alert`` と同型の1宛先1通・戻り値 bool。
-    """
-    settings = get_settings()
-    url = f"{settings.frontend_base_url}/admin/identity-documents"
-    return await _send(
-        to_email,
-        "【カタヅケ管理】本人確認書類の提出がありました",
-        _wrap(
-            "<p>依頼者から本人確認書類の提出がありました。管理画面から審査してください。</p>"
-            f'<p><a href="{html.escape(url, quote=True)}">本人確認書類の審査へ</a></p>'
-        ),
-    )
-
-
 async def send_operator_application_approved(to_email: str, company_name: str, invite_code: str) -> bool:
     """⑤ 業者事前申込の承認通知（申込者宛・招待コード案内）。"""
     settings = get_settings()
@@ -767,38 +747,6 @@ async def send_account_unsuspended(to_email: str, party: str) -> bool:
             "あらためてログインしてからご利用ください。</p>"
             "<p>ご不便をおかけし申し訳ありませんでした。</p>"
             f'<p><a href="{url}">マイページを開く</a></p>'
-        ),
-    )
-
-
-async def send_identity_document_reviewed(
-    to_email: str, approved: bool, reason: str | None = None
-) -> bool:
-    """本人確認書類の審査結果通知（依頼者宛・r6 H2）。
-
-    却下時は再提出のために理由を本文へ含める（DB にも保存され /mypage/identity で
-    再確認できるが、能動的に再訪しない限り気付けないため）。
-    """
-    settings = get_settings()
-    url = f"{settings.frontend_base_url}/mypage/identity"
-    if approved:
-        return await _send(
-            to_email,
-            "【カタヅケ】本人確認が完了しました",
-            _wrap(
-                "<p>ご提出いただいた本人確認書類の確認が完了しました。</p>"
-                f'<p><a href="{url}">本人確認の状況を確認する</a></p>'
-            ),
-        )
-    reason_html = f"<p>理由: {html.escape(reason)}</p>" if reason else ""
-    return await _send(
-        to_email,
-        "【カタヅケ】本人確認書類のご確認のお願い",
-        _wrap(
-            "<p>ご提出いただいた本人確認書類を確認しましたが、受理できませんでした。</p>"
-            f"{reason_html}"
-            "<p>お手数ですが、内容をご確認のうえ再度ご提出ください。</p>"
-            f'<p><a href="{url}">本人確認書類を再提出する</a></p>'
         ),
     )
 

@@ -1,17 +1,13 @@
-"""UserIdentityDocument モデル — 依頼者の本人確認書類（審査書類）。
+"""UserIdentityDocument モデル — 依頼者の本人確認書類（**受付廃止済み**の過去の記録）。
 
-なりすまし・不正出品防止のため、依頼者が任意で身分証（運転免許証・マイナンバー
-カード・パスポート・在留カード・健康保険証）の画像を提出し、admin が承認/却下する
-（任意提出書類。古物営業法第15条の確認義務を負うのは訪問する古物商（業者）であり、
-当社ではない）。
+かつて依頼者が任意で身分証（運転免許証・マイナンバーカード等）の画像を提出し、
+admin が承認/却下していた。身分証の画像を預かること自体のリスクを避けるため、
+2026-11 に受付を全面的にやめた（API は 410・user_identity.py）。保存済みの画像は
+alembic 0049 で消去済みで、今後この表に画像が書き込まれる経路は無い。
 
-``operator_license.py``（Operator.license_image_data）と同じ設計方針を踏襲する:
-画像本体はDBの BYTEA に直接保存し（既存の presign/ファイルシステム方式は再利用しない）、
-配信は認証必須の専用エンドポイントでのみ行う。BLOB本体は ``deferred=True`` とし、
-admin一覧等の通常クエリでは一切ロードされないようにする（メモリ枯渇DoS対策）。
-
-マイナンバーカード・パスポートは裏面に個人番号等の機微情報を含み得るため、
-アプリ層でそもそも裏面画像を受理・保存しない（user_identity.py 参照）。
+表は、提出日時・書類種別・審査結果を運営の操作履歴（admin.py のアクティビティ）として
+読むためだけに残す。画像列は退会時の匿名化（users.py）で NULL にする処理が残るのみ。
+お引き取りの際の本人確認は、古物営業法第15条に基づき訪問する古物商（業者）が行う。
 """
 
 from __future__ import annotations
@@ -39,19 +35,8 @@ DOC_TYPES = (
     DOC_TYPE_RESIDENCE_CARD,
     DOC_TYPE_HEALTH_INSURANCE_CARD,
 )
-# 新規提出で受け付ける書類種別。健康保険証は健康保険法第194条の2（保険者番号等の取得制限）の
-# 観点から本人確認書類として受け付けない。DOC_TYPES（DB の CHECK 制約と一致）には既存の
-# 提出済み記録の読み取り・審査のために残す。
-DOC_TYPES_REJECTED_ON_SUBMIT = (DOC_TYPE_HEALTH_INSURANCE_CARD,)
-SUBMITTABLE_DOC_TYPES = tuple(t for t in DOC_TYPES if t not in DOC_TYPES_REJECTED_ON_SUBMIT)
-# 裏面必須の書類種別（表裏で記載内容が異なる書類）。
-DOC_TYPES_REQUIRING_BACK = (
-    DOC_TYPE_DRIVERS_LICENSE,
-    DOC_TYPE_RESIDENCE_CARD,
-    DOC_TYPE_HEALTH_INSURANCE_CARD,
-)
-# 裏面を受理しても保存せず破棄する書類種別（個人番号等の機微情報保護のため）。
-DOC_TYPES_DISCARDING_BACK = (DOC_TYPE_MY_NUMBER_CARD, DOC_TYPE_PASSPORT)
+# 新規提出で受け付ける書類種別は無い（受付廃止）。DOC_TYPES は DB の CHECK 制約と
+# 一致させるため、過去の記録の読み取り用に残す。
 
 # status の許容値（alembic 0023 のCHECK制約と一致させる）。
 DOCUMENT_STATUS_PENDING = "pending"

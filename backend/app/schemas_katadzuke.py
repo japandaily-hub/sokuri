@@ -505,67 +505,6 @@ class UserBankAccountDeleteRequest(BaseModel):
     current_password: str | None = None
 
 
-# ──────────────────────────── マイページ: 本人確認 ────────────────────────────
-
-IdentityDocType = Literal[
-    "drivers_license", "my_number_card", "passport", "residence_card", "health_insurance_card"
-]
-
-
-class UserIdentityStatusOut(BaseModel):
-    status: str
-    document_id: uuid.UUID | None = None
-    doc_type: str | None = None
-    submitted_at: UtcDatetime | None = None
-    reviewed_at: UtcDatetime | None = None
-    reject_reason: str | None = None
-    has_back: bool = False
-
-
-class UserIdentityDocumentAdminOut(BaseModel):
-    id: uuid.UUID
-    user_id: uuid.UUID
-    user_email: str
-    user_name: str | None
-    doc_type: str
-    status: str
-    submitted_at: UtcDatetime
-    reviewed_at: UtcDatetime | None
-    reject_reason: str | None
-    has_back: bool
-
-
-class IdentityDocumentListCounts(BaseModel):
-    """GET /admin/identity-documents の ``counts``（status/q 絞込に関わらない全件内訳）。
-
-    OperatorListCounts と同型の契約（status も q も反映しない全件内訳）。バッジは
-    「いま審査待ちが何件あるか」を常に示す必要があり、検索中だけ数が変わると
-    絞込の解除忘れで審査漏れが起きる。退会済みユーザーの書類は一覧と同じ条件で
-    除外する（審査対象外のため、バッジに出すと永久に減らない件数になる）。
-    """
-
-    pending: int
-    approved: int
-    rejected: int
-
-
-class UserIdentityDocumentAdminListResponse(BaseModel):
-    """r10 O-M1〜M3: 一覧応答を list から {items,total,counts} へ変更する。
-
-    従来は素の list を返しており、web は総件数を知る術がなかったため
-    (1) 審査待ちの総数をバッジに出せない (2) Pager が末尾を越えて空ページに着地し
-    「審査待ち0件」と誤読される、の2つが同時に起きていた。
-    """
-
-    items: list[UserIdentityDocumentAdminOut]
-    total: int
-    counts: IdentityDocumentListCounts
-
-
-class IdentityDocumentRejectRequest(BaseModel):
-    reject_reason: str = Field(min_length=1, max_length=500)
-
-
 # ──────────────────────────── 写真アップロード ────────────────────────────
 
 

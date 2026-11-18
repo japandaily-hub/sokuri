@@ -1,398 +1,63 @@
-"""依頼者の本人確認（身分証提出）エンドポイント — 認証必須の専用ファイル配信。
+"""依頼者の本人確認書類（身分証画像）の受付 — 廃止済み。
 
-``operator_license.py``（審査書類画像をDBのBYTEAに保存し、認証必須の専用
-エンドポイントでのみ配信する設計）を踏襲する。既存の presign/ファイルシステム
-方式（case_photos.py の /upload/presign・/files/{key}、無認証capability URL）
-は再利用しない。
+運転免許証・マイナンバーカード等の画像を預かること自体が個人情報の漏えい時の
+被害を大きくするため、本人確認書類の受付を全面的にやめた（2026-11）。保存済みの
+画像は alembic 0049 で消去している。お引き取りの際の本人確認は、古物営業法
+第15条に基づき訪問する古物商（業者）が行う。
 
-マイナンバーカード・パスポートは裏面に個人番号・本籍地等の機微情報を含み得るため、
-裏面画像を受け取っても一切保存しない（アプリ層で構造的に破棄する）。
+旧エンドポイントは、古い画面やブックマークからの呼び出しに「受付終了」を明示する
+ため 410 Gone だけを返す。リクエスト本文は一切読まない（multipart を解析しない＝
+画像がサーバーのメモリにも載らない）。認証も行わない: どの利用者にも同じ固定の
+応答を返すだけで、在不在や状態を漏らす情報が無いため。
+
+業者の古物商許可証画像（operator_license.py）は本件の対象外。
 """
 
 from __future__ import annotations
 
 import logging
-import uuid
-from datetime import date, datetime, timedelta, timezone
-from typing import Literal
 
-from fastapi import (
-    APIRouter,
-    BackgroundTasks,
-    Depends,
-    HTTPException,
-    Query,
-    Request,
-    status,
-)
-from fastapi.responses import Response
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.datastructures import UploadFile as StarletteUploadFile
-
-from app.api.deps import get_current_user
-from app.api.rate_limit_deps import RateLimitGuard
-from app.config import get_settings
-from app.core.error_summary import describe_exception
-from app.core.http_errors import http_exception_factory
-from app.db.models.user import (
-    IDENTITY_STATUS_APPROVED,
-    IDENTITY_STATUS_PENDING,
-    User,
-)
-from app.db.models.user_identity_document import (
-    DOC_TYPES_DISCARDING_BACK,
-    DOC_TYPES_REJECTED_ON_SUBMIT,
-    DOC_TYPES_REQUIRING_BACK,
-    SUBMITTABLE_DOC_TYPES,
-    DOCUMENT_STATUS_PENDING,
-    UserIdentityDocument,
-)
-from app.db.session import get_session
-from app.schemas_katadzuke import UserIdentityStatusOut
-from app.services import notify
-from app.services.storage import MAX_UPLOAD_BYTES, sniff_image_ext
+from fastapi import APIRouter, status
+from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# 日本標準時（固定 UTC+9・DST無し）。zoneinfo("Asia/Tokyo") は環境によって
-# tzdata パッケージ未導入で ZoneInfoNotFoundError になり得るため、
-# 固定オフセットで代替する（JSTにDSTは存在しないため正確）。
-_JST = timezone(timedelta(hours=9), name="Asia/Tokyo")
+IDENTITY_DOCUMENTS_RETIRED_DETAIL = (
+    "本人確認書類の受付は終了しました。古物営業法で定める場合には、"
+    "買取業者が訪問時に本人確認を行います。"
+)
 
-_CONTENT_TYPE_BY_EXT = {"jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp"}
-_MULTIPART_OVERHEAD_ALLOWANCE = 64 * 1024
-_MAX_DECLARED_CONTENT_LENGTH = MAX_UPLOAD_BYTES + _MULTIPART_OVERHEAD_ALLOWANCE
-_READ_CHUNK_BYTES = 1024 * 1024
-_MIN_AGE_YEARS = 18
-
-_UNSUPPORTED_FORMAT = http_exception_factory(
-    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-    detail="対応していないファイル形式です（jpeg / png / webp のみアップロードできます）。",
-)
-_TOO_LARGE = http_exception_factory(
-    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-    detail="ファイルサイズが上限（10MB）を超えています。",
-)
-_NO_FRONT_FILE = http_exception_factory(
-    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-    detail="表面の画像ファイルが指定されていません。",
-)
-_INVALID_DOC_TYPE = http_exception_factory(
-    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-    detail="書類の種類の指定が正しくありません。",
-)
-_DOC_TYPE_NOT_ACCEPTED = http_exception_factory(
-    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-    detail=(
-        "健康保険証は本人確認書類として受け付けられません。"
-        "運転免許証・マイナンバーカード（表面のみ）・パスポート等をご利用ください。"
-    ),
-)
-_BACK_REQUIRED = http_exception_factory(
-    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-    detail="この書類の種類は裏面の画像も必要です。",
-)
-_BIRTH_DATE_REQUIRED = http_exception_factory(
-    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-    detail="先に生年月日を登録してください。",
-)
-_UNDER_AGE = http_exception_factory(
-    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-    detail="本人確認は18歳以上の方のみご利用いただけます。",
-)
-_PENDING_EXISTS = http_exception_factory(
-    status_code=status.HTTP_409_CONFLICT,
-    detail="本人確認書類は審査中です。審査結果をお待ちください。",
-)
-_ALREADY_APPROVED = http_exception_factory(
-    status_code=status.HTTP_409_CONFLICT,
-    detail="本人確認は承認済みです。",
-)
-_NOT_FOUND = http_exception_factory(
-    status_code=status.HTTP_404_NOT_FOUND,
-    detail="本人確認書類が見つかりません。",
+# 廃止した旧エンドポイント（メソッド, パス）。テストでもこの表を唯一の情報源にする。
+RETIRED_IDENTITY_ROUTES: tuple[tuple[str, str], ...] = (
+    ("GET", "/users/me/identity"),
+    ("POST", "/users/me/identity-documents"),
+    ("GET", "/users/me/identity-documents/{document_id}/file"),
+    ("GET", "/admin/identity-documents"),
+    ("GET", "/admin/identity-documents/{document_id}/file"),
+    ("PATCH", "/admin/identity-documents/{document_id}/approve"),
+    ("PATCH", "/admin/identity-documents/{document_id}/reject"),
 )
 
 
-def _is_adult(birth_date: date, *, today: date) -> bool:
-    """``today`` 時点で18歳以上かどうかを判定する（誕生日当日は18歳とみなす）。"""
-    age = today.year - birth_date.year - (
-        (today.month, today.day) < (birth_date.month, birth_date.day)
-    )
-    return age >= _MIN_AGE_YEARS
-
-
-async def _read_upload(upload: StarletteUploadFile) -> bytes:
-    """multipart のファイルパートをチャンク単位で読み込み、上限超過を検知する。"""
-    chunks: list[bytes] = []
-    total_bytes = 0
-    while True:
-        chunk = await upload.read(_READ_CHUNK_BYTES)
-        if not chunk:
-            break
-        total_bytes += len(chunk)
-        if total_bytes > MAX_UPLOAD_BYTES:
-            raise _TOO_LARGE()
-        chunks.append(chunk)
-    await upload.close()
-    return b"".join(chunks)
-
-
-@router.get(
-    "/users/me/identity",
-    response_model=UserIdentityStatusOut,
-    summary="本人確認ステータス取得（最新の提出1件）",
-)
-async def get_my_identity_status(
-    user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
-) -> UserIdentityStatusOut:
-    row = (
-        await session.execute(
-            select(
-                UserIdentityDocument.id,
-                UserIdentityDocument.doc_type,
-                UserIdentityDocument.submitted_at,
-                UserIdentityDocument.reviewed_at,
-                UserIdentityDocument.reject_reason,
-                UserIdentityDocument.back_image_data.isnot(None),
-            )
-            .where(UserIdentityDocument.user_id == user.id)
-            .order_by(UserIdentityDocument.submitted_at.desc())
-            .limit(1)
-        )
-    ).first()
-    if row is None:
-        return UserIdentityStatusOut(status=user.identity_status)
-    document_id, doc_type, submitted_at, reviewed_at, reject_reason, has_back = row
-    return UserIdentityStatusOut(
-        status=user.identity_status,
-        document_id=document_id,
-        doc_type=doc_type,
-        submitted_at=submitted_at,
-        reviewed_at=reviewed_at,
-        reject_reason=reject_reason,
-        has_back=bool(has_back),
+async def _identity_documents_retired() -> JSONResponse:
+    """本文・パスパラメータを読まずに 410 を返す（全旧エンドポイント共通）。"""
+    # 認証なしで叩けるため INFO にはしない（大量に叩かれて保持7日のログを押し流させない）。
+    logger.debug("user_identity: 廃止済みの本人確認書類エンドポイントへのアクセスに 410 を返しました")
+    return JSONResponse(
+        status_code=status.HTTP_410_GONE,
+        content={"detail": IDENTITY_DOCUMENTS_RETIRED_DETAIL},
+        headers={"Cache-Control": "no-store"},
     )
 
 
-@router.post(
-    "/users/me/identity-documents",
-    response_model=UserIdentityStatusOut,
-    summary="本人確認書類の提出（multipart: doc_type, front必須, back任意）",
-)
-async def submit_identity_document(
-    request: Request,
-    background: BackgroundTasks,
-    user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
-    _rl: object = Depends(RateLimitGuard("identity_submit")),
-) -> UserIdentityStatusOut:
-    """``operator_license.py`` と同じ理由で ``Request`` を直接受け取り、認証ゲート
-    （``get_current_user``）解決後にのみ ``request.form()`` を呼び出す
-    （未認証の巨大ボディ読み込みDoS対策。詳細は operator_license.py の docstring 参照）。
-    """
-    request.state.rate_limit.hit_account(str(user.id))
-
-    content_length = request.headers.get("content-length")
-    if content_length is not None:
-        try:
-            declared_length = int(content_length)
-        except ValueError:
-            declared_length = None
-        if declared_length is not None and declared_length > _MAX_DECLARED_CONTENT_LENGTH:
-            raise _TOO_LARGE()
-
-    form = await request.form(max_part_size=MAX_UPLOAD_BYTES)
-
-    doc_type = form.get("doc_type")
-    if isinstance(doc_type, str) and doc_type in DOC_TYPES_REJECTED_ON_SUBMIT:
-        logger.warning(
-            "user_identity: 受付対象外の書類種別の提出を拒否 - user_id=%s doc_type=%s",
-            user.id,
-            doc_type,
-        )
-        raise _DOC_TYPE_NOT_ACCEPTED()
-    if not isinstance(doc_type, str) or doc_type not in SUBMITTABLE_DOC_TYPES:
-        raise _INVALID_DOC_TYPE()
-
-    front = form.get("front")
-    if front is None or not isinstance(front, StarletteUploadFile):
-        raise _NO_FRONT_FILE()
-    back = form.get("back")
-    back_upload = back if isinstance(back, StarletteUploadFile) else None
-
-    requires_back = doc_type in DOC_TYPES_REQUIRING_BACK
-    discards_back = doc_type in DOC_TYPES_DISCARDING_BACK
-    if requires_back and back_upload is None:
-        raise _BACK_REQUIRED()
-
-    # ── 業務前提の検証（重い画像読み込みの前に済ませる） ──────────────
-    if user.birth_date is None:
-        raise _BIRTH_DATE_REQUIRED()
-    if not _is_adult(user.birth_date, today=datetime.now(_JST).date()):
-        raise _UNDER_AGE()
-
-    existing_status = (
-        await session.scalar(
-            select(UserIdentityDocument.status)
-            .where(UserIdentityDocument.user_id == user.id)
-            .order_by(UserIdentityDocument.submitted_at.desc())
-            .limit(1)
-        )
-    )
-    if existing_status == DOCUMENT_STATUS_PENDING:
-        raise _PENDING_EXISTS()
-    if user.identity_status == IDENTITY_STATUS_APPROVED:
-        raise _ALREADY_APPROVED()
-
-    # ── 表面画像 ────────────────────────────────────────────────
-    # 画像の読み込み（I/O待ち）に時間がかかるため、TOCTOU対策の行ロックは
-    # ここでは取得せず、実際にINSERTする直前（下記）まで遅延させる
-    # （ロック保持時間を最小化し、他リクエストの待ち行列を作らないため）。
-    front_data = await _read_upload(front)
-    if not front_data:
-        raise _NO_FRONT_FILE()
-    front_ext = sniff_image_ext(front_data)
-    if front_ext is None:
-        raise _UNSUPPORTED_FORMAT()
-    front_content_type = _CONTENT_TYPE_BY_EXT[front_ext]
-
-    # ── 裏面画像 ────────────────────────────────────────────────
-    back_data: bytes | None = None
-    back_content_type: str | None = None
-    if back_upload is not None:
-        raw_back = await _read_upload(back_upload)
-        if discards_back:
-            # マイナンバーカード・パスポートの裏面は個人番号等の機微情報を
-            # 含み得るため、受理はしても保存しない（構造的に破棄する）。
-            raw_back = b""
-        elif raw_back:
-            back_ext = sniff_image_ext(raw_back)
-            if back_ext is None:
-                raise _UNSUPPORTED_FORMAT()
-            back_data = raw_back
-            back_content_type = _CONTENT_TYPE_BY_EXT[back_ext]
-        elif requires_back:
-            raise _BACK_REQUIRED()
-
-    # ── TOCTOU対策（security review M-2） ─────────────────────────
-    # 上のpending/approved判定から画像読み込みの間に、別リクエスト（多重送信・
-    # 複数タブ等）が並行してpendingを作成しうる。本人行を SELECT ... FOR UPDATE
-    # でロックしてから判定を再実行することで、2件のpending書類が同時に
-    # 作られる競合を防ぐ（`with_for_update()` は同一行への書き込みを直列化する
-    # ため、後続トランザクションはここで待機し、コミット後の最新状態で
-    # 再判定されることになる）。
-    locked_user = (
-        await session.execute(select(User).where(User.id == user.id).with_for_update())
-    ).scalar_one()
-    existing_status = (
-        await session.scalar(
-            select(UserIdentityDocument.status)
-            .where(UserIdentityDocument.user_id == locked_user.id)
-            .order_by(UserIdentityDocument.submitted_at.desc())
-            .limit(1)
-        )
-    )
-    if existing_status == DOCUMENT_STATUS_PENDING:
-        raise _PENDING_EXISTS()
-    if locked_user.identity_status == IDENTITY_STATUS_APPROVED:
-        raise _ALREADY_APPROVED()
-
-    now = datetime.now(timezone.utc)
-    document = UserIdentityDocument(
-        user_id=locked_user.id,
-        doc_type=doc_type,
-        front_image_data=front_data,
-        front_image_content_type=front_content_type,
-        back_image_data=back_data,
-        back_image_content_type=back_content_type,
-        status=DOCUMENT_STATUS_PENDING,
-        submitted_at=now,
-    )
-    session.add(document)
-    locked_user.identity_status = IDENTITY_STATUS_PENDING
-
-    # rollback は Session 内の全 ORM インスタンスを expire するため、except 節で
-    # user.id へ触ると遅延ロード（SELECT）が走り、非同期では MissingGreenlet に
-    # なって本来のエラーが握り潰される（r12 横展開: PG 同時実行検証で cases.py に
-    # 見つかった同型バグ。commit 前に値を写し取っておく）。
-    user_id = user.id
-
-    try:
-        await session.commit()
-    except Exception as exc:
-        await session.rollback()
-        logger.error(
-            "user_identity: 本人確認書類の保存に失敗 - user_id=%s - %s",
-            user_id,
-            describe_exception(exc),
-            exc_info=True,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="本人確認書類の保存に失敗しました。時間をおいて再度お試しください。",
-        ) from exc
-    await session.refresh(document)
-
-    # r10 O-M1: 提出は admin が能動的に一覧を見に行かない限り気づけず、審査待ちが
-    # 滞留していた（依頼者側は「審査中」のまま待たされ続ける）。業者の事前申込
-    # （send_operator_application_admin_alert）と同じく ADMIN_EMAILS 宛に1通ずつ
-    # 送る。LINE 併用の notify_dispatch は依頼者・業者本人向けの経路であり、
-    # 運営宛の内部通知は経由させない（宛先解決の前提が異なる）。
-    admin_emails = get_settings().admin_emails
-    if not admin_emails:
-        logger.warning(
-            "user_identity: ADMIN_EMAILS が未設定のため、本人確認書類の提出通知を送信できません。"
-        )
-    for admin_email in admin_emails:
-        background.add_task(notify.send_identity_submitted_admin_alert, admin_email)
-
-    return UserIdentityStatusOut(
-        status=user.identity_status,
-        document_id=document.id,
-        doc_type=document.doc_type,
-        submitted_at=document.submitted_at,
-        reviewed_at=document.reviewed_at,
-        reject_reason=document.reject_reason,
-        has_back=back_data is not None,
-    )
-
-
-@router.get(
-    "/users/me/identity-documents/{document_id}/file",
-    summary="自分が提出した本人確認書類の画像を取得（本人のみ）",
-)
-async def get_my_identity_document_file(
-    document_id: uuid.UUID,
-    side: Literal["front", "back"] = Query(...),
-    user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session),
-) -> Response:
-    if side == "front":
-        columns = (
-            UserIdentityDocument.user_id,
-            UserIdentityDocument.front_image_data,
-            UserIdentityDocument.front_image_content_type,
-        )
-    else:
-        columns = (
-            UserIdentityDocument.user_id,
-            UserIdentityDocument.back_image_data,
-            UserIdentityDocument.back_image_content_type,
-        )
-    row = (
-        await session.execute(select(*columns).where(UserIdentityDocument.id == document_id))
-    ).first()
-    # 他人の document_id は「存在しない」と同一の404にする（IDOR経由の在不在オラクル防止）。
-    if row is None or row[0] != user.id or row[1] is None:
-        raise _NOT_FOUND()
-    _, data, content_type = row
-    return Response(
-        content=data,
-        media_type=content_type or "application/octet-stream",
-        headers={"Cache-Control": "private, no-store"},
+for _method, _path in RETIRED_IDENTITY_ROUTES:
+    router.add_api_route(
+        _path,
+        _identity_documents_retired,
+        methods=[_method],
+        status_code=status.HTTP_410_GONE,
+        summary="（廃止）本人確認書類 — 常に 410 Gone",
+        include_in_schema=False,
     )

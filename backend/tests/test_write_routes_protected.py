@@ -72,6 +72,17 @@ _ALLOWLIST: dict[tuple[str, str], str] = {
     ("POST", "/api/v1/auth/operator/login"): (
         "同上（業者ログイン。アカウント軸のキーは operator: で名前空間分離）。"
     ),
+    # 本人確認書類の受付廃止（user_identity.py）。本文を読まず DB にも触れず固定の 410 を返す
+    # だけで書き込み口ではない。振る舞いは tests/test_user_identity.py で固定。
+    ("POST", "/api/v1/users/me/identity-documents"): (
+        "廃止済み（常に 410・本文を読まず DB に書かない）。"
+    ),
+    ("PATCH", "/api/v1/admin/identity-documents/{document_id}/approve"): (
+        "廃止済み（常に 410・本文を読まず DB に書かない）。"
+    ),
+    ("PATCH", "/api/v1/admin/identity-documents/{document_id}/reject"): (
+        "廃止済み（常に 410・本文を読まず DB に書かない）。"
+    ),
 }
 
 
