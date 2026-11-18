@@ -654,12 +654,12 @@
   flex: 1;
   height: 8px;
   background: var(--line-soft);
-  border-radius: var(--radius-s);
+  border-radius: 0; /* 進捗バーは角丸にしない（見本 v12：罫線の作法） */
   overflow: hidden;
 }
 .op-profile .completion-bar {
   height: 100%;
-  border-radius: var(--radius-s);
+  border-radius: 0;
   background: var(--blue);
   transition: width .5s var(--ease);
 }
