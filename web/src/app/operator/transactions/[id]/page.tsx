@@ -174,7 +174,7 @@ export default function OperatorTransactionPage() {
         <div className="op-wrap narrow">
           <div className="op-alert error" role="alert">{error ?? "取引情報が見つかりません。"}</div>
           {/* V-07: 他社の取引・権限のない取引を開いた場合も、操作部品は出さず戻る導線だけを示す。 */}
-          <p style={{ fontSize: 13.5, color: "var(--body-soft)", lineHeight: 1.8, marginTop: 12 }}>
+          <p style={{ fontSize: 15, color: "var(--body-soft)", lineHeight: 1.8, marginTop: 12 }}>
             お探しの取引が開けませんでした。ご自身の取引は、取引一覧から開いてください。
           </p>
           <Link
@@ -298,14 +298,14 @@ export default function OperatorTransactionPage() {
           {txn.status !== "cancelled" ? (
             <div className="op-card">
               <h2>成約後の進め方</h2>
-              <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.85, marginTop: 8 }}>
+              <p style={{ fontSize: 15, color: "var(--body)", lineHeight: 1.85, marginTop: 8 }}>
                 <strong style={{ color: "var(--navy)" }}>買取代金のお支払い方法は、成約後にご案内します。</strong>
                 ご不明な点は運営へお問い合わせください。
               </p>
               {/* 2026-09-26 ボタン化: 2段落目を状態で分ける。completed では依頼ボタンごと引く。 */}
               {active ? (
                 <>
-                  <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.85, marginTop: 8 }}>
+                  <p style={{ fontSize: 15, color: "var(--body)", lineHeight: 1.85, marginTop: 8 }}>
                     <strong style={{ color: "var(--navy)" }}>作業完了はユーザーが確定します。</strong>
                     訪問・引き取りが済んだら、下のボタンでユーザーに完了確定を依頼してください（LINEまたはメールでお知らせします）。
                   </p>
@@ -321,19 +321,19 @@ export default function OperatorTransactionPage() {
                     完了確定を依頼する
                   </button>
                   {completionBlockedNote ? (
-                    <p style={{ fontSize: 12.5, color: "var(--body-soft)", marginTop: 6 }}>{completionBlockedNote}</p>
+                    <p style={{ fontSize: 15, color: "var(--body-soft)", marginTop: 6 }}>{completionBlockedNote}</p>
                   ) : null}
                   {completionError ? (
                     <div className="op-alert error" style={{ marginTop: 6 }}>{completionError}</div>
                   ) : null}
                   {completionRequested ? (
-                    <p role="status" style={{ fontSize: 13, color: "var(--green)", marginTop: 6 }}>
+                    <p role="status" style={{ fontSize: 15, color: "var(--green)", marginTop: 6 }}>
                       ユーザーに完了確定を依頼しました。
                     </p>
                   ) : null}
                 </>
               ) : txn.status === "completed" ? (
-                <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.85, marginTop: 8 }}>
+                <p style={{ fontSize: 15, color: "var(--body)", lineHeight: 1.85, marginTop: 8 }}>
                   <strong style={{ color: "var(--navy)" }}>作業完了はユーザーが確定済みです。</strong>
                 </p>
               ) : null}
@@ -347,7 +347,7 @@ export default function OperatorTransactionPage() {
               <p style={{ fontFamily: "var(--head)", fontWeight: 600, color: "var(--navy)" }}>
                 キャンセル: {CANCELLED_BY_LABEL[txn.cancellation.cancelled_by]}による
               </p>
-              <p style={{ fontSize: 12, color: "var(--body-soft)", marginTop: 4 }}>
+              <p style={{ fontSize: 15, color: "var(--body-soft)", marginTop: 4 }}>
                 {formatJstDateTime(txn.cancellation.cancelled_at)}
               </p>
               <p style={{ marginTop: 6, wordBreak: "break-word", overflowWrap: "anywhere" }}>
@@ -424,7 +424,7 @@ export default function OperatorTransactionPage() {
                       </span>
                       <span className={`status-chip ${REDUCTION_CHIP_CLASS[r.status]}`}>{REDUCTION_STATUS_LABEL[r.status]}</span>
                     </div>
-                    <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.75, marginTop: 6 }}>{r.reason}</p>
+                    <p style={{ fontSize: 15, color: "var(--body)", lineHeight: 1.75, marginTop: 6 }}>{r.reason}</p>
                   </li>
                 ))}
               </ul>
@@ -432,7 +432,7 @@ export default function OperatorTransactionPage() {
 
             {active && !pendingReduction && reductionRemaining !== 0 ? (
               <form onSubmit={openReductionModal} style={{ marginTop: txn.reduction_requests.length > 0 ? 18 : 4 }}>
-                <p style={{ fontSize: 13, color: "var(--body-soft)", marginBottom: 14, lineHeight: 1.8 }}>
+                <p style={{ fontSize: 15, color: "var(--body-soft)", marginBottom: 14, lineHeight: 1.8 }}>
                   現地確認の結果、物量・状態が想定と異なる場合のみ申請してください。現在の金額:{" "}
                   <strong style={{ color: "var(--navy)" }}>{formatYen(currentAmount)}</strong>
                   <br />
@@ -474,7 +474,7 @@ export default function OperatorTransactionPage() {
                     onChange={(e) => setReason(e.target.value)}
                     placeholder="現地確認の結果、想定より家電の破損が多く再販価値が下がるため"
                   />
-                  <p style={{ fontSize: 11.5, color: "var(--body-soft)", marginTop: 5 }}>ユーザーに表示されます。</p>
+                  <p style={{ fontSize: 15, color: "var(--body-soft)", marginTop: 5 }}>ユーザーに表示されます。</p>
                 </div>
                 <button type="submit" ref={reductionSubmitRef} disabled={busy} className="btn btn-primary">
                   減額を申請する
@@ -484,19 +484,19 @@ export default function OperatorTransactionPage() {
             {pendingReduction ? <div className="op-alert warn" style={{ marginTop: 14, marginBottom: 0 }}>ユーザーの回答待ちの申請があります。</div> : null}
             {/* r10 M4 是正: 上限到達時はフォームを出さず、出せない理由を明示する。 */}
             {active && !pendingReduction && reductionRemaining === 0 ? (
-              <p style={{ fontSize: 13, color: "var(--body-soft)", marginTop: 8, lineHeight: 1.8 }}>
+              <p style={{ fontSize: 15, color: "var(--body-soft)", marginTop: 8, lineHeight: 1.8 }}>
                 減額申請は1取引につき{reductionLimit}回までです。上限に達しているため、これ以上申請できません。
                 金額の相談が必要な場合はチャットでユーザーとお話しください。
               </p>
             ) : null}
-            {!active ? <p style={{ fontSize: 13, color: "var(--body-soft)", marginTop: 8 }}>この取引では申請できません。</p> : null}
+            {!active ? <p style={{ fontSize: 15, color: "var(--body-soft)", marginTop: 8 }}>この取引では申請できません。</p> : null}
           </div>
 
           {/* ===== キャンセル ===== */}
           {active && (
             <div className="op-card">
               <h2>キャンセル</h2>
-              <p style={{ fontSize: 13, color: "var(--body-soft)", marginTop: 4, marginBottom: 14 }}>
+              <p style={{ fontSize: 15, color: "var(--body-soft)", marginTop: 4, marginBottom: 14 }}>
                 キャンセルは記録され、運営が確認します。
               </p>
               <button
@@ -540,7 +540,7 @@ export default function OperatorTransactionPage() {
             </div>
           )}
 
-          <Link href="/operator/transactions" style={{ display: "inline-block", marginTop: 8, fontSize: 13.5, fontWeight: 600, color: "var(--blue)" }}>
+          <Link href="/operator/transactions" style={{ display: "inline-block", marginTop: 8, fontSize: 15, fontWeight: 600, color: "var(--blue)" }}>
             ← 取引一覧へ
           </Link>
         </div>
@@ -555,7 +555,7 @@ export default function OperatorTransactionPage() {
             <div className="modal-biz">
               <div>
                 <div className="modal-biz-name">{formatYen(currentAmount)} → {formatYen(modal.amount)}</div>
-                <div className="modal-biz-amount" style={{ fontSize: 13, fontWeight: 600, color: "var(--body-soft)" }}>{modal.reason}</div>
+                <div className="modal-biz-amount" style={{ fontSize: 15, fontWeight: 600, color: "var(--body-soft)" }}>{modal.reason}</div>
               </div>
             </div>
             <div className="modal-actions">

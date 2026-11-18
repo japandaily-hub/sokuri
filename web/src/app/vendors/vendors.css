@@ -28,7 +28,7 @@
    あれはベタ地の話で、写真＋veil .65 の上では --lime は 13px で AA に届かないため白＋白罫に、
    リードは 16px なので幅を詰めて 1〜2 行に収める。veil は既定の .65（--headline を外した）。 */
 .vendors-page .vd-band .hero-band__copy h1 { margin: 12px 0 0; }
-.vendors-page .vd-band .eyebrow { color: #fff; }
+.vendors-page .vd-band .eyebrow { color: var(--white); }
 .vendors-page .vd-band .eyebrow::before { background: var(--white); }
 .vendors-page .vd-band .hero-band__copy p { max-width: 30em; }
 /* r2 M3 是正: 帯だけ .container（--maxw 1240）で、帯下の本文は .vendors-wrap（720）。
@@ -53,7 +53,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--body-soft);
   text-decoration: none;
@@ -78,7 +78,7 @@
   margin: calc(-1 * clamp(10px, 2vw, 24px)) 0 16px;
   max-width: none;
   text-align: right;
-  font-size: 12px;
+  font-size: 15px;
   line-height: 1.7;
   color: var(--body-soft);
 }
@@ -90,14 +90,14 @@
   padding-left: 12px;
   border-left: 3px solid var(--primary);
   font-family: var(--ui);
-  font-size: 13.5px;
+  font-size: 15px;
   line-height: 1.85;
   color: var(--ink);
   max-width: 40em;
 }
 
 .vendors-page .vendors-lead {
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.9;
   color: var(--body);
   margin: 0 0 24px;
@@ -132,7 +132,7 @@
   border-left: 3px solid var(--danger);
   padding-left: 14px;
   margin: 0;
-  font-size: 13.5px;
+  font-size: 15px;
   line-height: 1.85;
   color: var(--body);
 }
@@ -153,7 +153,7 @@
 }
 .vendors-page .vd-state-text {
   margin: 0;
-  font-size: 13px;
+  font-size: 15px;
   color: var(--body-soft);
 }
 /* r6 #10: エラーの器から出した主導線（出品する／業者登録）。枠を持たず、ページの地
@@ -179,7 +179,7 @@
    フォーカスリングは消さない（:focus-visible は共通のまま効く）。 */
 .vendors-page .vd-state-link {
   font-family: inherit;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--blue);
   text-decoration: underline;
@@ -207,7 +207,7 @@
 }
 .vendors-page .vd-empty-title {
   font-family: var(--head);
-  font-weight: 600;
+  font-weight: 700;
   font-size: clamp(18px, 2.4vw, 24px);
   color: var(--ink);
   line-height: 1.6;
@@ -237,7 +237,7 @@
 .vendors-page .vd-sample h2,
 .vendors-page .vd-sample h3 {
   font-family: var(--head);
-  font-weight: 600;
+  font-weight: 700;
   font-size: clamp(16px, 2vw, 19px);
   color: var(--ink);
   line-height: 1.6;
@@ -255,14 +255,14 @@
 .vendors-page .vd-criteria li {
   padding: 14px 0;
   border-bottom: 1px solid var(--line);
-  font-size: 13.5px;
+  font-size: 15px;
   line-height: 1.9;
   color: var(--body);
 }
 .vendors-page .vd-criteria b {
   display: block;
   font-family: var(--head);
-  font-weight: 600;
+  font-weight: 700;
   font-size: 15px;
   color: var(--ink);
   margin-bottom: 4px;
@@ -281,7 +281,7 @@
   position: relative;
   padding-left: 1.15em;
   font-family: var(--ui);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.95;
   color: var(--body);
 }
@@ -328,7 +328,7 @@
 }
 .vendors-page .vendor-row-name {
   font-family: var(--head);
-  font-weight: 600;
+  font-weight: 700;
   font-size: 18px;
   color: var(--ink);
   text-decoration: none;
@@ -338,7 +338,7 @@
 .vendors-page .vendor-tag {
   display: inline-block;
   font-family: var(--ui);
-  font-size: 11px;
+  font-size: 15px;
   letter-spacing: .06em;
   padding: 2px 8px;
   border: 1px solid var(--line);
@@ -354,16 +354,16 @@
   display: flex;
   align-items: baseline;
   gap: 6px;
-  font-size: 13px;
+  font-size: 15px;
 }
-.vendors-page .vendor-rating-count { font-family: var(--ui); color: var(--body-soft); font-size: 12px; }
+.vendors-page .vendor-rating-count { font-family: var(--ui); color: var(--body-soft); font-size: 15px; }
 /* 「よかった 3・伸びしろ 1」を単語の途中で折り返させない（CJK は既定で文字間どこでも
    折り返せるため、この文字列だけは1かたまりで扱う。「（口コミN件）」はその後ろで折り返してよい）。 */
 .vendors-page .vendor-rating-value { display: inline-block; white-space: nowrap; }
 
 .vendors-page .vendor-row-quote {
   margin: 10px 0 0;
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.7;
   color: var(--ink);
   border-left: 1px solid var(--line);
@@ -373,7 +373,7 @@
 .vendors-page .vendor-row-meta {
   margin: 10px 0 0;
   font-family: var(--ui);
-  font-size: 12px;
+  font-size: 15px;
   color: var(--body-soft);
   display: flex;
   flex-wrap: wrap;
@@ -382,7 +382,7 @@
 .vendors-page .vendor-row-link {
   flex: none;
   align-self: center;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--blue);
   text-decoration: underline;
@@ -412,7 +412,7 @@
   justify-content: space-between;
   gap: 8px 20px;
   font-family: var(--ui);
-  font-size: 12.5px;
+  font-size: 15px;
   color: var(--body-soft);
 }
 .vendors-page .vd-foot-links {

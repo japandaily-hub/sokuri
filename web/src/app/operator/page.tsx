@@ -344,7 +344,7 @@ function LotCard({
                   <>
                     他社の入札額は匿名で表示されます（社名・コメントは非開示）
                     <br />
-                    <span style={{ fontSize: "11.5px" }}>{BID_RANGE_HINT}</span>
+                    <span style={{ fontSize: "15px" }}>{BID_RANGE_HINT}</span>
                   </>
                 )}
               </p>

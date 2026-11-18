@@ -551,9 +551,9 @@ export default function OperatorChatPage() {
         <nav className="case-sidebar" aria-label="交渉中の案件">
           <div className="case-sidebar-head">交渉中の案件</div>
           {sideLoading ? (
-            <div style={{ padding: 14, fontSize: 12.5, color: "var(--body-soft)" }}>読み込み中…</div>
+            <div style={{ padding: 14, fontSize: 15, color: "var(--body-soft)" }}>読み込み中…</div>
           ) : transactions.length === 0 ? (
-            <div style={{ padding: 14, fontSize: 12.5, color: "var(--body-soft)" }}>成約済みの案件はありません</div>
+            <div style={{ padding: 14, fontSize: 15, color: "var(--body-soft)" }}>成約済みの案件はありません</div>
           ) : (
             transactions.map((t) => (
               <button
@@ -624,11 +624,11 @@ export default function OperatorChatPage() {
               {/* r8-fix-frontend2 H3 是正: キャンセル済み・完了済みの取引では続行操作
                   （送信・日程提案）ができないことを明示する。 */}
               {isClosed ? (
-                <div style={{ padding: "8px 20px", fontSize: 12.5, color: "var(--body-soft)" }} role="status">
+                <div style={{ padding: "8px 20px", fontSize: 15, color: "var(--body-soft)" }} role="status">
                   この取引は終了しています。メッセージの送信・日程提案はできません。
                 </div>
               ) : isVisiting ? (
-                <div style={{ padding: "8px 20px", fontSize: 12.5, color: "var(--body-soft)" }} role="status">
+                <div style={{ padding: "8px 20px", fontSize: 15, color: "var(--body-soft)" }} role="status">
                   訪問日程は確定済みです。変更が必要な場合はメッセージでご相談ください。
                 </div>
               ) : null}
@@ -639,7 +639,7 @@ export default function OperatorChatPage() {
                 <div
                   style={{
                     padding: "8px 20px",
-                    fontSize: 12.5,
+                    fontSize: 15,
                     color: "var(--body-soft)",
                     wordBreak: "break-word",
                     overflowWrap: "anywhere",
@@ -654,7 +654,7 @@ export default function OperatorChatPage() {
               ) : null}
 
               {messagesError ? (
-                <div style={{ padding: "8px 20px", fontSize: 12.5, color: "var(--danger)" }}>{messagesError}</div>
+                <div style={{ padding: "8px 20px", fontSize: 15, color: "var(--danger)" }}>{messagesError}</div>
               ) : null}
 
               {/* メッセージ */}
@@ -856,7 +856,7 @@ export default function OperatorChatPage() {
 
               {/* 入力エリア（終了済み取引では非表示にし、終了案内のみ出す） */}
               {isClosed ? (
-                <div className="input-area" style={{ color: "var(--body-soft)", fontSize: 13, padding: "12px 20px" }}>
+                <div className="input-area" style={{ color: "var(--body-soft)", fontSize: 15, padding: "12px 20px" }}>
                   この取引は終了しています
                 </div>
               ) : isAdminViewing ? (
@@ -864,7 +864,7 @@ export default function OperatorChatPage() {
                   className="input-area"
                   role="note"
                   data-testid="chat-read-only"
-                  style={{ color: "var(--body-soft)", fontSize: 13, padding: "12px 20px" }}
+                  style={{ color: "var(--body-soft)", fontSize: 15, padding: "12px 20px" }}
                 >
                   運営は代理で送信できません
                 </div>

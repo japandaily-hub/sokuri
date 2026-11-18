@@ -155,7 +155,7 @@ export default function VendorDetailPage() {
             <div className="bid-message">
               {profile.intro_message ?? "この業者からの紹介文はまだ登録されていません。"}
             </div>
-            <p style={{ marginTop: 12, fontSize: 13, color: "var(--body-soft)" }}>
+            <p style={{ marginTop: 12, fontSize: 15, color: "var(--body-soft)" }}>
               入札の選択は案件詳細から行えます。
             </p>
           </div>
@@ -197,7 +197,7 @@ export default function VendorDetailPage() {
                 </div>
               ))
             ) : (
-              <p style={{ fontSize: 13, color: "var(--body-soft)", padding: "8px 0" }}>
+              <p style={{ fontSize: 15, color: "var(--body-soft)", padding: "8px 0" }}>
                 口コミはまだありません。
               </p>
             )}

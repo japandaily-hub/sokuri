@@ -115,7 +115,7 @@ export default function OperatorSignupPage() {
         <div className="auth-wrap">
           <div className="auth-card">
             <div className="auth-head">
-              <span className="buyer-tag"><span className="buyer-tag__en">BUYER</span>買取業者さま向け</span>
+              <span className="buyer-tag">買取業者さま向け</span>
               <h1 className="auth-title">業者登録</h1>
               {/* ラウンド5 指摘（18）: 依頼者（売りたい方）が誤って開いても戻る導線が無く、
                   必須の古物商許可番号まで見えるため「これが自分の登録画面か」と不安になる。

@@ -22,7 +22,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--body-soft);
   text-decoration: none;
@@ -56,18 +56,18 @@
   flex-shrink: 0;
   display: grid; place-items: center;
   font-family: var(--head);
-  font-size: 32px; font-weight: 400; color: #fff;
+  font-size: 32px; font-weight: 700; color: var(--white);
 }
 .vendor-page .biz-hero-info { flex: 1; min-width: 0; }
 .vendor-page .biz-hero-name {
   font-family: var(--head);
   font-size: clamp(18px, 3vw, 22px);
-  font-weight: 400;
+  font-weight: 700;
   color: var(--navy);
   line-height: 1.3;
 }
 .vendor-page .biz-hero-area {
-  font-size: 13px;
+  font-size: 15px;
   color: var(--body-soft);
   margin-top: 4px;
 }
@@ -81,7 +81,7 @@
   margin-top: 8px;
 }
 .vendor-page .biz-tag {
-  font-size: 11px; font-weight: 600;
+  font-size: 15px; font-weight: 600;
   padding: 4px 10px; border-radius: 0;
 }
 .vendor-page .biz-tag-green { background: rgba(var(--primary-rgb),.1); color: var(--green); }
@@ -94,13 +94,13 @@
 }
 .vendor-page .rating-num {
   font-family: var(--head);
-  font-size: 18px; font-weight: 600; color: var(--navy);
+  font-size: 18px; font-weight: 700; color: var(--navy);
   /* 「よかった 3・伸びしろ 1」が単語の途中で折り返さないようにする（CJK は既定で
      文字間どこでも折り返せるため）。 */
   white-space: nowrap;
 }
 .vendor-page .rating-count {
-  font-size: 13px; color: var(--body-soft);
+  font-size: 15px; color: var(--body-soft);
 }
 
 /* 評価バー */
@@ -112,7 +112,7 @@
   display: flex; align-items: center; gap: 8px;
 }
 .vendor-page .rating-bar-lbl {
-  font-size: 11.5px; color: var(--body-soft); font-weight: 600;
+  font-size: 15px; color: var(--body-soft); font-weight: 600;
   width: 14px; text-align: right;
 }
 .vendor-page .rating-bar-track {
@@ -123,7 +123,7 @@
   height: 100%; background: var(--gold-text); border-radius: 3px;
 }
 .vendor-page .rating-bar-num {
-  font-size: 11.5px; color: var(--body-soft);
+  font-size: 15px; color: var(--body-soft);
   width: 28px; text-align: right;
 }
 
@@ -138,25 +138,25 @@
 }
 .vendor-page .biz-stat-val {
   font-family: var(--head);
-  font-size: 22px; font-weight: 400; color: var(--navy); line-height: 1;
+  font-size: 22px; font-weight: 700; color: var(--navy); line-height: 1;
 }
 .vendor-page .biz-stat-val small {
-  font-size: 12px; color: var(--body-soft); margin-left: 2px;
+  font-size: 15px; color: var(--body-soft); margin-left: 2px;
 }
 .vendor-page .biz-stat-lbl {
-  font-size: 11px; color: var(--body-soft); margin-top: 4px; font-weight: 600;
+  font-size: 15px; color: var(--body-soft); margin-top: 4px; font-weight: 600;
 }
 
 /* 専門カテゴリ見出し */
 .vendor-page .cat-heading {
   margin-bottom: 6px;
-  font-size: 12px; font-weight: 600; color: var(--body-soft);
+  font-size: 15px; font-weight: 600; color: var(--body-soft);
 }
 /* 専門カテゴリ chip */
 .vendor-page .cat-grid { display: flex; gap: 8px; flex-wrap: wrap; }
 .vendor-page .cat-chip {
   background: var(--pale); color: var(--blue);
-  font-family: var(--head); font-size: 13px; font-weight: 600;
+  font-family: var(--head); font-size: 15px; font-weight: 700;
   padding: 8px 14px; border-radius: 0;
   border: 1.5px solid rgba(var(--primary-rgb),.2);
 }
@@ -173,23 +173,23 @@
   display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
 }
 .vendor-page .bid-label-badge {
-  background: var(--blue); color: #fff;
-  font-family: var(--head); font-size: 12px; font-weight: 600;
+  background: var(--blue); color: var(--white);
+  font-family: var(--head); font-size: 15px; font-weight: 700;
   padding: 4px 12px; border-radius: 0;
   display: inline-flex; align-items: center; gap: 4px;
 }
 .vendor-page .bid-amount-big {
   font-family: var(--head);
-  font-size: 40px; font-weight: 400; color: var(--navy); line-height: 1;
+  font-size: 40px; font-weight: 700; color: var(--navy); line-height: 1;
 }
 .vendor-page .bid-amount-big small {
   font-size: 16px; color: var(--body-soft); margin-right: 4px;
 }
 .vendor-page .bid-amount-note {
-  font-size: 12.5px; color: var(--body-soft); margin-top: 4px;
+  font-size: 15px; color: var(--body-soft); margin-top: 4px;
 }
 .vendor-page .bid-message {
-  font-size: 13px; color: var(--body); line-height: 1.82; margin-top: 14px;
+  font-size: 15px; color: var(--body); line-height: 1.82; margin-top: 14px;
 }
 .vendor-page .bid-cta-row {
   display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap;
@@ -208,7 +208,7 @@
 }
 .vendor-page .detail-card-title {
   font-family: var(--head);
-  font-size: 15px; font-weight: 600; color: var(--navy);
+  font-size: 15px; font-weight: 700; color: var(--navy);
   margin-bottom: 16px;
   display: flex; align-items: center; gap: 8px;
 }
@@ -232,10 +232,10 @@
 .vendor-page .promise-body strong {
   display: block;
   font-family: var(--head);
-  font-size: 13.5px; font-weight: 600; color: var(--navy);
+  font-size: 15px; font-weight: 700; color: var(--navy);
 }
 .vendor-page .promise-body span {
-  font-size: 12.5px; color: var(--body-soft); line-height: 1.7;
+  font-size: 15px; color: var(--body-soft); line-height: 1.7;
 }
 
 /* 口コミ */
@@ -250,21 +250,21 @@
 .vendor-page .reviewer-avatar {
   width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
   display: grid; place-items: center;
-  font-family: var(--head); font-size: 14px; font-weight: 400; color: #fff;
+  font-family: var(--head); font-size: 15px; font-weight: 700; color: var(--white);
 }
 .vendor-page .reviewer-info { flex: 1; }
 .vendor-page .reviewer-name {
   font-family: var(--head);
-  font-size: 13.5px; font-weight: 600; color: var(--navy);
+  font-size: 15px; font-weight: 700; color: var(--navy);
 }
 .vendor-page .review-meta {
-  font-size: 11.5px; color: var(--body-soft); margin-top: 2px;
+  font-size: 15px; color: var(--body-soft); margin-top: 2px;
 }
 .vendor-page .review-verdict {
   display: inline-block;
   font-family: var(--head);
-  font-weight: 600;
-  font-size: 12.5px;
+  font-weight: 700;
+  font-size: 15px;
   padding: 2px 9px;
   border-radius: 0;
   border: 1px solid var(--line);
@@ -274,20 +274,20 @@
 .vendor-page .review-verdict[data-verdict="good"] { border-color: var(--green); color: var(--green); }
 .vendor-page .review-verdict[data-verdict="improve"] { border-color: var(--gold-text); color: var(--gold-text); }
 .vendor-page .review-text {
-  font-size: 13.5px; color: var(--body); line-height: 1.82;
+  font-size: 15px; color: var(--body); line-height: 1.82;
 }
 .vendor-page .review-tags {
   display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;
 }
 .vendor-page .review-tag {
-  font-size: 11px; background: var(--line-soft); color: var(--body-soft);
+  font-size: 15px; background: var(--line-soft); color: var(--body-soft);
   padding: 3px 9px; border-radius: 0; font-weight: 600;
 }
 .vendor-page .review-more {
   text-align: center; margin-top: 16px;
 }
 .vendor-page .review-more-btn {
-  font-size: 13.5px; font-weight: 600; color: var(--blue);
+  font-size: 15px; font-weight: 700; color: var(--blue);
   background: none; border: none; cursor: pointer;
   text-decoration: underline; text-underline-offset: 3px;
   font-family: var(--head);
@@ -296,7 +296,7 @@
 /* 対応エリア */
 .vendor-page .area-tags { display: flex; gap: 6px; flex-wrap: wrap; }
 .vendor-page .area-tag {
-  font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 0;
+  font-size: 15px; font-weight: 600; padding: 7px 14px; border-radius: 0;
   background: var(--pale); color: var(--blue); border: 1px solid rgba(var(--primary-rgb),.15);
 }
 
@@ -316,10 +316,10 @@
 .vendor-page .biz-footer-info strong {
   display: block;
   font-family: var(--head);
-  font-size: 15px; font-weight: 400; color: var(--navy);
+  font-size: 15px; font-weight: 700; color: var(--navy);
 }
 .vendor-page .biz-footer-info span {
-  font-size: 12px; color: var(--body-soft);
+  font-size: 15px; color: var(--body-soft);
 }
 .vendor-page .biz-footer-cta .btn svg {
   fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
@@ -333,7 +333,7 @@
   .vendor-page .detail-card { padding: 18px 16px; }
   .vendor-page .bid-cta-row .btn { flex: 1; min-width: 0; }
   .vendor-page .biz-footer-inner { gap: 8px; }
-  .vendor-page .biz-footer-cta .btn { font-size: 13px; padding: 10px 14px; }
+  .vendor-page .biz-footer-cta .btn { font-size: 15px; padding: 10px 14px; }
 }
 @media (max-width: 400px) {
   .vendor-page .biz-big-avatar { width: 64px; height: 64px; font-size: 26px; border-radius: 0; }
@@ -348,7 +348,7 @@
 .vendor-page .review-report {
   display: inline-block;
   margin-top: 6px;
-  font-size: 11.5px;
+  font-size: 15px;
   color: var(--body-soft);
   text-decoration: underline;
   text-underline-offset: 3px;

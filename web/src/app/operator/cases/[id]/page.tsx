@@ -454,10 +454,10 @@ export default function OperatorCaseDetailPage() {
                 // 案件が成約等で open/bidding 以外に移った場合、backend は他社分の
                 // 開示を止める（top_bid_amount/is_top_bidder が null）。自社分のみの
                 // 一覧から「最高額」を計算すると誤表示になるため、その旨を案内する。
-                <p style={{ fontSize: 14, color: "var(--body-soft)" }}>入札状況は成約後は表示されません</p>
+                <p style={{ fontSize: 15, color: "var(--body-soft)" }}>入札状況は成約後は表示されません</p>
               ) : (
                 <>
-                  <p style={{ fontSize: 14, color: "var(--body)", marginBottom: caseData.my_bid ? 8 : 4 }}>
+                  <p style={{ fontSize: 15, color: "var(--body)", marginBottom: caseData.my_bid ? 8 : 4 }}>
                     現在の最高額 <strong>¥{formatYen(topBidAmount).replace("円", "")}</strong>
                     （{bidderCount}社）
                   </p>
@@ -465,7 +465,7 @@ export default function OperatorCaseDetailPage() {
                     isTied ? (
                       <>
                         <span className="status-chip negotiating">他社と同額で並んでいます</span>
-                        <p style={{ fontSize: 12, color: "var(--body-soft)", marginTop: 6, lineHeight: 1.8 }}>
+                        <p style={{ fontSize: 15, color: "var(--body-soft)", marginTop: 6, lineHeight: 1.8 }}>
                           同額の場合に優先される仕組みはなく、業者は依頼者が選びます。上回りたい場合は金額を引き上げてください。
                         </p>
                       </>
@@ -478,7 +478,7 @@ export default function OperatorCaseDetailPage() {
                     ) : null
                   ) : null}
                   {otherBids.length > 0 ? (
-                    <ul className="op-other-bids" style={{ marginTop: 12, paddingLeft: 18, fontSize: 13, color: "var(--body-soft)", lineHeight: 1.9 }}>
+                    <ul className="op-other-bids" style={{ marginTop: 12, paddingLeft: 18, fontSize: 15, color: "var(--body-soft)", lineHeight: 1.9 }}>
                       {otherBids.map((b) => (
                         <li key={b.id}>
                           他社 ¥{formatYen(b.amount).replace("円", "")}
@@ -487,7 +487,7 @@ export default function OperatorCaseDetailPage() {
                       ))}
                     </ul>
                   ) : null}
-                  <p style={{ fontSize: 12, color: "var(--body-soft)", marginTop: 10, lineHeight: 1.8 }}>
+                  <p style={{ fontSize: 15, color: "var(--body-soft)", marginTop: 10, lineHeight: 1.8 }}>
                     他社の入札額は匿名で表示されます（社名・コメントは非開示）
                   </p>
                 </>
@@ -555,7 +555,7 @@ export default function OperatorCaseDetailPage() {
                     ? "（他社と同額です。上回るには引き上げてください）"
                     : ""}
               </h2>
-              <p style={{ fontSize: 13, color: "var(--body-soft)", marginBottom: 18, lineHeight: 1.8 }}>
+              <p style={{ fontSize: 15, color: "var(--body-soft)", marginBottom: 18, lineHeight: 1.8 }}>
                 現在の入札額は<strong>¥{formatYen(caseData.my_bid.amount).replace("円", "")}</strong>です。金額は成約が決まるまで何度でも引き上げられます（下げることはできません）。他社の入札額は匿名で表示されます（社名・コメントは非開示）。
               </p>
               {raiseError ? <div className="op-alert error" style={{ marginBottom: 12 }}>{raiseError}</div> : null}
@@ -578,10 +578,10 @@ export default function OperatorCaseDetailPage() {
                     aria-describedby="raiseAmountHint"
                   />
                 </div>
-                <p id="raiseAmountHint" style={{ fontSize: 12, color: "var(--body-soft)", marginTop: 6, lineHeight: 1.8 }}>
+                <p id="raiseAmountHint" style={{ fontSize: 15, color: "var(--body-soft)", marginTop: 6, lineHeight: 1.8 }}>
                   現在額より高い金額のみ入力できます（1,000円単位）
                   <br />
-                  <span style={{ fontSize: 11.5 }}>{BID_RANGE_HINT}</span>
+                  <span style={{ fontSize: 15 }}>{BID_RANGE_HINT}</span>
                 </p>
               </div>
               <div className="field">
@@ -601,7 +601,7 @@ export default function OperatorCaseDetailPage() {
               <button type="submit" disabled={raiseBusy} className="btn btn-primary btn-block">
                 {raiseBusy ? "送信中…" : "この金額に引き上げる"}
               </button>
-              <p style={{ fontSize: 11.5, color: "var(--body-soft)", marginTop: 8, lineHeight: 1.8 }}>
+              <p style={{ fontSize: 15, color: "var(--body-soft)", marginTop: 8, lineHeight: 1.8 }}>
                 引き上げは1,000円以上・1入札につき最大20回まで
               </p>
             </form>
@@ -644,7 +644,7 @@ export default function OperatorCaseDetailPage() {
               <h2 style={{ fontFamily: "var(--head)", fontSize: 15, fontWeight: 400, color: "var(--navy)", marginBottom: 4, borderLeft: "2px solid var(--primary)", paddingLeft: 12 }}>
                 入札する
               </h2>
-              <p style={{ fontSize: 13, color: "var(--body-soft)", marginBottom: 18, lineHeight: 1.8 }}>
+              <p style={{ fontSize: 15, color: "var(--body-soft)", marginBottom: 18, lineHeight: 1.8 }}>
                 買取額と引き取り費用を踏まえた「依頼者への提示額」を入力してください。金額は成約が決まるまで何度でも引き上げられます（下げることはできません）。他社の入札額は匿名で表示されます（社名・コメントは非開示）。
               </p>
               <div className="field">
@@ -668,8 +668,8 @@ export default function OperatorCaseDetailPage() {
                 </div>
                 {/* r10 M1 是正: ダッシュボードの入札フォームにだけあった手数料注記・範囲ヒントを
                     詳細画面にも同文言で置く（同じ操作なのに条件の説明が片方に無かった）。 */}
-                <p id="bidAmountHint" style={{ fontSize: 12, color: "var(--body-soft)", marginTop: 6, lineHeight: 1.8 }}>
-                  <span style={{ fontSize: 11.5 }}>{BID_RANGE_HINT}</span>
+                <p id="bidAmountHint" style={{ fontSize: 15, color: "var(--body-soft)", marginTop: 6, lineHeight: 1.8 }}>
+                  <span style={{ fontSize: 15 }}>{BID_RANGE_HINT}</span>
                 </p>
               </div>
               <div className="field">
@@ -696,7 +696,7 @@ export default function OperatorCaseDetailPage() {
             <div className="op-alert info">この案件は入札を受け付けていません。</div>
           )}
 
-          <Link href="/operator/cases" style={{ display: "inline-block", marginTop: 8, fontSize: 13.5, fontWeight: 600, color: "var(--blue)" }}>
+          <Link href="/operator/cases" style={{ display: "inline-block", marginTop: 8, fontSize: 15, fontWeight: 600, color: "var(--blue)" }}>
             ← 案件一覧へ
           </Link>
         </div>

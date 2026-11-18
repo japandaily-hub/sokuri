@@ -358,7 +358,7 @@ export default function OperatorProfilePage() {
               {avatarInitial}
             </div>
             <div className="prof-info">
-              <span className="op-eyebrow">BUYER PROFILE</span>
+              <span className="op-eyebrow">買取業者のプロフィール</span>
               <div className="prof-name">{companyName || "業者名未設定"}</div>
               <div className="prof-tags">
                 {verified ? (
@@ -615,7 +615,7 @@ export default function OperatorProfilePage() {
                 <span className="head-sub">ユーザーへの見え方</span>
               </div>
               <div className="prof-card-body" style={{ paddingTop: 6, paddingBottom: 6 }}>
-                <p className="field-hint" style={{ margin: "8px 0 4px", fontSize: 13 }}>
+                <p className="field-hint" style={{ margin: "8px 0 4px", fontSize: 15 }}>
                   評価と口コミは、成約したユーザーからの投稿をそのまま常時公開しています（非表示にはできません）。
                 </p>
                 {TOGGLES.map((t) => {
@@ -763,7 +763,7 @@ export default function OperatorProfilePage() {
             {/* 退会（r8-fix-frontend2 M6 対応） */}
             <section className="prof-card flush">
               <div className="prof-card-body">
-                <p style={{ fontSize: 12.5, color: "var(--body-soft)", lineHeight: 1.7 }}>
+                <p style={{ fontSize: 15, color: "var(--body-soft)", lineHeight: 1.7 }}>
                   アカウントの退会をご希望の場合はこちらから手続きできます。進行中の取引がある場合は退会できません（先に取引を完了・キャンセルしてください）。
                 </p>
                 <button
@@ -772,7 +772,7 @@ export default function OperatorProfilePage() {
                     setWithdrawError(null);
                     setWithdrawModalOpen(true);
                   }}
-                  style={{ marginTop: 10, fontSize: 13, fontWeight: 600, color: "var(--danger)", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", padding: 0 }}
+                  style={{ marginTop: 10, fontSize: 15, fontWeight: 600, color: "var(--danger)", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", padding: 0 }}
                 >
                   退会する
                 </button>

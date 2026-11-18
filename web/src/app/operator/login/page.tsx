@@ -112,7 +112,7 @@ function OperatorLoginForm() {
         <div className="auth-wrap">
           <div className="auth-card">
             <div className="auth-head">
-              <span className="buyer-tag"><span className="buyer-tag__en">BUYER</span>買取業者さま向け</span>
+              <span className="buyer-tag">買取業者さま向け</span>
               <h1 className="auth-title">業者ログイン</h1>
               <p className="auth-sub">登録業者さま向けの管理画面に入ります。</p>
             </div>

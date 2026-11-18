@@ -258,7 +258,7 @@ export default function VendorListPage() {
                   />
                   {/* eslint-enable @next/next/no-img-element */}
                 </Reveal>
-                <RevealLines as="h2" mark="under" className="vd-empty-title" lines={["審査を通過した業者から順に掲載します"]} />
+                <RevealLines as="h2" className="vd-empty-title" lines={["審査を通過した業者から順に掲載します"]} />
                 {/* r5 #1/#24: 同じ文が帯の直下（.vd-notice）に出るため、ここでは繰り返さない。
                     業者向けの導線は「掲載時に表示する項目」の末尾（.vd-sample-cta）に1本だけ置く。 */}
                 <div className="vd-empty-cta">

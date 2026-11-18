@@ -36,7 +36,7 @@
 }
 .op-dash .dash-tab {
   padding: 10px 20px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--body-soft);
   cursor: pointer;
@@ -58,8 +58,8 @@
 .op-dash .dash-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
 .op-dash .dash-tab .ic { width: 15px; height: 15px; stroke-width: 2; }
 .op-dash .tab-badge {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   background: var(--blue);
   color: var(--white);
   border-radius: 0;
@@ -81,10 +81,10 @@
   padding: 18px 20px;
   background: var(--white);
 }
-.op-dash .sum-label { font-size: 12px; font-weight: 600; color: var(--body-soft); margin-bottom: 8px; }
+.op-dash .sum-label { font-size: 15px; font-weight: 600; color: var(--body-soft); margin-bottom: 8px; }
 .op-dash .sum-val { font-family: var(--ui); font-variant-numeric: tabular-nums; font-size: 26px; font-weight: 600; color: var(--navy); line-height: 1; }
-.op-dash .sum-val span { font-size: 13px; font-weight: 600; color: var(--body-soft); margin-left: 2px; }
-.op-dash .sum-sub { font-size: 11.5px; color: var(--body-soft); margin-top: 5px; }
+.op-dash .sum-val span { font-size: 15px; font-weight: 600; color: var(--body-soft); margin-left: 2px; }
+.op-dash .sum-sub { font-size: 15px; color: var(--body-soft); margin-top: 5px; }
 .op-dash .sum-card.highlight { border-color: var(--blue); background: var(--pale); }
 .op-dash .sum-card.highlight .sum-val { color: var(--blue); }
 
@@ -98,7 +98,7 @@
 }
 .op-dash .filter-select {
   font-family: var(--sans);
-  font-size: 13.5px;
+  font-size: 15px;
   color: var(--ink);
   background: var(--white);
   border: 1.5px solid var(--line);
@@ -112,8 +112,8 @@
   transition: border-color .2s;
 }
 .op-dash .filter-select:focus { border-color: var(--blue); }
-.op-dash .filter-label { font-size: 13px; font-weight: 600; color: var(--body-soft); white-space: nowrap; }
-.op-dash .filter-count { margin-left: auto; font-size: 13px; color: var(--body-soft); white-space: nowrap; }
+.op-dash .filter-label { font-size: 15px; font-weight: 600; color: var(--body-soft); white-space: nowrap; }
+.op-dash .filter-count { margin-left: auto; font-size: 15px; color: var(--body-soft); white-space: nowrap; }
 
 /* ---------- 案件カード ---------- */
 .op-dash .lot-grid { display: flex; flex-direction: column; gap: 16px; }
@@ -153,7 +153,7 @@
   gap: 4px; color: var(--body-soft); background: var(--pale);
 }
 .op-dash .lot-photo .imgph .ic { width: 22px; height: 22px; stroke: var(--body-soft); }
-.op-dash .lot-photo .imgph small { font-size: 9px; line-height: 1.2; text-align: center; padding: 0 4px; }
+.op-dash .lot-photo .imgph small { font-size: 15px; line-height: 1.2; text-align: center; padding: 0 4px; }
 .op-dash .lot-photo-more {
   background: var(--pale);
   display: flex;
@@ -162,15 +162,15 @@
   flex-direction: column;
   gap: 2px;
 }
-.op-dash .lot-photo-more span { font-family: var(--head); font-size: 15px; font-weight: 600; color: var(--blue); }
-.op-dash .lot-photo-more small { font-size: 10px; color: var(--body-soft); }
+.op-dash .lot-photo-more span { font-family: var(--head); font-size: 15px; font-weight: 700; color: var(--blue); }
+.op-dash .lot-photo-more small { font-size: 15px; color: var(--body-soft); }
 
 /* 案件情報 */
 .op-dash .lot-info { padding: 18px 20px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .op-dash .lot-info-top { display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
-.op-dash .lot-id { font-size: 11px; font-weight: 600; color: var(--body-soft); letter-spacing: .06em; }
+.op-dash .lot-id { font-size: 15px; font-weight: 600; color: var(--body-soft); letter-spacing: .06em; }
 .op-dash .lot-tag {
-  font-size: 11px; font-weight: 600;
+  font-size: 15px; font-weight: 600;
   padding: 2px 9px; border-radius: 0;
   border: 1px solid var(--line);
   color: var(--body-soft);
@@ -183,7 +183,7 @@
   flex-wrap: wrap;
 }
 .op-dash .lot-item-chip {
-  font-size: 12px;
+  font-size: 15px;
   color: var(--ink);
   background: var(--pale);
   border-radius: 0;
@@ -191,14 +191,14 @@
   font-weight: 600;
 }
 .op-dash .lot-meta { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 4px; }
-.op-dash .lot-meta-item { font-size: 12.5px; color: var(--body-soft); display: flex; align-items: center; gap: 5px; }
+.op-dash .lot-meta-item { font-size: 15px; color: var(--body-soft); display: flex; align-items: center; gap: 5px; }
 .op-dash .lot-meta-item .ic { width: 13px; height: 13px; stroke: var(--body-soft); stroke-width: 1.9; flex-shrink: 0; }
-.op-dash .lot-meta-item strong { color: var(--ink); font-size: 14px; font-family: var(--head); }
+.op-dash .lot-meta-item strong { color: var(--ink); font-size: 15px; font-family: var(--head); }
 .op-dash .lot-timer {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 12.5px;
+  font-size: 15px;
   font-weight: 600;
 }
 .op-dash .lot-timer.urgent { color: var(--danger); }
@@ -216,7 +216,7 @@
   min-width: 220px;
   background: var(--pale-2);
 }
-.op-dash .current-top { font-size: 12px; color: var(--body-soft); margin-bottom: 2px; }
+.op-dash .current-top { font-size: 15px; color: var(--body-soft); margin-bottom: 2px; }
 .op-dash .current-amount {
   font-family: var(--ui);
   font-variant-numeric: tabular-nums;
@@ -225,16 +225,16 @@
   color: var(--navy);
   line-height: 1;
 }
-.op-dash .current-amount span { font-size: 12px; color: var(--body-soft); font-weight: 600; margin-left: 2px; }
+.op-dash .current-amount span { font-size: 15px; color: var(--body-soft); font-weight: 600; margin-left: 2px; }
 .op-dash .my-bid-row {
   background: var(--white);
   border: 1.5px solid var(--line);
   border-radius: 0;
   padding: 10px 12px;
-  font-size: 12.5px;
+  font-size: 15px;
   color: var(--body-soft);
 }
-.op-dash .my-bid-row strong { color: var(--ink); font-size: 14px; }
+.op-dash .my-bid-row strong { color: var(--ink); font-size: 15px; }
 
 /* 入札フォーム（金額入力欄は operator-shared.css の .yen-input-wrap を使用。
    旧 .bid-input-wrap 独自実装は廃止・二重管理を解消） */
@@ -247,8 +247,8 @@
   border: none;
   border-radius: 0;
   font-family: var(--head);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   cursor: pointer;
   transition: .2s;
 }
@@ -256,7 +256,7 @@
 .op-dash .bid-submit:disabled { opacity: .6; cursor: not-allowed; }
 .op-dash .bid-submit.update { background: var(--white); color: var(--blue); border: 1.5px solid var(--blue); }
 .op-dash .bid-submit.update:hover { background: var(--pale); }
-.op-dash .bid-hint { font-size: 11px; color: var(--body-soft); text-align: center; line-height: 1.5; }
+.op-dash .bid-hint { font-size: 15px; color: var(--body-soft); text-align: center; line-height: 1.5; }
 
 /* ---------- タブコンテンツ ---------- */
 .op-dash .tab-content { display: none; }
@@ -278,7 +278,7 @@
 }
 .op-dash .density-btn {
   font-family: var(--sans);
-  font-size: 12.5px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--body-soft);
   background: var(--white);
@@ -327,8 +327,8 @@
 .op-dash .lot-compact-thumb .ic { width: 18px; height: 18px; stroke: var(--body-soft); }
 .op-dash .lot-compact-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .op-dash .lot-compact-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.op-dash .lot-compact-items { font-size: 13.5px; font-weight: 600; color: var(--navy); }
-.op-dash .lot-compact-meta { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--body-soft); }
+.op-dash .lot-compact-items { font-size: 15px; font-weight: 600; color: var(--navy); }
+.op-dash .lot-compact-meta { display: flex; gap: 12px; flex-wrap: wrap; font-size: 15px; color: var(--body-soft); }
 .op-dash .lot-compact-meta span { display: inline-flex; align-items: center; gap: 4px; }
 .op-dash .lot-compact-meta .ic { width: 12px; height: 12px; stroke: var(--body-soft); flex-shrink: 0; }
 .op-dash .lot-compact-meta strong { color: var(--ink); font-family: var(--head); }
@@ -340,7 +340,7 @@
   flex-shrink: 0;
   text-align: right;
 }
-.op-dash .lot-compact-mybid { font-size: 12px; font-weight: 600; color: var(--body-soft); white-space: nowrap; }
+.op-dash .lot-compact-mybid { font-size: 15px; font-weight: 600; color: var(--body-soft); white-space: nowrap; }
 .op-dash .lot-compact-mybid strong { color: var(--ink); }
 
 @media (max-width: 640px) {
@@ -379,20 +379,20 @@
   justify-content: center;
   font-family: var(--head);
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--white);
   flex-shrink: 0;
 }
 .op-dash .neg-user-ic.done { background: var(--pale); color: var(--green); }
 .op-dash .neg-user-ic.done .ic { width: 22px; height: 22px; stroke: var(--green); stroke-width: 2.4; }
 .op-dash .neg-info { flex: 1; min-width: 0; }
-.op-dash .neg-lot { font-size: 13px; font-weight: 600; color: var(--navy); margin-bottom: 3px; }
-.op-dash .neg-preview { font-size: 12.5px; color: var(--body-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.op-dash .neg-lot { font-size: 15px; font-weight: 600; color: var(--navy); margin-bottom: 3px; }
+.op-dash .neg-preview { font-size: 15px; color: var(--body-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .op-dash .neg-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0; }
 .op-dash .neg-amount { font-family: var(--ui); font-variant-numeric: tabular-nums; font-size: 18px; font-weight: 600; color: var(--navy); }
-.op-dash .neg-time { font-size: 11.5px; color: var(--body-soft); }
+.op-dash .neg-time { font-size: 15px; color: var(--body-soft); }
 .op-dash .unread-chip {
-  font-size: 11px; font-weight: 600;
+  font-size: 15px; font-weight: 700;
   background: var(--blue); color: var(--white);
   border-radius: 0; padding: 2px 8px;
   font-family: var(--head);
@@ -409,7 +409,7 @@
    ここでは本ページ固有のパーツ（金額表示・注意書き）のみ追加定義する。 */
 .op-dash .modal-amount { font-family: var(--ui); font-variant-numeric: tabular-nums; font-size: 32px; font-weight: 600; color: var(--navy); text-align: center; padding: 16px; background: var(--pale); border-radius: 0; margin-bottom: 20px; }
 .op-dash .modal-amount span { font-size: 15px; font-weight: 600; color: var(--body-soft); }
-.op-dash .modal-warn { font-size: 12.5px; color: var(--gold-text); background: var(--warm); border-radius: 0; padding: 10px 14px; margin-bottom: 20px; line-height: 1.7; display: flex; gap: 8px; align-items: flex-start; }
+.op-dash .modal-warn { font-size: 15px; color: var(--gold-text); background: var(--warm); border-radius: 0; padding: 10px 14px; margin-bottom: 20px; line-height: 1.7; display: flex; gap: 8px; align-items: flex-start; }
 .op-dash .modal-warn .ic { width: 16px; height: 16px; stroke: var(--gold); flex-shrink: 0; margin-top: 1px; }
 
 /* ---------- 入札成功トースト ---------- */
@@ -422,8 +422,8 @@
   color: var(--white);
   border-radius: 0;
   padding: 13px 24px;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   font-family: var(--head);
   z-index: 300;
   display: flex;
@@ -446,7 +446,7 @@
   gap: 20px;
   flex-wrap: wrap;
   background: var(--white);
-  font-size: 12px;
+  font-size: 15px;
 }
 .op-dash .biz-footer span { color: var(--body-soft); }
 .op-dash .biz-footer a { color: var(--body-soft); text-decoration: underline; text-underline-offset: 2px; }
@@ -469,5 +469,5 @@
 /* スマホ幅では横スクロールにすると 3 つ目のタブが「交」で切れて壊れて見える（モバイル監査
    2026-09-07）。全幅で折り返し、狭幅は余白を詰めて 2 段に収める。 */
 @media (max-width: 599px) {
-  .op-dash .dash-tab { padding: 10px 12px; font-size: 13.5px; }
+  .op-dash .dash-tab { padding: 10px 12px; font-size: 15px; }
 }

@@ -33,7 +33,7 @@
   margin-bottom: 22px;
 }
 .op-head h1 { font-size: clamp(20px, 3vw, 26px); }
-.op-head p { font-size: 13.5px; color: var(--body-soft); margin-top: 4px; }
+.op-head p { font-size: 15px; color: var(--body-soft); margin-top: 4px; }
 
 /* 汎用カード（AI要約・写真グリッドの入れ物など） */
 .op-card {
@@ -46,8 +46,8 @@
 }
 .op-card h2 {
   font-family: var(--head);
-  font-size: 14.5px;
-  font-weight: 400;
+  font-size: 15px;
+  font-weight: 700;
   color: var(--navy);
   margin-bottom: 4px;
   border-left: 2px solid var(--primary);
@@ -58,11 +58,11 @@
 .op-alert {
   border-radius: var(--radius-s);
   padding: 12px 16px;
-  font-size: 13.5px;
+  font-size: 15px;
   line-height: 1.75;
   margin-bottom: 16px;
 }
-.op-alert.success { background: var(--mint); color: #1f5c33; border-color: #b9dcc3; }
+.op-alert.success { background: var(--mint); color: var(--green); border-color: var(--line); }
 .op-alert.warn { background: var(--warm); color: var(--gold-text); border: 1px solid var(--gold); }
 .op-alert.error { background: var(--danger-bg-soft); color: var(--danger); border: 1px solid var(--danger-border-soft); }
 .op-alert.info { background: var(--pale); color: var(--body); border: 1px solid var(--line); }
@@ -70,16 +70,16 @@
 /* 減額申請中などの注意チップ（cases.css の .status-chip に無い amber バリアント） */
 .status-chip.warn { background: var(--warm); color: var(--gold-text); border: 1px solid var(--gold); }
 /* 未読メッセージ件数バッジ（取引一覧カード。r6-flow M-3 対応） */
-.status-chip.unread { background: var(--primary); color: #fff; border: 1px solid var(--primary); }
+.status-chip.unread { background: var(--primary); color: var(--white); border: 1px solid var(--primary); }
 
 /* 案件詳細: AI要約 */
-.op-ai-summary { font-size: 11px; font-weight: 600; letter-spacing: .06em; color: var(--body-soft); margin-bottom: 6px; }
-.op-ai-summary + p { font-size: 13.5px; color: var(--body); line-height: 1.8; }
+.op-ai-summary { font-size: 15px; font-weight: 600; letter-spacing: .06em; color: var(--body-soft); margin-bottom: 6px; }
+.op-ai-summary + p { font-size: 15px; color: var(--body); line-height: 1.8; }
 
 /* 案件詳細: 商品アルバムカード（見出し + AIコンディションチップ + 要約） */
 .op-album-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
 .op-album-head h2 { margin-bottom: 0; }
-.op-album-summary { font-size: 12.5px; color: var(--body-soft); line-height: 1.7; margin: 2px 0 10px; }
+.op-album-summary { font-size: 15px; color: var(--body-soft); line-height: 1.7; margin: 2px 0 10px; }
 
 /* 案件詳細 / 取引詳細: 写真グリッド */
 .op-photo-grid {
@@ -101,7 +101,7 @@
 .my-bid-card { text-align: center; }
 .my-bid-card .amount { font-family: var(--ui); font-variant-numeric: tabular-nums; font-size: 32px; font-weight: 600; color: var(--navy); margin: 10px 0 4px; }
 .my-bid-card .amount span { font-size: 15px; margin-right: 2px; color: var(--body-soft); }
-.my-bid-card p.comment { font-size: 13.5px; color: var(--body); line-height: 1.8; margin: 10px 0; text-align: left; background: var(--line-soft); border-radius: 0; padding: 12px 14px; }
+.my-bid-card p.comment { font-size: 15px; color: var(--body); line-height: 1.8; margin: 10px 0; text-align: left; background: var(--line-soft); border-radius: 0; padding: 12px 14px; }
 
 /* 入札フォーム: 金額入力（¥ プレフィックス付き） */
 .yen-input-wrap {
@@ -118,7 +118,7 @@
   padding: 0 14px;
   font-family: var(--head);
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--body-soft);
   border-right: 1px solid var(--line);
   align-self: stretch;
@@ -154,8 +154,8 @@
 }
 .txn-row:hover { border-color: var(--primary-l); }
 .txn-row-info { min-width: 0; }
-.txn-row-title { font-family: var(--head); font-size: 15px; font-weight: 600; color: var(--navy); }
-.txn-row-meta { font-size: 12.5px; color: var(--body-soft); margin-top: 4px; }
+.txn-row-title { font-family: var(--head); font-size: 15px; font-weight: 700; color: var(--navy); }
+.txn-row-meta { font-size: 15px; color: var(--body-soft); margin-top: 4px; }
 .txn-row-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 
 @media (max-width: 560px) {
@@ -165,8 +165,8 @@
 
 /* ---------- ステータスチップ（案件一覧・取引一覧・減額申請の共通部品） ---------- */
 .status-chip {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   font-family: var(--head);
   padding: 2px 9px;
   border-radius: 0;
@@ -199,7 +199,7 @@
   margin-right: auto;
 }
 .empty-state h3 { font-size: 17px; color: var(--navy); margin-bottom: 8px; }
-.empty-state p { font-size: 14px; color: var(--body-soft); line-height: 1.8; margin-bottom: 20px; }
+.empty-state p { font-size: 15px; color: var(--body-soft); line-height: 1.8; margin-bottom: 20px; }
 
 /* ---------- 案件一覧: まとめカード（lot-card） ---------- */
 .lot-list { display: flex; flex-direction: column; gap: 14px; }
@@ -234,12 +234,12 @@
 
 .lot-info { padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .lot-info-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.lot-id { font-size: 11px; font-weight: 600; color: var(--body-soft); letter-spacing: .06em; }
-.lot-title { font-family: var(--head); font-size: 15px; font-weight: 600; color: var(--navy); }
+.lot-id { font-size: 15px; font-weight: 600; color: var(--body-soft); letter-spacing: .06em; }
+.lot-title { font-family: var(--head); font-size: 15px; font-weight: 700; color: var(--navy); }
 .lot-meta { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 2px; }
-.lot-meta-item { font-size: 12.5px; color: var(--body-soft); display: flex; align-items: center; gap: 5px; }
+.lot-meta-item { font-size: 15px; color: var(--body-soft); display: flex; align-items: center; gap: 5px; }
 .lot-meta-item .ic { width: 13px; height: 13px; stroke: var(--body-soft); stroke-width: 1.9; flex-shrink: 0; }
-.lot-bid-count { font-size: 12.5px; font-weight: 600; color: var(--blue); margin-top: 2px; }
+.lot-bid-count { font-size: 15px; font-weight: 600; color: var(--blue); margin-top: 2px; }
 
 .lot-action {
   border-left: 1px solid var(--line-soft);
@@ -287,19 +287,19 @@
   background: var(--pale);
   color: var(--blue);
   font-family: var(--head);
-  font-weight: 600;
-  font-size: 13px;
+  font-weight: 700;
+  font-size: 15px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
 .listing-info { flex: 1; min-width: 200px; }
-.listing-title { font-family: var(--head); font-size: 16px; font-weight: 600; color: var(--navy); }
-.listing-meta { font-size: 12.5px; color: var(--body-soft); margin-top: 4px; line-height: 1.6; }
+.listing-title { font-family: var(--head); font-size: 16px; font-weight: 700; color: var(--navy); }
+.listing-meta { font-size: 15px; color: var(--body-soft); margin-top: 4px; line-height: 1.6; }
 .listing-status-badge {
-  font-size: 11.5px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   font-family: var(--head);
   padding: 4px 12px;
   border-radius: 0;
@@ -317,7 +317,7 @@
   padding: 16px 18px;
   margin-bottom: 16px;
 }
-.decided-label { font-size: 11.5px; font-weight: 600; color: var(--deep); letter-spacing: .04em; margin-bottom: 6px; }
+.decided-label { font-size: 15px; font-weight: 600; color: var(--deep); letter-spacing: .04em; margin-bottom: 6px; }
 
 /* ---------- 取引詳細: レビューカード（review-card） ---------- */
 .review-card {
@@ -328,21 +328,21 @@
   padding: 20px 22px;
   margin-bottom: 16px;
 }
-.review-card h4 { font-family: var(--head); font-size: 14.5px; font-weight: 400; color: var(--navy); border-left: 2px solid var(--primary); padding-left: 12px; }
+.review-card h4 { font-family: var(--head); font-size: 15px; font-weight: 700; color: var(--navy); border-left: 2px solid var(--primary); padding-left: 12px; }
 .modal-textarea {
   width: 100%;
   border: 1.5px solid var(--line);
   border-radius: var(--radius-s);
   padding: 12px 14px;
   font-family: var(--sans);
-  font-size: 13.5px;
+  font-size: 15px;
   color: var(--ink);
   resize: vertical;
   min-height: 84px;
   transition: border-color .2s;
 }
 .modal-textarea:focus { border-color: var(--blue); }
-.modal-textarea-hint { font-size: 11.5px; color: var(--body-soft); margin-top: 4px; line-height: 1.6; }
+.modal-textarea-hint { font-size: 15px; color: var(--body-soft); margin-top: 4px; line-height: 1.6; }
 
 /* ---------- 減額申請・キャンセル確認モーダル（B-2: window.confirm/prompt を置換） ---------- */
 .modal-overlay {
@@ -373,7 +373,7 @@
 }
 .modal-overlay.show .modal-card { transform: translateY(0); }
 .modal-title { font-size: 18px; color: var(--navy); margin-bottom: 8px; }
-.modal-sub { font-size: 13.5px; color: var(--body-soft); line-height: 1.75; margin-bottom: 20px; }
+.modal-sub { font-size: 15px; color: var(--body-soft); line-height: 1.75; margin-bottom: 20px; }
 .modal-biz {
   display: flex;
   align-items: center;
@@ -387,16 +387,16 @@
   width: 40px;
   height: 40px;
   border-radius: 0;
-  color: #fff;
+  color: var(--white);
   font-family: var(--head);
-  font-weight: 600;
+  font-weight: 700;
   font-size: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
-.modal-biz-name { font-family: var(--head); font-weight: 600; font-size: 14.5px; color: var(--navy); }
+.modal-biz-name { font-family: var(--head); font-weight: 700; font-size: 15px; color: var(--navy); }
 .modal-actions { display: flex; gap: 10px; }
 .btn-modal-cancel {
   flex: 1;
@@ -406,8 +406,8 @@
   background: var(--white);
   color: var(--ink);
   font-family: var(--head);
-  font-weight: 600;
-  font-size: 14px;
+  font-weight: 700;
+  font-size: 15px;
   cursor: pointer;
   transition: .2s;
 }
@@ -419,10 +419,10 @@
   border-radius: 0;
   border: none;
   background: var(--blue);
-  color: #fff;
+  color: var(--white);
   font-family: var(--head);
-  font-weight: 600;
-  font-size: 14px;
+  font-weight: 700;
+  font-size: 15px;
   cursor: pointer;
   box-shadow: none;
   transition: .2s;
@@ -458,7 +458,7 @@
   padding: 12px 16px;
   background: var(--white);
   border: 1px solid var(--line);
-  font-size: 13px;
+  font-size: 15px;
 }
 .lot-filters .lot-filter { display: inline-flex; align-items: center; gap: 8px; color: var(--body); }
 .lot-filters .lot-filter select {
@@ -474,19 +474,19 @@
 .lot-filters .lot-filter select:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 .lot-filters .lot-filter-check input { width: 16px; height: 16px; accent-color: var(--primary); }
 .lot-filters .lot-filter-count { margin-left: auto; color: var(--body-soft); }
-.lot-filter-empty { padding: 28px 0; text-align: center; color: var(--body-soft); font-size: 13.5px; }
+.lot-filter-empty { padding: 28px 0; text-align: center; color: var(--body-soft); font-size: 15px; }
 @media (max-width: 480px) {
   .lot-filters .lot-filter-count { margin-left: 0; width: 100%; }
 }
 
 /* 品目要約（案件IDの代わりに出す見出し補助）。ID用の小さな等幅風スタイルを上書きする */
-.lot-id.lot-items { font-size: 13px; letter-spacing: 0; color: var(--ink); font-weight: 600; text-transform: none; }
+.lot-id.lot-items { font-size: 15px; letter-spacing: 0; color: var(--ink); font-weight: 600; text-transform: none; }
 
 /* 読み込み中のプレースホルダ（確定前に誤った案内・空状態を出さないため。V-13） */
 .op-skeleton { display: grid; gap: 12px; }
 .op-skeleton-row {
   height: 96px;
-  background: linear-gradient(90deg, #eceae4 25%, #f6f4ef 50%, #eceae4 75%);
+  background: linear-gradient(90deg, var(--paper-2) 25%, var(--paper) 50%, var(--paper-2) 75%);
   background-size: 200% 100%;
   animation: op-skeleton-shimmer 1.4s ease-in-out infinite;
 }
