@@ -35,10 +35,6 @@ const BARE_PREFIXES = [
   // ペルソナ監査 L-1: /forbidden はログイン済みの利用者が権限不足で飛ばされる画面。共通ヘッダーの
   // 「ログイン／LINEではじめる」（未ログイン表示）を出さないため、ヘッダーは ForbiddenContent が自前で描く。
   "/forbidden",
-  // 2026-09-18 本採用: /lp のデザインがトップ（"/"）に昇格。独自クロム（ヘッダー・全画面メニュー・
-  // 浮遊CTA・pagetop・フッター）を自前で描くため、旧 "/lp" の代わりに "/" をここに置く。
-  // ("/" は完全一致のみ判定される。`${p}/` = "//" で始まる実ルートは存在しないため安全)
-  "/",
 ];
 
 /**
@@ -58,15 +54,11 @@ export function SiteChrome({ children }: { children: React.ReactNode }) {
 
   if (bare) return <>{children}</>;
 
-  // 額装フレーム（.site-frame）はヘッダーの外側に描く。
-  // 旧トップ(/top-classic)だけは page.tsx 側が額を複数枚に割って描くため、ここでは包まない。
-  // （新トップ "/" は上の bare 判定で早期リターンするため、ここには届かない）
-  const framed = pathname !== "/top-classic";
-
+  // 額装フレーム（.site-frame）はヘッダーの外側に描く。トップ（"/"）も共通クロムで描く（見本 v12）。
   return (
     <>
       <SiteHeader />
-      {framed ? <div className="site-frame">{children}</div> : children}
+      <div className="site-frame">{children}</div>
       <SiteFooter />
       {/* key でルート毎に再マウントし、.hero-cta 監視の表示状態を必ずリセットする */}
       {dockless ? null : <Dock key={pathname} />}

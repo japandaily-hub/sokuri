@@ -1349,10 +1349,8 @@ export default function BusinessPage() {
             <div>
               <h5>ユーザーの方へ</h5>
               <ul>
-                {/* 2026-09-18 本採用: 新トップ(/lp移植)の対応セクションへ retarget
-                    （#flow→#daily、#auction→#choose。#trust/#founder/#fee は同名のまま） */}
+                {/* 2026-11-19 トップ作り直し: 区画の id は daily/trust/fee/founder（旧 #choose は無くなった） */}
                 <li><Link href="/#daily">使い方</Link></li>
-                <li><Link href="/#choose">仕組み</Link></li>
                 <li><Link href="/#trust">安心の取り組み</Link></li>
                 <li><Link href="/faq">よくある質問</Link></li>
               </ul>
@@ -1360,7 +1358,7 @@ export default function BusinessPage() {
             <div>
               <h5>カタヅケについて</h5>
               <ul>
-                <li><Link href="/#founder">運営者メッセージ</Link></li>
+                <li><Link href="/#founder">運営者</Link></li>
                 <li><Link href="/contact">お問い合わせ</Link></li>
                 <li><Link href="/legal">特定商取引法に基づく表記</Link></li>
                 <li><Link href="/privacy">プライバシーポリシー</Link></li>

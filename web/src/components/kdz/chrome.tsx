@@ -23,8 +23,7 @@ export function SiteFooter() {
           <div>
             <h5>サービス</h5>
             <ul>
-              {/* 2026-09-18 本採用: 新トップ(/lp移植)には旧 #flow が無いため、使い方に相当する
-                  #daily（出品から引き取りまでのタイムライン）へ retarget */}
+              {/* トップの区画 id は daily（使い方）/trust/fee/founder。ここを変えるときは app/page.tsx も見る */}
               <li><Link href="/#daily">使い方</Link></li>
               <li><Link href="/create">出品する</Link></li>
               <li><Link href="/photo-guide">撮影ガイド</Link></li>
@@ -42,7 +41,7 @@ export function SiteFooter() {
           <div>
             <h5>カタヅケについて</h5>
             <ul>
-              <li><Link href="/#founder">運営者メッセージ</Link></li>
+              <li><Link href="/#founder">運営者</Link></li>
               <li><Link href="/company">運営者情報</Link></li>
               <li><Link href="/legal">特定商取引法に基づく表記</Link></li>
               <li><Link href="/privacy">プライバシーポリシー</Link></li>

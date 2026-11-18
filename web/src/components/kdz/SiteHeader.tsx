@@ -9,14 +9,12 @@ export type NavItem = { href: string; label: string };
 
 const DEFAULT_NAV: NavItem[] = [
   { href: "/#daily", label: "使い方" },
-  { href: "/examples", label: "利用イメージ" },
-  { href: "/photo-guide", label: "撮影ガイド" },
   { href: "/faq", label: "よくある質問" },
+  { href: "/business", label: "業者の方へ" },
 ];
 
 const DEFAULT_MOBILE: NavItem[] = [
   { href: "/#daily", label: "使い方" },
-  { href: "/#choose", label: "仕組み" },
   { href: "/#trust", label: "安心の取り組み" },
   { href: "/#fee", label: "料金" },
   { href: "/faq", label: "よくある質問" },
