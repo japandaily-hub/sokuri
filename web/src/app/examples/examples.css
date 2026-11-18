@@ -30,7 +30,7 @@
    打消しの対象＝カード群の直前（フィルターの下）に移した。文言は短縮せず・折りたたまず、
    14px --body のまま「金額より手前」を維持する。 */
 .cases-hero-note {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--body);
   max-width: 680px;
   line-height: 1.85;
@@ -58,12 +58,12 @@
 .stats-num {
   font-family: var(--head);
   font-size: clamp(28px, 3.5vw, 42px);
-  font-weight: 400;
+  font-weight: 700;
   color: var(--ink);
   line-height: 1.2;
 }
 .stats-num span { font-family: var(--ui); font-size: .5em; color: var(--primary); font-weight: 600; margin-left: 3px; }
-.stats-lbl { font-family: var(--ui); font-size: 13px; color: var(--body-soft); margin-top: 6px; font-weight: 600; }
+.stats-lbl { font-family: var(--ui); font-size: 15px; color: var(--body-soft); margin-top: 6px; font-weight: 600; }
 /* R4 ラウンド5 指摘（12）: 数字で出すのは ¥0 と 4都県 の2項目だけ。「1社」「12カテゴリ」は
    数字の級数をやめ、ラベル先行の文型で本文と同じ大きさに置く（「登録業者が1社しかない」
    「12が何の12か分からない」という誤読を消す）。数字の代わりに明朝の1行を主役にする。 */
@@ -71,7 +71,7 @@
 .stats-txt {
   font-family: var(--head);
   font-size: clamp(16px, 1.7vw, 19px);
-  font-weight: 600;
+  font-weight: 700;
   color: var(--ink);
   line-height: 1.6;
 }
@@ -103,7 +103,7 @@
 }
 .filter-chip {
   font-family: var(--ui);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   padding: 7px 16px;
   border-radius: 0;
@@ -115,12 +115,12 @@
 }
 .filter-chip:hover { border-color: var(--primary); color: var(--primary); }
 .filter-chip.active { background: var(--primary); border-color: var(--primary); color: var(--white); }
-.filter-count { margin-left: auto; font-family: var(--ui); font-size: 13px; color: var(--body-soft); white-space: nowrap; }
+.filter-count { margin-left: auto; font-family: var(--ui); font-size: 15px; color: var(--body-soft); white-space: nowrap; }
 /* 架空である旨の常設ラベル（打消し表示の補助）。件数の隣に置き、絞り込み操作中も消えない。
    本体の打消し表示はカード群直前の .cases-hero-note と各カードの .model-chip が担う */
 .filter-note {
   font-family: var(--ui);
-  font-size: 12px;
+  font-size: 15px;
   color: var(--body-soft);
   white-space: nowrap;
   flex: 0 0 auto;
@@ -160,14 +160,14 @@
 .case-cats { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .case-cat {
   font-family: var(--ui);
-  font-size: 12px; font-weight: 600;
+  font-size: 15px; font-weight: 600;
   padding: 3px 10px; border-radius: 0;
   border: 1px solid var(--line);
   color: var(--body-soft);
 }
 .case-tag-chip {
   font-family: var(--ui);
-  font-size: 12px; font-weight: 600;
+  font-size: 15px; font-weight: 600;
   color: var(--primary);
   background: var(--pale);
   padding: 3px 10px;
@@ -195,12 +195,12 @@
   justify-content: center;
   font-family: var(--head);
   font-size: 16px;
-  font-weight: 400;
+  font-weight: 700;
   color: var(--white);
   flex-shrink: 0;
 }
 .case-persona-info .name { font-size: 15px; font-weight: 600; color: var(--ink); }
-.case-persona-info .attr { font-family: var(--ui); font-size: 12px; color: var(--body-soft); margin-top: 2px; }
+.case-persona-info .attr { font-family: var(--ui); font-size: 15px; color: var(--body-soft); margin-top: 2px; }
 
 /* R4_BRIEF E.1: DOM 順は 条件（.case-facts）→ ラベル → 金額。
    金額は 32px → 24px。架空の買取額を、点数・社数・日数（実際に体験できる「流れ」）より
@@ -214,11 +214,11 @@
   margin-bottom: 12px;
   line-height: 1.7;
 }
-.case-amount-label { font-family: var(--ui); font-size: 12px; font-weight: 600; color: var(--body-soft); margin-bottom: 4px; }
+.case-amount-label { font-family: var(--ui); font-size: 15px; font-weight: 600; color: var(--body-soft); margin-bottom: 4px; }
 .case-amount {
   font-family: var(--head);
   font-size: 24px;
-  font-weight: 400;
+  font-weight: 700;
   color: var(--ink);
   line-height: 1.2;
 }
@@ -226,14 +226,14 @@
    数字は <b> で括るが明朝 400 に戻す（正典「明朝のウェイトは 400/600 のみ」）。
    tabular-nums で 6 カードの桁位置を揃える。 */
 .case-amount b { font-weight: 400; font-variant-numeric: tabular-nums; letter-spacing: .01em; }
-.case-amount span { font-family: var(--ui); font-size: 14px; font-weight: 600; color: var(--body-soft); margin-left: 2px; }
+.case-amount span { font-family: var(--ui); font-size: 15px; font-weight: 600; color: var(--body-soft); margin-left: 2px; }
 /* カード内の打消し表示は 1 本だけ（ラウンド6 指摘 7/13）。金額の「手前」に置き、
    強調表示（¥ の 24px）より先に読ませる（指摘 18）。
    級数・色は 12.5px / --body のまま据え置く: 12px・--body-soft まで落とすと打消しが
    強調表示に対して弱くなる（消費者庁「打消し表示」の考え方。R4_BRIEF B.4 と同じ理由）。 */
 .case-note {
   font-family: var(--ui);
-  font-size: 12.5px;
+  font-size: 15px;
   color: var(--body);
   line-height: 1.8;
   margin-bottom: 6px;
@@ -244,7 +244,7 @@
   background: var(--pale-2);
   border-radius: 0;
   padding: 16px 18px;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--ink);
   line-height: 1.9;
   position: relative;
@@ -275,7 +275,7 @@
 /* 一覧末尾の打消し表示 */
 .cases-note {
   font-family: var(--ui);
-  font-size: 13.5px;
+  font-size: 15px;
   color: var(--body);
   line-height: 1.8;
   padding-top: clamp(20px, 3vw, 28px);
@@ -287,7 +287,7 @@
    margin-top は隣接時だけ 0 にして、この行が CTA から切り離されないようにする） */
 .cases-assure {
   font-family: var(--ui);
-  font-size: 13px;
+  font-size: 15px;
   color: var(--body-soft);
   line-height: 1.8;
   margin-top: clamp(32px, 4vw, 48px);
@@ -300,7 +300,7 @@
   border: 1px solid var(--line);
   border-radius: 0;
   padding: clamp(32px, 4vw, 56px);
-  text-align: center;
+  text-align: left;
   margin-top: clamp(40px, 5vw, 64px);
 }
 /* ラウンド6 指摘（15・High）: モバイルで「あなたの家の不用／品、いくらになる？」と語中改行し、
@@ -317,7 +317,7 @@
   overflow-wrap: anywhere;
 }
 .cases-cta p { font-size: 15px; color: var(--body-soft); margin-bottom: 24px; line-height: 1.9; }
-.cases-cta-actions { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+.cases-cta-actions { display: flex; justify-content: flex-start; gap: 12px; flex-wrap: wrap; }
 
 /* ---------- レスポンシブ（閾値は額装解除と同じ 859px） ---------- */
 @media (max-width: 859px) {
@@ -328,7 +328,7 @@
     gap: 18px 12px;
   }
   .stats-item--minor .stats-num { font-size: 22px; }
-  .stats-item--minor .stats-lbl { font-size: 12px; }
+  .stats-item--minor .stats-lbl { font-size: 15px; }
   /* 文型の項目は 2 列に収まるよう幅の上限を外し、下段は 1 段小さく */
   .stats-item--text { max-width: none; }
   .stats-item--minor .stats-txt { font-size: 15px; }

@@ -514,7 +514,6 @@ export default function FaqPage() {
                         </div>
                         <RevealLines
                           as="h2"
-                          mark="under"
                           className="faq-section-title"
                           lines={[c.label]}
                         />
@@ -556,7 +555,7 @@ export default function FaqPage() {
               <div className="faq-contact">
                 <Ic name="chat" />
                 <div className="faq-contact-info">
-                  <RevealLines as="h2" mark="under" lines={["解決しない場合はお問い合わせください"]} />
+                  <RevealLines as="h2" lines={["解決しない場合はお問い合わせください"]} />
                   <p>フォームよりお気軽にご連絡ください。通常3営業日以内にご返信いたします。</p>
                   <Link href="/contact" className="btn btn-primary faq-contact-btn">
                     お問い合わせフォームへ

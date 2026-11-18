@@ -199,7 +199,6 @@ function ContactPageContent() {
 
       <section className="ct-head">
         <div className="ct-head__box">
-          <span className="ct-head__en">CONTACT</span>
           <h1>お問い合わせ</h1>
           <p>サービスに関するご質問・ご要望など、お気軽にお問い合わせください。</p>
           <p className="ct-head__faq">

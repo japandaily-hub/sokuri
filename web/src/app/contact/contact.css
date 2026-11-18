@@ -42,17 +42,16 @@
 .ct-head + .section.tight { padding-top: clamp(32px, 5vw, 56px); }
 .ct-head__en {
   display: block;
-  font-family: var(--en);
-  font-size: 11.5px;
+  font-family: var(--goth);
+  font-size: 15px;
   font-weight: 600;
-  letter-spacing: .18em;
-  text-transform: uppercase;
+  letter-spacing: .08em;
   color: var(--primary);
 }
 .ct-head h1 {
   font-family: var(--head);
   font-size: clamp(26px, 3.6vw, 38px);
-  font-weight: 400;
+  font-weight: 700;
   color: var(--navy);
   margin-top: 12px;
   letter-spacing: -.01em;
@@ -68,7 +67,7 @@
    重なって見える・r1/r2 レビュー） */
 .ct-head__faq {
   margin-top: 18px;
-  font-size: 14px;
+  font-size: 15px;
 }
 .ct-head__faq a {
   color: var(--blue);
@@ -103,7 +102,7 @@
   font-family: var(--head);
   font-size: clamp(17px, 2vw, 20px);
   color: var(--navy);
-  font-weight: 600;
+  font-weight: 700;
   margin-bottom: 6px;
   /* 折り返しは読点「、」の位置だけに許す（語中で割らない）。列が極端に狭い場合の
      はみ出しは overflow-wrap が最後の逃げ道として吸収する。 */
@@ -114,7 +113,7 @@
   max-width: 24em;
 }
 .line-first-body p {
-  font-size: 14.5px;
+  font-size: 15px;
   color: var(--body-soft);
   line-height: 1.75;
 }
@@ -139,17 +138,16 @@
   box-shadow: var(--shadow-m);
 }
 .form-section-label {
-  font-family: var(--en);
-  font-size: 12px;
+  font-family: var(--goth);
+  font-size: 15px;
   font-weight: 600;
-  letter-spacing: .14em;
+  letter-spacing: .08em;
   color: var(--primary);
-  text-transform: uppercase;
   margin-bottom: 10px;
 }
 .form-owner {
   font-family: var(--ui);
-  font-size: 12.5px;
+  font-size: 15px;
   color: var(--body-soft);
   line-height: 1.8;
   margin-bottom: 24px;
@@ -168,14 +166,14 @@
 .contact-wrap .field-row .field { margin-bottom: 24px; }
 .contact-wrap .field label {
   display: block;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--ink);
   margin-bottom: 8px;
 }
 .contact-wrap .field label .req {
   display: inline-block;
-  font-size: 11px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--white);
   background: var(--blue);
@@ -187,7 +185,7 @@
 }
 .contact-wrap .field label .opt {
   display: inline-block;
-  font-size: 11px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--body-soft);
   background: var(--white); /* 背景を明示（axe が背景を判定できず 1.56:1 と報告した対策・profile と同型） */
@@ -231,7 +229,7 @@
    寸法・色（12px・--body-soft・margin-top 5px）に合わせ、ページ側にスコープする。 */
 .contact-wrap .field-hint {
   font-family: var(--ui);
-  font-size: 12px;
+  font-size: 15px;
   color: var(--body-soft);
   margin-top: 5px;
   line-height: 1.6;
@@ -274,7 +272,7 @@
   color: var(--white);
   border-radius: var(--radius);
   font-family: var(--head);
-  font-weight: 400;
+  font-weight: 700;
   border: none;
   cursor: pointer;
   box-shadow: none;
@@ -287,7 +285,7 @@
 .submit-area .btn-submit:hover { opacity: .8; }
 .submit-area .btn-submit:disabled { opacity: .6; cursor: not-allowed; }
 .submit-area .note {
-  font-size: 12.5px;
+  font-size: 15px;
   color: var(--body-soft);
   text-align: center;
   line-height: 1.75;
@@ -334,7 +332,7 @@
 /* 業者向けの案内（ラウンド5 指摘 18）。フォームカードの手前に 1 行だけ置く。
    囲みは持たせない（.ct-head と同じ「罫と余白だけで区切る」構え）。 */
 .ct-biz-note {
-  font-size: 13.5px;
+  font-size: 15px;
   color: var(--body-soft);
   line-height: 1.85;
   margin: 0 0 24px;
@@ -353,7 +351,7 @@
   gap: 16px;
   margin: 40px 0 32px;
   color: var(--body-soft);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
 }
 .or-divider::before,

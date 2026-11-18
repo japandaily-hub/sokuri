@@ -199,7 +199,7 @@ export default function CompanyPage() {
             /legal（特定商取引法に基づく表記）に既出の事実をそのまま案内するだけで、
             新しい事実・期限・理由は書かない（掲載可否はユーザー確認待ちのため）。 */}
         <div className="about-section">
-          <span className="eyebrow">COMPANY</span>
+          <span className="eyebrow">運営者</span>
           <h2>運営者情報</h2>
           {/* 表の直前に安心の3点（再掲）。掲載できない項目が縦に並ぶ面と同じ視野に置く */}
           <ul className="co-assure" aria-label="ご利用にあたっての安心の3点">
@@ -233,7 +233,7 @@ export default function CompanyPage() {
 
         {/* ============ 業者の方へ：お預かりする情報の扱い（既出の事実の再掲） ============ */}
         <div className="about-section">
-          <span className="eyebrow">FOR VENDORS</span>
+          <span className="eyebrow">業者の方へ</span>
           <h2>業者の方へ：お預かりする情報の扱い</h2>
           <p className="co-vendor-lead">
             ご登録の際にお預かりする書類と口座情報の扱いを、業者向けページとプライバシーポリシーから再掲します。
@@ -250,8 +250,8 @@ export default function CompanyPage() {
 
         {/* ============ 私たちが大切にすること ============ */}
         <div className="about-section">
-          <span className="eyebrow">VALUES</span>
-          <RevealLines mark="under" lines={["私たちが大切にすること"]} />
+          <span className="eyebrow">考え方</span>
+          <RevealLines lines={["私たちが大切にすること"]} />
           <div className="values-grid">
             {VALUES.map((v, i) => (
               <Reveal as="div" className="value-card" stagger={i} key={v.title}>

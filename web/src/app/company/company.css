@@ -12,7 +12,7 @@
 /* 見出しは共有部品の flex align-items:center で既に光学中心にある。ここで詰めるのは
    帯の総高だけ（見出し2行に対して 480px は地の面積が勝ちすぎるため 420px 上限に落とす）。 */
 .co-band.hero-band--tall { min-height: clamp(320px, 34vw, 420px); }
-.co-band .hero-band__copy { text-align: center; padding-block: clamp(28px, 4vw, 40px); }
+.co-band .hero-band__copy { text-align: left; padding-block: clamp(28px, 4vw, 40px); }
 
 /* ---------- 本文ラッパ ---------- */
 .about-wrap {
@@ -33,20 +33,12 @@
 .about-section { margin-bottom: clamp(44px, 6vw, 64px); }
 .about-section:last-of-type { margin-bottom: clamp(44px, 6vw, 64px); }
 /* 章ラベルは共有の .eyebrow（ダッシュ＋1px 罫）に統一。1px 囲みチップは廃止し、
-   トップ／撮影ガイド／業者向けと同じ書式にそろえる。中身が英字のため、
-   デザイン正典の英字ラベル書式（var(--en) 600 uppercase）だけを重ねる。 */
-.about-section .eyebrow {
-  font-family: var(--en);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: .14em;
-  text-transform: uppercase;
-  margin-bottom: 12px;
-}
+   トップ／撮影ガイド／業者向けと同じ書式にそろえる。見本 v12 に合わせ中身は日本語（英字ラベルは使わない）。 */
+.about-section .eyebrow { margin-bottom: 12px; }
 .about-section h2 {
-  font-family: var(--serif);
+  font-family: var(--head);
   font-size: clamp(20px, 3vw, 26px);
-  font-weight: 600;
+  font-weight: 700;
   color: var(--ink);
   margin-bottom: 16px;
   line-height: 1.5;
@@ -75,7 +67,7 @@
   border-top: 1px solid var(--line-soft);
   background: transparent;
   font-family: var(--ui);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--body-soft);
   width: 140px;
@@ -86,7 +78,7 @@
 .company-table td {
   padding: 14px 0;
   border-top: 1px solid var(--line-soft);
-  font-size: 14.5px;
+  font-size: 15px;
   color: var(--ink);
   line-height: 1.8;
   vertical-align: top;
@@ -103,7 +95,7 @@
   display: block;
   margin-top: 4px;
   font-family: var(--ui);
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.7;
   color: var(--body-soft);
 }
@@ -123,7 +115,7 @@
 .co-assure b {
   display: block;
   font-family: var(--ui);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--ink);
   margin-bottom: 5px;
@@ -131,7 +123,7 @@
 .co-assure span {
   display: block;
   font-family: var(--ui);
-  font-size: 12.5px;
+  font-size: 15px;
   line-height: 1.8;
   color: var(--body-soft);
 }
@@ -152,13 +144,13 @@
 .co-vendor li:last-child { border-bottom: 1px solid var(--line); }
 .co-vendor b {
   font-family: var(--ui);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--body-soft);
   line-height: 1.8;
 }
 .co-vendor span {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--ink);
   line-height: 1.85;
 }
@@ -168,7 +160,7 @@
 .about-section .about-disclose {
   margin-top: 14px;
   font-family: var(--ui);
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.85;
   color: var(--body-soft);
 }
@@ -184,15 +176,15 @@
   margin-bottom: clamp(44px, 6vw, 64px);
 }
 .mission-card blockquote {
-  font-family: var(--serif);
+  font-family: var(--head);
   font-size: clamp(18px, 2.5vw, 22px);
-  font-weight: 600;
+  font-weight: 700;
   color: var(--ink);
   line-height: 1.75;
   margin-bottom: 14px;
 }
 .mission-card p {
-  font-size: 14.5px;
+  font-size: 15px;
   color: var(--body);
   line-height: 1.95;
 }
@@ -201,7 +193,7 @@
 .mission-card .mission-sign {
   margin-top: 16px;
   font-family: var(--ui);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   letter-spacing: .02em;
   line-height: 1.7;
@@ -240,15 +232,15 @@
   .value-img { max-width: 260px; }
 }
 .value-card strong {
-  font-family: var(--serif);
+  font-family: var(--head);
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--ink);
   display: block;
   margin-bottom: 8px;
 }
 .value-card p {
-  font-size: 13.5px;
+  font-size: 15px;
   color: var(--body);
   line-height: 1.85;
 }
@@ -258,7 +250,7 @@
   padding-top: 10px;
   border-top: 1px solid var(--line);
   font-family: var(--ui);
-  font-size: 12.5px;
+  font-size: 15px;
   line-height: 1.8;
   color: var(--body-soft);
 }
@@ -272,15 +264,15 @@
   border-bottom: 1px solid var(--line);
   border-radius: 0;
   padding: clamp(32px, 5vw, 48px) clamp(20px, 4vw, 32px);
-  text-align: center;
+  text-align: left;
 }
 /* 見出しの語中改行止め（ラウンド6 指摘 12: 390px で「片付けをも／っと」と語の途中で折れていた）。
    keep-all は句読点・括弧でしか折らせないため、入り切らない幅で横スクロールが出ないよう
    overflow-wrap:anywhere を対に置く（/examples の .cases-hero h1 と同じ作法）。 */
 .about-cta h3 {
-  font-family: var(--serif);
+  font-family: var(--head);
   font-size: clamp(19px, 2.5vw, 24px);
-  font-weight: 600;
+  font-weight: 700;
   color: var(--ink);
   margin-bottom: 10px;
   line-height: 1.55;
@@ -288,7 +280,7 @@
   overflow-wrap: anywhere;
 }
 .about-cta p {
-  font-size: 14.5px;
+  font-size: 15px;
   color: var(--body);
   margin-bottom: 24px;
   line-height: 1.9;
@@ -296,7 +288,7 @@
 .about-cta-btns {
   display: flex;
   gap: 12px;
-  justify-content: center;
+  justify-content: flex-start;
   flex-wrap: wrap;
 }
 
@@ -316,6 +308,6 @@
   .co-vendor li { grid-template-columns: 1fr; gap: 5px 0; }
 }
 @media (max-width: 600px) {
-  .company-table th { width: 92px; font-size: 12px; padding: 12px 14px 12px 0; }
-  .company-table td { font-size: 13px; padding: 12px 0; }
+  .company-table th { width: 92px; font-size: 15px; padding: 12px 14px 12px 0; }
+  .company-table td { font-size: 15px; padding: 12px 0; }
 }

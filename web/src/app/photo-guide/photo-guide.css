@@ -8,7 +8,7 @@
 
 /* ---------- ヒーロー（.hero-band--tall.hero-band--face） ---------- */
 /* 帯の上は白抜き。eyebrow の罫だけ --lime に落として見出しの邪魔をしない */
-.pg-hero .eyebrow { color: #fff; }
+.pg-hero .eyebrow { color: var(--white); }
 .pg-hero .eyebrow::before { background: var(--lime); }
 .pg-hero .hero-band__copy { padding-block: clamp(32px, 5vw, 56px); }
 .pg-hero .hero-band__copy h1 { margin-top: 16px; }
@@ -59,7 +59,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--ink);
 }
@@ -87,7 +87,7 @@
   background: var(--ink);
   border: 1px solid var(--ink);
   color: var(--white);
-  font-family: var(--en-display);
+  font-family: var(--num);
   font-size: 18px;
   font-weight: 400;
   display: flex;
@@ -99,13 +99,13 @@
 .guide-section-head h2 { font-size: clamp(18px, 2.5vw, 24px); color: var(--ink); margin-bottom: 0; align-self: center; }
 /* リードは 2行目に落として左端を container にそろえる。段の全幅だと1行が長すぎるので
    手順リストの本文（.shoot-step-body p）と同じ 46em で折る */
-.guide-section-head p { grid-column: 1 / -1; max-width: 46em; font-size: 14px; color: var(--body-soft); line-height: 1.7; }
+.guide-section-head p { grid-column: 1 / -1; max-width: 46em; font-size: 15px; color: var(--body-soft); line-height: 1.7; }
 
 /* 注記（買取額の決まり方・写り込み注意）。打消しは本文と同一視野に置く */
 .pg-note {
   margin-top: 16px;
   font-family: var(--ui);
-  font-size: 13.5px;
+  font-size: 15px;
   color: var(--body-soft);
   line-height: 1.8;
 }
@@ -127,7 +127,7 @@
   gap: 10px;
 }
 .compare-label-badge {
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 600;
   font-family: var(--ui);
   padding: 4px 12px;
@@ -141,7 +141,7 @@
 .compare-label-badge.is-good { background: var(--marker); }
 .compare-label-badge.is-bad { background: var(--pale-2); border: 1px solid var(--line); }
 /* min-height はこの p 自身の 2行ぶん（line-height 1.8 × 2）。片方が1行でも脚がそろう */
-.compare-label p { font-size: 13.5px; color: var(--body); line-height: 1.8; min-height: 3.6em; }
+.compare-label p { font-size: 15px; color: var(--body); line-height: 1.8; min-height: 3.6em; }
 
 /* ---------- 撮影の手順（番号＋文のリスト。画像なし） ---------- */
 .limit-chips {
@@ -152,7 +152,7 @@
 }
 .limit-chip {
   font-family: var(--ui);
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.6;
   color: var(--ink);
   background: var(--white);
@@ -171,7 +171,7 @@
   border-bottom: 1px solid var(--line);
 }
 .shoot-step-num {
-  font-family: var(--en-display);
+  font-family: var(--num);
   font-size: 20px;
   line-height: 1.4;
   color: var(--primary);
@@ -180,11 +180,11 @@
   min-width: 2.4em;
 }
 .shoot-step-body h4 { font-size: 15px; font-weight: 600; color: var(--ink); margin-bottom: 5px; }
-.shoot-step-body p { font-size: 14px; color: var(--body); line-height: 1.85; max-width: 46em; }
+.shoot-step-body p { font-size: 15px; color: var(--body); line-height: 1.85; max-width: 46em; }
 .shoot-step-body .tip {
   margin-top: 10px;
   font-family: var(--ui);
-  font-size: 12.5px;
+  font-size: 15px;
   line-height: 1.7;
   color: var(--primary-d);
   border-left: 2px solid var(--marker);
@@ -220,19 +220,19 @@
   .tip-splits { gap: clamp(48px, 6vw, 72px); }
 }
 .tip-copy { min-width: 0; }
-.tip-copy h4 { font-family: var(--serif); font-size: clamp(17px, 2.2vw, 21px); font-weight: 600; color: var(--ink); margin-bottom: 10px; }
+.tip-copy h4 { font-family: var(--head); font-size: clamp(17px, 2.2vw, 21px); font-weight: 700; color: var(--ink); margin-bottom: 10px; }
 /* 本文は 26em（実測 377px）で折る。列の全幅（1440px で約 590px）に 2 行だけ流すと、
    461px の正方形画像の隣で「幅は広いのに背が低い」塊になり、上下の空きが実際より大きく見えた
    （ラウンド6 指摘 4/8）。文字の塊の縦横比を画像側に近づけるための折り返し幅
    （実測: 1行の長さが 26em を超える 02 だけ 3 行になり 140px → 169px）。 */
-.tip-copy p { font-size: 14.5px; color: var(--body); line-height: 1.95; max-width: 26em; }
+.tip-copy p { font-size: 15px; color: var(--body); line-height: 1.95; max-width: 26em; }
 /* 具体例の1行（ラウンド6 指摘 8）。書式は §2 手順の .shoot-step-body .tip と同一にして、
    ページ内で「例示は青の縦罫の小さな行」という同じ記号で読ませる。
    .tip-num（01/02/03）は廃止（指摘 11: 手順章と同じ番号書式で読み分けができない）。 */
 .tip-copy .tip {
   margin-top: 14px;
   font-family: var(--ui);
-  font-size: 12.5px;
+  font-size: 15px;
   line-height: 1.7;
   color: var(--primary-d);
   border-left: 2px solid var(--marker);
@@ -267,8 +267,8 @@
   color: var(--white);
 }
 .point-ic .ic { width: 18px; height: 18px; stroke-width: 2; }
-.point-body h4 { font-size: 14.5px; font-weight: 600; color: var(--ink); margin-bottom: 4px; }
-.point-body p { font-size: 13.5px; color: var(--body-soft); line-height: 1.8; }
+.point-body h4 { font-size: 15px; font-weight: 600; color: var(--ink); margin-bottom: 4px; }
+.point-body p { font-size: 15px; color: var(--body-soft); line-height: 1.8; }
 
 /* ---------- カテゴリ別チェックリスト（品目名＋確認項目。箱は作らない） ----------
    ラウンド6 指摘（5）: 72px のサムネは中身が判別できず、1px 枠のボックスに小さな画像が乗る
@@ -290,14 +290,14 @@
 /* 品目名は明朝 600（見出しは明朝の正典）。アイコン列が無くなったので block に戻す */
 .cat-guide-card .cat-name {
   display: block;
-  font-family: var(--serif);
+  font-family: var(--head);
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--ink);
   margin-bottom: 10px;
 }
 .cat-guide-card ul { padding-left: 16px; }
-.cat-guide-card li { font-size: 13px; color: var(--body-soft); line-height: 1.85; margin-bottom: 4px; }
+.cat-guide-card li { font-size: 15px; color: var(--body-soft); line-height: 1.85; margin-bottom: 4px; }
 
 /* ---------- 末尾 CTA（--pale-2 の1ブロック。見出し・本文・ボタンを内包） ----------
    ラウンド6 指摘（3 High / 6 High）: 濃紺帯が見出し＋本文2行で終わり、ボタン2本が帯の外の
@@ -312,16 +312,16 @@
   background: var(--pale-2);
   border-top: 1px solid var(--line);
   padding: clamp(40px, 5.5vw, 64px) 0 clamp(30px, 4vw, 44px);
-  text-align: center;
+  text-align: left;
 }
-/* READY は .deep-band__label の書式（--en 600 uppercase・字間 .16em）だけを借り、
+/* 出品へのラベルは .deep-band__label の位置だけを借り、書式は見本 v12 の .label（日本語・15px・700）に揃え、
    濃紺地用の --lime から --primary に落とす（淡い地の上で --lime は読めないため） */
-.pg-cta-band .deep-band__label { color: var(--primary); }
+.pg-cta-band .deep-band__label { color: var(--primary); font-family: var(--goth); font-size: 15px; font-weight: 700; letter-spacing: .08em; text-transform: none; }
 .pg-cta-band h2 { font-size: clamp(20px, 2.8vw, 30px); color: var(--ink); margin-top: 14px; }
-.pg-cta-band p { font-size: 14.5px; color: var(--body); line-height: 1.95; margin-top: 14px; }
+.pg-cta-band p { font-size: 15px; color: var(--body); line-height: 1.95; margin-top: 14px; }
 .pg-cta-btns {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: stretch;
   gap: 14px;
   flex-wrap: wrap;
@@ -345,7 +345,7 @@
     gap: 14px clamp(14px, 4vw, 20px);
     justify-content: stretch;
   }
-  .merit-chip { align-items: flex-start; font-size: 14px; line-height: 1.8; }
+  .merit-chip { align-items: flex-start; font-size: 15px; line-height: 1.8; }
   /* 1行の高さ 14×1.8 ＝ 25.2px に対してアイコン 20px。(25.2 − 20) ÷ 2 ≒ 2.6px 下げる */
   .merit-chip .ic { margin-top: 2.6px; }
   .cat-guide-grid { grid-template-columns: repeat(2, 1fr); }

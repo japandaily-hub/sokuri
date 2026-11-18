@@ -187,7 +187,7 @@ export default function PhotoGuidePage() {
             <div className="guide-section-head">
               <div className="guide-section-num">1</div>
               <div>
-                <RevealLines mark="under" lines={["1点ずつ、全体が写るように撮る"]} />
+                <RevealLines lines={["1点ずつ、全体が写るように撮る"]} />
                 <p>
                   品物は1点ずつ撮影します。1枚の写真に1つの品物だけを、全体が写るように収めましょう。撮った写真はまとめて1つのアルバムになり、業者はそれを見て、入札する買取総額を決めます。
                 </p>
@@ -379,8 +379,8 @@ export default function PhotoGuidePage() {
           .deep-band__label から借り、色を --primary に落とす（案 A の指定どおり）。 */}
       <section className="pg-cta-band">
         <div className="container">
-          <span className="deep-band__label">READY</span>
-          <RevealLines mark="under" lines={["準備ができたら、さっそく出品しよう"]} />
+          <span className="deep-band__label">出品へ</span>
+          <RevealLines lines={["準備ができたら、さっそく出品しよう"]} />
           <p>
             1点ずつ撮って、まとめて出すだけ。1点ずつ売る手間も、しつこい営業電話もありません。
             <br />

@@ -104,7 +104,7 @@
 /* 件数は検索窓の直下（操作した場所）に出す。min-height で入力前後の行送りを固定する */
 .faq-page .search-hint {
   font-family: var(--ui);
-  font-size: 13px;
+  font-size: 15px;
   color: var(--body-soft);
   margin-top: 10px;
   min-height: 20px;
@@ -129,7 +129,7 @@
 }
 .faq-page .cat-chip {
   font-family: var(--ui);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   padding: 7px 14px;
   border-radius: 0;
@@ -145,7 +145,7 @@
 }
 .faq-page .cat-chip:hover { border-color: var(--primary); color: var(--primary); }
 .faq-page .cat-chip.active { background: var(--primary); border-color: var(--primary); color: var(--white); }
-.faq-page .cat-chip .ic { font-size: 14px; stroke-width: 1.8; }
+.faq-page .cat-chip .ic { font-size: 15px; stroke-width: 1.8; }
 
 /* ---------- コンテンツレイアウト ---------- */
 /* 本文は共通 .section（padding 上下 clamp(72px,9vw,128px)）の中。
@@ -166,12 +166,11 @@
   top: 89px;
 }
 .faq-page .faq-side-title {
-  font-family: var(--en);
-  font-size: 11px;
+  font-family: var(--goth);
+  font-size: 15px;
   font-weight: 600;
   letter-spacing: .1em;
   color: var(--body-soft);
-  text-transform: uppercase;
   margin-bottom: 12px;
 }
 .faq-page .faq-side-link {
@@ -179,7 +178,7 @@
   align-items: center;
   gap: 10px;
   font-family: var(--ui);
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--body-soft);
   text-decoration: none;
@@ -248,12 +247,12 @@
 .faq-page .faq-section-title {
   font-family: var(--head);
   font-size: 19px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--ink);
 }
 .faq-page .faq-section-count {
   font-family: var(--ui);
-  font-size: 12px;
+  font-size: 15px;
   color: var(--body-soft);
   font-weight: 600;
   background: none;
@@ -264,7 +263,7 @@
    件数の隣に置く。角丸0・影0、ホバーは opacity のみ。 */
 .faq-page .faq-section-all {
   font-family: var(--ui);
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--primary);
   background: none;
@@ -306,7 +305,7 @@
   text-align: left;
   font-family: var(--head);
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.7;
   color: var(--ink);
   transition: color .15s;
@@ -320,7 +319,7 @@
   width: 20px;
   background: none;
   border-radius: 0;
-  font-family: var(--en-display);
+  font-family: var(--num);
   font-size: 16px;
   font-weight: 400;
   line-height: 1.7;
@@ -370,7 +369,7 @@
   overflow: hidden;
   min-height: 0;
   padding: 0 4px 0 32px;
-  font-size: 14.5px;
+  font-size: 15px;
   line-height: 1.95;
   max-width: 54em; /* PCで1行が長くなりすぎないよう約48字で折り返す */
   color: var(--body);
@@ -384,7 +383,7 @@
 }
 .faq-page .faq-a-cat {
   font-family: var(--ui);
-  font-size: 12px;
+  font-size: 15px;
   color: var(--body-soft);
   font-style: normal;
   display: block;
@@ -436,7 +435,7 @@
   margin-bottom: 6px;
 }
 .faq-page .faq-contact-info p {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--body);
   line-height: 1.8;
 }
@@ -445,7 +444,7 @@
    （導線の本数はどの幅でも常に1本。ラウンド6 指摘 25） */
 .faq-page .faq-biz-line {
   font-family: var(--ui);
-  font-size: 13px;
+  font-size: 15px;
   color: var(--body-soft);
   line-height: 1.8;
   margin-top: 14px;
@@ -471,8 +470,8 @@
     gap: 6px;
     padding-block: 2px;
   }
-  .faq-page .cat-chip { padding: 6px 10px; font-size: 12px; gap: 4px; }
-  .faq-page .cat-chip .ic { font-size: 13px; }
+  .faq-page .cat-chip { padding: 6px 10px; font-size: 15px; gap: 4px; }
+  .faq-page .cat-chip .ic { font-size: 15px; }
 
   .faq-page .faq-body {
     /* minmax(0,1fr): 子要素の最小幅でトラックが広がり横スクロールが出るのを防ぐ */

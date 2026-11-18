@@ -286,7 +286,7 @@ export default function ExamplesPage() {
           </p>
           <Reveal className="cases-cta">
             <div className="cases-cta-inner">
-              <RevealLines mark="under" lines={["あなたの家の不用品、いくらになる？"]} />
+              <RevealLines lines={["あなたの家の不用品、いくらになる？"]} />
               <p>
                 1点ずつ撮って、業者に競ってもらうだけ。
                 <br />
