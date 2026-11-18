@@ -37,11 +37,10 @@ const BANNED: ReadonlyArray<readonly [string, RegExp, string]> = [
 /**
  * 除外（src からの相対パス。ディレクトリは配下すべて）。いずれも後続の作業で消える・作り直すため、
  * そのコミットで本リストからも外す（外し忘れても、対象が消えれば検査に影響しない）。
- *  - app/opengraph-image.tsx … OGP 画像（next/og）。CSS 変数が使えず色を直書きするうえ、
- *                             Satori 用の書体指定も絡むため、専用の作業（C11）で作り直す。
+ * 現在、除外はない（OGP 画像 app/opengraph-image.tsx も新トークンの値へ替え済みで走査に入る）。
  * app/page.tsx・app/top.css（トップ）は作り直し済みで旧値が無いため除外しない。
  */
-const EXCLUDED: readonly string[] = ["app/opengraph-image.tsx"];
+const EXCLUDED: readonly string[] = [];
 
 /** 検査対象の拡張子（テストファイル自身は旧値を文字列として含むため除く） */
 const TARGET_EXTENSIONS = [".css", ".tsx", ".ts"] as const;
@@ -82,8 +81,8 @@ describe("デザイントークンの旧値が残っていない", () => {
     assert.ok(TARGET_FILES.includes("app/layout.tsx"));
   });
 
-  it("除外は opengraph-image.tsx だけで、走査に入らない", () => {
-    assert.equal(TARGET_FILES.includes("app/opengraph-image.tsx"), false);
+  it("opengraph-image.tsx も走査に入る", () => {
+    assert.equal(TARGET_FILES.includes("app/opengraph-image.tsx"), true);
   });
 
   for (const [label, pattern, reason] of BANNED) {

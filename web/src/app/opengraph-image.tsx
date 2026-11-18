@@ -4,8 +4,8 @@ import { ImageResponse } from "next/og";
  * Next.js 15 File Convention: /opengraph-image
  * 1200x630 の OGP/Twitter Card 画像を動的生成する。
  * X / Slack / LINE 共有時のリッチプレビュー用。
- * 人の森整合テーマ: 白地・直角・影なし。緑の二段ワードマークと明朝の見出し。
- * フォントは既存実装と同じくシステム書体指定（外部フォントの取得は行わない）。
+ * 見本 v12: 生成り地(#f6f2ea)・藍(#2e4a7d)・墨(#24221f)。直角・影なし。CSS 変数が使えないため値を直書きする。
+ * 書体はシステム書体指定のまま（edge で和文フォントを取得する仕組みが無く、Zen Maru Gothic への替えは見送り）。
  */
 
 export const runtime = "edge";
@@ -25,10 +25,10 @@ export default function OgImage() {
           alignItems: "flex-start",
           justifyContent: "space-between",
           padding: "72px 80px",
-          background: "#ffffff",
-          color: "#333333",
+          background: "#f6f2ea",
+          color: "#24221f",
           fontFamily: '"Hiragino Mincho ProN", "Yu Mincho", serif',
-          border: "1px solid #333333",
+          border: "1px solid #24221f",
         }}
       >
         {/* Top: 二段ワードマーク */}
@@ -45,7 +45,7 @@ export default function OgImage() {
               fontSize: "46px",
               fontWeight: 400,
               letterSpacing: "0.14em",
-              color: "#333333",
+              color: "#24221f",
             }}
           >
             カタヅケ
@@ -57,7 +57,7 @@ export default function OgImage() {
               fontSize: "19px",
               fontWeight: 600,
               letterSpacing: "0.18em",
-              color: "#1447e0",
+              color: "#2e4a7d",
             }}
           >
             KATAZUKE
@@ -67,7 +67,7 @@ export default function OgImage() {
         {/* 旧OGのピルを直角・細枠チップとして保持。文言は「AI査定」→「写真査定」。
             AI を主語にした査定は実装に無く（CONSTRAINTS §3・BRIEF §4.1）、本文も
             「写真と品目から」で統一しているため、OG だけ残すと誇張表示になる。 */}
-        <div style={{ display: "flex", position: "absolute", top: "72px", right: "80px", border: "1px solid #1447e0", color: "#1447e0", fontSize: "22px", fontWeight: 400, padding: "8px 20px", letterSpacing: "0.08em" }}>
+        <div style={{ display: "flex", position: "absolute", top: "72px", right: "80px", border: "1px solid #2e4a7d", color: "#2e4a7d", fontSize: "22px", fontWeight: 400, padding: "8px 20px", letterSpacing: "0.08em" }}>
           写真 × 入札 × リユース
         </div>
 
@@ -86,7 +86,7 @@ export default function OgImage() {
               fontWeight: 400,
               lineHeight: 1.4,
               letterSpacing: "0.04em",
-              color: "#333333",
+              color: "#24221f",
             }}
           >
             不用品を撮って送るだけ。
@@ -98,7 +98,7 @@ export default function OgImage() {
               fontWeight: 400,
               lineHeight: 1.4,
               letterSpacing: "0.04em",
-              color: "#1447e0",
+              color: "#2e4a7d",
             }}
           >
             片付けと買取が、まとめて片づく。
@@ -108,7 +108,7 @@ export default function OgImage() {
               display: "flex",
               width: "96px",
               height: "1px",
-              background: "#1447e0",
+              background: "#2e4a7d",
             }}
           />
         </div>
@@ -118,7 +118,7 @@ export default function OgImage() {
           style={{
             display: "flex",
             gap: "16px",
-            color: "#1447e0",
+            color: "#2e4a7d",
             fontSize: "24px",
             fontWeight: 400,
           }}
@@ -127,8 +127,8 @@ export default function OgImage() {
             style={{
               display: "flex",
               padding: "10px 22px",
-              border: "1px solid #1447e0",
-              background: "#ffffff",
+              border: "1px solid #2e4a7d",
+              background: "#f6f2ea",
             }}
           >
             カタヅケの利用料は無料
@@ -137,8 +137,8 @@ export default function OgImage() {
             style={{
               display: "flex",
               padding: "10px 22px",
-              border: "1px solid #1447e0",
-              background: "#ffffff",
+              border: "1px solid #2e4a7d",
+              background: "#f6f2ea",
             }}
           >
             撮るだけ
@@ -147,8 +147,8 @@ export default function OgImage() {
             style={{
               display: "flex",
               padding: "10px 22px",
-              border: "1px solid #1447e0",
-              background: "#ffffff",
+              border: "1px solid #2e4a7d",
+              background: "#f6f2ea",
             }}
           >
             写真で入札
@@ -157,8 +157,8 @@ export default function OgImage() {
             style={{
               display: "flex",
               padding: "10px 22px",
-              border: "1px solid #1447e0",
-              background: "#ffffff",
+              border: "1px solid #2e4a7d",
+              background: "#f6f2ea",
             }}
           >
             営業電話ゼロ
