@@ -11,7 +11,7 @@ const boxStyle: React.CSSProperties = {
   marginBottom: 20,
   padding: "12px 16px",
   background: "var(--warm, #fff8e6)",
-  color: "var(--body, #333)",
+  color: "var(--body, var(--ink))",
   border: "1px solid var(--gold, #c9a227)",
   fontSize: 13.5,
   lineHeight: 1.75,

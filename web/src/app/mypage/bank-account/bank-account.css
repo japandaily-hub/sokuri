@@ -84,7 +84,7 @@
   font-size: 14px;
   font-weight: 600;
   color: var(--danger);
-  background: #fff;
+  background: var(--white);
   border: 1.5px solid var(--danger);
   padding: 12px 22px;
   cursor: pointer;

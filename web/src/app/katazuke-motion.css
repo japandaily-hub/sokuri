@@ -136,7 +136,7 @@ html.js-rv .rv--zoom.in img{
 /* セキュリティレビュー対応(Low-2): 純装飾帯なのでクリック/タップを一切奪わないようにする。
    overflow:clip は box(top:2%)/folding-hands(top:98%) の上下端アイコンが実際に半分切れて
    しまうため使わない(円周配置は意図的に .ill-loop-inner の外周にわずかにはみ出す設計)。 */
-.ill-loop{padding:clamp(20px,3.4vw,36px) 0 clamp(4px,1vw,12px);background:#fff;pointer-events:none;}
+.ill-loop{padding:clamp(20px,3.4vw,36px) 0 clamp(4px,1vw,12px);background:var(--white);pointer-events:none;}
 .ill-loop-inner{position:relative;width:100%;max-width:520px;aspect-ratio:1/1;margin-inline:auto;}
 /* 円周上の位置は呼び出し側がインラインstyleで --ill-top/--ill-left を渡す方式にしている。
    当初は .ill-item--box{top:2%;left:50%} のようなBEM修飾子セレクタを6つ並べていたが、

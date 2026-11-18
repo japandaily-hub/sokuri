@@ -218,7 +218,7 @@
 
 .flow-footer { position: fixed; bottom: 0; left: 0; right: 0; z-index: 50; background: var(--white); border-top: 1px solid var(--line); box-shadow: none; }
 .flow-footer .inner { max-width: 600px; margin: 0 auto; padding: 14px 20px; display: flex; gap: 12px; justify-content: flex-end; align-items: center; }
-.btn-flow-back { padding: 14px 24px; border-radius: 0; border: 1px solid #333; background: var(--white); color: #333; font-family: var(--head); font-size: 15px; font-weight: 600; letter-spacing: .08em; cursor: pointer; transition: opacity .25s; white-space: normal; }
+.btn-flow-back { padding: 14px 24px; border-radius: 0; border: 1px solid var(--ink); background: var(--white); color: var(--ink); font-family: var(--head); font-size: 15px; font-weight: 600; letter-spacing: .08em; cursor: pointer; transition: opacity .25s; white-space: normal; }
 .btn-flow-back:hover { opacity: .8; }
 .btn-flow-back:disabled { border-color: var(--line-soft); color: var(--body-soft); background: var(--line-soft); cursor: not-allowed; opacity: 1; }
 .btn-flow-next { padding: 14px 30px; border-radius: 0; border: none; background: var(--primary); color: var(--white); font-family: var(--head); font-size: 15px; font-weight: 600; letter-spacing: .08em; cursor: pointer; box-shadow: none; transition: opacity .25s; display: flex; align-items: center; gap: 8px; white-space: normal; }
@@ -251,7 +251,7 @@
    共有ビジュアル部品 v2（ビジュアル再構築 2026-09-14・BRIEF §1）
    globals.css が全ルート（BARE 含む）に読み込むので、どのページでもそのまま使う。
    モバイル閾値は額装解除（katazuke.css .site-frame）と同じ 859px に統一。
-   角丸0・影0・backdrop-filter なし。画像の上に乗せる色だけ rgba(20,35,92,.x) を許可。
+   角丸0・影0・backdrop-filter なし。画像の上に乗せる色だけ rgba(var(--deep-rgb),.x) を許可。
    ============================================================ */
 
 /* ---------- §1.2 .hero-band — フレームブリード写真帯 ----------
@@ -271,7 +271,7 @@
    濃紺地の上から消すため（alt="" 運用なので読み上げには影響しない）。画像が届けば無関係になる。 */
 .hero-band > img { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0;
   object-fit: cover; object-position: var(--band-pos, 50% 50%); color: transparent; font-size: 0; }
-.hero-band__veil { position: absolute; inset: 0; background: rgba(20,35,92,.65); pointer-events: none; }
+.hero-band__veil { position: absolute; inset: 0; background: rgba(var(--deep-rgb),.65); pointer-events: none; }
 .hero-band__copy { position: relative; z-index: 1; color: #fff; font-family: var(--serif); }
 .hero-band__copy h1, .hero-band__copy h2, .hero-band__copy h3 { color: #fff; font-weight: 600; font-size: clamp(24px,3.4vw,40px); line-height: 1.5; }
 .hero-band__copy p { font-size: 16px; line-height: 1.9; margin-top: 12px; }
@@ -296,9 +296,9 @@
 }
 /* veil の規約（画像は warm off-white 指定のため合成色が明るい）:
    既定 .65 = 見出し＋本文（14px 以上）／--headline .55 = 見出し（24px 以上・600）のみ／--quiet .18 = 文字を置かない */
-.hero-band--headline .hero-band__veil { background: rgba(20,35,92,.55); }
-.hero-band--quiet .hero-band__veil { background: rgba(20,35,92,.18); }
-/* R4 ラウンド4 指摘（2/18/26/27）: 平坦な rgba(20,35,92,.55〜.65) は紫がかった一枚の色面になり
+.hero-band--headline .hero-band__veil { background: rgba(var(--deep-rgb),.55); }
+.hero-band--quiet .hero-band__veil { background: rgba(var(--deep-rgb),.18); }
+/* R4 ラウンド4 指摘（2/18/26/27）: 平坦な rgba(var(--deep-rgb),.55〜.65) は紫がかった一枚の色面になり
    人物カットの素材感が消え、さらに / のモバイル（実測 p95 4.41）は AA 未達だった。
    人物入り帯だけ veil を「文字側が濃い水平グラデ＋青みを抑えた中性の暗色」に置き換える。
    - 混色を rgba(16,20,34,.x) 側へ寄せて青の寄与（B=92 → 34）を落とし、紫かぶりを消す
@@ -323,7 +323,7 @@
    co-band はコピーが中央寄せ（company.css:15）で水平グラデでは救えず、人物帯でもないため
    R4_BRIEF D.1 の是正順②「--headline を外して veil を .65 に上げる」を core 側で当てる
    （JSX のクラスは変えない）。計算値: .65 で約 5.6:1。画像の再生成はしない。 */
-.co-band.hero-band--headline .hero-band__veil { background: rgba(20,35,92,.65); }
+.co-band.hero-band--headline .hero-band__veil { background: rgba(var(--deep-rgb),.65); }
 /* R4 ラウンド4 指摘（35/39）＋ 画像選定メモ: biz-band-sorting は人物の頭部が画像上部 13〜33% に
    あり、既定 42% では PC（1440px で帯 400px ＝ 可視域が画像高の 49.4%）で額が上端に接する。
    縦位置を 32% に寄せると可視域の上端が画像高 16.2% → 頭部の余白が確保される
@@ -512,7 +512,7 @@
 .img-frame--4x5 { aspect-ratio: 4/5; }
 /* 地は既定で --pale-2。--pale は互換のため残す（同値）。淡青面の上で白地にしたい枠だけ --white */
 .img-frame--pale { background: var(--pale-2); }
-.img-frame--white { background: #fff; }
+.img-frame--white { background: var(--white); }
 /* contain は既存 3D アイコン（/img/real/* 512px 正方形）にのみ許可。v2 の写真には使わない */
 .img-frame--contain img { object-fit: contain; }
 /* contain は素材が枠を埋めないので、枠の地が素材に焼かれた地と違うと「枠の中にもう一枚ずれた四角」が浮く
@@ -553,17 +553,17 @@
 /* 地は --deep。画像が未着・失敗のときにベタ一色の板に見えないよう、上に極薄の縦グラデだけ重ねる
    （画像が届けば > img がこの地を覆うので無関係になる）。 */
 .auth-side { position: relative; background-color: var(--deep); overflow: hidden;
-  background-image: linear-gradient(180deg, rgba(255,255,255,.07), rgba(20,35,92,0) 46%); }
+  background-image: linear-gradient(180deg, rgba(255,255,255,.07), rgba(var(--deep-rgb),0) 46%); }
 .auth-side > img { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; object-fit: cover; object-position: 50% 40%;
   color: transparent; font-size: 0; }
 /* 下部 40% のグラデ。白抜き文字はこの不透明側にだけ置く */
 .auth-side::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 40%; pointer-events: none;
-  background: linear-gradient(180deg, rgba(20,35,92,0), rgba(20,35,92,.75)); }
+  background: linear-gradient(180deg, rgba(var(--deep-rgb),0), rgba(var(--deep-rgb),.75)); }
 .auth-side__line { position: absolute; left: 0; right: 0; bottom: var(--auth-side-pad-b, 0px); z-index: 1; margin: 0;
   padding: 0 clamp(24px,4vw,48px) clamp(28px,4vw,48px); color: #fff; font-family: var(--serif); font-weight: 600;
   font-size: clamp(24px,2.4vw,32px); line-height: 1.5; letter-spacing: .06em; text-wrap: balance; }
 /* 業者側は終端を .85 まで濃くし、業務用の入口を色で区別 */
-.operator-auth .auth-side::after { background: linear-gradient(180deg, rgba(20,35,92,0), rgba(20,35,92,.85)); }
+.operator-auth .auth-side::after { background: linear-gradient(180deg, rgba(var(--deep-rgb),0), rgba(var(--deep-rgb),.85)); }
 @media (min-width: 860px) {
   .auth-page--split > main { display: grid; grid-template-columns: minmax(0,46fr) minmax(0,54fr);
     min-height: calc(100dvh - var(--auth-bar-h, 68px)); }
@@ -574,7 +574,7 @@
      .auth-side を stretch させる案は取らない — 1 行コピー（.auth-side__line）が下端＝
      ページ最下部へ落ちてファーストビューから消え、ラウンド2 で入れた「1 行が視界から出ない」設計が壊れるため。
      地は main の background ではなく ::before で敷く。/signup は signup.css:62 の
-     `.signup-page > main{background:#fff}` が「レイヤー無しはレイヤー有りに常に勝つ」ため
+     `.signup-page > main{background:var(--white)}` が「レイヤー無しはレイヤー有りに常に勝つ」ため
      どんな特異度でも上書きできず、main の背景では 4 ページのうち /signup だけ効かない（実測）。
      ::before なら別ボックスなので main 自身の地の上に載る。
      grid-column:1/grid-row:1 を .auth-side と共有し、DOM 順で先＝下に敷かれる。
@@ -604,11 +604,11 @@
      モバイル（21:9・160px の帯／キャプション非表示）には適用しない＝帯を暗くしない。 */
   .auth-page--split > main > .auth-side::after {
     height: 56%;
-    background: linear-gradient(180deg, rgba(20,35,92,0), rgba(20,35,92,.44) 50%, rgba(20,35,92,.84));
+    background: linear-gradient(180deg, rgba(var(--deep-rgb),0), rgba(var(--deep-rgb),.44) 50%, rgba(var(--deep-rgb),.84));
   }
   /* 業者側は終端をさらに濃く（業務用の入口を色で区別する既存方針を維持） */
   .auth-page--split.operator-auth > main > .auth-side::after {
-    background: linear-gradient(180deg, rgba(20,35,92,0), rgba(20,35,92,.48) 50%, rgba(20,35,92,.88));
+    background: linear-gradient(180deg, rgba(var(--deep-rgb),0), rgba(var(--deep-rgb),.48) 50%, rgba(var(--deep-rgb),.88));
   }
 }
 /* ---------- R5 認証4ページ（ラウンド5 指摘 4/13/24/31/33/35/38） ---------- */

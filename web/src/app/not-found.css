@@ -17,7 +17,7 @@
 .nf-card {
   max-width: 480px;
   width: 100%;
-  background: #fff;
+  background: var(--white);
   border-radius: var(--radius);
   box-shadow: var(--shadow-m);
   border: 1px solid var(--line-soft);
@@ -81,7 +81,7 @@
   gap: 12px;
   background: var(--pale);
   border-radius: 0;
-  border: 1px solid rgba(82,126,82, 0.12);
+  border: 1px solid rgba(var(--primary-rgb), 0.12);
   padding: 14px 16px;
   text-decoration: none;
   transition: 0.2s;

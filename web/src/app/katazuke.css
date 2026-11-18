@@ -142,7 +142,7 @@ section:has(> .vt){position:relative;}
     right:max(8px, calc((100vw - var(--maxw))/2 - 46px));
     writing-mode:vertical-rl;text-orientation:mixed;
     font-family:var(--head);font-size:34px;font-weight:400;line-height:1.35;
-    letter-spacing:.12em;color:#333;}
+    letter-spacing:.12em;color:var(--ink);}
   .vt::first-letter{color:var(--primary);}
   .vt .n{text-combine-upright:all;}
 }
@@ -287,16 +287,16 @@ section:has(> .vt){position:relative;}
 /* ============================================================
    HERO — 白地に若草の blob。写真は直角＋緑罫＋破線コネクタ
    ============================================================ */
-.hero{position:relative;overflow:hidden;background:#fff;
+.hero{position:relative;overflow:hidden;background:var(--white);
   padding:clamp(40px,5vw,72px) 0 clamp(56px,7vw,96px);}
 .hero-blob{position:absolute;right:-12vw;top:-30vh;width:70vw;height:120vh;
-  background:#e8effc;border-radius:42% 58% 55% 45%/48% 42% 58% 52%;
+  background:var(--indigo-tint);border-radius:42% 58% 55% 45%/48% 42% 58% 52%;
   z-index:0;pointer-events:none;}
 .hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(32px,5vw,64px);align-items:center;}
 /* コピー・写真は blob より前面に */
 .hero-copy,
 .hero-figure{position:relative;z-index:1;}
-.hero-eyebrow{display:inline-flex;align-items:center;gap:9px;background:#fff;
+.hero-eyebrow{display:inline-flex;align-items:center;gap:9px;background:var(--white);
   border:1px solid var(--line);border-radius:0;padding:8px 16px 8px 12px;
   font-size:13px;font-weight:400;color:var(--ink);}
 .hero-eyebrow .dot{width:8px;height:8px;border-radius:50%;background:var(--primary);}
@@ -348,13 +348,13 @@ section:has(> .vt){position:relative;}
 .hero-carousel__ctrl{position:absolute;left:0;right:0;bottom:0;z-index:2;
   display:flex;align-items:center;justify-content:space-between;gap:14px;
   padding:14px clamp(16px,2.6vw,24px);
-  background:linear-gradient(180deg,rgba(20,35,92,0),rgba(20,35,92,.72));}
+  background:linear-gradient(180deg,rgba(var(--deep-rgb),0),rgba(var(--deep-rgb),.72));}
 .hero-carousel__dots{display:flex;align-items:center;gap:9px;}
 .hero-carousel__dot{width:8px;height:8px;padding:0;border-radius:50%;
   border:1px solid rgba(255,255,255,.85);background:rgba(255,255,255,.35);
   cursor:pointer;transition:opacity .25s var(--ease);}
 .hero-carousel__dot:hover{opacity:.75;}
-.hero-carousel__dot.is-active{background:#fff;}
+.hero-carousel__dot.is-active{background:var(--white);}
 .hero-carousel__toggle{display:grid;place-items:center;width:30px;height:30px;padding:0;flex:none;
   border:1px solid rgba(255,255,255,.6);background:transparent;color:#fff;cursor:pointer;
   transition:opacity .25s var(--ease);}
@@ -370,8 +370,8 @@ section:has(> .vt){position:relative;}
   border:1px solid var(--primary);pointer-events:none;}
 /* 破線コネクタ */
 .hero-photo::after{content:"";position:absolute;top:50%;left:-46px;width:38px;
-  border-top:1px dashed #333;}
-.hero-badge{position:absolute;display:flex;align-items:center;gap:10px;background:#fff;
+  border-top:1px dashed var(--ink);}
+.hero-badge{position:absolute;display:flex;align-items:center;gap:10px;background:var(--white);
   border:1px solid var(--line);border-radius:0;padding:12px 15px;
   font-size:13px;font-weight:400;color:var(--ink);}
 .hero-badge .bi{width:34px;height:34px;border-radius:0;display:grid;place-items:center;flex:none;color:#fff;}
@@ -383,9 +383,9 @@ section:has(> .vt){position:relative;}
 .hero-badge.b-bid .bi{background:var(--deep);}
 @media(max-width:340px){.hero-badge{display:none;}}
 
-/* 4ステップ帯: ヘアラインの箱 + Libre Baskerville の番号 */
+/* 4ステップ帯: ヘアラインの箱 + 数字の番号 */
 .hero-how{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
-  background:#fff;border:1px solid var(--line);border-radius:0;padding:14px 20px;
+  background:var(--white);border:1px solid var(--line);border-radius:0;padding:14px 20px;
   box-shadow:none;margin:22px 0 6px;}
 .hw-step{display:flex;align-items:center;gap:7px;font-family:var(--head);
   font-size:13px;font-weight:400;color:var(--ink);}
@@ -397,7 +397,7 @@ section:has(> .vt){position:relative;}
 @media(max-width:480px){.hw-arr{display:none;}.hero-how{gap:10px;}}
 
 /* 帯：信頼の根拠 — 白地に上下ヘアライン */
-.assure{background:#fff;color:var(--ink);border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+.assure{background:var(--white);color:var(--ink);border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
 .assure .container{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;
   padding-block:28px;}
 .assure-item{display:flex;align-items:center;gap:12px;}
@@ -422,7 +422,7 @@ section:has(> .vt){position:relative;}
 /* ============================================================
    共感（悩み）— 枠も面も持たない。区切りは余白のみ
    ============================================================ */
-.empathy{background:#fff;}
+.empathy{background:var(--white);}
 .emp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(28px,3.4vw,40px);}
 .emp-card{background:transparent;border:0;border-radius:0;box-shadow:none;overflow:hidden;}
 .emp-photo{aspect-ratio:4/3;background:var(--pale);overflow:hidden;}
@@ -474,7 +474,7 @@ section:has(> .vt){position:relative;}
 /* ============================================================
    AUCTION（業者が競う仕組み）
    ============================================================ */
-.auction{background:#fff;color:var(--ink);overflow:hidden;border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+.auction{background:var(--white);color:var(--ink);overflow:hidden;border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
 .auction .section-head h2{color:var(--ink);}
 .auction .section-head .sub{color:var(--body);}
 .auction .eyebrow{color:var(--primary);}
@@ -544,7 +544,7 @@ section:has(> .vt){position:relative;}
 .scene-body{padding:18px 0 0;}
 .scene-tag{display:inline-flex;align-items:center;gap:7px;font-family:var(--head);font-weight:400;
   font-size:12px;letter-spacing:.06em;padding:4px 12px;border-radius:0;
-  color:var(--primary);background:#fff;border:1px solid var(--primary);}
+  color:var(--primary);background:var(--white);border:1px solid var(--primary);}
 .scene-tag .ic{font-size:14px;}
 .scene-body h3{font-size:18px;margin-top:12px;color:var(--ink);transition:color .25s;}
 .scene-body p{font-size:15px;color:var(--body);margin-top:8px;line-height:1.9;}
@@ -566,7 +566,7 @@ section:has(> .vt){position:relative;}
 /* ============================================================
    料金（透明性） — 「無料」はマーカーで強度を作る
    ============================================================ */
-.fee-card{max-width:var(--maxw-text);margin-inline:auto;background:#fff;border:1px solid var(--line);
+.fee-card{max-width:var(--maxw-text);margin-inline:auto;background:var(--white);border:1px solid var(--line);
   border-radius:0;box-shadow:none;overflow:hidden;}
 .fee-head{background:var(--pale);padding:26px 30px;border-bottom:1px solid var(--line);text-align:center;}
 .fee-head h3{font-size:22px;color:var(--ink);}
@@ -591,7 +591,7 @@ section:has(> .vt){position:relative;}
 .biz-banner-copy h2::first-letter{color:var(--primary);}
 .biz-banner-copy p{font-size:15px;color:var(--body);margin-top:12px;line-height:1.9;}
 .biz-banner-tags{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;}
-.biz-tag{font-size:12.5px;font-weight:400;color:var(--primary);background:#fff;
+.biz-tag{font-size:12.5px;font-weight:400;color:var(--primary);background:var(--white);
   border:1px solid var(--primary);border-radius:0;padding:5px 14px;}
 .biz-banner-cta{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:12px;}
 /* クラス名は据え置き。人の森整合版では緑地白文字の直角ボタン */
@@ -662,10 +662,10 @@ section:has(> .vt){position:relative;}
 /* ============================================================
    最終CTA — 白地に若草の blob。人の顔を主役に
    ============================================================ */
-.final{background:#fff;color:var(--ink);text-align:center;overflow:hidden;position:relative;
+.final{background:var(--white);color:var(--ink);text-align:center;overflow:hidden;position:relative;
   border-top:1px solid var(--line);}
 .final::before{content:"";position:absolute;left:-18vw;bottom:-40vh;width:60vw;height:100vh;
-  background:#e8effc;border-radius:48% 52% 45% 55%/52% 48% 52% 48%;z-index:0;pointer-events:none;}
+  background:var(--indigo-tint);border-radius:48% 52% 45% 55%/52% 48% 52% 48%;z-index:0;pointer-events:none;}
 .final .container{position:relative;z-index:2;}
 .cta-staff{display:flex;justify-content:center;margin-bottom:22px;}
 .cta-staff img{width:60px;height:60px;border-radius:50%;object-fit:cover;border:2px solid #fff;
@@ -675,7 +675,7 @@ section:has(> .vt){position:relative;}
 .final h2::first-letter{color:var(--primary);}
 .final p{font-size:16px;color:var(--body);margin-top:16px;max-width:34em;margin-inline:auto;line-height:2;}
 .final .final-cta{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-top:30px;}
-.final .btn-ghost{background:#fff;color:#333;border:1px solid #333;}
+.final .btn-ghost{background:var(--white);color:var(--ink);border:1px solid var(--ink);}
 .final .final-note{margin-top:22px;font-size:13px;color:var(--body-soft);}
 
 /* ============================================================

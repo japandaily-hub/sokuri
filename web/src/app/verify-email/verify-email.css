@@ -19,7 +19,7 @@
 
 /* ── カード ── */
 .confirm-card {
-  background: #fff;
+  background: var(--white);
   border-radius: var(--radius);
   box-shadow: var(--shadow-m);
   border: 1px solid var(--line-soft);
@@ -106,7 +106,7 @@
   font-weight: 600;
   padding: 8px 18px;
   border-radius: 0;
-  border: 1px solid rgba(82,126,82, .2);
+  border: 1px solid rgba(var(--primary-rgb), .2);
   margin-bottom: 28px;
 }
 

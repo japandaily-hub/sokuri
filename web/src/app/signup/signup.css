@@ -7,9 +7,9 @@
 .signup-page .area-chip.selected { border-color: var(--blue); background: var(--blue); color: #fff; }
 
 .signup-page .role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.signup-page .role-card { border: 2px solid var(--line); border-radius: var(--radius-s); padding: 16px 14px; cursor: pointer; transition: border-color .2s, background .2s, box-shadow .2s; user-select: none; display: flex; flex-direction: column; gap: 6px; text-align: left; background: #fff; }
+.signup-page .role-card { border: 2px solid var(--line); border-radius: var(--radius-s); padding: 16px 14px; cursor: pointer; transition: border-color .2s, background .2s, box-shadow .2s; user-select: none; display: flex; flex-direction: column; gap: 6px; text-align: left; background: var(--white); }
 .signup-page .role-card:hover { border-color: var(--blue); background: var(--pale); }
-.signup-page .role-card.selected { border-color: var(--blue); background: var(--pale); box-shadow: 0 0 0 3px rgba(82,126,82,.12); }
+.signup-page .role-card.selected { border-color: var(--blue); background: var(--pale); box-shadow: 0 0 0 3px rgba(var(--primary-rgb),.12); }
 .signup-page .role-card .rc-ic { width: 40px; height: 40px; border-radius: 0; background: var(--pale); color: var(--blue); display: grid; place-items: center; }
 .signup-page .role-card.selected .rc-ic { background: var(--blue); color: #fff; }
 .signup-page .role-card .rc-ic .ic { font-size: 22px; }
@@ -57,15 +57,15 @@
 .signup-page { --auth-bar-h: 76px; }
 
 /* フォーム面の地は全幅で白（左カラムは .auth-side が --deep を塗る）。
-   他の認証3ページ（.auth-page{background:#fff}）と地を揃え、--pale の大面積使用を減らす。
+   他の認証3ページ（.auth-page{background:var(--white)}）と地を揃え、--pale の大面積使用を減らす。
    .form-card は 1px var(--line) を持つので、白地でも入力欄の境界は沈まない。
    859px 以下も同じ白にする: モバイルだけ .flow-bg の --pale が残ると、同じページが
    画面幅で別物に見え、/login・/operator/* と地が割れる（ラウンド2 指摘）。 */
-.signup-page > main { background: #fff; }
+.signup-page > main { background: var(--white); }
 
 /* フォーム直上の注記（登録＝業者への通知ではない、という実装事実） */
 .signup-page .signup-lead-note {
-  background: #fff; border: 1px solid var(--line); border-radius: 0;
+  background: var(--white); border: 1px solid var(--line); border-radius: 0;
   padding: 14px 16px; margin-bottom: 22px;
   font-size: 13.5px; line-height: 1.85; color: var(--body);
 }

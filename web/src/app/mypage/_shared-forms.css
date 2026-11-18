@@ -34,7 +34,7 @@
 .profile-page .form-card,
 .bank-page .form-card,
 .identity-page .form-card {
-  background: #fff;
+  background: var(--white);
   border-radius: var(--radius);
   border: 1px solid var(--line-soft);
   padding: 22px 20px;

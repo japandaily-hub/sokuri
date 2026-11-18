@@ -29,7 +29,7 @@
    リードは 16px なので幅を詰めて 1〜2 行に収める。veil は既定の .65（--headline を外した）。 */
 .vendors-page .vd-band .hero-band__copy h1 { margin: 12px 0 0; }
 .vendors-page .vd-band .eyebrow { color: #fff; }
-.vendors-page .vd-band .eyebrow::before { background: #fff; }
+.vendors-page .vd-band .eyebrow::before { background: var(--white); }
 .vendors-page .vd-band .hero-band__copy p { max-width: 30em; }
 /* r2 M3 是正: 帯だけ .container（--maxw 1240）で、帯下の本文は .vendors-wrap（720）。
    見出しの左端と本文の左端が別の線に乗っていたので、帯側を本文のラッパー幅に合わせる。
@@ -113,7 +113,7 @@
    掲載前の画面が作りかけに見えた。シェルの内パディングを詰めて中身を 1 つの塊にし、
    余白は塊の外（margin-bottom）へ寄せる。 */
 .vendors-page .vd-state {
-  background: #fff;
+  background: var(--white);
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   padding: clamp(26px, 4vw, 40px) 20px;
@@ -194,7 +194,7 @@
 /* 空状態（意図された空）: 白面を上下のヘアラインで区切る。
    r3 是正: 上下パディングは .vd-state と同じ値に詰め、余白は塊の外に寄せる。 */
 .vendors-page .vd-empty {
-  background: #fff;
+  background: var(--white);
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   padding: clamp(26px, 4vw, 40px) 0;
@@ -314,7 +314,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  background: #fff;
+  background: var(--white);
   border: 1px solid var(--line);
   border-radius: 0;
   padding: 18px 20px;
@@ -343,7 +343,7 @@
   padding: 2px 8px;
   border: 1px solid var(--line);
   color: var(--body-soft);
-  background: #fff;
+  background: var(--white);
   border-radius: 0;
   white-space: nowrap;
 }
@@ -400,7 +400,7 @@
 .vendors-page .vd-foot {
   flex: none;
   border-top: 1px solid var(--line);
-  background: #fff;
+  background: var(--white);
 }
 .vendors-page .vd-foot-inner {
   max-width: 720px;

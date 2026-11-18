@@ -114,7 +114,7 @@
 
 /* フォームカード */
 .withdraw-page .form-card {
-  background: #fff;
+  background: var(--white);
   border-radius: var(--radius);
   box-shadow: none;
   border: 1px solid var(--line-soft);
@@ -145,7 +145,7 @@
 }
 .withdraw-page .field input:focus {
   border-color: var(--danger);
-  background: #fff;
+  background: var(--white);
   box-shadow: none;
 }
 .withdraw-page .field.has-error input {

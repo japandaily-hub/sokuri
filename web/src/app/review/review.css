@@ -32,7 +32,7 @@
 
 /* ── 取引サマリー ── */
 .review-page .txn-card {
-  background: #fff; border-radius: var(--radius);
+  background: var(--white); border-radius: var(--radius);
   box-shadow: none; border: 1px solid var(--line-soft);
   padding: 20px; margin-bottom: 20px;
 }
@@ -48,7 +48,7 @@
 
 /* ── 評価フォーム ── */
 .review-page .rate-card {
-  background: #fff; border-radius: var(--radius);
+  background: var(--white); border-radius: var(--radius);
   box-shadow: none; border: 1px solid var(--line-soft);
   padding: 24px 20px; margin-bottom: 14px;
 }
@@ -71,7 +71,7 @@
 }
 .review-page .toggle-slider::before {
   content: ""; position: absolute; width: 18px; height: 18px;
-  border-radius: 50%; background: #fff; left: 3px; top: 3px;
+  border-radius: 50%; background: var(--white); left: 3px; top: 3px;
   transition: .3s; box-shadow: none;
 }
 .review-page .publish-toggle input:checked + .toggle-slider { background: var(--green); }
@@ -82,14 +82,14 @@
 /* 次のアクション */
 .review-page .next-card {
   background: var(--pale); border-radius: var(--radius);
-  border: 1px solid rgba(82,126,82,.12); padding: 20px;
+  border: 1px solid rgba(var(--primary-rgb),.12); padding: 20px;
   margin-bottom: 14px;
 }
 .review-page .next-card-title { font-family: var(--head); font-size: 14px; font-weight: 400; color: var(--navy); margin-bottom: 14px; }
 .review-page .next-actions { display: flex; flex-direction: column; gap: 10px; }
 .review-page .next-action-btn {
   display: flex; align-items: center; gap: 12px;
-  background: #fff; border-radius: 0; border: 1px solid var(--line-soft);
+  background: var(--white); border-radius: 0; border: 1px solid var(--line-soft);
   padding: 14px 16px; text-decoration: none; transition: .2s; white-space: normal;
 }
 .review-page .next-action-btn:hover { box-shadow: none; }

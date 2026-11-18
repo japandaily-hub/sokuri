@@ -25,7 +25,7 @@
 /* ヘッダー（戻る矢印 + ロゴ + タイトル + ID + 通知ベル） */
 .chat-page .chat-header {
   height: 56px;
-  background: #fff;
+  background: var(--white);
   border-bottom: 1px solid var(--line);
   display: flex;
   align-items: center;
@@ -90,7 +90,7 @@
 .chat-page .biz-sidebar {
   width: 200px;
   flex-shrink: 0;
-  background: #fff;
+  background: var(--white);
   border-right: 1px solid var(--line);
   display: flex;
   flex-direction: column;
@@ -163,7 +163,7 @@
 
 /* チャット相手ヘッダー */
 .chat-page .chat-peer-header {
-  background: #fff;
+  background: var(--white);
   border-bottom: 1px solid var(--line);
   padding: 12px 20px;
   display: flex;
@@ -248,7 +248,7 @@
   color: #1a6040;
   flex-shrink: 0;
 }
-.chat-page .line-dot { width: 8px; height: 8px; border-radius: 50%; background: #06c755; flex-shrink: 0; }
+.chat-page .line-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line-green); flex-shrink: 0; }
 
 /* メッセージエリア */
 .chat-page .messages-area {
@@ -291,7 +291,7 @@
   word-break: break-word;
 }
 .chat-page .msg.them .bubble {
-  background: #fff;
+  background: var(--white);
   border: 1px solid var(--line);
   border-bottom-left-radius: 4px;
   color: var(--ink);
@@ -319,7 +319,7 @@
 
 /* 引き取り日程カード */
 .chat-page .schedule-card {
-  background: #fff;
+  background: var(--white);
   border: 1.5px solid var(--blue);
   border-radius: var(--radius-s);
   padding: 16px 18px;
@@ -407,7 +407,7 @@
 
 /* メッセージ入力 */
 .chat-page .input-area {
-  background: #fff;
+  background: var(--white);
   border-top: 1px solid var(--line);
   padding: 12px 16px;
   display: flex;
@@ -432,7 +432,7 @@
   color: var(--ink);
   transition: border-color .2s, background .2s;
 }
-.chat-page .msg-input:focus { border-color: var(--blue); background: #fff; }
+.chat-page .msg-input:focus { border-color: var(--blue); background: var(--white); }
 .chat-page .msg-input::placeholder { color: #bcc3d4; }
 .chat-page .btn-send {
   width: 40px;

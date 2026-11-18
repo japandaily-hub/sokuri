@@ -90,7 +90,7 @@
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--white);
   border: 2px solid var(--line);
   display: grid;
   place-items: center;
@@ -147,7 +147,7 @@
   color: var(--ink);
   transition: .2s;
   user-select: none;
-  background: #fff;
+  background: var(--white);
 }
 .profile-page .area-chip:hover {
   border-color: var(--blue);
@@ -268,7 +268,7 @@
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--white);
   left: 3px;
   top: 3px;
   transition: .3s;
@@ -291,7 +291,7 @@
   padding: 18px 20px;
   border: 1.5px solid var(--danger);
   border-radius: var(--radius);
-  background: #fff;
+  background: var(--white);
 }
 .profile-page .danger-zone .danger-title {
   font-family: var(--head);

@@ -38,12 +38,12 @@
    下罫は引かない（直下 .merit-bar の border-top が区切りを持つ・ヘアラインの二重引きを避ける）。
    2ボタンの天地は align-items:stretch でそろえる（.btn.btn-line は min-height 60/54px、
    .btn-ghost は padding で高さが決まるため、そろえないと数 px の段差が出る）。 */
-.pg-hero-actions { background: #fff; padding: clamp(22px, 3vw, 32px) 0; }
+.pg-hero-actions { background: var(--white); padding: clamp(22px, 3vw, 32px) 0; }
 .pg-hero-actions .hero-cta { margin-top: 0; align-items: stretch; }
 
 /* ---------- 帯の直下：4チェック行（白地・上下ヘアライン） ---------- */
 .merit-bar {
-  background: #fff;
+  background: var(--white);
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   padding: 18px 0;
@@ -155,7 +155,7 @@
   font-size: 13px;
   line-height: 1.6;
   color: var(--ink);
-  background: #fff;
+  background: var(--white);
   border: 1px solid var(--line);
   padding: 6px 12px;
 }

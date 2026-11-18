@@ -22,7 +22,7 @@
 
 /* ユーザーカード */
 .user-card {
-  background: #fff;
+  background: var(--white);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 24px 28px;
@@ -110,7 +110,7 @@
   margin-bottom: 24px;
 }
 .sum-card {
-  background: #fff;
+  background: var(--white);
   border: 1px solid var(--line);
   border-radius: var(--radius-s);
   padding: 16px 18px;
@@ -155,7 +155,7 @@
 
 /* 会員情報の入力状況カード */
 .member-status-card {
-  background: #fff;
+  background: var(--white);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 16px 20px 4px;
@@ -195,7 +195,7 @@
   gap: 0;
   border-bottom: 2px solid var(--line);
   margin-bottom: 20px;
-  background: #fff;
+  background: var(--white);
   border-radius: var(--radius-s) var(--radius-s) 0 0;
   overflow: hidden;
 }
@@ -256,7 +256,7 @@
   gap: 14px;
 }
 .lot-card {
-  background: #fff;
+  background: var(--white);
   border: 1.5px solid var(--line);
   border-radius: var(--radius);
   overflow: hidden;
@@ -505,7 +505,7 @@
   background: var(--blue-d);
 }
 .btn-lot.ghost {
-  background: #fff;
+  background: var(--white);
   color: var(--ink);
   border: 1.5px solid var(--line);
 }
@@ -531,7 +531,7 @@
 .empty-state {
   text-align: center;
   padding: 56px 20px;
-  background: #fff;
+  background: var(--white);
   border: 1px solid var(--line);
   border-radius: var(--radius);
 }
@@ -562,7 +562,7 @@
 
 /* プロフィール編集 */
 .profile-card {
-  background: #fff;
+  background: var(--white);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   overflow: hidden;
@@ -658,7 +658,7 @@
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--white);
   top: 3px;
   left: 3px;
   transition: transform 0.2s;

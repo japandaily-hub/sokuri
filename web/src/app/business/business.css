@@ -539,7 +539,7 @@
 }
 .business-page .field input::placeholder,
 .business-page .field textarea::placeholder { color: var(--body-soft); opacity: .7; }
-/* フォーカスリングは主色由来（緑の名残 rgba(82,126,82,…) を撤去） */
+/* フォーカスリングは主色由来（緑の名残 rgba(var(--primary-rgb),…) を撤去） */
 .business-page .field input:focus,
 .business-page .field select:focus,
 .business-page .field textarea:focus {

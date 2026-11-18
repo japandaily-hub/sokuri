@@ -13,7 +13,7 @@
 
 /* 進捗ステップ + チャット戻り導線の帯 */
 .schedule-page .sch-progress {
-  background: #fff;
+  background: var(--white);
   border-bottom: 1px solid var(--line-soft);
   padding: 14px 0;
 }
@@ -53,7 +53,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #fff;
+  background: var(--white);
 }
 .schedule-page .sch-step.done .step-num { background: var(--green); border-color: var(--green); color: #fff; }
 .schedule-page .sch-step.active .step-num { background: var(--blue); border-color: var(--blue); color: #fff; }
@@ -101,7 +101,7 @@
 
 /* 業者情報カード */
 .schedule-page .biz-card {
-  background: #fff;
+  background: var(--white);
   border: 1.5px solid var(--line);
   border-radius: var(--radius);
   padding: 18px 20px;
@@ -152,7 +152,7 @@
 
 /* カレンダー */
 .schedule-page .cal-card {
-  background: #fff;
+  background: var(--white);
   border: 1.5px solid var(--line);
   border-radius: var(--radius);
   overflow: hidden;
@@ -171,7 +171,7 @@
   height: 32px;
   border-radius: 50%;
   border: 1.5px solid var(--line);
-  background: #fff;
+  background: var(--white);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -250,7 +250,7 @@
   background: var(--green);
 }
 .schedule-page .cal-day.selected { background: var(--blue); color: #fff; border-color: var(--blue-d); }
-.schedule-page .cal-day.selected::after { background: #fff; }
+.schedule-page .cal-day.selected::after { background: var(--white); }
 
 .schedule-page .cal-legend {
   display: flex;
@@ -265,7 +265,7 @@
 
 /* 時間帯選択 */
 .schedule-page .time-card {
-  background: #fff;
+  background: var(--white);
   border: 1.5px solid var(--line);
   border-radius: var(--radius);
   padding: 20px;
@@ -297,7 +297,7 @@
   color: var(--ink);
   cursor: pointer;
   transition: .15s;
-  background: #fff;
+  background: var(--white);
   font-family: var(--sans);
 }
 .schedule-page .time-slot:hover:not(.disabled) { border-color: var(--blue); color: var(--blue); }
@@ -307,7 +307,7 @@
 
 /* 備考 */
 .schedule-page .note-card {
-  background: #fff;
+  background: var(--white);
   border: 1.5px solid var(--line);
   border-radius: var(--radius);
   padding: 20px;
@@ -344,7 +344,7 @@
 .schedule-page .sch-side { display: flex; flex-direction: column; gap: 16px; }
 
 .schedule-page .confirm-card {
-  background: #fff;
+  background: var(--white);
   border: 1.5px solid var(--line);
   border-radius: var(--radius);
   padding: 20px;
