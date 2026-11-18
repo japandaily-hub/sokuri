@@ -93,10 +93,10 @@ export default function MyCasesPage() {
                     <img
                       src={photoSrc(c.photos[0].url)}
                       alt=""
-                      className="h-16 w-16 shrink-0 rounded-none border border-kdz-line object-cover"
+                      className="h-16 w-16 shrink-0 rounded-kdz-s border border-kdz-line object-cover"
                     />
                   ) : (
-                    <div className="h-16 w-16 shrink-0 rounded-none bg-kdz-pale" />
+                    <div className="h-16 w-16 shrink-0 rounded-kdz-s bg-kdz-pale" />
                   )}
                   <div className="min-w-0">
                     <p className="font-bold text-kdz-ink">{formatPurposeLabel(c.purpose)}</p>

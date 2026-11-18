@@ -62,7 +62,7 @@
   font-weight: 700;
   background: var(--blue);
   color: var(--white);
-  border-radius: 0;
+  border-radius: var(--radius-s);
   padding: 1px 7px;
   font-family: var(--head);
 }
@@ -102,7 +102,7 @@
   color: var(--ink);
   background: var(--white);
   border: 1.5px solid var(--line);
-  border-radius: 0;
+  border-radius: var(--radius);
   padding: 8px 32px 8px 12px;
   cursor: pointer;
   appearance: none;
@@ -171,7 +171,7 @@
 .op-dash .lot-id { font-size: 15px; font-weight: 600; color: var(--body-soft); letter-spacing: .06em; }
 .op-dash .lot-tag {
   font-size: 15px; font-weight: 600;
-  padding: 2px 9px; border-radius: 0;
+  padding: 2px 9px; border-radius: var(--radius-s);
   border: 1px solid var(--line);
   color: var(--body-soft);
 }
@@ -186,7 +186,7 @@
   font-size: 15px;
   color: var(--ink);
   background: var(--pale);
-  border-radius: 0;
+  border-radius: var(--radius-s);
   padding: 3px 10px;
   font-weight: 600;
 }
@@ -229,7 +229,7 @@
 .op-dash .my-bid-row {
   background: var(--white);
   border: 1.5px solid var(--line);
-  border-radius: 0;
+  border-radius: var(--radius-s);
   padding: 10px 12px;
   font-size: 15px;
   color: var(--body-soft);
@@ -245,7 +245,7 @@
   background: var(--blue);
   color: var(--white);
   border: none;
-  border-radius: 0;
+  border-radius: var(--radius);
   font-family: var(--head);
   font-size: 15px;
   font-weight: 700;
@@ -272,7 +272,7 @@
 .op-dash .density-toggle {
   display: inline-flex;
   border: 1.5px solid var(--line);
-  border-radius: 0;
+  border-radius: var(--radius-s);
   overflow: hidden;
   flex-shrink: 0;
 }
@@ -315,7 +315,7 @@
 .op-dash .lot-compact-thumb {
   width: 44px;
   height: 44px;
-  border-radius: 0;
+  border-radius: var(--radius-s);
   overflow: hidden;
   background: var(--pale);
   display: flex;
@@ -371,7 +371,7 @@
 .op-dash a.negotiation-card:hover { border-color: var(--primary-l); }
 .op-dash .neg-user-ic {
   width: 44px; height: 44px;
-  border-radius: 0;
+  border-radius: var(--radius-s);
   background: var(--ink);
   border: 1px solid var(--ink);
   display: flex;
@@ -394,7 +394,7 @@
 .op-dash .unread-chip {
   font-size: 15px; font-weight: 700;
   background: var(--blue); color: var(--white);
-  border-radius: 0; padding: 2px 8px;
+  border-radius: var(--radius-s); padding: 2px 8px;
   font-family: var(--head);
 }
 
@@ -407,9 +407,9 @@
    operator-shared.css の .modal-overlay/.modal-card/.modal-title/.modal-sub/
    .modal-actions/.btn-modal-cancel/.btn-modal-confirm を使用。
    ここでは本ページ固有のパーツ（金額表示・注意書き）のみ追加定義する。 */
-.op-dash .modal-amount { font-family: var(--ui); font-variant-numeric: tabular-nums; font-size: 32px; font-weight: 600; color: var(--navy); text-align: center; padding: 16px; background: var(--pale); border-radius: 0; margin-bottom: 20px; }
+.op-dash .modal-amount { font-family: var(--ui); font-variant-numeric: tabular-nums; font-size: 32px; font-weight: 600; color: var(--navy); text-align: center; padding: 16px; background: var(--pale); border-radius: var(--radius); margin-bottom: 20px; }
 .op-dash .modal-amount span { font-size: 15px; font-weight: 600; color: var(--body-soft); }
-.op-dash .modal-warn { font-size: 15px; color: var(--gold-text); background: var(--warm); border-radius: 0; padding: 10px 14px; margin-bottom: 20px; line-height: 1.7; display: flex; gap: 8px; align-items: flex-start; }
+.op-dash .modal-warn { font-size: 15px; color: var(--gold-text); background: var(--warm); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 20px; line-height: 1.7; display: flex; gap: 8px; align-items: flex-start; }
 .op-dash .modal-warn .ic { width: 16px; height: 16px; stroke: var(--gold); flex-shrink: 0; margin-top: 1px; }
 
 /* ---------- 入札成功トースト ---------- */
@@ -420,7 +420,7 @@
   transform: translateX(-50%) translateY(80px);
   background: var(--deep);
   color: var(--white);
-  border-radius: 0;
+  border-radius: var(--radius);
   padding: 13px 24px;
   font-size: 15px;
   font-weight: 700;

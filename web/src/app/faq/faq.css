@@ -44,7 +44,7 @@
   width: 100%;
   padding: 13px 46px 13px 16px;
   border: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: var(--radius);
   font-size: 15px;
   font-family: var(--ui);
   color: var(--ink);
@@ -74,7 +74,7 @@
   transform: translateY(-50%);
   background: none;
   border: 0;
-  border-radius: 0;
+  border-radius: var(--radius-s);
   width: 24px;
   height: 24px;
   cursor: pointer;
@@ -183,7 +183,7 @@
   color: var(--body-soft);
   text-decoration: none;
   padding: 9px 12px;
-  border-radius: 0;
+  border-radius: var(--radius);
   transition: color .15s, background .15s;
   cursor: pointer;
   background: none;
@@ -227,7 +227,7 @@
 .faq-page .faq-section-icon {
   width: 36px;
   height: 36px;
-  border-radius: 0;
+  border-radius: var(--radius-s);
   background: var(--ink);
   border: 1px solid var(--ink);
   display: flex;
@@ -412,7 +412,7 @@
 /* ---------- お問い合わせ誘導 ---------- */
 .faq-page .faq-contact {
   border: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: var(--radius);
   padding: clamp(22px, 3vw, 28px);
   display: flex;
   align-items: flex-start;

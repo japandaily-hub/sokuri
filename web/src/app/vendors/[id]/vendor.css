@@ -52,7 +52,7 @@
 }
 .vendor-page .biz-big-avatar {
   width: 80px; height: 80px;
-  border-radius: 0;
+  border-radius: var(--radius-s);
   flex-shrink: 0;
   display: grid; place-items: center;
   font-family: var(--head);
@@ -82,7 +82,7 @@
 }
 .vendor-page .biz-tag {
   font-size: 15px; font-weight: 600;
-  padding: 4px 10px; border-radius: 0;
+  padding: 4px 10px; border-radius: var(--radius-s);
 }
 .vendor-page .biz-tag-green { background: rgba(var(--primary-rgb),.1); color: var(--green); }
 .vendor-page .biz-tag-blue  { background: var(--pale); color: var(--blue); }
@@ -133,7 +133,7 @@
   margin-bottom: 20px;
 }
 .vendor-page .biz-stat {
-  background: var(--pale); border-radius: 0;
+  background: var(--pale); border-radius: var(--radius);
   padding: 14px 10px; text-align: center;
 }
 .vendor-page .biz-stat-val {
@@ -175,7 +175,7 @@
 .vendor-page .bid-label-badge {
   background: var(--blue); color: var(--white);
   font-family: var(--head); font-size: 15px; font-weight: 700;
-  padding: 4px 12px; border-radius: 0;
+  padding: 4px 12px; border-radius: var(--radius-s);
   display: inline-flex; align-items: center; gap: 4px;
 }
 .vendor-page .bid-amount-big {
@@ -221,7 +221,7 @@
 .vendor-page .promise-list { display: flex; flex-direction: column; gap: 12px; }
 .vendor-page .promise-item { display: flex; align-items: flex-start; gap: 12px; }
 .vendor-page .promise-ic {
-  width: 32px; height: 32px; border-radius: 0; flex-shrink: 0;
+  width: 32px; height: 32px; border-radius: var(--radius-s); flex-shrink: 0;
   background: var(--pale); color: var(--green);
   display: grid; place-items: center;
 }
@@ -266,7 +266,7 @@
   font-weight: 700;
   font-size: 15px;
   padding: 2px 9px;
-  border-radius: 0;
+  border-radius: var(--radius);
   border: 1px solid var(--line);
   color: var(--body-soft);
   vertical-align: middle;
@@ -281,7 +281,7 @@
 }
 .vendor-page .review-tag {
   font-size: 15px; background: var(--line-soft); color: var(--body-soft);
-  padding: 3px 9px; border-radius: 0; font-weight: 600;
+  padding: 3px 9px; border-radius: var(--radius-s); font-weight: 600;
 }
 .vendor-page .review-more {
   text-align: center; margin-top: 16px;
@@ -296,7 +296,7 @@
 /* 対応エリア */
 .vendor-page .area-tags { display: flex; gap: 6px; flex-wrap: wrap; }
 .vendor-page .area-tag {
-  font-size: 15px; font-weight: 600; padding: 7px 14px; border-radius: 0;
+  font-size: 15px; font-weight: 600; padding: 7px 14px; border-radius: var(--radius-s);
   background: var(--pale); color: var(--blue); border: 1px solid rgba(var(--primary-rgb),.15);
 }
 
@@ -336,7 +336,7 @@
   .vendor-page .biz-footer-cta .btn { font-size: 15px; padding: 10px 14px; }
 }
 @media (max-width: 400px) {
-  .vendor-page .biz-big-avatar { width: 64px; height: 64px; font-size: 26px; border-radius: 0; }
+  .vendor-page .biz-big-avatar { width: 64px; height: 64px; font-size: 26px; border-radius: var(--radius-s); }
   .vendor-page .biz-hero-name { font-size: 16px; }
   .vendor-page .biz-stat-val { font-size: 18px; }
   .vendor-page .bid-amount-big { font-size: 24px; }

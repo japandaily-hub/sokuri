@@ -92,7 +92,7 @@
   width: 100%;
   aspect-ratio: 1;
   object-fit: cover;
-  border-radius: 0;
+  border-radius: var(--radius-s);
   border: 1px solid var(--line);
   background: var(--line-soft);
 }
@@ -101,7 +101,7 @@
 .my-bid-card { text-align: center; }
 .my-bid-card .amount { font-family: var(--ui); font-variant-numeric: tabular-nums; font-size: 32px; font-weight: 600; color: var(--navy); margin: 10px 0 4px; }
 .my-bid-card .amount span { font-size: 15px; margin-right: 2px; color: var(--body-soft); }
-.my-bid-card p.comment { font-size: 15px; color: var(--body); line-height: 1.8; margin: 10px 0; text-align: left; background: var(--line-soft); border-radius: 0; padding: 12px 14px; }
+.my-bid-card p.comment { font-size: 15px; color: var(--body); line-height: 1.8; margin: 10px 0; text-align: left; background: var(--line-soft); border-radius: var(--radius); padding: 12px 14px; }
 
 /* 入札フォーム: 金額入力（¥ プレフィックス付き） */
 .yen-input-wrap {
@@ -169,7 +169,7 @@
   font-weight: 700;
   font-family: var(--head);
   padding: 2px 9px;
-  border-radius: 0;
+  border-radius: var(--radius-s);
   white-space: nowrap;
 }
 .status-chip.bidding { background: var(--pale); color: var(--primary); border: 1px solid var(--primary); }
@@ -274,7 +274,7 @@
 .listing-thumb {
   width: 56px;
   height: 56px;
-  border-radius: 0;
+  border-radius: var(--radius-s);
   overflow: hidden;
   border: 1px solid var(--line);
   background: var(--line-soft);
@@ -283,7 +283,7 @@
 .listing-more {
   width: 56px;
   height: 56px;
-  border-radius: 0;
+  border-radius: var(--radius-s);
   background: var(--pale);
   color: var(--blue);
   font-family: var(--head);
@@ -302,7 +302,7 @@
   font-weight: 700;
   font-family: var(--head);
   padding: 4px 12px;
-  border-radius: 0;
+  border-radius: var(--radius-s);
   flex-shrink: 0;
 }
 .listing-status-badge.badge-waiting { background: var(--pale); color: var(--gold); border: 1px solid var(--gold); }
@@ -363,7 +363,7 @@
 .modal-overlay.show { opacity: 1; pointer-events: all; visibility: visible; transition: opacity .25s; }
 .modal-card {
   background: var(--white);
-  border-radius: 0;
+  border-radius: var(--radius);
   padding: 32px 28px 24px;
   max-width: 420px;
   width: 100%;
@@ -379,14 +379,14 @@
   align-items: center;
   gap: 12px;
   background: var(--line-soft);
-  border-radius: 0;
+  border-radius: var(--radius);
   padding: 14px 16px;
   margin-bottom: 20px;
 }
 .modal-biz-avatar {
   width: 40px;
   height: 40px;
-  border-radius: 0;
+  border-radius: var(--radius-s);
   color: var(--white);
   font-family: var(--head);
   font-weight: 700;
@@ -401,7 +401,7 @@
 .btn-modal-cancel {
   flex: 1;
   padding: 13px;
-  border-radius: 0;
+  border-radius: var(--radius);
   border: 1.5px solid var(--line);
   background: var(--white);
   color: var(--ink);
@@ -416,7 +416,7 @@
 .btn-modal-confirm {
   flex: 1;
   padding: 13px;
-  border-radius: 0;
+  border-radius: var(--radius);
   border: none;
   background: var(--blue);
   color: var(--white);
@@ -466,7 +466,7 @@
   font-family: var(--ui);
   padding: 6px 10px;
   border: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: var(--radius);
   background: var(--white);
   color: var(--ink);
   max-width: 100%;

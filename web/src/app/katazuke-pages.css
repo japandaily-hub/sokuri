@@ -53,7 +53,7 @@
 .forget-link:hover { text-decoration: underline; }
 .field input, .field textarea, .field select {
   width: 100%; font-size: 15px; color: var(--ink);
-  background: var(--white); border: 1px solid var(--line); border-radius: 0;
+  background: var(--white); border: 1px solid var(--line); border-radius: var(--radius);
   padding: 12px 14px; transition: border-color .2s;
 }
 .field input::placeholder { color: var(--body-soft); }
@@ -76,7 +76,7 @@
 
 /* エラーバナー */
 .auth-error {
-  background: var(--white); border: 1px solid var(--danger); border-radius: 0;
+  background: var(--white); border: 1px solid var(--danger); border-radius: var(--radius);
   padding: 11px 14px; font-size: 15px; color: var(--danger); margin-bottom: 18px;
   display: flex; align-items: center; gap: 8px; line-height: 1.6;
 }
@@ -154,7 +154,7 @@
 .kdz-toast {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
   background: var(--deep); color: #fff; font-family: var(--head); font-size: 15px; font-weight: 600;
-  padding: 14px 22px; border-radius: 0; z-index: 200; box-shadow: none;
+  padding: 14px 22px; border-radius: var(--radius); z-index: 200; box-shadow: none;
 }
 
 /* モーダル（共通） */
@@ -162,7 +162,7 @@
   position: fixed; inset: 0; background: rgba(51,51,51,.45); backdrop-filter: none;
   z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px;
 }
-.kdz-modal { background: var(--white); border: 1px solid var(--line); border-radius: 0; max-width: 400px; width: 100%; padding: 32px 28px; box-shadow: none; }
+.kdz-modal { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); max-width: 400px; width: 100%; padding: 32px 28px; box-shadow: none; }
 .kdz-modal h2 { font-family: var(--head); font-size: 21px; font-weight: 400; color: var(--ink); margin-bottom: 8px; }
 .kdz-modal .modal-sub { font-size: 15px; color: var(--body-soft); line-height: 1.75; margin-bottom: 22px; }
 
@@ -198,16 +198,16 @@
 .step-title { font-family: var(--head); font-size: clamp(20px,3vw,26px); font-weight: 400; color: var(--ink); margin-bottom: 8px; line-height: 1.5; }
 .step-desc { font-size: 15px; color: var(--body); line-height: 1.75; margin-bottom: 24px; }
 
-.form-card { background: var(--white); border: 1px solid var(--line); border-radius: 0; box-shadow: none; padding: 26px 24px; margin-bottom: 16px; }
+.form-card { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: none; padding: 26px 24px; margin-bottom: 16px; }
 /* .field-top .req/.opt: Field コンポーネント（components/kdz/auth.tsx）の rightSlot に
    直接 .req/.opt バッジを渡すケース（label 文字列に埋め込めないため）。ラベル内埋め込み版
    （.field label .req/.opt）と見た目を統一する。値は katazuke.css の .req/.opt と同一。 */
-.field label .req, .field-top .req { font-family: var(--ui); font-size: 15px; font-weight: 500; color: var(--white); background: var(--primary); padding: 2px 10px; border-radius: 0; margin-left: 6px; vertical-align: middle; }
-.field label .opt, .field-top .opt { font-family: var(--ui); font-size: 15px; font-weight: 500; color: var(--white); background: #808080; padding: 2px 10px; border-radius: 0; margin-left: 6px; vertical-align: middle; }
+.field label .req, .field-top .req { font-family: var(--ui); font-size: 15px; font-weight: 500; color: var(--white); background: var(--primary); padding: 2px 10px; border-radius: var(--radius-s); margin-left: 6px; vertical-align: middle; }
+.field label .opt, .field-top .opt { font-family: var(--ui); font-size: 15px; font-weight: 500; color: var(--white); background: #808080; padding: 2px 10px; border-radius: var(--radius-s); margin-left: 6px; vertical-align: middle; }
 
 .select-wrap { position: relative; }
 .select-wrap::after { content: ""; position: absolute; right: 14px; top: 50%; transform: translateY(-50%); width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid var(--body-soft); pointer-events: none; }
-.select-wrap select { width: 100%; font-size: 15px; color: var(--ink); background: var(--white); border: 1px solid var(--line); border-radius: 0; padding: 12px 36px 12px 14px; appearance: none; cursor: pointer; }
+.select-wrap select { width: 100%; font-size: 15px; color: var(--ink); background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 36px 12px 14px; appearance: none; cursor: pointer; }
 .select-wrap select:focus { border-color: var(--primary); background: var(--white); }
 
 .pw-strength { margin-top: 8px; display: flex; gap: 5px; align-items: center; }
@@ -216,10 +216,10 @@
 
 .flow-footer { position: fixed; bottom: 0; left: 0; right: 0; z-index: 50; background: var(--white); border-top: 1px solid var(--line); box-shadow: none; }
 .flow-footer .inner { max-width: 600px; margin: 0 auto; padding: 14px 20px; display: flex; gap: 12px; justify-content: flex-end; align-items: center; }
-.btn-flow-back { padding: 14px 24px; border-radius: 0; border: 1px solid var(--ink); background: var(--white); color: var(--ink); font-family: var(--head); font-size: 15px; font-weight: 600; letter-spacing: .08em; cursor: pointer; transition: opacity .25s; white-space: normal; }
+.btn-flow-back { padding: 14px 24px; border-radius: var(--radius-s); border: 1px solid var(--ink); background: var(--white); color: var(--ink); font-family: var(--head); font-size: 15px; font-weight: 600; letter-spacing: .08em; cursor: pointer; transition: opacity .25s; white-space: normal; }
 .btn-flow-back:hover { opacity: .8; }
 .btn-flow-back:disabled { border-color: var(--line-soft); color: var(--body-soft); background: var(--line-soft); cursor: not-allowed; opacity: 1; }
-.btn-flow-next { padding: 14px 30px; border-radius: 0; border: none; background: var(--primary); color: var(--white); font-family: var(--head); font-size: 15px; font-weight: 600; letter-spacing: .08em; cursor: pointer; box-shadow: none; transition: opacity .25s; display: flex; align-items: center; gap: 8px; white-space: normal; }
+.btn-flow-next { padding: 14px 30px; border-radius: var(--radius); border: none; background: var(--primary); color: var(--white); font-family: var(--head); font-size: 15px; font-weight: 600; letter-spacing: .08em; cursor: pointer; box-shadow: none; transition: opacity .25s; display: flex; align-items: center; gap: 8px; white-space: normal; }
 .btn-flow-next:hover { opacity: .8; }
 .btn-flow-next:disabled { background: var(--line-soft); color: var(--body-soft); box-shadow: none; cursor: not-allowed; opacity: 1; }
 
@@ -694,6 +694,6 @@
    ページ CSS は unlayered で本ファイルに常に勝つため、この2クラスをページ CSS で再定義しない。 */
 .model-chip { display: inline-block; font-family: var(--ui); font-size: 15px; font-weight: 600;
   line-height: 1.5; letter-spacing: .02em; color: var(--ink); background: var(--marker);
-  border: 0; border-radius: 0; padding: 6px 12px; }
+  border: 0; border-radius: var(--radius-s); padding: 6px 12px; }
 .model-note { font-family: var(--ui); font-size: 15px; line-height: 1.9; color: var(--body);
   max-width: 56em; margin: 0 0 clamp(20px, 2.4vw, 32px); }

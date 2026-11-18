@@ -38,7 +38,7 @@
 .opchat-page .ch-back {
   width: 36px;
   height: 36px;
-  border-radius: 0;
+  border-radius: var(--radius-s);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -63,7 +63,7 @@
   color: var(--gold-text);
   border: 1px solid var(--gold);
   padding: 3px 10px;
-  border-radius: 0;
+  border-radius: var(--radius-s);
   white-space: nowrap;
 }
 .opchat-page .ch-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
@@ -71,7 +71,7 @@
 .opchat-page .ch-bell {
   width: 36px;
   height: 36px;
-  border-radius: 0;
+  border-radius: var(--radius-s);
   background: var(--pale);
   display: flex;
   align-items: center;
@@ -95,7 +95,7 @@
   font-weight: 600;
   color: var(--body-soft);
   padding: 8px 12px;
-  border-radius: 0;
+  border-radius: var(--radius-s);
   white-space: nowrap;
   transition: color .15s, background .15s;
 }
@@ -106,7 +106,7 @@
   color: var(--body-soft);
   background: none;
   border: 1.5px solid var(--line);
-  border-radius: 0;
+  border-radius: var(--radius);
   padding: 7px 13px;
   cursor: pointer;
   white-space: nowrap;
@@ -155,7 +155,7 @@
   font-size: 15px;
   font-weight: 600;
   padding: 2px 7px;
-  border-radius: 0;
+  border-radius: var(--radius-s);
   display: inline-block;
   margin-bottom: 6px;
 }
@@ -199,7 +199,7 @@
 .opchat-page .peer-avatar {
   width: 40px;
   height: 40px;
-  border-radius: 0;
+  border-radius: var(--radius-s);
   background: var(--pale);
   color: var(--body-soft);
   font-family: var(--head);
@@ -216,7 +216,7 @@
 .opchat-page .amount-chip {
   background: var(--pale);
   border: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: var(--radius-s);
   padding: 8px 14px;
   text-align: center;
   flex-shrink: 0;
@@ -252,7 +252,7 @@
 .opchat-page .msg-avatar {
   width: 32px;
   height: 32px;
-  border-radius: 0;
+  border-radius: var(--radius-s);
   background: var(--pale);
   color: var(--body-soft);
   font-family: var(--head);
@@ -267,7 +267,7 @@
 .opchat-page .bubble {
   max-width: 68%;
   padding: 12px 16px;
-  border-radius: 0;
+  border-radius: var(--radius);
   font-family: var(--ui);
   font-size: 15px;
   line-height: 1.7;
@@ -337,7 +337,7 @@
   color: var(--ink);
   background: var(--white);
   border: 1.5px solid var(--line);
-  border-radius: 0;
+  border-radius: var(--radius);
   padding: 8px 10px;
   transition: border-color .2s;
 }
@@ -345,7 +345,7 @@
 .opchat-page .sp-remove {
   width: 28px;
   height: 28px;
-  border-radius: 0;
+  border-radius: var(--radius-s);
   background: rgba(215,0,53,.08);
   border: none;
   cursor: pointer;
@@ -368,7 +368,7 @@
   color: var(--ink);
   background: var(--white);
   border: 1.5px solid var(--line);
-  border-radius: 0;
+  border-radius: var(--radius);
   padding: 6px 8px;
   cursor: pointer;
   text-align: center;
@@ -410,7 +410,7 @@
 .opchat-page .btn-send-schedule {
   width: 100%;
   padding: 11px;
-  border-radius: 0;
+  border-radius: var(--radius);
   border: none;
   background: var(--blue);
   color: var(--white);
@@ -437,7 +437,7 @@
   color: var(--ink);
   background: var(--white);
   border: 1.5px solid var(--line);
-  border-radius: 0;
+  border-radius: var(--radius);
   padding: 6px 8px;
 }
 .opchat-page .sp-time-select:focus { border-color: var(--blue); }
@@ -493,7 +493,7 @@
 .opchat-page .tool-btn {
   width: 36px;
   height: 36px;
-  border-radius: 0;
+  border-radius: var(--radius-s);
   background: var(--pale);
   border: none;
   cursor: pointer;
@@ -512,7 +512,7 @@
   flex: 1;
   background: var(--pale);
   border: 1.5px solid var(--line);
-  border-radius: 0;
+  border-radius: var(--radius);
   padding: 10px 18px;
   font-family: var(--sans);
   font-size: 15px;
@@ -577,7 +577,7 @@
   gap: 2px;
   background: var(--line-soft);
   margin: 12px 16px;
-  border-radius: 0;
+  border-radius: var(--radius);
   overflow: hidden;
 }
 .opchat-page .dp-item-thumb {
@@ -625,7 +625,7 @@
 .opchat-page .btn-propose {
   margin: 0 16px 16px;
   padding: 11px;
-  border-radius: 0;
+  border-radius: var(--radius);
   border: none;
   background: var(--deep);
   color: var(--white);

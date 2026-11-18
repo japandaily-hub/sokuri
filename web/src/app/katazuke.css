@@ -377,7 +377,7 @@ section:has(> .vt){position:relative;}
 .auction .section-head .sub{color:var(--body);}
 .auction .eyebrow{color:var(--primary);}
 
-.auc-figure{border-radius:0;overflow:hidden;background:var(--pale);box-shadow:none;aspect-ratio:16/10;}
+.auc-figure{border-radius:var(--radius);overflow:hidden;background:var(--pale);box-shadow:none;aspect-ratio:16/10;}
 .auc-figure img{width:100%;height:100%;object-fit:contain;}
 
 /* ============================================================
@@ -399,13 +399,13 @@ section:has(> .vt){position:relative;}
    ============================================================ */
 .media-split{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,4vw,60px);align-items:center;}
 
-.media-figure{border-radius:0;overflow:hidden;aspect-ratio:4/3;background:var(--pale);box-shadow:none;}
+.media-figure{border-radius:var(--radius);overflow:hidden;aspect-ratio:4/3;background:var(--pale);box-shadow:none;}
 .media-figure img{width:100%;height:100%;object-fit:cover;}
 
 /* ---------- 業者向け導線バナー — 淡い緑面 + 上下ヘアライン ---------- */
 
 .biz-tag{font-size:12.5px;font-weight:400;color:var(--primary);background:var(--white);
-  border:1px solid var(--primary);border-radius:0;padding:5px 14px;}
+  border:1px solid var(--primary);border-radius:var(--radius-s);padding:5px 14px;}
 
 /* クラス名は据え置き。人の森整合版では緑地白文字の直角ボタン */
 .btn-white{background:var(--primary);color:#fff;box-shadow:none;}
