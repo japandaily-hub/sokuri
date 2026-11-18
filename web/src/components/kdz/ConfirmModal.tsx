@@ -151,7 +151,7 @@ export function ConfirmModal({
             {emphasis}
           </p>
         ) : null}
-        <p className="mt-2 text-sm leading-relaxed text-kdz-body">{message}</p>
+        <p className="mt-2 text-[15px] leading-relaxed text-kdz-body">{message}</p>
         {error ? (
           <div className="mt-3">
             <Notice tone="error">{error}</Notice>
@@ -159,7 +159,7 @@ export function ConfirmModal({
         ) : null}
         {typedMatch ? (
           <div className="mt-3">
-            <label className="text-sm text-kdz-bodysoft" htmlFor="kdzConfirmModalTyped">
+            <label className="text-[15px] text-kdz-bodysoft" htmlFor="kdzConfirmModalTyped">
               {typedMatch.inputLabel}
             </label>
             <input
@@ -180,13 +180,13 @@ export function ConfirmModal({
               }}
             />
             {typedMismatch && reason.trim() !== "" ? (
-              <p className="mt-1 text-sm text-kdz-danger">{typedMatch.mismatchHint ?? "入力が一致していません"}</p>
+              <p className="mt-1 text-[15px] text-kdz-danger">{typedMatch.mismatchHint ?? "入力が一致していません"}</p>
             ) : null}
           </div>
         ) : null}
         {withReason && !typedMatch ? (
           <div className="mt-3">
-            <label className="text-sm text-kdz-bodysoft" htmlFor="kdzConfirmModalReason">
+            <label className="text-[15px] text-kdz-bodysoft" htmlFor="kdzConfirmModalReason">
               {reasonLabel}
             </label>
             <textarea
@@ -197,17 +197,17 @@ export function ConfirmModal({
               onChange={(e) => setReason(e.target.value)}
               maxLength={REASON_MAX_LENGTH}
             />
-            <p className="mt-1 text-sm text-kdz-bodysoft">
+            <p className="mt-1 text-[15px] text-kdz-bodysoft">
               個人情報や誹謗中傷は記載しないでください（残り{REASON_MAX_LENGTH - reason.length}文字）
             </p>
             {reasonMissing ? (
-              <p className="mt-1 text-sm text-kdz-danger">理由を入力してください</p>
+              <p className="mt-1 text-[15px] text-kdz-danger">理由を入力してください</p>
             ) : null}
           </div>
         ) : null}
         {withPassword ? (
           <div className="mt-3">
-            <label className="text-sm text-kdz-bodysoft" htmlFor="kdzConfirmModalPassword">
+            <label className="text-[15px] text-kdz-bodysoft" htmlFor="kdzConfirmModalPassword">
               {passwordLabel}
             </label>
             <input
@@ -227,7 +227,7 @@ export function ConfirmModal({
               }}
             />
             {passwordMissing ? (
-              <p className="mt-1 text-sm text-kdz-danger">パスワードを入力してください</p>
+              <p className="mt-1 text-[15px] text-kdz-danger">パスワードを入力してください</p>
             ) : null}
           </div>
         ) : null}

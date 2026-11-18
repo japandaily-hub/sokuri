@@ -116,7 +116,7 @@ export function StatusBadge({
 }) {
   return (
     <span
-      className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-kdz-s px-2.5 py-1 text-[13px] font-bold ${
+      className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-kdz-s px-2.5 py-1 text-[15px] font-bold ${
         BADGE_STYLES[value] ?? BADGE_ENDED
       }`}
     >
@@ -180,7 +180,7 @@ export function KdzStepper({
             </div>
             <span
               className={[
-                "mt-2 text-[13px]",
+                "mt-2 text-[15px]",
                 isActive
                   ? "font-bold text-brand-700"
                   : isDone

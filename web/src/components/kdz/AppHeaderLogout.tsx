@@ -14,7 +14,7 @@ export function AppHeaderLogout() {
         clearAllUserLocalState();
         void signOut({ callbackUrl: "/" });
       }}
-      className="inline-flex min-h-[44px] items-center px-1 text-[14px] font-semibold text-kdz-bodysoft transition-colors hover:text-kdz-blue"
+      className="inline-flex min-h-[44px] items-center px-1 text-[15px] font-semibold text-kdz-bodysoft transition-colors hover:text-kdz-blue"
     >
       ログアウト
     </button>

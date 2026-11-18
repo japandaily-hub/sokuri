@@ -23,7 +23,7 @@ export function AdminProxyBanner() {
   return (
     <div
       role="status"
-      className="border-b border-amber-400 bg-amber-100 px-4 py-2 text-center text-sm text-amber-950"
+      className="border-b border-amber-400 bg-amber-100 px-4 py-2 text-center text-[15px] text-amber-950"
       data-testid="admin-proxy-banner"
     >
       <strong className="font-semibold">運営が代理で閲覧中です。</strong>
