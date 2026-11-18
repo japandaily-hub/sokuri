@@ -72,7 +72,7 @@ export const CASE_PROGRESS_ALL_DONE = CASE_PROGRESS_STEPS.length;
  * それより前は済み、後は未。4（CASE_PROGRESS_ALL_DONE）は全部済み。
  * 取り下げ・キャンセル（案件・取引のどちらも）は流れから外れたので null（進み具合を出さない）。
  * - 取引なし: draft=出品の途中 / open・bidding=業者を選ぶ / closed（取引が未取得）=日程を決める
- * - 取引あり: 日程未確定（visit_date なし・visiting でない）=日程を決める / 日程確定=引き取り / 完了=全部済み
+ * - 取引あり（案件が draft/open でも取引が優先）: 日程未確定（visit_date が null・空文字・visiting でない）=日程を決める / 日程確定=引き取り / 完了=全部済み
  */
 export function caseProgressStep(
   caseStatus: CaseStatus,
@@ -81,7 +81,9 @@ export function caseProgressStep(
   if (txn) {
     if (txn.status === "cancelled") return null;
     if (txn.status === "completed") return CASE_PROGRESS_ALL_DONE;
-    return txn.visit_date != null || txn.status === "visiting" ? 3 : 2;
+    // 空文字・空白だけの visit_date は「未確定」と同じ扱い（null と区別しない）。
+    const hasVisitDate = typeof txn.visit_date === "string" && txn.visit_date.trim() !== "";
+    return hasVisitDate || txn.status === "visiting" ? 3 : 2;
   }
   switch (caseStatus) {
     case "draft":
@@ -94,4 +96,17 @@ export function caseProgressStep(
     case "cancelled":
       return null;
   }
+}
+
+/** 進み具合の1段の見た目の状態。 */
+export type CaseProgressStepState = "done" | "now" | "todo";
+
+/**
+ * 段の添字 index の状態。currentStep は caseProgressStep の値（CASE_PROGRESS_ALL_DONE のときは
+ * どの段も done になり、now は出ない）。
+ */
+export function caseProgressStepState(index: number, currentStep: number): CaseProgressStepState {
+  if (index < currentStep) return "done";
+  if (index === currentStep) return "now";
+  return "todo";
 }

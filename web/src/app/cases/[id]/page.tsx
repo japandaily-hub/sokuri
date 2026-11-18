@@ -18,7 +18,7 @@ import { formatJstDateTime } from "@/lib/datetime";
 import { formatVisitSchedule } from "@/lib/categories";
 import { jstTodayIso } from "@/lib/visit-slots";
 import "./case-detail.css";
-import { CASE_PROGRESS_STEPS, buildHousingAttributes, caseProgressStep, isCaseIdFormat, isCompletionBeforeVisit, meaningfulCaseSummary } from "@/lib/case-detail-view";
+import { CASE_PROGRESS_STEPS, buildHousingAttributes, caseProgressStep, caseProgressStepState, isCaseIdFormat, isCompletionBeforeVisit, meaningfulCaseSummary } from "@/lib/case-detail-view";
 import { formatPurposeLabel } from "@/lib/case-labels";
 import {
   Card,
@@ -550,17 +550,13 @@ export default function UserCaseDetailPage() {
       {progressStep !== null ? (
         <ol className="cd-stepper" aria-label="進み具合">
           {CASE_PROGRESS_STEPS.map((step, index) => {
-            const state = index < progressStep ? "done" : index === progressStep ? "now" : "todo";
+            const state = caseProgressStepState(index, progressStep);
             return (
               <li key={step.full} className={`cd-stepper__step cd-stepper__step--${state}`} aria-current={state === "now" ? "step" : undefined}>
-                {step.short !== step.full ? (
-                  <>
-                    <span className="cd-stepper__full">{step.full}</span>
-                    <span className="cd-stepper__short" aria-hidden="true">{step.short}</span>
-                  </>
-                ) : (
-                  step.full
-                )}
+                {/* 段名は読み上げ用に全幅のものを常に残し、見た目の全幅／短縮は aria-hidden の span を CSS で出し分ける。 */}
+                <span className="sr-only">{step.full}</span>
+                <span className="cd-stepper__full" aria-hidden="true">{step.full}</span>
+                <span className="cd-stepper__short" aria-hidden="true">{step.short}</span>
                 {state === "done" ? <span className="sr-only">（済み）</span> : null}
               </li>
             );
@@ -569,238 +565,7 @@ export default function UserCaseDetailPage() {
       ) : null}
 
       <div className={showBids ? "cd-grid" : "cd-grid cd-grid--solo"}>
-        {/* ===== 品物（左 4fr） ===== */}
-        <section className="cd-items-col" aria-labelledby="cd-items-heading">
-          <h2 className="cd-h-sm" id="cd-items-heading">
-            出品した品物
-            <span>
-              <span className="cd-num">{itemCount}</span>点
-            </span>
-          </h2>
-          <ul className="cd-items">
-            {albums.map((album, albumIndex) => {
-              const item = album.id ? (caseData.items?.find((it) => it.id === album.id) ?? null) : null;
-              const isEditing = item != null && editingItemId === item.id;
-              const isSavingItem = item != null && busyOps.has(`item:${item.id}:save`);
-              const isResettingItem = item != null && busyOps.has(`item:${item.id}:reset`);
-              const isDeletingItem = item != null && busyOps.has(`item:${item.id}:delete`);
-              const isUploadingItem = item != null && busyOps.has(`item:${item.id}:upload`);
-              const itemAnyBusy = item != null && isItemBusy(item.id);
-              // AI推定値そのものが無ければ「AI推定に戻す」を出しても戻す先が無いため無効化する。
-              const hasAiFallback = item != null && (item.ai_condition != null || item.ai_summary != null);
-              // 折りたたみ中でも、編集中の品物は隠さない。
-              const isFolded = albumIndex >= CD_ITEMS_PREVIEW && !itemsExpanded && !isEditing;
-              const thumb = album.photos[0];
-              const summary = meaningfulCaseSummary(album.description);
-
-              return (
-                <li key={album.id ?? "unassigned"} className="cd-item" hidden={isFolded}>
-                  <div className="cd-item__row">
-                    <span className="cd-item__thumb">
-                      {thumb ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={photoSrc(thumb.url)} alt="" />
-                      ) : null}
-                    </span>
-                    <span className="cd-item__name">{album.title ?? "写真"}</span>
-                    {album.condition ? (
-                      <span className="cd-item__cat">{CASE_ITEM_CONDITION_LABEL[album.condition] ?? album.condition}</span>
-                    ) : null}
-                  </div>
-                  {summary ? <p className="cd-item__desc">{summary}</p> : null}
-
-                  {item && canEditCase ? (
-                    <div className="cd-item__tools">
-                      {!isEditing ? (
-                        <button
-                          type="button"
-                          disabled={itemAnyBusy}
-                          onClick={() => startEditItem(item)}
-                          className={btnSecondary}
-                        >
-                          編集
-                        </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        disabled={itemAnyBusy}
-                        onClick={() => triggerAddPhoto(item.id)}
-                        className={btnSecondary}
-                      >
-                        {isUploadingItem ? "アップロード中…" : "＋ 写真を追加"}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={itemAnyBusy}
-                        onClick={() => handleDeleteItem(item)}
-                        className={btnDanger}
-                      >
-                        {isDeletingItem ? "削除中…" : "品物を削除"}
-                      </button>
-                    </div>
-                  ) : null}
-
-          {isEditing && item ? (
-            <div className="mt-2 space-y-3 rounded-kdz border border-kdz-line bg-kdz-pale p-4">
-              {editError ? <p className="text-xs font-semibold text-kdz-danger">{editError}</p> : null}
-              <div>
-                <label className="mb-1 block text-xs font-semibold text-kdz-bodysoft">品物名</label>
-                <input
-                  type="text"
-                  maxLength={40}
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  placeholder="例: 洗濯機 / ソファ"
-                  className={inputBase}
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-semibold text-kdz-bodysoft">状態</label>
-                <select
-                  value={editCondition}
-                  onChange={(e) => setEditCondition(e.target.value)}
-                  className={inputBase}
-                >
-                  {Object.entries(CASE_ITEM_CONDITION_LABEL).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-semibold text-kdz-bodysoft">説明</label>
-                <textarea
-                  value={editDescription}
-                  maxLength={500}
-                  onChange={(e) => setEditDescription(e.target.value)}
-                  rows={3}
-                  className={inputBase}
-                />
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={isSavingItem || isResettingItem}
-                  onClick={() => saveEditItem(item)}
-                  className={btnPrimary}
-                >
-                  {isSavingItem ? "保存中…" : "保存"}
-                </button>
-                <button
-                  type="button"
-                  disabled={isSavingItem || isResettingItem}
-                  onClick={cancelEditItem}
-                  className={btnSecondary}
-                >
-                  編集をやめる
-                </button>
-                {hasAiFallback ? (
-                  <button
-                    type="button"
-                    disabled={isSavingItem || isResettingItem}
-                    onClick={() => resetEditItemToAi(item)}
-                    className="inline-flex items-center text-sm font-semibold text-kdz-bodysoft hover:underline disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {isResettingItem ? "リセット中…" : "自動で付けた内容に戻す"}
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
-
-                  {/* 写真の一覧・削除は編集中に開く（一覧は 56px のサムネイルに絞ったため）。 */}
-                  {isEditing || item == null ? (
-          <ul className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-5">
-            {album.photos.map((p) => {
-              const isDeletingPhoto = busyOps.has(`photo:${p.id}:delete`);
-              return (
-                <li key={p.id} className="group relative">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={photoSrc(p.url)}
-                    alt=""
-                    className="aspect-square w-full rounded-kdz border border-kdz-line object-cover"
-                  />
-                  {canEditCase ? (
-                    <button
-                      type="button"
-                      aria-label="この写真を削除"
-                      disabled={isDeletingPhoto}
-                      onClick={() => handleDeletePhoto(p.id)}
-                      className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(var(--deep-rgb),.85)] text-white opacity-0 transition-opacity focus:opacity-100 disabled:opacity-100 group-hover:opacity-100"
-                    >
-                      {isDeletingPhoto ? (
-                        <Spinner className="h-3 w-3" />
-                      ) : (
-                        <Icon name="close" className="h-3.5 w-3.5" strokeWidth={2.5} />
-                      )}
-                    </button>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-          {hiddenAlbumCount > 0 ? (
-            <button
-              type="button"
-              className="cd-items-more"
-              aria-expanded={itemsExpanded}
-              onClick={() => setItemsExpanded((v) => !v)}
-            >
-              {itemsExpanded ? "閉じる" : `ほか ${hiddenAlbumCount} 点を見る`}
-            </button>
-          ) : null}
-
-          <input
-            ref={addPhotoInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            multiple
-            className="hidden"
-            onChange={handleAddPhotoFilesSelected}
-          />
-
-      {caseData.ai_status === "pending" && aiPollTimedOut ? (
-        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-kdz bg-kdz-pale p-4" role="status">
-          <p className="text-sm leading-relaxed text-kdz-body">
-            説明の作成に時間がかかっています。ページを再読み込みしてください。
-          </p>
-          <button type="button" onClick={() => window.location.reload()} className={btnSecondary}>
-            再読み込み
-          </button>
-        </div>
-      ) : caseData.ai_status === "pending" ? (
-        <div className="mt-4 flex items-center gap-2 rounded-kdz bg-kdz-pale p-4" role="status">
-          <Spinner className="h-4 w-4 text-brand-600" />
-          <p className="text-sm leading-relaxed text-kdz-body">
-            写真をもとに品物の説明を作っています（通常1〜2分）。この画面は自動で更新されます。
-          </p>
-        </div>
-      ) : caseData.ai_status === "failed" ? (
-        <div className="mt-4 rounded-kdz bg-kdz-pale p-4">
-          <p className="text-sm leading-relaxed text-kdz-body">
-            品物の説明を自動で作れませんでした。写真と入力内容で入札を受け付けます。
-          </p>
-        </div>
-      ) : meaningfulCaseSummary(caseData.ai_summary) ? (
-        <div className="mt-4 rounded-kdz bg-kdz-pale p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-kdz-bodysoft">
-            品物の説明（業者に表示されます）
-          </p>
-          <p className="mt-1.5 text-sm leading-relaxed text-kdz-body">
-            {meaningfulCaseSummary(caseData.ai_summary)}
-          </p>
-        </div>
-      ) : null}
-        </section>
-
-        {/* ===== 届いた入札（右 7fr） ===== */}
+        {/* ===== 届いた入札（右 7fr。DOM は入札が先＝スマホの表示順・読み上げ順と一致。PC は grid-template-areas で右に置く） ===== */}
         {showBids && (
           <section className="cd-bids-col" aria-labelledby="cd-bids-heading">
             <h2 className="cd-h-sm" id="cd-bids-heading">
@@ -879,7 +644,7 @@ export default function UserCaseDetailPage() {
                               onClick={() =>
                                 setConfirmState({
                                   title: "この業者に決定しますか？",
-                                  message: `${b.operator?.company_name ?? "この業者"}（${formatYen(b.amount)}）に決定しますか？決定すると、他の業者の入札はすべて無効になり、元に戻せません。業者に伝わるのは住所と連絡用のメールアドレスだけです（氏名・電話番号は伝わりません）。決定後も、取引のキャンセルはできます（理由は業者に共有されます）。`,
+                                  message: `${b.operator?.company_name ?? "この業者"}（${formatYen(b.amount)}）に決定しますか？決定すると、他の業者の入札はすべて無効になり、元に戻せません。業者に伝わるのは住所とご登録のメールアドレスだけです（LINEだけで登録した方はメールが渡らず、LINEでの連絡のご案内になります。氏名・電話番号は伝わりません）。決定後も、取引のキャンセルはできます（理由は業者に共有されます）。`,
                                   confirmLabel: "決定する",
                                   onConfirm: () => {
                                     setConfirmState(null);
@@ -901,7 +666,7 @@ export default function UserCaseDetailPage() {
                   <h3>「この業者に決める」を押すと</h3>
                   <ol>
                     <li>確認の画面が出ます。ここではまだ決まりません。</li>
-                    <li>確認の画面で決めると、住所と連絡用のメールアドレスが、選んだ1社にだけ伝わります。</li>
+                    <li>確認の画面で決めると、住所とご登録のメールアドレスが、選んだ1社にだけ伝わります（LINEだけで登録した方はメールが渡らず、LINEでの連絡のご案内になります）。</li>
                     <li>ほかの業者には、カタヅケから自動でお断りの連絡が入ります。</li>
                   </ol>
                 </div>
@@ -933,13 +698,244 @@ export default function UserCaseDetailPage() {
             >
               出品を取り下げる
             </button>
-            <p className="mt-2 text-xs text-kdz-bodysoft">
+            <p className="mt-2 text-[15px] text-kdz-bodysoft">
               ※ 業者を決めた後の取り消しは、取引の画面の一番下にある「この取引をキャンセルする」から行えます。
             </p>
           </>
         ) : null}
           </section>
         )}
+
+        {/* ===== 品物（左 4fr） ===== */}
+        <section className="cd-items-col" aria-labelledby="cd-items-heading">
+          <h2 className="cd-h-sm" id="cd-items-heading">
+            出品した品物
+            <span>
+              <span className="cd-num">{itemCount}</span>点
+            </span>
+          </h2>
+          <ul className="cd-items">
+            {albums.map((album, albumIndex) => {
+              const item = album.id ? (caseData.items?.find((it) => it.id === album.id) ?? null) : null;
+              const isEditing = item != null && editingItemId === item.id;
+              const isSavingItem = item != null && busyOps.has(`item:${item.id}:save`);
+              const isResettingItem = item != null && busyOps.has(`item:${item.id}:reset`);
+              const isDeletingItem = item != null && busyOps.has(`item:${item.id}:delete`);
+              const isUploadingItem = item != null && busyOps.has(`item:${item.id}:upload`);
+              const itemAnyBusy = item != null && isItemBusy(item.id);
+              // AI推定値そのものが無ければ「AI推定に戻す」を出しても戻す先が無いため無効化する。
+              const hasAiFallback = item != null && (item.ai_condition != null || item.ai_summary != null);
+              // 折りたたみ中でも、編集中の品物は隠さない。
+              const isFolded = albumIndex >= CD_ITEMS_PREVIEW && !itemsExpanded && !isEditing;
+              const thumb = album.photos[0];
+              const summary = meaningfulCaseSummary(album.description);
+
+              return (
+                <li key={album.id ?? "unassigned"} className="cd-item" hidden={isFolded}>
+                  <div className="cd-item__row">
+                    <span className="cd-item__thumb">
+                      {thumb ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={photoSrc(thumb.url)} alt="" />
+                      ) : null}
+                    </span>
+                    <span className="cd-item__name">{album.title ?? "写真"}</span>
+                    {album.condition ? (
+                      <span className="cd-item__cat">{CASE_ITEM_CONDITION_LABEL[album.condition] ?? album.condition}</span>
+                    ) : null}
+                  </div>
+                  {summary ? <p className="cd-item__desc">{summary}</p> : null}
+
+                  {item && canEditCase ? (
+                    <div className="cd-item__tools">
+                      {!isEditing ? (
+                        <button
+                          type="button"
+                          disabled={itemAnyBusy}
+                          onClick={() => startEditItem(item)}
+                          className={btnSecondary}
+                        >
+                          編集
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        disabled={itemAnyBusy}
+                        onClick={() => triggerAddPhoto(item.id)}
+                        className={btnSecondary}
+                      >
+                        {isUploadingItem ? "アップロード中…" : "＋ 写真を追加"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={itemAnyBusy}
+                        onClick={() => handleDeleteItem(item)}
+                        className={btnDanger}
+                      >
+                        {isDeletingItem ? "削除中…" : "品物を削除"}
+                      </button>
+                    </div>
+                  ) : null}
+
+          {isEditing && item ? (
+            <div className="mt-2 space-y-3 rounded-kdz border border-kdz-line bg-kdz-pale p-4">
+              {editError ? <p className="text-[15px] font-semibold text-kdz-danger">{editError}</p> : null}
+              <div>
+                <label className="mb-1 block text-[15px] font-semibold text-kdz-bodysoft">品物名</label>
+                <input
+                  type="text"
+                  maxLength={40}
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="例: 洗濯機 / ソファ"
+                  className={inputBase}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-[15px] font-semibold text-kdz-bodysoft">状態</label>
+                <select
+                  value={editCondition}
+                  onChange={(e) => setEditCondition(e.target.value)}
+                  className={inputBase}
+                >
+                  {Object.entries(CASE_ITEM_CONDITION_LABEL).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-[15px] font-semibold text-kdz-bodysoft">説明</label>
+                <textarea
+                  value={editDescription}
+                  maxLength={500}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  rows={3}
+                  className={inputBase}
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={isSavingItem || isResettingItem}
+                  onClick={() => saveEditItem(item)}
+                  className={btnPrimary}
+                >
+                  {isSavingItem ? "保存中…" : "保存"}
+                </button>
+                <button
+                  type="button"
+                  disabled={isSavingItem || isResettingItem}
+                  onClick={cancelEditItem}
+                  className={btnSecondary}
+                >
+                  編集をやめる
+                </button>
+                {hasAiFallback ? (
+                  <button
+                    type="button"
+                    disabled={isSavingItem || isResettingItem}
+                    onClick={() => resetEditItemToAi(item)}
+                    className="inline-flex items-center text-[15px] font-semibold text-kdz-bodysoft hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isResettingItem ? "リセット中…" : "自動で付けた内容に戻す"}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+                  {/* 写真の一覧は常に出す（行のサムネは先頭1枚だけなので、全件はここで見せる）。削除ボタンは canEditCase のときだけ。 */}
+                  {album.photos.length > 0 ? (
+          <ul className="mt-3 grid grid-cols-4 gap-2" aria-label={`${album.title ?? "写真"}の写真`}>
+            {album.photos.map((p) => {
+              const isDeletingPhoto = busyOps.has(`photo:${p.id}:delete`);
+              return (
+                <li key={p.id} className="group relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={photoSrc(p.url)}
+                    alt=""
+                    className="aspect-square w-full rounded-kdz border border-kdz-line object-cover"
+                  />
+                  {canEditCase ? (
+                    <button
+                      type="button"
+                      aria-label="この写真を削除"
+                      disabled={isDeletingPhoto}
+                      onClick={() => handleDeletePhoto(p.id)}
+                      className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-[rgba(var(--deep-rgb),.85)] text-white opacity-0 transition-opacity focus:opacity-100 disabled:opacity-100 group-hover:opacity-100"
+                    >
+                      {isDeletingPhoto ? (
+                        <Spinner className="h-3 w-3" />
+                      ) : (
+                        <Icon name="close" className="h-3.5 w-3.5" strokeWidth={2.5} />
+                      )}
+                    </button>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+          {hiddenAlbumCount > 0 ? (
+            <button
+              type="button"
+              className="cd-items-more"
+              aria-expanded={itemsExpanded}
+              onClick={() => setItemsExpanded((v) => !v)}
+            >
+              {itemsExpanded ? "閉じる" : `ほか ${hiddenAlbumCount} 点を見る`}
+            </button>
+          ) : null}
+
+          <input
+            ref={addPhotoInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            multiple
+            className="hidden"
+            onChange={handleAddPhotoFilesSelected}
+          />
+
+      {caseData.ai_status === "pending" && aiPollTimedOut ? (
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-kdz bg-kdz-pale p-4" role="status">
+          <p className="text-[15px] leading-relaxed text-kdz-body">
+            説明の作成に時間がかかっています。ページを再読み込みしてください。
+          </p>
+          <button type="button" onClick={() => window.location.reload()} className={btnSecondary}>
+            再読み込み
+          </button>
+        </div>
+      ) : caseData.ai_status === "pending" ? (
+        <div className="mt-4 flex items-center gap-2 rounded-kdz bg-kdz-pale p-4" role="status">
+          <Spinner className="h-4 w-4 text-brand-600" />
+          <p className="text-[15px] leading-relaxed text-kdz-body">
+            写真をもとに品物の説明を作っています（通常1〜2分）。この画面は自動で更新されます。
+          </p>
+        </div>
+      ) : caseData.ai_status === "failed" ? (
+        <div className="mt-4 rounded-kdz bg-kdz-pale p-4">
+          <p className="text-[15px] leading-relaxed text-kdz-body">
+            品物の説明を自動で作れませんでした。写真と入力内容で入札を受け付けます。
+          </p>
+        </div>
+      ) : meaningfulCaseSummary(caseData.ai_summary) ? (
+        <div className="mt-4 rounded-kdz bg-kdz-pale p-4">
+          <p className="text-[15px] font-semibold text-kdz-bodysoft">
+            品物の説明（業者に表示されます）
+          </p>
+          <p className="mt-1.5 text-[15px] leading-relaxed text-kdz-body">
+            {meaningfulCaseSummary(caseData.ai_summary)}
+          </p>
+        </div>
+      ) : null}
+        </section>
       </div>
 
 
@@ -952,14 +948,14 @@ export default function UserCaseDetailPage() {
               <h2 className="font-normal text-kdz-ink">
                 業者が決まりました: {txn.operator?.company_name ?? "業者"}
               </h2>
-              <p className="mt-1 text-sm text-kdz-bodysoft">
+              <p className="mt-1 text-[15px] text-kdz-bodysoft">
                 決定した金額 {formatYen(txn.initial_amount)}
                 {txn.final_amount != null && txn.final_amount !== txn.initial_amount
                   ? ` → 確定額 ${formatYen(txn.final_amount)}`
                   : ""}
               </p>
               {txn.contact_email ? (
-                <p className="mt-0.5 text-xs text-kdz-bodysoft">
+                <p className="mt-0.5 text-[15px] text-kdz-bodysoft">
                   業者連絡先: {txn.contact_email}
                 </p>
               ) : null}
@@ -968,11 +964,11 @@ export default function UserCaseDetailPage() {
           </div>
 
           {txn.operator_deleted ? (
-            <div className="mt-3 rounded-kdz border border-[var(--danger-border-soft)] bg-[var(--danger-bg-soft)] p-3 text-sm leading-relaxed text-kdz-danger" role="alert">
+            <div className="mt-3 rounded-kdz border border-[var(--danger-border-soft)] bg-[var(--danger-bg-soft)] p-3 text-[15px] leading-relaxed text-kdz-danger" role="alert">
               この業者は退会したため、この取引は進められません。キャンセルして新しく出品してください
             </div>
           ) : txn.operator_suspended ? (
-            <div className="mt-3 rounded-kdz border border-[var(--danger-border-soft)] bg-[var(--danger-bg-soft)] p-3 text-sm leading-relaxed text-kdz-danger" role="alert">
+            <div className="mt-3 rounded-kdz border border-[var(--danger-border-soft)] bg-[var(--danger-bg-soft)] p-3 text-[15px] leading-relaxed text-kdz-danger" role="alert">
               この業者は現在利用停止中です。運営（
               <Link href="/contact" className="underline">
                 お問い合わせフォーム
@@ -984,11 +980,11 @@ export default function UserCaseDetailPage() {
           {/* r8-fix-frontend2 H2 是正: キャンセルの理由が相手方に一切届かなかった問題への対応。
               誰が・なぜ・いつキャンセルしたかを表示する。 */}
           {txn.cancellation ? (
-            <div className="mt-3 rounded-kdz border border-kdz-line bg-kdz-pale p-3 text-sm leading-relaxed text-kdz-body" role="status">
+            <div className="mt-3 rounded-kdz border border-kdz-line bg-kdz-pale p-3 text-[15px] leading-relaxed text-kdz-body" role="status">
               <p className="font-semibold text-kdz-ink">
                 キャンセル: {CANCELLED_BY_LABEL[txn.cancellation.cancelled_by]}による
               </p>
-              <p className="mt-1 text-xs text-kdz-bodysoft">
+              <p className="mt-1 text-[15px] text-kdz-bodysoft">
                 {formatJstDateTime(txn.cancellation.cancelled_at)}
               </p>
               {txn.cancellation.reason ? (
@@ -1021,12 +1017,12 @@ export default function UserCaseDetailPage() {
                   </a>
                 ) : null}
                 {txn.visit_date ? (
-                  <p className="self-center text-sm font-semibold text-kdz-body">
+                  <p className="self-center text-[15px] font-semibold text-kdz-body">
                     訪問予定: {formatVisitSchedule(txn.visit_date, txn.visit_time_slot)}
                   </p>
                 ) : null}
                 {txn.operator_suspended ? (
-                  <p className="w-full text-xs font-semibold text-kdz-danger">
+                  <p className="w-full text-[15px] font-semibold text-kdz-danger">
                     ※ 業者が対応できないため、チャット送信・日程調整の返信が届かない場合があります。
                   </p>
                 ) : null}
@@ -1046,7 +1042,7 @@ export default function UserCaseDetailPage() {
           {/* r10 M2 是正: 業者側にのみ表示されていた申請上限・残り回数を依頼者側にも明示する
               （成約後・キャンセル前のみ意味を持つため active な状態でのみ表示）。 */}
           {reductionQuota && (txn.status === "pending" || txn.status === "visiting") ? (
-            <p className="mt-4 text-xs text-kdz-bodysoft">
+            <p className="mt-4 text-[15px] text-kdz-bodysoft">
               業者からの減額の申請は、1つの取引につき{reductionQuota.limit}回までです
               {reductionQuota.remaining !== null ? `（残り${reductionQuota.remaining}回）` : ""}
             </p>
@@ -1057,7 +1053,7 @@ export default function UserCaseDetailPage() {
               REDUCTION_STATUS_LABEL（lib/katadzuke-api.ts）を使う。 */}
           {txn.reduction_requests.length > 0 && (
             <div className="mt-4">
-              <p className="text-sm font-normal text-kdz-ink">減額申請の履歴</p>
+              <p className="text-[15px] font-normal text-kdz-ink">減額申請の履歴</p>
               <ul className="mt-2 space-y-2">
                 {txn.reduction_requests.map((r) => (
                   <li
@@ -1065,12 +1061,12 @@ export default function UserCaseDetailPage() {
                     className="rounded-kdz border border-kdz-line p-3"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-semibold text-kdz-ink">
+                      <span className="text-[15px] font-semibold text-kdz-ink">
                         {formatYen(r.original_amount)} → {formatYen(r.requested_amount)}
                       </span>
                       <StatusBadge value={r.status} label={REDUCTION_STATUS_LABEL[r.status]} />
                     </div>
-                    <p className="mt-1 text-xs leading-relaxed text-kdz-body">理由: {r.reason}</p>
+                    <p className="mt-1 text-[15px] leading-relaxed text-kdz-body">理由: {r.reason}</p>
                   </li>
                 ))}
               </ul>
@@ -1080,17 +1076,17 @@ export default function UserCaseDetailPage() {
           {/* 減額申請（承認待ち） */}
           {pendingReduction && (
             <div className="mt-4 rounded-kdz border border-[var(--gold)] bg-[var(--warm)] p-4">
-              <p className="text-sm font-semibold text-[var(--gold-text)]">業者から減額申請が届いています</p>
-              <p className="mt-1 text-sm text-[var(--gold-text)]">
+              <p className="text-[15px] font-semibold text-[var(--gold-text)]">業者から減額申請が届いています</p>
+              <p className="mt-1 text-[15px] text-[var(--gold-text)]">
                 {formatYen(pendingReduction.original_amount)} →{" "}
                 <strong>{formatYen(pendingReduction.requested_amount)}</strong>
               </p>
-              <p className="mt-2 rounded-kdz bg-[var(--white)] p-3 text-sm leading-relaxed text-kdz-body">
+              <p className="mt-2 rounded-kdz bg-[var(--white)] p-3 text-[15px] leading-relaxed text-kdz-body">
                 理由: {pendingReduction.reason}
               </p>
               {/* 減額の承認・却下は依頼者本人だけ（運営の代理閲覧では backend が 403 にするため出さない。security M-1）。 */}
               {isAdminViewing ? (
-                <p className="mt-3 text-xs text-[var(--gold-text)]" data-testid="reduction-admin-note">
+                <p className="mt-3 text-[15px] text-[var(--gold-text)]" data-testid="reduction-admin-note">
                   減額の承認・却下は依頼者本人だけが行えます（運営は代理で判断できません）。
                 </p>
               ) : (
@@ -1167,7 +1163,7 @@ export default function UserCaseDetailPage() {
             </div>
           ) : null}
           {pendingReduction ? (
-            <p className="mt-2 text-xs text-kdz-bodysoft">
+            <p className="mt-2 text-[15px] text-kdz-bodysoft">
               ※ 減額申請への回答後に完了確定できます。
             </p>
           ) : null}
@@ -1236,7 +1232,7 @@ export default function UserCaseDetailPage() {
                     },
                   });
                 }}
-                className="text-sm text-kdz-bodysoft underline underline-offset-2 hover:text-kdz-body disabled:cursor-not-allowed disabled:opacity-50"
+                className="text-[15px] text-kdz-bodysoft underline underline-offset-2 hover:text-kdz-body disabled:cursor-not-allowed disabled:opacity-50"
               >
                 この取引をキャンセルする
               </button>
@@ -1245,7 +1241,7 @@ export default function UserCaseDetailPage() {
         </Card>
       )}
 
-      <Link href="/cases" className="inline-block text-sm font-semibold text-brand-700 hover:underline">
+      <Link href="/cases" className="inline-block text-[15px] font-semibold text-brand-700 hover:underline">
         ← マイ案件一覧へ
       </Link>
       </div>

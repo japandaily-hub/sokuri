@@ -3,7 +3,7 @@
  */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { CASE_PROGRESS_ALL_DONE, CASE_PROGRESS_STEPS, buildHousingAttributes, caseProgressStep, isCaseIdFormat, isCompletionBeforeVisit, meaningfulCaseSummary } from "./case-detail-view.ts";
+import { CASE_PROGRESS_ALL_DONE, CASE_PROGRESS_STEPS, buildHousingAttributes, caseProgressStep, caseProgressStepState, isCaseIdFormat, isCompletionBeforeVisit, meaningfulCaseSummary } from "./case-detail-view.ts";
 
 test("案件IDはUUID形式のみ受け付ける", () => {
   assert.equal(isCaseIdFormat("c1358ff2-7d6a-4c1e-9d3a-0123456789ab"), true);
@@ -66,6 +66,12 @@ test("進み具合: 状態ごとの「いまの段」（取り下げ・キャン
     ["日付だけ入っている pending", ["closed", { status: "pending", visit_date: "2026-12-01" }], 3],
     ["完了", ["closed", { status: "completed", visit_date: "2026-12-01" }], CASE_PROGRESS_ALL_DONE],
     ["成約後キャンセル（取引 cancelled・案件も cancelled）", ["cancelled", { status: "cancelled", visit_date: null }], null],
+    ["visiting だが visit_date が null（visiting を優先）", ["closed", { status: "visiting", visit_date: null }], 3],
+    ["completed で visit_date が null", ["closed", { status: "completed", visit_date: null }], CASE_PROGRESS_ALL_DONE],
+    ["pending で visit_date が空文字（未確定と同じ）", ["closed", { status: "pending", visit_date: "" }], 2],
+    ["pending で visit_date が空白だけ（未確定と同じ）", ["closed", { status: "pending", visit_date: "  " }], 2],
+    ["取引あり・案件 draft でも取引が優先", ["draft", { status: "pending", visit_date: null }], 2],
+    ["取引あり・案件 open でも取引が優先", ["open", { status: "visiting", visit_date: "2026-12-01" }], 3],
     ["取引だけ cancelled", ["closed", { status: "cancelled", visit_date: null }], null],
   ];
   for (const [label, args, expected] of cases) {
@@ -83,4 +89,13 @@ test("進み具合: 4段の名前（SP の短い名前を含む）", () => {
     ["出品", "業者選び", "日程", "引き取り"],
   );
   assert.equal(CASE_PROGRESS_ALL_DONE, 4);
+});
+
+test("進み具合: done/now/todo の組み立て（全部済みのとき now は出ない）", () => {
+  const states = (step: number) => CASE_PROGRESS_STEPS.map((_, i) => caseProgressStepState(i, step));
+  assert.deepEqual(states(0), ["now", "todo", "todo", "todo"]);
+  assert.deepEqual(states(2), ["done", "done", "now", "todo"]);
+  assert.deepEqual(states(3), ["done", "done", "done", "now"]);
+  assert.deepEqual(states(CASE_PROGRESS_ALL_DONE), ["done", "done", "done", "done"]);
+  assert.equal(states(CASE_PROGRESS_ALL_DONE).includes("now"), false);
 });
