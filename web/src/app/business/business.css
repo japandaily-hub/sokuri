@@ -345,34 +345,17 @@
 .business-page .vc-facts dd b { font-size: 20px; font-weight: 600; }
 .business-page .vc-facts dd span { font-size: 15px; font-weight: 600; color: var(--body); margin-left: 3px; }
 /* r5 #4: 表（.vc-facts）と引用の間は塊が分かれて見えるまで余白を広げる。 */
-.business-page .vc-quote {
+/* 「このケースのポイント」の囲み（/examples の .case-quote と同じ見た目: 淡い面・15px・見出し 15px/600） */
+.business-page .vc-point {
   margin: 28px 0 0;
-  padding: 2px 0 2px 18px;
-  border-left: 3px solid var(--primary);
-}
-.business-page .vc-quote p {
-  font-family: var(--head);
-  font-weight: 700;
-  font-size: 16px;
-  line-height: 2;
+  background: var(--pale-2);
+  padding: 16px 18px;
+  font-size: 15px;
   color: var(--ink);
-  margin: 0;
+  line-height: 1.9;
 }
-.business-page .vc-quote p.vc-quote__label {
-  font-family: var(--ui);
-  font-weight: 500;
-  font-size: 15px;
-  line-height: 1.7;
-  color: var(--body-soft);
-  margin-bottom: 6px;
-}
-.business-page .vc-quote footer {
-  font-family: var(--ui);
-  font-size: 15px;
-  line-height: 1.7;
-  color: var(--body-soft);
-  margin-top: 10px;
-}
+.business-page .vc-point__label { font-family: var(--ui); font-size: 15px; font-weight: 600; color: var(--ink); margin: 0 0 6px; }
+.business-page .vc-point p { margin: 0; }
 
 /* ============ フロー（業者視点・4ステップ） ============
    r5 #2/#15/#21/#34: 旧 3D アイコン（カメラ・棒グラフ・王冠・トラック）を外し、
@@ -846,6 +829,6 @@
   .business-page .biz-hero-cta .btn { width: 100%; }
 }
 
-/* 最終検査（legal）: ヒーローの人物写真に対する可視の打消し（/vendors .vd-photo-note と同じ12px） */
+/* 最終検査（legal）: ヒーローの人物写真に対する可視の打消し（/vendors の figcaption と同じ） */
 .business-page .biz-photo-note { margin-top: 14px; font-family: var(--ui); font-size: 15px; line-height: 1.7; color: var(--body-soft); }
 

@@ -11,6 +11,7 @@
  * design-token-guard.test.mts と同じく、コメント内の言及も対象にする（経緯の説明で旧ファイル名を
  * 書き残すと次の検索・置換で拾われるため。説明が要るときは「旧 3D アイコン」のようにパスを書かずに書く）。
  */
+import { CASES, VENDOR_CASES } from "./model-cases.ts";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
@@ -37,6 +38,12 @@ const BANNED: ReadonlyArray<readonly [string, string]> = [
   ["v2/faq-band", "よくある質問の顔写真の帯"],
   ["v2/biz-hero", "業者向けページの顔写真"],
   ["v2/admin-hero", "運営の顔写真"],
+  ["top-hero-couple-60s", "顔の写る人物写真（ヒーローのカルーセル）"],
+  ["top-hero-couple-child", "顔の写る人物写真（ヒーローのカルーセル）"],
+  ["top-hero-man-20s", "顔の写る人物写真（ヒーローのカルーセル）"],
+  ["top-hero-person", "顔の写る人物写真（ヒーロー）"],
+  ["top-hero-woman-20s", "顔の写る人物写真（ヒーローのカルーセル）"],
+  ["top-founder-desk", "運営者の人物写真"],
   ["v2/undefined", "画像 id が未定義のまま組み立てられた URL（404）"],
   ["/img/ill/", "水彩イラストは全廃"],
   ["/img/lp/deco/", "水彩イラストは全廃"],
@@ -97,5 +104,31 @@ describe("photo-guard: 写真の参照が実在し、共通の色調補正が定
     const css = FILES.find((f) => f.rel === "app/katazuke.css")?.text ?? "";
     assert.match(css, /\.kdz-photo img\{[^}]*filter:saturate\(\.8\) contrast\(\.96\) sepia\(\.06\)/);
     assert.match(css, /\.kdz-photo img\{[^}]*border-radius:var\(--radius\)/);
+  });
+});
+
+describe("photo-guard: モデルケースに人物の肖像・仮名・一人称の引用が無い", () => {
+  it("依頼者ケースの lot が public/img/v2 に実在する", () => {
+    for (const c of CASES) {
+      assert.ok(existsSync(join(PUBLIC_DIR, "img", "v2", `${c.lot}.webp`)), `lot が存在しない: ${c.lot}`);
+    }
+  });
+
+  it("依頼者ケースは仮名・アバター・一人称の引用（name/avatar/quote）を持たない", () => {
+    for (const c of CASES) {
+      for (const key of ["name", "avatar", "quote", "quoteShort", "portrait", "portraitAlt", "thumbs"]) {
+        assert.ok(!(key in c), `CaseItem に ${key} が残っている (id:${c.id})`);
+      }
+      assert.ok(c.point.length > 0);
+    }
+  });
+
+  it("業者ケースは speaker（肩書・年代）・quote・portrait を持たず、point を持つ", () => {
+    for (const v of VENDOR_CASES) {
+      for (const key of ["speaker", "quote", "portrait", "portraitAlt"]) {
+        assert.ok(!(key in v), `VendorCase に ${key} が残っている (${v.id})`);
+      }
+      assert.ok(v.point.length > 0);
+    }
   });
 });

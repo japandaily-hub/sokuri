@@ -68,7 +68,6 @@
 }
 .faq-page .faq-search-clear.show { display: flex; }
 
-x
 /* 見出し＋リード文の面。下は検索窓が続くので詰める。 */
 .faq-page .faq-lead {
   background: var(--white);

@@ -745,9 +745,9 @@ export default function BusinessPage() {
                     では31,000〜148,000円）。
                   </p>
                   {/* 架空の人物の「声」に見せない（景表法）。一人称の引用ではなく、ケースの要点として三人称で書く。 */}
-                  <div className="vc-quote">
-                    <p className="vc-quote__label">このケースのポイント（{v.speaker}の場合）</p>
-                    <p>{v.quote}</p>
+                  <div className="vc-point">
+                    <h4 className="vc-point__label">このケースのポイント</h4>
+                    <p>{v.point}</p>
                   </div>
                 </article>
               ))}

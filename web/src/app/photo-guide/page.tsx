@@ -299,15 +299,18 @@ export default function PhotoGuidePage() {
                   className={i % 2 === 1 ? "media-split media-split--rev tip-split" : "media-split tip-split"}
                   key={t.h}
                 >
-                  <div className="img-frame img-frame--1x1 sp-bleed">
-                    <img
-                      src={`/img/v2/${t.img}.webp`}
-                      width={800}
-                      height={800}
-                      alt=""
-                      loading="lazy"
-                      decoding="async"
-                    />
+                  <div className="tip-photo">
+                    <div className="img-frame img-frame--1x1 sp-bleed">
+                      <img
+                        src={`/img/v2/${t.img}.webp`}
+                        width={800}
+                        height={800}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </div>
+                    <p className="kdz-photo-note">（写真はイメージです）</p>
                   </div>
                   {/* ラウンド6 指摘（11）: この節の 01/02/03 は §2「撮影の手順」と同じ番号書式で、
                       どちらが手順でどちらが補足か読み分けられなかった。番号は手順章だけの記号として残し、

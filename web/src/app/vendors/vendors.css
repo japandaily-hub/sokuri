@@ -53,21 +53,6 @@
   fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
 }
 
-.vendors-page .vd-photo-note {
-  /* R4 r4 #14: 帯の直下に置く打消し。共有 .model-note の下余白（最大32px）ではリード文と
-     切れて見えるので、このページだけ詰めて帯 → 打消し → リードを1塊にする。 */
-  /* r6 #3: 本文と同じ左端・同じ間隔で単独の段落として浮いており、何に対する注記か
-     位置で読めなかった。帯のキャプション位置（帯の直下・右寄せ・12px）に寄せる。
-     負の margin-top は .vendors-wrap の上パディング（24〜40px）の内側に収まる量だけ。
-     文言は変えない。 */
-  margin: calc(-1 * clamp(10px, 2vw, 24px)) 0 16px;
-  max-width: none;
-  text-align: right;
-  font-size: 15px;
-  line-height: 1.7;
-  color: var(--body-soft);
-}
-
 /* r5 #24: 掲載0件・取得失敗のときだけ帯の直下に置く1行（出品はできる／入札の入り方）。
    注意色は使わない（障害の通知ではなく、次の一手の提示）。 */
 .vendors-page .vd-notice {

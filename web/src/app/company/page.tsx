@@ -156,7 +156,7 @@ export default function CompanyPage() {
     <main id="main">
       {/* ============ ヒーロー（見出し＋独立した写真帯・LCP） ============
           文字は写真に重ねない: 見出しは写真の上、写真は直下の細い帯（.kdz-photo--strip） */}
-      <section className="kdz-lead co-band">
+      <section className="kdz-lead">
         <div className="container">
           <h1>
             「片付ける」を、

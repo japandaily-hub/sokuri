@@ -201,7 +201,7 @@
 }
 /* 2カラムのときだけ。859px 以下は .sp-bleed（負マージンで額の内側いっぱい）が幅を持つため触らない */
 @media (min-width: 860px) {
-  .tip-split > .img-frame { width: 100%; max-width: none; }
+  .tip-photo > .img-frame { width: 100%; max-width: none; }
   .tip-splits { gap: clamp(48px, 6vw, 72px); }
 }
 .tip-copy { min-width: 0; }

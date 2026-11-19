@@ -236,11 +236,6 @@ section:has(> .vt){position:relative;}
 }
 /* CTA 行の中のボタンは最低高を揃える（LINE は2行組み、副ボタンは1行で実高がずれるため） */
 .hero-cta>.btn,.final-cta>.btn,.pg-hero-cta>.btn,.biz-hero-cta>.btn{min-height:56px;}
-/* R4 ラウンド4 指摘（17/12）: 濃色帯の上では白ベタの副ボタンが主ボタンより目立ち主従が逆転する
-   （/photo-guide ヒーロー）。帯のコピー内だけ白枠の透過ボタンにして主従を戻す。
-   白文字は veil 上で 6:1 以上、枠線 .72 は非テキスト 3:1 以上。 */
-.hero-band__copy .btn-ghost{background:transparent;color:var(--white);border-color:rgba(255,255,255,.72);}
-.hero-band__copy .btn-ghost:hover{background:rgba(255,255,255,.16);color:var(--white);}
 .btn-lg{font-size:17px;min-height:60px;padding:0 36px;}
 .btn-block{width:100%;}
 
@@ -296,7 +291,7 @@ section:has(> .vt){position:relative;}
    切り位置は枠の --pos を使う（.hero-photo img の object-position:center 35% に勝たせる）。 */
 .hero-photo > .img-frame{position:absolute;inset:0;aspect-ratio:auto;}
 .hero-photo > .img-frame img{object-position:var(--pos,50% 50%);}
-/* 縦ヒーロー画像（top-hero-person / biz-hero。素材 1024x1536＝2:3）の AR と切り位置。
+/* 縦ヒーロー画像（素材 1024x1536＝2:3）の AR と切り位置。
    PC は枠と素材の AR が一致するため object-fit:cover のトリミングが起きず object-position は無効
    ＝ PC 用の --pos は書かない。859px 以下だけ 4:5 に詰めて上下を切るので、そこで初めて縦位置が効く。
    値は必ずクラスで渡す（インライン style のカスタムプロパティは使わない）。 */

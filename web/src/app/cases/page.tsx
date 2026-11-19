@@ -83,7 +83,7 @@ export default function MyCasesPage() {
               src="/img/v2/top-worry-boxes.webp"
               width={800}
               height={800}
-              alt="出品を待つ品物の写真（イメージ）"
+              alt=""
               loading="lazy"
               decoding="async"
             />
