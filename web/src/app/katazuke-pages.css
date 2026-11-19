@@ -672,16 +672,22 @@
 /* ---------- 認証4ページの左カラム: 文字を写真に重ねない（手持ち写真の使い方・方針） ----------
    以前は 1 行コピー（.auth-side__line）を写真の下端に重ね、読ませるために下端スクリムを敷いていた。
    写真は人物なし（品物・部屋）に替えたうえで、写真とコピーを縦に並べる:
-   写真（.auth-side > img）が残りの高さを取り、その下の濃紺の地にコピーと「（写真はイメージです）」を置く。
+   写真（.auth-side > img）が左列の残りの高さをいっぱいに取り、その下の短い生成り地の帯に
+   コピーと「（写真はイメージです）」を置く。藍のベタ面は残さない（地は --paper。
+   PC の main::before＝行の実高ぶんの地も --paper にして、写真の下に藍の空白が覗かないようにする）。
    スクリム（::after）は不要なので消す。上の absolute 配置・グラデの規則は、この後勝ちの規則が無効化する。
    859px 以下は 21/9・最大 160px の帯のまま（コピーは非表示・注記だけ残す）。 */
-.auth-side { display: flex; flex-direction: column; }
+.auth-side { display: flex; flex-direction: column; background-color: var(--paper); background-image: none; }
 .auth-side::after { display: none; }
 .auth-side > img { position: static; inset: auto; flex: 1 1 0; min-height: 0; height: auto;
   filter: saturate(.8) contrast(.96) sepia(.06); }
-.auth-side__line { position: static; flex: none; padding: clamp(20px,3vw,32px) clamp(24px,4vw,48px) 0; }
-.auth-side__note { flex: none; margin: 0; padding: 8px clamp(24px,4vw,48px) clamp(16px,2.4vw,24px);
-  font-size: 15px; line-height: 1.6; color: var(--lime); }
+.auth-side__line { position: static; flex: none; color: var(--ink); text-shadow: none;
+  padding: clamp(16px,2.2vw,24px) clamp(24px,4vw,48px) 0; }
+.auth-side__note { flex: none; margin: 0; padding: 4px clamp(24px,4vw,48px) clamp(14px,2vw,20px);
+  font-size: 15px; line-height: 1.6; color: var(--body-soft); }
+@media (min-width: 860px) {
+  .auth-page--split > main::before { background: var(--paper); }
+}
 @media (max-width: 859px) {
   .auth-side__note { padding: 6px 16px 8px; }
 }

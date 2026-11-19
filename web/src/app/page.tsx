@@ -108,10 +108,10 @@ export default function HomePage() {
                 <figure className="tp-photo">
                   {/* LCP 画像。lazy にせず優先度を上げる。スマホ（900px 以下）は別の写真 */}
                   <picture>
-                    <source media="(max-width:900px)" srcSet="/img/lp/fee-empty-room.webp" />
+                    <source media="(max-width:900px)" srcSet="/img/v2/top-scene-danshari.webp" />
                     <img
                       src="/img/lp/register-listing.webp"
-                      alt="片付けを進める部屋のイメージ"
+                      alt="片付けを進める部屋と、畳に並べた品物のイメージ"
                       width={1024}
                       height={1024}
                       fetchPriority="high"
@@ -187,7 +187,7 @@ export default function HomePage() {
                 あなたの連絡先を知りません。
               </h2>
             </div>
-            <div>
+            <div className="tp-trust-side">
               <p>
                 一括見積もりに申し込んだら電話が鳴りやまなかった、という話をよく聞きます。カタヅケで業者が入札のときに見られるのは、品物の写真と、市区町村までの地域などの情報だけです。だから、電話のかけようがありません。
               </p>
@@ -274,14 +274,14 @@ export default function HomePage() {
               <figure className="tp-step-photo tp-step-photo--1">
                 <img
                   src="/img/v2/top-hero.webp"
-                  alt="床に並べた品物を、スマートフォンで撮ろうとしている手元"
+                  alt="床に一列に並べた花瓶・毛布・やかん・バッグ・靴などの品物"
                   width={900}
                   height={1350}
                   loading="lazy"
                   decoding="async"
                 />
                 <figcaption>
-                  床に並べて、スマートフォンで撮るだけ。
+                  床に並べて、1点ずつ撮るだけ。
                   <span>（写真はイメージです）</span>
                 </figcaption>
               </figure>

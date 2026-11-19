@@ -209,7 +209,7 @@ function LoginForm() {
       <main id="main">
         <Reveal as="aside" variant="zoom" className="auth-side">
           {/* eslint-disable @next/next/no-img-element */}
-          <img src="/img/v2/top-scene-jikka.webp" width={800} height={800} alt="" loading="lazy" decoding="async" />
+          <img src="/img/v2/pg-tip-light.webp" width={800} height={800} alt="" loading="lazy" decoding="async" />
           <p className="auth-side__line">入札の結果を、確かめに。</p>
           <p className="auth-side__note">（写真はイメージです）</p>
         </Reveal>

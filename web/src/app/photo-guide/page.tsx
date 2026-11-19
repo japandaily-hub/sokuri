@@ -131,10 +131,10 @@ export default function PhotoGuidePage() {
         <div className="container kdz-strip">
           <figure className="kdz-photo kdz-photo--strip">
             <img
-              src="/img/v2/ex-lot-rearrange.webp"
-              width={1536}
-              height={1024}
-              alt="模様替えで出す品物を部屋に並べた様子（イメージ）"
+              src="/img/v2/pg-tip-detail.webp"
+              width={800}
+              height={800}
+              alt="木製の家具の取っ手と、引き出しの表面の小さな傷のアップ（イメージ）"
               loading="eager"
               fetchPriority="high"
               decoding="async"
