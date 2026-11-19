@@ -9,9 +9,9 @@
 /* ---------- ヒーロー（.kdz-lead ＋ .kdz-photo--strip・katazuke.css） ---------- */
 .pg-hero h1 { margin-top: 16px; }
 .pg-hero p { max-width: 34em; }
-/* 全幅の大写真にしない: 帯の高さを共通の --strip（21:9）の約7割に抑える（正方形素材の傷・取っ手を残す縦位置） */
-.pg-hero .kdz-photo--strip img { aspect-ratio: 10/3; object-position: 50% 56%; }
-@media (max-width: 600px) { .pg-hero .kdz-photo--strip img { aspect-ratio: 20/9; } }
+/* 手順の中の写真（列幅の半分・4:3）。色調と角丸は共通の .kdz-photo */
+.shoot-step-photo { max-width: 50%; margin-top: 14px; }
+@media (max-width: 600px) { .shoot-step-photo { max-width: 80%; } }
 
 /* ---------- ヒーローの CTA 行（帯の外・直下の白面） ----------
    R4 A.4「LINE CTA を写真帯／濃紺帯の上に置かない」。帯の上では主色ブルーの面が

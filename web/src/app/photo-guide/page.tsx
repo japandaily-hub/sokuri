@@ -25,7 +25,7 @@ const MERITS = [
 const LIMITS = ["写真は1点につき12枚まで", "1回の出品につき150枚まで"];
 
 /** 撮影の手順（6ステップ） */
-const STEPS: { h: string; p: string; tip: string }[] = [
+const STEPS: { h: string; p: string; tip: string; photo?: { src: string; alt: string } }[] = [
   {
     h: "明るい場所に品物を移動する",
     p: "窓際や電気をつけた部屋など、できるだけ明るい場所を選びます。暗い写真は業者が状態を判断しにくくなります。",
@@ -50,6 +50,7 @@ const STEPS: { h: string; p: string; tip: string }[] = [
     h: "傷・汚れ・色あせ・へこみは隠さず撮る",
     p: "傷・汚れ・色あせ・色落ち・へこみなど、気になる部分は隠さずアップで撮りましょう。正直に伝えておくと、訪問時に金額が変わりにくくなります。",
     tip: "傷や汚れも写しておくと、業者が状態を判断しやすくなります",
+    photo: { src: "pg-tip-detail", alt: "木製の家具の取っ手と、引き出しの表面の小さな傷のアップ（イメージ）" },
   },
   {
     h: "品目名を出品画面に入力する",
@@ -114,8 +115,8 @@ const numOf = (i: number) => String(i + 1).padStart(2, "0");
 export default function PhotoGuidePage() {
   return (
     <main id="main">
-      {/* ============ ヒーロー（見出し＋独立した写真帯・LCP） ============
-          顔の写る写真（pg-hero）は使わない。文字は写真に重ねず、見出しの下に品物だけの写真を細い帯で置く。 */}
+      {/* ============ ヒーロー（見出しは文字だけ・/faq と同じ作り） ============
+          写真は冒頭に置かず、「傷・汚れも撮る」の手順（#steps）の中に置く。 */}
       <section className="kdz-lead pg-hero">
         <div className="container">
           <span className="eyebrow">撮影ガイド</span>
@@ -127,20 +128,6 @@ export default function PhotoGuidePage() {
           <p>
             カタヅケでは、業者は写真と品目情報をもとに入札します。上手に撮ると、業者が品物を判断しやすくなります。
           </p>
-        </div>
-        <div className="container kdz-strip">
-          <figure className="kdz-photo kdz-photo--strip">
-            <img
-              src="/img/v2/pg-tip-detail.webp"
-              width={800}
-              height={800}
-              alt="木製の家具の取っ手と、引き出しの表面の小さな傷のアップ（イメージ）"
-              loading="eager"
-              fetchPriority="high"
-              decoding="async"
-            />
-            <figcaption>（写真はイメージです）</figcaption>
-          </figure>
         </div>
       </section>
 
@@ -273,6 +260,12 @@ export default function PhotoGuidePage() {
                       <Ic name="spark" />
                       {s.tip}
                     </span>
+                    {s.photo ? (
+                      <figure className="kdz-photo kdz-photo--43 shoot-step-photo">
+                        <img src={`/img/v2/${s.photo.src}.webp`} width={800} height={800} alt={s.photo.alt} loading="lazy" decoding="async" />
+                        <figcaption>（写真はイメージです）</figcaption>
+                      </figure>
+                    ) : null}
                   </div>
                 </Reveal>
               ))}

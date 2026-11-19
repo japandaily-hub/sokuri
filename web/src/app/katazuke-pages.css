@@ -688,6 +688,11 @@
   font-size: 15px; line-height: 1.6; color: var(--body-soft); }
 @media (min-width: 860px) {
   .auth-page--split > main::before { background: var(--paper); }
+  /* PC: 見出し文と注記は左列上部の生成り地、写真はその下から列の下端までいっぱい（下に余白を残さない）。
+     DOM 順（写真→コピー→注記）は変えず、見た目の順だけ order で入れ替える。文字は写真に重ねない。 */
+  .auth-side__line { order: 1; padding-bottom: 4px; }
+  .auth-side__note { order: 2; padding-top: 0; padding-bottom: 12px; }
+  .auth-side > img { order: 3; }
 }
 @media (max-width: 859px) {
   .auth-side__note { padding: 6px 16px 8px; }

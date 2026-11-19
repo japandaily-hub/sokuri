@@ -33,7 +33,6 @@ import { Ic } from "@/components/kdz/Icons";
 import { Reveal, RevealLines } from "@/components/kdz/interactions";
 import {
   CASES,
-  caseName,
   MODEL_CASE_CHIP,
   MODEL_CASE_NOTE,
   type CaseItem,
@@ -114,15 +113,9 @@ function CaseCard({ c, index }: { c: CaseItem; index: number }) {
           ))}
         </div>
 
-        {/* ラウンド6 指摘（2/6/10/12/16/20）: ラウンド5 で足した矩形の肖像を撤回し、
-            頭文字の円アバター 1 本に戻した（同一人物を2つの記号で示す二重表示の解消。
-            6件中3件だけ肖像がありカードの立ち上がり高さも不揃いだった）。
-            顔のある3人（田中・鈴木・山口）はトップの「こんなふうに使えます」が担う。
-            c.portrait / c.portraitAlt はトップ専用のフィールドなのでここでは参照しない。 */}
+        {/* 仮名・人物の丸アイコンは使わない（架空の体験談を実在の利用者に見せない）。ケースの説明だけを出す */}
         <div className="case-persona">
-          <div className="case-avatar">{c.avatar}</div>
           <div className="case-persona-info">
-            <div className="name">{caseName(c)}</div>
             <div className="attr">{c.persona}</div>
           </div>
         </div>
@@ -156,7 +149,8 @@ function CaseCard({ c, index }: { c: CaseItem; index: number }) {
         </div>
 
         <div className="case-quote">
-          <p>{c.quote}</p>
+          <h3 className="case-point-label">このケースのポイント</h3>
+          <p>{c.point}</p>
         </div>
       </div>
     </Reveal>
@@ -249,7 +243,7 @@ export default function ExamplesPage() {
               このページの表示に必要な2文だけを後ろに足す。 */}
           <p className="cases-hero-note" role="note">
             {MODEL_CASE_NOTE}
-            カード内のコメントも架空のもので、実際の利用者の体験談ではありません。最終的な買取額は、業者が現物を確認したうえで決まります。
+            カード内の「ケースのポイント」も架空のもので、実際の利用者の体験談ではありません。最終的な買取額は、業者が現物を確認したうえで決まります。
           </p>
 
           {/* ============ 事例グリッド ============ */}

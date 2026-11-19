@@ -184,21 +184,6 @@
    同一人物を肖像＋頭文字の2記号で示す二重表示と、6件中3件だけ肖像があることによる
    カードの立ち上がり高さの不揃いを解消する。顔はトップのモデルケース節が担う。 */
 .case-persona { display: flex; align-items: center; gap: 10px; }
-.case-avatar {
-  width: 44px; height: 44px;
-  border-radius: 50%;
-  background: var(--ink);
-  border: 1px solid var(--ink);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--head);
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--white);
-  flex-shrink: 0;
-}
-.case-persona-info .name { font-size: 15px; font-weight: 600; color: var(--ink); }
 .case-persona-info .attr { font-family: var(--ui); font-size: 15px; color: var(--body-soft); margin-top: 2px; }
 
 /* R4_BRIEF E.1: DOM 順は 条件（.case-facts）→ ラベル → 金額。
@@ -248,18 +233,8 @@
   line-height: 1.9;
   position: relative;
 }
-.case-quote::before {
-  content: "\201C";
-  font-family: var(--head);
-  font-size: 36px;
-  color: var(--primary);
-  opacity: .3;
-  position: absolute;
-  top: 6px;
-  left: 10px;
-  line-height: 1;
-}
-.case-quote p { padding-left: 22px; }
+.case-point-label { font-family: var(--ui); font-size: 15px; font-weight: 600; color: var(--ink); margin: 0 0 6px; }
+.case-quote p { margin: 0; }
 /* 引用が架空である旨の注記（旧 .case-quote-note）はカード群の手前の .cases-hero-note に
    集約した（ラウンド6 指摘 7/13。6件で計19本あった小活字を減らす）。 */
 
