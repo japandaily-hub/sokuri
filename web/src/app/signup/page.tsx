@@ -10,6 +10,7 @@ import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { signupUser, toDisplayMessage, clearRedirectLoopStorage, KdzApiError } from "@/lib/katadzuke-api";
 import { Ic } from "@/components/kdz/Icons";
+import { AuthSidePhoto } from "@/components/kdz/AuthSidePhoto";
 import { KdzLogo } from "@/components/kdz/Logo";
 import { PasswordField, LineConsentAuth, TrustRow } from "@/components/kdz/auth";
 import { TERMS_VERSION_OUTDATED_CODE, TERMS_VERSION_OUTDATED_MESSAGE, USER_TERMS_VERSION } from "@/lib/line-consent";
@@ -153,8 +154,7 @@ export default function SignupPage() {
 
       <main id="main">
         <Reveal as="aside" variant="zoom" className="auth-side">
-          {/* eslint-disable @next/next/no-img-element */}
-          <img src="/img/v2/ex-lot-closet.webp" width={1536} height={1024} alt="" loading="lazy" decoding="async" />
+          <AuthSidePhoto src="/img/v2/ex-lot-closet.webp" width={1536} height={1024} />
           <p className="auth-side__line">撮って、あとは待つだけ。</p>
           <p className="auth-side__note">（写真はイメージです）</p>
         </Reveal>

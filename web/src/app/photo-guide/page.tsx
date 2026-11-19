@@ -187,7 +187,7 @@ export default function PhotoGuidePage() {
 
             <div className="compare-grid">
               <figure className="compare-card">
-                <Reveal as="figure" variant="zoom" className="img-frame img-frame--1x1 sp-bleed">
+                <Reveal as="figure" variant="zoom" className="img-frame compare-photo">
                   <img
                     src="/img/v2/pg-good.webp"
                     width={800}
@@ -206,7 +206,7 @@ export default function PhotoGuidePage() {
               </figure>
 
               <figure className="compare-card">
-                <Reveal as="figure" variant="zoom" className="img-frame img-frame--1x1 sp-bleed">
+                <Reveal as="figure" variant="zoom" className="img-frame compare-photo compare-photo--bad">
                   <img
                     src="/img/v2/pg-bad.webp"
                     width={800}

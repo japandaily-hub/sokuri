@@ -98,6 +98,10 @@
   gap: clamp(16px, 3vw, 28px);
 }
 .compare-card { min-width: 0; }
+/* 良い例・悪い例の写真は 4:3 に切り、幅を 8 割に絞って表示の高さを従来（1:1）の約 6 割にする */
+.compare-photo { aspect-ratio: 4/3; width: 80%; margin-inline: auto; }
+/* 悪い例は撮り方の差（暗い・見切れ）が伝わる範囲で、明るさを良い例にそろえる（わざと暗く見せない） */
+.compare-photo--bad img { filter: brightness(1.15); }
 /* 2枚のキャプションは行数が 1行／2行で割れるため、min-height で脚の高さを固定し
    良い例・避けたい例の下端をそろえる（バッジ列は auto、文は残り幅） */
 .compare-label {

@@ -19,6 +19,7 @@ import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { signupOperator, toDisplayMessage } from "@/lib/katadzuke-api";
 import { AuthBar, Field, PasswordField } from "@/components/kdz/auth";
+import { AuthSidePhoto } from "@/components/kdz/AuthSidePhoto";
 import { Reveal } from "@/components/kdz/interactions";
 
 export default function OperatorSignupPage() {
@@ -108,8 +109,7 @@ export default function OperatorSignupPage() {
       <AuthBar rightHref="/operator/login" rightLabel="ログインはこちら →" />
       <main id="main">
         <Reveal as="aside" variant="zoom" className="auth-side">
-          {/* eslint-disable @next/next/no-img-element */}
-          <img src="/img/v2/biz-reason-photo.webp" width={800} height={800} alt="" loading="lazy" decoding="async" />
+          <AuthSidePhoto src="/img/v2/biz-reason-photo.webp" width={800} height={800} />
           <p className="auth-side__line">審査制。古物商許可を確認します。</p>
           <p className="auth-side__note">（写真はイメージです）</p>
         </Reveal>

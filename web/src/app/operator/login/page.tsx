@@ -18,6 +18,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn, signOut, useSession } from "next-auth/react";
 import { AuthBar, Field, PasswordField } from "@/components/kdz/auth";
+import { AuthSidePhoto } from "@/components/kdz/AuthSidePhoto";
 import { Reveal } from "@/components/kdz/interactions";
 import { safeInternalPath } from "@/lib/safe-path";
 import { clearRedirectLoopStorage } from "@/lib/katadzuke-api";
@@ -105,8 +106,7 @@ function OperatorLoginForm() {
       <AuthBar rightHref="/operator/signup" rightLabel="業者登録はこちら →" />
       <main id="main">
         <Reveal as="aside" variant="zoom" className="auth-side">
-          {/* eslint-disable @next/next/no-img-element */}
-          <img src="/img/v2/biz-reason-bulk.webp" width={800} height={800} alt="" loading="lazy" decoding="async" />
+          <AuthSidePhoto src="/img/v2/biz-reason-bulk.webp" width={800} height={800} />
           <p className="auth-side__line">業者の方の入口です。</p>
           <p className="auth-side__note">（写真はイメージです）</p>
         </Reveal>

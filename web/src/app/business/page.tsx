@@ -179,18 +179,16 @@ const STATS: { num: string; unit: string; label: string }[] = [
 ];
 
 /** 仕入れる3つの理由（画像付き3カラム）。効果の断定は避け、条件と手順で説明する。 */
-const REASONS: { n: string; tag: string; img: string; h: ReactNode; p: string }[] = [
+const REASONS: { n: string; tag: string; h: ReactNode; p: string }[] = [
   {
     n: "01",
     tag: "まとめ",
-    img: "biz-reason-bulk",
     h: "まとめ買取で、1回の訪問にまとまる",
     p: "ユーザーは家じゅうの不用品をまとめて出品します。1回の訪問でまとまった点数を見られるため、1点ずつ集める買取に比べて移動・交渉のコストを削減しやすくなります。",
   },
   {
     n: "02",
     tag: "下見なし",
-    img: "biz-reason-photo",
     /* r2 L6 是正: 3カラム幅で「写真と品目から、下／見なしで…」と語中改行されるため、
        「下見なし」だけを折り返し禁止にして読点で割れるようにする（text-wrap:balance と併用）。 */
     h: (
@@ -203,7 +201,6 @@ const REASONS: { n: string; tag: string; img: string; h: ReactNode; p: string }[
   {
     n: "03",
     tag: "入札制",
-    img: "biz-reason-route",
     h: "入札制で、自社の基準に合う案件だけ選べる",
     p: "複数業者が買取総額で競う入札制。過度な価格競争ではなく、出品された品物全体の価値に対して金額を提示できます。自社の買取基準や対応エリアに合った案件だけに入札可能です。",
   },
@@ -643,18 +640,6 @@ export default function BusinessPage() {
             <div className="biz-reason-grid">
               {REASONS.map((r, i) => (
                 <Reveal as="article" className="biz-reason" stagger={i} key={r.n}>
-                  <div className="img-frame img-frame--1x1 img-frame--pale biz-reason-fig">
-                    {/* eslint-disable @next/next/no-img-element */}
-                    <img
-                      src={`/img/v2/${r.img}.webp`}
-                      width={800}
-                      height={800}
-                      alt=""
-                      loading="lazy"
-                      decoding="async"
-                    />
-                    {/* eslint-enable @next/next/no-img-element */}
-                  </div>
                   <div className="biz-reason-num">
                     {r.n}
                     <span className="biz-reason-tag">{r.tag}</span>

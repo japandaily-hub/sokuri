@@ -694,8 +694,9 @@
   .auth-side__note { order: 2; padding-top: 0; padding-bottom: 12px; }
   .auth-side > img { order: 3; }
 }
+/* スマホ幅（左カラムが並ばない幅）では写真の帯ごと出さない。画像は AuthSidePhoto が PC 幅でしか描かない */
 @media (max-width: 859px) {
-  .auth-side__note { padding: 6px 16px 8px; }
+  .auth-side { display: none; }
 }
 
 /* ---------- R4 モデルケース（架空）の明示 — トップ / /examples / /business 共通 ----------

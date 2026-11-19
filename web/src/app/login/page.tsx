@@ -9,6 +9,7 @@ import { useSearchParams } from "next/navigation";
 import { getSession, signIn, signOut, useSession } from "next-auth/react";
 import { clearAllUserLocalState } from "@/lib/user-local-state";
 import { AuthBar, Field, PasswordField, LineConsentAuth, TrustRow } from "@/components/kdz/auth";
+import { AuthSidePhoto } from "@/components/kdz/AuthSidePhoto";
 import { Reveal } from "@/components/kdz/interactions";
 import { safeInternalPath } from "@/lib/safe-path";
 import { USER_HOME_PATH, resolvePostLoginPath } from "@/lib/post-login-path";
@@ -208,8 +209,7 @@ function LoginForm() {
       <AuthBar rightHref="/signup" rightLabel="新規登録はこちら →" />
       <main id="main">
         <Reveal as="aside" variant="zoom" className="auth-side">
-          {/* eslint-disable @next/next/no-img-element */}
-          <img src="/img/v2/pg-tip-light.webp" width={800} height={800} alt="" loading="lazy" decoding="async" />
+          <AuthSidePhoto src="/img/v2/pg-tip-light.webp" width={800} height={800} />
           <p className="auth-side__line">入札の結果を、確かめに。</p>
           <p className="auth-side__note">（写真はイメージです）</p>
         </Reveal>
