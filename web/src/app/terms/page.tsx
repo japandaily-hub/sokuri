@@ -73,6 +73,9 @@ export default function TermsPage() {
         />
         <div className="hero-band__veil" aria-hidden="true" />
       </section>
+      <div className="container">
+        <p className="kdz-photo-note">（写真はイメージです）</p>
+      </div>
 
       <section className="legal-head">
         <div className="legal-head__inner">

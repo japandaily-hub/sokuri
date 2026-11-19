@@ -116,50 +116,6 @@ html.js-rv .rv--zoom.in img{
 }
 
 /* ------------------------------------------------------------
-   イラスト用スコープ。今回は WebP 画像アセットのため直接は使わないが、
-   将来 SVG 化した際に差し色を局所化するための予約スコープ（:root には置かない）。
-   ------------------------------------------------------------ */
-.ill-scope{
-  --ill-terracotta:#c05f43;
-  --ill-sage:#7d9b6a;
-  --ill-bark:#8a6a4f;
-  --ill-paper:#f7f3ec;
-}
-
-/* ------------------------------------------------------------
-   循環イラスト帯（.ill-loop）— 元は Phase 1 #5 でトップ専用 katazuke-top.css に実装。
-   Phase 3 で /faq・/contact にも同じ帯を置くため、ページ非依存の本ファイル（globals.css から
-   全ページに読み込まれる）へ移設した。セレクタ・値はトップページ実装から変更していない。
-   「物が片付く・リユースされ循環していく」イメージ。PC は円周上に緩やかな配置、
-   859px 以下（.sp-bleed と同じ既存の閾値）は横スクロールが起きない 2 列グリッドに切り替える。
-   ------------------------------------------------------------ */
-/* セキュリティレビュー対応(Low-2): 純装飾帯なのでクリック/タップを一切奪わないようにする。
-   overflow:clip は box(top:2%)/folding-hands(top:98%) の上下端アイコンが実際に半分切れて
-   しまうため使わない(円周配置は意図的に .ill-loop-inner の外周にわずかにはみ出す設計)。 */
-.ill-loop{padding:clamp(20px,3.4vw,36px) 0 clamp(4px,1vw,12px);background:var(--white);pointer-events:none;}
-.ill-loop-inner{position:relative;width:100%;max-width:520px;aspect-ratio:1/1;margin-inline:auto;}
-/* 円周上の位置は呼び出し側がインラインstyleで --ill-top/--ill-left を渡す方式にしている。
-   当初は .ill-item--box{top:2%;left:50%} のようなBEM修飾子セレクタを6つ並べていたが、
-   このビルド環境(postcss-import + Tailwind layer平坦化)ではその形の時だけ原因不明のまま
-   6ルールが最終CSSから丸ごと消える現象を実機検証で確認したため、CSS変数方式に変更して回避した。
-   同じ問題を作らないよう、position の値は必ずJS側(illustrations.tsのILL_POSITIONS)で
-   一元管理し、このファイルには個別セレクタを増やさないこと。 */
-.ill-item{position:absolute;width:clamp(60px,8.6vw,100px);transform:translate(-50%,-50%);top:var(--ill-top,50%);left:var(--ill-left,50%);}
-.ill-item img{width:100%;height:100%;display:block;}
-@media(max-width:859px){
-  .ill-loop-inner{position:static;display:grid;grid-template-columns:repeat(2,1fr);
-    gap:clamp(14px,4vw,22px);max-width:320px;aspect-ratio:auto;}
-  .ill-item{position:static;width:100%;transform:none;margin-inline:auto;}
-}
-/* 画面が窮屈になる 480px 以下は、2点を間引いて4点構成にする（設計書の許容範囲）。
-   対象は呼び出し側(illustrations.ts の ILL_THIN_ON_MOBILE)が data-ill-thin 属性を付けて示す。
-   `.ill-item--books,.ill-item--plant{display:none}` のようなクラス複数指定セレクタは、
-   このビルド環境で原因不明のまま丸ごと消える現象を確認したため使わない（上の .ill-item 参照）。 */
-@media(max-width:480px){
-  [data-ill-thin]{display:none;}
-}
-
-/* ------------------------------------------------------------
    reduced-motion: 回転を止め、遅延も無効化する
    （globals.css の全体ルールで duration 自体は 0.001ms 化されるため、ここは delay のみ担う）
    ------------------------------------------------------------ */

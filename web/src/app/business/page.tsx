@@ -229,7 +229,7 @@ const ASSURANCES: { n: string; h: string; p: string }[] = [
 ];
 
 /** 業者視点のフロー（4ステップ）。
- *  r5 #2/#15/#21/#34: 旧 3D アイコン（/img/real/how-camera・how-trend・how-crown・how-truck）を外した。
+ *  r5 #2/#15/#21/#34: 旧 3D アイコン（how-camera・how-trend・how-crown・how-truck）を外した。
  *  理由は3つ: ①素材集の借り物に見え、他ページのフォトリアル生活空間シリーズから浮いていた
  *  ②「選ばれる＝王冠」は「ユーザーが1社を選択」と結び付かない広告表現 ③右肩上がりの棒グラフを
  *  買取総額の近傍に置くと、集計統計を出さない方針の隣で成果の上昇を示唆する（有利誤認の入口）。
@@ -515,25 +515,21 @@ export default function BusinessPage() {
         <section className="biz-hero" ref={heroRef}>
           <div className="container">
             <div className="media-split media-split--rev biz-hero-split">
-              <div className="img-frame img-frame--2x3 img-frame--pale biz-hero-fig sp-bleed">
+              {/* 顔の写る写真は使わない（景表法: 実在のスタッフ・業者に見えるため）。手元と品物だけの写真（top-handover）。
+                  色調補正と角丸は共通の .kdz-photo。「（写真はイメージです）」は右の .biz-photo-note が担う。 */}
+              <figure className="kdz-photo kdz-photo--32 biz-hero-fig">
                 {/* eslint-disable @next/next/no-img-element */}
-                {/* R4 D.2 #5: 素材を人物入り（仕分けた棚の前に立つスタッフ）に差し替えたため、
-                    「誰が入札する側なのか」を伝える意味を持つ画像になった。alt は spec_people.json の
-                    文言をそのまま使う。r2 H4 で alt="" にした理由（取得失敗時に alt 文が枠内へ流れる）は、
-                    共有部品側の `.img-frame img{color:transparent;font-size:0}` で解消済み。
-                    枠 2:3 と素材 1024x1536 は AR 一致で無トリミングのため --pos は書かない
-                    （859px 以下の 4:5 だけ business.css で --pos:50% 42% を与える）。 */}
                 <img
-                  src="/img/v2/biz-hero.webp"
-                  width={900}
-                  height={1350}
-                  alt="仕分けた棚の前に立つリユース業者のスタッフ（イメージ）"
+                  src="/img/v2/top-handover.webp"
+                  width={1536}
+                  height={1024}
+                  alt="引き取りに使う段ボール箱を両手で持つ手元（イメージ）"
                   loading="eager"
                   fetchPriority="high"
                   decoding="async"
                 />
                 {/* eslint-enable @next/next/no-img-element */}
-              </div>
+              </figure>
               <div className="biz-hero-copy">
                 <span className="eyebrow">買取業者の方へ</span>
                 <h1>
@@ -572,7 +568,7 @@ export default function BusinessPage() {
                     ご依頼（売りたい）の方はこちら →
                   </Link>
                 </p>
-                {/* 最終検査（legal）: 顔のある人物を2点出すページなので、可視の打消しを /vendors・/login と同じ文言で置く */}
+                {/* 最終検査（legal）: 写真には可視の打消しを /vendors・/login と同じ文言で置く */}
                 <p className="biz-photo-note">※ 写真はイメージです。</p>
               </div>
             </div>
@@ -611,24 +607,28 @@ export default function BusinessPage() {
           </div>
         </section>
 
-        {/* ============ 章の切れ目（写真帯・veil .65 = 見出し＋14px 以上の注記） ============
-            R4 D.2 #6: 素材が人物入り（作業台で仕分ける2人）に替わるため、縦位置を持つ
-            .hero-band--face を足す（横位置の修飾子は帯が常に素材より横長で効かないため無い）。 */}
-        <section className="hero-band hero-band--mid hero-band--face biz-band-sorting">
-          {/* eslint-disable @next/next/no-img-element */}
-          <img
-            src="/img/v2/biz-band-sorting.webp"
-            width={1920}
-            height={1088}
-            alt=""
-            loading="lazy"
-            decoding="async"
-          />
-          {/* eslint-enable @next/next/no-img-element */}
-          <div className="hero-band__veil" aria-hidden="true" />
-          <div className="container hero-band__copy">
+        {/* ============ 章の切れ目（見出し＋独立した写真帯） ============
+            文字は写真に重ねない: 見出しと注記は写真の上、写真は直下の細い帯（.kdz-photo--strip）。
+            人物の写る素材（biz-band-sorting）は使わず、台所の品物だけの写真に替えた。 */}
+        <section className="kdz-lead biz-band-sorting">
+          <div className="container">
             <h2>写真と品目から、入札できる。</h2>
             <p className="biz-band-note">最終額は、訪問時の現物確認で決まります。</p>
+          </div>
+          <div className="container kdz-strip">
+            <figure className="kdz-photo kdz-photo--strip">
+              {/* eslint-disable @next/next/no-img-element */}
+              <img
+                src="/img/v2/ex-lot-kitchen.webp"
+                width={1536}
+                height={1024}
+                alt="台所まわりの食器や調理道具を並べた写真（イメージ）"
+                loading="lazy"
+                decoding="async"
+              />
+              {/* eslint-enable @next/next/no-img-element */}
+              <figcaption>（写真はイメージです）</figcaption>
+            </figure>
           </div>
         </section>
 
@@ -708,21 +708,6 @@ export default function BusinessPage() {
                 <article className="vc-card" key={v.id}>
                   <span className="model-chip">{MODEL_CASE_CHIP}</span>
                   <div className="vc-head">
-                    <div className="img-frame img-frame--1x1 vc-fig">
-                      {/* eslint-disable @next/next/no-img-element */}
-                      {/* 表示は 220px（859px 以下 140px）。原寸 800 では表示幅の2倍を超えるため
-                          440px の派生 webp を参照する。1:1 枠 × 1:1 素材はトリミングが起きないので
-                          --pos は書かない（書いても効かない）。円形にもしない。 */}
-                      <img
-                        src={`/img/v2/${v.portrait}-440.webp`}
-                        width={440}
-                        height={440}
-                        alt={v.portraitAlt}
-                        loading="lazy"
-                        decoding="async"
-                      />
-                      {/* eslint-enable @next/next/no-img-element */}
-                    </div>
                     <div className="vc-meta">
                       <h3>{v.shop}</h3>
                       <p className="vc-attr">

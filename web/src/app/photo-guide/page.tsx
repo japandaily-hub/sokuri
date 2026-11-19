@@ -95,7 +95,7 @@ const POINTS: { icon: IcName; h: string; p: string }[] = [
 /** カテゴリ別チェックリスト（品目名＋確認項目のみ。サムネイルは置かない）
     ラウンド6 指摘（5）: 行頭の 72px サムネは 3D 静物の中身が判別できず、1px 枠のボックスに
     小さな画像が乗るだけの構成が安く見えていた（512px 素材を 72px＝7.1倍で敷く BRIEF §1.11 の
-    2x 規約超過もここが唯一の残件だった）。/img/real/cat-*.webp の参照を外し、箱組も畳んで
+    2x 規約超過もここが唯一の残件だった）。3D 静物（cat-*）の参照を外し、箱組も畳んで
     ヘアラインの台帳（.point-list / /company の .co-vendor と同じ作法）にそろえる。
     Icons.tsx は core 所有・R4 で変更不可のため、6品目すべてに合う .ic が無い（家電・PC／ゲーム）。
     半端なアイコンを混ぜるより品目名のみで通す。 */
@@ -114,19 +114,10 @@ const numOf = (i: number) => String(i + 1).padStart(2, "0");
 export default function PhotoGuidePage() {
   return (
     <main id="main">
-      {/* ============ ヒーロー（写真帯・LCP） ============ */}
-      <section className="hero-band hero-band--tall hero-band--face pg-hero">
-        <img
-          src="/img/v2/pg-hero.webp"
-          width={1920}
-          height={1088}
-          alt="明るい部屋で、床に置いた品物をスマートフォンで撮影する女性（イメージ）"
-          loading="eager"
-          fetchPriority="high"
-          decoding="async"
-        />
-        <div className="hero-band__veil" aria-hidden="true" />
-        <div className="container hero-band__copy">
+      {/* ============ ヒーロー（見出し＋独立した写真帯・LCP） ============
+          顔の写る写真（pg-hero）は使わない。文字は写真に重ねず、見出しの下に品物だけの写真を細い帯で置く。 */}
+      <section className="kdz-lead pg-hero">
+        <div className="container">
           <span className="eyebrow">撮影ガイド</span>
           <h1>
             撮るほど、
@@ -136,6 +127,20 @@ export default function PhotoGuidePage() {
           <p>
             カタヅケでは、業者は写真と品目情報をもとに入札します。上手に撮ると、業者が品物を判断しやすくなります。
           </p>
+        </div>
+        <div className="container kdz-strip">
+          <figure className="kdz-photo kdz-photo--strip">
+            <img
+              src="/img/v2/ex-lot-rearrange.webp"
+              width={1536}
+              height={1024}
+              alt="模様替えで出す品物を部屋に並べた様子（イメージ）"
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
+            />
+            <figcaption>（写真はイメージです）</figcaption>
+          </figure>
         </div>
       </section>
 

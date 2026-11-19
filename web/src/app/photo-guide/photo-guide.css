@@ -6,31 +6,9 @@
    モバイル閾値は共有部品と同じ 859px に揃える。
    ============================================================ */
 
-/* ---------- ヒーロー（.hero-band--tall.hero-band--face） ---------- */
-/* 帯の上は白抜き。eyebrow の罫だけ --lime に落として見出しの邪魔をしない */
-.pg-hero .eyebrow { color: var(--white); }
-.pg-hero .eyebrow::before { background: var(--lime); }
-.pg-hero .hero-band__copy { padding-block: clamp(32px, 5vw, 56px); }
-.pg-hero .hero-band__copy h1 { margin-top: 16px; }
-.pg-hero .hero-band__copy p { max-width: 34em; }
-/* ラウンド6 指摘（2・モバイル）: 共有の .hero-band--face の veil は水平グラデ
-   （390px で左 .74 → 右 .60）で、390px 幅では 14 ポイントの差が「左は夜・右は日中光」に割れ、
-   境目が縦の線として見えていた。モバイルだけ横方向のランプをやめ、上明→下暗の縦グラデにする。
-   混色は core と同じ中性ダーク rgba(16,20,34) のまま（紫かぶりを戻さない）。
-   コントラスト（白 #fff on 合成色・画像側の輝度は core が実測から逆算した最悪値 v≒222〜228）:
-   .66→約 6.7:1／.72→約 7.5:1／.78→約 8.3:1。モバイルは帯の高さいっぱいに copy が入る
-   （h1 2行＋本文3〜4行で min-height 240px を超える）ため、いちばん薄い上端でも AA を
-   割らない .66 を floor にする。ラウンド6 実測の p95（h1 7.08／本文 6.97）を下回らない側の変更。
-   ページ CSS は unlayered で layer(components) の .hero-band--face に常に勝つ。
-   PC は現状の水平グラデのまま（1440px では 1389px に広がるため縦線として認識されない）。 */
-@media (max-width: 859px) {
-  .pg-hero .hero-band__veil {
-    background: linear-gradient(180deg,
-      rgba(16, 20, 34, .66) 0%,
-      rgba(16, 20, 34, .72) 55%,
-      rgba(16, 20, 34, .78) 100%);
-  }
-}
+/* ---------- ヒーロー（.kdz-lead ＋ .kdz-photo--strip・katazuke.css） ---------- */
+.pg-hero h1 { margin-top: 16px; }
+.pg-hero p { max-width: 34em; }
 
 /* ---------- ヒーローの CTA 行（帯の外・直下の白面） ----------
    R4 A.4「LINE CTA を写真帯／濃紺帯の上に置かない」。帯の上では主色ブルーの面が

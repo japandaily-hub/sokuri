@@ -114,29 +114,13 @@ export default function VendorListPage() {
       {signedIn ? <AppHeader /> : <SiteHeader />}
       <main id="main">
         {/* ============ 写真帯（静的。取得状態に依存しない） ============ */}
-        {/* r2 M5 是正: 見出し1語だけでは帯の濃紺面が空に見えたため、/photo-guide の帯と同じ
-            eyebrow ＋ h1 ＋ 1行リードの構成に揃える。小さい文字を載せるので veil は
-            --headline（.55）をやめ既定の .65 に戻す（白 13〜16px で AA を確保するため）。
-            R4 D.2 #7: 素材に遠景の作業者が入るため縦位置修飾子 .hero-band--face を足す。
-            --headline は付けない（3要素が載る帯なので veil を .65 のまま維持する）。
+        {/* 見出し区画（eyebrow ＋ h1 ＋ 1行リード）。写真は文字に重ねず、直下の独立した細い帯に置く。
             R4 C.3-4 / R4 r4 #1: 承認済みの実在業者がいる断定文（「〜業者です」）は、掲載0件でも
             取得失敗中でも優良誤認になるため出さない。0件では「…のみを掲載します／現在、掲載中の
             業者はありません。」、取得失敗では「…のみを掲載します。」（0件の断定は足さない）。
             1社以上あるときだけ現行文のまま。 */}
-        <section className="hero-band hero-band--slim hero-band--face vd-band">
-          {/* eslint-disable @next/next/no-img-element */}
-          <img
-            src="/img/v2/vd-band.webp"
-            width={1920}
-            height={1088}
-            alt=""
-            loading="eager"
-            fetchPriority="high"
-            decoding="async"
-          />
-          {/* eslint-enable @next/next/no-img-element */}
-          <div className="hero-band__veil" aria-hidden="true" />
-          <div className="container hero-band__copy">
+        <section className="kdz-lead vd-band">
+          <div className="vd-lead">
             <span className="eyebrow">審査制</span>
             <h1>登録業者一覧</h1>
             <p>
@@ -149,6 +133,21 @@ export default function VendorListPage() {
                     "古物商許可番号を確認し、運営が承認した業者のみを掲載します。"
                   : "古物商許可番号を確認し、運営が承認した業者です。"}
             </p>
+          </div>
+          {/* 文字は写真に重ねない: 見出しの下の独立した細い帯。「※ 写真はイメージです。」は直下の .vd-photo-note */}
+          <div className="vd-lead">
+            <figure className="kdz-photo kdz-photo--strip">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/img/v2/vd-band.webp"
+                width={1920}
+                height={1088}
+                alt=""
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+              />
+            </figure>
           </div>
         </section>
 

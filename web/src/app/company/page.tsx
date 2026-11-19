@@ -154,24 +154,29 @@ const VALUES: { img: string; w: number; title: string; body: string; fact: React
 export default function CompanyPage() {
   return (
     <main id="main">
-      {/* ============ ヒーロー（写真帯・見出しのみ・LCP） ============ */}
-      <section className="hero-band hero-band--tall hero-band--headline co-band">
-        <img
-          src="/img/v2/co-band.webp"
-          width={1920}
-          height={1088}
-          alt=""
-          loading="eager"
-          fetchPriority="high"
-          decoding="async"
-        />
-        <div className="hero-band__veil" aria-hidden="true" />
-        <div className="container hero-band__copy">
+      {/* ============ ヒーロー（見出し＋独立した写真帯・LCP） ============
+          文字は写真に重ねない: 見出しは写真の上、写真は直下の細い帯（.kdz-photo--strip） */}
+      <section className="kdz-lead co-band">
+        <div className="container">
           <h1>
             「片付ける」を、
             <br />
             もっとかんたんに。
           </h1>
+        </div>
+        <div className="container kdz-strip">
+          <figure className="kdz-photo kdz-photo--strip">
+            <img
+              src="/img/v2/co-band.webp"
+              width={1920}
+              height={1088}
+              alt=""
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
+            />
+            <figcaption>（写真はイメージです）</figcaption>
+          </figure>
         </div>
       </section>
 

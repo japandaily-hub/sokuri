@@ -23,31 +23,16 @@
   padding: clamp(24px, 4vw, 40px) var(--container-pad, 24px) clamp(48px, 7vw, 80px);
 }
 
-/* r2 M5 是正: 帯が見出し1語だけで濃紺面が空に見えたので eyebrow ＋ h1 ＋ 1行リードにする。
-   帯の上の eyebrow は既定色（--primary）だと濃紺に沈む。.deep-band は --lime を使うが
-   あれはベタ地の話で、写真＋veil .65 の上では --lime は 13px で AA に届かないため白＋白罫に、
-   リードは 16px なので幅を詰めて 1〜2 行に収める。veil は既定の .65（--headline を外した）。 */
-.vendors-page .vd-band .hero-band__copy h1 { margin: 12px 0 0; }
-.vendors-page .vd-band .eyebrow { color: var(--white); }
-.vendors-page .vd-band .eyebrow::before { background: var(--white); }
-.vendors-page .vd-band .hero-band__copy p { max-width: 30em; }
-/* r2 M3 是正: 帯だけ .container（--maxw 1240）で、帯下の本文は .vendors-wrap（720）。
-   見出しの左端と本文の左端が別の線に乗っていたので、帯側を本文のラッパー幅に合わせる。
-   .vendors-wrap と同じ 720px ＋ 左右 24px（border-box）なので左端が一本の線に揃う。 */
-.vendors-page .vd-band .hero-band__copy {
+/* 見出し区画（eyebrow ＋ h1 ＋ 1行リード）と、その下の独立した写真帯。文字は写真に重ねない。
+   見出しの左端と本文の左端が別の線に乗らないよう、本文のラッパー（.vendors-wrap＝720px）と同じ幅・左右余白に合わせる。 */
+.vendors-page .vd-lead {
   max-width: 720px;
-  padding-inline: 24px;
+  margin-inline: auto;
+  padding-inline: var(--container-pad, 24px);
 }
-/* r5 #6: 素材（台車の作業者）が右端 1/8 に小さく写り、左端に用途不明の近接物が入って
-   主題が読めなかった。帯の縦位置を下げて（46%）主題を中央寄りに残し、コピーを下辺に寄せて
-   上半分を写真に明け渡す。--slim（180〜240px）では上下とも文字で埋まるので下限を 240px に上げる。
-   ページCSS は @layer に入らないため、共有 .hero-band--face（layer components）の
-   --band-pos: 50% 42% に対してこの指定が勝つ（モバイルの共有値 46% と同値なので SP は不変）。 */
-.vendors-page .vd-band {
-  min-height: clamp(240px, 22vw, 300px);
-  --band-pos: 50% 46%;
-  align-items: end;
-}
+.vendors-page .vd-band h1 { margin: 12px 0 0; }
+.vendors-page .vd-band p { max-width: 30em; }
+.vendors-page .vd-band .kdz-photo { margin-top: clamp(20px, 3vw, 28px); }
 
 .vendors-page .vendors-back {
   display: inline-flex;

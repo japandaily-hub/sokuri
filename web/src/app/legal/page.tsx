@@ -45,6 +45,9 @@ export default function LegalPage() {
         />
         <div className="hero-band__veil" aria-hidden="true" />
       </section>
+      <div className="container">
+        <p className="kdz-photo-note">（写真はイメージです）</p>
+      </div>
 
       <div className="doc-wrap">
         <div className="doc-eyebrow">LEGAL</div>

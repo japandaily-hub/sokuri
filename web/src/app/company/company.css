@@ -4,15 +4,11 @@
    katazuke.css / katazuke-pages.css にあるため再定義しない。
    ここはこのページでしか使わない .about-* / .company-table /
    .mission-card / .values-* のみを定義する。
-   ヒーローは共有部品 .hero-band--tall.hero-band--headline（page.tsx 側）。
+   ヒーローは共有部品 .kdz-lead ＋ .kdz-photo--strip（page.tsx 側）。
    ============================================================ */
 
-/* ---------- ヒーロー（.hero-band--tall.hero-band--headline） ---------- */
-/* 見出しのみを中央に白抜き。本文・注記は帯に乗せない（veil .55 のため） */
-/* 見出しは共有部品の flex align-items:center で既に光学中心にある。ここで詰めるのは
-   帯の総高だけ（見出し2行に対して 480px は地の面積が勝ちすぎるため 420px 上限に落とす）。 */
-.co-band.hero-band--tall { min-height: clamp(320px, 34vw, 420px); }
-.co-band .hero-band__copy { text-align: left; padding-block: clamp(28px, 4vw, 40px); }
+/* ---------- ヒーロー（.kdz-lead ＋ .kdz-photo--strip・katazuke.css） ---------- */
+/* 見出しのみ。本文・注記は写真に重ねず、帯から降りた白面（.about-lead）に置く。 */
 
 /* ---------- 本文ラッパ ---------- */
 .about-wrap {

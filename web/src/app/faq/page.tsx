@@ -3,19 +3,14 @@
 /** よくある質問（FAQ）。デザインハンドオフ「よくある質問.html」由来。
  *  検索・カテゴリフィルタ・アコーディオン開閉を伴うためクライアントコンポーネント。
  *  ヘッダー/フッターは共通 SiteChrome が付与するため、ここでは <main id="main"> の中身のみを描画する。
- *  ビジュアル再構築 v2（BRIEF §2.4）: 画像はヒーロー帯 1 本だけ。Q&A の間に帯を入れない
+ *  写真・イラストは置かない（見出しは文字だけ）。Q&A の間にも帯を入れない
  *  （打消し表示の近接を壊さないため）。サイドバーは既存の線アイコン .ic に一本化する。 */
 
 import "./faq.css";
-import { useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Ic, type IcName } from "@/components/kdz/Icons";
 import { Reveal, RevealLines } from "@/components/kdz/interactions";
-import { ILLUSTRATIONS, ILL_POSITIONS, ILL_THIN_ON_MOBILE, illSrc, type IllName } from "@/lib/illustrations";
-
-/** 循環イラスト帯（ビジュアル刷新 Phase 3）。表示順・位置クラスはトップページの
- *  ILL_LOOP と同じ6点（katazuke-motion.css の .ill-item--<name> 円周配置に対応）。 */
-const ILL_LOOP: IllName[] = ["box", "truck", "house-tree", "folding-hands", "books", "plant"];
 
 type CatKey = "fee" | "privacy" | "item" | "flow" | "area";
 
@@ -292,37 +287,10 @@ export default function FaqPage() {
 
   return (
     <main id="main" className="faq-page">
-      {/* ヒーロー写真帯（.site-frame の内側いっぱいに届く）。
-          --headline のため帯に置くのは h1（見出し）だけ。本文・注記・検索窓は帯の下に置く。
-          R4 ラウンド5 指摘（1/3）: --slim（PC 240px / SP 160px）では PC で人物の頭頂が帯の
-          上端で切れ、SP では帯が薄すぎて人物が判別できなかった。--mid（PC 400px / SP 220px）に
-          上げると可視域が画像高の 30.5% → 50.8%（SP は 100%）に広がり、頭上の余白が確保できる。
-          帯の縦位置（--band-pos）は core 所有（R4_BRIEF D.1）なのでここには書かない。 */}
-      <section className="hero-band hero-band--mid hero-band--face hero-band--headline faq-hero">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/img/v2/faq-band.webp"
-          width={1920}
-          height={1088}
-          alt=""
-          loading="eager"
-          fetchPriority="high"
-          decoding="async"
-        />
-        <div className="hero-band__veil" aria-hidden="true" />
-        <div className="container hero-band__copy">
-          <h1>よくある質問</h1>
-        </div>
-      </section>
-
-      {/* 帯の直下の白面（リード文）。
-          ラウンド6 指摘（9）: リード文が検索窓の下にあり「道具が説明より先に出る」読み順に
-          なっていた。DOM 順で説明 → 検索窓に直す（CSS の order で見た目だけ入れ替えると
-          DOM 順・タブ順と食い違うので使わない）。
-          ラウンド6 指摘（5）: モバイルで検索窓が帯の下端に接し、帯とフォームが1つの塊に
-          見えていた。帯を受ける余白はこの面の上パディングが持ち、ヘアラインは置かない。 */}
-      <div className="faq-lead">
+      {/* 見出しは文字だけ（顔の写る帯・水彩イラストは廃止。景表法: 実在の人物に見える写真を使わない） */}
+      <div className="faq-lead kdz-lead">
         <div className="container">
+          <h1>よくある質問</h1>
           <p>
             ご利用前の疑問にまとめてお答えします。解決しない場合は
             <Link href="/contact">お問い合わせ</Link>
@@ -397,41 +365,6 @@ export default function FaqPage() {
           </div>
         </div>
       </div>
-
-      {/* ============ 循環イラスト帯 ============
-          ビジュアル刷新 Phase 3（architect指示）: 検索・カテゴリタブを読み終えた直後、
-          本文の Q&A に入る前の一息の位置に置く（トップページと同じ .ill-loop を再利用。
-          クラス定義は katazuke-motion.css へ移設済みで新規追加はしていない）。装飾のみのため
-          section 全体を aria-hidden にする。 */}
-      <section className="ill-loop" aria-hidden="true">
-        <div className="container">
-          <div className="ill-loop-inner ill-scope">
-            {ILL_LOOP.map((name, i) => {
-              const meta = ILLUSTRATIONS[name];
-              const pos = ILL_POSITIONS[name];
-              return (
-                <Reveal
-                  key={name}
-                  className={`ill-item ill-item--${name}`}
-                  stagger={i}
-                  style={{ "--ill-top": pos.top, "--ill-left": pos.left } as CSSProperties}
-                  data-ill-thin={ILL_THIN_ON_MOBILE.includes(name) ? "" : undefined}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={illSrc(name)}
-                    alt={meta.alt}
-                    width={meta.w}
-                    height={meta.h}
-                    loading="lazy"
-                    decoding="async"
-                  />
-                </Reveal>
-              );
-            })}
-          </div>
-        </div>
-      </section>
 
       <div className="section">
         <div className="container">

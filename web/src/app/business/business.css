@@ -126,37 +126,8 @@
   line-height: 1.6;
 }
 
-/* ============ 章の切れ目の写真帯 ============
-   veil 既定（.65）のままなので 14px 以上の注記を1行だけ置ける。
-   r5 #8: 素材（16:9）に対し帯は常に横長で、横位置では白見出しと左の人物の肩・腕の重なりを
-   避けられない。/faq と同じ処方で「コピーを下辺へ寄せ、veil を縦グラデに替える」。
-   上 40% は .24 で人物2名の階調を残し、文字が乗る下辺は .70（白 #fff で計算値 約 7:1）。
-   ページCSS は @layer 外なので、共有 .hero-band--face の横グラデ（layer components）に勝つ。 */
-.business-page .biz-band-sorting { align-items: end; }
-/* r6 #4: コピーが左の人物の胸〜腕を横切っていた（素材は中央が白文字用の無人ゾーン）。
-   文字の塊を帯の中央へ寄せる。縦位置（下辺寄せ）と veil の縦グラデはそのままなので、
-   実測コントラスト（h2 p95 6.68／注記 7.79・モバイル 6.08／7.52）は動かない。
-   横位置は object-position では動かせない（帯は常に素材より横長＝D.1）ため、
-   画像ではなく文字側を動かす。 */
-.business-page .biz-band-sorting .hero-band__copy {
-  padding-bottom: clamp(4px, 1vw, 12px);
-  /* 指摘の 34em（544px）では内幅 496px に対し h2 が 2 行に割れる（実測: 1024px 幅で行幅
-     592px、1440px 幅で 40px×14字 ≒ 660px）。48em（768px・内幅 720px）にして 1 行を保つ。
-     text-align:center なので、箱の幅にかかわらず行そのものは帯の中央に乗る。 */
-  max-width: 48em;
-  text-align: left;
-}
-.business-page .biz-band-sorting .hero-band__veil {
-  /* 指摘の 0→40% .24 / 100% .7 だと、下辺に寄せた h2（帯下端から約 60〜100px）が .45 前後の
-     位置に来て AA を割る。文字が実際に乗る 70% 以降を .68 まで先に上げ、p95 で AA を確保する。 */
-  /* 実測: h2 の上端は帯の 55%、注記は 74%（1064px 幅）。文字が乗り始める 55% で .62 に達するよう
-     ランプを前に寄せる（h2 約 6:1／注記 約 7:1）。上 32% は .20〜.26 で人物2名の階調を残す。 */
-  background: linear-gradient(180deg,
-    rgba(14,20,38,.20) 0%,
-    rgba(14,20,38,.26) 32%,
-    rgba(14,20,38,.62) 55%,
-    rgba(14,20,38,.76) 100%);
-}
+/* ============ 章の切れ目（見出し＋独立した写真帯） ============
+   文字は写真に重ねない。見出し区画は共通の .kdz-lead、写真は .kdz-photo--strip（katazuke.css）。 */
 .business-page .biz-band-sorting .biz-band-note {
   font-size: 15px;
   line-height: 1.8;
@@ -273,14 +244,9 @@
 /* チップはカード先頭・肖像より上・金額より手前（打消し表示の近接） */
 .business-page .vc-card .model-chip { margin-bottom: 16px; }
 .business-page .vc-head {
-  display: grid;
-  grid-template-columns: minmax(0, 220px) 1fr;
-  gap: 20px;
-  align-items: center;
+  /* 肖像（人物の生成画像）は廃止した。店名・属性だけの 1 列 */
+  display: block;
 }
-/* R4 r4 #12: align-items:center のセルで枠の高さが縮み、1:1 のはずの肖像が横長
-   （約 220x182）に潰れていた。セル内で上寄せにして aspect-ratio を保たせる。 */
-.business-page .vc-fig { width: 100%; align-self: start; }
 .business-page .vc-meta { min-width: 0; }
 .business-page .vc-meta h3 {
   font-family: var(--head);
@@ -820,10 +786,7 @@
   .business-page .biz-hero-fig { order: 2; }
   .business-page .biz-hero-copy { order: 1; }
   .business-page .biz-hero-fig {
-    aspect-ratio: 4/5;
-    --pos: 50% 42%;
-    /* 画像が CTA の後ろに回るので、間隔は grid の row-gap（28〜64px）だけに任せる
-       （旧 margin-bottom:28px は「画像 → 文」の順のときの下余白だった） */
+    /* 画像が CTA の後ろに回るので、間隔は grid の row-gap（28〜64px）だけに任せる */
     margin-top: 0;
     margin-bottom: 0;
   }
@@ -835,8 +798,6 @@
      カタカナが語中で割れて店名が読めなかった。肖像を上・見出しを全幅に積み替える。
      overflow-wrap:anywhere は使わない（どこでも割れて悪化するため）。 */
   .business-page .vc-grid { grid-template-columns: 1fr; }
-  .business-page .vc-head { grid-template-columns: 1fr; gap: 14px; }
-  .business-page .vc-fig { width: min(160px, 42%); }
   .business-page .vc-meta h3 {
     font-size: 17px;
     word-break: auto-phrase;
