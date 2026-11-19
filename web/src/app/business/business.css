@@ -359,6 +359,14 @@
   color: var(--ink);
   margin: 0;
 }
+.business-page .vc-quote p.vc-quote__label {
+  font-family: var(--ui);
+  font-weight: 500;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--body-soft);
+  margin-bottom: 6px;
+}
 .business-page .vc-quote footer {
   font-family: var(--ui);
   font-size: 15px;

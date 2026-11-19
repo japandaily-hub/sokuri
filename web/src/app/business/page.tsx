@@ -759,10 +759,11 @@ export default function BusinessPage() {
                     <Link href="/examples">利用イメージ（モデルケース）</Link>
                     では31,000〜148,000円）。
                   </p>
-                  <blockquote className="vc-quote">
+                  {/* 架空の人物の「声」に見せない（景表法）。一人称の引用ではなく、ケースの要点として三人称で書く。 */}
+                  <div className="vc-quote">
+                    <p className="vc-quote__label">このケースのポイント（{v.speaker}の場合）</p>
                     <p>{v.quote}</p>
-                    <footer>{v.speaker}</footer>
-                  </blockquote>
+                  </div>
                 </article>
               ))}
             </div>
