@@ -174,7 +174,7 @@ export function RevealLines({
 
 /** 面としてのフォールバック（--pale-2 の枠地・濃紺の帯地）を自前で持つ入れ物の中の画像。
  *  ここは alt の有無に関わらず視覚的に隠してよい（壊れアイコン＋alt 文字より枠の地の方が読める）。 */
-const FRAMED_IMG_SELECTOR = ".img-frame img, .hero-band > img, .auth-side > img";
+const FRAMED_IMG_SELECTOR = ".img-frame img, .hero-band > img, .auth-side > img, .kdz-photo img";
 
 /**
  * 画像が取得できなかったとき、Chrome が左上に描く壊れ画像アイコン（と alt 文字）を消す保険。

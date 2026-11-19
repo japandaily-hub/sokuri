@@ -565,3 +565,26 @@ img[data-ph]{position:relative;}
 /* スクロールバーの色（globals.css の直書き #cfd6cc は globals を触らない方針のため、ここで上書きする。globals の規則は @layer の外で、layer 内のこの規則より通常は強い。!important で layer の優先順を逆転させて勝たせる） */
 *{scrollbar-color:var(--line-strong) transparent !important;}
 *::-webkit-scrollbar-thumb{background-color:var(--line-strong) !important;}
+
+/* ---------- 写真の共通部品 .kdz-photo（手持ちの生成写真の使い方・方針） ----------
+   色調補正と角丸は top.css の .tp-photo img と同じ値（saturate .8 / contrast .96 / sepia .06・var(--radius)）。
+   文字は写真に重ねない: 見出しは写真の外（.kdz-lead）、写真は見出しの下の独立した細い帯（--strip）か本文の脇に置く。
+   「（写真はイメージです）」は figcaption に 15px で添える（景表法: 実在の利用者・スタッフ・業者に見せない）。 */
+.kdz-photo{margin:0;}
+.kdz-photo img{display:block;width:100%;height:auto;object-fit:cover;border-radius:var(--radius);
+  filter:saturate(.8) contrast(.96) sepia(.06);}
+/* .img-frame 内の写真にも同じ色調補正を当てる入れ物（例: /examples の主役画像） */
+.kdz-toned img{filter:saturate(.8) contrast(.96) sepia(.06);}
+.kdz-photo figcaption{margin-top:8px;font-size:15px;line-height:1.6;color:var(--body-soft);}
+/* 文字なしの写真帯（.hero-band・.auth-side）の直下に添える注記 */
+.kdz-photo-note{margin:0;padding-top:8px;font-size:15px;line-height:1.6;color:var(--body-soft);}
+.kdz-photo--strip img{aspect-ratio:21/9;}
+.kdz-photo--32 img{aspect-ratio:3/2;}
+.kdz-photo--43 img{aspect-ratio:4/3;}
+.kdz-photo--sq img{aspect-ratio:1/1;}
+@media (max-width:600px){.kdz-photo--strip img{aspect-ratio:16/9;}}
+/* 写真を持つページ冒頭の見出し区画（帯の上に文字を重ねる .hero-band の代わり）。地は生成りのまま */
+.kdz-lead{padding-block:clamp(40px,6vw,72px) 0;}
+.kdz-lead h1,.kdz-lead h2{color:var(--ink);font-weight:600;font-size:clamp(28px,3.6vw,42px);line-height:1.5;margin-top:16px;}
+.kdz-lead p{max-width:34em;margin-top:12px;color:var(--body);line-height:1.9;}
+.kdz-strip{padding-block:clamp(20px,3vw,32px) clamp(24px,4vw,48px);}
