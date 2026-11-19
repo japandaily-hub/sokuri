@@ -154,8 +154,9 @@ export default function SignupPage() {
       <main id="main">
         <Reveal as="aside" variant="zoom" className="auth-side">
           {/* eslint-disable @next/next/no-img-element */}
-          <img src="/img/v2/su-side.webp" width={900} height={1350} alt="" loading="lazy" decoding="async" />
+          <img src="/img/v2/ex-lot-closet.webp" width={1536} height={1024} alt="" loading="lazy" decoding="async" />
           <p className="auth-side__line">撮って、あとは待つだけ。</p>
+          <p className="auth-side__note">（写真はイメージです）</p>
         </Reveal>
         <div className="flow-wrap">
           {/* STEP 1 */}
@@ -315,12 +316,6 @@ export default function SignupPage() {
 
           {step < 4 && <TrustRow />}
 
-          {/* R6 指摘 11（a11y・法務）: 左（モバイルは上部の帯）の人物は生成画像（3Dレンダー）で、
-              実在の利用者ではない。/vendors が帯直下に置いている 1 行（.vd-photo-note）と
-              同じ文言で揃える。画像は装飾（alt=""）なので読み上げには出ず、この 1 行が
-              音声利用者にとっての唯一の手掛かりになる。新しい約束・条件は足さない。
-              帯の上に重ねない（§1.2「帯上の文字は 24px 以上の見出しのみ」）ためフォーム列の末尾に置く。 */}
-          <p className="photo-note">※ 写真はイメージです。</p>
         </div>
       </main>
 

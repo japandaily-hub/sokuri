@@ -514,10 +514,10 @@
 /* 地は既定で --pale-2。--pale は互換のため残す（同値）。淡青面の上で白地にしたい枠だけ --white */
 .img-frame--pale { background: var(--pale-2); }
 .img-frame--white { background: var(--white); }
-/* contain は既存 3D アイコン（/img/real/* 512px 正方形）にのみ許可。v2 の写真には使わない */
+/* contain は旧 3D アイコン（512px 正方形・廃止済み）向けの修飾子。写真には使わない */
 .img-frame--contain img { object-fit: contain; }
 /* contain は素材が枠を埋めないので、枠の地が素材に焼かれた地と違うと「枠の中にもう一枚ずれた四角」が浮く
-   （ラウンド3 指摘）。/img/real/* の焼き地を実測すると how-camera=rgb(238,241,250)・
+   （ラウンド3 指摘）。旧 3D 素材の焼き地を実測すると how-camera=rgb(238,241,250)・
    trust-illus-1=rgb(239,242,252) で、--pale(#eef3ff=238,243,255) とはほぼ一致、
    --pale-2(#f4f7fc=244,247,252) は 2% ほど明るく細い縁として見える。よって contain の枠だけ地を --pale に合わせる。
    --white / --pale より後に置き、明示指定より後勝ちさせる（contain＝3D 素材用という一体の用途のため）。
@@ -543,8 +543,8 @@
    実 DOM: .auth-page.auth-page--split > .auth-bar(68px) + main#main > [aside.auth-side + .auth-wrap]
    （/signup は .flow-header + main > .flow-wrap）。grid は <main> に張り、.auth-side は .auth-wrap（.flow-wrap）の
    直前の兄弟として置く。.auth-wrap(440px)・.auth-card・LINE ボタン（角丸 99px）の中身は変えない。
-   <aside class="auth-side"><img src="/img/v2/su-side.webp" width="900" height="1350" alt="" loading="lazy" decoding="async" />
-     <p class="auth-side__line">撮って、あとは待つだけ。</p></aside>
+   <aside class="auth-side"><img src="/img/v2/<id>.webp" width="800" height="800" alt="" loading="lazy" decoding="async" />
+     <p class="auth-side__line">撮って、あとは待つだけ。</p><p class="auth-side__note">（写真はイメージです）</p></aside>
    --auth-bar-h: 上部バーの高さ（既定 68px＝.auth-bar）。/signup は .flow-header の実高をページ側で上書きする。
    --auth-side-pad-b: .auth-side__line を持ち上げる量（既定 0）。固定フッターは下の @media で
    フォーム列（left:46%）に閉じ込め、左カラムには重ならないようにしたので、コア側では常に 0 を当てる。
@@ -649,9 +649,6 @@
   .auth-page--split > main > .flow-wrap {
     align-self: start; padding-top: calc(var(--auth-bar-h, 68px) + 24px);
   }
-  /* 指摘 15: /operator/signup の左（書類マクロ os-side）が /operator/login の人物全景と
-     被写体スケールが揃わず、業者2ページが別シリーズに見える。机の全景寄りに引く（人物なしは維持）。 */
-  .operator-auth .auth-side > img[src*="os-side"] { object-position: 50% 45%; }
   /* 指摘 15: 業者側の下端グラデが青寄り（20,35,92）で木部・書類に乗ると紫に転ぶ。
      中性ダーク（16,20,34）に置換。終端は .88 のままなので .auth-side__line のコントラストは下がらない
      （同アルファでは中性のほうが暗い＝計算値は上がる）。 */
@@ -663,21 +660,6 @@
   /* カード上部の 21:9 帯（最大 160px）に畳む。フォームは常に無地面 */
   .auth-side { aspect-ratio: 21/9; max-height: 160px; }
   .auth-side { --auth-side-pad-b: 0px; }
-  /* R4 ラウンド4 指摘（14/30/34/40/42・5名が同一指摘）＋ 画像選定メモ: ol-side は頭頂が画像高の
-     約18% にあり、21:9 に畳む帯（可視域が画像高の約 27%）では既定 50% 40% で顔の上半分が切れる。
-     縦位置を 14% に寄せて頭頂の余白を確保する（offset = (1 - 0.27) × P。P=.40→29%、P=.14→10%）。
-     PC（min-width:860px の分割レイアウト）は 50% 40% のまま。
-     ページ CSS（operator-auth.css）には object-position を書かない規約のため core に置く。
-     /operator/signup（os-side・人物なし）には当てないよう src で限定する。 */
-  .operator-auth .auth-side > img[src*="ol-side"] { object-position: 50% 14%; }
-  /* 2026-09-15 実機報告（/login）: li-side も同じ理由で頭が切れていた。行 639 の
-     「画像が未生成」段階では su-side/li-side にこの対応が漏れていたまま、後日
-     画像だけ追加されて放置されていた。li-side は頭頂が画像高の約4%（実測: 900x1350の
-     元画像を上から300pxクロップして確認、毛先は約55px≒4.1%）と ol-side（18%）よりずっと
-     浅い位置にあるため、既定 50% 40% は言うに及ばず ol-side と同じ 14% でもまだ深すぎる。
-     同じ余白の考え方（offset = (1 - 0.27) × P）で offset を頭頂よりわずかに浅い約4%に
-     収める P=6% を採用（P=.06→offset≈4.4%）。 */
-  .login-page .auth-side > img[src*="li-side"] { object-position: 50% 6%; }
   /* BRIEF §1.10「859px 以下は帯に畳み、文字は非表示」に戻す。ラウンド2 では
      「無文字だと情報量ゼロの濃紺スラブになる」として 1 行だけ残していたが、
      その 1 行は実測 17.94px で、§1.2 の「帯上に置ける文字は 24px 以上の見出しのみ」に反する。
@@ -685,6 +667,23 @@
      写真の明部に 17.94px の白抜きが乗り AA を割る（cover なので明部の位置は制御できない）。
      帯は aspect-ratio:21/9・max-height:160px の無文字のまま残し、文言はカード側の見出しが担う。 */
   .auth-side__line { display: none; }
+}
+
+/* ---------- 認証4ページの左カラム: 文字を写真に重ねない（手持ち写真の使い方・方針） ----------
+   以前は 1 行コピー（.auth-side__line）を写真の下端に重ね、読ませるために下端スクリムを敷いていた。
+   写真は人物なし（品物・部屋）に替えたうえで、写真とコピーを縦に並べる:
+   写真（.auth-side > img）が残りの高さを取り、その下の濃紺の地にコピーと「（写真はイメージです）」を置く。
+   スクリム（::after）は不要なので消す。上の absolute 配置・グラデの規則は、この後勝ちの規則が無効化する。
+   859px 以下は 21/9・最大 160px の帯のまま（コピーは非表示・注記だけ残す）。 */
+.auth-side { display: flex; flex-direction: column; }
+.auth-side::after { display: none; }
+.auth-side > img { position: static; inset: auto; flex: 1 1 0; min-height: 0; height: auto;
+  filter: saturate(.8) contrast(.96) sepia(.06); }
+.auth-side__line { position: static; flex: none; padding: clamp(20px,3vw,32px) clamp(24px,4vw,48px) 0; }
+.auth-side__note { flex: none; margin: 0; padding: 8px clamp(24px,4vw,48px) clamp(16px,2.4vw,24px);
+  font-size: 15px; line-height: 1.6; color: var(--lime); }
+@media (max-width: 859px) {
+  .auth-side__note { padding: 6px 16px 8px; }
 }
 
 /* ---------- R4 モデルケース（架空）の明示 — トップ / /examples / /business 共通 ----------

@@ -109,8 +109,9 @@ export default function OperatorSignupPage() {
       <main id="main">
         <Reveal as="aside" variant="zoom" className="auth-side">
           {/* eslint-disable @next/next/no-img-element */}
-          <img src="/img/v2/os-side.webp" width={900} height={1350} alt="" loading="lazy" decoding="async" />
+          <img src="/img/v2/biz-reason-photo.webp" width={800} height={800} alt="" loading="lazy" decoding="async" />
           <p className="auth-side__line">審査制。古物商許可を確認します。</p>
+          <p className="auth-side__note">（写真はイメージです）</p>
         </Reveal>
         <div className="auth-wrap">
           <div className="auth-card">

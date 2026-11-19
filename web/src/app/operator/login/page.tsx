@@ -106,8 +106,9 @@ function OperatorLoginForm() {
       <main id="main">
         <Reveal as="aside" variant="zoom" className="auth-side">
           {/* eslint-disable @next/next/no-img-element */}
-          <img src="/img/v2/ol-side.webp" width={900} height={1350} alt="" loading="lazy" decoding="async" />
+          <img src="/img/v2/biz-reason-bulk.webp" width={800} height={800} alt="" loading="lazy" decoding="async" />
           <p className="auth-side__line">業者の方の入口です。</p>
+          <p className="auth-side__note">（写真はイメージです）</p>
         </Reveal>
         <div className="auth-wrap">
           <div className="auth-card">
@@ -266,10 +267,6 @@ function OperatorLoginForm() {
             <Link href="/company">運営者情報</Link>
           </div>
 
-          {/* R6 指摘 11（a11y・法務）: 左（モバイルは上部の帯）の人物は生成画像（3Dレンダー）で、
-              実在の登録業者ではない。/vendors・/signup・/login と同じ文言で 1 行だけ揃える。
-              画像は装飾（alt=""）なので読み上げには出ず、この 1 行が音声利用者の手掛かりになる。 */}
-          <p className="photo-note">※ 写真はイメージです。</p>
         </div>
       </main>
     </div>
