@@ -51,6 +51,8 @@
 .create-page .item-empty-cta .pd-ic .ic { font-size: 27px; }
 
 /* STEP1: 撮影の流れと査定のコツ（人の森作法: 白地・ヘアライン・直角・明朝） */
+/* まとめ撮りのイメージ写真。小さめの横長（色調・角丸は共通の .kdz-photo） */
+.create-page .create-photo { max-width: 360px; margin: 0 0 16px; }
 .create-page .shoot-guide {
   margin-top: 24px; padding: 20px 18px 16px; background: var(--white);
   border: 1px solid var(--line); border-radius: var(--radius);

@@ -701,10 +701,25 @@ export default function CreateCasePage() {
               </div>
 
               {isEmptyStep1 ? (
-                <button type="button" className="item-empty-cta" onClick={addNewItem}>
-                  <span className="pd-ic"><Ic name="camera" /></span>
-                  <span className="pd-title">＋ 最初の品物を撮影する</span>
-                </button>
+                <>
+                  {/* まとめ撮りのイメージ（人物の写らない品物の写真・小さめの横長）。最初の撮影ボタンの直前に置く */}
+                  <figure className="kdz-photo kdz-photo--32 create-photo">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/img/v2/ex-lot-jikka.webp"
+                      width={1536}
+                      height={1024}
+                      alt="まとめて出す品物を和室に並べた様子（まとめ撮りのイメージ）"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                    <figcaption>まとめ撮りのイメージ（写真はイメージです）</figcaption>
+                  </figure>
+                  <button type="button" className="item-empty-cta" onClick={addNewItem}>
+                    <span className="pd-ic"><Ic name="camera" /></span>
+                    <span className="pd-title">＋ 最初の品物を撮影する</span>
+                  </button>
+                </>
               ) : (
                 <>
                   {items.length > 0 && (

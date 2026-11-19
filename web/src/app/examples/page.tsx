@@ -5,8 +5,8 @@
  *  ヘッダー/フッターは共通 SiteChrome が付与するため、ここでは <main id="main"> の中身のみ描画する。
  *  カテゴリフィルターはクライアント側の状態で切り替える（元デザインの filterCases 相当）。
  *  ビジュアル再構築 v2（BRIEF §2.3）: 帯は置かず、6件の主役画像でリズムを作る。
- *  主役画像は /img/v2/ex-lot-*.webp（1536x1024 生成 → 1600×1067 表示・.img-frame--3x2）、
- *  小2枚は既存 3D シリーズ /img/real/cat-*.webp（512x512・.img-frame--1x1）。
+ *  主役画像は人物の写らない品物・部屋の写真（model-cases.ts の lot・.img-frame--3x2）。
+ *  3D アイコンの小2枚は廃止した。写真には「（写真はイメージです）」を添える。
  *  奇数番目=画像左／偶数番目=画像右（.media-split--rev）で交互に置く。
  *
  *  R4: 事例データ（CASES）は @/lib/model-cases の単一正本を読む。トップ（/）の「利用イメージ」
@@ -79,35 +79,21 @@ function CaseCard({ c, index }: { c: CaseItem; index: number }) {
         <Reveal
           as="figure"
           variant="zoom"
-          className="img-frame img-frame--3x2 sp-bleed"
+          className="img-frame img-frame--3x2 sp-bleed kdz-toned"
           data-label={c.tag}
           stagger={index}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`/img/v2/${c.lot}.webp`}
-            width={1600}
-            height={1067}
+            width={c.lotSize[0]}
+            height={c.lotSize[1]}
             alt={c.lotAlt}
             loading="lazy"
             decoding="async"
           />
         </Reveal>
-        <div className="case-thumbs">
-          {c.thumbs.map((slug) => (
-            <div className="img-frame img-frame--1x1 img-frame--pale" key={slug}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`/img/real/${slug}.webp`}
-                width={512}
-                height={512}
-                alt=""
-                loading="lazy"
-                decoding="async"
-              />
-            </div>
-          ))}
-        </div>
+        <p className="kdz-photo-note">（写真はイメージです）</p>
       </div>
 
       <div className="case-body">

@@ -153,7 +153,6 @@
 .cases-grid > .case-card:last-child { padding-bottom: clamp(20px, 2.5vw, 28px); }
 
 .case-media { display: flex; flex-direction: column; gap: 10px; }
-.case-thumbs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
 .case-body { display: flex; flex-direction: column; gap: 16px; }
 
@@ -384,8 +383,6 @@
   .case-persona { order: 3; }
   .case-amount-box { order: 4; }
   .case-quote { order: 5; }
-  /* 主役画像だけ .sp-bleed で画面端まで。小2枚は本文と同じ内寄せに保つ */
-  .case-thumbs { margin-top: 2px; }
   /* 金額の SP 拡大（旧 30px）は撤回。base の 24px のまま＝条件行より大きくしない */
 }
 /* ラウンド6 指摘（4/11/14＝3視点・うち High 1）: 2 列グリッドではセルの丈が揃わず、

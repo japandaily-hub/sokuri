@@ -76,7 +76,20 @@ export default function MyCasesPage() {
       ) : null}
       {viewState === "empty" ? (
         <Card className="text-center">
-          <p className="text-[15px] text-kdz-bodysoft">まだ案件がありません。</p>
+          {/* 0 件のときだけ添える小さな写真（人物なし・120〜160px）。業務画面の一覧そのものには写真を足さない */}
+          <figure className="kdz-photo kdz-photo--sq mx-auto mb-4 w-[140px]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/img/v2/top-worry-boxes.webp"
+              width={800}
+              height={800}
+              alt="出品を待つ品物の写真（イメージ）"
+              loading="lazy"
+              decoding="async"
+            />
+            <figcaption>（写真はイメージです）</figcaption>
+          </figure>
+          <p className="text-[15px] text-kdz-bodysoft">まだ案件がありません。最初の品物を撮ってみましょう。</p>
           <a href="/create" className={`${btnPrimary} mt-4`}>
             最初の出品をする
           </a>
