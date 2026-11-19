@@ -141,7 +141,8 @@
 .line-consent__cb { width: 20px; height: 20px; flex-shrink: 0; accent-color: var(--blue); margin-top: 2px; cursor: pointer; }
 .line-consent__agree label { font-size: 15px; color: var(--body); line-height: 1.75; cursor: pointer; text-align: left; }
 .line-consent__agree a { color: var(--blue); font-weight: 600; text-decoration: underline; }
-.line-consent__agree .req { margin-left: 6px; font-size: 15px; font-weight: 700; color: var(--danger); }
+/* 共通 .req（藍地に白字）を打ち消し、ここは地なしの文字だけにする。藍地に --danger の赤字だと読めない */
+.line-consent__agree .req { margin-left: 6px; font-size: 15px; font-weight: 700; color: var(--danger); background: none; padding: 0; }
 .line-consent .btn-line-auth:disabled { opacity: .45; }
 .line-consent__hint { margin: 8px 0 0; font-size: 15px; color: var(--body-soft); line-height: 1.7; text-align: center; }
 /* タッチ端末: チェックボックスの行全体を 44px 以上のタップ領域にする（M-12 と同じ基準） */
