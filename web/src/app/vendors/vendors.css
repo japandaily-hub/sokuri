@@ -23,7 +23,7 @@
   padding: clamp(24px, 4vw, 40px) var(--container-pad, 24px) clamp(48px, 7vw, 80px);
 }
 
-/* 見出し区画（eyebrow ＋ h1 ＋ 1行リード）と、その下の独立した写真帯。文字は写真に重ねない。
+/* 見出し区画（eyebrow ＋ h1 ＋ 1行リード）。写真は置かない（2026-11-19 の写真の見直し第2弾）。
    見出しの左端と本文の左端が別の線に乗らないよう、本文のラッパー（.vendors-wrap＝720px）と同じ幅・左右余白に合わせる。 */
 .vendors-page .vd-lead {
   max-width: 720px;
