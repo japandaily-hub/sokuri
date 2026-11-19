@@ -69,6 +69,11 @@
 .tp-promise p{max-width:32em;}
 @media (max-width:900px){.tp-promise-sec{padding:80px 0 72px;}.tp-promise li{grid-template-columns:1fr;gap:8px;}}
 
+/* 見出し区画の右列に添える小さな写真（右列幅の半分・4:3）。色調と角丸は共通の .kdz-photo */
+.tp-trust-photo{margin-top:20px;}
+.tp-trust-photo img{width:50%;}
+@media (max-width:900px){.tp-trust-photo img{width:60%;}}
+
 .tp-who{margin-top:56px;background:var(--white);border:1px solid var(--line);border-radius:var(--radius);overflow-x:auto;}
 .tp-who table{width:100%;border-collapse:collapse;font-size:16px;min-width:520px;}
 .tp-who caption{text-align:left;padding:20px 24px 4px;font-weight:700;color:var(--ink);}
@@ -100,6 +105,7 @@
 .tp-step-photo{grid-column:1;grid-row:2;margin:4px 0 0 76px;}
 .tp-step-photo img{display:block;width:100%;aspect-ratio:3/2;object-fit:cover;object-position:50% 58%;
   border-radius:var(--radius);filter:saturate(.8) contrast(.96) sepia(.06);}
+.tp-step-photo--1 img{object-position:50% 52%;}
 .tp-step-photo figcaption{margin-top:12px;font-size:16px;color:var(--body);line-height:1.7;}
 .tp-step-photo figcaption span{display:block;font-size:15px;color:var(--body-soft);}
 @media (max-width:900px){

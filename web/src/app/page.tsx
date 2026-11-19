@@ -187,9 +187,22 @@ export default function HomePage() {
                 あなたの連絡先を知りません。
               </h2>
             </div>
-            <p>
-              一括見積もりに申し込んだら電話が鳴りやまなかった、という話をよく聞きます。カタヅケで業者が入札のときに見られるのは、品物の写真と、市区町村までの地域などの情報だけです。だから、電話のかけようがありません。
-            </p>
+            <div>
+              <p>
+                一括見積もりに申し込んだら電話が鳴りやまなかった、という話をよく聞きます。カタヅケで業者が入札のときに見られるのは、品物の写真と、市区町村までの地域などの情報だけです。だから、電話のかけようがありません。
+              </p>
+              <figure className="kdz-photo kdz-photo--43 tp-trust-photo">
+                <img
+                  src="/img/v2/top-worry-phone.webp"
+                  alt="机の上に受話器を外して置いた電話機とメモ帳"
+                  width={800}
+                  height={800}
+                  loading="lazy"
+                  decoding="async"
+                />
+                <figcaption>（写真はイメージです）</figcaption>
+              </figure>
+            </div>
           </div>
           <ol className="tp-promise">
             <li>
@@ -258,6 +271,20 @@ export default function HomePage() {
                 家じゅうの品物を1点ずつ撮影して、品目を選んで登録します。思いついた物から撮っていけば大丈夫です。
                 <small>スマートフォンのカメラだけでできます。</small>
               </p>
+              <figure className="tp-step-photo tp-step-photo--1">
+                <img
+                  src="/img/v2/top-hero.webp"
+                  alt="床に並べた品物を、スマートフォンで撮ろうとしている手元"
+                  width={900}
+                  height={1350}
+                  loading="lazy"
+                  decoding="async"
+                />
+                <figcaption>
+                  床に並べて、スマートフォンで撮るだけ。
+                  <span>（写真はイメージです）</span>
+                </figcaption>
+              </figure>
             </li>
             <li>
               <div className="tp-step-t">
