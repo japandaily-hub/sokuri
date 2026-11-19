@@ -1,9 +1,9 @@
 /* プライバシーポリシー（長文・節構成）ページ固有CSS。
-   共通クラス（.container/.eyebrow/.hero-band 等）は katazuke.css /
+   共通クラス（.container/.eyebrow 等）は katazuke.css /
    katazuke-pages.css にあるため再定義しない。
    デザイン正典: docs/design_handoff_katazuke/プライバシーポリシー.html の <style> を移植。
-   v2: 淡青ヘッダー面 .legal-hero を廃し、共通の無文字帯（.hero-band--fixed --quiet）＋
-   帯直下の見出しブロック .legal-head に置き換え。第2条の表は罫線を水平方向だけに整理し、
+   v2: 淡青ヘッダー面 .legal-hero を廃し、見出しブロック .legal-head に置き換え。
+   写真の見直し第2弾（2026-11-19）で写真帯を外し、見出しブロックから始まる形にした。第2条の表は罫線を水平方向だけに整理し、
    859px 以下はカード積みにする（BRIEF §2.10）。 */
 
 /* 帯直下の見出しブロック（法務3ページ共通の構え）。本文 .legal-body と同じ 760px 幅に揃える */

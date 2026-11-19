@@ -25,29 +25,6 @@ export const metadata = publicPageMetadata({
 export default function LegalPage() {
   return (
     <main id="main">
-      {/* 法務3ページ共通の無文字帯（高さ固定・文字は置かない）。
-          R6 指摘 2/6/9/12/16（High が4件）: /legal だけ --pos-r が付いており、3ページを
-          並べると「同じ素材なのに1枚だけ絵が違う＝画像が壊れている」に見えていた。
-          素材 lg-band（1920x1080）に対し帯は常にそれより横長にトリミングされるため
-          object-position の横成分は効かず、--pos-r は見た目を変えないまま
-          「右を見せている」という誤った宣言だけを残していた（core の幾何コメント参照）。
-          修飾子を /terms・/privacy と同じ1組（--fixed --quiet）に揃え、縦位置と高さは
-          core の .hero-band--fixed（--band-pos:50% 53% / 186px・SP 120px）1本だけが持つ。 */}
-      <section className="hero-band hero-band--fixed hero-band--quiet">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/img/v2/lg-band.webp"
-          width="1920"
-          height="1080"
-          alt=""
-          loading="lazy"
-          decoding="async"
-        />
-        <div className="hero-band__veil" aria-hidden="true" />
-      </section>
-      <div className="container">
-        <p className="kdz-photo-note">（写真はイメージです）</p>
-      </div>
 
       <div className="doc-wrap">
         <div className="doc-eyebrow">LEGAL</div>

@@ -1,9 +1,9 @@
 /* ============================================================
    利用規約ページ固有スタイル（design_handoff_katazuke/利用規約.html の <style> を移植）
-   共通クラス（.container/.eyebrow/.section/.hero-band 等）は katazuke.css /
+   共通クラス（.container/.eyebrow/.section 等）は katazuke.css /
    katazuke-pages.css 側を使用し再定義しない。
-   v2: 淡青ヘッダー面 .legal-hero を廃し、共通の無文字帯（.hero-band--fixed
-   --quiet）＋帯直下の見出しブロック .legal-head に置き換えた（BRIEF §2.10）。
+   v2: 淡青ヘッダー面 .legal-hero を廃し、見出しブロック .legal-head に置き換えた（BRIEF §2.10）。
+   写真の見直し第2弾（2026-11-19）で写真帯を外し、見出しブロックから始まる形にした。
    ============================================================ */
 
 /* 帯直下の見出しブロック（法務3ページ共通の構え）。本文 .legal-body と同じ 760px 幅に揃える */

@@ -256,44 +256,8 @@
    角丸0・影0・backdrop-filter なし。画像の上に乗せる色だけ rgba(var(--deep-rgb),.x) を許可。
    ============================================================ */
 
-/* ---------- §1.2 .hero-band — 文字を重ねない写真帯（/contact・法務3ページ） ----------
-   帯の上に文字は置かない（手持ち写真の使い方の方針）。見出しを持つページの写真は .kdz-lead ＋ .kdz-photo--strip
-   （katazuke.css）に移した。ここに残すのは、文字なしの帯（ct-band・lg-band）に要る最小限だけ。
-   <section class="hero-band hero-band--slim hero-band--quiet">
-     <img src="/img/v2/<id>.webp" width height alt="" loading decoding />
-     <div class="hero-band__veil" aria-hidden="true"></div>
-   </section>
-   --band-pos（cover で切る縦位置）は素材ごとに core に置く（ページ CSS・インライン style には書かない）。 */
-.hero-band { position: relative; display: flex; align-items: center; min-height: clamp(180px,22vw,240px);
-  padding-block: clamp(32px,5vw,56px); color: #fff;
-  /* forced-colors と画像取得失敗（alt="" は何も描かれない）の地 */
-  background-color: var(--deep); }
-/* color:transparent / font-size:0 は取得失敗時に Chrome が左上へ描く壊れ画像アイコンと alt 文字を消すため */
-.hero-band > img { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0;
-  object-fit: cover; object-position: var(--band-pos, 50% 50%); color: transparent; font-size: 0; }
-.hero-band__veil { position: absolute; inset: 0; background: rgba(var(--deep-rgb),.65); pointer-events: none; }
-/* 高さ修飾子。--slim は /contact、--fixed は法務3ページ用の固定高（/terms の .tab-wrap{top:76px} に影響させない） */
-.hero-band--slim { min-height: clamp(180px,22vw,240px); }
-.hero-band--fixed { min-height: 186px; height: 186px; padding-block: 0; }
-/* veil: 文字を置かない帯は --quiet（.18） */
-.hero-band--quiet .hero-band__veil { background: rgba(var(--deep-rgb),.18); }
-@media (max-width: 859px) {
-  .hero-band--slim { min-height: clamp(160px,40vw,200px); }
-  .hero-band--fixed { min-height: 120px; height: 120px; }
-}
-/* /contact の素材 ct-band: 封筒は縦 34〜70%。帯高を上げて可視域を広げ、P=.52 で封筒とカップを丸ごと入れる
-   （SP は 200px）。素材で限定して core に置く。 */
-.hero-band:has(> img[src*="ct-band"]) { --band-pos: 50% 52%; min-height: clamp(200px,21vw,300px); }
-@media (max-width: 859px) {
-  .hero-band:has(> img[src*="ct-band"]) { min-height: 200px; }
-}
-/* 法務3ページ（素材 lg-band 1920x1080）: 帯高 186px で文具一式（縦 42〜63%）が入る P=.53 の 1 値に統一する */
-.hero-band--fixed { --band-pos: 50% 53%; }
-
-/* 強制カラー: 帯の画像と veil だけ消し、濃紺地は UA 色に任せる（無限定 img{display:none} は禁止）。color は上書きしない */
-@media (forced-colors: active) {
-  .hero-band > img, .hero-band__veil { display: none; }
-}
+/* §1.2 .hero-band（文字を置かない写真帯）は 2026-11-19 の写真の見直し第2弾で最後の利用箇所
+   （お問い合わせ・法務3ページ）から外したため削除した。写真は .kdz-photo（katazuke.css）だけを使う。 */
 
 /* ---------- §1.3 .deep-band — 濃紺ベタ帯（1ページ最大1本・ボタンは置かず直下の白面へ） ---------- */
 .deep-band { background: var(--deep); color: #fff; padding: clamp(48px,7vw,88px) 0; }

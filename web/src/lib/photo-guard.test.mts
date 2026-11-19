@@ -48,6 +48,12 @@ const BANNED: ReadonlyArray<readonly [string, string]> = [
   ["/img/ill/", "水彩イラストは全廃"],
   ["/img/lp/deco/", "水彩イラストは全廃"],
   ["/img/real/", "3D アイコンは全廃"],
+  // 写真の見直し第2弾（2026-11-19・ペルソナ3人の合意）: 比喩の静物・使い回し・実在の施設に見える写真
+  ["v2/co-value-", "会社概要の比喩の静物（ガラスの立方体・器の輪・鍵の箱）"],
+  ["v2/lg-band", "法務3ページで使い回していた文具の帯"],
+  ["v2/ct-band", "お問い合わせの封蝋の封筒（演出が強い）"],
+  ["v2/vd-band", "業者一覧の倉庫（自社や業者の施設に見える）"],
+  ["v2/vd-empty", "業者一覧の空状態の木箱"],
 ];
 
 const TARGET_EXTENSIONS = [".css", ".tsx", ".ts"] as const;

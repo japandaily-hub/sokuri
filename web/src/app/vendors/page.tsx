@@ -134,23 +134,6 @@ export default function VendorListPage() {
                   : "古物商許可番号を確認し、運営が承認した業者です。"}
             </p>
           </div>
-          {/* 文字は写真に重ねない: 見出しの下の独立した細い帯。「※ 写真はイメージです。」は figcaption */}
-          <div className="vd-lead">
-            <figure className="kdz-photo kdz-photo--strip">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/img/v2/vd-band.webp"
-                width={1920}
-                height={1088}
-                alt=""
-                loading="eager"
-                fetchPriority="high"
-                decoding="async"
-              />
-              {/* R4 r4 #14: 実在の登録業者の写真と誤読されないよう、写真の直下に可視の打消しを置く */}
-              <figcaption>※ 写真はイメージです。</figcaption>
-            </figure>
-          </div>
         </section>
 
         <div className="vendors-wrap">
@@ -239,22 +222,6 @@ export default function VendorListPage() {
           {isEmpty ? (
             <>
               <section className="vd-empty" aria-label="掲載中の業者">
-                <Reveal
-                  as="figure"
-                  variant="zoom"
-                  className="img-frame img-frame--1x1 img-frame--pale vd-empty-fig"
-                >
-                  {/* eslint-disable @next/next/no-img-element */}
-                  <img
-                    src="/img/v2/vd-empty.webp"
-                    width={800}
-                    height={800}
-                    alt=""
-                    loading="lazy"
-                    decoding="async"
-                  />
-                  {/* eslint-enable @next/next/no-img-element */}
-                </Reveal>
                 <RevealLines as="h2" className="vd-empty-title" lines={["審査を通過した業者から順に掲載します"]} />
                 {/* r5 #1/#24: 同じ文が帯の直下（.vd-notice）に出るため、ここでは繰り返さない。
                     業者向けの導線は「掲載時に表示する項目」の末尾（.vd-sample-cta）に1本だけ置く。 */}

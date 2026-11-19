@@ -112,26 +112,17 @@ const VENDOR_NOTES: { h: string; p: React.ReactNode }[] = [
 
 /**
  * 私たちが大切にすること（デザインの VALUES）。
- * 線アイコンを 3D 静物（/img/v2/co-value-*.webp）に置き換え、各項に
- * 検証できる事実の1文（fact）を添える。実績値・体験談は置かない。
+ * 各項に検証できる事実の1文（fact）を添える。実績値・体験談は置かない。
+ * 2026-11-19 写真の見直し第2弾: 比喩の静物（ガラスの立方体・器の輪）と /business からの
+ * 使い回し（biz-req-docs）は作り物に見えるため、画像を外して文字だけのカードにした。
  */
-const VALUES: { img: string; w: number; title: string; body: string; fact: React.ReactNode }[] = [
+const VALUES: { title: string; body: string; fact: React.ReactNode }[] = [
   {
-    img: "co-value-clear",
-    w: 520,
     title: "透明性",
     body: "入札価格・評価情報をユーザーに公開します。納得して判断できる環境を作ります。",
     fact: "カタヅケの利用料は0円です（出張・運搬・処分の費用の扱いは業者ごとに異なります）。届いた入札の金額は、すべて一覧で見比べられます。",
   },
   {
-    /* ラウンド5 指摘（2/12/16/19）: 旧 co-value-safe は「青いリボンを掛けた白い箱に金色の鍵」で、
-       贈り物にしか見えず「古物商許可証を運営が確認する」という下の1文とつながらなかった。
-       R4 D.1 により画像の再生成はしないため、同じ 1:1 で既に検査を通った現場の静物
-       biz-req-docs（窓光の机に書類一式と印鑑箱・背後にファイル棚）を再利用する。
-       ルート跨ぎの再利用は既存の biz-reason-bulk（/business と / の業者バナー）と同じ作法。
-       残り2点（透明性・循環）の比喩オブジェクトは 1:1 の代替が v2 に無いため画像担当に残す。 */
-    img: "biz-req-docs",
-    w: 800,
     title: "安全・安心",
     body: "古物商許可番号の登録を必須とし、運営が許可証を確認した業者のみが参加します。",
     fact: (
@@ -143,8 +134,6 @@ const VALUES: { img: string; w: number; title: string; body: string; fact: React
     ),
   },
   {
-    img: "co-value-cycle",
-    w: 520,
     title: "サーキュラーエコノミー",
     body: "まだ使えるものが、廃棄ではなく再流通に回ることを目指します。",
     fact: "品物を買い取るのは、古物商許可を受けた登録業者です。",
@@ -165,7 +154,7 @@ export default function CompanyPage() {
           </h1>
         </div>
         <div className="container kdz-strip">
-          <figure className="kdz-photo kdz-photo--strip">
+          <figure className="kdz-photo kdz-photo--strip co-hero-photo">
             <img
               src="/img/v2/co-band.webp"
               width={1920}
@@ -260,16 +249,6 @@ export default function CompanyPage() {
           <div className="values-grid">
             {VALUES.map((v, i) => (
               <Reveal as="div" className="value-card" stagger={i} key={v.title}>
-                <Reveal as="figure" variant="zoom" className="img-frame img-frame--pale img-frame--1x1 value-img" stagger={i}>
-                  <img
-                    src={`/img/v2/${v.img}.webp`}
-                    width={v.w}
-                    height={v.w}
-                    alt=""
-                    loading="lazy"
-                    decoding="async"
-                  />
-                </Reveal>
                 <strong>{v.title}</strong>
                 <p>{v.body}</p>
                 <p className="value-fact">{v.fact}</p>

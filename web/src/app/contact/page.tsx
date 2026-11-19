@@ -158,40 +158,6 @@ function ContactPageContent() {
 
   return (
     <main id="main">
-      {/* ============ ページヒーロー（帯上に文字を置かない） ============
-          r1 レビュー（ct-band 未生成のため帯は無文字の濃紺ベタ）の時点では、情報ゼロの
-          上端を詰めるため法務3ページと同じ --fixed（PC 160px／モバイル 120px）に落とし、
-          「ct-band 生成後に --slim へ戻すかは画像が入ってから判断する」と保留していた。
-          ラウンド4（画像投入後）で PC・SP とも「封筒とカップが上下で切れた薄片に見える／
-          読み込み途中のように見える」の指摘が2件出たため、保留していた判断をここで確定し
-          --slim（PC clamp(180px,22vw,240px)／モバイル clamp(160px,40vw,200px)）へ戻した。
-          高さは共有の修飾子だけで決める（ページ CSS で .hero-band--* を再定義しない・
-          --band-pos もページ CSS に書かない＝R4 D.1/F.0）。帯上に文字は置かないまま。
-
-          ラウンド5 指摘（1/6/8/10/17 の5件が同一箇所）: 縦位置が未是正で封筒のフラップが
-          上端、カップが右端で切れていた。是正は core の katazuke-pages.css に入り
-          （.hero-band:has(> img[src*="ct-band"]) で --band-pos:50% 52% と
-          min-height:clamp(200px,21vw,300px)／SP 200px を素材限定で指定）、封筒とカップが
-          丸ごと画角に入る。ここで持っていた --pos-r（--band-pos:20%→80% 50% の横位置）は
-          外す: 素材 1920x1080 に対し帯は常にそれより横長にトリミングされるため横成分は
-          効かず、「右寄せで切っている」という誤った宣言が残るだけだった（縦位置の共有
-          修飾子は core 側が :has() で当てるため、ここにクラスを足す必要はない）。 */}
-      <section className="hero-band hero-band--slim hero-band--quiet">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/img/v2/ct-band.webp"
-          width="1920"
-          height="1080"
-          alt=""
-          loading="eager"
-          fetchPriority="high"
-          decoding="async"
-        />
-        <div className="hero-band__veil" aria-hidden="true" />
-      </section>
-      <div className="container">
-        <p className="kdz-photo-note">（写真はイメージです）</p>
-      </div>
 
       <section className="ct-head">
         <div className="ct-head__box">

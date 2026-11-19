@@ -32,7 +32,8 @@
 }
 .vendors-page .vd-band h1 { margin: 12px 0 0; }
 .vendors-page .vd-band p { max-width: 30em; }
-.vendors-page .vd-band .kdz-photo { margin-top: clamp(20px, 3vw, 28px); }
+/* 写真の見直し第2弾で倉庫の写真帯を外した。見出し区画の下に本文との間をとる */
+.vendors-page .vd-band { padding-bottom: clamp(24px, 4vw, 40px); }
 
 .vendors-page .vendors-back {
   display: inline-flex;
@@ -169,11 +170,6 @@
   border-bottom: 1px solid var(--line);
   padding: clamp(26px, 4vw, 40px) 0;
   text-align: center;
-}
-.vendors-page .vd-empty-fig {
-  width: 100%;
-  max-width: 480px;
-  margin: 0 auto clamp(24px, 4vw, 32px);
 }
 .vendors-page .vd-empty-title {
   font-family: var(--head);

@@ -10,6 +10,10 @@
 /* ---------- ヒーロー（.kdz-lead ＋ .kdz-photo--strip・katazuke.css） ---------- */
 /* 見出しのみ。本文・注記は写真に重ねず、帯から降りた白面（.about-lead）に置く。 */
 
+/* 写真の見直し第2弾: 左下で途中から切れる座布団を写さず、奥の壁と障子だけを見せる。
+   素材 1920x1088 の縦 0〜76% を 21:9 で切り出す（座布団は縦 86% より下）。SP も 21:9 のまま。 */
+.co-hero-photo img { aspect-ratio: 21 / 9; object-position: 50% 0%; }
+
 /* ---------- 本文ラッパ ---------- */
 .about-wrap {
   max-width: 860px;
@@ -219,13 +223,6 @@
   border: 0;
   padding: 0;
   min-width: 0;
-}
-/* .img-frame--pale .img-frame--1x1（白面の上の枠）。幅上限は3カラムのときだけ掛ける。
-   1カラムに畳んだあとも 260px のままだと、本文（段の全幅）に対して枠だけが左に小さく残り、
-   カードの右辺が段差になって面として読めなくなる（ラウンド2 実測: 枠 220px / 本文 345px）。 */
-.value-img { width: 100%; margin-bottom: 14px; }
-@media (min-width: 860px) {
-  .value-img { max-width: 260px; }
 }
 .value-card strong {
   font-family: var(--head);
